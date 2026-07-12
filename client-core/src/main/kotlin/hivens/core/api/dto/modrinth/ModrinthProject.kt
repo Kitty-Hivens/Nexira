@@ -14,13 +14,23 @@ data class ModrinthProject(
     val id: String,
     val slug: String,
     val title: String,
+    /** `mod` / `resourcepack` / `shader` / ... -- also the URL path segment (`modrinth.com/<type>/<slug>`). */
+    @SerialName("project_type") val projectType: String = "mod",
     /** Short one-line summary -- the page tagline. */
     val description: String = "",
     /** Long-form CommonMark project body. */
     val body: String = "",
     val categories: List<String> = emptyList(),
+    val license: ModrinthLicense? = null,
     @SerialName("icon_url") val iconUrl: String? = null,
     val gallery: List<ModrinthGalleryImage> = emptyList(),
+)
+
+@Serializable
+data class ModrinthLicense(
+    val id: String? = null,
+    val name: String? = null,
+    val url: String? = null,
 )
 
 @Serializable

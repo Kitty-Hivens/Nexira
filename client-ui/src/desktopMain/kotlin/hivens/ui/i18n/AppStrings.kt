@@ -805,6 +805,10 @@ interface AppStrings {
     val contentFilterShaderPacks: String
     val contentDeleteTitle: String
     val contentDeleteBody: String
+    val contentActionDetails: String
+    val contentActionOpenPage: String
+    val contentDetailAuthors: String
+    val contentDetailSize: String
     val contentTabFetchErrorTitle: String
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String

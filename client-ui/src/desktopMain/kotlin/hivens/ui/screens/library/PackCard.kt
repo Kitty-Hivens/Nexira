@@ -15,14 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,14 +32,13 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.ui.components.InitialsAvatar
 import hivens.ui.components.SourceBadge
-import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
@@ -76,7 +70,6 @@ fun PackCard(
     val s = LocalStrings.current
     val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
     val art = rememberPackArt(instance)
-    var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -142,23 +135,18 @@ fun PackCard(
                 // No Play / Settings on the card: the whole card opens the detail,
                 // where launch + every setting live. Card keeps only the overflow
                 // (open folder / delete) as out-of-the-way quick actions.
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Symbol(NxIcon.MoreVert, contentDescription = s.packCardMore, tint = Color.White)
-                    }
-                    NxContextMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        NxMenuItem(
-                            label   = s.serverSettingsOpenFolder,
-                            icon    = NxIcon.FolderOpen,
-                            onClick = { menuOpen = false; onOpenFolder() },
-                        )
-                        NxMenuItem(
-                            label       = s.editorDelete,
-                            icon        = NxIcon.Delete,
-                            destructive = true,
-                            onClick     = { menuOpen = false; onDelete() },
-                        )
-                    }
+                NxKebabButton(contentDescription = s.packCardMore, tint = Color.White) { dismiss ->
+                    NxMenuItem(
+                        label   = s.serverSettingsOpenFolder,
+                        icon    = NxIcon.FolderOpen,
+                        onClick = { dismiss(); onOpenFolder() },
+                    )
+                    NxMenuItem(
+                        label       = s.editorDelete,
+                        icon        = NxIcon.Delete,
+                        destructive = true,
+                        onClick     = { dismiss(); onDelete() },
+                    )
                 }
             }
         }

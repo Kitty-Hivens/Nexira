@@ -3,7 +3,9 @@ package hivens.launcher.instance
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
@@ -21,6 +23,9 @@ enum class ContentKind { Mod, ResourcePack, ShaderPack }
  * pack manifest. [fileName] is the on-disk name with any `.disabled` suffix
  * stripped, so a toggle is just a rename. [iconBytes] is the icon extracted from
  * the archive (fabric `icon`, forge `logoFile`, resource-pack `pack.png`) or null.
+ * [homepageUrl] / [license] / [authors] / [dependencies] come from the archive's
+ * own metadata (fabric.mod.json / quilt.mod.json / forge mods.toml) -- the offline,
+ * origin-agnostic source the details view reads first, before any Modrinth lookup.
  */
 class InstalledContent(
     val kind: ContentKind,
@@ -31,6 +36,10 @@ class InstalledContent(
     val enabled: Boolean,
     val iconBytes: ByteArray?,
     val sizeBytes: Long,
+    val homepageUrl: String? = null,
+    val license: String? = null,
+    val authors: List<String> = emptyList(),
+    val dependencies: List<String> = emptyList(),
 ) {
     // Identity for Compose list diffing excludes the icon bytes (a fresh array
     // each scan would otherwise read as a change); the file name + state is what
@@ -103,6 +112,10 @@ class InstanceContentScanner {
             enabled     = enabled,
             iconBytes   = meta?.icon,
             sizeBytes   = size,
+            homepageUrl = meta?.homepageUrl?.takeIf { it.isNotBlank() },
+            license     = meta?.license?.takeIf { it.isNotBlank() },
+            authors     = meta?.authors.orEmpty(),
+            dependencies = meta?.dependencies.orEmpty(),
         )
     }
 
@@ -125,26 +138,79 @@ class InstanceContentScanner {
             runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()
                 ?: runCatching { el.jsonObject.entries.maxByOrNull { it.key.toIntOrNull() ?: 0 }?.value?.jsonPrimitive?.contentOrNull }.getOrNull()
         }
-        return Meta(name, version, description, iconPath?.let { readEntryBytes(zip, it) })
+        val contact = root["contact"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val homepage = firstString(contact?.get("homepage")) ?: firstString(contact?.get("sources"))
+        // `authors` entries are bare strings or `{ name, contact }` objects.
+        val authors = stringList(root["authors"]) { el ->
+            runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()
+                ?: runCatching { el.jsonObject["name"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+        }
+        val depends = (root["depends"]?.let { runCatching { it.jsonObject.keys.toList() }.getOrNull() }.orEmpty())
+            .filterNot { it in PLATFORM_DEPS }
+        return Meta(
+            name, version, description, iconPath?.let { readEntryBytes(zip, it) },
+            homepageUrl = homepage, license = firstString(root["license"]), authors = authors, dependencies = depends,
+        )
     }
 
     private fun parseQuilt(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
-        val meta = json.parseToJsonElement(zip.getInputStream(entry).readBytes().decodeToString())
-            .jsonObject["quilt_loader"]?.jsonObject?.get("metadata")?.jsonObject
+        val loader = json.parseToJsonElement(zip.getInputStream(entry).readBytes().decodeToString())
+            .jsonObject["quilt_loader"]?.jsonObject
+        val meta = loader?.get("metadata")?.jsonObject
         val name = meta?.get("name")?.jsonPrimitive?.contentOrNull
         val version = meta?.get("version")?.jsonPrimitive?.contentOrNull
         val description = meta?.get("description")?.jsonPrimitive?.contentOrNull
         val iconPath = meta?.get("icon")?.jsonPrimitive?.contentOrNull
-        return Meta(name, version, description, iconPath?.let { readEntryBytes(zip, it) })
+        val contact = meta?.get("contact")?.let { runCatching { it.jsonObject }.getOrNull() }
+        val homepage = firstString(contact?.get("homepage")) ?: firstString(contact?.get("sources"))
+        // `contributors` is a { name: role } object.
+        val authors = meta?.get("contributors")?.let { runCatching { it.jsonObject.keys.toList() }.getOrNull() }.orEmpty()
+        // `quilt_loader.depends` is an array of `{ id }` objects (or bare id strings).
+        val depends = (loader?.get("depends")?.let { runCatching { it.jsonArray }.getOrNull() }.orEmpty())
+            .mapNotNull { el ->
+                runCatching { el.jsonObject["id"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+                    ?: runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()
+            }
+            .filterNot { it in PLATFORM_DEPS }
+        return Meta(
+            name, version, description, iconPath?.let { readEntryBytes(zip, it) },
+            homepageUrl = homepage, license = firstString(meta?.get("license")), authors = authors, dependencies = depends,
+        )
     }
 
-    /** TOML has no bundled parser; a `key = "value"` line scan covers the fields we show. */
+    /**
+     * TOML has no bundled parser; a `key = "value"` line scan covers the fields we
+     * show. Dependencies are left out here: forge/neoforge `[[dependencies.<modid>]]`
+     * blocks need section-aware parsing the flat line scan can't do reliably.
+     */
     private fun parseForgeToml(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
         val text = zip.getInputStream(entry).readBytes().decodeToString()
         val name = TOML_DISPLAY_NAME.find(text)?.groupValues?.get(1)
         val version = TOML_VERSION.find(text)?.groupValues?.get(1)?.takeIf { !it.startsWith("\${") }
         val logo = TOML_LOGO.find(text)?.groupValues?.get(1)
-        return Meta(name, version, null, logo?.let { readEntryBytes(zip, it) })
+        val homepage = TOML_DISPLAY_URL.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+        val license = TOML_LICENSE.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+        val authors = TOML_AUTHORS.find(text)?.groupValues?.get(1)
+            ?.split(',')?.map { it.trim() }?.filter { it.isNotBlank() }.orEmpty()
+        return Meta(
+            name, version, null, logo?.let { readEntryBytes(zip, it) },
+            homepageUrl = homepage, license = license, authors = authors,
+        )
+    }
+
+    /** A field that may be a bare string OR an array of strings -- take the first usable value. */
+    private fun firstString(el: JsonElement?): String? {
+        el ?: return null
+        runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()?.let { return it }
+        return runCatching { el.jsonArray.firstNotNullOfOrNull { it.jsonPrimitive.contentOrNull } }.getOrNull()
+    }
+
+    /** Map a JSON array (strings or objects) through [transform] to a trimmed, non-blank list. */
+    private fun stringList(el: JsonElement?, transform: (JsonElement) -> String?): List<String> {
+        el ?: return emptyList()
+        val arr = runCatching { el.jsonArray }.getOrNull()
+            ?: return listOfNotNull(transform(el)).map { it.trim() }.filter { it.isNotBlank() }
+        return arr.mapNotNull(transform).map { it.trim() }.filter { it.isNotBlank() }
     }
 
     /** Resource pack: `pack.mcmeta` description + `pack.png` icon. */
@@ -195,6 +261,10 @@ class InstanceContentScanner {
         val version: String?,
         val description: String?,
         val icon: ByteArray?,
+        val homepageUrl: String? = null,
+        val license: String? = null,
+        val authors: List<String> = emptyList(),
+        val dependencies: List<String> = emptyList(),
     )
 
     private companion object {
@@ -202,6 +272,11 @@ class InstanceContentScanner {
         val TOML_DISPLAY_NAME = Regex("""displayName\s*=\s*["']([^"']*)["']""")
         val TOML_VERSION = Regex("""\bversion\s*=\s*["']([^"']*)["']""")
         val TOML_LOGO = Regex("""logoFile\s*=\s*["']([^"']*)["']""")
+        val TOML_DISPLAY_URL = Regex("""displayURL\s*=\s*["']([^"']*)["']""")
+        val TOML_LICENSE = Regex("""(?m)^\s*license\s*=\s*["']([^"']*)["']""")
+        val TOML_AUTHORS = Regex("""authors\s*=\s*["']([^"']*)["']""")
         val ICON_CANDIDATES = listOf("icon.png", "pack.png", "logo.png", "icon.jpg", "logo.jpg")
+        // Platform / loader ids that are always present and add no signal to a "requires" list.
+        val PLATFORM_DEPS = setOf("minecraft", "java", "fabricloader", "quilt_loader", "quilted_fabric_api")
     }
 }

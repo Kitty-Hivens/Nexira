@@ -22,9 +22,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,11 +42,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.interfaces.IMirrorPackClient
@@ -67,6 +71,8 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.core.smrt.ModIconResolver
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxKebabButton
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxVerticalScrollbar
@@ -76,7 +82,9 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
+import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -109,6 +117,7 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
     val mirrorClient: IMirrorPackClient = koinInject()
     val controller: LauncherController = koinInject()
     val iconResolver: ModIconResolver = koinInject()
+    val modrinth: ModrinthClient = koinInject()
     val scope = rememberCoroutineScope()
 
     var items by remember(instance.id) { mutableStateOf<List<InstalledContent>?>(null) }
@@ -116,6 +125,7 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
     var query by remember(instance.id) { mutableStateOf("") }
     var filter by remember(instance.id) { mutableStateOf(ContentFilter.All) }
     var pendingDelete by remember(instance.id) { mutableStateOf<InstalledContent?>(null) }
+    var detailsOf by remember(instance.id) { mutableStateOf<InstalledContent?>(null) }
     var browsing by remember(instance.id) { mutableStateOf(false) }
 
     LaunchedEffect(instance.id, scanTick) {
@@ -129,6 +139,10 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
     // undeclared-jar probe, then a letter. Bounded concurrency keeps a big pack from
     // stampeding the network + disk. Keyed on kind+fileName so a toggle never re-resolves.
     val iconCache = remember(instance.id) { mutableStateMapOf<String, ContentIconState>() }
+    // Modrinth project resolved by file hash, cached per item (kind-agnostic:
+    // mods, resource packs and shaders are all Modrinth project types). Powers the
+    // open-page action and fills details a sparse archive leaves blank.
+    val projectCache = remember(instance.id) { mutableStateMapOf<String, ModrinthProject?>() }
     LaunchedEffect(items) {
         val list = items ?: return@LaunchedEffect
         val gate = Semaphore(8)
@@ -218,6 +232,23 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
         }
     }
 
+    // Resolve an item's Modrinth project by file hash, cached per item. Kind-
+    // agnostic (mod / resourcepack / shader all resolve the same way); null means
+    // Modrinth does not index this file, and callers fall back to embedded data.
+    suspend fun resolveProject(c: InstalledContent): ModrinthProject? {
+        val key = "${c.kind}:${c.fileName}"
+        if (projectCache.containsKey(key)) return projectCache[key]
+        val file = instanceDir.resolve(c.kind.folder())
+            .resolve(if (c.enabled) c.fileName else c.fileName + DISABLED_SUFFIX)
+        val project = withContext(Dispatchers.IO) {
+            val sha1 = runCatching { sha1Of(file) }.getOrNull() ?: return@withContext null
+            val version = runCatching { modrinth.versionByHash(sha1) }.getOrNull() ?: return@withContext null
+            runCatching { modrinth.resolveProject(version.projectId) }.getOrNull()
+        }
+        projectCache[key] = project
+        return project
+    }
+
     if (browsing) {
         ModBrowser(
             mcVersion = instance.cachedManifest?.minecraftVersion.orEmpty(),
@@ -304,6 +335,8 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
                                     else -> { _ -> }
                                 },
                                 onDelete         = if (freeEdit) ({ pendingDelete = c }) else null,
+                                onDetails        = { detailsOf = c },
+                                resolveProject   = { resolveProject(c) },
                             )
                         }
                     }
@@ -324,6 +357,14 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
             confirmLabel = s.editorDelete,
             onConfirm    = { scope.launch { manager.delete(instanceDir, target.kind, target.fileName); scanTick++ } },
             onDismiss    = { pendingDelete = null },
+        )
+    }
+
+    detailsOf?.let { target ->
+        ContentDetailsDialog(
+            content        = target,
+            resolveProject = { resolveProject(target) },
+            onDismiss      = { detailsOf = null },
         )
     }
 }
@@ -440,7 +481,11 @@ private fun ContentRow(
     showToggle: Boolean,
     onToggle: (Boolean) -> Unit,
     onDelete: (() -> Unit)?,
+    onDetails: () -> Unit,
+    resolveProject: suspend () -> ModrinthProject?,
 ) {
+    val s = LocalStrings.current
+    val uriHandler = LocalUriHandler.current
     val dim = if (effectiveEnabled) 1f else 0.5f
     Row(
         modifier              = Modifier
@@ -471,9 +516,27 @@ private fun ContentRow(
                 onCheckedChange = onToggle,
             )
         }
-        if (onDelete != null) {
-            Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDelete).padding(6.dp)) {
-                Symbol(NxIcon.Delete, contentDescription = null, tint = NxTheme.colors.error, size = 18.dp)
+        // One overflow instead of a bare trash can: Details is always available
+        // (local metadata at minimum); Open page and Delete appear only when the
+        // caller passed them (a mod with a known URL / a user-owned row).
+        NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
+            NxMenuItem(label = s.contentActionDetails, icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
+            // "Open page" is kind-agnostic: the embedded homepage if the archive
+            // declared one, else the canonical Modrinth page (mod / resourcepack /
+            // shader all resolve by file hash). Resolved while the menu is open, so
+            // it appears once a URL is known and never sits there dead for content
+            // with no page anywhere.
+            var page by remember(content.fileName) { mutableStateOf(content.homepageUrl) }
+            if (page == null) {
+                LaunchedEffect(content.fileName) {
+                    page = resolveProject()?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
+                }
+            }
+            page?.let { url ->
+                NxMenuItem(label = s.contentActionOpenPage, icon = NxIcon.OpenInNew, onClick = { dismiss(); uriHandler.openUri(url) })
+            }
+            if (onDelete != null) {
+                NxMenuItem(label = s.editorDelete, icon = NxIcon.Delete, destructive = true, onClick = { dismiss(); onDelete() })
             }
         }
     }
@@ -628,4 +691,91 @@ private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Bo
             else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
         }
     }
+}
+
+/**
+ * Read-only details for one installed item. Everything but the Modrinth link is
+ * offline (the jar / pack declared it). [pageUrl] starts at the embedded homepage
+ * and, for a mod without one, best-effort resolves the canonical Modrinth page by
+ * file hash -- a non-Modrinth / private jar simply keeps a null link.
+ */
+@Composable
+private fun ContentDetailsDialog(
+    content: InstalledContent,
+    resolveProject: suspend () -> ModrinthProject?,
+    onDismiss: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val uriHandler = LocalUriHandler.current
+    // The archive's own metadata is authoritative; the Modrinth project (resolved
+    // by file hash, any kind) only fills the gaps a sparse archive leaves -- so a
+    // resource pack from Modrinth reads like a mod from Modrinth.
+    var project by remember(content.fileName) { mutableStateOf<ModrinthProject?>(null) }
+    LaunchedEffect(content.fileName) { project = resolveProject() }
+    val description = content.description ?: project?.description?.takeIf { it.isNotBlank() }
+    val license = content.license ?: project?.license?.let { it.name ?: it.id }
+    val pageUrl = content.homepageUrl ?: project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(content.displayName, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                content.version?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                description?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+                }
+                MetaLine(s.contentDetailSize, humanSize(content.sizeBytes))
+                license?.let {
+                    Text(s.contentTabModLicensePrefix(it), style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
+                }
+                if (content.authors.isNotEmpty()) MetaLine(s.contentDetailAuthors, content.authors.joinToString(", "))
+                if (content.dependencies.isNotEmpty()) {
+                    Text(s.contentTabModDependencies(content.dependencies.size), style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
+                    Text(content.dependencies.joinToString(", "), style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary)
+                }
+            }
+        },
+        confirmButton = {
+            pageUrl?.let { url ->
+                TextButton(onClick = { uriHandler.openUri(url); onDismiss() }) {
+                    Text(s.contentActionOpenPage, color = NxTheme.colors.primary)
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(s.editorClose) } },
+        containerColor = NxTheme.colors.surface,
+    )
+}
+
+@Composable
+private fun MetaLine(label: String, value: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("$label:", style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary)
+    }
+}
+
+private fun sha1Of(file: Path): String {
+    val md = MessageDigest.getInstance("SHA-1")
+    Files.newInputStream(file).use { ins ->
+        val buf = ByteArray(1 shl 16)
+        while (true) {
+            val n = ins.read(buf)
+            if (n < 0) break
+            md.update(buf, 0, n)
+        }
+    }
+    return md.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+}
+
+private fun humanSize(bytes: Long): String = when {
+    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
+    bytes >= 1024      -> "${bytes / 1024} KB"
+    else               -> "$bytes B"
 }
