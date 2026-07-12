@@ -46,6 +46,10 @@ private fun FrostTier.coatLayers(): List<SurfaceLayer> = toLayers().mapNotNull {
  * and a luminance-derived bevel hairline -- composited via [FrostSurface]. The body
  * survives the coat coming off (light theme, no wallpaper, glassIntensity 0), so the
  * plane never collapses into the page.
+ *
+ * [opaque] forces a fully solid body on every theme (dark otherwise keeps a hair of
+ * bleed-through, [bodyFloor]) -- for overlays like [hivens.ui.nx.NxContextMenu] that
+ * float over arbitrary content and must not let it read through.
  */
 @Composable
 fun NxSurface(
@@ -55,6 +59,7 @@ fun NxSurface(
     glass: Boolean = true,
     tier: FrostTier = FrostTier.Frosted,
     hairline: Boolean = true,
+    opaque: Boolean = false,
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -76,7 +81,7 @@ fun NxSurface(
 
     val layers = buildList {
         addAll(coat.filterIsInstance<Backdrop>())          // blurred wallpaper, under the body
-        add(Body(role, bodyFloor(dark)))
+        add(Body(role, if (opaque) 1f else bodyFloor(dark)))
         addAll(coat.filterNot { it is Backdrop })          // wash / texture / edge bands, over the body
         if (hairline) add(EdgeBorder(explicitColor = bevelHairline(bodyColor)))
         if (interactionSource != null) add(StateOverlay())
