@@ -8,11 +8,15 @@ import hivens.launcher.runtime.MojangLibrary
 import hivens.launcher.runtime.flattenArguments
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.io.FileOutputStream
 import java.io.IOException
@@ -56,6 +60,12 @@ class ModernInstallerResolver(
      * (e.g. Cleanroom -> 25) so the installer JDK matches the GAME's JDK.
      */
     private val installerJavaMajor: Int? = null,
+    /**
+     * The default (latest) loader version for a Minecraft version, resolved when a
+     * pack pins none (the blank-version contract, see LocalPackCreator). Forge reads
+     * its promotions, NeoForge its version index.
+     */
+    private val latestVersion: suspend (mcVersion: String) -> String,
     private val installerUrl: (mcVersion: String, loaderVersion: String) -> String,
 ) : LoaderResolver {
 
@@ -63,8 +73,11 @@ class ModernInstallerResolver(
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
-            val dotMinecraft = cacheDir.resolve("$loaderId-$mcVersion-$loaderVersion".replace(Regex("[^A-Za-z0-9._-]"), "_"))
-            ensureInstalled(mcVersion, loaderVersion, dotMinecraft)
+            // Blank = "use the default": resolve the latest so the installer URL
+            // never carries an empty version segment (which 404s).
+            val resolvedVersion = loaderVersion.ifBlank { latestVersion(mcVersion) }
+            val dotMinecraft = cacheDir.resolve("$loaderId-$mcVersion-$resolvedVersion".replace(Regex("[^A-Za-z0-9._-]"), "_"))
+            ensureInstalled(mcVersion, resolvedVersion, dotMinecraft)
 
             val versionJsonPath = locateVersionJson(dotMinecraft)
             val version = json.decodeFromString(
@@ -244,6 +257,8 @@ class ModernInstallerResolver(
     companion object {
         const val NEOFORGE_MAVEN = "https://maven.neoforged.net/releases"
         const val FORGE_MAVEN = "https://maven.minecraftforge.net"
+        const val FORGE_PROMOTIONS = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
+        const val NEOFORGE_META_LATEST = "https://maven.neoforged.net/api/maven/latest/version/releases/net/neoforged/neoforge"
 
         private const val INSTALLED_MARKER = ".nexira-installed"
         private const val INSTALL_TIMEOUT_MINUTES = 20L
@@ -256,6 +271,30 @@ class ModernInstallerResolver(
                 "\"clientToken\":\"00000000-0000-0000-0000-000000000000\"," +
                 "\"authenticationDatabase\":{},\"launcherVersion\":{\"name\":\"2.0\",\"format\":21}}"
 
+        /**
+         * NeoForge's version encodes the Minecraft version (minus the leading "1."):
+         * MC "1.21.1" -> "21.1.", MC "1.21" -> "21.0.". Used as the version-index
+         * filter that finds the latest build for a Minecraft version.
+         */
+        internal fun neoforgeVersionPrefix(mc: String): String {
+            val parts = mc.split('.')
+            val minor = parts.getOrNull(1) ?: throw IOException("cannot derive a NeoForge version from Minecraft '$mc'")
+            val patch = parts.getOrNull(2) ?: "0"
+            return "$minor.$patch."
+        }
+
+        /** The recommended build for [mc] from a promotions_slim.json body, else the latest. */
+        internal fun pickForgePromotion(json: Json, promotionsBody: String, mc: String): String? {
+            val promos = json.parseToJsonElement(promotionsBody).jsonObject["promos"]?.jsonObject ?: return null
+            return (promos["$mc-recommended"] ?: promos["$mc-latest"])?.jsonPrimitive?.contentOrNull
+        }
+
+        private suspend fun fetchText(clientProvider: HttpClientProvider, url: String): String =
+            clientProvider.current.prepareGet(url).execute { resp ->
+                if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
+                resp.bodyAsText()
+            }
+
         /** NeoForge: the version string encodes the Minecraft version, so the
          *  installer coordinate carries no mc segment. */
         fun neoforge(
@@ -265,6 +304,12 @@ class ModernInstallerResolver(
             cacheDir: Path,
         ): ModernInstallerResolver = ModernInstallerResolver(
             clientProvider, json, javaManager, cacheDir, loaderId = "neoforge",
+            latestVersion = { mc ->
+                val prefix = neoforgeVersionPrefix(mc)
+                json.parseToJsonElement(fetchText(clientProvider, "$NEOFORGE_META_LATEST?filter=$prefix"))
+                    .jsonObject["version"]?.jsonPrimitive?.contentOrNull
+                    ?: throw IOException("no NeoForge version for Minecraft $mc (prefix $prefix)")
+            },
         ) { _, version -> "$NEOFORGE_MAVEN/net/neoforged/neoforge/$version/neoforge-$version-installer.jar" }
 
         /** Modern Forge: `<mc>-<build>` slug, same shape as the legacy maven. */
@@ -275,6 +320,10 @@ class ModernInstallerResolver(
             cacheDir: Path,
         ): ModernInstallerResolver = ModernInstallerResolver(
             clientProvider, json, javaManager, cacheDir, loaderId = "forge",
+            latestVersion = { mc ->
+                pickForgePromotion(json, fetchText(clientProvider, FORGE_PROMOTIONS), mc)
+                    ?: throw IOException("no Forge promotion for Minecraft $mc")
+            },
         ) { mc, version -> "$FORGE_MAVEN/net/minecraftforge/forge/$mc-$version/forge-$mc-$version-installer.jar" }
     }
 }
