@@ -42,6 +42,8 @@ object RussianStrings : AppStrings {
     override val launchAbort       = "Отмена"
     override val launchRunning     = "Игра запущена"
     override val launchDownloading = "Загрузка:"
+    override val launchPreparing   = "Подготовка"
+    override val launchFailed      = "Ошибка запуска"
 
     // Launcher States
     override val stateInit        = "Инициализация..."

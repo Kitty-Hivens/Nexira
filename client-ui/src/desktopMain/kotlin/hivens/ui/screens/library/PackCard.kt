@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,11 +41,14 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
+import hivens.ui.notifications.IndicationCenter
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import java.time.Duration
 import java.time.Instant
+import kotlin.math.roundToInt
+import org.koin.compose.koinInject
 
 /**
  * One Library row. Same three-layer background as the Browse card: a
@@ -70,6 +75,8 @@ fun PackCard(
     val s = LocalStrings.current
     val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
     val art = rememberPackArt(instance)
+    val indications: IndicationCenter = koinInject()
+    val indication by indications.launchIndication(instance.id).collectAsState()
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -150,6 +157,42 @@ fun PackCard(
                 }
             }
         }
+
+        // Launch state for this pack, produced by LaunchDriver -- a corner pill so
+        // launching a pack reflects on its card instead of only in a transient toast.
+        indication?.let {
+            LaunchStatusPill(it, Modifier.align(Alignment.TopEnd).padding(10.dp))
+        }
+    }
+}
+
+/** Compact launch-state pill overlaid on the card while a launch of this pack is in flight. */
+@Composable
+private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
+    val (dotColor, label) = when (indication) {
+        IndicationCenter.LaunchIndication.Preparing -> NxTheme.colors.progressAccent to s.launchPreparing
+        is IndicationCenter.LaunchIndication.Downloading ->
+            NxTheme.colors.progressAccent to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchPreparing)
+        IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
+        IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
+    }
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(dotColor))
+        Text(
+            text       = label,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = Color.White,
+            fontWeight = FontWeight.Medium,
+            maxLines   = 1,
+        )
     }
 }
 

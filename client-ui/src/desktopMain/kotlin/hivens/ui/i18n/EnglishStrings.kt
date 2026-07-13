@@ -45,6 +45,8 @@ object EnglishStrings : AppStrings {
     override val launchAbort       = "Cancel"
     override val launchRunning     = "Game running"
     override val launchDownloading = "Downloading:"
+    override val launchPreparing   = "Preparing"
+    override val launchFailed      = "Launch failed"
 
     // Launcher States
     override val stateInit        = "Initializing..."
