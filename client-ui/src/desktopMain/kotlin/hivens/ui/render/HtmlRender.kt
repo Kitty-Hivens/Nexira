@@ -48,6 +48,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
+import org.intellij.markdown.parser.CancellationToken
 import org.intellij.markdown.parser.MarkdownParser
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -71,7 +72,13 @@ import java.net.URI
 /** Convert GitHub-flavoured markdown to an HTML string for [HtmlBody]. */
 fun markdownToHtml(markdown: String): String {
     val flavour = GFMFlavourDescriptor()
-    val tree = MarkdownParser(flavour).buildMarkdownTreeFromString(markdown)
+    // The explicit CancellationToken and the CharSequence-typed input select the
+    // non-deprecated MarkdownParser API; the bare-flavour constructor and the
+    // String buildMarkdownTreeFromString overload are deprecated. NonCancellable
+    // is the constructor default -- passed only to reach the primary constructor.
+    val source: CharSequence = markdown
+    val tree = MarkdownParser(flavour, cancellationToken = CancellationToken.NonCancellable)
+        .buildMarkdownTreeFromString(source)
     return HtmlGenerator(markdown, tree, flavour).generateHtml()
 }
 
