@@ -5,15 +5,15 @@
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
 kotlin            = "2.4.0"
-compose           = "1.11.0"
+compose           = "1.11.1"
 buildconfigPlugin = "6.0.10"
 versionsPlugin    = "0.54.0"
-# ksp tracks its own release line, decoupled from the Kotlin version. 2.3.9 is
-# the latest published KSP and has no 2.4.0-numbered build yet; KSP2 runs on the
-# Analysis API and compiles cleanly against the Kotlin 2.4.0 toolchain here
-# (:widget-processor / :client-ui kspKotlinDesktop both green). Bump when a newer
-# KSP ships; it does not need to match the Kotlin minor.
-ksp               = "2.3.9"
+# ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
+# the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
+# against the Kotlin 2.4.0 toolchain here (:widget-processor / :client-ui
+# kspKotlinDesktop both green). Bump when a newer KSP ships; it does not need to
+# match the Kotlin minor.
+ksp               = "2.3.10"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
 ktor              = "3.5.1"
@@ -23,24 +23,25 @@ coroutines        = "1.11.0"
 
 # ── UI / Compose ecosystem ───────────────────────────────────────────────────
 # composeMaterial3 tracks JetBrains' separately-published material3 artifact,
-# which lags Compose-MP core by ~2 release lines. core 1.11.0 GA shipped but
-# material3 has no 1.10.x / 1.11.x stable; latest stable is 1.9.0 (two lines
-# behind), with 1.11.0-alpha07 as the JetBrains-paired alpha.
+# which lags Compose-MP core by ~2 release lines. core 1.11.1 shipped but
+# material3 has no 1.10.x / 1.11.x stable; 1.11.0-alpha07 is the JetBrains-paired
+# alpha for the 1.11 line. 1.12.0-alpha03 exists but pairs with compose 1.12-beta,
+# so it stays parked until compose core moves to 1.12 stable.
 composeMaterial3  = "1.11.0-alpha07"
 markdownRenderer  = "0.43.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
-markdown          = "0.7.5"
+markdown          = "0.7.7"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
 jsoup             = "1.22.2"
 coil              = "3.5.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
-materialColorUtils = "4.1.1"
+materialColorUtils = "5.0.0"
 filekit           = "0.14.2"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.0.18"
-logback           = "1.5.37"
+logback           = "1.5.38"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
@@ -92,8 +93,8 @@ skinema           = "0.6.2"
 # junit (Jupiter) and junitPlatform version independently: Jupiter 5.x pairs with
 # Platform 1.x.
 mockk             = "1.14.11"
-junit             = "5.12.2"
-junitPlatform     = "1.12.2"
+junit             = "5.14.4"
+junitPlatform     = "1.14.4"
 
 [libraries]
 # Logging
