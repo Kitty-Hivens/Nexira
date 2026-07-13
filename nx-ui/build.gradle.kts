@@ -17,6 +17,10 @@ group = "hivens"
 // Repositories live in settings.gradle.kts (FAIL_ON_PROJECT_REPOS); no block here.
 
 kotlin {
+    // KMP modules don't apply the `java` plugin, so the root's toolchain pin
+    // (java-plugin modules only) skips them; set it here so org.gradle.jvm.version
+    // matches the JDK 26 leaf modules instead of falling back to the daemon JVM.
+    jvmToolchain(26)
     jvm("desktop")
 
     sourceSets {
@@ -60,6 +64,6 @@ compose.resources {
 // explicitly here too, matching client-ui, so the module is correct in isolation.
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_25)
+        jvmTarget.set(JvmTarget.JVM_26)
     }
 }

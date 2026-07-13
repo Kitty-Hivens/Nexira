@@ -25,7 +25,7 @@ on:
         required: true
 
 env:
-  JAVA_VERSION: '25'
+  JAVA_VERSION: '26'
   JAVA_DISTRIBUTION: 'liberica'
 
 permissions:
