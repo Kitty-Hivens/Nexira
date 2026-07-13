@@ -44,6 +44,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger("LibraryBody")
 
 @Serializable
 data class LibraryBodyProps(
@@ -90,8 +93,12 @@ fun LibraryBody(instance: WidgetInstance) {
             confirmLabel = s.editorDelete,
             onConfirm    = {
                 scope.launch {
-                    withContext(Dispatchers.IO) { deleteInstanceDir(instanceDirOf(paths, target)) }
-                    repo.delete(target.id)
+                    val removed = withContext(Dispatchers.IO) { deleteInstanceDir(instanceDirOf(paths, target)) }
+                    // Drop the Library entry only when the files are actually gone.
+                    // A locked file (a running game holding a jar) would otherwise
+                    // leave orphaned data on disk with the pack vanished from the
+                    // list and no way to retry.
+                    if (removed) repo.delete(target.id)
                 }
             },
             onDismiss    = { pendingDelete = null },
@@ -102,12 +109,24 @@ fun LibraryBody(instance: WidgetInstance) {
 private fun instanceDirOf(paths: PlatformPaths, instance: PackInstance): Path =
     paths.dataDir.resolve("instances").resolve(instance.instanceDirName)
 
-/** Recursive delete, deepest-first so directories are empty before removal; best-effort per entry. */
-private fun deleteInstanceDir(dir: Path) {
-    if (!Files.exists(dir)) return
+/**
+ * Recursive delete, deepest-first so directories are empty before removal.
+ * Returns true only when every entry was removed; a failed entry is logged and
+ * leaves the tree partial so the caller keeps the Library entry rather than
+ * orphaning files on disk with the pack gone from the list.
+ */
+private fun deleteInstanceDir(dir: Path): Boolean {
+    if (!Files.exists(dir)) return true
+    var ok = true
     Files.walk(dir).use { stream ->
-        stream.sorted(Comparator.reverseOrder()).forEach { path -> runCatching { Files.delete(path) } }
+        stream.sorted(Comparator.reverseOrder()).forEach { path ->
+            runCatching { Files.delete(path) }.onFailure { e ->
+                ok = false
+                log.warn("delete instance dir: could not remove {} -- {}", path, e.toString())
+            }
+        }
     }
+    return ok
 }
 
 @Composable
