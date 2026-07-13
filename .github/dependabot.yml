@@ -1,0 +1,73 @@
+# Dependabot keeps the Gradle version catalog, the docs npm project, and the
+# GitHub Actions used by the workflows current. Updates target `dev` (the active
+# development branch) -- bumps integrate and get tested there before flowing to
+# `stable` via the release process, never landing straight on the release branch.
+# Grouped so a week's bumps arrive as a few reviewable PRs instead of a swarm.
+version: 2
+
+updates:
+  # Gradle: reads gradle/libs.versions.toml plus every module's build.gradle.kts.
+  - package-ecosystem: gradle
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "com.google.devtools.ksp*"
+      compose:
+        patterns:
+          - "org.jetbrains.compose*"
+      ktor:
+        patterns:
+          - "io.ktor*"
+      koin:
+        patterns:
+          - "io.insert-koin*"
+      test:
+        patterns:
+          - "org.junit*"
+          - "io.mockk*"
+    ignore:
+      # JUnit 6.x drops Java 8 and needs a JVM 17+ runtime; authlib-agent and
+      # profiler-agent compile to Java 8 bytecode for the legacy 1.12.2 game JVM,
+      # and Gradle's variant resolution rejects junit 6 on their test classpath.
+      # Stay on the 5.x (Jupiter) / 1.x (Platform) lines -- minors/patches only.
+      - dependency-name: "org.junit.jupiter:*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.junit.platform:*"
+        update-types: ["version-update:semver-major"]
+      # compose material3 is a JetBrains pre-release (1.11.0-alpha07) paired to
+      # the compose 1.11 core. Because it is already a pre-release, Dependabot
+      # would otherwise jump it to the 1.12 alpha line, which needs compose 1.12.
+      # Keep it on 1.11 (patch/alpha bumps only) until compose core moves to 1.12.
+      - dependency-name: "org.jetbrains.compose.material3:*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+
+  # Docs site (Astro / Starlight) under docs/.
+  - package-ecosystem: npm
+    directory: /docs
+    target-branch: dev
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      astro:
+        patterns:
+          - "astro"
+          - "@astrojs/*"
+
+  # Actions referenced by .github/workflows/*.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      actions:
+        patterns:
+          - "*"
