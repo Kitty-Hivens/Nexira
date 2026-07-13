@@ -21,14 +21,14 @@ pluginManagement {
 }
 
 // foojay-resolver-convention -- safety net for the Gradle toolchain
-// jvmToolchain(25) call in root build.gradle.kts. If a contributor runs the
-// build with a JDK <25 (or no JDK 25 at all on PATH), Gradle resolves and
+// jvmToolchain(26) call in root build.gradle.kts. If a contributor runs the
+// build with a JDK <26 (or no JDK 26 at all on PATH), Gradle resolves and
 // downloads one automatically from the foojay.io distributions API rather
 // than failing with a cryptic "no toolchains of required version found"
-// error. Policy stays loose (any vendor of JDK 25); foojay defaults to a
+// error. Policy stays loose (any vendor of JDK 26); foojay defaults to a
 // safe-bet vendor when it picks for you.
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 // Repository centralization (Gradle 7+ convention):

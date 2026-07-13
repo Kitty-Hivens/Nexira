@@ -27,6 +27,10 @@ group = "hivens"
 // is a build-time error by design -- changes go in one place only.
 
 kotlin {
+    // KMP modules don't apply the `java` plugin, so the root's toolchain pin
+    // (java-plugin modules only) skips them; set it here so org.gradle.jvm.version
+    // matches the JDK 26 leaf modules instead of falling back to the daemon JVM.
+    jvmToolchain(26)
     jvm("desktop")
 
     sourceSets {
@@ -517,7 +521,7 @@ tasks.named("check") { dependsOn(verifyRuntimeModules) }
 // recomposition audits but wasted IO on every regular compile.
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_25)
+        jvmTarget.set(JvmTarget.JVM_26)
 
         val composeMetricsEnabled = providers.gradleProperty("nexiraComposeMetrics")
             .map { it == "true" }.orElse(false).get()
@@ -529,7 +533,7 @@ tasks.withType<KotlinJvmCompile>().configureEach {
             // compiler restricts typealiases to top level only.
             "-XXLanguage:+NestedTypeAliases",
 
-            // Bytecode: emit default methods directly (legal on jvmTarget=25).
+            // Bytecode: emit default methods directly (legal on jvmTarget=26).
             // Smaller class files, removes the DefaultImpls indirection.
             "-jvm-default=no-compatibility",
 

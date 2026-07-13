@@ -7,7 +7,7 @@
 //     custom DefaultTask subclass can use Property<T>, @Input / @Output
 //     annotations, etc., without explicit dependency declarations.
 //   - Java 17+ source/target by default, which lines up with the project's
-//     JDK 25 toolchain (buildSrc runs under the daemon's JDK, not the
+//     JDK 26 toolchain (buildSrc runs under the daemon's JDK, not the
 //     subprojects' toolchain pin).
 //
 // Why buildSrc/ rather than `:build-logic` composite-included module:

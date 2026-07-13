@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  JAVA_VERSION: '25'
+  JAVA_VERSION: '26'
   JAVA_DISTRIBUTION: 'liberica'
   # Every setup-java step below uses `cache: 'gradle'` -- reuses
   # ~/.gradle/caches + ~/.gradle/wrapper across runs (keyed on *.gradle*,
