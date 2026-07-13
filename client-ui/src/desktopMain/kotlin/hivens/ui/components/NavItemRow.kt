@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
@@ -34,5 +35,7 @@ internal fun NavItemRowContent(icon: IconKey, label: String, isSelected: Boolean
         color = if (isSelected) NxTheme.colors.primary
                 else NxTheme.colors.textPrimary,
         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
     )
 }

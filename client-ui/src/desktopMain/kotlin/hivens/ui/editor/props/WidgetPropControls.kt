@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,9 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
@@ -108,6 +109,8 @@ private fun BoolRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) 
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
             color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         NxSwitch(
@@ -127,6 +130,8 @@ private fun ColorRow(label: String, hex: String, onChange: (String) -> Unit) {
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
             color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(140.dp),
         )
         HexField(
@@ -149,6 +154,8 @@ private fun StringRow(label: String, value: String, onChange: (String) -> Unit) 
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
             color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(140.dp),
         )
         Box(
@@ -184,6 +191,8 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
             color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(140.dp),
         )
         Box(modifier = Modifier.weight(1f)) {
@@ -199,11 +208,12 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
                     .clickable { expanded = true }
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             )
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            NxContextMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { opt ->
-                    DropdownMenuItem(
-                        text    = { Text(opt, style = MaterialTheme.typography.bodySmall) },
-                        onClick = { onChange(opt); expanded = false },
+                    NxMenuItem(
+                        label    = opt,
+                        selected = opt == selected,
+                        onClick  = { onChange(opt); expanded = false },
                     )
                 }
             }

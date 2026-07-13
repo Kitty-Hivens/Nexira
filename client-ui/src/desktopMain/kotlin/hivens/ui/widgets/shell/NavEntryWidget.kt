@@ -216,9 +216,11 @@ private fun NavSlot(
     }
     val iconFill = if (outlineSwap && !active && cz.navSelectionOutlineIcons) 0f else 1f
 
-    // 13% fill matches the original Material indicator alpha; LeftBar / Dot use
-    // the solid accent since they are thin marks, not a backing.
-    val fill = accent.copy(alpha = 0.13f)
+    // The rail sits over the wallpaper, so the backing needs more presence than
+    // the original 13% Material indicator alpha to read as selected -- 22% keeps
+    // it at least as strong as the settings side-nav (18% on a section plane).
+    // LeftBar / Dot use the solid accent since they are thin marks, not a backing.
+    val fill = accent.copy(alpha = 0.22f)
     val interaction = remember { MutableInteractionSource() }
 
     Box(Modifier.graphicsLayer { translationY = offsetY }) {

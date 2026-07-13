@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +65,8 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.PlayButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -404,29 +404,17 @@ private fun LogSessionPicker(
                 modifier           = Modifier.size(16.dp),
             )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text    = {
-                    Text(
-                        s.consoleSessionLive,
-                        fontFamily = LocalMonoFamily.current,
-                        fontSize   = 11.sp,
-                        color      = if (selectedFile == null) colors.primary else colors.textPrimary,
-                    )
-                },
-                onClick = { onSelectGeneral(); open = false },
+        NxContextMenu(expanded = open, onDismissRequest = { open = false }) {
+            NxMenuItem(
+                label    = s.consoleSessionLive,
+                selected = selectedFile == null,
+                onClick  = { onSelectGeneral(); open = false },
             )
             files.forEach { f ->
-                DropdownMenuItem(
-                    text    = {
-                        Text(
-                            f.name,
-                            fontFamily = LocalMonoFamily.current,
-                            fontSize   = 11.sp,
-                            color      = if (f == selectedFile) colors.primary else colors.textPrimary,
-                        )
-                    },
-                    onClick = { onSelectFile(f); open = false },
+                NxMenuItem(
+                    label    = f.name,
+                    selected = f == selectedFile,
+                    onClick  = { onSelectFile(f); open = false },
                 )
             }
         }
