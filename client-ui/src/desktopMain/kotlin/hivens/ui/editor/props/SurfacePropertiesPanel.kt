@@ -281,7 +281,7 @@ private fun navSelectionStyleLabel(variant: NavSelectionStyle, s: AppStrings): S
         NavSelectionStyle.None    -> s.navStyleNone
     }
 
-// Smaller than the settings-screen SettingsSwitchRow (bodyLarge): the 320dp
+// Smaller than a full settings-screen switch row (bodyLarge): the 320dp
 // surface panel cramps long toggle names, so the label drops to bodySmall and
 // takes the row's remaining width with the Switch pinned at the end.
 @Composable

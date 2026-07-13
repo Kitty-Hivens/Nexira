@@ -448,6 +448,7 @@ fun EditableWidgetChrome(
     if (forceRemoveOpen) {
         AlertDialog(
             onDismissRequest = { forceRemoveOpen = false },
+            containerColor   = NxTheme.colors.surface,
             title            = { Text(s.editorForceRemoveTitle) },
             text             = {
                 Text(

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +33,8 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxSwitch
@@ -79,9 +79,8 @@ internal fun AppearanceSection(
 
     NxSection(s.settingsSectionUI) {
         // Language. The whole row opens the picker; the trailing shows the
-        // current locale and hosts the menu (Material dropdown stands in until
-        // NxContextMenu lands, #387). Per-locale PuppetClick lets a driver switch
-        // without opening the menu first.
+        // current locale and hosts the menu. Per-locale PuppetClick lets a driver
+        // switch without opening the menu first.
         NxRow(
             title    = s.settingsLanguage,
             icon     = NxIcon.Language,
@@ -93,21 +92,15 @@ internal fun AppearanceSection(
                         Text(currentLocale.displayName, color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
                         Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary)
                     }
-                    DropdownMenu(
+                    NxContextMenu(
                         expanded         = langExpanded,
                         onDismissRequest = { langExpanded = false },
-                        containerColor   = NxTheme.colors.surface,
                     ) {
                         AppLocale.entries.forEach { locale ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        locale.displayName,
-                                        color      = if (locale == currentLocale) NxTheme.colors.primary else NxTheme.colors.textPrimary,
-                                        fontWeight = if (locale == currentLocale) FontWeight.Bold else FontWeight.Normal,
-                                    )
-                                },
-                                onClick = { langExpanded = false; onLocaleChanged(locale) },
+                            NxMenuItem(
+                                label    = locale.displayName,
+                                selected = locale == currentLocale,
+                                onClick  = { langExpanded = false; onLocaleChanged(locale) },
                             )
                             PuppetClick("settings.language.${locale.name}") {
                                 langExpanded = false; onLocaleChanged(locale)

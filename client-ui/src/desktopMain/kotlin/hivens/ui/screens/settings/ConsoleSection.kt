@@ -68,7 +68,7 @@ internal fun ConsoleSection(paths: PlatformPaths) {
         manager.save(coerced)
     }
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         NxSection(s.consoleSecDisplay) {
             NxSlider(
                 label         = s.consoleSecFontSize,

@@ -5,11 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
 import hivens.launcher.diag.DiagnosticBundle
@@ -200,8 +199,8 @@ internal fun DiagnosticsSection(
             Spacer(Modifier.height(4.dp))
             Text(
                 text     = s.settingsDiagnosticBundleHint,
+                style    = MaterialTheme.typography.bodySmall,
                 color    = NxTheme.colors.textSecondary,
-                fontSize = TextUnit(11f, TextUnitType.Sp),
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
