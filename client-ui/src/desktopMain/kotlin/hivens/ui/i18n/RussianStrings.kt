@@ -652,7 +652,6 @@ object RussianStrings : AppStrings {
     override val accountFaceAuto             = "Авто"
     override val profileSignOutSmartycraft   = "Выйти из SmartyCraft"
     override val profileSignOutMicrosoft     = "Выйти из Microsoft"
-    override val msaNotConfigured            = "Вход через Microsoft не настроен в этой сборке."
     override val wardrobeTitle               = "Гардероб"
     override val wardrobeSignedOut           = "Войдите, чтобы управлять скинами и плащами."
     override val wardrobeUpload               = "Загрузить"

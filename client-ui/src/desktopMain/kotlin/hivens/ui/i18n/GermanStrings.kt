@@ -651,7 +651,6 @@ object GermanStrings : AppStrings {
     override val accountFaceAuto             = "Auto"
     override val profileSignOutSmartycraft   = "Von SmartyCraft abmelden"
     override val profileSignOutMicrosoft     = "Von Microsoft abmelden"
-    override val msaNotConfigured            = "Die Microsoft-Anmeldung ist in diesem Build nicht konfiguriert."
     override val wardrobeTitle               = "Kleiderschrank"
     override val wardrobeSignedOut           = "Melde dich an, um Skins und Umhänge zu verwalten."
     override val wardrobeUpload               = "Hochladen"
