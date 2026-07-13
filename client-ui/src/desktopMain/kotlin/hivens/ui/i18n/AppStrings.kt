@@ -700,7 +700,6 @@ interface AppStrings {
     val accountFaceAuto: String
     val profileSignOutSmartycraft: String
     val profileSignOutMicrosoft: String
-    val msaNotConfigured: String
     val wardrobeTitle: String
     val wardrobeSignedOut: String
     val wardrobeUpload: String

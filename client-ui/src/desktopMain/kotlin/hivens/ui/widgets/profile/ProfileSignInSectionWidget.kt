@@ -65,12 +65,18 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()
-    val s = LocalStrings.current
 
     // The device-code provider is registered only when a client id is configured.
     val msaConfigured = remember { authRegistry.all.any { it.capabilities.supportsDeviceCode } }
     var refreshKey by remember { mutableIntStateOf(0) }
     val msSession = remember(refreshKey, ctx.session) { credentials.accountFor(MS_KEY) }
+
+    // Microsoft / multi-account is deferred to a later release. With no Microsoft
+    // client id configured the provider never registers, so there is nothing to
+    // sign into here -- render the section as nothing rather than a "not configured
+    // in this build" dead-end. It returns in full the moment a build ships a client
+    // id (which is the off-by-default switch: no release ships one).
+    if (msSession == null && !msaConfigured) return
 
     PuppetScreen("Profile_Microsoft")
     Box(Modifier.fillMaxWidth()) {
@@ -78,21 +84,15 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
             Modifier.widthIn(max = 520.dp).padding(top = 4.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            when {
-                msSession != null -> MicrosoftAccount(msSession) { refreshKey++ }
-
-                msaConfigured -> MicrosoftSignInButton(
+            if (msSession != null) {
+                MicrosoftAccount(msSession) { refreshKey++ }
+            } else {
+                MicrosoftSignInButton(
                     onSignedIn = {
                         credentials.primarySession()?.let { ctx.onLogin(it) }
                         refreshKey++
                     },
                     puppetId = "account.signin.microsoft",
-                )
-
-                else -> Text(
-                    text = s.msaNotConfigured,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = NxTheme.colors.textSecondary,
                 )
             }
         }

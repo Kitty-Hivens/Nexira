@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import hivens.auth.AuthProviderRegistry
 import hivens.ui.components.NavItemRowContent
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -22,6 +24,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import org.koin.compose.koinInject
 
 // Vertical category nav for the profile surface. Writes
 // `selectedCategory.value` on tap; the surface composable reads it
@@ -34,10 +37,17 @@ fun ProfileNavWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
     val s = LocalStrings.current
     val style = LocalStyle.current
+    val authRegistry: AuthProviderRegistry = koinInject()
     val current by ctx.selectedCategory
 
-    // Both provider sections always show; each owns its signed-in/out state.
-    val categories = ProfileCategory.entries
+    // Microsoft / multi-account is deferred: its category shows only when a client
+    // id is configured (the device-code provider registers only then). Without one
+    // the profile is a single SmartyCraft section -- no dangling Microsoft tab into
+    // an empty pane.
+    val msaConfigured = remember { authRegistry.all.any { it.capabilities.supportsDeviceCode } }
+    val categories = ProfileCategory.entries.filter {
+        it != ProfileCategory.Microsoft || msaConfigured
+    }
 
     Column(
         modifier = Modifier
