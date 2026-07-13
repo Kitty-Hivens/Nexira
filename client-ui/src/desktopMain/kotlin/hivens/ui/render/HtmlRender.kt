@@ -140,7 +140,7 @@ private fun group(parent: Element): List<Frag> {
     for (n in parent.childNodes()) {
         val tag = (n as? Element)?.tagName()?.lowercase()
         if (tag != null && (tag in BLOCK_TAGS || tag == "img")) {
-            flush(); out.add(BlockEl(n as Element))
+            flush(); out.add(BlockEl(n))
         } else {
             inline.add(n)
         }
