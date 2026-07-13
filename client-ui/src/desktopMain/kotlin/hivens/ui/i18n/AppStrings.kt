@@ -44,6 +44,8 @@ interface AppStrings {
     val launchAbort: String
     val launchRunning: String
     val launchDownloading: String
+    val launchPreparing: String
+    val launchFailed: String
 
     // --- Launcher States ---
     val stateInit: String
