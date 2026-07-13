@@ -129,7 +129,13 @@ subprojects {
 
         jvmArgs(
             if (isCi) "-Xmx1g" else "-Xmx512m",
-            "-XX:+UseParallelGC"
+            "-XX:+UseParallelGC",
+            // skiko / skinema / lib* load native code through java.lang.System::load
+            // (Panama downcalls). JDK 24+ warns on restricted native access and a
+            // future JDK blocks it outright; grant it up front so test JVMs match
+            // the packaged launcher (compose.desktop + packaging jvmArgs already set
+            // this). A harmless no-op for the pure-JVM module tests.
+            "--enable-native-access=ALL-UNNAMED"
         )
     }
 }
