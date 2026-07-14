@@ -14,13 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,20 +33,24 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.core.data.GameMode
 import hivens.core.data.MultiplayerServerEntry
-import hivens.core.data.WorldDimension
 import hivens.core.data.WorldEntry
 import hivens.launcher.instance.ServersDatReader
 import hivens.launcher.instance.WorldScanner
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxSectionHeader
 import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.RetryStateBlock
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import java.io.File
 import java.nio.file.Path
-import java.time.Duration
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -124,7 +121,7 @@ private fun WorldsList(
         modifier            = modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { SectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
+        item { NxSectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
         if (worlds.isEmpty()) {
             item { EmptyHint(text = s.worldsTabLocalEmpty) }
         } else {
@@ -133,7 +130,7 @@ private fun WorldsList(
 
         item { Spacer(Modifier.height(4.dp)) }
 
-        item { SectionHeader(text = s.worldsTabServersSection(servers.size)) }
+        item { NxSectionHeader(text = s.worldsTabServersSection(servers.size)) }
         if (servers.isEmpty()) {
             item { EmptyHint(text = s.worldsTabServersEmpty) }
         } else {
@@ -142,16 +139,6 @@ private fun WorldsList(
 
         item { Spacer(Modifier.height(8.dp)) }
     }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text       = text,
-        style      = MaterialTheme.typography.titleSmall,
-        color      = CelestiaTheme.colors.primary,
-        fontWeight = FontWeight.Bold,
-    )
 }
 
 @Composable
@@ -167,7 +154,7 @@ private fun EmptyHint(text: String) {
         Text(
             text  = text,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
     }
 }
@@ -186,24 +173,34 @@ private fun WorldCard(world: WorldEntry) {
     ) {
         WorldThumb(iconPath = world.iconPath)
 
-        Column(modifier = Modifier.weight(1f)) {
+        // Minecraft's own world-list layout: icon, name, then two muted lines
+        // (folder + last-played date, game mode + version) instead of a row of
+        // accent chips -- "Overworld" sat on nearly every world and read as noise.
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text       = world.displayName,
                 style      = MaterialTheme.typography.bodyLarge,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
             )
             Text(
-                text  = lastPlayedLabel(world.lastPlayedEpochMs, s::worldsTabLastPlayed),
-                style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
+                text     = worldSubtitle(world),
+                style    = MaterialTheme.typography.labelSmall,
+                color    = NxTheme.colors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 6.dp)) {
-                world.mcVersion?.let { v -> Chip("MC $v") }
-                world.gameMode?.let { g -> Chip(gameModeLabel(g, s)) }
-                world.dimensions.forEach { dim -> Chip(dimensionLabel(dim, s), accent = true) }
+            val info = worldInfoLine(world, s)
+            if (info.isNotBlank()) {
+                Text(
+                    text     = info,
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = NxTheme.colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -215,7 +212,7 @@ private fun WorldThumb(iconPath: String?) {
         modifier         = Modifier
             .size(56.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(CelestiaTheme.colors.surfaceVariant),
+            .background(NxTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (iconPath != null) {
@@ -225,8 +222,7 @@ private fun WorldThumb(iconPath: String?) {
                 modifier           = Modifier.size(56.dp),
             )
         } else {
-            Icon(
-                imageVector        = Icons.Default.Public,
+            Symbol(icon = NxIcon.Public,
                 contentDescription = null,
                 tint               = Color.White.copy(alpha = 0.55f),
                 modifier           = Modifier.size(28.dp),
@@ -254,16 +250,15 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
                 Text(
                     text       = entry.name,
                     style      = MaterialTheme.typography.bodyLarge,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
                 )
                 if (entry.hidden) {
-                    Icon(
-                        imageVector        = Icons.Default.VisibilityOff,
+                    Symbol(icon = NxIcon.VisibilityOff,
                         contentDescription = s.worldsTabServerHiddenLabel,
-                        tint               = CelestiaTheme.colors.textSecondary,
+                        tint               = NxTheme.colors.textSecondary,
                         modifier           = Modifier.size(14.dp),
                     )
                 }
@@ -271,7 +266,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
             Text(
                 text  = entry.ip,
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
     }
@@ -287,7 +282,7 @@ private fun ServerThumb(iconBase64: String?) {
         modifier         = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(CelestiaTheme.colors.surfaceVariant),
+            .background(NxTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (bytes != null) {
@@ -297,8 +292,7 @@ private fun ServerThumb(iconBase64: String?) {
                 modifier           = Modifier.size(48.dp),
             )
         } else {
-            Icon(
-                imageVector        = Icons.Default.Computer,
+            Symbol(icon = NxIcon.Computer,
                 contentDescription = null,
                 tint               = Color.White.copy(alpha = 0.55f),
                 modifier           = Modifier.size(24.dp),
@@ -307,40 +301,21 @@ private fun ServerThumb(iconBase64: String?) {
     }
 }
 
-@Composable
-private fun Chip(text: String, accent: Boolean = false) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        shape   = MaterialTheme.shapes.extraSmall,
-        label   = {
-            Text(
-                text  = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (accent) Color.White else CelestiaTheme.colors.textSecondary,
-            )
-        },
-        colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (accent) CelestiaTheme.colors.primary.copy(alpha = 0.7f)
-                                     else        CelestiaTheme.colors.outline.copy(alpha = 0.25f),
-            disabledLabelColor     = if (accent) Color.White else CelestiaTheme.colors.textSecondary,
-        ),
-        border  = null,
-    )
+/** Second line, MC-style: "<folder>  ·  <last-played date>" (date omitted if unknown). */
+private fun worldSubtitle(world: WorldEntry): String {
+    val date = world.lastPlayedEpochMs
+        .takeIf { it > 0L }
+        ?.let { WORLD_DATE_FMT.format(Instant.ofEpochMilli(it)) }
+    return listOfNotNull(world.dirName, date).joinToString("  ·  ")
 }
 
-private fun lastPlayedLabel(epochMs: Long, formatter: (String) -> String): String {
-    if (epochMs <= 0L) return formatter("—")
-    val dur = Duration.between(Instant.ofEpochMilli(epochMs), Instant.now())
-    val label = when {
-        dur.toMinutes() < 1 -> "<1 min"
-        dur.toHours() < 1   -> "${dur.toMinutes()}m"
-        dur.toDays() < 1    -> "${dur.toHours()}h"
-        dur.toDays() < 30   -> "${dur.toDays()}d"
-        else                -> "${dur.toDays() / 30}mo"
-    }
-    return formatter(label)
-}
+/** Third line, MC-style: "<game mode>  ·  <version>" (each part dropped when absent). */
+private fun worldInfoLine(world: WorldEntry, s: AppStrings): String =
+    listOfNotNull(world.gameMode?.let { gameModeLabel(it, s) }, world.mcVersion)
+        .joinToString("  ·  ")
+
+private val WORLD_DATE_FMT: DateTimeFormatter =
+    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withZone(ZoneId.systemDefault())
 
 private fun gameModeLabel(mode: GameMode, s: AppStrings): String = when (mode) {
     GameMode.Survival  -> s.worldsTabGameSurvival
@@ -348,11 +323,4 @@ private fun gameModeLabel(mode: GameMode, s: AppStrings): String = when (mode) {
     GameMode.Adventure -> s.worldsTabGameAdventure
     GameMode.Spectator -> s.worldsTabGameSpectator
     GameMode.Unknown   -> s.worldsTabGameUnknown
-}
-
-private fun dimensionLabel(dim: WorldDimension, s: AppStrings): String = when (dim) {
-    WorldDimension.Overworld -> s.worldsTabDimOverworld
-    WorldDimension.Nether    -> s.worldsTabDimNether
-    WorldDimension.End       -> s.worldsTabDimEnd
-    WorldDimension.Other     -> s.worldsTabDimOther
 }

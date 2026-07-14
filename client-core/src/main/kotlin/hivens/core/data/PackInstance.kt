@@ -34,6 +34,8 @@ data class PackInstance(
     val instanceDirName: String,
     val createdAtEpoch: Long,
     val lastPlayedEpochOrZero: Long = 0L,
+    /** Total seconds spent in-game across all sessions; summed on each game exit. */
+    val playtimeSeconds: Long = 0L,
     /**
      * Pack version this instance is pinned to. Null means "follow
      * whatever [Pack.latestVersion] currently is". Pinning is the
@@ -68,4 +70,25 @@ data class PackInstance(
      * case, then writes the snapshot back.
      */
     val cachedManifest: CachedManifestSnapshot? = null,
+    /**
+     * Square pack icon, captured from the catalogue at install time. Drives the
+     * Library card avatar; null (local imports, pre-field instances) falls back
+     * to title initials.
+     */
+    val iconUrl: String? = null,
+    /**
+     * Wide banner, captured from the catalogue at install time. Backs the
+     * Library card; null falls back to procedural pixel art.
+     */
+    val bannerUrl: String? = null,
+    /**
+     * The set of files the pack itself laid down at install / last sync -- the
+     * update BASELINE. Captured by the installers (sha1 + size per file, reused from
+     * the source manifest). Null on instances created before this field existed (and
+     * on Local instances never installed from a remote source). The
+     * [hivens.core.update.UpdateReconciler] diffs a new version's target manifest
+     * against this baseline + the current on-disk state to decide what to add /
+     * update / safely delete, leaving user-added files (which are NOT in here) alone.
+     */
+    val installedManifest: FileManifest? = null,
 )

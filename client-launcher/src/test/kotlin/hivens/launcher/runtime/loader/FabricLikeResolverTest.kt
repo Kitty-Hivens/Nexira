@@ -10,6 +10,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FabricLikeResolverTest {
 
@@ -43,5 +44,34 @@ class FabricLikeResolverTest {
         val loader = profile.libraries.first { it.coord.groupArtifact == "net.fabricmc:fabric-loader" }
         assertEquals("https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.16.0/fabric-loader-0.16.0.jar", loader.url)
         assertNull(loader.sha1, "an omitted sha1 -> null (download without verification)")
+    }
+
+    @Test
+    fun `blank loader version resolves the latest stable, never an empty url segment`() = runTest {
+        // Meta list is newest-first; a newer non-stable precedes the newest stable.
+        val listJson = """
+            [ {"loader":{"version":"0.20.0","stable":false}},
+              {"loader":{"version":"0.19.3","stable":true}},
+              {"loader":{"version":"0.19.0","stable":true}} ]
+        """.trimIndent()
+        val profileJson = """{"mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient","libraries":[]}"""
+        val listUrl    = "https://meta.test/v2/versions/loader/1.21.1"
+        val profileUrl = "https://meta.test/v2/versions/loader/1.21.1/0.19.3/profile/json"
+        val requested = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            requested += req.url.toString()
+            when (req.url.toString()) {
+                listUrl    -> respond(listJson, HttpStatusCode.OK)
+                profileUrl -> respond(profileJson, HttpStatusCode.OK)
+                else       -> respond("nope", HttpStatusCode.NotFound)
+            }
+        }
+        val resolver = FabricLikeResolver(HttpClientProvider { HttpClient(engine) }, json, "fabric", "https://meta.test/v2")
+
+        val profile = resolver.resolve("1.21.1", "") // blank -> resolver default
+
+        assertEquals("net.fabricmc.loader.impl.launch.knot.KnotClient", profile.mainClass)
+        assertTrue(requested.none { it.contains("//profile/json") }, "must not build the empty-segment URL: $requested")
+        assertTrue(profileUrl in requested, "should fetch the newest STABLE loader's profile (0.19.3), not the newer 0.20.0")
     }
 }

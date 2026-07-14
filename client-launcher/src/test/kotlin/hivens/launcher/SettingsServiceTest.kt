@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.core.data.ModuleId
 import hivens.core.data.SettingsData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -95,6 +96,39 @@ class SettingsServiceTest {
             loaded.homeView,
             "unknown enum value must coerce to the field default",
         )
+    }
+
+    @Test
+    fun `disabledModules round-trips through the file`() {
+        val file = workDir / "settings.json"
+        SettingsService(json, file).saveSettings(
+            SettingsData(disabledModules = setOf(ModuleId.Keyring.id, ModuleId.Tray.id)),
+        )
+        val reloaded = SettingsService(json, file).getSettings()
+        assertEquals(setOf("keyring", "tray"), reloaded.disabledModules)
+    }
+
+    @Test
+    fun `an unknown module id survives decode without resetting other fields`() {
+        // disabledModules is Set<String>, not Set<ModuleId>, exactly so a newer
+        // build's id (or a typo) read by this build stays an inert string rather
+        // than tripping the coerce-to-default reset an enum-in-collection would --
+        // the same class of silent wipe the unknown-enum test above guards.
+        val file = workDir / "settings.json"
+        Files.writeString(
+            file,
+            """
+            {
+              "memoryMB": 8192,
+              "disabledModules": ["keyring", "future-module"]
+            }
+            """.trimIndent(),
+        )
+        val loaded = SettingsService(json, file).getSettings()
+        assertEquals(8192, loaded.memoryMB, "sibling fields must survive an unknown module id")
+        assertEquals(setOf("keyring", "future-module"), loaded.disabledModules)
+        assertEquals(ModuleId.Keyring, ModuleId.fromId("keyring"))
+        assertEquals(null, ModuleId.fromId("future-module"), "unknown id maps to no module")
     }
 
     @Test

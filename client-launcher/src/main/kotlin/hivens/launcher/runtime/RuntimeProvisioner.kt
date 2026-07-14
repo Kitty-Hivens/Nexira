@@ -212,6 +212,13 @@ class RuntimeProvisioner(
      * The rule-allowed vanilla libraries with maven coordinates -- the base of
      * the merge. Paths match [planVanillaDownloads]'s library destinations.
      */
+    /**
+     * Every Minecraft version id from Mojang's manifest, newest-first -- the
+     * source list for a version picker when creating a pack from scratch.
+     */
+    suspend fun availableMinecraftVersions(): List<String> =
+        json.decodeFromString(MojangVersionManifest.serializer(), fetchText(versionManifestUrl)).versions.map { it.id }
+
     internal fun vanillaLibraries(version: MojangVersion): List<ResolvedLibrary> =
         version.libraries.mapNotNull { lib ->
             if (!isLibraryAllowed(lib.rules)) return@mapNotNull null
@@ -431,28 +438,38 @@ class RuntimeProvisioner(
         if (Files.isRegularFile(task.dest) && (task.size <= 0 || Files.size(task.dest) == task.size)) {
             return
         }
-        val tmp = task.dest.resolveSibling("${task.dest.fileName}.tmp")
         Files.createDirectories(task.dest.parent)
-        runCatching { Files.deleteIfExists(tmp) }
-        httpClient.prepareGet(task.url).execute { resp ->
-            if (!resp.status.isSuccess()) throw IOException("GET ${task.url} -> HTTP ${resp.status}")
-            FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-        }
-        if (task.sha1.isNotBlank()) {
-            val actual = sha1Of(tmp)
-            if (!actual.equals(task.sha1, ignoreCase = true)) {
-                runCatching { Files.deleteIfExists(tmp) }
-                throw IOException("sha1 mismatch for ${task.url}: expected ${task.sha1}, got $actual")
+        // Unique temp per writer: the shared libraries root can be provisioned
+        // concurrently (a launch and an import fetching the same lib), so a fixed
+        // "<dest>.tmp" sibling would let two downloads clobber each other's bytes.
+        // The finally drops a partial temp on any failure.
+        val tmp = Files.createTempFile(task.dest.parent, "${task.dest.fileName}.", ".tmp")
+        try {
+            httpClient.prepareGet(task.url).execute { resp ->
+                if (!resp.status.isSuccess()) throw IOException("GET ${task.url} -> HTTP ${resp.status}")
+                FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
             }
+            if (task.sha1.isNotBlank()) {
+                val actual = sha1Of(tmp)
+                if (!actual.equals(task.sha1, ignoreCase = true)) {
+                    throw IOException("sha1 mismatch for ${task.url}: expected ${task.sha1}, got $actual")
+                }
+            }
+            moveAtomic(tmp, task.dest)
+        } finally {
+            runCatching { Files.deleteIfExists(tmp) }
         }
-        moveAtomic(tmp, task.dest)
     }
 
     private fun writeBytes(dest: Path, bytes: ByteArray) {
         Files.createDirectories(dest.parent)
-        val tmp = dest.resolveSibling("${dest.fileName}.tmp")
-        Files.write(tmp, bytes)
-        moveAtomic(tmp, dest)
+        val tmp = Files.createTempFile(dest.parent, "${dest.fileName}.", ".tmp")
+        try {
+            Files.write(tmp, bytes)
+            moveAtomic(tmp, dest)
+        } finally {
+            runCatching { Files.deleteIfExists(tmp) }
+        }
     }
 
     /** Places installer-bundled jar bytes into the shared root, skip-if-present. */
@@ -472,9 +489,13 @@ class RuntimeProvisioner(
             throw IOException("local library sha1 mismatch at $src: expected $sha1, got ${sha1Of(src)}")
         }
         Files.createDirectories(dest.parent)
-        val tmp = dest.resolveSibling("${dest.fileName}.tmp")
-        Files.copy(src, tmp, StandardCopyOption.REPLACE_EXISTING)
-        moveAtomic(tmp, dest)
+        val tmp = Files.createTempFile(dest.parent, "${dest.fileName}.", ".tmp")
+        try {
+            Files.copy(src, tmp, StandardCopyOption.REPLACE_EXISTING)
+            moveAtomic(tmp, dest)
+        } finally {
+            runCatching { Files.deleteIfExists(tmp) }
+        }
     }
 
     private fun moveAtomic(tmp: Path, dest: Path) {

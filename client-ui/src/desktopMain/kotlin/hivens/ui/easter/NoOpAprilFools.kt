@@ -1,21 +1,9 @@
 package hivens.ui.easter
 
-import androidx.compose.foundation.IndicationNodeFactory
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 
 /**
  * Default no-op implementation of [AprilFoolsLifecycle]. Returned by
@@ -66,42 +54,6 @@ object NoOpAprilFools : AprilFoolsLifecycle {
     ): ChaosCardTracker = NoOpCardTracker
 
     @Composable
-    override fun ChaosButton(
-        id: String,
-        text: String,
-        onClick: () -> Unit,
-        modifier: Modifier,
-        enabled: Boolean,
-        colors: ButtonColors,
-    ) {
-        // M3 1.11-alpha07 paints the default state-layer with a shape
-        // that does not match Button.shape; killing LocalIndication
-        // here drops the second overlay. Hover affordance survives as
-        // the cursor change.
-        CompositionLocalProvider(LocalIndication provides NoOpIndication) {
-            Button(
-                onClick   = onClick,
-                modifier  = modifier,
-                enabled   = enabled,
-                colors    = colors,
-                shape     = MaterialTheme.shapes.small,
-                // Skiko paints hoveredElevation shadow as a rect-blur
-                // outside the rounded clip; zero every elevation to
-                // suppress.
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation  = 0.dp,
-                    pressedElevation  = 0.dp,
-                    focusedElevation  = 0.dp,
-                    hoveredElevation  = 0.dp,
-                    disabledElevation = 0.dp,
-                ),
-            ) {
-                Text(text)
-            }
-        }
-    }
-
-    @Composable
     override fun WrapContent(
         pixelCursorState: State<Offset>,
         windowSize: IntSize,
@@ -128,25 +80,4 @@ private object NoOpCardTracker : ChaosCardTracker {
     override fun setOrigin(positionInWindow: Offset) = Unit
     override fun setOnClick(onClick: () -> Unit) = Unit
     override fun release() = Unit
-}
-
-/**
- * Indication that paints nothing -- the node it returns is an empty
- * [Modifier.Node] that doesn't react to any interaction. Used to
- * suppress M3's default ripple/state-layer on chaos buttons where
- * Compose Multiplatform 1.11 + M3 1.11-alpha07 was painting the
- * hover overlay with a shape that didn't line up with the Button
- * container.
- *
- * Implements [IndicationNodeFactory], the non-deprecated successor
- * to the old `Indication`/`IndicationInstance` pair. Singleton
- * object so equality / hashCode are by identity.
- */
-internal object NoOpIndication : IndicationNodeFactory {
-    private class EmptyNode : Modifier.Node()
-
-    override fun create(interactionSource: InteractionSource): DelegatableNode = EmptyNode()
-
-    override fun equals(other: Any?): Boolean = other === this
-    override fun hashCode(): Int = System.identityHashCode(this)
 }

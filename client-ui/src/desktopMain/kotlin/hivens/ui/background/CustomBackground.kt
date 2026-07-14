@@ -5,7 +5,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
@@ -18,54 +17,50 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import hivens.ui.theme.WallpaperTone
+import hivens.ui.theme.luminanceOfArgb
+import hivens.ui.theme.wallpaperToneFromImage
 import org.jetbrains.skia.Codec
 import org.jetbrains.skia.Data
 import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.makeFromFileName
 import org.slf4j.LoggerFactory
 import java.io.File
-import kotlin.time.Duration.Companion.milliseconds
 
 private val log = LoggerFactory.getLogger("CustomBackground")
-
-private const val MAX_ANIMATED_FRAMES        = 240
-private const val MAX_ANIMATED_PIXELS_TOTAL  = 1920L * 1080L * 60L
-
-private data class DecodedBg(
-    val frames: List<ImageBitmap>,
-    val durationsMs: List<Int>,
-    val repetitionCount: Int,
-)
 
 /**
  * Renders a custom background wallpaper behind the main app content.
  *
  * Supports: blur, darkening, opacity, parallax, vignette, color tint,
- * multiple scale modes, alignment control, and multi-frame animated
- * formats (GIF, APNG, animated WebP) decoded via Skiko Codec.
+ * multiple scale modes and alignment control. Still images decode through
+ * Skia; video and animated images (GIF, APNG, animated WebP) play through
+ * Skinema (see [rememberSkinemaFrame]).
  */
 @Composable
 fun CustomBackground(
     settings: BackgroundSettings,
     modifier: Modifier = Modifier,
-    mousePosProvider: () -> Offset = { Offset(0.5f, 0.5f) }
+    mousePosProvider: () -> Offset = { Offset(0.5f, 0.5f) },
+    onBackdrop: (BackdropState) -> Unit = {},
 ) {
-    if (!settings.enabled || settings.imagePath.isNullOrBlank()) return
-    val file = File(settings.imagePath)
-    if (!file.exists()) return
+    if (!settings.hasUsableImage()) {
+        LaunchedEffect(Unit) { onBackdrop(BackdropState.EMPTY) }
+        return
+    }
+    val file = File(settings.imagePath!!)
 
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedParallaxImage(
             file             = file,
             settings         = settings,
-            mousePosProvider = mousePosProvider
+            mousePosProvider = mousePosProvider,
+            onBackdrop       = onBackdrop,
         )
 
         // Darkening overlay
@@ -115,166 +110,144 @@ fun CustomBackground(
 private fun AnimatedParallaxImage(
     file: File,
     settings: BackgroundSettings,
-    mousePosProvider: () -> Offset
+    mousePosProvider: () -> Offset,
+    onBackdrop: (BackdropState) -> Unit,
 ) {
-    val contentScale = when (settings.scaleMode) {
-        ScaleMode.COVER    -> ContentScale.Crop
-        ScaleMode.CONTAIN  -> ContentScale.Fit
-        ScaleMode.STRETCH  -> ContentScale.FillBounds
-        ScaleMode.ORIGINAL -> ContentScale.None
-        ScaleMode.TILE     -> ContentScale.None
+    // Shared helpers (Backdrop.kt) so a frosted surface reproduces this exact
+    // transform when it redraws a blurred slice -- no drift between the two.
+    val contentScale = bgContentScale(settings.scaleMode)
+    val alignment = bgAlignment(settings.alignX, settings.alignY)
+
+    // Classify off the UI thread (png/webp need a frame-count probe); null
+    // until known, so the background draws nothing for a frame rather than
+    // blocking composition on file I/O.
+    val mediaKind by produceState<BackgroundMediaKind?>(null, file) {
+        value = withContext(Dispatchers.IO) { backgroundMediaKind(file) }
     }
 
-    val alignment = Alignment { size, space, _ ->
-        val x = ((space.width - size.width) * settings.alignX).toInt()
-        val y = ((space.height - size.height) * settings.alignY).toInt()
-        IntOffset(x, y)
+    // Still image decodes through Skia; video + animated images play through
+    // Skinema. Only the active branch composes, so switching media kind tears
+    // down the other's decode/player state.
+    val staticBitmap = if (mediaKind == BackgroundMediaKind.Static) rememberStaticImage(file) else null
+    // Material-You seed: static from the decoded bitmap (off-thread); video from its
+    // first decoded frame (via the player's onSeed). Either feeds BackdropState.seedArgb.
+    var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
+    val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased)
+        rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, settings.hardwareDecode, onSeed = { videoSeed = it }) else null
+    // Seed + brightness in ONE pixel read (a large wallpaper is tens of MB; two reads
+    // OOM'd). Video only exposes its seed, so brightness falls back to the seed's luma.
+    val staticTone by produceState<WallpaperTone?>(null, staticBitmap) {
+        value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { wallpaperToneFromImage(bmp) } }
     }
+    val seedArgb = staticTone?.seedArgb ?: videoSeed
+    val avgLuminance = staticTone?.avgLuminance ?: videoSeed?.let { luminanceOfArgb(it) }
 
-    val imageBitmap = rememberSkiaImage(file, settings.animationSpeedMultiplier, settings.loopMode)
+    val painter: Painter? = when {
+        staticBitmap != null -> remember(staticBitmap) { BitmapPainter(staticBitmap) }
+        else                 -> videoPainter
+    }
+    if (painter == null) return
 
-    if (imageBitmap != null) {
-        val useParallax = settings.parallaxIntensity > 0f
-        val baseModifier = Modifier
-            .fillMaxSize()
-            .let {
-                if (settings.blurRadius > 0f)
-                    it.blur(settings.blurRadius.dp, BlurredEdgeTreatment.Unbounded)
-                else it
-            }
-            .alpha(settings.opacity)
-
-        if (useParallax) {
-            val mousePos = mousePosProvider()
-            val targetX  = (0.5f - mousePos.x) * settings.parallaxIntensity * 80f
-            val targetY  = (0.5f - mousePos.y) * settings.parallaxIntensity * 80f
-            val parallaxX by animateFloatAsState(targetX, spring(stiffness = 50f, dampingRatio = 0.8f))
-            val parallaxY by animateFloatAsState(targetY, spring(stiffness = 50f, dampingRatio = 0.8f))
-            Image(
-                painter            = BitmapPainter(imageBitmap),
-                contentDescription = null,
-                contentScale       = contentScale,
-                alignment          = alignment,
-                modifier           = baseModifier.graphicsLayer {
-                    val extraScale = 1f + settings.parallaxIntensity * 0.15f
-                    scaleX       = extraScale
-                    scaleY       = extraScale
-                    translationX = parallaxX
-                    translationY = parallaxY
-                }
-            )
-        } else {
-            Image(
-                painter            = BitmapPainter(imageBitmap),
-                contentDescription = null,
-                contentScale       = contentScale,
-                alignment          = alignment,
-                modifier           = baseModifier
-            )
+    val isAnimated = mediaKind == BackgroundMediaKind.TimeBased
+    val tint = remember(settings.tintColor) {
+        settings.tintColor?.let {
+            try { Color(("FF" + it.removePrefix("#")).toLong(16)) } catch (_: Exception) { null }
         }
+    }
+    // Saturation applies at the Image, so it covers the static painter and every
+    // video frame alike; the frost slice mirrors it via BackdropState.saturation.
+    val saturationFilter = remember(settings.saturation) { bgSaturationFilter(settings.saturation) }
+    // Publish the wallpaper recipe for frosted surfaces. A still carries its
+    // bitmap so the frost redraws a real blurred slice; time-based publishes a
+    // null bitmap + isAnimated so the frost falls back to a scrim (per-frame
+    // reblur of video is too costly). Live parallax is read through
+    // mousePosProvider so mouse movement does not churn this.
+    LaunchedEffect(staticBitmap, settings, isAnimated, seedArgb, avgLuminance) {
+        onBackdrop(
+            BackdropState(
+                bitmap            = staticBitmap,
+                contentScale      = contentScale,
+                alignment         = alignment,
+                opacity           = settings.opacity,
+                bgBlurRadiusDp    = settings.blurRadius,
+                darken            = settings.darkenAmount,
+                tint              = tint,
+                tintOpacity       = settings.tintOpacity,
+                saturation        = settings.saturation,
+                parallaxIntensity = settings.parallaxIntensity,
+                isAnimated        = isAnimated,
+                seedArgb          = seedArgb,
+                avgLuminance      = avgLuminance,
+                mouse             = mousePosProvider,
+            ),
+        )
+    }
+
+    val useParallax = settings.parallaxIntensity > 0f
+    // alpha OUTSIDE the blur (leftmost = outermost): an opacity tick then only
+    // recomposites the cached blurred layer. With alpha inside, every tick of
+    // the opacity slider invalidated the blur's input and re-blurred the whole
+    // wallpaper -- the slider-drag jank. Uniform alpha commutes with a linear
+    // blur, so the output is identical.
+    val baseModifier = Modifier
+        .fillMaxSize()
+        .alpha(settings.opacity)
+        .let {
+            if (settings.blurRadius > 0f)
+                it.blur(settings.blurRadius.dp, BlurredEdgeTreatment.Unbounded)
+            else it
+        }
+
+    if (useParallax) {
+        val target = parallaxTranslationFor(mousePosProvider(), settings.parallaxIntensity)
+        val parallaxX by animateFloatAsState(target.x, spring(stiffness = 50f, dampingRatio = 0.8f))
+        val parallaxY by animateFloatAsState(target.y, spring(stiffness = 50f, dampingRatio = 0.8f))
+        Image(
+            painter            = painter,
+            contentDescription = null,
+            contentScale       = contentScale,
+            alignment          = alignment,
+            colorFilter        = saturationFilter,
+            modifier           = baseModifier.graphicsLayer {
+                val extraScale = parallaxScaleFor(settings.parallaxIntensity)
+                scaleX       = extraScale
+                scaleY       = extraScale
+                translationX = parallaxX
+                translationY = parallaxY
+            }
+        )
+    } else {
+        Image(
+            painter            = painter,
+            contentDescription = null,
+            contentScale       = contentScale,
+            alignment          = alignment,
+            colorFilter        = saturationFilter,
+            modifier           = baseModifier
+        )
     }
 }
 
 @Composable
-private fun rememberSkiaImage(
-    file: File,
-    speedMultiplier: Float,
-    loopMode: BackgroundLoopMode,
-): ImageBitmap? {
-    var decoded  by remember(file) { mutableStateOf<DecodedBg?>(null) }
-    var frameIdx by remember(file) { mutableStateOf(0) }
-    val speedRef = rememberUpdatedState(speedMultiplier)
-
+private fun rememberStaticImage(file: File): ImageBitmap? {
+    var bitmap by remember(file) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(file) {
         if (!file.exists()) return@LaunchedEffect
-        withContext(Dispatchers.IO) {
-            decoded = decodeBackground(file) { preview -> decoded = preview }
-        }
+        withContext(Dispatchers.IO) { bitmap = decodeStaticBackground(file) }
     }
-
-    val d = decoded ?: return null
-    if (d.frames.size <= 1) {
-        return d.frames.firstOrNull()
-    }
-
-    // Skia spec: repetitionCount = N means N additional plays after the
-    // first. -1 = loop forever, 0 = play once. loopMode lets the user
-    // override the codec's stored hint -- LoopForever for ambient bg use,
-    // PlayOnce when they want the intro-frame settle pattern. Slider
-    // changes mid-play take effect on the next frame swap
-    // (rememberUpdatedState keeps the captured ref fresh without
-    // restarting the effect).
-    LaunchedEffect(d, loopMode) {
-        val totalPlays = when (loopMode) {
-            BackgroundLoopMode.LoopForever -> Int.MAX_VALUE
-            BackgroundLoopMode.PlayOnce    -> 1
-            BackgroundLoopMode.UseCodec    ->
-                if (d.repetitionCount < 0) Int.MAX_VALUE else d.repetitionCount + 1
-        }
-        var played = 0
-        while (played < totalPlays) {
-            for (i in d.frames.indices) {
-                frameIdx = i
-                val speed   = speedRef.value.coerceAtLeast(0.01f)
-                val waitMs  = (d.durationsMs[i] / speed).toLong().coerceAtLeast(1L)
-                delay(waitMs.milliseconds)
-            }
-            played++
-        }
-        // PlayOnce / finite codec: hold on the last frame.
-        frameIdx = d.frames.lastIndex
-    }
-
-    return d.frames[frameIdx.coerceIn(0, d.frames.lastIndex)]
+    return bitmap
 }
 
-private fun decodeBackground(file: File, onPreview: (DecodedBg) -> Unit = {}): DecodedBg? {
+private fun decodeStaticBackground(file: File): ImageBitmap? {
     var data:  Data?  = null
     var codec: Codec? = null
-    try {
+    return try {
         data  = Data.makeFromFileName(file.absolutePath)
         codec = Codec.makeFromData(data)
-        val frameCount = codec.frameCount
-        val info       = codec.imageInfo
-
-        // Frame 0 first -- becomes the final result for statics and
-        // the preview emit for multi-frame formats so the user sees
-        // the image immediately instead of grey while the remaining
-        // N-1 frames decode.
-        val frame0 = decodeFrame(codec, info, frame = 0)
-        val preview = DecodedBg(
-            frames          = listOf(frame0),
-            durationsMs     = listOf(0),
-            repetitionCount = 0,
-        )
-
-        if (frameCount <= 1) return preview
-
-        val pixelsTotal = info.width.toLong() * info.height.toLong() * frameCount.toLong()
-        if (frameCount > MAX_ANIMATED_FRAMES || pixelsTotal > MAX_ANIMATED_PIXELS_TOTAL) {
-            log.warn(
-                "Animated bg too large (frames={}, ~{}MB raw) -- using frame 0 only",
-                frameCount, pixelsTotal * 4 / 1_048_576,
-            )
-            return preview
-        }
-
-        // Emit the preview so the user sees frame 0 while frames
-        // 1..N-1 decode below.
-        onPreview(preview)
-
-        val frames    = ArrayList<ImageBitmap>(frameCount).also { it.add(frame0) }
-        val durations = ArrayList<Int>(frameCount).also { it.add(codec.framesInfo[0].duration.coerceAtLeast(1)) }
-        val infos     = codec.framesInfo
-        for (i in 1 until frameCount) {
-            frames.add(decodeFrame(codec, info, frame = i))
-            // delay() of 0 spins -- guarantee positive duration per frame.
-            durations.add(infos[i].duration.coerceAtLeast(1))
-        }
-        return DecodedBg(frames, durations, codec.repetitionCount)
+        decodeFrame(codec, codec.imageInfo, frame = 0)
     } catch (e: Exception) {
-        log.error("Failed to decode custom background at {}", file.absolutePath, e)
-        return null
+        log.error("Failed to decode static background at {}", file.absolutePath, e)
+        null
     } finally {
         codec?.close()
         data?.close()

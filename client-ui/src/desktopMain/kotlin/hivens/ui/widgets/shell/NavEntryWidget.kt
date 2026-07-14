@@ -17,16 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,24 +25,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import hivens.ui.Screen
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.easter.LocalAprilFools
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 import kotlin.math.sin
 import kotlin.random.Random
+import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 // One configurable nav-rail item. `target` selects what the item does --
 // a screen navigation, the console-window toggle, or logout. The whole
@@ -64,7 +56,7 @@ import kotlin.random.Random
 // enum: it reads composition locals + koin and the enum must stay a plain
 // serializable value.
 @Serializable
-enum class NavTarget { Home, Library, Browse, Profile, Settings, About, Console, Logout }
+enum class NavTarget { Home, Library, Browse, Profile, Wardrobe, Settings, About, Console, Logout }
 
 @Serializable
 data class NavEntryProps(
@@ -80,44 +72,51 @@ fun NavEntry(instance: WidgetInstance) {
 
     when (p.target) {
         NavTarget.Home -> NavSlot(
-            icon         = Icons.Default.Home,
-            outlinedIcon = NavOutlinedIcons.home,
+            icon         = NxIcon.Home,
+            outlineSwap  = true,
             phase        = 0.0f,
             active       = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
             onClick      = { ctx.onScreenChange(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
-            icon         = Icons.Default.Star,
-            outlinedIcon = NavOutlinedIcons.library,
+            icon         = NxIcon.Star,
+            outlineSwap  = true,
             phase        = 0.55f,
             active       = screen is Screen.Library || screen is Screen.PackDetail,
             onClick      = { ctx.onScreenChange(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(
-            icon         = Icons.Default.Search,
-            outlinedIcon = NavOutlinedIcons.browse,
+            icon         = NxIcon.Search,
+            outlineSwap  = true,
             phase        = 1.65f,
-            active       = screen is Screen.Browse || screen is Screen.BrowsePackDetail,
+            active       = screen is Screen.Browse || screen is Screen.CataloguePackDetail,
             onClick      = { ctx.onScreenChange(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
-            icon         = Icons.Default.Person,
-            outlinedIcon = NavOutlinedIcons.profile,
+            icon         = NxIcon.Person,
+            outlineSwap  = true,
             phase        = 1.1f,
             active       = screen is Screen.Profile,
             onClick      = { ctx.onScreenChange(Screen.Profile) },
         )
+        NavTarget.Wardrobe -> NavSlot(
+            icon         = NxIcon.Palette,
+            outlineSwap  = true,
+            phase        = 1.6f,
+            active       = screen is Screen.Wardrobe,
+            onClick      = { ctx.onScreenChange(Screen.Wardrobe) },
+        )
         NavTarget.Settings -> NavSlot(
-            icon         = Icons.Default.Settings,
-            outlinedIcon = NavOutlinedIcons.settings,
+            icon         = NxIcon.Settings,
+            outlineSwap  = true,
             phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
-                screen is Screen.BackgroundSettings || screen is Screen.CustomizationExtension,
+                screen is Screen.BackgroundSettings,
             onClick      = { ctx.onScreenChange(Screen.Settings) },
         )
         NavTarget.About -> NavSlot(
-            icon         = Icons.Default.Info,
-            outlinedIcon = NavOutlinedIcons.about,
+            icon         = NxIcon.Info,
+            outlineSwap  = true,
             phase        = 3.3f,
             active       = screen is Screen.About,
             onClick      = { ctx.onScreenChange(Screen.About) },
@@ -125,7 +124,7 @@ fun NavEntry(instance: WidgetInstance) {
         NavTarget.Console -> {
             val gameConsole: GameConsoleService = koinInject()
             NavSlot(
-                icon          = Icons.Default.Build,
+                icon          = NxIcon.Build,
                 phase         = 0.0f,
                 active        = gameConsole.shouldShowConsole,
                 chaosEligible = false,
@@ -138,11 +137,11 @@ fun NavEntry(instance: WidgetInstance) {
             // free of auth-state vocabulary.
             if (!ctx.isAuthenticated) return
             NavSlot(
-                icon          = Icons.AutoMirrored.Filled.ExitToApp,
+                icon          = NxIcon.ExitToApp,
                 phase         = 0.0f,
                 active        = false,
                 chaosEligible = false,
-                iconTint      = CelestiaTheme.colors.error.copy(alpha = 0.75f),
+                iconTint      = NxTheme.colors.error.copy(alpha = 0.75f),
                 onClick       = ctx.onLogout,
             )
         }
@@ -160,17 +159,18 @@ fun NavEntry(instance: WidgetInstance) {
 // (Pill is the original Material capsule). The decoration is drawn behind /
 // around the icon; the icon and decoration share the selection accent
 // ([CustomizationSettings.navSelectionAccent], else the theme primary).
-// [outlinedIcon] is the idle-state twin used when the user enables the
-// filled<->outlined icon swap; null keeps the filled icon in both states.
+// [outlineSwap] marks a screen-nav entry whose idle icon switches to the
+// outlined FILL-axis form when the user enables the swap; service entries
+// stay filled in both states.
 @Composable
 private fun NavSlot(
-    icon: ImageVector,
+    icon: IconKey,
     phase: Float,
     active: Boolean,
     enabled: Boolean = true,
     chaosEligible: Boolean = true,
     iconTint: Color? = null,
-    outlinedIcon: ImageVector? = null,
+    outlineSwap: Boolean = false,
     onClick: () -> Unit,
 ) {
     val af = LocalAprilFools.current
@@ -208,26 +208,28 @@ private fun NavSlot(
     // Selection accent: the user's nav override, else the theme primary -- so
     // by default it tracks the palette / accent override. Shared by the icon
     // tint and every decoration.
-    val accent = cz.navSelectionAccent?.toWidgetColorOrNull() ?: CelestiaTheme.colors.primary
+    val accent = cz.navSelectionAccent?.toWidgetColorOrNull() ?: NxTheme.colors.primary
     val iconColor = when {
         iconTint != null -> iconTint
         active           -> accent
-        else             -> CelestiaTheme.colors.textSecondary.copy(alpha = if (enabled) 0.70f else 0.20f)
+        else             -> NxTheme.colors.textSecondary.copy(alpha = if (enabled) 0.70f else 0.20f)
     }
-    // Filled when selected; outlined twin when the user opted into the swap and
-    // this entry is idle. Service entries pass no twin and stay filled.
-    val shownIcon = if (cz.navSelectionOutlineIcons && !active && outlinedIcon != null) outlinedIcon else icon
+    val iconFill = if (outlineSwap && !active && cz.navSelectionOutlineIcons) 0f else 1f
 
-    // 13% fill matches the original Material indicator alpha; LeftBar / Dot use
-    // the solid accent since they are thin marks, not a backing.
-    val fill = accent.copy(alpha = 0.13f)
+    // The rail sits over the wallpaper, so the backing needs more presence than
+    // the original 13% Material indicator alpha to read as selected -- 22% keeps
+    // it at least as strong as the settings side-nav (18% on a section plane).
+    // LeftBar / Dot use the solid accent since they are thin marks, not a backing.
+    val fill = accent.copy(alpha = 0.22f)
     val interaction = remember { MutableInteractionSource() }
 
     Box(Modifier.graphicsLayer { translationY = offsetY }) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                // Taller than the icon so the slots tile flush (rail spacing is 0)
+                // and the breathing room between buttons stays inside the hit area.
+                .height(54.dp)
                 .selectable(
                     selected          = active,
                     enabled           = enabled,
@@ -269,10 +271,10 @@ private fun NavSlot(
                     NavSelectionStyle.None -> Unit
                 }
             }
-            Icon(
-                imageVector        = shownIcon,
+            Symbol(icon = icon,
                 contentDescription = null,
                 tint               = iconColor,
+                fill               = iconFill,
                 modifier           = Modifier.size(24.dp),
             )
         }

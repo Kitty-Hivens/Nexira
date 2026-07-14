@@ -1,6 +1,5 @@
 package hivens.ui.editor.presets
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,15 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,15 +26,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,10 +40,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.nx.NxButton
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // Modal preset manager. Reached via the "Presets" chip on the
@@ -65,15 +58,16 @@ import kotlinx.coroutines.withContext
 fun PresetManagerPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
-    onSaveCurrent: (String) -> Unit,
+    onSaveCurrent: suspend (String) -> Unit,
     onLoad: (PresetMeta) -> Unit,
-    onDelete: (PresetMeta) -> Unit,
+    onDelete: suspend (PresetMeta) -> Unit,
     onExport: (PresetMeta) -> Unit,
     listProvider: () -> List<PresetMeta>,
 ) {
     if (!visible) return
 
     val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
     var presets by remember(visible) { mutableStateOf(emptyList<PresetMeta>()) }
     var newName by remember(visible) { mutableStateOf("") }
     // Init empty + load off the UI thread: listProvider() is a directory scan and
@@ -85,13 +79,12 @@ fun PresetManagerPanel(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            color           = CelestiaTheme.colors.surface,
-            shape           = RoundedCornerShape(16.dp),
+            color           = NxTheme.colors.surface,
+            shape           = MaterialTheme.shapes.large,
             shadowElevation = 18.dp,
             modifier        = Modifier
                 .width(520.dp)
-                .height(620.dp)
-                .shadow(elevation = 24.dp, shape = RoundedCornerShape(16.dp)),
+                .height(620.dp),
         ) {
             Column(Modifier.fillMaxSize().padding(20.dp)) {
                 // Header
@@ -101,30 +94,29 @@ fun PresetManagerPanel(
                     modifier              = Modifier.fillMaxWidth(),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector        = Icons.Default.Inventory2,
+                        Symbol(icon = NxIcon.Inventory2,
                             contentDescription = null,
-                            tint               = CelestiaTheme.colors.primary,
+                            tint               = NxTheme.colors.primary,
                             modifier           = Modifier.size(22.dp),
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
                             text       = s.editorPresetsTitle,
                             style      = MaterialTheme.typography.titleMedium,
-                            color      = CelestiaTheme.colors.textPrimary,
+                            color      = NxTheme.colors.textPrimary,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = s.editorClose,
-                             tint = CelestiaTheme.colors.textSecondary)
+                        Symbol(NxIcon.Close, contentDescription = s.editorClose,
+                             tint = NxTheme.colors.textSecondary)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text  = s.editorPresetsIntro,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -135,7 +127,7 @@ fun PresetManagerPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.55f))
+                        .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.55f))
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     BasicTextField(
@@ -143,16 +135,16 @@ fun PresetManagerPanel(
                         onValueChange = { newName = it },
                         singleLine    = true,
                         textStyle     = TextStyle(
-                            color    = CelestiaTheme.colors.textPrimary,
+                            color    = NxTheme.colors.textPrimary,
                             fontSize = 14.sp,
                         ),
-                        cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                        cursorBrush   = SolidColor(NxTheme.colors.primary),
                         modifier      = Modifier.weight(1f),
                         decorationBox = { inner ->
                             if (newName.isEmpty()) {
                                 Text(
                                     text  = s.editorPresetNamePlaceholder,
-                                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                                    color = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
@@ -160,26 +152,26 @@ fun PresetManagerPanel(
                         },
                     )
                     Spacer(Modifier.width(10.dp))
-                    Button(
+                    NxButton(
+                        label   = s.editorSave,
                         onClick = {
                             val n = newName.trim()
                             if (n.isNotEmpty()) {
-                                onSaveCurrent(n)
-                                newName = ""
-                                presets = listProvider()
+                                scope.launch {
+                                    onSaveCurrent(n)
+                                    newName = ""
+                                    // Reload AFTER the write lands (and off the UI
+                                    // thread): listing before the suspend save
+                                    // completed showed a stale set missing the
+                                    // just-saved preset.
+                                    presets = withContext(Dispatchers.IO) { listProvider() }
+                                }
                             }
                         },
-                        shape   = RoundedCornerShape(8.dp),
+                        icon    = NxIcon.Save,
                         enabled = newName.isNotBlank(),
-                        colors  = ButtonDefaults.buttonColors(
-                            containerColor = CelestiaTheme.colors.primary,
-                            contentColor   = Color.White,
-                        ),
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(s.editorSave, fontWeight = FontWeight.Medium)
-                    }
+                        compact = true,
+                    )
                 }
 
                 Spacer(Modifier.height(16.dp))
@@ -187,7 +179,7 @@ fun PresetManagerPanel(
                 Text(
                     text       = s.editorPresetsSaved(presets.size),
                     style      = MaterialTheme.typography.labelMedium,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -198,13 +190,13 @@ fun PresetManagerPanel(
                             .fillMaxWidth()
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.35f)),
+                            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.35f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text  = s.editorPresetsEmpty,
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                 } else {
@@ -217,8 +209,10 @@ fun PresetManagerPanel(
                                 meta     = meta,
                                 onLoad   = { onLoad(meta) },
                                 onDelete = {
-                                    onDelete(meta)
-                                    presets = listProvider()
+                                    scope.launch {
+                                        onDelete(meta)
+                                        presets = withContext(Dispatchers.IO) { listProvider() }
+                                    }
                                 },
                                 onExport = { onExport(meta) },
                             )
@@ -243,14 +237,14 @@ private fun PresetRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.55f))
+            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.55f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Column(Modifier.weight(1f)) {
             Text(
                 text       = meta.name,
                 style      = MaterialTheme.typography.bodyLarge,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -258,35 +252,24 @@ private fun PresetRow(
             Text(
                 text       = formatTime(meta.createdAt),
                 style      = MaterialTheme.typography.labelSmall,
-                color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f),
+                color      = NxTheme.colors.textSecondary.copy(alpha = 0.75f),
                 fontFamily = LocalMonoFamily.current,
             )
         }
         Spacer(Modifier.width(8.dp))
-        Button(
-            onClick = onLoad,
-            shape   = RoundedCornerShape(8.dp),
-            colors  = ButtonDefaults.buttonColors(
-                containerColor = CelestiaTheme.colors.primary,
-                contentColor   = Color.White,
-            ),
-        ) {
-            Text(s.editorApply, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.labelMedium)
-        }
+        NxButton(label = s.editorApply, onClick = onLoad, compact = true)
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector        = Icons.Default.Upload,
+            Symbol(icon = NxIcon.Upload,
                 contentDescription = s.editorExport,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(18.dp),
             )
         }
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector        = Icons.Default.Delete,
+            Symbol(icon = NxIcon.Delete,
                 contentDescription = s.editorDelete,
-                tint               = CelestiaTheme.colors.error,
+                tint               = NxTheme.colors.error,
                 modifier           = Modifier.size(18.dp),
             )
         }

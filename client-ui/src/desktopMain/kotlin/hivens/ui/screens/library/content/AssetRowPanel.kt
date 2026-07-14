@@ -11,11 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,9 +26,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtAssetEntry
+import hivens.ui.components.SourceBadge
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 
 /**
  * One asset row -- resourcepack / shaderpack / config / generic file
@@ -60,10 +58,9 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier              = Modifier.fillMaxWidth(),
         ) {
-            Icon(
-                imageVector        = Icons.Default.Folder,
+            Symbol(icon = NxIcon.Folder,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.primary.copy(alpha = 0.8f),
+                tint               = NxTheme.colors.primary.copy(alpha = 0.8f),
                 modifier           = Modifier.size(20.dp),
             )
 
@@ -71,7 +68,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                 Text(
                     text       = asset.dest,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
@@ -80,20 +77,20 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                     Text(
                         text  = s.contentTabAssetSizeLabel(asset.sizeBytes / 1024L),
                         style = MaterialTheme.typography.labelSmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                     asset.display?.category?.takeIf { it.isNotBlank() }?.let { cat ->
                         Text(
                             text  = "· $cat",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                     if (!asset.required) {
                         Text(
                             text  = "· ${s.contentTabAssetOptional}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                 }
@@ -101,10 +98,9 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
 
             SourceBadge(asset.source)
 
-            Icon(
-                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(20.dp),
             )
         }
@@ -118,7 +114,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                 Text(
                     text     = s.contentTabAssetNoDescription,
                     style    = MaterialTheme.typography.bodySmall,
-                    color    = CelestiaTheme.colors.textSecondary,
+                    color    = NxTheme.colors.textSecondary,
                     modifier = Modifier.padding(start = 30.dp),
                 )
             }

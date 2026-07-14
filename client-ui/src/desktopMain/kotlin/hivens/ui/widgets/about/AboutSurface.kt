@@ -3,31 +3,17 @@ package hivens.ui.widgets.about
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.delay
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.jvm.SystemHardware
 import hivens.core.jvm.SystemMemory
@@ -39,10 +25,10 @@ import hivens.ui.layout.AdaptiveWidth
 import hivens.ui.layout.WidthClass
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -201,24 +187,7 @@ fun AboutSurface(onBack: () -> Unit) {
                 WidthClass.Compact  -> 12.dp
             }
             Column(Modifier.fillMaxSize().padding(pad)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = s.navBack,
-                            tint               = CelestiaTheme.colors.textPrimary,
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text       = s.aboutTitle,
-                        style      = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color      = CelestiaTheme.colors.textPrimary,
-                    )
-                }
-                Spacer(Modifier.height(if (widthClass == WidthClass.Expanded) 20.dp else 12.dp))
-
+                // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
                 if (widthClass == WidthClass.Expanded) {
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         SlotRenderer(
@@ -235,11 +204,9 @@ fun AboutSurface(onBack: () -> Unit) {
                         )
                     }
                 } else {
-                    // Too narrow to split side by side: stack the columns. Each
-                    // half stays height-bounded (weight) so the credits widget's
-                    // own scroll keeps working; the right half has no inner scroll,
-                    // so it gets one to keep its fixed cards reachable. (A single
-                    // outer scroll would collide with the credits' inner scroll.)
+                    // Too narrow for side-by-side: stack the slots, each weight-bounded
+                    // so a self-scrolling widget has a height to scroll within. No
+                    // verticalScroll on a slot -- it would collide with that inner scroll.
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SlotRenderer(
                             SurfaceId(SURFACE),
@@ -250,7 +217,7 @@ fun AboutSurface(onBack: () -> Unit) {
                         SlotRenderer(
                             SurfaceId(SURFACE),
                             SlotId("right"),
-                            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
                             spacing  = 16.dp,
                         )
                     }

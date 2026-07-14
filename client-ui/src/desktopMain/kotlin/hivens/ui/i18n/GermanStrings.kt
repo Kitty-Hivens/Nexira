@@ -16,17 +16,25 @@ object GermanStrings : AppStrings {
     override val loginErrorEmpty   = "Benutzername und Passwort eingeben"
     override val loginErrorGeneric = "Anmeldefehler"
     override val loginRegister     = "Konto erstellen"
+    override val loginPlayOffline  = "Offline spielen"
+    override val loginMicrosoft    = "Mit Microsoft anmelden"
+    override val msaTitle          = "Microsoft-Anmeldung"
+    override val msaInstruction    = "Diese Seite öffnen und den Code eingeben:"
+    override val msaCopyCode       = "Code kopieren"
+    override val msaOpenBrowser    = "Seite öffnen"
+    override val msaWaiting        = "Warten auf Bestätigung..."
 
     // Navigation
     override val navLogout   = "Abmelden"
     override val navBack     = "Zurück"
+    override val navForward  = "Vorwärts"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WILLKOMMEN ZURÜCK, $name"
     override val dashboardServers              = "VERFÜGBARE SERVER"
     override val dashboardServersEmpty         = "Keine Server gefunden"
     override val dashboardLoginRequiredTitle   = "Anmelden, um Server zu sehen"
-    override val dashboardLoginRequiredHint    = "Bitte die rechte Seitenleiste zur Anmeldung verwenden. Die Serverliste ist auf SMARTYcraft nur nach Anmeldung verfügbar."
+    override val dashboardLoginRequiredHint    = "Die SmartyCraft-Serverliste ist nur nach Anmeldung verfügbar. Anmeldung im Bereich Profil."
 
     // Launch Control
     override val launchReady       = "Bereit zum Spielen"
@@ -34,6 +42,8 @@ object GermanStrings : AppStrings {
     override val launchAbort       = "Abbrechen"
     override val launchRunning     = "Spiel läuft"
     override val launchDownloading = "Herunterladen:"
+    override val launchPreparing   = "Vorbereitung"
+    override val launchFailed      = "Start fehlgeschlagen"
 
     // Launcher States
     override val stateInit        = "Initialisierung..."
@@ -78,6 +88,12 @@ object GermanStrings : AppStrings {
     override val settingsThemePicker        = "Design auswählen"
     override val settingsThemePickerSub     = "Farbschema anpassen"
     override val settingsDarkTheme          = "Dunkles Design"
+    override val settingsDarkThemeDesc      = "Dunkles Oberflächen-Design"
+    override val settingsThemeModeTitle             = "Themenquelle"
+    override val settingsThemeModeManual            = "Manuell"
+    override val settingsThemeModeSystem            = "System"
+    override val settingsThemeModeWallpaper         = "Hintergrund"
+    override val settingsThemeModeSystemUnavailable = "Systemschema ist in dieser Umgebung nicht verfügbar"
     override val settingsCloseAfterLaunch   = "Launcher nach Spielstart in Tray minimieren"
     override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet."
     override val settingsSaved              = "Einstellungen gespeichert"
@@ -105,6 +121,12 @@ object GermanStrings : AppStrings {
     override val newsFilterClear        = "Filter zurücksetzen"
     override val railCollapse           = "Leiste einklappen"
     override val railExpand             = "Leiste ausklappen"
+    override val windowMinimize         = "Minimieren"
+    override val windowMaximize         = "Maximieren"
+    override val windowRestore          = "Wiederherstellen"
+    override val windowClose            = "Schließen"
+    override val crumbHome              = "Start"
+    override val crumbLoading           = "Wird geladen…"
     override val paginationPrev         = "Vorherige Seite"
     override val paginationNext         = "Nächste Seite"
 
@@ -129,8 +151,6 @@ object GermanStrings : AppStrings {
 
     override val serverSettingsResetConfirmTitle = "Client zurücksetzen?"
     override val serverSettingsResetConfirmBody  = "Alle heruntergeladenen Dateien des Clients dieses Servers werden unwiderruflich gelöscht."
-    override val customizationResetConfirmTitle  = "Anpassungen zurücksetzen?"
-    override val customizationResetConfirmBody   = "Alle Anpassungs-Überschreibungen (Farben, Dichte, Form) kehren auf die Standardwerte zurück."
     override val backgroundResetConfirmTitle     = "Hintergrund zurücksetzen?"
     override val backgroundResetConfirmBody      = "Die gesamte Konfiguration des eigenen Hintergrunds kehrt auf die Standardwerte zurück."
     override val logoutConfirmTitle              = "Abmelden?"
@@ -186,6 +206,7 @@ object GermanStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Debug-Konsole"
+    override val consoleEmptyHint = "Alles ruhig. Starte ein Pack, dann laufen die Logs hier ein."
     override fun consoleHeaderCount(filtered: Int, total: Int) = "Spielausgabe ($filtered/$total)"
     override val consoleCopyAll = "Alles kopieren"
     override val consoleClear   = "Leeren"
@@ -271,11 +292,11 @@ object GermanStrings : AppStrings {
     // =========================================================================
     // Custom Background
     // =========================================================================
-    override val backgroundTitle          = "Benutzerdefinierter Hintergrund"
-    override val backgroundSubtitle       = "Launcher-Hintergrund anpassen"
+    override val backgroundTitle          = "Erscheinungsbild"
+    override val backgroundSubtitle       = "Hintergrund, Thema und Palette des Launchers"
     override val backgroundEnable         = "Aktivieren"
-    override val backgroundSectionImage   = "Bild"
-    override val backgroundPickFile       = "Hintergrundbild auswählen"
+    override val backgroundSectionImage   = "Bild oder Video"
+    override val backgroundPickFile       = "Hintergrundbild oder -video auswählen"
     override val backgroundPickButton     = "Datei auswählen"
     override val backgroundSectionScale   = "Skalierung"
     override val backgroundScaleCover     = "Füllen"
@@ -311,7 +332,7 @@ object GermanStrings : AppStrings {
     // =========================================================================
     // About Screen
     // =========================================================================
-    override val aboutTitle                = "ÜBER DEN LAUNCHER"
+    override val aboutTitle                = "Über den Launcher"
     override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
     override val locale = java.util.Locale.GERMAN
     override fun aboutBuildDate(date: String) = "Erstellt: $date"
@@ -352,8 +373,6 @@ object GermanStrings : AppStrings {
     override val trayStatusIdle    = "Wartend"
     override val trayStatusRunning = "Spiel läuft"
     override val trayShow          = "Launcher anzeigen"
-    override val trayServers       = "Server"
-    override val trayNoServers     = "Keine Server geladen"
     override val trayHintTitle     = "Nexira läuft weiter"
     override val trayHintBody      = "Das Fenster liegt im System-Tray. Klicke auf das Tray-Symbol, um es zurückzuholen."
     override val trayHintShow      = "Fenster anzeigen"
@@ -441,9 +460,9 @@ object GermanStrings : AppStrings {
     override val settingsOpenSmrtHelperDesc       = "Ersetzt den originalen Smarty-Mod auf Smarty-Servern durch unseren quelloffenen Helfer. Dieselben Netzwerkfunktionen, aber ohne Überwachung. Gibt es für die Spielversion keinen Ersatz, wird der Start blockiert statt den Original-Mod auszuführen."
     override val settingsStrictModCheckTitle      = "Genaue Mod-Prüfung"
     override val settingsStrictModCheckDesc       = "Löscht nach der Synchronisierung alles im Mods-Ordner, was der Server nicht angefordert hat. Hält die Installation sauber, entfernt aber auch von Hand hinzugefügte Mods."
-    override val settingsNetworkAgentTitle        = "Netzwerk-Agent verwenden?"
+    override val settingsNetworkAgentTitle        = "Netzwerk-Agent verwenden"
     override val settingsNetworkAgentDesc         = "Richtet die Anmeldung des Spiels beim Start auf SmartyCraft aus: den Server-Beitritt und die Skin-Prüfung. Der Beitritt läuft dann über SmartyCraft und Skins werden weiterhin geladen, ohne SmartyCrafts gepatchte Anmelde-Bibliothek einzuspielen. Nötig, um SmartyCraft-Servern beizutreten."
-    override val settingsSmartyAuthLibTitle       = "SmartyCrafts Anmelde-Bibliothek verwenden?"
+    override val settingsSmartyAuthLibTitle       = "SmartyCrafts Anmelde-Bibliothek verwenden"
     override val settingsSmartyAuthLibDesc        = "Der ältere Weg: SmartyCrafts gepatchte Anmelde-Bibliothek aus dessen Client nehmen und statt der originalen in die Sammlung legen. Durch den Netzwerk-Agenten oben ersetzt und als Reserve behalten. Lässt sich die Datei nicht beziehen, wird der Start blockiert. Standardmäßig aus."
 
     override val settingsSectionDataDir       = "Datenverzeichnis"
@@ -596,41 +615,101 @@ object GermanStrings : AppStrings {
     override val settingsCategoryExperimental = "Experimentell"
     override val settingsCategoryAdvanced     = "Erweitert"
     override val settingsCategoryDiagnostics  = "Diagnose"
+    override val settingsCategoryConsole      = "Konsole"
+    override val consoleSecDisplay            = "Anzeige"
+    override val consoleSecColors             = "Severity-Farben"
+    override val consoleSecFontSize           = "Schriftgröße"
+    override val consoleSecWrap               = "Zeilenumbruch"
+    override val consoleSecGutter             = "Severity-Leiste"
+    override val consoleSecTimestamps         = "Zeitstempel"
+    override val consoleSecBuffer             = "Zeilenpuffer"
+    override val consoleSecColorInfo          = "Info"
+    override val consoleSecColorWarn          = "Warn"
+    override val consoleSecColorError         = "Error"
+    override val consoleSecColorAuto          = "Auto"
+    override val consoleSecApplyNote          = "Änderungen greifen beim nächsten Öffnen der Konsole."
+    override val consoleSecHighlightRules     = "Hervorhebungsregeln"
+    override val consoleSecFilterRules        = "Filter / Stumm"
+    override val consoleSecAddRule            = "Regel hinzufügen"
+    override val consoleSecRulePattern        = "Muster"
+    override val consoleSecRegex              = "regex"
+    override val consoleSecBold               = "Fett"
+    override val consoleSecRulesEmpty         = "Noch keine Regeln."
+    override val consoleSecArt                 = "Leere-Konsole-Art"
+    override val consoleSecArtAdd              = "Art hinzufügen"
+    override val consoleSecArtPaste            = "ASCII- oder Braille-Art einfügen"
+    override val consoleSecArtEmpty            = "Noch keine eigene Art."
 
     override val profileCategoryAccount = "Konto"
     override val profileCategorySignIn      = "Anmelden"
     override val profileCategorySecurity    = "Sicherheit"
     override val profileForgetSavedSignIn   = "Gespeicherte Anmeldung vergessen"
     override val profileSecurityHint        = "Deine Anmeldung ist auf diesem Gerät für die automatische Anmeldung gespeichert."
+    override val accountsTitle               = "Konten"
+    override val accountRemove               = "Entfernen"
+    override val accountFaceLabel            = "Anzeigen als"
+    override val accountFaceAuto             = "Auto"
+    override val profileSignOutSmartycraft   = "Von SmartyCraft abmelden"
+    override val profileSignOutMicrosoft     = "Von Microsoft abmelden"
+    override val wardrobeTitle               = "Kleiderschrank"
+    override val wardrobeSignedOut           = "Melde dich an, um Skins und Umhänge zu verwalten."
+    override val wardrobeUpload               = "Hochladen"
+    override val wardrobeApplySmartycraft     = "Anwenden (SmartyCraft)"
+    override val wardrobeEmpty                = "Deine Bibliothek ist leer. Lade ein Skin-PNG hoch, um zu beginnen."
+    override val wardrobeSaved               = "Gespeichert"
+    override val wardrobeCapes               = "Umhänge"
+    override val wardrobeApplyCape           = "Clan-Umhang setzen"
+    override val wardrobeCapeClanHint        = "Umhänge gelten clanweit -- nur der Clan-Anführer kann einen setzen."
+    override val wardrobeDefaults            = "Standard-Skins"
+    override val wardrobePoseStand           = "Stehend"
+    override val wardrobePoseWave            = "Winken"
+    override val wardrobePoseSit             = "Sitzend"
+    override val wardrobePoseFaceCover       = "Gesicht verdecken"
+    override val wardrobePoseWalk            = "Gehen"
 
     override val backgroundLoopMode      = "Schleife"
     override val backgroundLoopUseCodec  = "Aus Codec"
     override val backgroundLoopForever   = "Endlos"
     override val backgroundLoopOnce      = "Einmal"
 
-    override val settingsCustomizationExt    = "Anpassung (exp.)"
-    override val settingsCustomizationExtSub = "Dichte, Akzent, Glas-Deckkraft, Farbüberschreibungen"
-    override val customizationTitle           = "Anpassung"
-    override val customizationSubtitle        = "Experimentelle Feinabstimmung"
-    override val customizationDensity         = "Dichteskala"
-    override val customizationGlassIntensity  = "Glas-Deckkraft"
-    override val customizationAccentOverride  = "Akzent überschreiben"
     override val customizationAccentClear     = "Überschreibung löschen"
     override val customizationSectionVisual   = "Visuell"
     override val customizationSectionColors   = "FARBÜBERSCHREIBUNGEN"
-    override val customizationExperimentalToggle = "Alle Farben überschreiben"
-    override val customizationExperimentalSub    = "7-Farb-Matrix freischalten. Kann unleserlich werden."
-    override val customizationReset           = "Alles zurücksetzen"
     override val customizationHexInvalid      = "Ungültiger Hex"
     override val themePickerAccentOverride    = "Akzent überschreiben (sofort)"
 
-    override val browseTitle        = "Katalog"
-    override val browseSubtitle     = "Auf dem Mirror veröffentlichte Packs"
-    override val browseEmptyTitle   = "Katalog ist leer"
-    override val browseEmptyMessage = "Der Mirror ist erreichbar, hat aber noch keine Packs veröffentlicht. Schau später wieder vorbei."
-    override val browseErrorTitle   = "Mirror nicht erreichbar"
-    override val browseErrorMessage = "Mirror konnte nicht erreicht werden. Verbindung prüfen und erneut versuchen."
-    override val browseRetry        = "Erneut versuchen"
+    override val browseTitle             = "Katalog"
+    override val browseSearchPlaceholder = "Packs suchen"
+    override val browseImport            = "Datei importieren"
+    override val libraryAddAction        = "Pack hinzufügen"
+    override val libraryNewLocalPack     = "Neues lokales Pack"
+    override val libraryImportPack       = "Pack importieren"
+    override val createPackName          = "Name"
+    override val createPackMc            = "Minecraft-Version"
+    override val createPackLoader        = "Loader"
+    override val createPackLoaderVersion = "Loader-Version (optional)"
+    override val createPackConfirm       = "Erstellen"
+    override val createPackCancel        = "Abbrechen"
+    override val createPackShowSnapshots = "Snapshots anzeigen"
+    override val createPackHideSnapshots = "Snapshots ausblenden"
+    override val browseEmptyTitle        = "Katalog ist leer"
+    override val browseEmptyMessage      = "Der Mirror ist erreichbar, hat aber noch keine Packs veröffentlicht. Schau später wieder vorbei."
+    override val browseErrorTitle        = "Mirror nicht erreichbar"
+    override val browseErrorMessage      = "Mirror konnte nicht erreicht werden. Verbindung prüfen und erneut versuchen."
+    override val browseRetry             = "Erneut versuchen"
+    override fun modrinthCategory(id: String) = when (id) {
+        "adventure"    -> "Abenteuer"
+        "challenging"  -> "Anspruchsvoll"
+        "combat"       -> "Kampf"
+        "kitchen-sink" -> "Alles dabei"
+        "lightweight"  -> "Leichtgewichtig"
+        "magic"        -> "Magie"
+        "multiplayer"  -> "Mehrspieler"
+        "optimization" -> "Optimierung"
+        "quests"       -> "Quests"
+        "technology"   -> "Technik"
+        else           -> humanizeCategory(id)
+    }
 
     override val browseDetailErrorTitle    = "Pack konnte nicht geladen werden"
     override val browseDetailErrorMessage  = "Manifest konnte nicht geladen werden. Verbindung prüfen und erneut versuchen."
@@ -645,7 +724,7 @@ object GermanStrings : AppStrings {
     override val browseDetailCompatTitle      = "Kompatibilität"
     override val browseDetailCompatMc         = "Minecraft"
     override val browseDetailCompatLoader     = "Loader"
-    override val browseDetailCompatJava       = "Java"
+    override val browseDetailCompatJava       = "Runtime"
     override val browseDetailVersionTitle     = "Version"
 
     override val browseDetailInstallRunningTitle  = "Installation läuft..."
@@ -667,6 +746,24 @@ object GermanStrings : AppStrings {
     override val fileBrowserEmptyFolder      = "(leer)"
 
     override val contentTabUnsupportedOrigin    = "Inhaltsansicht ist heute nur für Mirror-veröffentlichte Packs verfügbar. Andere Quellen folgen in einem Folge-PR."
+    override val contentDetachTitle             = "Verfolgtes Pack"
+    override val contentDetachBody              = "Loslösen, um Mods frei zu aktivieren, zu löschen und hinzuzufügen."
+    override val contentTrackedOptionalBody     = "Optionale Mods werden hier umgeschaltet. Loslösen, um hinzuzufügen und zu entfernen."
+    override val contentDetachButton            = "Loslösen"
+    override val contentAddFiles                = "Dateien hinzufügen"
+    override val contentFindProjects            = "Projekte finden"
+    override val contentSearchPlaceholder       = "Inhalt durchsuchen..."
+    override val contentEmpty                   = "Nichts gefunden"
+    override val contentFilterAll               = "Alle"
+    override val contentFilterMods              = "Mods"
+    override val contentFilterResourcePacks     = "Ressourcen"
+    override val contentFilterShaderPacks       = "Shader"
+    override val contentDeleteTitle             = "Datei löschen?"
+    override val contentDeleteBody              = "Die Datei wird endgültig von der Festplatte entfernt."
+    override val contentActionDetails           = "Details"
+    override val contentActionOpenPage          = "Seite öffnen"
+    override val contentDetailAuthors           = "Autoren"
+    override val contentDetailSize              = "Größe"
     override val contentTabFetchErrorTitle      = "Pack-Inhalt konnte nicht geladen werden"
     override val contentTabFetchErrorGeneric    = "Das Mirror-Manifest konnte nicht geladen werden."
     override val contentTabRetry                = "Erneut versuchen"
@@ -772,8 +869,14 @@ object GermanStrings : AppStrings {
     override fun notifPackRunning(packName: String)     = "$packName laeuft"
     override fun notifPackFailed(packName: String)      = "$packName konnte nicht gestartet werden"
     override fun notifPackSessionEnded(packName: String) = "Sitzung $packName beendet"
+    override fun notifInstallSyncing(packName: String)  = "Installiere $packName"
+    override fun notifInstallDone(packName: String)     = "$packName installiert"
+    override fun notifInstallFailed(packName: String)   = "$packName konnte nicht installiert werden"
+    override fun notifInstallCancelled(packName: String) = "Installation von $packName abgebrochen"
+    override val notifActionCancel                      = "Abbrechen"
     override val notifActionShowConsole                 = "Konsole anzeigen"
     override val notifActionStop                        = "Stoppen"
+    override val notifActionPlayOffline                 = "Offline spielen"
     override fun notifReasonExitCode(code: Int)         = "Spiel mit Code $code beendet"
     override val notifReasonInternal                    = "Interner Fehler"
     override fun notifReasonInternalDetail(detail: String) = detail
@@ -801,6 +904,7 @@ object GermanStrings : AppStrings {
     override val homeQuickContinue  = "Fortsetzen"
     override val homeQuickStart     = "Starten"
     override val homeQuickButton    = "Spielen"
+    override fun homeHeroPlaytime(hours: Long) = "$hours Std. gespielt"
     override val launchTileReady    = "Starten"
     override val launchTileBlocked  = "Noch nicht spielbar"
 
@@ -811,12 +915,6 @@ object GermanStrings : AppStrings {
     override val libraryHeaderSubtitle = "Installierte Modpacks"
 
     // --- Customization widget labels ---
-    override val customGlassAlpha   = "Glas-Transparenz"
-    override val customCardCorner   = "Kartenecke (dp)"
-    override val customCardBorder   = "Kartenrahmen (dp)"
-    override val customButtonCorner = "Knopfecke (dp)"
-    override val customAnimSpeed    = "Animationsgeschwindigkeit"
-    override val customSoftGlow     = "Dekoratives Leuchten"
 
     // --- Layout editor: common actions ---
     override val editorClose   = "Schließen"
@@ -844,8 +942,17 @@ object GermanStrings : AppStrings {
         "widget.appshell.region.center" to "Hauptbereich",
         "widget.appshell.region.collapsed" to "Eingeklappt",
         "widget.appshell.region.swipeToCollapse" to "Mit Wischen einklappen",
+        "widget.appshell.region.frostTier" to "Glas",
         "widget.appshell.region.glassAlphaPct" to "Glas, %",
         "widget.appshell.region.left" to "Linke Leiste",
+        "widget.appshell.region.top" to "Titelleiste",
+        "widget.appshell.region.body" to "Hauptbereich",
+        "widget.appshell.topbar.breadcrumb" to "Brotkrümel",
+        "widget.appshell.topbar.heightDp" to "Höhe",
+        "widget.appshell.topbar.cornerStyle" to "Eckenstil",
+        "widget.appshell.topbar.groupStyle" to "Gruppierung",
+        "widget.appshell.topbar.frostTier" to "Glas",
+        "widget.appshell.topbar.controls" to "Fenstertasten",
         "widget.appshell.region.right" to "Rechte Leiste",
         "widget.appshell.region.showDivider" to "Trennlinie",
         "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
@@ -879,29 +986,6 @@ object GermanStrings : AppStrings {
         "widget.container.tabs.label2" to "Tab 2",
         "widget.container.tabs.label3" to "Tab 3",
         "widget.container.tabs.tabCount" to "Tabs",
-        "widget.customization.accent.override" to "Akzentfarbe",
-        "widget.customization.color.background" to "Farbe: background",
-        "widget.customization.color.criticalAccent" to "Farbe: criticalAccent",
-        "widget.customization.color.error" to "Farbe: error",
-        "widget.customization.color.outline" to "Farbe: outline",
-        "widget.customization.color.primary" to "Farbe: primary",
-        "widget.customization.color.progressAccent" to "Farbe: progressAccent",
-        "widget.customization.color.secondary" to "Farbe: secondary",
-        "widget.customization.color.success" to "Farbe: success",
-        "widget.customization.color.surface" to "Farbe: surface",
-        "widget.customization.color.textPrimary" to "Farbe: textPrimary",
-        "widget.customization.color.textSecondary" to "Farbe: textSecondary",
-        "widget.customization.color.warnAccent" to "Farbe: warnAccent",
-        "widget.customization.density" to "UI-Dichte",
-        "widget.customization.experimental.toggle" to "Experimentelle Einstellungen",
-        "widget.customization.glass.alpha" to "Glas-Deckkraft",
-        "widget.customization.glass.intensity" to "Glas-Intensität",
-        "widget.customization.reset" to "Anpassung zurücksetzen",
-        "widget.customization.shape.animMultiplier" to "Animationstempo",
-        "widget.customization.shape.buttonCorner" to "Button-Rundung",
-        "widget.customization.shape.cardBorder" to "Kartenrahmen-Stärke",
-        "widget.customization.shape.cardCorner" to "Kartenrundung",
-        "widget.customization.shape.softGlow" to "Dekoratives Leuchten",
         "widget.home.classic.content" to "Klassisches Dashboard",
         "widget.home.new.clock" to "Uhr",
         "widget.home.new.clock.accent" to "Akzentfarbe",
@@ -910,6 +994,9 @@ object GermanStrings : AppStrings {
         "widget.home.new.clock.mode" to "Modus",
         "widget.home.new.clock.showSeconds" to "Sekunden",
         "widget.home.new.clock.title" to "Überschrift",
+        "widget.home.new.hero" to "Pack-Hero-Karte",
+        "widget.home.new.hero.height" to "Höhe",
+        "widget.home.new.hero.showMeta" to "Metadaten",
         "widget.home.new.launchbutton" to "Startknopf",
         "widget.home.new.launchbutton.label" to "Beschriftung",
         "widget.home.new.music" to "Musikplayer",
@@ -925,6 +1012,8 @@ object GermanStrings : AppStrings {
         "widget.home.new.recent.title" to "Überschrift",
         "widget.home.new.spacer" to "Abstand",
         "widget.home.new.spacer.height" to "Höhe",
+        "widget.home.new.video" to "Videoplayer",
+        "widget.home.new.video.url" to "Video-URL",
         "widget.home.new.welcome" to "Willkommensbanner",
         "widget.home.new.welcome.customGreeting" to "Eigener Begrüßungstext",
         "widget.home.new.welcome.showSubtitle" to "Untertitel anzeigen",
@@ -934,6 +1023,7 @@ object GermanStrings : AppStrings {
         "widget.library.header" to "Bibliothekskopf",
         "widget.library.header.subtitle" to "Untertitel",
         "widget.library.header.title" to "Überschrift",
+        "widget.library.header.show" to "Kopf anzeigen",
         "widget.nav.entry" to "Navigationspunkt",
         "widget.notes.scratch" to "Notizen",
         "widget.notes.scratch.placeholder" to "Schreib etwas...",
@@ -942,8 +1032,8 @@ object GermanStrings : AppStrings {
         "widget.notifications.history.expandUp" to "Nach oben ausklappen",
         "widget.notifications.history.clock12h" to "12-Stunden-Format (am/pm)",
         "widget.notifications.history.verticalTime" to "Zeit gestapelt",
-        "widget.profile.account.section" to "Konto",
-        "widget.profile.signin" to "Anmelden",
+        "widget.profile.account.section" to "SmartyCraft",
+        "widget.profile.signin" to "Microsoft",
         "widget.profile.nav" to "Profilnavigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Vorschauhöhe",
@@ -958,6 +1048,29 @@ object GermanStrings : AppStrings {
     override val recoverySafeModeTitle = "Oberfläche nicht wiederherstellbar"
     override val recoverySafeModeBody  = "Die Oberfläche ist mehrfach hintereinander abgestürzt. Ein Absturzbericht wurde gespeichert. Starte den Launcher neu."
     override val recoverySafeModeQuit  = "Beenden"
+
+    override val recoveryTitle              = "Wiederherstellungsmodus"
+    override val recoveryBody               = "Deaktiviere ein Modul oder setze einen beschädigten Zustand zurück, dann fortfahren. Änderungen greifen beim Neustart des Launchers."
+    override val recoveryModulesHeading     = "Module deaktivieren"
+    override val recoveryModuleTray         = "System-Tray"
+    override val recoveryModuleNotify       = "Benachrichtigungen"
+    override val recoveryModuleSkinema      = "Medien-Hintergründe"
+    override val recoveryModuleKeyring      = "System-Schlüsselbund"
+    override val recoveryResetsHeading      = "Zurücksetzen"
+    override val recoveryResetLayout        = "Layout"
+    override val recoveryResetCustomization = "Anpassung"
+    override val recoveryResetSettings      = "Einstellungen"
+    override val recoveryContinue           = "Normal starten"
+    override val recoveryRelaunchFailed     = "Automatischer Neustart fehlgeschlagen. Öffne den Launcher erneut."
+    override val recoveryRestartInApp       = "Im Wiederherstellungsmodus neu starten"
+    override val thresholdStageFiles     = "dateien werden geprüft"
+    override val thresholdStageNetwork   = "netzwerkstatus"
+    override val thresholdStageMigration = "migrationsprüfung"
+    override val thresholdStageModules   = "module werden gestartet"
+    override val thresholdErrorTitle     = "start fehlgeschlagen"
+    override val thresholdOpenLogs       = "log-ordner öffnen"
+    override val thresholdQuit           = "beenden"
+    override val recoveryReloadedNotice = "Oberfläche nach einem Fehler neu geladen"
     override val editorSave    = "Speichern"
     override val editorApply   = "Anwenden"
     override val editorExport  = "Exportieren"
@@ -968,6 +1081,12 @@ object GermanStrings : AppStrings {
     override val editorSlotRow    = "Reihe"
     override val editorSlotGrid   = "Raster"
     override val editorSlotCanvas = "Leinwand"
+    override val editorSlotCubeGrid = "Würfel"
+    override val editorSlotLayoutMenuTitle     = "Layout"
+    override val editorSlotGridColumns         = "Spalten"
+    override val editorSlotGridColumnsDecrease = "Weniger Spalten"
+    override val editorSlotGridColumnsIncrease = "Mehr Spalten"
+    override val editorSlotLayoutHandle        = "Slot-Layout"
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"
@@ -1023,11 +1142,12 @@ object GermanStrings : AppStrings {
     override val editorSurfShortRightRail = "Rechte Leiste"
     override val editorSurfShortAbout     = "Über"
     override val editorSurfShortBg        = "Hintergrund"
-    override val editorSurfShortStyle     = "Stil"
     override val editorSurfShortProfile   = "Profil"
     override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
     override val editorSurfShortShell     = "Hülle"
+    override val editorSurfShortTopBar    = "Oben"
+    override val editorSurfShortBody      = "Bereich"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Start (klassisch)"
@@ -1037,11 +1157,12 @@ object GermanStrings : AppStrings {
     override val editorSurfRightRail   = "Rechte Leiste"
     override val editorSurfAbout       = "Über"
     override val editorSurfBg          = "Hintergrund-Einstellungen"
-    override val editorSurfStyle       = "Anpassung"
     override val editorSurfProfile     = "Profil"
     override val editorSurfServer      = "Server-Details"
     override val editorSurfTheme       = "Themenauswahl"
     override val editorSurfShell        = "App-Hülle"
+    override val editorSurfTopBar       = "Obere Leiste"
+    override val editorSurfBody         = "Hauptbereich"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Musik-Player"
@@ -1055,18 +1176,33 @@ object GermanStrings : AppStrings {
     override val audioStatusReady      = "Bereit"
     override val audioStatusPlaying    = "Spielt"
     override val audioStatusPaused     = "Pausiert"
-    override val audioFormatHint       = "WAV / AU / AIFF werden unterstützt. MP3 kommt mit Skinema."
+    override val audioFormatHint       = "MP3, FLAC, OGG, WAV und mehr."
     override val audioNoPlayerHere     = "Kein Player auf diesem Layout"
     override val audioAddMusicPlayer   = "Music player hinzufügen"
-    override val audioErrorUnsupported = "Format nicht unterstützt -- WAV / AU / AIFF nötig."
+    override val audioErrorUnsupported = "Format nicht unterstützt oder Datei beschädigt."
     override val audioErrorOpenFailed  = "Datei konnte nicht geöffnet werden"
     override val audioErrorDeviceBusy  = "Audiogerät ist belegt"
     override val audioErrorPlaybackFailed = "Wiedergabe fehlgeschlagen"
+
+    // --- Video player ---
+    override val videoFullscreen     = "Vollbild"
+    override val videoExitFullscreen = "Vollbild verlassen"
+    override val videoMute           = "Stummschalten"
+    override val videoUnmute         = "Ton ein"
+    override val videoReplay         = "Erneut abspielen"
+    override val videoError          = "Video konnte nicht abgespielt werden"
+    override val videoLoading        = "Video wird geladen…"
+    override val videoOpenInBrowser  = "Im Browser öffnen"
+    override val videoSkipBack        = "10 Sekunden zurück"
+    override val videoSkipForward     = "10 Sekunden vor"
+    override val videoWidgetEmpty     = "Video-URL in den Widget-Einstellungen festlegen"
 
     // --- Library pack card ---
     override val packCardPlay          = "Spielen"
     override val packCardSettings      = "Einstellungen"
     override val packCardMore          = "Mehr"
+    override val packCardDeleteTitle   = "Instanz löschen?"
+    override val packCardDeleteBody    = "Die Instanz und alle ihre Dateien (Welten, Einstellungen, Mods) werden endgültig entfernt. Das kann nicht rückgängig gemacht werden."
     override val packCardNeverPlayed   = "Nie gespielt"
     override val packCardPlayedJustNow = "gerade eben"
     override fun packCardPlayedMinutesAgo(n: Long) = "vor $n Min"

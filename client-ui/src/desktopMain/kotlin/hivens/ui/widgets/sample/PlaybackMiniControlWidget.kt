@@ -24,12 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,7 +47,10 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
 import hivens.widget.model.InjectService
@@ -95,17 +92,16 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
             .background(glassSurfaceAlpha(0.55f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Icon(
-            imageVector        = Icons.Default.MusicNote,
+        Symbol(icon = NxIcon.MusicNote,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.primary,
+            tint               = NxTheme.colors.primary,
             modifier           = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(10.dp))
         Text(
             text       = currentTitleShort(state, s),
             style      = MaterialTheme.typography.bodyMedium,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.Medium,
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
@@ -121,7 +117,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
         // can transport it from anywhere on the surface.
         val canTransport = state is PlaybackState.Playing || state is PlaybackState.Paused || state is PlaybackState.Ready
         TransportButton(
-            icon        = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+            icon        = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
             enabled     = canTransport,
             onClick     = { if (isPlaying) service.pause() else service.play() },
             description = if (isPlaying) s.audioPause else s.audioPlay,
@@ -143,39 +139,38 @@ private fun DisabledPlaceholder() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f))
+            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.4f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Icon(
-            imageVector        = Icons.AutoMirrored.Filled.VolumeOff,
+        Symbol(icon = NxIcon.VolumeOff,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+            tint               = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
             modifier           = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(10.dp))
         Text(
             text  = s.audioNoPlayerHere,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         Spacer(Modifier.weight(1f))
         Text(
             text  = s.audioAddMusicPlayer,
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+            color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
         )
     }
 }
 
 @Composable
 private fun TransportButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: IconKey,
     enabled: Boolean,
     onClick: () -> Unit,
     description: String,
 ) {
-    val bg = if (enabled) CelestiaTheme.colors.primary else CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f)
-    val tint = if (enabled) CelestiaTheme.colors.onPrimary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+    val bg = if (enabled) NxTheme.colors.primary else NxTheme.colors.surfaceVariant.copy(alpha = 0.4f)
+    val tint = if (enabled) NxTheme.colors.onPrimary else NxTheme.colors.textSecondary.copy(alpha = 0.4f)
     Box(
         modifier = Modifier
             .size(30.dp)
@@ -184,8 +179,7 @@ private fun TransportButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector        = icon,
+        Symbol(icon = icon,
             contentDescription = description,
             tint               = tint,
             modifier           = Modifier.size(16.dp),
@@ -211,8 +205,9 @@ private fun MiniVolumeBar(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "mini-vol-track",
     )
+    // Always faintly visible so the handle is findable; full opacity on hover/drag.
     val thumbAlpha by animateFloatAsState(
-        targetValue   = if (active) 1f else 0f,
+        targetValue   = if (active) 1f else 0.65f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "mini-vol-thumb-alpha",
     )
@@ -228,14 +223,19 @@ private fun MiniVolumeBar(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     pressing = true
-                    val w = size.width.coerceAtLeast(1).toFloat()
-                    onValueChange((down.position.x / w).coerceIn(0f, 1f))
-                    drag(down.id) { change ->
-                        val newValue = (change.position.x / w).coerceIn(0f, 1f)
-                        onValueChange(newValue)
-                        change.consume()
+                    // finally: a cancelled drag must still release the pressed
+                    // state, or the thumb sticks enlarged.
+                    try {
+                        val w = size.width.coerceAtLeast(1).toFloat()
+                        onValueChange((down.position.x / w).coerceIn(0f, 1f))
+                        drag(down.id) { change ->
+                            val newValue = (change.position.x / w).coerceIn(0f, 1f)
+                            onValueChange(newValue)
+                            change.consume()
+                        }
+                    } finally {
+                        pressing = false
                     }
-                    pressing = false
                 }
             },
         contentAlignment = Alignment.CenterStart,
@@ -245,14 +245,14 @@ private fun MiniVolumeBar(
                 .fillMaxWidth()
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.outline.copy(alpha = 0.20f)),
+                .background(NxTheme.colors.outline.copy(alpha = 0.20f)),
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(value)
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
         if (widthPx > 0 && thumbAlpha > 0.01f) {
             val thumbHalfPx = with(LocalDensity.current) { 8.dp.toPx() / 2f }
@@ -263,7 +263,7 @@ private fun MiniVolumeBar(
                     .size(8.dp)
                     .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
-                    .background(CelestiaTheme.colors.primary),
+                    .background(NxTheme.colors.primary),
             )
         }
     }

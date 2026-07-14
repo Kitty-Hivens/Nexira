@@ -1,13 +1,10 @@
 package hivens.ui.easter
 
-import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 
@@ -83,22 +80,6 @@ interface AprilFoolsLifecycle {
     ): ChaosCardTracker
 
     // ── Composable surface ────────────────────────────────────────────────
-
-    /**
-     * Drop-in replacement for any Button that should participate in chaos.
-     * NoOp impl renders a plain [androidx.compose.material3.Button];
-     * RealAprilFools renders the chaos-aware version that the engine can
-     * target (escape from layout, run/spin/flee animations).
-     */
-    @Composable
-    fun ChaosButton(
-        id: String,
-        text: String,
-        onClick: () -> Unit,
-        modifier: Modifier = Modifier,
-        enabled: Boolean = true,
-        colors: ButtonColors = ButtonDefaults.buttonColors(),
-    )
 
     /**
      * Wraps the whole application in the chaos overlay (drift, shake,

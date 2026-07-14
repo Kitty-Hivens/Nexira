@@ -1,13 +1,13 @@
 package hivens.ui.screens.library
 
-import hivens.ui.theme.LocalMonoFamily
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -23,18 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,9 +44,13 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxVerticalScrollbar
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.LocalMonoFamily
 import java.awt.Desktop
 import java.nio.file.Files
 import java.nio.file.Path
@@ -65,6 +58,8 @@ import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Two-pane file browser scoped to a single instance directory. Left
@@ -91,7 +86,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
             Text(
                 text  = s.fileBrowserNoRoot,
                 style = MaterialTheme.typography.bodyMedium,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
         return
@@ -115,12 +110,15 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
 
     Row(modifier = modifier.fillMaxSize()) {
         // Left: tree.
+        val hover = remember { MutableInteractionSource() }
+        val hovered by hover.collectIsHoveredAsState()
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.medium)
-                .background(glassSurfaceAlpha(0.55f)),
+                .background(glassSurfaceAlpha(0.55f))
+                .hoverable(hover),
         ) {
             val listState = rememberLazyListState()
             LazyColumn(
@@ -148,8 +146,9 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            VerticalScrollbar(
+            NxVerticalScrollbar(
                 adapter  = rememberScrollbarAdapter(listState),
+                revealed = hovered || listState.isScrollInProgress,
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
             )
         }
@@ -171,7 +170,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                     Text(
                         text  = s.fileBrowserPickAFile,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
             } else {
@@ -230,7 +229,7 @@ private fun FileTreeRow(
     onToggleExpand: () -> Unit,
     onSelect: () -> Unit,
 ) {
-    val rowBg = if (isSelected) CelestiaTheme.colors.primary.copy(alpha = 0.25f)
+    val rowBg = if (isSelected) NxTheme.colors.primary.copy(alpha = 0.25f)
                 else Color.Transparent
 
     val s = LocalStrings.current
@@ -251,26 +250,23 @@ private fun FileTreeRow(
         when {
             node.isEmpty -> Spacer(Modifier.size(20.dp))
             node.isDir -> {
-                Icon(
-                    imageVector        = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                Symbol(icon = if (isExpanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(4.dp))
-                Icon(
-                    imageVector        = Icons.Default.Folder,
+                Symbol(icon = NxIcon.Folder,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
+                    tint               = NxTheme.colors.primary.copy(alpha = 0.85f),
                     modifier           = Modifier.size(16.dp),
                 )
             }
             else -> {
                 Spacer(Modifier.size(20.dp))
-                Icon(
-                    imageVector        = fileIconFor(node.path),
+                Symbol(icon = fileIconFor(node.path),
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -280,26 +276,26 @@ private fun FileTreeRow(
             Text(
                 text       = s.fileBrowserEmptyFolder,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                color      = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                 fontStyle  = FontStyle.Italic,
             )
         } else {
             Text(
                 text       = node.path.name,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = if (node.isDir) FontWeight.SemiBold else FontWeight.Normal,
             )
         }
     }
 }
 
-private fun fileIconFor(path: Path): androidx.compose.ui.graphics.vector.ImageVector {
+private fun fileIconFor(path: Path): IconKey {
     val ext = path.name.substringAfterLast('.', "").lowercase()
     return when (ext) {
-        in TEXT_EXTENSIONS -> Icons.Default.Description
-        in IMAGE_EXTENSIONS -> Icons.Default.Image
-        else -> Icons.AutoMirrored.Filled.InsertDriveFile
+        in TEXT_EXTENSIONS -> NxIcon.Description
+        in IMAGE_EXTENSIONS -> NxIcon.Image
+        else -> NxIcon.InsertDriveFile
     }
 }
 
@@ -348,7 +344,7 @@ private fun TextPreview(file: Path) {
     if (state == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
-                color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
+                color       = NxTheme.colors.primary.copy(alpha = 0.6f),
                 strokeWidth = 2.dp,
                 modifier    = Modifier.size(24.dp),
             )
@@ -363,7 +359,7 @@ private fun TextPreview(file: Path) {
             Text(
                 text  = s.fileBrowserTextTruncated(TEXT_PREVIEW_MAX_BYTES / 1024),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.error,
+                color = NxTheme.colors.error,
             )
             Spacer(Modifier.height(6.dp))
         }
@@ -375,7 +371,7 @@ private fun TextPreview(file: Path) {
             Text(
                 text       = state.text,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontFamily = LocalMonoFamily.current,
             )
         }
@@ -411,40 +407,32 @@ private fun BinaryPreview(file: Path) {
             Text(
                 text  = s.fileBrowserBinaryHint,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
-        Button(
-            onClick        = { runCatching { Desktop.getDesktop().open(file.toFile()) } },
-            shape          = MaterialTheme.shapes.small,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-            colors         = ButtonDefaults.buttonColors(
-                containerColor = CelestiaTheme.colors.primary,
-                contentColor   = Color.White,
-            ),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(s.fileBrowserOpenExternally, fontWeight = FontWeight.SemiBold)
-        }
+        NxButton(
+            label   = s.fileBrowserOpenExternally,
+            onClick = { runCatching { Desktop.getDesktop().open(file.toFile()) } },
+            icon    = NxIcon.OpenInNew,
+        )
     }
 }
 
 @Composable
 private fun PreviewHeader(file: Path, sizeLabel: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(fileIconFor(file), contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(18.dp))
+        Symbol(fileIconFor(file), contentDescription = null, tint = NxTheme.colors.primary, modifier = Modifier.size(18.dp))
         Text(
             text       = file.name,
             style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text  = sizeLabel,
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
     }
 }

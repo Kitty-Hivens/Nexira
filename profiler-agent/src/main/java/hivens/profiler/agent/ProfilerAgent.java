@@ -65,6 +65,10 @@ public final class ProfilerAgent {
     private static final long FLUSH_INTERVAL_SECONDS = 30L;
 
     /** JVM agent entry point (Premain-Class in the jar manifest). */
+    // The flush executor is a session-lifetime daemon shut down via the shutdown hook
+    // below, not a scoped resource -- try-with-resources would close it immediately,
+    // and ScheduledExecutorService has no close() on this agent's Java 8 target.
+    @SuppressWarnings("resource")
     public static void premain(String agentArgs, Instrumentation inst) {
         try {
             String out = System.getProperty("nexira.profiler.out");

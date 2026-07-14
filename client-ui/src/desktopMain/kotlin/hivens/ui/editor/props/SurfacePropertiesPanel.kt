@@ -27,15 +27,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewSidebar
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,10 +50,13 @@ import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.nx.NxSwitch
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.customization.HexField
 
@@ -100,7 +97,7 @@ fun SurfacePropertiesPanel(
                 .clip(RoundedCornerShape(14.dp))
                 // Solid surface, no glass: a settings panel must stay readable and
                 // not composite with the layers it floats over.
-                .background(CelestiaTheme.colors.surface),
+                .background(NxTheme.colors.surface),
         ) {
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
@@ -116,25 +113,23 @@ fun SurfacePropertiesPanel(
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector        = Icons.AutoMirrored.Filled.ViewSidebar,
+                    Symbol(icon = NxIcon.ViewSidebar,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.primary,
+                        tint               = NxTheme.colors.primary,
                         modifier           = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = title,
                         style      = MaterialTheme.typography.titleSmall,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector        = Icons.Default.Close,
+                    Symbol(icon = NxIcon.Close,
                         contentDescription = s.editorClose,
-                        tint               = CelestiaTheme.colors.textSecondary,
+                        tint               = NxTheme.colors.textSecondary,
                         modifier           = Modifier.size(16.dp),
                     )
                 }
@@ -177,11 +172,11 @@ private fun NavSelectionControl(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column {
-            Text(s.navSelectionTitle, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(s.navSelectionTitle, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
             Text(
                 s.navSelectionSub,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
 
@@ -195,13 +190,13 @@ private fun NavSelectionControl(
                     modifier = Modifier
                         .clip(RoundedCornerShape(style.buttonCorner))
                         .background(
-                            if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+                            if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
                             else glassSurfaceAlpha(0.4f),
                         )
                         .border(
                             width = 1.dp,
-                            color = if (selected) CelestiaTheme.colors.primary
-                            else CelestiaTheme.colors.outline.copy(alpha = 0.25f),
+                            color = if (selected) NxTheme.colors.primary
+                            else NxTheme.colors.outline.copy(alpha = 0.25f),
                             shape = RoundedCornerShape(style.buttonCorner),
                         )
                         .clickable { onChange(customization.copy(navSelectionStyle = variant)) }
@@ -210,7 +205,7 @@ private fun NavSelectionControl(
                     Text(
                         text       = navSelectionStyleLabel(variant, s),
                         style      = MaterialTheme.typography.bodySmall,
-                        color      = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
+                        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 }
@@ -245,7 +240,7 @@ private fun NavSelectionControl(
             Text(
                 text  = s.navSelectionAccent,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
             Row(
                 modifier              = Modifier.fillMaxWidth(),
@@ -265,8 +260,7 @@ private fun NavSelectionControl(
                         shape          = MaterialTheme.shapes.small,
                         contentPadding = PaddingValues(8.dp),
                     ) {
-                        Icon(
-                            imageVector        = Icons.Default.Close,
+                        Symbol(icon = NxIcon.Close,
                             contentDescription = s.customizationAccentClear,
                             modifier           = Modifier.size(14.dp),
                         )
@@ -287,7 +281,7 @@ private fun navSelectionStyleLabel(variant: NavSelectionStyle, s: AppStrings): S
         NavSelectionStyle.None    -> s.navStyleNone
     }
 
-// Smaller than the settings-screen SettingsSwitchRow (bodyLarge): the 320dp
+// Smaller than a full settings-screen switch row (bodyLarge): the 320dp
 // surface panel cramps long toggle names, so the label drops to bodySmall and
 // takes the row's remaining width with the Switch pinned at the end.
 @Composable
@@ -300,16 +294,12 @@ private fun CompactSwitchRow(title: String, checked: Boolean, onCheckedChange: (
         Text(
             text     = title,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textPrimary,
+            color    = NxTheme.colors.textPrimary,
             modifier = Modifier.weight(1f),
         )
-        Switch(
+        NxSwitch(
             checked         = checked,
             onCheckedChange = onCheckedChange,
-            colors          = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.primary,
-                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f),
-            ),
         )
     }
 }

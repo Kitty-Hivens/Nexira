@@ -241,21 +241,20 @@ jobs:
         env:
           NEXIRA_DATA_DIR: /tmp/nexira-data
         run: |
-          # KeyringStorageFactory logs the chosen backend at INFO level on
-          # startup. Without libsecret on the host, the construction call
-          # for LinuxLibsecretKeyringStorage throws on SymbolLookup; the
-          # factory's runCatching swallows and selects NoOpKeyringStorage.
-          # If a future refactor stops catching the construction-time
-          # exception, the launcher would crash before reaching this log;
-          # absence of "Keyring storage: NoOp" is the failure signal.
+          # The secret store now opens lazily via libvault (LazySecretVault) on first
+          # use, not at boot, so a no-libsecret host no longer eagerly selects and logs
+          # "Keyring storage: NoOp" during the boot smoke -- tier choice is deferred to
+          # the first vault access (login), and the old KeyringStorageFactory only runs
+          # on a pre-v5 credentials migration. What still matters: a no-libsecret host
+          # must degrade lazily, not crash at boot on a keyring / libsecret symbol
+          # lookup. (Graceful boot is also asserted by the init + launch steps above.)
           LOG="$NEXIRA_DATA_DIR/logs/launcher.log"
-          if grep -q "Keyring storage: NoOp" "$LOG"; then
-            echo "::notice title=Portability::Keyring factory correctly fell back to NoOp on ${{ matrix.distro_name }}"
-          else
-            echo "::error title=Portability::Expected 'Keyring storage: NoOp' on ${{ matrix.distro_name }} (libsecret absent) -- factory fallback regressed or did not log"
-            grep -i 'keyring' "$LOG" | head -20 || echo "(no keyring lines in log)"
+          if grep -qiE 'libsecret.*(fail|error|throw|exception)|SymbolLookup|Secret Service.*(fail|error)' "$LOG"; then
+            echo "::error title=Portability::Keyring/libsecret failure at boot on ${{ matrix.distro_name }} (secret store should degrade lazily, not crash):"
+            grep -inE 'libsecret|SymbolLookup|Secret Service|keyring|vault' "$LOG" | head -20
             exit 1
           fi
+          echo "::notice title=Portability::no-libsecret boot healthy; secret store degrades lazily via libvault (tier selected on first use, not at boot)"
 
       - name: Upload stdout and log on failure
         if: failure()

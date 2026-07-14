@@ -31,6 +31,7 @@ class ModernInstallerResolverTest {
         },
         cacheDir = Files.createTempDirectory("modern-cache"),
         loaderId = "neoforge",
+        latestVersion = { "21.1.0" }, // unused by the harvest / place-only / locate tests
     ) { _, version -> "https://example/neoforge-$version-installer.jar" }
 
     @Test
@@ -127,5 +128,22 @@ class ModernInstallerResolverTest {
         assertFalse(ForgeResolver.isLaunchwrapperEra("1.16.5"))
         assertFalse(ForgeResolver.isLaunchwrapperEra("1.20.1"))
         assertFalse(ForgeResolver.isLaunchwrapperEra("nonsense"))
+    }
+
+    @Test
+    fun `neoforgeVersionPrefix maps Minecraft to the NeoForge version-index prefix`() {
+        assertEquals("21.1.", ModernInstallerResolver.neoforgeVersionPrefix("1.21.1"))
+        assertEquals("21.0.", ModernInstallerResolver.neoforgeVersionPrefix("1.21")) // no patch -> .0
+        assertEquals("20.4.", ModernInstallerResolver.neoforgeVersionPrefix("1.20.4"))
+    }
+
+    @Test
+    fun `pickForgePromotion prefers recommended, falls back to latest, else null`() {
+        val json = Json { ignoreUnknownKeys = true }
+        val both = """{"promos":{"1.21.1-latest":"52.1.15","1.21.1-recommended":"52.1.0"}}"""
+        assertEquals("52.1.0", ModernInstallerResolver.pickForgePromotion(json, both, "1.21.1"))
+        val latestOnly = """{"promos":{"1.21.1-latest":"52.1.15"}}"""
+        assertEquals("52.1.15", ModernInstallerResolver.pickForgePromotion(json, latestOnly, "1.21.1"))
+        assertNull(ModernInstallerResolver.pickForgePromotion(json, """{"promos":{}}""", "1.21.1"))
     }
 }

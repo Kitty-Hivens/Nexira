@@ -1,72 +1,66 @@
 package hivens.ui.widgets.bgsettings
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import hivens.core.data.ThemeMode
+import hivens.core.data.UiStyle
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.components.GlassCard
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
 private const val SURFACE = "bg.settings"
 
-// bg.settings surface. AppLayout routes Screen.BackgroundSettings
-// here. Two slots: `controls` (weight 1, holds enable+image+scale+
-// position+effects+loop+tint+reset widgets in a scrollable card)
-// and `preview` (weight 1, holds the live preview widget).
-//
-// The CONTROLS slot is wrapped in a GlassCard whose internal Column
-// has verticalScroll -- this is the one surface where a slot needs
-// scroll because the knob stack is genuinely tall (~15 widgets).
-// The scroll wraps the slot itself; widgets inside cannot be
-// Lazy-list-based without crashing, but the controls slot has no
-// such widget by default and the palette filter (Phase 5) will
-// eventually keep foreign Lazy widgets out. Until then, the user
-// can crash here by dropping LazyColumn into controls -- documented
-// trade-off, recoverable via reset.
-//
-// PREVIEW slot has no scroll; the preview widget fills its bounded
-// box and lets CustomBackground handle layered rendering.
+// Island widths -- bounded so sliders never run to the monitor edge (Rule 6 / D08)
+// and the live wallpaper breathes in the channel between them (Rule 3 gap).
+private val PANEL_WIDTH = 380.dp
+private val THEME_PANEL_WIDTH = 320.dp
+
+/**
+ * Appearance studio. AppLayout routes Screen.BackgroundSettings here. Two islands over
+ * the live wallpaper: the wallpaper controls (the `controls` slot -- enable + image +
+ * scale + position + effects + loop + tint + reset widgets) at the start, and the theme
+ * axis ([AppearanceThemeIsland] -- dark/light, UI style, theme picker) at the end.
+ *
+ * No in-screen title or back button: the top-bar breadcrumb names the screen and drives
+ * navigation, as on the other surfaces. There is also no preview -- the app's
+ * [hivens.ui.background.CustomBackground] renders behind the whole shell, so the screen
+ * stays transparent apart from the islands and the LIVE UI is the preview: editing a
+ * wallpaper knob or the theme updates the real background + palette at full size (Monet
+ * seeds the scheme from the wallpaper), with no second video pipeline.
+ */
 @Composable
 fun BgSettingsSurface(
     currentSettings: BackgroundSettings,
     onSettingsChanged: (BackgroundSettings) -> Unit,
     onBack: () -> Unit,
+    isDarkTheme: Boolean,
+    onToggleDarkTheme: () -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChanged: (ThemeMode) -> Unit,
+    systemThemeAvailable: Boolean,
+    uiStyle: UiStyle,
+    onUiStyleChanged: (UiStyle) -> Unit,
+    onOpenThemePicker: () -> Unit,
 ) {
-    val s = LocalStrings.current
     val settings = remember { mutableStateOf(currentSettings) }
-    val previewMousePos = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
-    val previewSize = remember { mutableStateOf(IntSize.Zero) }
 
     val update: (BackgroundSettings.() -> BackgroundSettings) -> Unit = remember(onSettingsChanged) {
         { block ->
@@ -75,14 +69,7 @@ fun BgSettingsSurface(
         }
     }
 
-    val ctx = remember(settings, update, previewMousePos, previewSize) {
-        BgSettingsContext(
-            settings        = settings,
-            update          = update,
-            previewMousePos = previewMousePos,
-            previewSize     = previewSize,
-        )
-    }
+    val ctx = remember(settings, update) { BgSettingsContext(settings = settings, update = update) }
 
     PuppetScreen("BackgroundSettings")
     PuppetClick("background.back") { onBack() }
@@ -96,52 +83,32 @@ fun BgSettingsSurface(
     }
 
     CompositionLocalProvider(LocalBgSettingsContext provides ctx) {
-        Column(Modifier.fillMaxSize().padding(24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = s.navBack,
-                        tint               = CelestiaTheme.colors.textPrimary,
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text       = s.backgroundTitle,
-                        style      = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color      = CelestiaTheme.colors.textPrimary,
-                    )
-                    Text(
-                        text  = s.backgroundSubtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary,
-                    )
-                }
+        Row(Modifier.fillMaxSize().padding(16.dp)) {
+            NxSurface(NxSurfaceLevel.Floating, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
+                SlotRenderer(
+                    SurfaceId(SURFACE),
+                    SlotId("controls"),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    spacing  = 16.dp,
+                )
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.weight(1f))
 
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    SlotRenderer(
-                        SurfaceId(SURFACE),
-                        SlotId("controls"),
-                        // Scroll rides on the slot modifier: a Lazy-list widget dropped
-                        // into this slot would crash measurement (see file header).
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(20.dp),
-                        spacing  = 16.dp,
-                    )
-                }
-
-                GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"), Modifier.fillMaxSize())
-                }
-            }
+            AppearanceThemeIsland(
+                isDarkTheme          = isDarkTheme,
+                onToggleDarkTheme    = onToggleDarkTheme,
+                themeMode            = themeMode,
+                onThemeModeChanged   = onThemeModeChanged,
+                systemThemeAvailable = systemThemeAvailable,
+                uiStyle              = uiStyle,
+                onUiStyleChanged     = onUiStyleChanged,
+                onOpenThemePicker    = onOpenThemePicker,
+                modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
+            )
         }
     }
 }

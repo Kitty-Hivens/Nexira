@@ -3,6 +3,7 @@ package hivens.ui.widgets.bgsettings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxSlider
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -12,7 +13,12 @@ fun BgFxBlurWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current
     val s = LocalStrings.current
     val settings by ctx.settings
-    LabeledSlider(s.backgroundBlur, settings.blurRadius, 0f..25f, "%.0f px") {
-        ctx.update { copy(blurRadius = it) }
-    }
+    val v = settings.blurRadius
+    NxSlider(
+        label = s.backgroundBlur,
+        value = v,
+        range = 0f..25f,
+        valueText = "%.0f px".format(v),
+        onValueChange = { ctx.update { copy(blurRadius = it) } },
+    )
 }

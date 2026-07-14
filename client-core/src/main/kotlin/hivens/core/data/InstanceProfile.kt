@@ -27,10 +27,10 @@ data class InstanceProfile(
     val fullScreen: Boolean = false,
     val autoConnect: Boolean = true,
     /**
-     * Per-mod enabled/disabled bits. MutableMap so
-     * `ServerSettingsScreen.saveProfile()` can update in place without a
-     * `copy()` per toggle; surrounding `val` fields preserve safe
-     * equality / copy semantics for the record as a whole.
+     * Per-mod enabled/disabled bits. An immutable [Map] so the record keeps
+     * value semantics: `copy()` no longer shares a mutable backing map between
+     * two profiles (which let a mutation on one silently alias the other).
+     * Updated by rebuilding via `copy(optionalModsState = ...)`.
      */
-    val optionalModsState: MutableMap<String, Boolean> = HashMap(),
+    val optionalModsState: Map<String, Boolean> = emptyMap(),
 )

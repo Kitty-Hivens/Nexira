@@ -1,6 +1,5 @@
 package hivens.ui.widgets.about
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,11 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,16 +20,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.config.Branding
 import hivens.core.data.ReleaseChannel
-import hivens.ui.components.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.components.channelColor
-import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -55,7 +57,6 @@ data class AboutUpdateProps(
 fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutUpdateProps>()
     val ctx = LocalAboutContext.current
-    val af = LocalAprilFools.current
     val s = LocalStrings.current
     val state by ctx.updateState
 
@@ -63,7 +64,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val channel = remember { ReleaseChannel.classify(Branding.VERSION.removePrefix("v")) }
     val accent = channelColor(channel)
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    NxCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
             SectionLabel(p.title.ifBlank { s.aboutSectionUpdates })
             Spacer(Modifier.height(16.dp))
@@ -71,35 +72,38 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
             // Current version. Only the "i" opens the manager -- the tap target
             // is the icon, not the whole row.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector        = Icons.Default.Info,
+                Symbol(icon = NxIcon.Info,
                     contentDescription = s.updateManagerOpenHint,
-                    tint               = CelestiaTheme.colors.primary,
+                    tint               = NxTheme.colors.primary,
                     modifier           = Modifier
                         .size(18.dp)
                         .clip(CircleShape)
                         .clickable { ctx.showUpdateManager.value = true },
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(s.aboutCurrentVersion, color = CelestiaTheme.colors.textSecondary, fontSize = 13.sp)
-                Spacer(Modifier.weight(1f))
+                Text(s.aboutCurrentVersion, color = NxTheme.colors.textSecondary, fontSize = 13.sp)
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text       = versionText,
                     color      = accent,
                     fontSize   = 13.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = LocalMonoFamily.current,
+                    textAlign  = TextAlign.End,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    modifier   = Modifier.weight(1f),
                 )
             }
 
             // Only an actual available update renders below; up-to-date stays silent.
             (state as? UpdateCheckState.Available)?.let { current ->
                 val availChannel = ReleaseChannel.classify(current.update.version.removePrefix("v"))
-                val availAccent = if (current.update.isCritical) CelestiaTheme.colors.error else channelColor(availChannel)
+                val availAccent = if (current.update.isCritical) NxTheme.colors.error else channelColor(availChannel)
 
                 Spacer(Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.NewReleases, null, tint = availAccent, modifier = Modifier.size(18.dp))
+                    Symbol(NxIcon.NewReleases, null, tint = availAccent, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = current.update.version,
@@ -109,16 +113,14 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
                     )
                 }
                 Spacer(Modifier.height(12.dp))
-                af.ChaosButton(
-                    id      = "about_open_update_btn",
-                    text    = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
-                    onClick = { ctx.showUpdateDialog.value = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (current.update.isCritical) CelestiaTheme.colors.error else glassSurfaceAlpha(0.55f),
-                        contentColor   = CelestiaTheme.colors.textPrimary,
-                    ),
-                )
+                Flexible("about_open_update_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
+                        onClick = { ctx.showUpdateDialog.value = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = if (current.update.isCritical) NxButtonStyle.Destructive else NxButtonStyle.Secondary,
+                    )
+                }
             }
         }
     }

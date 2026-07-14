@@ -2,7 +2,6 @@ package hivens.ui.widgets.profile
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,26 +10,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
-import hivens.ui.components.GlassCard
-import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -76,17 +71,9 @@ fun ProfileSurface(
 ) {
     val s = LocalStrings.current
     val skinManager: SkinManager = koinInject()
-    val selectedCategory = remember {
-        mutableStateOf(if (session != null) ProfileCategory.Account else ProfileCategory.SignIn)
-    }
-
-    // Keep the category coherent with auth state: signing in lands on Account
-    // in place; signing out forces back to Sign in -- the only category that
-    // renders without a session.
-    LaunchedEffect(session != null) {
-        if (session == null) selectedCategory.value = ProfileCategory.SignIn
-        else if (selectedCategory.value == ProfileCategory.SignIn) selectedCategory.value = ProfileCategory.Account
-    }
+    // Per-provider sections each own their signed-in/out state, so the category
+    // no longer flips with the session; default to the SmartyCraft section.
+    val selectedCategory = remember { mutableStateOf(ProfileCategory.SmartyCraft) }
 
     val ctx = remember(session, selectedCategory) {
         ProfileContext(
@@ -106,23 +93,15 @@ fun ProfileSurface(
 
     CompositionLocalProvider(LocalProfileContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
-            Text(
-                text       = s.profileTitle,
-                style      = MaterialTheme.typography.headlineSmall,
-                color      = CelestiaTheme.colors.textPrimary,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            GlassCard(
-                modifier        = Modifier.weight(1f).fillMaxWidth(),
-                backgroundColor = glassSurfaceAlpha(0.7f),
+            // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
+            NxCard(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                level    = NxSurfaceLevel.Raised,
             ) {
                 if (authResolving && session == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            color       = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+                            color       = NxTheme.colors.primary.copy(alpha = 0.35f),
                             modifier    = Modifier.size(28.dp),
                             strokeWidth = 2.dp,
                         )
@@ -130,15 +109,14 @@ fun ProfileSurface(
                 } else {
                     Row(Modifier.fillMaxSize().padding(16.dp)) {
                         SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
-                        when {
-                            // Sign-in also covers the frame right after logout where
-                            // Account is still selected but the session is gone (the
-                            // LaunchedEffect above resets the category next
-                            // composition) -- otherwise the right pane goes blank.
-                            selectedCategory.value == ProfileCategory.SignIn || session == null ->
-                                SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
-                            else ->
+                        // The slot ids are historical: "account" hosts the SmartyCraft
+                        // section, "signin" the Microsoft one. Reused as-is so the
+                        // bundled layout + reconcile stay untouched.
+                        when (selectedCategory.value) {
+                            ProfileCategory.SmartyCraft ->
                                 SlotRenderer(SurfaceId(SURFACE), SlotId("account"), Modifier.weight(1f).fillMaxHeight())
+                            ProfileCategory.Microsoft ->
+                                SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
                         }
                     }
                 }

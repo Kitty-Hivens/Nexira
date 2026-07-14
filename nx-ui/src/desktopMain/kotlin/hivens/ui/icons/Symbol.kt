@@ -1,0 +1,84 @@
+package hivens.ui.icons
+
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import hivens.nx.ui.generated.resources.Res
+import hivens.nx.ui.generated.resources.material_symbols
+import org.jetbrains.compose.resources.Font
+
+/** A Material Symbols glyph identified by its codepoint. See [NxIcon] for the catalog. */
+@JvmInline
+value class IconKey(val codepoint: Int)
+
+/**
+ * Renders a Material Symbols icon as a font glyph from the bundled subset font, replacing
+ * the multi-MB material-icons-extended dependency. Drop-in for `Icon`: same argument order,
+ * honours `Modifier.size(...)` (defaults to 24.dp like `Icon`). Sizes above 24.dp need the
+ * explicit [size] parameter. The variable axes are driven per call:
+ *
+ * - [fill] 0f outlined .. 1f filled (animatable for the usual toggle effect)
+ * - [weight] 100..700 stroke weight.
+ */
+@Composable
+fun Symbol(
+    icon: IconKey,
+    contentDescription: String? = null,
+    modifier: Modifier = Modifier,
+    tint: Color = LocalContentColor.current,
+    fill: Float = 0f,
+    weight: Int = 400,
+    size: Dp? = null,
+) {
+    // Caller modifier before the default size: the reverse order lets size(24)
+    // clamp a smaller caller size up (size enforces incoming constraints).
+    val base = modifier.then(Modifier.size(size ?: 24.dp))
+    BoxWithConstraints(
+        modifier = if (contentDescription != null) {
+            base.semantics { this.contentDescription = contentDescription }
+        } else {
+            base
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        val px = with(LocalDensity.current) { maxHeight.toSp() }
+        Text(
+            // Unbounded so a dense glyph (globe, description) whose ink reaches the
+            // em edges isn't clipped by the size-px box -- it overflows by a hair
+            // into the caller's own padding instead of "sinking in".
+            modifier = Modifier.wrapContentSize(unbounded = true),
+            text = String(Character.toChars(icon.codepoint)),
+            color = tint,
+            fontSize = px,
+            fontFamily = FontFamily(
+                Font(
+                    Res.font.material_symbols,
+                    variationSettings = FontVariation.Settings(
+                        FontVariation.Setting("FILL", fill.coerceIn(0f, 1f)),
+                        FontVariation.Setting("wght", weight.toFloat()),
+                        FontVariation.Setting("opsz", px.value.coerceIn(24f, 48f)),
+                        FontVariation.Setting("GRAD", 0f),
+                    ),
+                ),
+            ),
+            style = TextStyle(
+                lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+            ),
+        )
+    }
+}

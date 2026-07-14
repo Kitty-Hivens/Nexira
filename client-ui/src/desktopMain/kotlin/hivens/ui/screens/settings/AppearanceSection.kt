@@ -1,40 +1,59 @@
 package hivens.ui.screens.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.MoveToInbox
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Wallpaper
-import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxRow
+import hivens.ui.nx.NxSection
+import hivens.ui.nx.NxSwitch
+import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.LocalThemeReveal
+import hivens.ui.theme.NxTheme
 
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
  * launcher looks and how it behaves around launches: language, theme
  * preset shortcut, background shortcut, dark/light toggle, home-view
  * variant, UI style variant, close-after-launch, offline mode.
+ *
+ * Two [NxSection] planes (Interface, Behavior) per the island model;
+ * expressiveness stays as a row state (day/night sun/moon + reveal,
+ * the offline accent), never a whole-row wash.
  *
  * Network bypasses live separately in [NetworkSection]; experimental
  * toggles in [ExperimentalSection].
@@ -47,7 +66,6 @@ internal fun AppearanceSection(
     onToggleTheme: () -> Unit,
     onOpenThemePicker: () -> Unit,
     onOpenBackgroundSettings: () -> Unit,
-    onOpenCustomizationExtension: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
@@ -56,251 +74,180 @@ internal fun AppearanceSection(
     onUiStyleChanged: (UiStyle) -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
-    var langDropdownExpanded by remember { mutableStateOf(false) }
+    var langExpanded by remember { mutableStateOf(false) }
+    var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
 
-    SettingsSectionTitle(s.settingsSectionUI)
-
-    // Language picker
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .background(settingsRowBackground())
-            .padding(16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Language, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
-            Text(s.settingsLanguage, color = CelestiaTheme.colors.textPrimary)
-        }
-
-        Box {
-            Row(
-                Modifier
-                    .clickable { langDropdownExpanded = true }
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(currentLocale.displayName, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
-            }
-
-            DropdownMenu(
-                expanded         = langDropdownExpanded,
-                onDismissRequest = { langDropdownExpanded = false },
-                containerColor   = CelestiaTheme.colors.surface
-            ) {
-                AppLocale.entries.forEach { locale ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                locale.displayName,
-                                color      = if (locale == currentLocale) CelestiaTheme.colors.primary
-                                else CelestiaTheme.colors.textPrimary,
-                                fontWeight = if (locale == currentLocale) FontWeight.Bold
-                                else FontWeight.Normal
+    NxSection(s.settingsSectionUI) {
+        // Language. The whole row opens the picker; the trailing shows the
+        // current locale and hosts the menu. Per-locale PuppetClick lets a driver
+        // switch without opening the menu first.
+        NxRow(
+            title    = s.settingsLanguage,
+            icon     = NxIcon.Language,
+            iconTint = NxTheme.colors.primary,
+            onClick  = { langExpanded = true },
+            trailing = {
+                Box {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(currentLocale.displayName, color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
+                        Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary)
+                    }
+                    NxContextMenu(
+                        expanded         = langExpanded,
+                        onDismissRequest = { langExpanded = false },
+                    ) {
+                        AppLocale.entries.forEach { locale ->
+                            NxMenuItem(
+                                label    = locale.displayName,
+                                selected = locale == currentLocale,
+                                onClick  = { langExpanded = false; onLocaleChanged(locale) },
                             )
-                        },
-                        onClick = { langDropdownExpanded = false; onLocaleChanged(locale) }
-                    )
-                    // Puppet: per-locale direct click. Drivers can switch
-                    // language without opening the dropdown first -- the
-                    // onLocaleChanged callback is what actually mutates
-                    // state, the dropdown is presentation only.
-                    PuppetClick("settings.language.${locale.name}") {
-                        langDropdownExpanded = false
-                        onLocaleChanged(locale)
+                            PuppetClick("settings.language.${locale.name}") {
+                                langExpanded = false; onLocaleChanged(locale)
+                            }
+                        }
                     }
                 }
-            }
+            },
+        )
+
+        // Theme preset shortcut.
+        PuppetClick("settings.openThemePicker") { onOpenThemePicker() }
+        NxRow(
+            title    = s.settingsThemePicker,
+            subtitle = s.settingsThemePickerSub,
+            icon     = NxIcon.Star,
+            iconTint = NxTheme.colors.primary,
+            onClick  = onOpenThemePicker,
+            trailing = { Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary) },
+        )
+
+        // Custom background shortcut.
+        PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
+        NxRow(
+            title    = s.settingsBackground,
+            subtitle = s.settingsBackgroundSub,
+            icon     = NxIcon.Wallpaper,
+            iconTint = NxTheme.colors.primary,
+            onClick  = onOpenBackgroundSettings,
+            trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.primary) },
+        )
+
+        // Dark theme: day/night identity (sun warm, moon cool) + GNOME-style reveal.
+        DayNightRow(
+            checked     = themeSwitchState,
+            title       = s.settingsDarkTheme,
+            description = s.settingsDarkThemeDesc,
+        ) { isChecked -> themeSwitchState = isChecked; onToggleTheme() }
+        PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
+            themeSwitchState = isChecked; onToggleTheme()
         }
+
+        // Home view variant. Lets the user A/B between the legacy Dashboard and the
+        // Library-first surface; the parent updates routing on change.
+        PickerBlock(s.settingsHomeViewTitle, s.settingsHomeViewSub) {
+            NxChoiceChip(s.settingsHomeViewClassic, homeView == HomeView.Classic)      { onHomeViewChanged(HomeView.Classic) }
+            NxChoiceChip(s.settingsHomeViewLibrary, homeView == HomeView.LibraryFirst) { onHomeViewChanged(HomeView.LibraryFirst) }
+            NxChoiceChip(s.settingsHomeViewNew,     homeView == HomeView.New)          { onHomeViewChanged(HomeView.New) }
+        }
+        PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
+        PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
+        PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
+
+        // UI style variant. Independent axis from palette -- governs form, surface
+        // treatment, motion. Celestia (current) and Brut (sharp / flat).
+        PickerBlock(s.settingsUiStyleTitle, s.settingsUiStyleSub) {
+            NxChoiceChip(s.settingsUiStyleCelestia, uiStyle == UiStyle.Celestia) { onUiStyleChanged(UiStyle.Celestia) }
+            NxChoiceChip(s.settingsUiStyleBrut,     uiStyle == UiStyle.Brut)     { onUiStyleChanged(UiStyle.Brut) }
+        }
+        PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
+        PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
     }
 
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(16.dp))
 
-    // Theme picker shortcut
-    PuppetClick("settings.openThemePicker") { onOpenThemePicker() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .clickable(onClick = onOpenThemePicker)
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.1f))
-            .padding(16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Star, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(s.settingsThemePicker, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(s.settingsThemePickerSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
-            }
+    NxSection(s.settingsSectionBehavior) {
+        NxToggle(s.settingsCloseAfterLaunch, form.closeAfterStart, description = s.settingsCloseAfterLaunchDesc, icon = NxIcon.MoveToInbox) {
+            form.closeAfterStart = it; save()
         }
-        Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
-    }
+        PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }
 
-    Spacer(Modifier.height(4.dp))
-
-    // Custom background shortcut
-    PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .clickable(onClick = onOpenBackgroundSettings)
-            .background(glassSurfaceAlpha(0.4f))
-            .padding(16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Wallpaper, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(s.settingsBackground, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(s.settingsBackgroundSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
-            }
+        NxToggle(s.settingsOfflineMode, form.isOfflineMode, description = s.settingsOfflineModeDesc, icon = NxIcon.WifiOff, accent = NxTheme.colors.error) {
+            form.isOfflineMode = it; save()
         }
-        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)
+        PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
     }
+}
 
-    Spacer(Modifier.height(4.dp))
+// Static day/night colours -- the sun stays warm-orange and the moon cool-blue
+// regardless of palette, so the dark-theme toggle reads as day/night at a glance.
+private val SunOrange = Color(0xFFFF8C00)
+private val MoonBlue  = Color(0xFF8AB4F8)
 
-    // Customization extension shortcut
-    PuppetClick("settings.openCustomizationExtension") { onOpenCustomizationExtension() }
+/**
+ * Dark-theme toggle as an in-plane row with a day/night identity: sun (warm) when
+ * light, moon (cool) when dark. Icon and switch track take that FIXED colour, not
+ * the palette accent. The flip runs through the GNOME-style reveal (a circle growing
+ * out of the switch) when a host is present; no host (or motion off) is a plain flip.
+ */
+@Composable
+internal fun DayNightRow(
+    checked: Boolean,
+    title: String,
+    description: String,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val style = LocalStyle.current
+    val tint = if (checked) MoonBlue else SunOrange
+    val reveal = LocalThemeReveal.current
+    val durationMs = style.animationDurationMs(550)
+    var switchOrigin by remember { mutableStateOf(Offset.Zero) }
+    val onToggle: (Boolean) -> Unit = { newValue ->
+        if (reveal != null) reveal.reveal(switchOrigin, durationMs) { onCheckedChange(newValue) }
+        else onCheckedChange(newValue)
+    }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .clickable(onClick = onOpenCustomizationExtension)
-            .background(glassSurfaceAlpha(0.4f))
-            .padding(16.dp),
+        modifier              = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Tune, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Symbol(if (checked) NxIcon.DarkMode else NxIcon.LightMode, null, tint = tint, size = 22.dp)
+            Spacer(Modifier.width(12.dp))
             Column {
-                Text(s.settingsCustomizationExt, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(s.settingsCustomizationExtSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
-        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)
-    }
-
-    Spacer(Modifier.height(4.dp))
-
-    // Dark theme toggle
-    var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
-    SettingsSwitchRow(
-        title           = s.settingsDarkTheme,
-        checked         = themeSwitchState,
-        onCheckedChange = { isChecked -> themeSwitchState = isChecked; onToggleTheme() }
-    )
-    PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
-        themeSwitchState = isChecked; onToggleTheme()
-    }
-
-    Spacer(Modifier.height(4.dp))
-
-    // Home view variant picker. Lets the user A/B between the legacy
-    // Dashboard and the new Library-first surface (currently a
-    // placeholder). The toggle persists via settings; the parent
-    // updates routing on change.
-    HomeViewPicker(
-        current      = homeView,
-        onChange     = onHomeViewChanged,
-        labelTitle   = s.settingsHomeViewTitle,
-        labelSub     = s.settingsHomeViewSub,
-        classicLabel = s.settingsHomeViewClassic,
-        libraryLabel = s.settingsHomeViewLibrary,
-        newLabel     = s.settingsHomeViewNew,
-    )
-    PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
-    PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
-    PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
-
-    Spacer(Modifier.height(4.dp))
-
-    // UI style variant picker. Independent axis from palette -- governs
-    // form, surface treatment, motion. Two initial variants: Celestia
-    // (current) and Brut (sharp / flat).
-    UiStylePicker(
-        current  = uiStyle,
-        onChange = onUiStyleChanged,
-        title    = s.settingsUiStyleTitle,
-        sub      = s.settingsUiStyleSub,
-        celestia = s.settingsUiStyleCelestia,
-        brut     = s.settingsUiStyleBrut,
-    )
-    PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
-    PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
-
-    Spacer(Modifier.height(8.dp))
-
-    // ── Behavior subsection ──────────────────────────────────────────
-    SettingsSectionTitle(s.settingsSectionBehavior)
-    SettingsRowWithDescription(
-        title           = s.settingsCloseAfterLaunch,
-        description     = s.settingsCloseAfterLaunchDesc,
-        icon            = Icons.Default.MoveToInbox,
-        iconTint        = CelestiaTheme.colors.textSecondary,
-        checked         = form.closeAfterStart,
-        enabled         = true,
-        onCheckedChange = { form.closeAfterStart = it; save() }
-    )
-    PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }
-
-    Spacer(Modifier.height(4.dp))
-
-    // Offline Mode
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .background(
-                if (form.isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
-                else settingsRowBackground()
-            )
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(
-                Icons.Default.WifiOff,
-                null,
-                tint = if (form.isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(
-                    s.settingsOfflineMode,
-                    color = CelestiaTheme.colors.textPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    s.settingsOfflineModeDesc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary
-                )
-            }
-        }
-        Switch(
-            checked = form.isOfflineMode,
-            onCheckedChange = { form.isOfflineMode = it; save() },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.error,
-                checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f)
-            )
+        Spacer(Modifier.width(12.dp))
+        NxSwitch(
+            checked         = checked,
+            onCheckedChange = onToggle,
+            accent          = tint,
+            modifier        = Modifier.onGloballyPositioned { switchOrigin = it.boundsInWindow().center },
         )
-        PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
+    }
+}
+
+/**
+ * A labelled single-select chip group (title + sub + wrapping [NxChoiceChip]s). The
+ * chips wrap to a second line on a narrow pane instead of the longest label shrinking
+ * per character.
+ */
+@Composable
+private fun PickerBlock(
+    title: String,
+    sub: String,
+    chips: @Composable FlowRowScope.() -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement   = Arrangement.spacedBy(8.dp),
+            content               = chips,
+        )
     }
 }

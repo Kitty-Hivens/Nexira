@@ -63,14 +63,23 @@ class SmartyModPlanner(
         val resolved = resolveHelper(server.version)
         val smartyGlobs = resolved?.smartyNames?.takeIf { it.isNotEmpty() } ?: DEFAULT_SMARTY_GLOBS
         val ignored = manifest?.let { matchingSmartyNames(it, smartyGlobs) } ?: emptySet()
+
+        // No proprietary Smarty in this manifest -> nothing to swap, so stay fully
+        // inert. The swap targets a raw SmartyCraft server, whose sync ships the
+        // Smarty jar this matches. Mirror/Hivens packs already bundle
+        // open-smrt-network and carry no Smarty; injecting the helper on top of
+        // their own copy would load the same coremod twice.
+        if (ignored.isEmpty()) {
+            log.info("open-smrt helper: no Smarty jar in {} manifest -- swap inert", server.name)
+            return Plan(emptySet(), null, strict, emptyList())
+        }
+
         if (resolved == null) {
             log.warn(
                 "open-smrt helper not fetched for {} (MC {}); Smarty stripped anyway, " +
                     "relying on the on-disk helper if present",
                 server.name, server.version,
             )
-        } else if (ignored.isEmpty()) {
-            log.info("open-smrt helper: no Smarty jar in {} manifest matched {}", server.name, smartyGlobs)
         }
         // Keep ONLY this version's exact helper filename -- a wildcard would also
         // shield a stale sibling-version jar (two coremods loaded) or an unrelated

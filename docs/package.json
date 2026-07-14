@@ -7,8 +7,11 @@
     "build": "astro build",
     "preview": "astro preview"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
-    "@astrojs/starlight": "^0.39.2",
-    "astro": "^6.3.5"
+    "@astrojs/starlight": "^0.41.3",
+    "astro": "^7.0.8"
   }
 }

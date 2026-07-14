@@ -5,12 +5,16 @@ import java.nio.file.Path
 import java.security.MessageDigest
 
 /**
- * Streaming SHA-1 of a file, lowercase hex. Shared by the provisioners
- * and sync service that verify downloads against manifest hashes; the
- * 64 KiB buffer keeps large library jars off the heap.
+ * Streaming hashes of a file, lowercase hex. Shared by the provisioners, the
+ * sync service, and the pack installers that verify downloads against manifest
+ * hashes; the 64 KiB buffer keeps large library jars off the heap.
  */
-internal fun sha1Of(path: Path): String {
-    val md = MessageDigest.getInstance("SHA-1")
+internal fun sha1Of(path: Path): String = digestOf(path, "SHA-1")
+
+internal fun sha512Of(path: Path): String = digestOf(path, "SHA-512")
+
+private fun digestOf(path: Path, algorithm: String): String {
+    val md = MessageDigest.getInstance(algorithm)
     Files.newInputStream(path).use { input ->
         val buf = ByteArray(64 * 1024)
         while (true) {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,12 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -30,15 +26,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.ui.Screen
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.screens.library.rememberPackArt
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.decorativePair
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -83,7 +88,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
         Text(
             text       = p.title.ifBlank { s.homeRecentTitle },
             style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
             modifier   = Modifier.padding(bottom = 8.dp),
         )
@@ -102,47 +107,56 @@ fun HomeNewRecent(instance: WidgetInstance) {
     }
 }
 
+// Mini version of the Library card's three-layer treatment: pixel-art fill,
+// captured banner when the pack has one, scrim, caption. Same footprint the
+// glyph tile had -- the row gets art, not more space.
 @Composable
 private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
-    val played = pack.lastPlayedEpochOrZero > 0L
-    Column(
+    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
+    val art = rememberPackArt(pack)
+    Box(
         modifier = Modifier
             .width(180.dp)
+            .height(96.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.40f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .clickable(onClick = onClick),
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(MaterialTheme.shapes.extraSmall)
-                .background(CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector        = if (played) Icons.Default.History else Icons.Default.Inventory2,
+        Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
+        if (art.bannerUrl != null) {
+            AsyncImage(
+                model              = art.bannerUrl,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f),
-                modifier           = Modifier.size(18.dp),
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
             )
         }
-        Text(
-            text       = pack.displayName,
-            style      = MaterialTheme.typography.bodyMedium,
-            color      = CelestiaTheme.colors.textPrimary,
-            fontWeight = FontWeight.SemiBold,
-            maxLines   = 1,
-            overflow   = TextOverflow.Ellipsis,
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.05f),
+                    1f to Color.Black.copy(alpha = 0.68f),
+                ),
+            ),
         )
-        Text(
-            text     = pack.packRef.id,
-            style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(10.dp),
+        ) {
+            Text(
+                text       = pack.displayName,
+                style      = MaterialTheme.typography.bodyMedium,
+                color      = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
+            )
+            Text(
+                text     = pack.packRef.id,
+                style    = MaterialTheme.typography.labelSmall,
+                color    = Color.White.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -161,23 +175,23 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
         Text(
             text       = s.homeNoPacksTitle,
             style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text  = s.homeNoPacksBody,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         Spacer(Modifier.height(2.dp))
         OutlinedButton(
             onClick = onBrowse,
             shape   = MaterialTheme.shapes.small,
             colors  = ButtonDefaults.outlinedButtonColors(
-                contentColor = CelestiaTheme.colors.primary,
+                contentColor = NxTheme.colors.primary,
             ),
         ) {
-            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+            Symbol(NxIcon.Search, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(s.browseOpen, fontWeight = FontWeight.Medium)
         }

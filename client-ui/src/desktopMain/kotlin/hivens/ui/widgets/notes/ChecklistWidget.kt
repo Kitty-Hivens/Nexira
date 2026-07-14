@@ -19,12 +19,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,7 +37,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
@@ -81,7 +77,7 @@ data class ChecklistState(val items: List<ChecklistItem> = emptyList(), val next
 fun ChecklistWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ChecklistProps>()
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     var state by instance.rememberWidgetState { ChecklistState() }
 
     fun add(text: String) {
@@ -151,13 +147,12 @@ fun ChecklistWidget(instance: WidgetInstance) {
 
 @Composable
 private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit, onDelete: () -> Unit) {
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier          = Modifier.fillMaxWidth().padding(vertical = 3.dp * scale),
     ) {
-        Icon(
-            imageVector        = if (item.done) Icons.Filled.CheckBox else Icons.Outlined.CheckBoxOutlineBlank,
+        Symbol(icon = if (item.done) NxIcon.CheckBox else NxIcon.CheckBoxOutlineBlank,
             contentDescription = null,
             tint               = if (item.done) palette.primary else palette.textSecondary,
             modifier           = Modifier.size(20.dp * scale).clip(RoundedCornerShape(4.dp)).clickable(onClick = onToggle),
@@ -173,8 +168,7 @@ private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit
             modifier   = Modifier.weight(1f),
         )
         Spacer(Modifier.width(6.dp * scale))
-        Icon(
-            imageVector        = Icons.Filled.Close,
+        Symbol(icon = NxIcon.Close,
             contentDescription = null,
             tint               = palette.textSecondary.copy(alpha = 0.5f),
             modifier           = Modifier.size(16.dp * scale).clip(RoundedCornerShape(4.dp)).clickable(onClick = onDelete),
@@ -185,7 +179,7 @@ private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit
 @Composable
 private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     var draft by remember { mutableStateOf("") }
     fun commit() {
         onAdd(draft)
@@ -220,8 +214,7 @@ private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
                 .clip(MaterialTheme.shapes.small)
                 .clickable(onClick = { commit() }),
         ) {
-            Icon(
-                imageVector        = Icons.Filled.Add,
+            Symbol(icon = NxIcon.Add,
                 contentDescription = null,
                 tint               = palette.primary,
                 modifier           = Modifier.size(18.dp * scale),

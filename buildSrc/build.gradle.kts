@@ -7,7 +7,7 @@
 //     custom DefaultTask subclass can use Property<T>, @Input / @Output
 //     annotations, etc., without explicit dependency declarations.
 //   - Java 17+ source/target by default, which lines up with the project's
-//     JDK 25 toolchain (buildSrc runs under the daemon's JDK, not the
+//     JDK 26 toolchain (buildSrc runs under the daemon's JDK, not the
 //     subprojects' toolchain pin).
 //
 // Why buildSrc/ rather than `:build-logic` composite-included module:
@@ -41,6 +41,13 @@ gradlePlugin {
         register("packaging") {
             id = "nexira.packaging"
             implementationClass = "hivens.packaging.PackagingPlugin"
+        }
+        // GraalVM / Liberica-NIK native-image build for the headless CLI
+        // (:client-cli). Same shape as `nexira.packaging`: typed ExecOperations
+        // tasks, config-cache clean, no third-party plugin on the classpath.
+        register("nativeImage") {
+            id = "nexira.native-image"
+            implementationClass = "hivens.nativeimage.NativeImagePlugin"
         }
     }
 }

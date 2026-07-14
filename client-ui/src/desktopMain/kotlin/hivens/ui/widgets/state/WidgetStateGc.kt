@@ -1,6 +1,6 @@
 package hivens.ui.widgets.state
 
-import hivens.launcher.LayoutGraphRepository
+import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview

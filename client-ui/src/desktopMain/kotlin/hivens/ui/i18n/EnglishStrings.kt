@@ -19,17 +19,25 @@ object EnglishStrings : AppStrings {
     override val loginErrorEmpty   = "Enter your username and password"
     override val loginErrorGeneric = "Login error"
     override val loginRegister     = "Create an account"
+    override val loginPlayOffline  = "Play offline"
+    override val loginMicrosoft    = "Sign in with Microsoft"
+    override val msaTitle          = "Sign in with Microsoft"
+    override val msaInstruction    = "Open this page and enter the code:"
+    override val msaCopyCode       = "Copy code"
+    override val msaOpenBrowser    = "Open page"
+    override val msaWaiting        = "Waiting for confirmation..."
 
     // Navigation
     override val navLogout   = "Log out"
     override val navBack     = "Back"
+    override val navForward  = "Forward"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WELCOME BACK, $name"
     override val dashboardServers              = "Available servers"
     override val dashboardServersEmpty         = "No servers found"
     override val dashboardLoginRequiredTitle   = "Sign in to see servers"
-    override val dashboardLoginRequiredHint    = "Use the panel on the right to log in. The server list lives behind authentication on SMARTYcraft."
+    override val dashboardLoginRequiredHint    = "The SmartyCraft server list lives behind authentication. Sign in from the Profile section."
 
     // Launch Control
     override val launchReady       = "Ready to play"
@@ -37,6 +45,8 @@ object EnglishStrings : AppStrings {
     override val launchAbort       = "Cancel"
     override val launchRunning     = "Game running"
     override val launchDownloading = "Downloading:"
+    override val launchPreparing   = "Preparing"
+    override val launchFailed      = "Launch failed"
 
     // Launcher States
     override val stateInit        = "Initializing..."
@@ -81,6 +91,12 @@ object EnglishStrings : AppStrings {
     override val settingsThemePicker        = "Choose theme"
     override val settingsThemePickerSub     = "Customize the color scheme"
     override val settingsDarkTheme          = "Dark theme"
+    override val settingsDarkThemeDesc      = "Dark interface theme"
+    override val settingsThemeModeTitle             = "Theme source"
+    override val settingsThemeModeManual            = "Manual"
+    override val settingsThemeModeSystem            = "System"
+    override val settingsThemeModeWallpaper         = "Wallpaper"
+    override val settingsThemeModeSystemUnavailable = "System scheme is not available in this environment"
     override val settingsCloseAfterLaunch   = "Hide launcher to tray after the game starts"
     override val settingsCloseAfterLaunchDesc = "Hides the launcher to the system tray once the game starts."
     override val settingsSaved              = "Settings saved"
@@ -108,6 +124,12 @@ object EnglishStrings : AppStrings {
     override val newsFilterClear        = "Clear filter"
     override val railCollapse           = "Collapse panel"
     override val railExpand             = "Expand panel"
+    override val windowMinimize         = "Minimize"
+    override val windowMaximize         = "Maximize"
+    override val windowRestore          = "Restore"
+    override val windowClose            = "Close"
+    override val crumbHome              = "Home"
+    override val crumbLoading           = "Loading…"
     override val paginationPrev         = "Previous page"
     override val paginationNext         = "Next page"
 
@@ -132,8 +154,6 @@ object EnglishStrings : AppStrings {
 
     override val serverSettingsResetConfirmTitle = "Reset this client?"
     override val serverSettingsResetConfirmBody  = "All downloaded files for this server's client are deleted permanently. This cannot be undone."
-    override val customizationResetConfirmTitle  = "Reset customization?"
-    override val customizationResetConfirmBody   = "Every customization override (colors, density, shape) returns to its default."
     override val backgroundResetConfirmTitle     = "Reset background?"
     override val backgroundResetConfirmBody      = "The entire custom background configuration returns to its defaults."
     override val logoutConfirmTitle              = "Log out?"
@@ -189,6 +209,7 @@ object EnglishStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Debug Console"
+    override val consoleEmptyHint = "All quiet. Launch a pack and the logs will stream in here."
     override fun consoleHeaderCount(filtered: Int, total: Int) = "Game Output ($filtered/$total)"
     override val consoleCopyAll = "Copy All"
     override val consoleClear   = "Clear"
@@ -273,11 +294,11 @@ object EnglishStrings : AppStrings {
     // =========================================================================
     // Custom Background
     // =========================================================================
-    override val backgroundTitle          = "Custom background"
-    override val backgroundSubtitle       = "Customize the launcher wallpaper"
+    override val backgroundTitle          = "Appearance"
+    override val backgroundSubtitle       = "Launcher wallpaper, theme and palette"
     override val backgroundEnable         = "Enable"
-    override val backgroundSectionImage   = "Image"
-    override val backgroundPickFile       = "Choose a background image"
+    override val backgroundSectionImage   = "Image or video"
+    override val backgroundPickFile       = "Choose a background image or video"
     override val backgroundPickButton     = "Choose file"
     override val backgroundSectionScale   = "Scaling"
     override val backgroundScaleCover     = "Cover"
@@ -354,8 +375,6 @@ object EnglishStrings : AppStrings {
     override val trayStatusIdle    = "Idle"
     override val trayStatusRunning = "Game running"
     override val trayShow          = "Show launcher"
-    override val trayServers       = "Servers"
-    override val trayNoServers     = "No servers loaded"
     override val trayHintTitle     = "Nexira is still running"
     override val trayHintBody      = "The window is hidden in the system tray. Click the tray icon to bring it back."
     override val trayHintShow      = "Show window"
@@ -443,9 +462,9 @@ object EnglishStrings : AppStrings {
     override val settingsOpenSmrtHelperDesc       = "Replace the upstream Smarty mod with our open-source helper on Smarty servers. Same network features, none of the surveillance. If no replacement exists for the game version, the launch is blocked rather than running the original mod."
     override val settingsStrictModCheckTitle      = "Exact mod verification"
     override val settingsStrictModCheckDesc       = "After syncing, delete everything in the mods folder the server did not ask for. Keeps the install clean, but also removes any mods you added by hand."
-    override val settingsNetworkAgentTitle        = "Use the network-support agent?"
+    override val settingsNetworkAgentTitle        = "Use the network-support agent"
     override val settingsNetworkAgentDesc         = "Point the game's login at SmartyCraft when it starts: the in-game join and the skin checks. The join then authenticates against SmartyCraft and skins still load, without swapping in SmartyCraft's patched login library. Needed to join SmartyCraft servers."
-    override val settingsSmartyAuthLibTitle       = "Use SmartyCraft's login library?"
+    override val settingsSmartyAuthLibTitle       = "Use SmartyCraft's login library"
     override val settingsSmartyAuthLibDesc        = "The older approach: take SmartyCraft's patched login library from its client and put it on the pack instead of the original. Replaced by the network agent above and kept as a fallback. If the file cannot be fetched, the launch is blocked. Off by default."
 
     override val settingsSectionDataDir       = "Data directory"
@@ -598,41 +617,101 @@ object EnglishStrings : AppStrings {
     override val settingsCategoryExperimental = "Experimental"
     override val settingsCategoryAdvanced     = "Advanced"
     override val settingsCategoryDiagnostics  = "Diagnostics"
+    override val settingsCategoryConsole      = "Console"
+    override val consoleSecDisplay            = "Display"
+    override val consoleSecColors             = "Severity colours"
+    override val consoleSecFontSize           = "Font size"
+    override val consoleSecWrap               = "Wrap lines"
+    override val consoleSecGutter             = "Severity strip"
+    override val consoleSecTimestamps         = "Timestamps"
+    override val consoleSecBuffer             = "Line buffer"
+    override val consoleSecColorInfo          = "Info"
+    override val consoleSecColorWarn          = "Warn"
+    override val consoleSecColorError         = "Error"
+    override val consoleSecColorAuto          = "Auto"
+    override val consoleSecApplyNote          = "Changes apply the next time the console is opened."
+    override val consoleSecHighlightRules     = "Highlight rules"
+    override val consoleSecFilterRules        = "Filter / mute"
+    override val consoleSecAddRule            = "Add rule"
+    override val consoleSecRulePattern        = "Pattern"
+    override val consoleSecRegex              = "regex"
+    override val consoleSecBold               = "Bold"
+    override val consoleSecRulesEmpty         = "No rules yet."
+    override val consoleSecArt                 = "Empty-console art"
+    override val consoleSecArtAdd              = "Add art"
+    override val consoleSecArtPaste            = "Paste ASCII or Braille art"
+    override val consoleSecArtEmpty            = "No custom art yet."
 
     override val profileCategoryAccount = "Account"
     override val profileCategorySignIn      = "Sign in"
     override val profileCategorySecurity    = "Security"
     override val profileForgetSavedSignIn   = "Forget saved sign-in"
     override val profileSecurityHint        = "Your sign-in is saved on this device for auto-login."
+    override val accountsTitle               = "Accounts"
+    override val accountRemove               = "Remove"
+    override val accountFaceLabel            = "Show as"
+    override val accountFaceAuto             = "Auto"
+    override val profileSignOutSmartycraft   = "Sign out of SmartyCraft"
+    override val profileSignOutMicrosoft     = "Sign out of Microsoft"
+    override val wardrobeTitle               = "Wardrobe"
+    override val wardrobeSignedOut           = "Sign in to manage your skins and capes."
+    override val wardrobeUpload               = "Upload"
+    override val wardrobeApplySmartycraft     = "Apply (SmartyCraft)"
+    override val wardrobeEmpty                = "Your library is empty. Upload a skin PNG to begin."
+    override val wardrobeSaved               = "Saved"
+    override val wardrobeCapes               = "Capes"
+    override val wardrobeApplyCape           = "Set clan cape"
+    override val wardrobeCapeClanHint        = "Capes are clan-wide -- only the clan leader can set one."
+    override val wardrobeDefaults            = "Default skins"
+    override val wardrobePoseStand           = "Standing"
+    override val wardrobePoseWave            = "Wave"
+    override val wardrobePoseSit             = "Sitting"
+    override val wardrobePoseFaceCover       = "Hide face"
+    override val wardrobePoseWalk            = "Walking"
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"
     override val backgroundLoopForever   = "Forever"
     override val backgroundLoopOnce      = "Play once"
 
-    override val settingsCustomizationExt    = "Customization (exp.)"
-    override val settingsCustomizationExtSub = "Density, accent, glass intensity, color overrides"
-    override val customizationTitle           = "Customization"
-    override val customizationSubtitle        = "Experimental visual tuning"
-    override val customizationDensity         = "Density scale"
-    override val customizationGlassIntensity  = "Glass opacity"
-    override val customizationAccentOverride  = "Accent override"
     override val customizationAccentClear     = "Clear override"
     override val customizationSectionVisual   = "Visual"
     override val customizationSectionColors   = "Color overrides"
-    override val customizationExperimentalToggle = "Per-role color overrides"
-    override val customizationExperimentalSub    = "Unlock 7-color override matrix. Easy to make unreadable combinations."
-    override val customizationReset           = "Reset all"
     override val customizationHexInvalid      = "Invalid hex"
     override val themePickerAccentOverride    = "Accent override (live)"
 
-    override val browseTitle        = "Browse"
-    override val browseSubtitle     = "Packs published on the mirror"
-    override val browseEmptyTitle   = "Catalog is empty"
-    override val browseEmptyMessage = "The mirror is reachable but has not published any packs yet. Check back later."
-    override val browseErrorTitle   = "Mirror unreachable"
-    override val browseErrorMessage = "Could not reach the mirror. Check your connection and retry."
-    override val browseRetry        = "Retry"
+    override val browseTitle             = "Browse"
+    override val browseSearchPlaceholder = "Search packs"
+    override val browseImport            = "Import file"
+    override val libraryAddAction        = "Add pack"
+    override val libraryNewLocalPack     = "New local pack"
+    override val libraryImportPack       = "Import pack"
+    override val createPackName          = "Name"
+    override val createPackMc            = "Minecraft version"
+    override val createPackLoader        = "Loader"
+    override val createPackLoaderVersion = "Loader version (optional)"
+    override val createPackConfirm       = "Create"
+    override val createPackCancel        = "Cancel"
+    override val createPackShowSnapshots = "Show snapshots"
+    override val createPackHideSnapshots = "Hide snapshots"
+    override val browseEmptyTitle        = "Catalog is empty"
+    override val browseEmptyMessage      = "The mirror is reachable but has not published any packs yet. Check back later."
+    override val browseErrorTitle        = "Mirror unreachable"
+    override val browseErrorMessage      = "Could not reach the mirror. Check your connection and retry."
+    override val browseRetry             = "Retry"
+    override fun modrinthCategory(id: String) = when (id) {
+        "adventure"    -> "Adventure"
+        "challenging"  -> "Challenging"
+        "combat"       -> "Combat"
+        "kitchen-sink" -> "Kitchen Sink"
+        "lightweight"  -> "Lightweight"
+        "magic"        -> "Magic"
+        "multiplayer"  -> "Multiplayer"
+        "optimization" -> "Optimization"
+        "quests"       -> "Quests"
+        "technology"   -> "Technology"
+        else           -> humanizeCategory(id)
+    }
 
     override val browseDetailErrorTitle    = "Could not load pack"
     override val browseDetailErrorMessage  = "Could not fetch the manifest. Check your connection and retry."
@@ -647,7 +726,7 @@ object EnglishStrings : AppStrings {
     override val browseDetailCompatTitle      = "Compatibility"
     override val browseDetailCompatMc         = "Minecraft"
     override val browseDetailCompatLoader     = "Loader"
-    override val browseDetailCompatJava       = "Java"
+    override val browseDetailCompatJava       = "Runtime"
     override val browseDetailVersionTitle     = "Version"
 
     override val browseDetailInstallRunningTitle  = "Installing..."
@@ -669,6 +748,24 @@ object EnglishStrings : AppStrings {
     override val fileBrowserEmptyFolder      = "(empty)"
 
     override val contentTabUnsupportedOrigin    = "Content view is only available for mirror-published packs today. Other sources will get parity in a follow-up."
+    override val contentDetachTitle             = "Tracked pack"
+    override val contentDetachBody              = "Detach to freely enable, delete and add mods."
+    override val contentTrackedOptionalBody     = "Optional mods toggle here. Detach to add and remove."
+    override val contentDetachButton            = "Detach"
+    override val contentAddFiles                = "Add files"
+    override val contentFindProjects            = "Find projects"
+    override val contentSearchPlaceholder       = "Search content..."
+    override val contentEmpty                   = "Nothing found"
+    override val contentFilterAll               = "All"
+    override val contentFilterMods              = "Mods"
+    override val contentFilterResourcePacks     = "Resource packs"
+    override val contentFilterShaderPacks       = "Shaders"
+    override val contentDeleteTitle             = "Delete file?"
+    override val contentDeleteBody              = "The file is removed from disk for good."
+    override val contentActionDetails           = "Details"
+    override val contentActionOpenPage          = "Open page"
+    override val contentDetailAuthors           = "Authors"
+    override val contentDetailSize              = "Size"
     override val contentTabFetchErrorTitle      = "Could not load pack content"
     override val contentTabFetchErrorGeneric    = "The mirror manifest failed to load."
     override val contentTabRetry                = "Retry"
@@ -771,8 +868,14 @@ object EnglishStrings : AppStrings {
     override fun notifPackRunning(packName: String)     = "$packName is running"
     override fun notifPackFailed(packName: String)      = "$packName failed to launch"
     override fun notifPackSessionEnded(packName: String) = "$packName session ended"
+    override fun notifInstallSyncing(packName: String)  = "Installing $packName"
+    override fun notifInstallDone(packName: String)     = "$packName installed"
+    override fun notifInstallFailed(packName: String)   = "$packName failed to install"
+    override fun notifInstallCancelled(packName: String) = "$packName install cancelled"
+    override val notifActionCancel                      = "Cancel"
     override val notifActionShowConsole                 = "Show console"
     override val notifActionStop                        = "Stop"
+    override val notifActionPlayOffline                 = "Play offline"
     override fun notifReasonExitCode(code: Int)         = "Game exited with code $code"
     override val notifReasonInternal                    = "Internal error"
     override fun notifReasonInternalDetail(detail: String) = detail
@@ -800,6 +903,7 @@ object EnglishStrings : AppStrings {
     override val homeQuickContinue  = "Continue"
     override val homeQuickStart     = "Launch"
     override val homeQuickButton    = "Play"
+    override fun homeHeroPlaytime(hours: Long) = "$hours h played"
     override val launchTileReady    = "Launch"
     override val launchTileBlocked  = "Can't play yet"
 
@@ -810,12 +914,6 @@ object EnglishStrings : AppStrings {
     override val libraryHeaderSubtitle = "Installed packs"
 
     // --- Customization widget labels ---
-    override val customGlassAlpha   = "Glass alpha"
-    override val customCardCorner   = "Card corner (dp)"
-    override val customCardBorder   = "Card border (dp)"
-    override val customButtonCorner = "Button corner (dp)"
-    override val customAnimSpeed    = "Animation speed"
-    override val customSoftGlow     = "Decorative glow"
 
     // --- Layout editor: common actions ---
     override val editorClose   = "Close"
@@ -843,8 +941,17 @@ object EnglishStrings : AppStrings {
         "widget.appshell.region.center" to "Main content",
         "widget.appshell.region.collapsed" to "Collapsed",
         "widget.appshell.region.swipeToCollapse" to "Swipe to collapse",
+        "widget.appshell.region.frostTier" to "Frost",
         "widget.appshell.region.glassAlphaPct" to "Glass, %",
         "widget.appshell.region.left" to "Left rail",
+        "widget.appshell.region.top" to "Title bar",
+        "widget.appshell.region.body" to "Main area",
+        "widget.appshell.topbar.breadcrumb" to "Breadcrumb",
+        "widget.appshell.topbar.heightDp" to "Height",
+        "widget.appshell.topbar.cornerStyle" to "Corner style",
+        "widget.appshell.topbar.groupStyle" to "Grouping",
+        "widget.appshell.topbar.frostTier" to "Frost",
+        "widget.appshell.topbar.controls" to "Window controls",
         "widget.appshell.region.right" to "Right panel",
         "widget.appshell.region.showDivider" to "Divider",
         "widget.appshell.region.widthDp" to "Width (0 = flexible)",
@@ -878,29 +985,6 @@ object EnglishStrings : AppStrings {
         "widget.container.tabs.label2" to "Tab 2",
         "widget.container.tabs.label3" to "Tab 3",
         "widget.container.tabs.tabCount" to "Tabs",
-        "widget.customization.accent.override" to "Accent color",
-        "widget.customization.color.background" to "Color: background",
-        "widget.customization.color.criticalAccent" to "Color: criticalAccent",
-        "widget.customization.color.error" to "Color: error",
-        "widget.customization.color.outline" to "Color: outline",
-        "widget.customization.color.primary" to "Color: primary",
-        "widget.customization.color.progressAccent" to "Color: progressAccent",
-        "widget.customization.color.secondary" to "Color: secondary",
-        "widget.customization.color.success" to "Color: success",
-        "widget.customization.color.surface" to "Color: surface",
-        "widget.customization.color.textPrimary" to "Color: textPrimary",
-        "widget.customization.color.textSecondary" to "Color: textSecondary",
-        "widget.customization.color.warnAccent" to "Color: warnAccent",
-        "widget.customization.density" to "UI density",
-        "widget.customization.experimental.toggle" to "Experimental settings",
-        "widget.customization.glass.alpha" to "Glass opacity",
-        "widget.customization.glass.intensity" to "Glass intensity",
-        "widget.customization.reset" to "Reset customization",
-        "widget.customization.shape.animMultiplier" to "Animation speed",
-        "widget.customization.shape.buttonCorner" to "Button rounding",
-        "widget.customization.shape.cardBorder" to "Card border width",
-        "widget.customization.shape.cardCorner" to "Card rounding",
-        "widget.customization.shape.softGlow" to "Decorative glow",
         "widget.home.classic.content" to "Classic dashboard",
         "widget.home.new.clock" to "Clock",
         "widget.home.new.clock.accent" to "Accent color",
@@ -909,6 +993,9 @@ object EnglishStrings : AppStrings {
         "widget.home.new.clock.mode" to "Mode",
         "widget.home.new.clock.showSeconds" to "Seconds",
         "widget.home.new.clock.title" to "Heading",
+        "widget.home.new.hero" to "Pack hero card",
+        "widget.home.new.hero.height" to "Height",
+        "widget.home.new.hero.showMeta" to "Metadata",
         "widget.home.new.launchbutton" to "Launch button",
         "widget.home.new.launchbutton.label" to "Label",
         "widget.home.new.music" to "Music player",
@@ -924,6 +1011,8 @@ object EnglishStrings : AppStrings {
         "widget.home.new.recent.title" to "Heading",
         "widget.home.new.spacer" to "Spacer",
         "widget.home.new.spacer.height" to "Height",
+        "widget.home.new.video" to "Video player",
+        "widget.home.new.video.url" to "Video URL",
         "widget.home.new.welcome" to "Welcome banner",
         "widget.home.new.welcome.customGreeting" to "Custom greeting text",
         "widget.home.new.welcome.showSubtitle" to "Show subtitle",
@@ -933,6 +1022,7 @@ object EnglishStrings : AppStrings {
         "widget.library.header" to "Library header",
         "widget.library.header.subtitle" to "Subtitle",
         "widget.library.header.title" to "Heading",
+        "widget.library.header.show" to "Show header",
         "widget.nav.entry" to "Nav item",
         "widget.notes.scratch" to "Notes",
         "widget.notes.scratch.placeholder" to "Write something...",
@@ -941,8 +1031,8 @@ object EnglishStrings : AppStrings {
         "widget.notifications.history.expandUp" to "Expand upward",
         "widget.notifications.history.clock12h" to "12-hour clock (am/pm)",
         "widget.notifications.history.verticalTime" to "Stacked time",
-        "widget.profile.account.section" to "Account",
-        "widget.profile.signin" to "Sign in",
+        "widget.profile.account.section" to "SmartyCraft",
+        "widget.profile.signin" to "Microsoft",
         "widget.profile.nav" to "Profile navigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Preview height",
@@ -957,6 +1047,29 @@ object EnglishStrings : AppStrings {
     override val recoverySafeModeTitle = "Can't recover the interface"
     override val recoverySafeModeBody  = "The interface crashed several times in a row. A crash report was saved to disk. Restart the launcher."
     override val recoverySafeModeQuit  = "Quit"
+
+    override val recoveryTitle              = "Recovery mode"
+    override val recoveryBody               = "Disable a module or reset a corrupted state, then continue. Changes apply when the launcher restarts."
+    override val recoveryModulesHeading     = "Disable modules"
+    override val recoveryModuleTray         = "System tray"
+    override val recoveryModuleNotify       = "Notifications"
+    override val recoveryModuleSkinema      = "Media backgrounds"
+    override val recoveryModuleKeyring      = "System keyring"
+    override val recoveryResetsHeading      = "Reset"
+    override val recoveryResetLayout        = "Layout"
+    override val recoveryResetCustomization = "Customization"
+    override val recoveryResetSettings      = "Settings"
+    override val recoveryContinue           = "Continue to normal boot"
+    override val recoveryRelaunchFailed     = "Couldn't restart automatically. Reopen the launcher."
+    override val recoveryRestartInApp       = "Restart in recovery mode"
+    override val thresholdStageFiles     = "checking files"
+    override val thresholdStageNetwork   = "network state"
+    override val thresholdStageMigration = "migration check"
+    override val thresholdStageModules   = "starting modules"
+    override val thresholdErrorTitle     = "boot failed"
+    override val thresholdOpenLogs       = "open logs folder"
+    override val thresholdQuit           = "quit"
+    override val recoveryReloadedNotice = "Interface reloaded after an error"
     override val editorSave    = "Save"
     override val editorApply   = "Apply"
     override val editorExport  = "Export"
@@ -967,6 +1080,12 @@ object EnglishStrings : AppStrings {
     override val editorSlotRow    = "Row"
     override val editorSlotGrid   = "Grid"
     override val editorSlotCanvas = "Canvas"
+    override val editorSlotCubeGrid = "Cube grid"
+    override val editorSlotLayoutMenuTitle     = "Layout"
+    override val editorSlotGridColumns         = "Columns"
+    override val editorSlotGridColumnsDecrease = "Fewer columns"
+    override val editorSlotGridColumnsIncrease = "More columns"
+    override val editorSlotLayoutHandle        = "Slot layout"
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Reset to default"
@@ -1022,11 +1141,12 @@ object EnglishStrings : AppStrings {
     override val editorSurfShortRightRail = "Right rail"
     override val editorSurfShortAbout     = "About"
     override val editorSurfShortBg        = "Background"
-    override val editorSurfShortStyle     = "Style"
     override val editorSurfShortProfile   = "Profile"
     override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
     override val editorSurfShortShell     = "Shell"
+    override val editorSurfShortTopBar    = "Top"
+    override val editorSurfShortBody      = "Main"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Home (classic)"
@@ -1036,11 +1156,12 @@ object EnglishStrings : AppStrings {
     override val editorSurfRightRail   = "Right panel"
     override val editorSurfAbout       = "About"
     override val editorSurfBg          = "Background settings"
-    override val editorSurfStyle       = "Customization"
     override val editorSurfProfile     = "Profile"
     override val editorSurfServer      = "Server details"
     override val editorSurfTheme       = "Theme picker"
     override val editorSurfShell        = "App shell"
+    override val editorSurfTopBar       = "Top bar"
+    override val editorSurfBody         = "Main area"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Music player"
@@ -1054,18 +1175,33 @@ object EnglishStrings : AppStrings {
     override val audioStatusReady      = "Ready"
     override val audioStatusPlaying    = "Playing"
     override val audioStatusPaused     = "Paused"
-    override val audioFormatHint       = "WAV / AU / AIFF supported. MP3 arrives with Skinema."
+    override val audioFormatHint       = "MP3, FLAC, OGG, WAV and more."
     override val audioNoPlayerHere     = "No player on this layout"
     override val audioAddMusicPlayer   = "Add a Music player"
-    override val audioErrorUnsupported = "Unsupported format -- needs WAV / AU / AIFF."
+    override val audioErrorUnsupported = "Unsupported or unreadable file."
     override val audioErrorOpenFailed  = "Could not open the file"
     override val audioErrorDeviceBusy  = "Audio device is busy"
     override val audioErrorPlaybackFailed = "Playback failed"
+
+    // --- Video player ---
+    override val videoFullscreen     = "Fullscreen"
+    override val videoExitFullscreen = "Exit fullscreen"
+    override val videoMute           = "Mute"
+    override val videoUnmute         = "Unmute"
+    override val videoReplay         = "Replay"
+    override val videoError          = "Could not play this video"
+    override val videoLoading        = "Loading video…"
+    override val videoOpenInBrowser  = "Open in browser"
+    override val videoSkipBack        = "Back 10 seconds"
+    override val videoSkipForward     = "Forward 10 seconds"
+    override val videoWidgetEmpty     = "Set a video URL in widget settings"
 
     // --- Library pack card ---
     override val packCardPlay          = "Play"
     override val packCardSettings      = "Settings"
     override val packCardMore          = "More"
+    override val packCardDeleteTitle   = "Delete instance?"
+    override val packCardDeleteBody    = "The instance and all its files (worlds, settings, mods) are removed for good. This can't be undone."
     override val packCardNeverPlayed   = "Never played"
     override val packCardPlayedJustNow = "just now"
     override fun packCardPlayedMinutesAgo(n: Long) = "$n min ago"

@@ -2,10 +2,18 @@ package hivens.launcher.di
 
 import hivens.config.Protocol
 import hivens.config.Storage
+import hivens.auth.AccountStore
 import hivens.auth.AuthProvider
+import hivens.auth.CredentialsManager
+import hivens.auth.LegacyCredentialsManager
+import hivens.auth.AuthProviderRegistry
+import hivens.auth.OfflineAuthProvider
+import hivens.auth.microsoft.MsaAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
 import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
+import hivens.launcher.network.MsaConfig
+import hivens.launcher.network.MsaConfigLoader
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
@@ -15,7 +23,11 @@ import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
-import hivens.core.security.IKeyringStorage
+import dev.hivens.libvault.SecretVault
+import dev.hivens.libvault.Vault
+import dev.hivens.libvault.VaultConfig
+import dev.hivens.libvault.VaultTier
+import hivens.auth.LazySecretVault
 import hivens.launcher.*
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
@@ -33,18 +45,37 @@ import hivens.launcher.runtime.loader.ForgeResolver
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ModernInstallerResolver
 import hivens.launcher.security.KeyringStorageFactory
-import hivens.launcher.smrt.ModIconResolver
-import hivens.core.api.dto.smrt.ModrinthProject
-import hivens.core.api.dto.smrt.ModrinthVersion
+import hivens.core.smrt.ModIconResolver
+import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.cache.CacheConfig
 import hivens.core.data.DashboardData
+import hivens.core.data.ModuleId
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
+import hivens.launcher.PackImportService
+import hivens.launcher.PackInstallCoordinator
+import hivens.launcher.PackInstallService
+import hivens.launcher.imports.ForeignInstanceImporter
+import hivens.launcher.imports.FtbAppSource
+import hivens.launcher.imports.LocalPackCreator
+import hivens.launcher.imports.LauncherImportService
+import hivens.launcher.imports.LauncherRootLocator
+import hivens.launcher.imports.MinecraftLauncherSource
+import hivens.launcher.imports.ModrinthAppSource
+import hivens.launcher.imports.PrismLauncherSource
+import hivens.launcher.curseforge.CurseForgeZipInstaller
+import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
+import hivens.launcher.catalogue.MirrorPackCatalogue
+import hivens.launcher.catalogue.ModrinthPackCatalogue
+import hivens.launcher.catalogue.PackArtResolver
+import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
@@ -54,7 +85,6 @@ import hivens.launcher.update.DesktopIntegration
 import hivens.launcher.update.SourceBuildService
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
-import hivens.widget.model.DefaultLayout
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -311,6 +341,13 @@ val networkModule = module {
         ServerProtocolConfigLoader(get()).load(get<Path>())
     }
 
+    // MsaConfig -- Microsoft OAuth client id, blank by default (sign-in disabled).
+    // Loads from <dataDir>/msa-config.json; nexira.msa.clientId / NEXIRA_MSA_CLIENT_ID
+    // override the client id. Blank keeps the launcher at Phase A behavior.
+    single<MsaConfig> {
+        MsaConfigLoader(get()).load(get<Path>())
+    }
+
     single { LauncherHashCache(
         dataDir = get<Path>().toFile(),
         router  = get<ChannelRouter>(),
@@ -348,20 +385,41 @@ val networkModule = module {
  * (secure + insecure-bypass variants).
  */
 val authModule = module {
-    // IKeyringStorage picked at startup via KeyringStorageFactory.system()
-    // -- libsecret on Linux, Credential Manager / DPAPI on Windows,
-    // Keychain on macOS, NoOp fallback when no daemon is reachable.
-    // CredentialsManager handles the file-fallback path internally when
-    // keyring.store() returns false, so this single line wires both
-    // the happy and the degraded path.
-    single<IKeyringStorage> {
-        KeyringStorageFactory.system()
+    // Secret storage via libvault: OS keyring (Secret Service / Credential
+    // Manager / Keychain) with an encrypted-file fallback, opened once for the
+    // process. The credentials.vault blob sits next to credentials.json. On a
+    // locked keyring the vault degrades to the file tier rather than prompting
+    // (see CredentialsManager KDoc).
+    single<SecretVault> {
+        // Open lazily, off the Compose first-composition thread: the OsKeyring open
+        // is a ~1.4s D-Bus probe, and resolving the account store eagerly in the
+        // shell would put it on the UI thread and delay the boot-threshold reveal.
+        // Every real consumer runs on Dispatchers.IO, so the open lands there.
+        LazySecretVault {
+            val ns = "io.github.kitty_hivens.Nexira"
+            val file = get<Path>().resolve("credentials.vault")
+            // Keyring disabled by boot recovery -> skip the OsKeyring tier (the DBus /
+            // Secret Service probe that can hang on a hostile session) and fall to the
+            // encrypted file, so saved credentials keep working without the keyring.
+            val keyringOff = ModuleId.Keyring.id in get<ISettingsService>().getSettings().disabledModules
+            val config = if (keyringOff) {
+                VaultConfig(namespace = ns, softwareFilePath = file, preferredTiers = listOf(VaultTier.SoftwareFile, VaultTier.Memory))
+            } else {
+                VaultConfig(namespace = ns, softwareFilePath = file)
+            }
+            Vault.open(config)
+        }
     }
-    single { CredentialsManager(get(), get(), get()) }
+    // Legacy keyring + AES reader, kept one release for the migration shim. Lazy
+    // single: built -- and the old keyring probed -- only when CredentialsManager
+    // hits a pre-v5 credentials.json and resolves the provider lambda below.
+    single { LegacyCredentialsManager(get(), get(), KeyringStorageFactory.system()) }
+    single { CredentialsManager(get(), get(), get<SecretVault>(), legacyProvider = { get() }) }
     // Interface aliases for the launch-flow seam. LauncherController binds the
     // I* slices; other consumers keep the concrete type. get<Concrete>() reuses
     // the single instance rather than building a second.
     single<ICredentialStore> { get<CredentialsManager>() }
+    single<AccountStore> { get<CredentialsManager>() }
 
     single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
 
@@ -372,6 +430,24 @@ val authModule = module {
      */
     single<AuthProvider>(named("insecure")) {
         SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
+    }
+
+    // Offline-play provider + the Microsoft provider + the registry the content
+    // router and launch gate consult. Microsoft is always constructible but only
+    // JOINS the registry -- and so surfaces in the login UI and activates its
+    // launch gate -- when a client id is configured. It uses the proxy-free
+    // "direct" HTTP client (login.microsoftonline.com / xboxlive must not go
+    // through the SC SOCKS channel).
+    single { OfflineAuthProvider() }
+    single { MsaAuthProvider(get<HttpClientProvider>(named("direct")), get<MsaConfig>().clientId) }
+    single {
+        AuthProviderRegistry(
+            buildList {
+                add(get<AuthProvider>())
+                add(get<OfflineAuthProvider>())
+                if (get<MsaConfig>().enabled) add(get<MsaAuthProvider>())
+            },
+        )
     }
 }
 
@@ -384,6 +460,7 @@ val cacheModule = module {
     single<Clock> { SystemClock }
     single { CacheFactory(rootDir = get<Path>().resolve("cache"), json = get(), scope = get(), clock = get()) }
     single { smrtPackCaches() }
+    single { modrinthCaches() }
 }
 
 /**
@@ -397,7 +474,64 @@ val mirrorModule = module {
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
-    single { SmrtSyncService(get(), get()) }
+    single { ModrinthClient(get(named("direct")), caches = get()) }
+    single { SmrtSyncService(get(), get(), get()) }
+
+    // Pack-catalogue read side: one provider per browsable source, indexed by
+    // origin so the Browse UI stays source-agnostic.
+    single { MirrorPackCatalogue(get()) }
+    single { ModrinthPackCatalogue(get()) }
+    single { PackCatalogueRegistry(listOf(get<MirrorPackCatalogue>(), get<ModrinthPackCatalogue>())) }
+    // Resolves an installed instance's native cover from its source when the
+    // install didn't capture one (pre-field instances), so Library cards and the
+    // PackDetail hero show real art instead of the pixel placeholder.
+    single { PackArtResolver(modrinth = get(), mirror = get()) }
+
+    // Install write side: dispatches a (pack, version) by origin onto the
+    // mirror sync installer or the Modrinth .mrpack installer.
+    single { PackInstallCoordinator(mirrorInstaller = get(), mrpackInstaller = get(), mirrorClient = get()) }
+    // App-scoped owner of catalogue installs: runs the install on the shared
+    // process scope (get<CoroutineScope>()) so navigating away from Browse does
+    // not cancel a download mid-flight.
+    single { PackInstallService(runInstall = get<PackInstallCoordinator>()::install, scope = get()) }
+    single {
+        CurseForgeZipInstaller(
+            json = get(),
+            javaManager = get(),
+            runtimeProvisioner = get(),
+            repository = get(),
+            dataDir = get(),
+        )
+    }
+    single { PackImportService(mrpackInstaller = get(), cfInstaller = get()) }
+    // Foreign-launcher import (phase 1: discovery). Candidate-root locator spans
+    // native XDG / Flatpak / Snap; one source per supported launcher.
+    single { LauncherRootLocator() }
+    single {
+        LauncherImportService(
+            sources = listOf(
+                MinecraftLauncherSource(get(), get()),
+                ModrinthAppSource(get()),
+                PrismLauncherSource(get(), get()),
+                FtbAppSource(get(), get()),
+            ),
+        )
+    }
+    // Import engine: copies a discovered instance's content and dedups a
+    // vanilla-layout runtime into the shared roots (see ForeignInstanceImporter).
+    single {
+        ForeignInstanceImporter(
+            runtimeProvisioner = get(),
+            javaManager = get(),
+            repository = get(),
+            dataDir = get(),
+            librariesDir = get<PlatformPaths>().librariesDir,
+            assetsDir = get<PlatformPaths>().assetsDir,
+        )
+    }
+    // Create an empty local pack from scratch (name + MC + loader); the Content
+    // tab's Modrinth browser + local-jar add fill it in.
+    single { LocalPackCreator(runtimeProvisioner = get(), javaManager = get(), repository = get(), dataDir = get()) }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
@@ -422,13 +556,14 @@ val mirrorModule = module {
 
     // Per-mod icon URL resolver for the Library PackDetail Content tab.
     // Direct iconUrl wins; otherwise resolves a Modrinth project's icon
-    // via SmrtPackClient. Results cached per project_id inside the
+    // via ModrinthClient. Results cached per project_id inside the
     // resolver instance.
     single {
-        val client: SmrtPackClient = get()
-        ModIconResolver { projectId ->
-            client.resolveModrinthProject(projectId).iconUrl
-        }
+        val client: ModrinthClient = get()
+        ModIconResolver(
+            resolveProjectIcon = { projectId -> client.resolveProject(projectId).iconUrl },
+            resolveIconByHash  = { sha1 -> client.versionByHash(sha1)?.let { client.resolveProject(it.projectId).iconUrl } },
+        )
     }
 }
 
@@ -508,7 +643,6 @@ val launchPipelineModule = module {
             profilerStore      = get(),
             agentExtractor     = get(),
             authlibSwapper     = get(),
-            openSmrtResolver   = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
             sharedLibrariesDir = get<PlatformPaths>().librariesDir,
         )
@@ -517,7 +651,7 @@ val launchPipelineModule = module {
     single {
         val dataDir: Path = get()
         val profiles: ProfileManager = get()
-        val credentials: CredentialsManager = get()
+        val credentials: ICredentialStore = get()
         val settings: ISettingsService = get()
         AutoSyncService(
             authService = get(),
@@ -651,27 +785,6 @@ val appModule = module {
         )
     }
 
-    // Widget layout graph persistence (Phase 1 / kernel-2). Default
-    // graph lives at /widget/default-layout.json inside :widget-api;
-    // first run seeds the file, thereafter the on-disk copy is the
-    // source of truth. Reactive via StateFlow so the future editor
-    // mutates the graph live.
-    single {
-        val dataDir: Path = get()
-        LayoutGraphRepository(
-            file         = dataDir.resolve(Storage.LAYOUT_GRAPH_FILE),
-            json         = get(),
-            scope        = get(),
-            defaultGraph = { DefaultLayout.load(get()) },
-        )
-    }
-
-    // Flush pending debounced layout writes on JVM shutdown. Lives as
-    // its own createdAtStart=true single so the hook is registered
-    // during startKoin{}. Runs in parallel with AppCoroutineScopeHook
-    // (JVM shutdown hooks run concurrently); flush() is mutex-locked
-    // and cancellation-safe, so racing with scope cancellation is OK.
-    single(createdAtStart = true) { LayoutGraphFlushHook(get()) }
 }
 
 // ── Module factories ────────────────────────────────────────────────────────
@@ -691,8 +804,21 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
         listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
-        modrinthProject = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
-        modrinthVersion = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
+    )
+}
+
+/**
+ * Modrinth metadata caches. A published project version is immutable, so the
+ * version cache keeps a long stale window; project metadata changes rarely.
+ */
+private fun Scope.modrinthCaches(): ModrinthCaches {
+    val f: CacheFactory = get()
+    val min = 60_000L
+    val hour = 60 * min
+    val day = 24 * hour
+    return ModrinthCaches(
+        project = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
+        version = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
     )
 }
 

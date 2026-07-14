@@ -45,34 +45,34 @@ subprojects {
     afterEvaluate {
         if (plugins.hasPlugin("java")) {
             configure<JavaPluginExtension> {
-                sourceCompatibility = JavaVersion.VERSION_25
-                targetCompatibility = JavaVersion.VERSION_25
-                // Vendor-loose toolchain pin: any JDK 25 distribution works
+                sourceCompatibility = JavaVersion.VERSION_26
+                targetCompatibility = JavaVersion.VERSION_26
+                // Vendor-loose toolchain pin: any JDK 26 distribution works
                 // (Liberica is the project's documented choice and what CI
                 // pulls via JAVA_DISTRIBUTION=liberica, but Temurin / Zulu /
                 // Microsoft / etc. are all fine locally). Pinning the
                 // languageVersion is what makes new contributors with
-                // JDK <25 on PATH auto-download a 25 via the
+                // JDK <26 on PATH auto-download a 26 via the
                 // foojay-resolver-convention plugin in settings.gradle.kts
                 // instead of failing with cryptic "no matching toolchain"
                 // errors. Game-side JRE is provisioned separately by
                 // JavaManagerService (Liberica) and is independent of this.
                 toolchain {
-                    languageVersion.set(JavaLanguageVersion.of(25))
+                    languageVersion.set(JavaLanguageVersion.of(26))
                 }
             }
         }
         // Kotlin's compilerOptions.jvmTarget defaults to JVM_1_8 if a
         // subproject's build script does not set it. A new module added
-        // without explicit kotlin { jvmToolchain(25) } / compilerOptions {
-        // jvmTarget = JVM_25 } would silently produce JVM 1.8 bytecode
-        // while loading Java 25 classes from dependencies -- an at-runtime
+        // without explicit kotlin { jvmToolchain(26) } / compilerOptions {
+        // jvmTarget = JVM_26 } would silently produce JVM 1.8 bytecode
+        // while loading Java 26 classes from dependencies -- an at-runtime
         // LinkageError waiting to happen, invisible until a 9+-only API
         // gets touched. Force-set on every Kotlin/JVM compile task so the
         // bytecode floor always matches the Java target above.
         tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
             compilerOptions {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_26)
             }
         }
     }
@@ -99,6 +99,18 @@ subprojects {
         }
     }
 
+    // Stable jar file names. project.version is a `git describe` string that
+    // changes almost every commit, so the default `<module>-<version>.jar`
+    // name makes build/libs accumulate a new jar per build and never drop the
+    // old ones. A classpath that then resolves an older jar loads stale
+    // classes: a type added in a later commit reads as NoClassDefFoundError
+    // while its older package-mates load fine. Dropping the version from the
+    // file name overwrites a single <module>.jar each build. The real version
+    // still rides in project.version (Implementation-Version, BuildConfig).
+    tasks.withType<Jar>().configureEach {
+        archiveVersion.set("")
+    }
+
     tasks.withType<Test>().configureEach {
         // CI wants maximum throughput (free runners, ephemeral); local
         // dev wants the laptop to stay usable while tests run. Detect via
@@ -117,7 +129,13 @@ subprojects {
 
         jvmArgs(
             if (isCi) "-Xmx1g" else "-Xmx512m",
-            "-XX:+UseParallelGC"
+            "-XX:+UseParallelGC",
+            // skiko / skinema / lib* load native code through java.lang.System::load
+            // (Panama downcalls). JDK 24+ warns on restricted native access and a
+            // future JDK blocks it outright; grant it up front so test JVMs match
+            // the packaged launcher (compose.desktop + packaging jvmArgs already set
+            // this). A harmless no-op for the pure-JVM module tests.
+            "--enable-native-access=ALL-UNNAMED"
         )
     }
 }

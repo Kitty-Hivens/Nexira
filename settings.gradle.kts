@@ -21,14 +21,14 @@ pluginManagement {
 }
 
 // foojay-resolver-convention -- safety net for the Gradle toolchain
-// jvmToolchain(25) call in root build.gradle.kts. If a contributor runs the
-// build with a JDK <25 (or no JDK 25 at all on PATH), Gradle resolves and
+// jvmToolchain(26) call in root build.gradle.kts. If a contributor runs the
+// build with a JDK <26 (or no JDK 26 at all on PATH), Gradle resolves and
 // downloads one automatically from the foojay.io distributions API rather
 // than failing with a cryptic "no toolchains of required version found"
-// error. Policy stays loose (any vendor of JDK 25); foojay defaults to a
+// error. Policy stays loose (any vendor of JDK 26); foojay defaults to a
 // safe-bet vendor when it picks for you.
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 // Repository centralization (Gradle 7+ convention):
@@ -65,11 +65,30 @@ rootProject.name = "nexira"
 include(":client-config")
 include(":client-core")
 // Auth seam carved out of the launcher god-module: :client-auth holds the
-// provider-agnostic AuthProvider SPI, :client-auth-smartycraft the SmartyCraft impl.
+// provider-agnostic AuthProvider SPI, :client-auth-smartycraft the SmartyCraft impl,
+// :client-auth-microsoft the Microsoft (MSA device-code) impl.
 include(":client-auth")
 include(":client-auth-smartycraft")
+include(":client-auth-microsoft")
 include(":client-launcher")
+// Headless native-image entrypoint: a Compose-free CLI over the launch
+// pipeline (auth -> resolve -> download -> JRE -> runtime -> launch),
+// buildable to a GraalVM / Liberica-NIK native binary for Linux. The GUI
+// (:client-ui) stays on the JVM -- Skiko/AWT block native-image of Compose.
+// See docs/native-image.md.
+include(":client-cli")
+// Media playback support (yt-dlp + URL video cache) feeding the Skinema player.
+// Its own seam: consumed by the UI only, unknown to the launch engine.
+include(":client-media")
+// Tray seam carved out of client-ui: :client-tray holds the TrayController SPI
+// and its libtray-backed impl. It depends only on libtray -- the launch engine
+// and auth are off-limits by construction, so a tray action can never block on
+// them.
+include(":client-tray")
 include(":client-ui")
+// Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
+// client-ui depends on it one-way; it depends on nothing in-tree.
+include(":nx-ui")
 include(":widget-model")
 include(":widget-api")
 include(":widget-processor")

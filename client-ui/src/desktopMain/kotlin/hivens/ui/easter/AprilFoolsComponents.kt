@@ -2,7 +2,6 @@ package hivens.ui.easter
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -13,10 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -26,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -62,16 +57,16 @@ fun AprilFoolsWrapper(
 
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        AprilFoolsEngine.run(
-            scope       = scope,
+    // The engine owns its own child scope (cancelled in stop()); start it and
+    // tear it down on dispose from one effect so the lifecycle is explicit and
+    // a re-mount can't leave a second engine running against the global state.
+    DisposableEffect(Unit) {
+        AprilFoolsEngine.start(
+            parent      = scope,
             cursorState = { pixelCursorState.value },
             windowSize  = { windowSize },
         )
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { ChaosState.clean() }
+        onDispose { AprilFoolsEngine.stop() }
     }
 
     CompositionLocalProvider(
@@ -172,9 +167,9 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isGhost)
-                        CelestiaTheme.colors.primary.copy(alpha = 0.38f)
+                        NxTheme.colors.primary.copy(alpha = 0.38f)
                     else
-                        CelestiaTheme.colors.primary,
+                        NxTheme.colors.primary,
                 ),
                 // Flat style drops elevation -- Brut surfaces don't lift,
                 // so a chaos button shouldn't either.
@@ -210,7 +205,7 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
  */
 @Composable
 private fun LegsCanvas(widthPx: Float, cycle: Float) {
-    val legColor  = CelestiaTheme.colors.textPrimary.copy(alpha = 0.9f)
+    val legColor  = NxTheme.colors.textPrimary.copy(alpha = 0.9f)
     Canvas(
         modifier = Modifier
             .width(widthPx.dp)
@@ -236,132 +231,6 @@ private fun LegsCanvas(widthPx: Float, cycle: Float) {
     }
 }
 
-// ─── AprilFoolsButton ─────────────────────────────────────────────────────────
-
-/**
- * Drop-in replacement for any Button that should participate in chaos.
- *
- * Behavior:
- *  - Registers itself with [ChaosState] so the engine can target it.
- *  - Tracks its own position via [onGloballyPositioned].
- *  - Becomes invisible (alpha=0) when the engine takes control.
- *  - Handles local FLEEING phase by offsetting itself on cursor hover.
- *  - Falls back to a normal Button when April Fools is not active.
- *
- * @param id     Stable unique string -- must not change across recompositions.
- * @param text   Localized label shown on the button.
- */
-@Composable
-fun AprilFoolsButton(
-    id: String,
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    colors: ButtonColors = ButtonDefaults.buttonColors(
-        containerColor = CelestiaTheme.colors.primary,
-    ),
-) {
-    // Pass-through when chaos is inactive. Same NoOpIndication +
-    // zero-elevation pair as NoOpAprilFools.ChaosButton -- shape and
-    // shadow off-clip leaks otherwise.
-    if (!AprilFools.isActive()) {
-        CompositionLocalProvider(LocalIndication provides NoOpIndication) {
-            Button(
-                onClick   = onClick,
-                modifier  = modifier,
-                enabled   = enabled,
-                colors    = colors,
-                shape     = MaterialTheme.shapes.small,
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation  = 0.dp,
-                    pressedElevation  = 0.dp,
-                    focusedElevation  = 0.dp,
-                    hoveredElevation  = 0.dp,
-                    disabledElevation = 0.dp,
-                ),
-            ) {
-                Text(text)
-            }
-        }
-        return
-    }
-
-    // ── Resolve or create the FloatingButton record ───────────────────────
-    val btn = remember(id) {
-        ChaosState.find(id) ?: FloatingButton(
-            id       = id,
-            label    = text,
-            widthPx  = 160f,
-            heightPx = 50f,
-            onClick  = onClick,
-        ).also { ChaosState.register(it) }
-    }
-
-    LaunchedEffect(onClick) { btn.onClick = onClick }
-
-    // Keep label in sync (locales can change at runtime)
-    DisposableEffect(id) {
-        onDispose { ChaosState.unregister(id) }
-    }
-
-    // ── Local flee offset (FLEEING phase only) ────────────────────────────
-    var fleeX by remember { mutableStateOf(0f) }
-    var fleeY by remember { mutableStateOf(0f) }
-    val animFleeX by animateFloatAsState(fleeX, spring(stiffness = 450f, dampingRatio = 0.65f), label = "fleeX")
-    val animFleeY by animateFloatAsState(fleeY, spring(stiffness = 450f, dampingRatio = 0.65f), label = "fleeY")
-
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
-
-    LaunchedEffect(isHovered) {
-        if (isHovered && btn.phase == ChaosPhase.FLEEING) {
-            // Jump to a random position relative to current spot
-            fleeX = Random.nextFloat() * 180f - 90f
-            fleeY = Random.nextFloat() * 80f  - 40f
-        }
-    }
-
-    // ── Render ────────────────────────────────────────────────────────────
-    // Single hover affordance: NoOpIndication suppresses the M3 default
-    // state-layer (the source of the stray rectangle on hover). The
-    // chaos engine still wires up via the explicit interactionSource
-    // passed to Button; the engine reads isHovered via the same source
-    // for the FLEEING-phase relocation trigger above.
-    CompositionLocalProvider(LocalIndication provides NoOpIndication) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier
-            .offset { IntOffset(animFleeX.toInt(), animFleeY.toInt()) }
-            .onGloballyPositioned { coords ->
-                // Update origin so the engine knows where to snap the overlay clone
-                btn.originPx = coords.positionInWindow()
-            }
-            .graphicsLayer {
-                // Invisible while engine has control; animates back when returning
-                alpha = if (btn.originalVisible) 1f else 0f
-            }
-            .then(
-                if (!btn.originalVisible) {
-                    Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent(PointerEventPass.Initial)
-                                    .changes.forEach { it.consume() }
-                            }
-                        }
-                    }
-                } else Modifier
-            ),
-        colors            = colors,
-        interactionSource = interactionSource,
-        shape             = MaterialTheme.shapes.small,
-    ) {
-        Text(text)
-    }
-    } // end CompositionLocalProvider(LocalIndication = NoOpIndication)
-}
 
 // ─── Close dialog ─────────────────────────────────────────────────────────────
 
@@ -409,7 +278,7 @@ fun AprilFoolsCloseDialog(
         Surface(
             modifier       = Modifier.width(440.dp).wrapContentHeight(),
             shape          = MaterialTheme.shapes.large,
-            color          = CelestiaTheme.colors.surface,
+            color          = NxTheme.colors.surface,
             tonalElevation = if (AprilFools.useFlatSurface) 0.dp else 10.dp,
         ) {
             Column(
@@ -423,13 +292,13 @@ fun AprilFoolsCloseDialog(
                     text       = s.aprilCloseTitle(escapes),
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     textAlign  = TextAlign.Center,
                 )
 
                 Text(
                     text  = s.aprilCloseBody(escapes),
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -467,8 +336,8 @@ fun AprilFoolsCloseDialog(
                             .align(Alignment.CenterEnd)
                             .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor         = CelestiaTheme.colors.error,
-                            disabledContainerColor = CelestiaTheme.colors.error.copy(alpha = 0.75f),
+                            containerColor         = NxTheme.colors.error,
+                            disabledContainerColor = NxTheme.colors.error.copy(alpha = 0.75f),
                         ),
                         interactionSource = closeBtnInteraction,
                         shape             = MaterialTheme.shapes.small,
@@ -485,7 +354,7 @@ fun AprilFoolsCloseDialog(
                     Text(
                         text  = s.aprilCloseEscapeCount(escapes, surrenderAfter),
                         style = MaterialTheme.typography.labelSmall,
-                        color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f),
+                        color = NxTheme.colors.textSecondary.copy(alpha = 0.45f),
                     )
                 }
             }

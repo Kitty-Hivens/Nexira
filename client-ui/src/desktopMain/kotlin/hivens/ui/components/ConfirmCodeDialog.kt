@@ -1,5 +1,6 @@
 package hivens.ui.components
 
+import hivens.ui.nx.NxButton
 import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -11,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,7 +23,7 @@ import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Six-digit TOTP prompt for the second factor of the SmartyCraft login.
@@ -65,7 +65,7 @@ fun ConfirmCodeDialog(
         Surface(
             modifier = Modifier.width(420.dp),
             shape = MaterialTheme.shapes.large,
-            color = CelestiaTheme.colors.surface,
+            color = NxTheme.colors.surface,
         ) {
             Column(
                 Modifier
@@ -77,13 +77,13 @@ fun ConfirmCodeDialog(
                     s.auth2faTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = CelestiaTheme.colors.textPrimary,
+                    color = NxTheme.colors.textPrimary,
                 )
 
                 Text(
                     s.auth2faPrompt,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 PuppetField("login.twoFactor.code", code, enabled = !isSubmitting) { raw ->
@@ -100,7 +100,7 @@ fun ConfirmCodeDialog(
                     placeholder = {
                         Text(
                             s.auth2faPlaceholder,
-                            color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+                            color = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -119,7 +119,7 @@ fun ConfirmCodeDialog(
                         fontSize = 24.sp,
                         textAlign = TextAlign.Center,
                         letterSpacing = 8.sp,
-                        color = CelestiaTheme.colors.textPrimary,
+                        color = NxTheme.colors.textPrimary,
                     ),
                     isError = errorMessage != null,
                     modifier = Modifier.fillMaxWidth().focusRequester(codeFocus),
@@ -128,7 +128,7 @@ fun ConfirmCodeDialog(
                 if (errorMessage != null) {
                     Text(
                         errorMessage,
-                        color = CelestiaTheme.colors.error,
+                        color = NxTheme.colors.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -142,25 +142,20 @@ fun ConfirmCodeDialog(
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp).padding(end = 4.dp),
                             strokeWidth = 2.dp,
-                            color = CelestiaTheme.colors.primary,
+                            color = NxTheme.colors.primary,
                         )
                         Spacer(Modifier.width(12.dp))
                     }
                     TextButton(onClick = onDismiss, enabled = !isSubmitting) {
-                        Text(s.auth2faCancel, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.auth2faCancel, color = NxTheme.colors.textSecondary)
                     }
                     PuppetClick("login.twoFactor.cancel", enabled = !isSubmitting) { onDismiss() }
                     Spacer(Modifier.width(8.dp))
-                    Button(
+                    NxButton(
+                        label   = s.auth2faSubmit,
                         onClick = { onSubmit(code) },
                         enabled = code.length == 6 && !isSubmitting,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = CelestiaTheme.colors.primary,
-                        ),
-                        shape = MaterialTheme.shapes.small,
-                    ) {
-                        Text(s.auth2faSubmit)
-                    }
+                    )
                     PuppetClick("login.twoFactor.submit", enabled = code.length == 6 && !isSubmitting) {
                         onSubmit(code)
                     }

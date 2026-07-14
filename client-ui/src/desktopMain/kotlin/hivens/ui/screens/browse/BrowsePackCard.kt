@@ -14,11 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,49 +21,70 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.core.api.dto.smrt.SmrtPackSummary
+import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
+import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.origin
-import hivens.ui.theme.originGradient
+import hivens.ui.components.SourceBadge
+import hivens.ui.effects.pixelArtBackground
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.decorativePair
 
 /**
- * One Browse row. Same shape as Library's PackCard (banner-as-bg +
- * avatar + title + chips + right-side action) so the two surfaces
- * read as one design language. Difference: no Play / Settings /
- * More -- browse is for catalogue inspect, not installed-instance
- * actions, so the right side carries a simple chevron and the whole
- * card is a click target into [BrowsePackDetailScreen].
+ * One Browse row. Same shape as Library's PackCard (banner-as-bg + avatar +
+ * title + chips + chevron) so the surfaces read as one design language. The
+ * whole card is a click target into the source's detail screen. The source
+ * badge follows [CataloguePack.origin], so the card stays source-neutral across
+ * the mirror, Modrinth and future sources.
  *
- * Every catalogue entry is mirror-sourced today; once we add other
- * sources (Modrinth / CurseForge / Local-imported) this card splits
- * its colour pass like PackCard already does.
+ * Background layers, back to front: a deterministic pixel-art fill (so a packless
+ * banner is never a flat green), the real banner image on top when the source
+ * carries one ([CataloguePack.bannerUrl]; transparent while loading or on
+ * failure, so the art shows through), then a dark scrim for text legibility.
+ * The avatar shows the pack icon, falling back to title initials.
  */
 @Composable
 fun BrowsePackCard(
-    pack: SmrtPackSummary,
+    pack: CataloguePack,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = LocalStrings.current
+    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.originGradient(PackOrigin.Mirror))
             .clickable(onClick = onClick),
     ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+        Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
+        if (pack.bannerUrl != null) {
+            AsyncImage(
+                model              = pack.bannerUrl,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        }
+        // Banners can be bright, so they get a heavier wash than the dark art.
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (pack.bannerUrl != null) 0.45f else 0.32f)))
 
         Row(
             modifier              = Modifier.fillMaxSize().padding(14.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            BrowseAvatar(pack.displayName)
+            BrowseAvatar(pack = pack, hue = hueA)
 
             Column(
                 modifier            = Modifier.weight(1f),
@@ -79,7 +95,7 @@ fun BrowsePackCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text       = pack.displayName,
+                        text       = pack.title,
                         style      = MaterialTheme.typography.titleMedium,
                         color      = Color.White,
                         fontWeight = FontWeight.SemiBold,
@@ -87,9 +103,10 @@ fun BrowsePackCard(
                         overflow   = TextOverflow.Ellipsis,
                         modifier   = Modifier.weight(1f, fill = false),
                     )
-                    SourceBadgeMirror(featured = pack.featured)
+                    SourceBadge(pack.origin)
                 }
-                if (pack.tagline.isNotBlank()) {
+                // Mirror summaries sometimes ship tagline == name; don't echo the title.
+                if (pack.tagline.isNotBlank() && !pack.tagline.equals(pack.title, ignoreCase = true)) {
                     Text(
                         text     = pack.tagline,
                         style    = MaterialTheme.typography.bodySmall,
@@ -102,14 +119,18 @@ fun BrowsePackCard(
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    MetaChip("MC ${pack.minecraftVersion}")
-                    MetaChip(pack.latestPackVersion)
-                    pack.tags.take(2).forEach { MetaChip(it, emphasis = false) }
+                    pack.mcVersion?.let { NxMetaChip("MC $it", tone = NxMetaChipTone.OnMedia) }
+                    pack.tags.take(3).forEach { tag ->
+                        NxMetaChip(
+                            if (pack.origin == PackOrigin.Modrinth) s.modrinthCategory(tag) else tag,
+                            tone = NxMetaChipTone.OnMedia,
+                        )
+                    }
                 }
             }
 
-            Icon(
-                imageVector        = Icons.AutoMirrored.Filled.ArrowForwardIos,
+            Symbol(
+                NxIcon.ArrowForwardIos,
                 contentDescription = null,
                 tint               = Color.White.copy(alpha = 0.75f),
                 modifier           = Modifier.size(20.dp),
@@ -120,18 +141,29 @@ fun BrowsePackCard(
 }
 
 @Composable
-private fun BrowseAvatar(displayName: String) {
-    val initials = displayName
+private fun BrowseAvatar(pack: CataloguePack, hue: Color) {
+    SubcomposeAsyncImage(
+        model              = pack.iconUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+        // While the icon resolves, a flat hue avoids a letters-then-icon flash;
+        // a missing or broken icon (incl. a null url) lands in error -> initials.
+        loading            = { Box(Modifier.fillMaxSize().background(hue)) },
+        error              = { InitialsAvatar(pack.title, hue) },
+    )
+}
+
+@Composable
+private fun InitialsAvatar(title: String, hue: Color) {
+    val initials = title
         .split(' ', '-', '_')
         .filter { it.isNotBlank() }
         .take(2)
         .joinToString("") { it.first().uppercaseChar().toString() }
         .ifEmpty { "?" }
     Box(
-        modifier         = Modifier
-            .size(64.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(CelestiaTheme.colors.origin(PackOrigin.Mirror)),
+        modifier         = Modifier.fillMaxSize().background(hue),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -143,36 +175,3 @@ private fun BrowseAvatar(displayName: String) {
     }
 }
 
-@Composable
-private fun SourceBadgeMirror(featured: Boolean) {
-    val label = if (featured) "Mirror ★" else "Mirror"
-    Box(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(CelestiaTheme.colors.origin(PackOrigin.Mirror).copy(alpha = 0.85f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelSmall,
-            color      = Color.White,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-@Composable
-private fun MetaChip(text: String, emphasis: Boolean = false) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        shape   = MaterialTheme.shapes.extraSmall,
-        label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
-        colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)
-                                     else          Color.Black.copy(alpha = 0.35f),
-            disabledLabelColor     = Color.White,
-        ),
-        border  = null,
-    )
-}

@@ -21,7 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -52,7 +52,7 @@ fun ServerDetailsBannerWidget(instance: WidgetInstance) {
             .background(glassSurfaceAlpha(0.5f))
             .border(
                 width = 1.dp,
-                color = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                color = NxTheme.colors.outline.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(p.cornerRadius.dp),
             ),
         contentAlignment = Alignment.Center,
@@ -66,12 +66,12 @@ fun ServerDetailsBannerWidget(instance: WidgetInstance) {
             )
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(s.serverDetailNoImage, color = CelestiaTheme.colors.textSecondary)
+                Text(s.serverDetailNoImage, color = NxTheme.colors.textSecondary)
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text  = s.serverDetailNoImageHint,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
                 )
             }
         }

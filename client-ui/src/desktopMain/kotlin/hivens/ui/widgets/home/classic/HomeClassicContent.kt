@@ -13,12 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -38,18 +34,20 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
+import hivens.core.launch.LaunchState
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ProfileManager
-import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.NetworkState
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.Dispatchers
@@ -149,7 +147,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
             text       = s.dashboardWelcome(ctx.session.playerName),
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
         )
 
         Spacer(Modifier.height(4.dp))
@@ -157,7 +155,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
         Text(
             text       = s.dashboardServers,
             style      = MaterialTheme.typography.bodySmall,
-            color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+            color      = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
             fontWeight = FontWeight.Bold,
         )
 
@@ -165,25 +163,24 @@ fun HomeClassicContent(instance: WidgetInstance) {
 
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             when {
-                isLoadingServers -> CircularProgressIndicator(color = CelestiaTheme.colors.primary)
+                isLoadingServers -> CircularProgressIndicator(color = NxTheme.colors.primary)
                 servers.isEmpty() -> {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector        = Icons.Default.WifiOff,
+                        Symbol(icon = NxIcon.WifiOff,
                             contentDescription = null,
-                            tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+                            tint               = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
                             modifier           = Modifier.size(48.dp),
                         )
                         Spacer(Modifier.height(16.dp))
-                        Text(s.dashboardServersEmpty, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.dashboardServersEmpty, color = NxTheme.colors.textSecondary)
                         Spacer(Modifier.height(16.dp))
                         OutlinedButton(
                             onClick = { fetchServers(forceRefresh = true) },
                             colors  = ButtonDefaults.outlinedButtonColors(
-                                contentColor = CelestiaTheme.colors.primary,
+                                contentColor = NxTheme.colors.primary,
                             ),
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Symbol(NxIcon.Refresh, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text(s.updateRetry)
                         }
@@ -237,7 +234,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
                 .fillMaxWidth()
                 .border(
                     width = 1.dp,
-                    color = CelestiaTheme.colors.outline.copy(alpha = 0.25f),
+                    color = NxTheme.colors.outline.copy(alpha = 0.25f),
                     shape = MaterialTheme.shapes.medium,
                 )
                 .background(
@@ -278,7 +275,7 @@ private fun AutoSyncProgressStrip(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = CelestiaTheme.colors.outline.copy(alpha = 0.20f),
+                color = NxTheme.colors.outline.copy(alpha = 0.20f),
                 shape = MaterialTheme.shapes.medium,
             )
             .background(
@@ -296,14 +293,14 @@ private fun AutoSyncProgressStrip(
                 Text(
                     text       = s.dashboardAutoSyncProgress(serverName, currentIdx, total),
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
                 if (totalBytes > 0) {
                     Text(
                         text  = s.dashboardAutoSyncBytes(bytesRead / 1_048_576, totalBytes / 1_048_576),
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                        color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                     )
                 }
             }
@@ -311,8 +308,8 @@ private fun AutoSyncProgressStrip(
             LinearProgressIndicator(
                 progress   = { progressFraction },
                 modifier   = Modifier.fillMaxWidth(),
-                color      = CelestiaTheme.colors.primary,
-                trackColor = CelestiaTheme.colors.outline.copy(alpha = 0.15f),
+                color      = NxTheme.colors.primary,
+                trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
             )
         }
     }

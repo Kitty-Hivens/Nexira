@@ -22,9 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,10 +35,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.components.GlassCard
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxColorSurface
 import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -57,7 +58,7 @@ fun ThemePickerGridWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val selectedTheme by ctx.selectedTheme
 
-    GlassCard(modifier = Modifier.fillMaxSize(), shape = MaterialTheme.shapes.large) {
+    NxCard(modifier = Modifier.fillMaxSize(), shape = MaterialTheme.shapes.large) {
         LazyVerticalGrid(
             columns               = GridCells.Fixed(2),
             contentPadding        = PaddingValues(16.dp),
@@ -89,7 +90,8 @@ private fun ThemeCard(
     )
 
     Box(modifier = Modifier.aspectRatio(1.2f).scale(scale)) {
-        GlassCard(
+        NxColorSurface(
+            color    = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(onClick = onClick)
@@ -103,8 +105,8 @@ private fun ThemeCard(
                     ) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
                     shape = MaterialTheme.shapes.medium,
                 ),
-            shape           = MaterialTheme.shapes.medium,
-            backgroundColor = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
+            shape    = MaterialTheme.shapes.medium,
+            border   = BorderStroke(1.dp, NxTheme.colors.outline),
         ) {
             Column(
                 modifier            = Modifier.fillMaxSize().padding(16.dp),
@@ -128,8 +130,7 @@ private fun ThemeCard(
                                 .background(CustomTheme.parseHexColor(theme.primary).copy(alpha = 0.2f))
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
-                            Icon(
-                                imageVector        = Icons.Default.Check,
+                            Symbol(icon = NxIcon.Check,
                                 contentDescription = null,
                                 tint               = CustomTheme.parseHexColor(theme.primary),
                                 modifier           = Modifier.size(14.dp),

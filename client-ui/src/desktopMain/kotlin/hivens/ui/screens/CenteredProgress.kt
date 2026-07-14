@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Centred loading spinner, the launcher's one async-loading shape. The
@@ -19,7 +19,7 @@ import hivens.ui.theme.CelestiaTheme
 internal fun CenteredProgress(modifier: Modifier = Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
+            color       = NxTheme.colors.primary.copy(alpha = 0.6f),
             strokeWidth = 2.dp,
             modifier    = Modifier.size(28.dp),
         )

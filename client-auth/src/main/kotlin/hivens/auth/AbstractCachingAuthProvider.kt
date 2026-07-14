@@ -75,7 +75,7 @@ abstract class AbstractCachingAuthProvider : AuthProvider {
                     isSslError = true,
                 )
             }
-            throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}", isNetworkError = true)
         }
 
     /**

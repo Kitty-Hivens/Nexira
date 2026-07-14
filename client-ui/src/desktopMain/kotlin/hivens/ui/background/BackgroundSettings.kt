@@ -1,6 +1,7 @@
 package hivens.ui.background
 
 import kotlinx.serialization.Serializable
+import java.io.File
 
 /**
  * Persistent settings for the custom background wallpaper.
@@ -23,7 +24,24 @@ data class BackgroundSettings(
     val tintOpacity: Float = 0.0f,
     val animationSpeedMultiplier: Float = 1.0f,
     val loopMode: BackgroundLoopMode = BackgroundLoopMode.UseCodec,
+    /**
+     * Decode a video wallpaper on the GPU when a device is available
+     * (Skinema HwAccel.AUTO), falling back to software per file otherwise.
+     * On by default: a 4K wallpaper is decoded in fixed-function silicon
+     * instead of saturating the CPU. Set false to force software decode
+     * (an escape hatch for a driver that opens but glitches mid-stream).
+     */
+    val hardwareDecode: Boolean = true,
 )
+
+/**
+ * The custom background can actually be drawn: it is enabled, has a path, and the
+ * file still exists. Gate transparency / "show the wallpaper" on this rather than
+ * [BackgroundSettings.enabled] alone -- a deleted image left the app transparent
+ * over a blank (white) window.
+ */
+fun BackgroundSettings.hasUsableImage(): Boolean =
+    enabled && !imagePath.isNullOrBlank() && File(imagePath).exists()
 
 @Serializable
 enum class ScaleMode { COVER, CONTAIN, STRETCH, ORIGINAL, TILE }

@@ -4,21 +4,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.NotifGlyph
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
@@ -34,7 +32,7 @@ fun NotificationAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 30.dp,
 ) {
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val style = LocalStyle.current
     val shape = RoundedCornerShape((style.cardCorner / 2).coerceAtMost(8.dp))
     Box(
@@ -53,8 +51,7 @@ fun NotificationAvatar(
                 contentScale       = ContentScale.Crop,
             )
         } else {
-            Icon(
-                imageVector        = glyph.toVector(),
+            Symbol(icon = glyph.toVector(),
                 contentDescription = null,
                 modifier           = Modifier.size(size * 0.56f),
                 tint               = palette.textSecondary,
@@ -64,7 +61,7 @@ fun NotificationAvatar(
 }
 
 // Glyph -> vector. Null (no authored icon) keeps the neutral package fallback.
-private fun NotifGlyph?.toVector(): ImageVector = when (this) {
-    NotifGlyph.Update -> Icons.Default.CloudDownload
-    null              -> Icons.Outlined.Inventory2
+private fun NotifGlyph?.toVector(): IconKey = when (this) {
+    NotifGlyph.Update -> NxIcon.CloudDownload
+    null              -> NxIcon.Inventory2
 }

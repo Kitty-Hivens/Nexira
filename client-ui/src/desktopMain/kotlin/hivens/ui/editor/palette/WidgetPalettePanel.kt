@@ -25,11 +25,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,7 +47,9 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalWidgetRegistry
 
 // Floating widget palette. Right-edge pinned. Slides in/out with the
@@ -115,7 +112,7 @@ fun WidgetPalettePanel(
                 .clip(RoundedCornerShape(14.dp))
                 // Solid surface, no glass: the panel floats over the right rail,
                 // and stacked translucent layers composited into muddy glass.
-                .background(CelestiaTheme.colors.surface),
+                .background(NxTheme.colors.surface),
         ) {
             // Header
             Row(
@@ -132,31 +129,29 @@ fun WidgetPalettePanel(
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector        = Icons.Default.Widgets,
+                    Symbol(icon = NxIcon.Widgets,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.primary,
+                        tint               = NxTheme.colors.primary,
                         modifier           = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = s.editorWidgets,
                         style      = MaterialTheme.typography.titleSmall,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text  = "${filtered.size}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                        color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector        = Icons.Default.Close,
+                    Symbol(icon = NxIcon.Close,
                         contentDescription = s.editorPaletteHide,
-                        tint               = CelestiaTheme.colors.textSecondary,
+                        tint               = NxTheme.colors.textSecondary,
                         modifier           = Modifier.size(16.dp),
                     )
                 }
@@ -164,7 +159,7 @@ fun WidgetPalettePanel(
             Text(
                 text     = s.editorPaletteHint,
                 style    = MaterialTheme.typography.labelSmall,
-                color    = CelestiaTheme.colors.textSecondary,
+                color    = NxTheme.colors.textSecondary,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 0.dp),
             )
             Spacer(Modifier.height(6.dp))
@@ -177,7 +172,7 @@ fun WidgetPalettePanel(
                     Text(
                         text  = s.editorPaletteEmpty,
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
             } else {
@@ -191,7 +186,7 @@ fun WidgetPalettePanel(
                         Text(
                             text  = s.editorPaletteNoMatch,
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                 } else {
@@ -225,13 +220,12 @@ private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 10.dp)
             .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, CelestiaTheme.colors.outline, RoundedCornerShape(10.dp))
+            .border(1.dp, NxTheme.colors.outline, RoundedCornerShape(10.dp))
             .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
     ) {
-        Icon(
-            imageVector        = Icons.Default.Search,
+        Symbol(icon = NxIcon.Search,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+            tint               = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
             modifier           = Modifier.size(16.dp),
         )
         Spacer(Modifier.width(8.dp))
@@ -240,24 +234,23 @@ private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
                 value         = query,
                 onValueChange = onQueryChange,
                 singleLine    = true,
-                textStyle     = MaterialTheme.typography.bodySmall.copy(color = CelestiaTheme.colors.textPrimary),
-                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
                 modifier      = Modifier.fillMaxWidth(),
             )
             if (query.isEmpty()) {
                 Text(
                     text  = s.editorPaletteSearch,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
                 )
             }
         }
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(22.dp)) {
-                Icon(
-                    imageVector        = Icons.Default.Close,
+                Symbol(icon = NxIcon.Close,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(14.dp),
                 )
             }

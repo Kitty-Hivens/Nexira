@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -31,25 +29,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.customization.sliderKeyboardAdjust
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.toWidgetColorOrNull
-
-@Composable
-internal fun SectionTitle(text: String) {
-    Text(
-        text          = text,
-        style         = MaterialTheme.typography.labelSmall,
-        fontWeight    = FontWeight.Bold,
-        color         = CelestiaTheme.colors.primary,
-        letterSpacing = 1.sp,
-    )
-}
 
 @Composable
 internal fun LabeledSlider(
@@ -65,7 +50,7 @@ internal fun LabeledSlider(
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
             modifier = Modifier.width(150.dp),
         )
         // Box owns hover-focus + arrow keys (fine adjustment); the Slider keeps
@@ -77,54 +62,18 @@ internal fun LabeledSlider(
                 valueRange    = range,
                 modifier      = Modifier.fillMaxWidth(),
                 colors        = SliderDefaults.colors(
-                    thumbColor         = CelestiaTheme.colors.primary,
-                    activeTrackColor   = CelestiaTheme.colors.primary,
-                    inactiveTrackColor = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                    thumbColor         = NxTheme.colors.primary,
+                    activeTrackColor   = NxTheme.colors.primary,
+                    inactiveTrackColor = NxTheme.colors.outline.copy(alpha = 0.2f),
                 ),
             )
         }
         Text(
             text     = format.format(value * displayMultiplier),
             style    = MaterialTheme.typography.labelSmall,
-            color    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+            color    = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
             modifier = Modifier.width(54.dp),
         )
-    }
-}
-
-@Composable
-internal fun ColorRoleRow(
-    role: String,
-    currentHex: String?,
-    invalidLabel: String,
-    onValidHex: (String) -> Unit,
-    onClear: () -> Unit,
-) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text       = role.replaceFirstChar { it.uppercase() },
-            modifier   = Modifier.width(100.dp),
-            color      = CelestiaTheme.colors.textSecondary,
-            style      = MaterialTheme.typography.bodySmall,
-            fontFamily = LocalMonoFamily.current,
-        )
-        HexField(
-            initialHex   = currentHex ?: "",
-            invalidLabel = invalidLabel,
-            onValidHex   = onValidHex,
-            modifier     = Modifier.weight(1f),
-        )
-        if (currentHex != null) {
-            OutlinedButton(
-                onClick        = onClear,
-                shape          = MaterialTheme.shapes.small,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            ) { Text("x", fontSize = 12.sp) }
-        }
     }
 }
 
@@ -153,7 +102,7 @@ internal fun HexField(
             modifier = Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(parsed?.takeIf { valid } ?: CelestiaTheme.colors.surface)
+                .background(parsed?.takeIf { valid } ?: NxTheme.colors.surface)
                 .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
         )
         Box(
@@ -164,7 +113,7 @@ internal fun HexField(
                 .background(glassSurfaceAlpha(0.4f))
                 .border(
                     width = 1.dp,
-                    color = if (valid) CelestiaTheme.colors.outline.copy(alpha = 0.3f) else CelestiaTheme.colors.error,
+                    color = if (valid) NxTheme.colors.outline.copy(alpha = 0.3f) else NxTheme.colors.error,
                     shape = MaterialTheme.shapes.small,
                 )
                 .padding(horizontal = 10.dp),
@@ -181,16 +130,16 @@ internal fun HexField(
                 },
                 singleLine    = true,
                 textStyle     = TextStyle(
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontFamily = LocalMonoFamily.current,
                     fontSize   = 13.sp,
                 ),
-                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
                 modifier      = Modifier.fillMaxWidth(),
             )
         }
         if (!valid) {
-            Text(invalidLabel, color = CelestiaTheme.colors.error, style = MaterialTheme.typography.labelSmall)
+            Text(invalidLabel, color = NxTheme.colors.error, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

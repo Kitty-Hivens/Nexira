@@ -5,43 +5,47 @@
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
 kotlin            = "2.4.0"
-compose           = "1.11.0"
+compose           = "1.11.1"
 buildconfigPlugin = "6.0.10"
 versionsPlugin    = "0.54.0"
-# ksp tracks its own release line, decoupled from the Kotlin version. 2.3.9 is
-# the latest published KSP and has no 2.4.0-numbered build yet; KSP2 runs on the
-# Analysis API and compiles cleanly against the Kotlin 2.4.0 toolchain here
-# (:widget-processor / :client-ui kspKotlinDesktop both green). Bump when a newer
-# KSP ships; it does not need to match the Kotlin minor.
-ksp               = "2.3.9"
+# ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
+# the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
+# against the Kotlin 2.4.0 toolchain here (:widget-processor / :client-ui
+# kspKotlinDesktop both green). Bump when a newer KSP ships; it does not need to
+# match the Kotlin minor.
+ksp               = "2.3.10"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.5.0"
-koin              = "4.2.1"
+ktor              = "3.5.1"
+koin              = "4.2.2"
 serialization     = "1.11.0"
 coroutines        = "1.11.0"
 
 # ── UI / Compose ecosystem ───────────────────────────────────────────────────
-# coil held at 3.4.0 (next is 3.5.0-beta01, skipped -- beta).
-#
 # composeMaterial3 tracks JetBrains' separately-published material3 artifact,
-# which lags Compose-MP core by ~2 release lines. core 1.11.0 GA shipped but
-# material3 has no 1.10.x / 1.11.x stable; latest stable is 1.9.0 (two lines
-# behind), with 1.11.0-alpha07 as the JetBrains-paired alpha. Same pattern as
-# composeIcons (pinned to its own latest-stable 1.7.3 instead of the core ref).
-composeIcons      = "1.7.3"
+# which lags Compose-MP core by ~2 release lines. core 1.11.1 shipped but
+# material3 has no 1.10.x / 1.11.x stable; 1.11.0-alpha07 is the JetBrains-paired
+# alpha for the 1.11 line. 1.12.0-alpha03 exists but pairs with compose 1.12-beta,
+# so it stays parked until compose core moves to 1.12 stable.
 composeMaterial3  = "1.11.0-alpha07"
-markdownRenderer  = "0.40.2"
-coil              = "3.4.0"
-filekit           = "0.14.1"
+markdownRenderer  = "0.43.0"
+# org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
+markdown          = "0.7.7"
+# jsoup -- HTML parsing for the in-launcher HTML renderer.
+jsoup             = "1.22.2"
+coil              = "3.5.0"
+# Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
+# Seeds a tonal palette from the wallpaper; mapped onto NxColors.
+materialColorUtils = "5.0.0"
+filekit           = "0.14.2"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.0.18"
-logback           = "1.5.34"
+logback           = "1.5.38"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
-proguard          = "7.8.2"
+proguard          = "7.9.1"
 
 # Pure-Panama tray library (Kitty-Hivens/libtray) -- replaces dorkbox/SystemTray
 # for the native tray icon. Now on Maven Central as dev.hivens:libtray
@@ -50,14 +54,35 @@ proguard          = "7.8.2"
 # 0.1.1: backend hardening -- fixes a DBusMessageIter buffer overflow (heap
 # corruption on every iterator call), native-memory leaks, watcher
 # re-registration (#10), and main-queue marshaling (#3).
-libtray           = "0.1.1"
+# 0.1.2: private D-Bus connection (dbus_bus_get_private) so a sibling libdbus
+# user's pump (libnotify, libvault) can't steal the tray host's property queries
+# off the shared bus -- the tray icon now renders on cold start.
+libtray           = "0.1.2"
 
 # Pure-Panama desktop notifications (Kitty-Hivens/libnotify) -- freedesktop
 # Notifications over D-Bus on Linux, WinRT toast on Windows, NSUserNotification
 # on macOS. Used for the OS-level "still running in the tray" hint, distinct
 # from the in-app NotificationCenter. Maven Central as dev.hivens:libnotify.
 # 0.1.1: same DBusMessageIter buffer-overflow + arena-leak fixes as libtray.
-libnotify         = "0.1.1"
+# 0.1.2: private D-Bus connection -- same shared-bus message-theft fix as libtray.
+libnotify         = "0.1.2"
+
+# Pure-Panama secret storage (Kitty-Hivens/libvault) -- OS keyring (Secret
+# Service / Credential Manager / Keychain) with an AES-256-GCM file fallback.
+# Replaces the in-tree IKeyringStorage + 4 native impls + the AES fallback that
+# lived inside CredentialsManager. Same dev.hivens family, mavenCentral.
+# 0.2.1: private D-Bus connection -- same shared-bus message-theft fix as libtray.
+libvault          = "0.2.1"
+
+# Media decode/playback (Kitty-Hivens/skinema) -- FFmpeg via Panama, frames
+# out as Skia images, fail-closed/drop-late, built for looping backgrounds.
+# Replaces the in-tree Skia-Codec animation path in CustomBackground and adds
+# video wallpapers. dev.hivens family, mavenCentral; decode-only LGPL FFmpeg +
+# libwebp + libass ship in per-platform skinema-natives classifier jars.
+# 0.6.2: the Windows natives bundle now ships liblzma-5.dll, which avcodec
+# hard-imports -- a clean Windows box could not load avcodec without it
+# (Linux/macOS unaffected). Decode-only patch, no API change from 0.6.1.
+skinema           = "0.6.2"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
@@ -68,8 +93,8 @@ libnotify         = "0.1.1"
 # junit (Jupiter) and junitPlatform version independently: Jupiter 5.x pairs with
 # Platform 1.x.
 mockk             = "1.14.11"
-junit             = "5.12.2"
-junitPlatform     = "1.12.2"
+junit             = "5.14.4"
+junitPlatform     = "1.14.4"
 
 [libraries]
 # Logging
@@ -106,38 +131,47 @@ compose-foundation              = { group = "org.jetbrains.compose.foundation", 
 compose-material3               = { group = "org.jetbrains.compose.material3",  name = "material3",           version.ref = "composeMaterial3" }
 compose-ui                      = { group = "org.jetbrains.compose.ui",         name = "ui",                  version.ref = "compose" }
 compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
-compose-material-icons-extended = { group = "org.jetbrains.compose.material",   name = "material-icons-extended", version.ref = "composeIcons" }
 
 # UI add-ons
 multiplatform-markdown-m3       = { group = "com.mikepenz",        name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+markdown-core                   = { group = "org.jetbrains",       name = "markdown",            version.ref = "markdown" }
+jsoup                           = { group = "org.jsoup",           name = "jsoup",               version.ref = "jsoup" }
 coil-compose                    = { group = "io.coil-kt.coil3",    name = "coil-compose",        version.ref = "coil" }
 coil-network-okhttp             = { group = "io.coil-kt.coil3",    name = "coil-network-okhttp", version.ref = "coil" }
+material-color-utilities        = { group = "com.materialkolor",   name = "material-color-utilities", version.ref = "materialColorUtils" }
 filekit-core                    = { group = "io.github.vinceglb", name = "filekit-core",         version.ref = "filekit" }
 filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "filekit-dialogs-compose", version.ref = "filekit" }
 
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
-libtray                          = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
-libnotify                        = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
+libtray                         = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
+libnotify                       = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
+libvault                        = { group = "dev.hivens", name = "libvault", version.ref = "libvault" }
+# skinema-compose pulls -core and -skiko at runtime; -skiko (the Skia frame
+# bridge, VideoFrameImage) is also a compile dep -- the background renders
+# frames through its own Painter rather than VideoSurface. Natives are
+# per-platform runtimeOnly classifiers, declared directly in client-ui.
+skinema-compose                 = { group = "dev.hivens", name = "skinema-compose", version.ref = "skinema" }
+skinema-skiko                   = { group = "dev.hivens", name = "skinema-skiko",   version.ref = "skinema" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.
 
 # Test
-mockk                            = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
-junit-jupiter                    = { group = "org.junit.jupiter",  name = "junit-jupiter",           version.ref = "junit" }
-junit-platform-launcher          = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
+mockk                           = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+junit-jupiter                   = { group = "org.junit.jupiter",  name = "junit-jupiter",           version.ref = "junit" }
+junit-platform-launcher         = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
 
 # KSP processor API (used by :widget-processor to scan @Widget composables
 # and emit GeneratedWidgetRegistry at compile time).
-ksp-api                          = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
+ksp-api                         = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 
 [plugins]
-kotlin-jvm              = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
-kotlin-multiplatform    = { id = "org.jetbrains.kotlin.multiplatform",        version.ref = "kotlin" }
-kotlin-serialization    = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-kotlin-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
-compose                 = { id = "org.jetbrains.compose",                     version.ref = "compose" }
-buildconfig             = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
-versions                = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
-ksp                     = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }
+kotlin-jvm                      = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
+kotlin-multiplatform            = { id = "org.jetbrains.kotlin.multiplatform",        version.ref = "kotlin" }
+kotlin-serialization            = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
+compose                         = { id = "org.jetbrains.compose",                     version.ref = "compose" }
+buildconfig                     = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
+versions                        = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
+ksp                             = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }

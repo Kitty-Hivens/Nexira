@@ -1,37 +1,30 @@
 package hivens.ui.audio
 
+import dev.hivens.skinema.player.VideoPlayer
+import hivens.ui.diag.SkinemaGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
-import javax.sound.sampled.AudioFormat
-import javax.sound.sampled.AudioInputStream
-import javax.sound.sampled.AudioSystem
-import javax.sound.sampled.DataLine
-import javax.sound.sampled.FloatControl
-import javax.sound.sampled.LineUnavailableException
-import javax.sound.sampled.SourceDataLine
-import javax.sound.sampled.UnsupportedAudioFileException
-import kotlin.io.path.name
-import kotlin.math.log10
 
-// In-process audio playback for the MusicPlayerWidget. Pure
-// javax.sound.sampled -- WAV / AU / AIFF / SND supported out of the
-// JDK box. MP3 / OGG / FLAC require a codec SPI; deferred to the
-// planned Skinema library which will wrap FFmpeg via Panama and
-// cover both audio and video. Until Skinema lands, the user can
-// convert MP3 -> WAV externally or use lossless source files.
+// In-process audio playback for the MusicPlayerWidget, backed by Skinema
+// (FFmpeg via Panama, audio = true). Plays mp3 / ogg / flac / opus / vorbis /
+// aac / wav and more; the audio device masters the player's clock. One track
+// at a time -- opening a new file closes the previous player.
 //
-// Single track at a time; opening a new file stops the previous
-// playback. State exposed as a StateFlow so widgets recompose on
-// position updates (1Hz from the playback loop).
+// Every engine touch (open/play/pause/stop/setVolume) and the state poll loop
+// run on a single-thread dispatcher [engine], confining the mutable fields to
+// one thread: no locking, no torn reads, and -- because Skinema's close()
+// blocks up to five seconds joining the decode thread -- no UI-thread freeze.
+// The public methods are fire-and-forget; widgets observe [state] / [volume].
 class AudioPlayer(private val scope: CoroutineScope) {
     private val log = LoggerFactory.getLogger(AudioPlayer::class.java)
 
@@ -41,219 +34,148 @@ class AudioPlayer(private val scope: CoroutineScope) {
     private val _volume = MutableStateFlow(1.0f)
     val volume: StateFlow<Float> = _volume.asStateFlow()
 
-    private var line: SourceDataLine? = null
-    private var playbackJob: Job? = null
+    // Serializes engine ops + the poll loop onto one IO thread. limitedParallelism(1)
+    // gives a confinement queue without owning a dedicated thread.
+    private val engine = Dispatchers.IO.limitedParallelism(1)
+
+    // All four are confined to [engine] -- only ever touched inside a
+    // launch(engine) { } below.
+    private var player: VideoPlayer? = null
     private var currentFile: Path? = null
-    private var currentFormat: AudioFormat? = null
-    private var totalFrames: Long = 0L
-    // Frame offset to start the next play() at -- nonzero only when we
-    // resumed from pause. Reset when a new file opens, stop fires, or
-    // playback ends naturally.
-    private var resumeFrameOffset: Long = 0L
+    private var pollJob: Job? = null
+    // Skinema represents both "opened, never played" and "played then paused"
+    // as State.Paused; this carries the distinction the UI needs (Ready vs
+    // Paused -- the latter enables the stop button, the former does not).
+    private var started = false
 
     fun open(file: Path) {
-        stop()
-        resumeFrameOffset = 0L
-        currentFile = file
-        try {
-            val stream = AudioSystem.getAudioInputStream(file.toAbsolutePath().toFile())
-            stream.close()
-            // Probe format + duration without holding the stream open.
-            val baseFormat = AudioSystem.getAudioFileFormat(file.toAbsolutePath().toFile())
-            currentFormat = baseFormat.format
-            totalFrames = baseFormat.frameLength.toLong()
-            val durationMs = if (baseFormat.format.frameRate > 0f && totalFrames > 0L) {
-                (totalFrames * 1000L / baseFormat.format.frameRate.toLong()).coerceAtLeast(0L)
-            } else 0L
-            _state.value = PlaybackState.Ready(
-                file       = file,
-                positionMs = 0L,
-                durationMs = durationMs,
-            )
-        } catch (e: UnsupportedAudioFileException) {
-            log.warn("Unsupported audio format: ${file.name}", e)
-            _state.value = PlaybackState.Error(file, AudioError.UnsupportedFormat)
-        } catch (e: Exception) {
-            log.error("Failed to open audio file ${file.name}", e)
-            _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+        scope.launch(engine) {
+            closeCurrent()
+            currentFile = file
+            started = false
+            if (!SkinemaGate.enabled) {
+                _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+                return@launch
+            }
+            val p = try {
+                VideoPlayer(path = file, loop = false, audio = true)
+            } catch (e: Exception) {
+                log.error("Failed to open audio file {}", file, e)
+                _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+                return@launch
+            }
+            // Assign before touching the player so a failure past this point
+            // still closes it (closeCurrent on the next open/stop) -- never an
+            // orphaned decode thread.
+            player = p
+            // Skinema opens and starts playing on its own thread. Hold it
+            // silent until the user hits play: volume 0 + pause are queued
+            // before the first audible buffer, so opening a track makes no
+            // sound. play() restores the real volume.
+            p.setVolume(0f)
+            p.pause()
+            _state.value = PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
+            startPolling()
         }
     }
 
     fun play() {
-        val file = currentFile ?: return
-        val current = _state.value
-        if (current is PlaybackState.Playing) return
-        val format = currentFormat ?: return
-
-        val startOffset = resumeFrameOffset
-        val frameRate = format.frameRate
-        val initialDurationMs = if (frameRate > 0f && totalFrames > 0L) {
-            totalFrames * 1000L / frameRate.toLong()
-        } else 0L
-        val initialPositionMs = if (frameRate > 0f) {
-            startOffset * 1000L / frameRate.toLong()
-        } else 0L
-        // Set Playing up-front so pause() racing against the coroutine
-        // has a clear sentinel to flip. The position-update loop below
-        // only emits Playing when the current state is still Playing --
-        // any pause() that lands during a blocking newLine.write will
-        // not be overwritten by a trailing emit.
-        _state.value = PlaybackState.Playing(file, initialPositionMs, initialDurationMs)
-
-        playbackJob?.cancel()
-        playbackJob = scope.launch(Dispatchers.IO) {
-            val newStream = AudioSystem.getAudioInputStream(file.toAbsolutePath().toFile())
-            try {
-                val info = DataLine.Info(SourceDataLine::class.java, format)
-                val newLine = AudioSystem.getLine(info) as SourceDataLine
-                newLine.open(format)
-                applyVolumeTo(newLine)
-                newLine.start()
-                line = newLine
-
-                val frameSize = format.frameSize
-                if (startOffset > 0L) {
-                    skipExact(newStream, startOffset * frameSize.toLong())
-                }
-                val buffer = ByteArray(4096)
-                var bytesRead = newStream.read(buffer)
-                var framesPlayed = startOffset
-                while (isActive && bytesRead != -1) {
-                    newLine.write(buffer, 0, bytesRead)
-                    framesPlayed += bytesRead / frameSize
-                    val positionMs = if (format.frameRate > 0f) {
-                        (framesPlayed * 1000L / format.frameRate.toLong())
-                    } else 0L
-                    val durationMs = if (format.frameRate > 0f && totalFrames > 0L) {
-                        totalFrames * 1000L / format.frameRate.toLong()
-                    } else 0L
-                    // Atomic update: a pause() landing between the read
-                    // and the write would flip state to Paused. Without
-                    // CAS, this branch could overwrite Paused back to
-                    // Playing (the original double-click bug).
-                    _state.update { snapshot ->
-                        if (snapshot is PlaybackState.Playing) {
-                            PlaybackState.Playing(file, positionMs, durationMs)
-                        } else snapshot
-                    }
-                    bytesRead = newStream.read(buffer)
-                }
-                // Cleanup is best-effort: pause()/stop() may have already
-                // stopped+flushed (or closed) the line. drain on a
-                // stopped/flushed line returns immediately, but a second
-                // close throws -- runCatching keeps us out of the Error
-                // branch on that benign race.
-                runCatching { newLine.drain() }
-                runCatching { newLine.close() }
-                if (line === newLine) line = null
-                if (isActive && _state.value is PlaybackState.Playing) {
-                    resumeFrameOffset = 0L
-                    _state.value = PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
-                }
-            } catch (e: LineUnavailableException) {
-                log.error("Audio line unavailable for ${file.name}", e)
-                _state.value = PlaybackState.Error(file, AudioError.DeviceBusy)
-            } catch (e: Exception) {
-                log.error("Playback failed for ${file.name}", e)
-                _state.value = PlaybackState.Error(file, AudioError.PlaybackFailed)
-            } finally {
-                runCatching { newStream.close() }
-            }
+        scope.launch(engine) {
+            val p = player ?: return@launch
+            started = true
+            p.setVolume(_volume.value)
+            // A finished track is revived by a seek (resume only un-pauses); a
+            // paused/opened one just resumes from where it stands.
+            if (p.state == VideoPlayer.State.Ended) p.seek(0L) else p.resume()
         }
     }
 
     fun pause() {
-        // javax.sound.sampled has no pause primitive. Stop and flush
-        // the line to unblock any pending newLine.write, then update
-        // state via CAS so a trailing emit from the play coroutine
-        // (already past its is-Playing check) cannot flip us back.
-        // Real seek lands with Skinema (FFmpeg via Panama).
-        val current = _state.value
-        if (current !is PlaybackState.Playing) return
-        val frameRate = currentFormat?.frameRate ?: 0f
-        resumeFrameOffset = if (frameRate > 0f) {
-            (current.positionMs * frameRate.toDouble() / 1000.0).toLong()
-        } else 0L
-        _state.update { snapshot ->
-            if (snapshot is PlaybackState.Playing) {
-                PlaybackState.Paused(snapshot.file, snapshot.positionMs, snapshot.durationMs)
-            } else snapshot
-        }
-        // Unblock the writer and cancel cleanup. Line is owned by the
-        // play coroutine -- it drains+closes in its finally path; we
-        // only signal here.
-        line?.stop()
-        line?.flush()
-        playbackJob?.cancel()
-        playbackJob = null
+        scope.launch(engine) { player?.pause() }
     }
 
     fun stop() {
-        playbackJob?.cancel()
-        playbackJob = null
-        line?.stop()
-        line?.close()
-        line = null
-        resumeFrameOffset = 0L
-        val current = _state.value
-        if (current is PlaybackState.Playing || current is PlaybackState.Paused) {
+        scope.launch(engine) {
+            closeCurrent()
             val file = currentFile
-            if (file != null) {
-                _state.value = PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
+            _state.value = if (file != null) {
+                PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
             } else {
-                _state.value = PlaybackState.Idle
+                PlaybackState.Idle
             }
         }
     }
 
-    // Linear 0..1. The line's MASTER_GAIN control is preferred (every
-    // SourceDataLine on every JDK platform supports it). VOLUME falls
-    // back where the device exposes one but not the other.
+    // Linear 0..1. Reflected on the flow immediately for the UI; held off the
+    // engine until the first play() so the silent open is not broken by a
+    // volume change during the Ready window.
     fun setVolume(level: Float) {
         val clamped = level.coerceIn(0f, 1f)
         _volume.value = clamped
-        line?.let { applyVolumeTo(it) }
+        scope.launch(engine) { if (started) player?.setVolume(clamped) }
     }
 
-    private fun applyVolumeTo(target: SourceDataLine) {
-        runCatching {
-            when {
-                target.isControlSupported(FloatControl.Type.MASTER_GAIN) -> {
-                    val control = target.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
-                    control.value = linearToDb(_volume.value, control.minimum, control.maximum)
-                }
-                target.isControlSupported(FloatControl.Type.VOLUME) -> {
-                    val control = target.getControl(FloatControl.Type.VOLUME) as FloatControl
-                    control.value = _volume.value.coerceIn(control.minimum, control.maximum)
-                }
+    // Confined to [engine]. cancelAndJoin guarantees the poll loop has stopped
+    // before the player is closed and the field nulled, so no poll iteration
+    // writes a stale state afterward.
+    private suspend fun closeCurrent() {
+        pollJob?.cancelAndJoin()
+        pollJob = null
+        player?.close()
+        player = null
+        started = false
+    }
+
+    private fun startPolling() {
+        pollJob = scope.launch(engine) {
+            while (isActive) {
+                val p = player ?: break
+                val file = currentFile ?: break
+                val st = p.state
+                _state.value = mapPlaybackState(
+                    file    = file,
+                    st      = st,
+                    started = started,
+                    posMs   = p.positionNanos() / 1_000_000L,
+                    durMs   = (p.durationNanos ?: 0L) / 1_000_000L,
+                )
+                // A failed track is terminal until the next open(); stop
+                // spinning the loop on it.
+                if (st is VideoPlayer.State.Failed) break
+                delay(POLL_INTERVAL_MS)
             }
-        }.onFailure { log.warn("Failed to apply volume to audio line", it) }
-    }
-
-    private fun linearToDb(linear: Float, min: Float, max: Float): Float {
-        if (linear <= 0f) return min
-        val db = (20.0 * log10(linear.toDouble())).toFloat()
-        return db.coerceIn(min, max)
-    }
-
-    // AudioInputStream.skip is not contractually exact -- platforms can
-    // return 0 if the stream is unbuffered or refuse to skip past a
-    // mark. Loop until satisfied; fall back to read-and-discard when
-    // skip stops making progress.
-    private fun skipExact(stream: AudioInputStream, bytesToSkip: Long) {
-        var remaining = bytesToSkip
-        val scratch = ByteArray(4096)
-        while (remaining > 0L) {
-            val skipped = stream.skip(remaining)
-            if (skipped > 0L) {
-                remaining -= skipped
-                continue
-            }
-            val n = stream.read(scratch, 0, minOf(remaining, scratch.size.toLong()).toInt())
-            if (n <= 0) return
-            remaining -= n
         }
     }
+
+    private companion object {
+        const val POLL_INTERVAL_MS = 200L
+    }
+}
+
+/**
+ * Maps Skinema's player state plus the [started] flag to a [PlaybackState].
+ * Pure -- the engine bridge's only branching, tested without natives.
+ *
+ * Skinema has no audio device error: a machine without one degrades to silent
+ * playback, never [VideoPlayer.State.Failed]. A failure is therefore an open /
+ * decode problem on the file, mapped to [AudioError.OpenFailed].
+ */
+internal fun mapPlaybackState(
+    file: Path,
+    st: VideoPlayer.State,
+    started: Boolean,
+    posMs: Long,
+    durMs: Long,
+): PlaybackState = when (st) {
+    VideoPlayer.State.Opening -> PlaybackState.Ready(file, positionMs = 0L, durationMs = durMs)
+    VideoPlayer.State.Playing -> PlaybackState.Playing(file, posMs, durMs)
+    VideoPlayer.State.Seeking -> PlaybackState.Playing(file, posMs, durMs)
+    VideoPlayer.State.Paused ->
+        if (started) PlaybackState.Paused(file, posMs, durMs)
+        else PlaybackState.Ready(file, posMs, durMs)
+    VideoPlayer.State.Ended -> PlaybackState.Ready(file, positionMs = 0L, durationMs = durMs)
+    is VideoPlayer.State.Failed -> PlaybackState.Error(file, AudioError.OpenFailed)
+    VideoPlayer.State.Closed -> PlaybackState.Idle
 }
 
 sealed class PlaybackState {

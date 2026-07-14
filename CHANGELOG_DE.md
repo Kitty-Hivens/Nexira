@@ -3,6 +3,19 @@
 Changelog von Nexira auf Deutsch. Gepflegt ab Version 2.3.4-beta4; die
 vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
 
+## [2.4.0-preview] - 2026-07-14
+
+2.4.0 öffnet den Launcher zur weiteren Mod-Welt. Ein neuer Browse-Tab sucht und installiert Modrinth-Modpacks, importiert eine `.mrpack`, ein CurseForge-Zip oder eine Instanz aus einem anderen Launcher und baut ein Pack von Grund auf; ein Kleiderschrank verwaltet Skins und Umhänge über einer überarbeiteten 3D-Figur; der Launcher kann dem Farbschema des Desktops folgen; und ein Boot-Screen plus ein Wiederherstellungsmodus tragen einen Start, der schiefgeht. Darunter zieht die gesamte Oberfläche auf ein einziges Designsystem um, die Start-Engine teilt sich in GUI-freie Module mit einer nativen CLI, und der Build wechselt auf Java 26.
+
+### Highlights
+- **Dies ist eine Vorschau**. 2.4.0 ist ein großes, schnelllebiges Release, das früh als Vorschau erscheint -- rechne mit rauen Kanten und melde bitte alles Kaputte im Issue-Tracker.
+- **Modpacks entdecken und installieren**. Ein neuer Browse-Tab durchsucht Modrinths Modpacks, zeigt ihre Beschreibungen im Launcher und installiert eines mit einem Klick -- und du kannst eine `.mrpack` oder ein CurseForge-Zip importieren oder ein leeres Pack von Grund auf anlegen.
+- **Ein Kleiderschrank für deine Skins**. Ein neuer Kleiderschrank hält deine Skins als kleine 3D-Figuren, wendet einen auf SmartyCraft an, wählt einen Umhang oder startet vom Standardsatz des Spiels -- der Look deiner Figur an einem Ort.
+- **Der Launcher folgt deinem Desktop**. Er kann das Hell-/Dunkel-Schema deines Systems selbst übernehmen und sein Thema an die Helligkeit des Hintergrunds anpassen, mit einem neuen Erscheinungsbild-Studio für Hintergrund- und Aussehens-Regler.
+- **Ein Boot-Screen und ein Wiederherstellungsmodus**. Ein schneller Boot-Screen erscheint beim Start; wenn etwas schiefgeht, halte Shift (oder übergib `--recovery`), um einen fehlerhaften Teil abzuschalten oder zurückzusetzen -- ohne Neuinstallation.
+- **Eine konsistente Oberfläche**. Die ganze UI zog auf ein einziges Designsystem um -- Flächen, Schaltflächen, Menüs und Einstellungsbereiche teilen dieselben Formen, Abstände und Icons und bleiben mit oder ohne Hintergrundbild lesbar.
+- **Packs zeigen, was sie tun**. Eine Pack-Karte trägt jetzt einen Live-Startzustand (Vorbereiten / Herunterladen / Läuft), und ein Teil-Import nennt die Mods, die noch einen manuellen Download brauchen, statt wie ein leeres Pack zu wirken.
+
 ## [2.3.4] - 2026-06-15
 
 Das Anpassungs-Release, konsolidiert. 2.3.4 macht die gesamte Oberfläche bearbeitbar -- und bearbeitbare Flächen tragen jetzt ihre eigenen Einstellungen --, baut das Profil um einen lebendigen 3D-Render deines Skins neu auf, bringt einen Update-Manager mit Kanälen und Rückrollen, gibt Benachrichtigungen ein festes Zuhause in der App und auf dem Desktop, lehrt die Oberfläche, in schmale Fenster zu passen, und bündelt den eigenen Schriftsatz des Launchers. Darunter: SmartyCraft-Modpacks treten ihren Servern bei, ohne etwas von SmartyCraft mitzuliefern, ein installiertes Modpack startet offline neu, der Speicher bemisst sich selbst, und ein tiefer Robustheits-Durchgang verhindert, dass eine kaputte Datei oder ein verirrtes Widget den Launcher umwirft. Es fasst die Linie 2.3.4-beta .. beta5 und alles seither zusammen.

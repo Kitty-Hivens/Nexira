@@ -33,7 +33,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
@@ -112,7 +112,7 @@ fun ClockWidget(instance: WidgetInstance) {
                 Text(
                     text       = p.title,
                     style      = MaterialTheme.typography.labelLarge.scaled(scale),
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                     modifier   = Modifier.align(Alignment.Start),
                 )
@@ -133,13 +133,13 @@ fun ClockWidget(instance: WidgetInstance) {
                 Text(
                     text       = timeFormatter.format(now),
                     style      = MaterialTheme.typography.titleLarge.scaled(scale),
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.Light,
                 )
                 Text(
                     text  = DATE_FORMATTER.format(now),
                     style = MaterialTheme.typography.bodySmall.scaled(scale),
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
         }
@@ -153,12 +153,12 @@ private fun ClockFace(
     accentOverride: Color?,
     modifier: Modifier = Modifier,
 ) {
-    val dialColor   = CelestiaTheme.colors.surface
-    val rimColor    = CelestiaTheme.colors.outline.copy(alpha = 0.50f)
-    val markerColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f)
-    val hourColor   = CelestiaTheme.colors.textPrimary
-    val minuteColor = CelestiaTheme.colors.textPrimary
-    val secondColor = accentOverride ?: CelestiaTheme.colors.primary
+    val dialColor   = NxTheme.colors.surface
+    val rimColor    = NxTheme.colors.outline.copy(alpha = 0.50f)
+    val markerColor = NxTheme.colors.textSecondary.copy(alpha = 0.75f)
+    val hourColor   = NxTheme.colors.textPrimary
+    val minuteColor = NxTheme.colors.textPrimary
+    val secondColor = accentOverride ?: NxTheme.colors.primary
 
     Box(
         modifier = modifier
