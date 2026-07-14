@@ -44,6 +44,9 @@ class DebugOverlayState {
     var recomposition by mutableStateOf(false)
     var perfHud by mutableStateOf(true)
 
+    /** Standalone FX sandbox: a centered demo card wired to the disintegrate effect. */
+    var fxDemo by mutableStateOf(false)
+
     /** Any facet that needs per-node bounds instrumentation (the perf HUD does not). */
     val needsDecorators: Boolean get() = slotBounds || widgetBounds || spacingRulers || recomposition
 
