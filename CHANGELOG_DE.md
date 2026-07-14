@@ -3,7 +3,7 @@
 Changelog von Nexira auf Deutsch. Gepflegt ab Version 2.3.4-beta4; die
 vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
 
-## [2.4.0] - 2026-07-14
+## [2.4.0-preview] - 2026-07-14
 
 2.4.0 öffnet den Launcher zur weiteren Mod-Welt. Ein neuer Browse-Tab sucht und installiert Modrinth-Modpacks, importiert eine `.mrpack`, ein CurseForge-Zip oder eine Instanz aus einem anderen Launcher und baut ein Pack von Grund auf; ein Kleiderschrank verwaltet Skins und Umhänge über einer überarbeiteten 3D-Figur; der Launcher kann dem Farbschema des Desktops folgen; und ein Boot-Screen plus ein Wiederherstellungsmodus tragen einen Start, der schiefgeht. Darunter zieht die gesamte Oberfläche auf ein einziges Designsystem um, die Start-Engine teilt sich in GUI-freie Module mit einer nativen CLI, und der Build wechselt auf Java 26.
 
