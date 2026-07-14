@@ -121,16 +121,22 @@ data class SettingsData(
     val offlinePlayerName: String? = null,
 
     // ── Experimental features ────────────────────────────────────────────
-    // Master gates both children -- switching off disables the sub-toggles
-    // regardless of their stored values. Defaults ON because the upstream
-    // protocol is currently a moving target and users need to receive
-    // emergency updates promptly.
+    // Master gates its children -- switching it off disables every sub-toggle
+    // regardless of their stored values. Defaults ON so the section's tools
+    // (adaptive memory, JVM-args builder, the update-channel picker) are
+    // reachable out of the box; each child then carries its own safe default.
 
     /** Master switch for the entire experimental features section. */
     val experimentalFeaturesEnabled: Boolean = true,
 
-    /** Block startup when installed version < `mandatory_min_version` from `meta/update-channel.json`. */
-    val mandatoryUpdatesEnabled: Boolean = true,
+    /**
+     * Block startup when installed version < `mandatory_min_version` from
+     * `meta/update-channel.json`. Opt-in (default OFF): the floor is an
+     * emergency lever for a broken upstream protocol, but honouring it can
+     * force an update and block the user's own startup, so enforcement is a
+     * conscious choice rather than the default posture.
+     */
+    val mandatoryUpdatesEnabled: Boolean = false,
 
     /**
      * Update channel the user follows (Release / Beta / Alpha / Dev / Git).
