@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -42,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import hivens.config.Branding
+import hivens.ui.fx.DisintegrateBox
 import hivens.ui.theme.NxTheme
 
 // Fixed HUD palette: a debug overlay reads over any wallpaper/theme, so it is a
@@ -140,6 +144,47 @@ fun DebugOverlay(state: DebugOverlayState) {
         if (state.perfHud) {
             PerfHud(Modifier.align(Alignment.TopEnd).padding(12.dp))
         }
+        if (state.fxDemo) {
+            FxDemoCard(Modifier.align(Alignment.Center))
+        }
+    }
+}
+
+// FX sandbox: a plain white accent card sliced apart by DisintegrateBox on tap and
+// sprung back on the next tap -- a place to eyeball + tune the juice in a dev build.
+@Composable
+private fun FxDemoCard(modifier: Modifier) {
+    var scattered by remember { mutableStateOf(false) }
+    DisintegrateBox(
+        scattered = scattered,
+        modifier = modifier
+            .size(260.dp, 340.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { scattered = !scattered },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Disintegrate FX", color = Color(0xFF16171B), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("tap: scatter / reassemble", color = Color(0xFF55606B), fontSize = 12.sp)
+            Spacer(Modifier.height(4.dp))
+            repeat(3) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFE9ECF1)),
+                )
+            }
+        }
     }
 }
 
@@ -160,6 +205,7 @@ private fun DebugControlPanel(state: DebugOverlayState, modifier: Modifier = Mod
         FacetRow("Spacing rulers", state.spacingRulers) { state.spacingRulers = it }
         FacetRow("Recomposition", state.recomposition) { state.recomposition = it }
         FacetRow("Perf HUD", state.perfHud) { state.perfHud = it }
+        FacetRow("FX: disintegrate", state.fxDemo) { state.fxDemo = it }
         Spacer(Modifier.height(6.dp))
         Text("F9 / \"uidebug\" toggles", color = PANEL_DIM, fontSize = 9.sp)
     }
