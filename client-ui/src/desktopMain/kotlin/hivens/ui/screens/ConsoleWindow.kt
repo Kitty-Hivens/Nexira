@@ -975,11 +975,13 @@ internal fun ConsoleContent(
                 onSubmit         = {
                     val txt = cmdInput.trim()
                     if (txt.isNotEmpty()) {
-                        gameConsole.submitConsoleInput(txt)
-                        // Echo the command into the buffer so the user
-                        // sees what they typed -- the game's stdout
-                        // reply lands on its own subsequent lines.
+                        val handled = gameConsole.submitConsoleInput(txt)
+                        // Echo the command into the buffer so the user sees what they
+                        // typed -- the game's stdout reply lands on its own lines.
                         gameConsole.append("> $txt", LogType.INFO)
+                        if (!handled && !gameConsole.canSendCommands) {
+                            gameConsole.append("no game running -- command ignored", LogType.WARN)
+                        }
                         cmdHistory.add(0, txt)
                         if (cmdHistory.size > 200) cmdHistory.removeAt(cmdHistory.size - 1)
                         cmdInput = ""

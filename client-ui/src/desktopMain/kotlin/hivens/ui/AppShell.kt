@@ -48,8 +48,6 @@ import hivens.ui.debug.DebugOverlay
 import hivens.ui.debug.DebugOverlayState
 import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
-import hivens.ui.debug.debugSlotChromeModifier
-import hivens.ui.debug.debugWidgetDecorator
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.ui.diag.SkinemaGate
@@ -819,16 +817,17 @@ fun FrameWindowScope.AppShellContent(
                 LocalWidgetDataRegistry                  provides widgetDataRegistry,
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,
                 LocalWidgetStateHost                     provides widgetStateStore,
-                // Dev UI-debug seams: report-only bounds instrumentation on every
-                // slot + widget, on non-release builds. Remembered so the static
-                // local's value stays stable (no subtree recompose); the editor
-                // overrides both deeper while editing. Identity (no-op) otherwise.
-                LocalWidgetDecorator                     provides remember(debugOverlay) {
-                    if (debugOverlay.available) debugWidgetDecorator(debugOverlay) else IdentityWidgetDecorator
-                },
-                LocalSlotChromeModifier                  provides remember(debugOverlay) {
-                    if (debugOverlay.available) debugSlotChromeModifier(debugOverlay) else IdentitySlotChromeModifier
-                },
+                // Dev UI-debug seams: report-only bounds instrumentation, mounted
+                // ONLY while a non-release build has the overlay on AND a facet needs
+                // it -- else identity, so a dev build with the overlay off runs the
+                // exact release tree (and the perf HUD then measures a clean UI).
+                // EditorSurfaceHost chains through these when not editing.
+                LocalWidgetDecorator                     provides
+                    if (debugOverlay.available && debugOverlay.enabled && debugOverlay.needsDecorators)
+                        debugOverlay.widgetDecorator else IdentityWidgetDecorator,
+                LocalSlotChromeModifier                  provides
+                    if (debugOverlay.available && debugOverlay.enabled && debugOverlay.needsDecorators)
+                        debugOverlay.slotChrome else IdentitySlotChromeModifier,
                 LocalWidgetChromeRenderer                provides chromeRenderer,
                 LocalWindowState                         provides windowState,
                 LocalWindowMaximizer                     provides maximizer,
