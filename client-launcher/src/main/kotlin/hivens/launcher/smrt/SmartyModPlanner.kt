@@ -70,7 +70,21 @@ class SmartyModPlanner(
         // open-smrt-network and carry no Smarty; injecting the helper on top of
         // their own copy would load the same coremod twice.
         if (ignored.isEmpty()) {
-            log.info("open-smrt helper: no Smarty jar in {} manifest -- swap inert", server.name)
+            // Tell a legitimate no-op (Mirror/Hivens packs carry no Smarty) apart from
+            // a glob MISS: a manifest that ships a Smarty-looking jar the active names
+            // failed to match leaves the surveillance mod live and silent. Warn only
+            // in that case, loud enough to fix the descriptor -- an info line here fires
+            // on every ordinary pack and would drown the real miss.
+            val missed = manifest?.let { smartyLikeUnmatched(it, smartyGlobs) }.orEmpty()
+            if (missed.isNotEmpty()) {
+                log.warn(
+                    "open-smrt helper: {} manifest ships Smarty-like jar(s) {} that no active name matched " +
+                        "-- surveillance mod NOT stripped; add the real name to smarty_names in smrt-helper.json for MC {}",
+                    server.name, missed, server.version,
+                )
+            } else {
+                log.info("open-smrt helper: no Smarty jar in {} manifest -- swap inert", server.name)
+            }
             return Plan(emptySet(), null, strict, emptyList())
         }
 
@@ -93,6 +107,20 @@ class SmartyModPlanner(
         return manifestProcessor.flattenManifest(manifest).keys
             .map { it.substringAfterLast('/') }
             .filter { name -> patterns.any { it.matches(name) } }
+            .toSet()
+    }
+
+    /**
+     * Manifest jar basenames that read as Smarty (a "smarty" substring) yet matched
+     * none of the [activeGlobs] -- the signature of a descriptor whose smarty_names
+     * drifted from the real upstream filename (e.g. a per-version override that no
+     * longer fits). Empty when there is genuinely no Smarty to swap.
+     */
+    private fun smartyLikeUnmatched(manifest: FileManifest, activeGlobs: List<String>): Set<String> {
+        val patterns = activeGlobs.map { globToRegex(it) }
+        return manifestProcessor.flattenManifest(manifest).keys
+            .map { it.substringAfterLast('/') }
+            .filter { name -> name.contains("smarty", ignoreCase = true) && patterns.none { it.matches(name) } }
             .toSet()
     }
 
