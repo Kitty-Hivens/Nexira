@@ -166,6 +166,15 @@
 -keep class dev.hivens.skinema.** { *; }
 -dontwarn dev.hivens.skinema.**
 
+# ── HoldKeyProbe: our own Project Panama libX11 downcalls ─────────────────
+# The hold-Shift-at-launch recovery gesture reads the X keymap over a short-lived
+# libX11 connection via FFM. MethodHandle.invoke(MemorySegment...) is signature-
+# polymorphic, so ProGuard sees a concrete descriptor, reports the invoke as an
+# unresolved MethodHandle member, and aborts. Same keep + dontwarn as the
+# dev.hivens Panama family, but this caller lives in our own tree.
+-keep class hivens.ui.bootstrap.HoldKeyProbe { *; }
+-dontwarn hivens.ui.bootstrap.HoldKeyProbe
+
 # ── dbus-java: ServiceLoader-resolved transport providers ─────────────────
 # Linux fielded report (file picker silently broken on AppImage): filekit's
 # XdgFilePickerPortal calls `DBusConnectionBuilder.forSessionBus()` which
