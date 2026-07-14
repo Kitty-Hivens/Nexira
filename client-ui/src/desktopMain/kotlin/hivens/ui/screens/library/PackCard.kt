@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,7 +77,10 @@ fun PackCard(
     val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
     val art = rememberPackArt(instance)
     val indications: IndicationCenter = koinInject()
-    val indication by indications.launchIndication(instance.id).collectAsState()
+    // Remember the flow: launchIndication() ends in a fresh asStateFlow() wrapper each
+    // call, so collecting it inline would re-subscribe on every recomposition.
+    val indicationFlow = remember(instance.id) { indications.launchIndication(instance.id) }
+    val indication by indicationFlow.collectAsState()
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -173,7 +177,7 @@ private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modi
     val (dotColor, label) = when (indication) {
         IndicationCenter.LaunchIndication.Preparing -> NxTheme.colors.progressAccent to s.launchPreparing
         is IndicationCenter.LaunchIndication.Downloading ->
-            NxTheme.colors.progressAccent to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchPreparing)
+            NxTheme.colors.progressAccent to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
         IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
         IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
     }

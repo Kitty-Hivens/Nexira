@@ -4,6 +4,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import hivens.auth.AuthProviderRegistry
 import hivens.core.data.SessionData
 
 // Surface-scoped state the profile widgets share. nav writes
@@ -36,3 +37,9 @@ internal val STUB_PROFILE: ProfileContext = ProfileContext(
     onLogin          = {},
     onLogout         = {},
 )
+
+// Microsoft / multi-account is deferred: it is gated on a registered device-code
+// provider, which only joins the registry when a Microsoft client id is configured.
+// Single-sourced here so the profile nav and the sign-in section share one gate.
+internal fun AuthProviderRegistry.hasDeviceCodeProvider(): Boolean =
+    all.any { it.capabilities.supportsDeviceCode }

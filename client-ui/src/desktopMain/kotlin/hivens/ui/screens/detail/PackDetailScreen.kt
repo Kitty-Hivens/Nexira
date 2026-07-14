@@ -65,6 +65,8 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxCalloutBanner
+import hivens.ui.nx.NxCalloutTone
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.PlayButton
@@ -85,7 +87,6 @@ import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
-import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
 import hivens.ui.utils.ConsoleSettingsManager
@@ -175,7 +176,13 @@ fun PackDetailScreen(
         // Import/provenance notice (e.g. a CurseForge import whose project/file-id
         // mods need a manual download). It was only ever written to the instance and
         // never shown, so a half-populated import read as an empty success.
-        if (pack.notes.isNotBlank()) PackNotesBanner(pack.notes)
+        if (pack.notes.isNotBlank()) {
+            NxCalloutBanner(
+                body     = pack.notes,
+                tone     = NxCalloutTone.Info,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+            )
+        }
 
         PackTabBar(selected = tabIndex, onSelect = { tabIndex = it })
 
@@ -398,10 +405,9 @@ private fun LogSessionPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text       = s.consoleSessionPickerLabel(currentLabel),
-                color      = colors.textSecondary,
-                fontSize   = 11.sp,
-                fontFamily = LocalMonoFamily.current,
+                text     = s.consoleSessionPickerLabel(currentLabel),
+                color    = colors.textSecondary,
+                fontSize = 11.sp,
             )
             Symbol(icon = NxIcon.ArrowDropDown,
                 contentDescription = null,
@@ -613,31 +619,6 @@ private fun HeroChip(text: String) {
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f))
-    }
-}
-
-// Import/provenance notice shown under the hero. Neutral info tone: the notes
-// field carries both benign provenance ("Created locally.") and actionable text
-// (a CurseForge import's manual-download list), so it frames as information and
-// lets the text speak.
-@Composable
-private fun PackNotesBanner(notes: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp)
-            .clip(RoundedCornerShape(LocalStyle.current.cardCorner))
-            .background(NxTheme.colors.surface)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment     = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Symbol(NxIcon.Info, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 18.dp)
-        Text(
-            text  = notes,
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
-        )
     }
 }
 
