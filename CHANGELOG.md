@@ -31,6 +31,7 @@ lives in this English file.
 2.4.0 opens the launcher onto the wider modding world. A new Browse tab searches and installs Modrinth modpacks, imports a `.mrpack` / a CurseForge zip / a foreign launcher's instance, or builds a pack from scratch; a Wardrobe manages your skins and capes over a reworked 3D character stack; the launcher can follow your desktop's colour scheme; and a boot screen plus a recovery mode carry a start that goes wrong. Underneath, the whole interface moves onto a single `:nx-ui` design system, the launch engine splits into headless modules with a native CLI, and the build moves to Java 26. Microsoft / multi-account infrastructure lands but stays gated off pending a later release.
 
 ### Highlights
+- **This is a preview**. 2.4.0 is a large, fast-moving release shipped early as a preview -- expect rough edges, and please report anything broken on the issue tracker.
 - **Browse and install modpacks**. A new Browse tab searches Modrinth's modpacks, renders their descriptions inside the launcher, and installs one in a click -- and you can import a `.mrpack` or a CurseForge zip, or start an empty pack from scratch.
 - **A wardrobe for your skins**. A new Wardrobe keeps your skins as small 3D figures, applies one to SmartyCraft, picks a cape, or starts from the game's default set -- your character's look in one place.
 - **The launcher follows your desktop**. It can track your system's light / dark scheme on its own and tune its theme to your wallpaper's brightness, with a new appearance studio gathering the background and look controls.
