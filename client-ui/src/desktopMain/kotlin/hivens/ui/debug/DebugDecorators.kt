@@ -47,7 +47,9 @@ fun debugWidgetDecorator(state: DebugOverlayState): WidgetDecorator =
         Box(
             Modifier
                 .onGloballyPositioned { coords ->
-                    if (state.enabled && state.widgetBounds) {
+                    // Report whenever the overlay is on; the Canvas filters which
+                    // kinds to draw per-facet, so a facet toggle is an instant redraw.
+                    if (state.enabled) {
                         state.bounds.report(key, DebugNode(coords.boundsInWindow(), label, DebugNodeKind.Widget))
                     }
                 }
@@ -68,7 +70,7 @@ fun debugSlotChromeModifier(state: DebugOverlayState): SlotChromeModifier =
             val label = "${path.leafSlot.value} [${content.orientation.name}]"
             DisposableEffect(key) { onDispose { state.bounds.remove(key) } }
             Modifier.onGloballyPositioned { coords ->
-                if (state.enabled && state.slotBounds) {
+                if (state.enabled) {
                     state.bounds.report(key, DebugNode(coords.boundsInWindow(), label, DebugNodeKind.Slot))
                 }
             }

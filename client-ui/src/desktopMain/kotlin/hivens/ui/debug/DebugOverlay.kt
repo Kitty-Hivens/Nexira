@@ -37,6 +37,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.io.File
 import hivens.config.Branding
 import hivens.ui.theme.NxTheme
@@ -191,30 +194,30 @@ private fun PerfHud(modifier: Modifier) {
     var rss by remember { mutableStateOf(-1L) }
     val renderApi = remember { runCatching { System.getProperty("skiko.renderApi") }.getOrNull() ?: "?" }
 
-    // One frame-clock loop: accumulate deltas, recompute every ~0.5s so the HUD
-    // recomposes twice a second rather than every frame.
+    // Sample fps over a short burst, then idle for a beat: this keeps the HUD from
+    // pinning the app at full framerate the whole time it is shown (continuous frames
+    // also inflate the idle fps reading). Heap + RSS are read off the frame callback,
+    // RSS on IO since it touches /proc.
     LaunchedEffect(Unit) {
-        var frames = 0
-        var accumNs = 0L
-        var last = 0L
         while (true) {
-            withFrameNanos { now ->
-                if (last != 0L) {
-                    accumNs += now - last
-                    frames++
-                    if (accumNs >= 500_000_000L) {
-                        fps = (frames * 1_000_000_000.0 / accumNs).toInt()
-                        frameMs10 = ((accumNs / frames) / 100_000L).toInt()
-                        val rt = Runtime.getRuntime()
-                        heapUsed = (rt.totalMemory() - rt.freeMemory()) shr 20
-                        heapMax = rt.maxMemory() shr 20
-                        rss = readRssMb()
-                        accumNs = 0
-                        frames = 0
-                    }
+            var frames = 0
+            var accumNs = 0L
+            var last = 0L
+            while (accumNs < 350_000_000L) {
+                withFrameNanos { now ->
+                    if (last != 0L) { accumNs += now - last; frames++ }
+                    last = now
                 }
-                last = now
             }
+            if (frames > 0) {
+                fps = (frames * 1_000_000_000.0 / accumNs).toInt()
+                frameMs10 = ((accumNs / frames) / 100_000L).toInt()
+            }
+            val rt = Runtime.getRuntime()
+            heapUsed = (rt.totalMemory() - rt.freeMemory()) shr 20
+            heapMax = rt.maxMemory() shr 20
+            rss = withContext(Dispatchers.IO) { readRssMb() }
+            delay(500)
         }
     }
 

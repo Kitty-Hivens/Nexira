@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import hivens.config.Branding
 import hivens.core.data.ReleaseChannel
+import hivens.widget.api.SlotChromeModifier
+import hivens.widget.api.WidgetDecorator
 
 /**
  * Switchboard for the dev UI-debug overlay. A process-lifetime Koin singleton so
@@ -41,6 +43,15 @@ class DebugOverlayState {
     var spacingRulers by mutableStateOf(false)
     var recomposition by mutableStateOf(false)
     var perfHud by mutableStateOf(true)
+
+    /** Any facet that needs per-node bounds instrumentation (the perf HUD does not). */
+    val needsDecorators: Boolean get() = slotBounds || widgetBounds || spacingRulers || recomposition
+
+    // Stable decorator instances held on the singleton so the root provider swaps
+    // identity, not the lambda -- and so the instrumentation mounts only while a facet
+    // needs it, keeping a non-release build identical to release when the overlay is off.
+    val widgetDecorator: WidgetDecorator by lazy { debugWidgetDecorator(this) }
+    val slotChrome: SlotChromeModifier by lazy { debugSlotChromeModifier(this) }
 
     /** Master on/off. A no-op on a release build so debug chrome never lights up. */
     fun toggle() {
