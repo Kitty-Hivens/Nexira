@@ -1,8 +1,6 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
-import hivens.core.api.dto.smrt.ModrinthProject
-import hivens.core.api.dto.smrt.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -92,8 +90,6 @@ class CachedSmrtPackClientTest {
             listing = f.create("pack-listing", SmrtPackListing.serializer(), listingConfig),
             summary = PassthroughCache(),
             manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), manifestConfig),
-            modrinthProject = PassthroughCache<ModrinthProject>(),
-            modrinthVersion = PassthroughCache<ModrinthVersion>(),
         )
     }
 

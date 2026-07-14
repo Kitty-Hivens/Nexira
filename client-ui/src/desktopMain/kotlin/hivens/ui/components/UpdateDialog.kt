@@ -5,10 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,16 +19,18 @@ import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.platform.SystemActions
-import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
+import hivens.ui.theme.NxTheme
 import java.nio.file.Paths
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,7 +135,7 @@ fun UpdateDialog(
         Surface(
             modifier  = Modifier.width(700.dp).wrapContentHeight(),
             shape     = MaterialTheme.shapes.large,
-            color     = CelestiaTheme.colors.surface,
+            color     = NxTheme.colors.surface,
             tonalElevation = 8.dp
         ) {
             Column(Modifier.padding(24.dp)) {
@@ -147,10 +145,9 @@ fun UpdateDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier          = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector        = if (isBlocking) Icons.Default.Warning else Icons.Default.CloudDownload,
+                    Symbol(icon = if (isBlocking) NxIcon.Warning else NxIcon.CloudDownload,
                         contentDescription = null,
-                        tint               = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary,
+                        tint               = if (isBlocking) NxTheme.colors.error else NxTheme.colors.primary,
                         modifier           = Modifier.size(32.dp)
                     )
                     Spacer(Modifier.width(12.dp))
@@ -162,13 +159,13 @@ fun UpdateDialog(
                                 else               -> s.updateTitle
                             },
                             style      = MaterialTheme.typography.titleLarge,
-                            color      = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.textPrimary,
+                            color      = if (isBlocking) NxTheme.colors.error else NxTheme.colors.textPrimary,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text  = update.version,
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary
+                            color = NxTheme.colors.textSecondary
                         )
                     }
                 }
@@ -179,7 +176,7 @@ fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
+                            .background(NxTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
                             .padding(12.dp)
                     ) {
                         val bannerText = when {
@@ -193,14 +190,14 @@ fun UpdateDialog(
                         Text(
                             bannerText,
                             style      = MaterialTheme.typography.bodyMedium,
-                            color      = CelestiaTheme.colors.error,
+                            color      = NxTheme.colors.error,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
+                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.2f))
                 Spacer(Modifier.height(16.dp))
 
                 // ── Highlights or full changelog ──────────────────────────────
@@ -210,7 +207,7 @@ fun UpdateDialog(
                 Text(
                     if (hasHighlights) s.updateHighlights else s.updateChangelog,
                     style      = MaterialTheme.typography.titleSmall,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(8.dp))
@@ -223,7 +220,7 @@ fun UpdateDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = bodyMaxHeight)
-                        .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
+                        .background(NxTheme.colors.background.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
                         .padding(12.dp)
                 ) {
                     Markdown(
@@ -250,17 +247,17 @@ fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
+                            .background(NxTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
                             .padding(12.dp)
                     ) {
                         Column {
                             Text(
                                 s.updateErrorTitle,
                                 style      = MaterialTheme.typography.titleSmall,
-                                color      = CelestiaTheme.colors.error,
+                                color      = NxTheme.colors.error,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(error, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.error)
+                            Text(error, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.error)
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -276,14 +273,13 @@ fun UpdateDialog(
                     // user can't accidentally yank focus mid-progress.
                     if (downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = { SystemActions.openUrl(update.releasePageUrl) }) {
-                            Icon(
-                                imageVector        = Icons.AutoMirrored.Filled.OpenInNew,
+                            Symbol(icon = NxIcon.OpenInNew,
                                 contentDescription = null,
-                                tint               = CelestiaTheme.colors.textSecondary,
+                                tint               = NxTheme.colors.textSecondary,
                                 modifier           = Modifier.size(16.dp)
                             )
                             Spacer(Modifier.width(6.dp))
-                            Text(s.updateViewOnGitHub, color = CelestiaTheme.colors.textSecondary)
+                            Text(s.updateViewOnGitHub, color = NxTheme.colors.textSecondary)
                         }
                     }
 
@@ -291,7 +287,7 @@ fun UpdateDialog(
 
                     if (!isBlocking && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = onDismiss) {
-                            Text(s.updateLater, color = CelestiaTheme.colors.textSecondary)
+                            Text(s.updateLater, color = NxTheme.colors.textSecondary)
                         }
                         Spacer(Modifier.width(8.dp))
                     }
@@ -302,7 +298,7 @@ fun UpdateDialog(
                     // user yanking themselves out of an installation in progress.
                     if (update.isMandatory && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = { exitProcess(0) }) {
-                            Text(s.updateExit, color = CelestiaTheme.colors.textSecondary)
+                            Text(s.updateExit, color = NxTheme.colors.textSecondary)
                         }
                         Spacer(Modifier.width(8.dp))
                     }
@@ -313,7 +309,7 @@ fun UpdateDialog(
                                 onClick = { launchDownload() },
                                 modifier = Modifier.focusRequester(primaryFocus),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
+                                    containerColor = if (isBlocking) NxTheme.colors.error else NxTheme.colors.primary
                                 ),
                                 shape  = MaterialTheme.shapes.small
                             ) {
@@ -330,7 +326,7 @@ fun UpdateDialog(
                                 onClick  = {},
                                 enabled  = false,
                                 colors   = ButtonDefaults.buttonColors(
-                                    disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+                                    disabledContainerColor = NxTheme.colors.primary.copy(alpha = 0.5f)
                                 ),
                                 shape = MaterialTheme.shapes.small
                             ) {
@@ -349,7 +345,7 @@ fun UpdateDialog(
                             Button(
                                 onClick = { installUpdate(path) },
                                 modifier = Modifier.focusRequester(primaryFocus),
-                                colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.success),
+                                colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.success),
                                 shape  = MaterialTheme.shapes.small
                             ) {
                                 Text(s.updateInstall, color = Color.White, fontWeight = FontWeight.Bold)
@@ -360,7 +356,7 @@ fun UpdateDialog(
                             Button(
                                 onClick = { errorMessage = null; downloadState = DownloadState.Idle },
                                 modifier = Modifier.focusRequester(primaryFocus),
-                                colors  = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
+                                colors  = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
                                 shape   = MaterialTheme.shapes.small
                             ) {
                                 Text(s.updateRetry, color = Color.White)
@@ -388,14 +384,14 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
                 text  = if (state.total > 0) "%.1f / %.1f MB".format(dlMB, totalMB)
                 else "%.1f MB".format(dlMB),
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary
+                color = NxTheme.colors.textSecondary
             )
 
             if (state.speed > 0) {
                 Text(
                     "%.2f MB/s".format(speedMB),
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = CelestiaTheme.colors.primary,
+                    color      = NxTheme.colors.primary,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -410,8 +406,8 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
         LinearProgressIndicator(
             progress        = { progress },
             modifier        = Modifier.fillMaxWidth().height(8.dp),
-            color           = CelestiaTheme.colors.primary,
-            trackColor      = CelestiaTheme.colors.surface,
+            color           = NxTheme.colors.primary,
+            trackColor      = NxTheme.colors.surface,
             gapSize         = 0.dp,
             drawStopIndicator = {}
         )
@@ -421,7 +417,7 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
             Text(
                 "${(progress * 100).roundToInt()}%",
                 style    = MaterialTheme.typography.bodySmall,
-                color    = CelestiaTheme.colors.textSecondary,
+                color    = NxTheme.colors.textSecondary,
                 modifier = Modifier.align(Alignment.End)
             )
         }

@@ -21,7 +21,7 @@ object AprilFools {
     var debugIntensity: Float? by mutableStateOf(null)
 
     // ── Style coupling ────────────────────────────────────────────────────────
-    // The chaos subsystem was designed under CelestiaTheme assumptions
+    // The chaos subsystem was designed under NxTheme assumptions
     // (rounded corners, glass surfaces, lively animations). With the
     // UiStyle axis live, chaos should follow the active style instead of
     // sitting outside it. AppShell pushes these values whenever uiStyle

@@ -2,8 +2,9 @@ package hivens.ui.editor
 
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import hivens.launcher.LayoutGraphRepository
+import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.model.CanvasPlacement
+import hivens.widget.model.GridCell
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
@@ -14,14 +15,16 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
 import hivens.widget.model.moveWidget
+import hivens.widget.model.placeWidgetInCell
 import hivens.widget.model.removeWidget
 import hivens.widget.model.reorderInSlot
+import hivens.widget.model.resizeWidgetInCell
 import hivens.widget.model.setGridColumns
 import hivens.widget.model.setSlotOrientation
 import hivens.widget.model.setWidgetOffset
 import hivens.widget.model.setWidgetSize
-import hivens.widget.model.setWidgetWeight
 import hivens.widget.model.setWidgetZ
+import hivens.widget.model.traverse
 import hivens.widget.model.updateWidgetChrome
 import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
@@ -151,12 +154,16 @@ class EditModeController(
         scope.launch(writeDispatcher) { repo.update { it.setSlotOrientation(path, orientation) } }
     }
 
-    fun setGridColumns(path: SlotPath, columns: Int) {
-        scope.launch(writeDispatcher) { repo.update { it.setGridColumns(path, columns) } }
-    }
-
-    fun setWidgetWeight(path: SlotPath, instanceId: String, weight: Float) {
-        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetWeight(path, instanceId, weight) } }
+    // Grid column nudge. Reads the current count from the graph INSIDE the
+    // serialized update so rapid +/- clicks compose without a lost-update race; the
+    // model clamps the result to 1..GRID_COLUMNS_MAX.
+    fun nudgeGridColumns(path: SlotPath, delta: Int) {
+        scope.launch(writeDispatcher) {
+            repo.update { g ->
+                val current = g.traverse(path)?.gridColumns ?: SlotContent().gridColumns
+                g.setGridColumns(path, current + delta)
+            }
+        }
     }
 
     // Canvas free-placement (orientation == Canvas): offset + size in dp,
@@ -172,6 +179,23 @@ class EditModeController(
 
     fun setWidgetZ(path: SlotPath, instanceId: String, z: Int) {
         scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetZ(path, instanceId, z) } }
+    }
+
+    // Cube grid (orientation == CubeGrid): re-anchor a widget to a target cell
+    // (keeping its span) or resize its span (keeping its anchor). placeWidgetInCell
+    // resolves collisions (pushes the overlapped widgets down) and compacts the
+    // grid, so the whole layout reflows in one transform.
+    fun moveWidgetToCell(path: SlotPath, instanceId: String, col: Int, row: Int, columns: Int) {
+        scope.launch(writeDispatcher) {
+            repo.update { g ->
+                val cur = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.cell ?: GridCell()
+                g.placeWidgetInCell(path, instanceId, cur.copy(col = col, row = row), columns)
+            }
+        }
+    }
+
+    fun resizeWidgetCell(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int) {
+        scope.launch(writeDispatcher) { repo.update { it.resizeWidgetInCell(path, instanceId, colSpan, rowSpan, columns) } }
     }
 
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {

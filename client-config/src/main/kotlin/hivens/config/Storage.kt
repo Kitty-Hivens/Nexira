@@ -9,6 +9,9 @@ object Storage {
     const val PACKS_FILE            = "packs.json"
     const val SERVERS_CACHE_FILE    = "servers-cache.json"
     const val LAYOUT_GRAPH_FILE     = "layout-graph.json"
+
+    /** One-shot marker: "boot into recovery once", written by the in-app restart action. */
+    const val RECOVERY_REQUEST_FILE = "recovery.request"
     const val PRESETS_DIR           = "presets"
 
     /** Extracted runtime helpers under the data dir (e.g. the profiler agent jar). */

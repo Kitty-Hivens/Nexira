@@ -24,12 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
@@ -53,12 +46,15 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationAvatar
-import hivens.ui.theme.CelestiaColors
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxColors
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberAction
@@ -68,13 +64,13 @@ import hivens.widget.api.rememberSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 @Serializable
 data class NotificationHistoryProps(
@@ -118,7 +114,7 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     val doNotDisturb by rememberSource(Sources.DoNotDisturb)
     val setDoNotDisturb = rememberCommand(Commands.SetDoNotDisturb)
     val store: NotificationArchiveStore = koinInject()
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     var expanded by remember { mutableStateOf(false) }
     val groups = remember(log) { groupHistory(log) }
     val outline = palette.outline.copy(alpha = 0.4f)
@@ -189,7 +185,7 @@ private fun HistoryHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             PillButton(
-                icon               = if (pointsUp) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                icon               = if (pointsUp) NxIcon.KeyboardArrowUp else NxIcon.KeyboardArrowDown,
                 contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
                 outline            = outline,
                 onClick            = onToggle,
@@ -197,7 +193,7 @@ private fun HistoryHeader(
             if (expanded) {
                 if (showTrash) {
                     PillButton(
-                        icon               = Icons.Default.Delete,
+                        icon               = NxIcon.Delete,
                         contentDescription = strings.notifHistoryClear,
                         outline            = outline,
                         onClick            = onClear,
@@ -208,7 +204,7 @@ private fun HistoryHeader(
                 }
             } else {
                 PillButton(
-                    icon               = Icons.Default.NotificationsOff,
+                    icon               = NxIcon.NotificationsOff,
                     contentDescription = strings.notifDoNotDisturb,
                     outline            = outline,
                     active             = dndActive,
@@ -226,13 +222,13 @@ private fun HistoryHeader(
 
 @Composable
 private fun PillButton(
-    icon: ImageVector,
+    icon: IconKey,
     contentDescription: String,
     outline: Color,
     active: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     // Active = the toggle is engaged (mute on): tint + fill shift to the accent so
     // the state reads at a glance without a separate label.
     Box(
@@ -244,8 +240,7 @@ private fun PillButton(
             .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector        = icon,
+        Symbol(icon = icon,
             contentDescription = contentDescription,
             tint               = if (active) palette.primary else palette.textSecondary,
             modifier           = Modifier.size(16.dp),
@@ -265,7 +260,7 @@ private fun CountPill(text: String, outline: Color, modifier: Modifier = Modifie
         Text(
             text       = text,
             style      = MaterialTheme.typography.labelMedium,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
             maxLines   = 1,
         )
@@ -284,7 +279,7 @@ private fun NotificationDrawer(
     fromTop: Boolean,
 ) {
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val edge = if (fromTop) Alignment.Top else Alignment.Bottom
     AnimatedVisibility(
         visible = expanded,
@@ -408,7 +403,7 @@ private fun groupHistory(log: List<PersistedNotification>): List<HistoryGroup> {
 @Composable
 private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, verticalTime: Boolean) {
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     Row(
         modifier          = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -486,7 +481,7 @@ private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Colo
 
 // Critical / Warn tint the title so failures stand out when scanning the log;
 // Info / Success read as normal primary text.
-private fun severityColor(severity: Severity, colors: CelestiaColors): Color = when (severity) {
+private fun severityColor(severity: Severity, colors: NxColors): Color = when (severity) {
     Severity.Critical -> colors.criticalAccent
     Severity.Warn     -> colors.warnAccent
     else              -> colors.textPrimary

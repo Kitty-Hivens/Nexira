@@ -13,7 +13,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.nx.NxSwitch
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
 
 /**
@@ -88,8 +89,8 @@ fun AprilFoolsDebugPanel() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .border(1.dp, CelestiaTheme.colors.error.copy(alpha = 0.4f), MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.error.copy(alpha = 0.06f))
+            .border(1.dp, NxTheme.colors.error.copy(alpha = 0.4f), MaterialTheme.shapes.medium)
+            .background(NxTheme.colors.error.copy(alpha = 0.06f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -99,18 +100,18 @@ fun AprilFoolsDebugPanel() {
             Text(
                 text       = "🐣 April Fools Debug",
                 fontWeight = FontWeight.Bold,
-                color      = CelestiaTheme.colors.error,
+                color      = NxTheme.colors.error,
                 fontSize   = 13.sp,
             )
             Spacer(Modifier.weight(1f))
             Text(
                 text  = "DEV ONLY (etc. clown)",
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.error.copy(alpha = 0.5f),
+                color = NxTheme.colors.error.copy(alpha = 0.5f),
             )
         }
 
-        HorizontalDivider(color = CelestiaTheme.colors.error.copy(alpha = 0.2f))
+        HorizontalDivider(color = NxTheme.colors.error.copy(alpha = 0.2f))
 
         // ── Force active toggle ───────────────────────────────────────────────
         Row(
@@ -121,9 +122,9 @@ fun AprilFoolsDebugPanel() {
             Text(
                 text  = "Force active (override date)",
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textPrimary,
+                color = NxTheme.colors.textPrimary,
             )
-            Switch(
+            NxSwitch(
                 checked         = isForced,
                 onCheckedChange = { enabled ->
                     AprilFools.debugForceActive = if (enabled) true else null
@@ -138,10 +139,7 @@ fun AprilFoolsDebugPanel() {
                         ChaosState.globalTiltDeg = 0f
                     }
                 },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = CelestiaTheme.colors.error,
-                    checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f),
-                ),
+                accent = NxTheme.colors.error,
             )
         }
 
@@ -154,13 +152,13 @@ fun AprilFoolsDebugPanel() {
                 Text(
                     text  = "Intensity",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isForced) CelestiaTheme.colors.textPrimary
-                    else CelestiaTheme.colors.textSecondary,
+                    color = if (isForced) NxTheme.colors.textPrimary
+                    else NxTheme.colors.textSecondary,
                 )
                 Text(
                     text       = "%.0f%% (day ~${(intensity * 13f + 1f).toInt()})".format(intensity * 100),
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = CelestiaTheme.colors.error,
+                    color      = NxTheme.colors.error,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -170,8 +168,8 @@ fun AprilFoolsDebugPanel() {
                 onValueChange = { AprilFools.debugIntensity = it },
                 enabled       = isForced,
                 colors        = SliderDefaults.colors(
-                    thumbColor       = CelestiaTheme.colors.error,
-                    activeTrackColor = CelestiaTheme.colors.error,
+                    thumbColor       = NxTheme.colors.error,
+                    activeTrackColor = NxTheme.colors.error,
                 ),
             )
 
@@ -198,13 +196,13 @@ fun AprilFoolsDebugPanel() {
             }
         }
 
-        HorizontalDivider(color = CelestiaTheme.colors.error.copy(alpha = 0.15f))
+        HorizontalDivider(color = NxTheme.colors.error.copy(alpha = 0.15f))
 
         // ── Event triggers ────────────────────────────────────────────────────
         Text(
             text  = "Trigger event now",
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -228,7 +226,7 @@ fun AprilFoolsDebugPanel() {
         Text(
             text  = "Registered: ${ChaosState.buttons.size} | Active: ${ChaosState.activeCount()}",
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+            color = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
         )
 
         // ── Reset ─────────────────────────────────────────────────────────────
@@ -247,7 +245,7 @@ fun AprilFoolsDebugPanel() {
             },
             modifier = Modifier.fillMaxWidth(),
             colors   = ButtonDefaults.outlinedButtonColors(
-                contentColor = CelestiaTheme.colors.error,
+                contentColor = NxTheme.colors.error,
             ),
             shape    = MaterialTheme.shapes.small,
         ) {

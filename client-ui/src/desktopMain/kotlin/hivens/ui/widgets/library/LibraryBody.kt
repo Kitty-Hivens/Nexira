@@ -8,36 +8,45 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.launcher.launch.LauncherController
-import hivens.ui.AppState
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.Screen
+import hivens.ui.nx.NxButton
+import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.platform.SystemActions
 import hivens.ui.screens.library.PackCard
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Comparator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
+
+private val log = LoggerFactory.getLogger("LibraryBody")
 
 @Serializable
 data class LibraryBodyProps(
@@ -57,10 +66,10 @@ fun LibraryBody(instance: WidgetInstance) {
     val ctx = LocalLibraryContext.current
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
-    val controller: LauncherController = koinInject()
-    val launchDriver: LaunchDriver = koinInject()
+    val paths: PlatformPaths = koinInject()
+    val scope = rememberCoroutineScope()
+    var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
-    val authedSession = (ctx.appState as? AppState.Authenticated)?.session
 
     if (instances.isEmpty()) {
         LibraryEmpty(
@@ -72,31 +81,60 @@ fun LibraryBody(instance: WidgetInstance) {
         LibraryList(
             instances    = instances,
             onOpenDetail = { ctx.onScreenChange(Screen.PackDetail(it.id)) },
-            onPlay       = { pack ->
-                // Unauthenticated state: defer to the detail screen
-                // which renders an explicit "Sign in to play" prompt
-                // instead of swallowing the click silently.
-                val session = authedSession
-                if (session == null) {
-                    ctx.onScreenChange(Screen.PackDetail(pack.id))
-                } else {
-                    launchDriver.observe(LaunchTarget.Pack(pack))
-                    controller.launchPackInstance(session, pack)
-                }
-            },
-            onSettings = { ctx.onScreenChange(Screen.PackDetail(it.id)) },
-            onMore     = { ctx.onScreenChange(Screen.PackDetail(it.id)) },
+            onOpenFolder = { SystemActions.openFolder(instanceDirOf(paths, it).toString()) },
+            onDelete     = { pendingDelete = it },
         )
     }
+
+    pendingDelete?.let { target ->
+        DestructiveConfirmDialog(
+            title        = s.packCardDeleteTitle,
+            body         = s.packCardDeleteBody,
+            confirmLabel = s.editorDelete,
+            onConfirm    = {
+                scope.launch {
+                    val removed = withContext(Dispatchers.IO) { deleteInstanceDir(instanceDirOf(paths, target)) }
+                    // Drop the Library entry only when the files are actually gone.
+                    // A locked file (a running game holding a jar) would otherwise
+                    // leave orphaned data on disk with the pack vanished from the
+                    // list and no way to retry.
+                    if (removed) repo.delete(target.id)
+                }
+            },
+            onDismiss    = { pendingDelete = null },
+        )
+    }
+}
+
+private fun instanceDirOf(paths: PlatformPaths, instance: PackInstance): Path =
+    paths.dataDir.resolve("instances").resolve(instance.instanceDirName)
+
+/**
+ * Recursive delete, deepest-first so directories are empty before removal.
+ * Returns true only when every entry was removed; a failed entry is logged and
+ * leaves the tree partial so the caller keeps the Library entry rather than
+ * orphaning files on disk with the pack gone from the list.
+ */
+private fun deleteInstanceDir(dir: Path): Boolean {
+    if (!Files.exists(dir)) return true
+    var ok = true
+    Files.walk(dir).use { stream ->
+        stream.sorted(Comparator.reverseOrder()).forEach { path ->
+            runCatching { Files.delete(path) }.onFailure { e ->
+                ok = false
+                log.warn("delete instance dir: could not remove {} -- {}", path, e.toString())
+            }
+        }
+    }
+    return ok
 }
 
 @Composable
 private fun LibraryList(
     instances: List<PackInstance>,
     onOpenDetail: (PackInstance) -> Unit,
-    onPlay: (PackInstance) -> Unit,
-    onSettings: (PackInstance) -> Unit,
-    onMore: (PackInstance) -> Unit,
+    onOpenFolder: (PackInstance) -> Unit,
+    onDelete: (PackInstance) -> Unit,
 ) {
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),
@@ -107,9 +145,8 @@ private fun LibraryList(
             PackCard(
                 instance     = instance,
                 onOpenDetail = { onOpenDetail(instance) },
-                onPlay       = { onPlay(instance) },
-                onSettings   = { onSettings(instance) },
-                onMore       = { onMore(instance) },
+                onOpenFolder = { onOpenFolder(instance) },
+                onDelete     = { onDelete(instance) },
             )
         }
     }
@@ -126,24 +163,17 @@ private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
             Text(
                 text       = title,
                 style      = MaterialTheme.typography.titleLarge,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text      = body,
                 style     = MaterialTheme.typography.bodyMedium,
-                color     = CelestiaTheme.colors.textSecondary,
+                color     = NxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 360.dp),
             )
-            Button(
-                onClick = onBrowse,
-                shape   = MaterialTheme.shapes.small,
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) { Text(s.browseOpen, fontWeight = FontWeight.SemiBold) }
+            NxButton(label = s.browseOpen, onClick = onBrowse)
         }
     }
 }

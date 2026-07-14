@@ -8,21 +8,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,19 +28,24 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.identity.SkinManager
+import hivens.ui.skin3d.SkinFraming
 import hivens.ui.skin3d.SkinView3D
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.skin3d.SkinViewState
+import hivens.ui.skin3d.rememberSkinViewState
+import hivens.ui.theme.NxTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.io.File
 
 // Shared skin pieces for the profile surface: the live 3D view ([SkinHero]),
 // the upload/refresh logic ([rememberSkinUploader]) and its block + status
@@ -62,6 +64,9 @@ fun SkinHero(
     modifier: Modifier = Modifier,
     interactive: Boolean = true,
     autoSpin: Boolean = true,
+    framing: SkinFraming = SkinFraming.Full,
+    cape: ImageBitmap? = null,
+    state: SkinViewState = rememberSkinViewState(),
 ) {
     val skinManager: SkinManager = koinInject()
     var skin by remember(playerName) { mutableStateOf<ImageBitmap?>(null) }
@@ -73,10 +78,18 @@ fun SkinHero(
     Box(modifier, contentAlignment = Alignment.Center) {
         val current = skin
         if (current != null) {
-            SkinView3D(current, Modifier.fillMaxSize(), interactive = interactive, autoSpin = autoSpin)
+            SkinView3D(
+                current,
+                Modifier.fillMaxSize(),
+                interactive = interactive,
+                autoSpin = autoSpin,
+                framing = framing,
+                cape = cape,
+                state = state,
+            )
         } else {
             CircularProgressIndicator(
-                color = CelestiaTheme.colors.primary,
+                color = NxTheme.colors.primary,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(28.dp),
             )
@@ -141,7 +154,7 @@ fun SkinControls(session: SessionData, onSkinChanged: () -> Unit, modifier: Modi
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = uploader.pick) { Text(s.profileUploadSkin) }
             IconButton(onClick = uploader.refresh) {
-                Icon(Icons.Default.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textSecondary)
+                Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxTheme.colors.textSecondary)
             }
         }
     }
@@ -151,8 +164,8 @@ fun SkinControls(session: SessionData, onSkinChanged: () -> Unit, modifier: Modi
 fun SkinUploadStatusLine(status: UploadStatus) {
     val s = LocalStrings.current
     when (status) {
-        is UploadStatus.Error -> StatusLine(status.message, CelestiaTheme.colors.error)
-        UploadStatus.Loading  -> StatusLine(s.profileUploadSkinLoading, CelestiaTheme.colors.textSecondary)
+        is UploadStatus.Error -> StatusLine(status.message, NxTheme.colors.error)
+        UploadStatus.Loading  -> StatusLine(s.profileUploadSkinLoading, NxTheme.colors.textSecondary)
         // Success is silent on purpose -- the changed skin is the feedback.
         is UploadStatus.Success, UploadStatus.None -> Unit
     }

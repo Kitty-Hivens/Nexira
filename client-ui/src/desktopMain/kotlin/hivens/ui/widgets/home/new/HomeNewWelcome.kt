@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.AppState
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -57,14 +57,14 @@ fun HomeNewWelcome(instance: WidgetInstance) {
             },
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
         )
         if (p.showSubtitle) {
             Spacer(Modifier.height(4.dp))
             Text(
                 text  = s.settingsHomeViewSub,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
     }

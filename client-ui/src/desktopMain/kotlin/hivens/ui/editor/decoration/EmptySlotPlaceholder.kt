@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotPath
 
 // Rendered by SlotRenderer when a slot has no widgets and the editor
@@ -72,7 +71,7 @@ fun EmptySlotPlaceholder(
     ) {
         // Dashed border via Canvas so we can use PathEffect; M3's
         // border modifier does not support dashed strokes.
-        val borderColor = CelestiaTheme.colors.primary.copy(alpha = breath)
+        val borderColor = NxTheme.colors.primary.copy(alpha = breath)
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRoundRect(
                 color  = borderColor,
@@ -90,16 +89,15 @@ fun EmptySlotPlaceholder(
             androidx.compose.foundation.layout.Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector        = Icons.Default.Add,
+                Symbol(icon = NxIcon.Add,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.primary.copy(alpha = breath),
+                    tint               = NxTheme.colors.primary.copy(alpha = breath),
                     modifier           = Modifier.padding(end = 6.dp),
                 )
                 Text(
                     text       = s.editorDragWidgetHere,
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
             }

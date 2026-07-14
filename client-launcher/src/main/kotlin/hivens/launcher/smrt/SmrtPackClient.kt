@@ -1,8 +1,6 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
-import hivens.core.api.dto.smrt.ModrinthProject
-import hivens.core.api.dto.smrt.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -19,11 +17,10 @@ import kotlinx.serialization.json.Json
 import java.io.IOException
 
 /**
- * Thin HTTP wrapper for the smrt mirror's `/v1/...` endpoints plus the
- * Modrinth `/v2/project/.../version/...` endpoint needed to resolve
- * modrinth-source items. Uses the "direct" HttpClient (strict TLS, no
- * SOCKS proxy) since both endpoints are public CDN-fronted and don't
- * need the SC channel's special handling.
+ * Thin HTTP wrapper for the smrt mirror's `/v1/...` endpoints. Uses the
+ * "direct" HttpClient (strict TLS, no SOCKS proxy) since the mirror is public
+ * CDN-fronted and needs none of the SC channel's special handling. Modrinth
+ * reads live in [hivens.launcher.modrinth.ModrinthClient].
  */
 class SmrtPackClient(
     private val httpProvider: HttpClientProvider,
@@ -33,7 +30,6 @@ class SmrtPackClient(
 ) : IMirrorPackClient {
     companion object {
         const val DEFAULT_MIRROR_BASE = "https://smrt.hivens.dev"
-        const val MODRINTH_API_BASE = "https://api.modrinth.com"
         private const val USER_AGENT = "Nexira-smrt-mirror-client"
 
         // Tolerant decoder: spec says unknown fields and unknown source
@@ -77,30 +73,6 @@ class SmrtPackClient(
     suspend fun listPacks(): SmrtPackListing {
         val url = "$mirrorBase/v1/packs"
         return caches.listing.get(url) { getJson(url) }
-    }
-
-    /**
-     * Resolve a modrinth source by hitting Modrinth's project/version
-     * endpoint. The wire manifest carries `project_id` + `version_id`
-     * but not the file URL -- Modrinth versions can ship multiple files
-     * (sources jar, deobf, signatures), and the primary one is flagged
-     * via `primary: true` on the file. Caller picks the file via
-     * [ModrinthVersion.primaryFile].
-     */
-    suspend fun resolveModrinthVersion(projectId: String, versionId: String): ModrinthVersion {
-        val url = "$MODRINTH_API_BASE/v2/project/$projectId/version/$versionId"
-        return caches.modrinthVersion.get(url) { getJson(url) }
-    }
-
-    /**
-     * Fetch project metadata for a Modrinth-sourced mod -- used by the
-     * Library PackDetail icon resolver when the manifest entry doesn't
-     * carry its own `display.iconUrl`. One call per project_id is
-     * enough; callers cache the result.
-     */
-    suspend fun resolveModrinthProject(projectId: String): ModrinthProject {
-        val url = "$MODRINTH_API_BASE/v2/project/$projectId"
-        return caches.modrinthProject.get(url) { getJson(url) }
     }
 
     /**

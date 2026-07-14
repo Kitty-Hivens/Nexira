@@ -61,8 +61,12 @@ class JsonDiskStore<V>(
         if (!Files.isDirectory(dir)) return
         runCatching {
             Files.list(dir).use { stream ->
-                stream.filter { it.fileName.toString().endsWith(".json") }
-                    .forEach { runCatching { Files.deleteIfExists(it) } }
+                stream.filter {
+                    val n = it.fileName.toString()
+                    // Also sweep AtomicFiles' "<hash>.json.tmp" left by a write that
+                    // crashed between temp-create and rename; reads never touch it.
+                    n.endsWith(".json") || n.endsWith(".json.tmp")
+                }.forEach { runCatching { Files.deleteIfExists(it) } }
             }
         }.onFailure { log.warn("cache clear failed for {}", dir, it) }
     }

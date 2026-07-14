@@ -32,6 +32,7 @@ export default defineConfig({
           translations: { ru: 'Для разработчиков' },
           items: [
             { label: 'Building from Source', slug: 'dev/building', translations: { ru: 'Сборка из исходников' } },
+            { label: 'Native image', slug: 'dev/native-image', translations: { ru: 'Нативная сборка' } },
             { label: 'Architecture', slug: 'dev/architecture', translations: { ru: 'Архитектура' } },
           ],
         },

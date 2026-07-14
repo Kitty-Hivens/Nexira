@@ -38,6 +38,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.welcome",
             "home.new.recent",
             "home.new.quicklaunch",
+            "home.new.hero",
             "library.header",
             "library.body",
             "appshell.rightrail.compactnews",
@@ -45,6 +46,10 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.left",
             "appshell.region.center",
             "appshell.region.right",
+            // custom title bar (top region + body wrapper + breadcrumb)
+            "appshell.region.top",
+            "appshell.region.body",
+            "appshell.topbar.breadcrumb",
             // editor-2 sample widgets
             "home.new.clock",
             "home.new.spacer",
@@ -52,6 +57,8 @@ class WidgetRegistryConsistencyTest {
             "home.new.launchbutton",
             // editor-3.7 music
             "home.new.music",
+            // inline video player (URL prop, expand-to-full)
+            "home.new.video",
             // unified configurable nav rail item
             "nav.entry",
             // Phase A.3 container sample
@@ -81,30 +88,6 @@ class WidgetRegistryConsistencyTest {
             "bg.loop.mode",
             "bg.tint",
             "bg.reset",
-            "bg.preview",
-            "customization.density",
-            "customization.glass.intensity",
-            "customization.glass.alpha",
-            "customization.accent.override",
-            "customization.experimental.toggle",
-            "customization.color.primary",
-            "customization.color.secondary",
-            "customization.color.background",
-            "customization.color.surface",
-            "customization.color.success",
-            "customization.color.error",
-            "customization.color.outline",
-            "customization.color.textPrimary",
-            "customization.color.textSecondary",
-            "customization.color.progressAccent",
-            "customization.color.warnAccent",
-            "customization.color.criticalAccent",
-            "customization.shape.cardCorner",
-            "customization.shape.cardBorder",
-            "customization.shape.buttonCorner",
-            "customization.shape.animMultiplier",
-            "customization.shape.softGlow",
-            "customization.reset",
             "profile.nav",
             "profile.skin.section",
             "profile.account.section",
@@ -137,6 +120,8 @@ class WidgetRegistryConsistencyTest {
                 "appshell.region.left",          // shell regions: the frame must stay whole
                 "appshell.region.center",
                 "appshell.region.right",
+                "appshell.region.top",           // title bar: hosts window controls + breadcrumb
+                "appshell.region.body",          // carries the whole app body
             ),
             nonRemovable,
             "non-removable set keeps the shell frame and sign-in panel intact; nav items " +
@@ -158,8 +143,10 @@ class WidgetRegistryConsistencyTest {
             "home.new.welcome",
             "home.new.launchbutton",
             "home.new.music",
+            "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",
+            "home.new.hero",
             // About surface (title overrides)
             "about.logo",
             "about.system.card",
@@ -180,6 +167,8 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.left",
             "appshell.region.center",
             "appshell.region.right",
+            // title bar (height / corner / group / frost / controls props)
+            "appshell.region.top",
             // unified nav rail item (target prop)
             "nav.entry",
             // persistent notification history (expand-direction + clock props)

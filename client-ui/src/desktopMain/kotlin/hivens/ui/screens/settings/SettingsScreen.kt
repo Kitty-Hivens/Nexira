@@ -3,11 +3,8 @@ package hivens.ui.screens.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
@@ -16,12 +13,11 @@ import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.components.GlassCard
-import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 
 /**
@@ -46,7 +42,6 @@ fun SettingsScreen(
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
-    onOpenCustomizationExtension: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
     PuppetScreen("Settings")
@@ -74,22 +69,13 @@ fun SettingsScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text(
-            text       = s.settingsTitle,
-            style      = MaterialTheme.typography.headlineSmall,
-            color      = CelestiaTheme.colors.textPrimary,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        // Explicit backgroundColor opts the Settings frame out of
-        // style.cardSurface -- stays glassy under Brut, same as the
-        // inner row panels. Routed through glassSurfaceAlpha so the
-        // customization knob still scales it.
-        GlassCard(
-            modifier        = Modifier.weight(1f).fillMaxWidth(),
-            backgroundColor = glassSurfaceAlpha(0.7f),
+        // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
+        // The frame is an NxCard: a library-owned tonal body + bevel hairline that
+        // stays a distinct plane under any style and with no wallpaper, instead of
+        // a glass-alpha that collapsed when the coat came off.
+        NxCard(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            level    = NxSurfaceLevel.Raised,
         ) {
             Row(Modifier.fillMaxSize().padding(16.dp)) {
                 SettingsCategoryNav(
@@ -111,7 +97,6 @@ fun SettingsScreen(
                             onToggleTheme                = onToggleTheme,
                             onOpenThemePicker            = onOpenThemePicker,
                             onOpenBackgroundSettings     = onOpenBackgroundSettings,
-                            onOpenCustomizationExtension = onOpenCustomizationExtension,
                             currentLocale                = currentLocale,
                             onLocaleChanged              = onLocaleChanged,
                             homeView                     = homeView,
@@ -119,6 +104,7 @@ fun SettingsScreen(
                             uiStyle                      = uiStyle,
                             onUiStyleChanged             = onUiStyleChanged,
                         )
+                        SettingsCategory.Console -> ConsoleSection(paths = paths)
                         SettingsCategory.Network -> NetworkSection(
                             form = form,
                             save = ::save,

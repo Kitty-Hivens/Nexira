@@ -6,7 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Confirm gate for an irreversible action. [confirmLabel] is the action's own
@@ -30,12 +30,12 @@ fun DestructiveConfirmDialog(
         text  = { Text(body, style = MaterialTheme.typography.bodyMedium) },
         confirmButton = {
             TextButton(onClick = { onConfirm(); onDismiss() }) {
-                Text(confirmLabel, color = CelestiaTheme.colors.error)
+                Text(confirmLabel, color = NxTheme.colors.error)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(s.editorCancel) }
         },
-        containerColor = CelestiaTheme.colors.surface,
+        containerColor = NxTheme.colors.surface,
     )
 }

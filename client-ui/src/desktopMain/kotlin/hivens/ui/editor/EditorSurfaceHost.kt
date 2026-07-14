@@ -20,20 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewQuilt
-import androidx.compose.material.icons.automirrored.filled.ViewSidebar
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,14 +32,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -72,17 +62,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
-import hivens.launcher.LayoutGraphRepository
-import hivens.launcher.LayoutReconcile
+import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.layout.LayoutReconcile
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.layout.AdaptiveWidth
-import hivens.widget.api.LocalLayoutGraph
-import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
 import hivens.ui.editor.decoration.UnsupportedWidgetPlaceholder
@@ -92,42 +75,45 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
 import hivens.ui.editor.palette.WidgetPalettePanel
-import hivens.ui.editor.props.SurfacePropertiesPanel
-import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.editor.presets.PresetEnvelope
 import hivens.ui.editor.presets.PresetManagerPanel
 import hivens.ui.editor.presets.PresetMeta
 import hivens.ui.editor.presets.PresetRepository
-import hivens.ui.widgets.home.classic.LocalHomeClassicContext
-import hivens.ui.widgets.home.new.LocalHomeNewContext
-import hivens.ui.widgets.library.LocalLibraryContext
-import hivens.ui.widgets.shell.LocalLeftRailContext
-import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.editor.props.SurfacePropertiesPanel
+import hivens.ui.editor.props.WidgetPropPanel
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.layout.AdaptiveWidth
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
 import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
-import hivens.ui.widgets.customization.LocalCustomizationContext
-import hivens.ui.widgets.customization.STUB_CUSTOMIZATION
+import hivens.ui.widgets.home.classic.LocalHomeClassicContext
+import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.ui.widgets.profile.LocalProfileContext
 import hivens.ui.widgets.profile.STUB_PROFILE
 import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
 import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
+import hivens.ui.widgets.shell.LocalLeftRailContext
+import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
-import hivens.widget.api.LocalUnknownWidgetDecorator
-import hivens.widget.api.LocalSlotControlDecorator
-import hivens.widget.api.LocalSlotDividerDecorator
+import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalSlotBoundsReporter
+import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.LocalStyle
+import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
-import hivens.widget.api.SlotControlDecorator
-import hivens.widget.api.SlotDividerDecorator
+import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.DefaultLayout
@@ -136,6 +122,8 @@ import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 
@@ -196,10 +184,24 @@ fun EditorSurfaceHost(
     // Surface-level settings panel (currently the left rail's nav-selection
     // settings). Mutually exclusive with the per-widget prop panel + palette.
     var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
-    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target and the
-    // surface settings panel, so re-entering does not silently reopen the last
-    // panel with the palette still hidden.
-    LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false } }
+    // Selected slot (Tier 2 slot layout chrome): the highlighted slot, its window
+    // rect (for the handle anchor), the cursor anchor for a right-click menu, and
+    // whether the handle's menu is open. selectedSlotState stays a State so the slot
+    // chrome modifier can read it without the host capturing a stale value.
+    val selectedSlotState = remember(availableSurfaces) { mutableStateOf<SlotPath?>(null) }
+    var selectedSlotRect  by remember(availableSurfaces) { mutableStateOf<Rect?>(null) }
+    var slotMenuCursor    by remember(availableSurfaces) { mutableStateOf<Offset?>(null) }
+    var handleMenuOpen    by remember(availableSurfaces) { mutableStateOf(false) }
+    fun clearSlotSelection() {
+        selectedSlotState.value = null
+        selectedSlotRect = null
+        slotMenuCursor = null
+        handleMenuOpen = false
+    }
+    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, the surface
+    // settings panel, and any slot selection, so re-entering does not silently reopen
+    // the last panel with the palette still hidden.
+    LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false; clearSlotSelection() } }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
@@ -366,43 +368,29 @@ fun EditorSurfaceHost(
         }
     }
 
-    // Slot control decorator: a compact orientation + grid-columns
-    // control at the start of every non-empty slot on the selected
-    // surface. Identity (renders nothing) when off, previewing, or for a
-    // foreign surface -- so other surfaces and production builds pay
-    // nothing. SlotRenderer invokes this as the slot's first child.
-    val slotControlDecorator: SlotControlDecorator = remember(state, previewing) {
+    // Slot chrome modifier: a zero-footprint Modifier applied to each slot's flow
+    // root on the selected surface. It highlights the selected slot, reports its
+    // bounds for the handle anchor, and routes a background / right-click press to
+    // selection + the layout menu. Identity off / previewing / foreign surface, so
+    // other surfaces and production pay nothing.
+    val slotChromeFactory: SlotChromeModifier = remember(state, previewing) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
-            { path, content ->
+            { path, _ ->
                 if (path.surface == selected) {
-                    SlotControl(path = path, content = content, controller = controller)
-                }
-            }
-        } else {
-            { _, _ -> }
-        }
-    }
-
-    // Slot divider decorator: a draggable handle between adjacent widgets
-    // in a Row/Column slot on the selected surface, redistributing their
-    // weight. Identity off / previewing / foreign surface.
-    val slotDividerDecorator: SlotDividerDecorator = remember(state, previewing) {
-        if (state is EditModeState.On && !previewing) {
-            val selected = state.surface
-            { path, content, leftIndex ->
-                if (path.surface == selected) {
-                    SlotDivider(
-                        path       = path,
-                        content    = content,
-                        leftIndex  = leftIndex,
-                        controller = controller,
-                        registry   = registry,
+                    slotChromeModifier(
+                        path          = path,
+                        selectedSlot  = selectedSlotState,
+                        onSelect      = { selectedSlotState.value = it; handleMenuOpen = false; slotMenuCursor = null },
+                        onContextMenu = { p, off -> selectedSlotState.value = p; slotMenuCursor = off; handleMenuOpen = false },
+                        onReportRect  = { selectedSlotRect = it },
                     )
+                } else {
+                    Modifier
                 }
             }
         } else {
-            { _, _, _ -> }
+            { _, _ -> Modifier }
         }
     }
 
@@ -413,8 +401,7 @@ fun EditorSurfaceHost(
         LocalWidgetDecorator    provides chromeDecorator,
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
-        LocalSlotControlDecorator provides slotControlDecorator,
-        LocalSlotDividerDecorator provides slotDividerDecorator,
+        LocalSlotChromeModifier provides slotChromeFactory,
         // Edit-mode reflow duration -- slot add / remove / resize animates while
         // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
@@ -438,7 +425,6 @@ fun EditorSurfaceHost(
         LocalRightRailContext     provides STUB_RIGHTRAIL,
         LocalAboutContext         provides STUB_ABOUT,
         LocalBgSettingsContext    provides STUB_BG_SETTINGS,
-        LocalCustomizationContext provides STUB_CUSTOMIZATION,
         LocalProfileContext       provides STUB_PROFILE,
         LocalServerDetailsContext provides STUB_SERVER_DETAILS,
         LocalThemePickerContext   provides STUB_THEME_PICKER,
@@ -453,7 +439,14 @@ fun EditorSurfaceHost(
                     // Box-level handler misses the chord when the side
                     // rails own focus.
                     if (editing && ev.type == KeyEventType.KeyUp && ev.key == Key.Escape) {
-                        editing = false
+                        // Staged: close an open slot menu, then drop the slot
+                        // selection, then exit edit mode (edit-exit stays the final
+                        // stage, matching the documented Ctrl+E / Escape contract).
+                        when {
+                            handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
+                            selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
+                            else                                     -> editing = false
+                        }
                         true
                     } else false
                 },
@@ -490,11 +483,11 @@ fun EditorSurfaceHost(
                                 TextButton(onClick = {
                                     controller.resetAll()
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorResetAll, color = CelestiaTheme.colors.error) }
+                                }) { Text(s.editorResetAll, color = NxTheme.colors.error) }
                                 TextButton(onClick = {
                                     controller.resetSurface(surfaceForReset)
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorReset, color = CelestiaTheme.colors.error) }
+                                }) { Text(s.editorReset, color = NxTheme.colors.error) }
                             }
                         },
                         dismissButton = {
@@ -515,10 +508,8 @@ fun EditorSurfaceHost(
                             customization = customization,
                             uiStyle       = uiStyle,
                         )
-                        coroutineScope.launch {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                presetRepo.save(envelope)
-                            }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            presetRepo.save(envelope)
                         }
                     },
                     onLoad = { meta ->
@@ -554,10 +545,8 @@ fun EditorSurfaceHost(
                         }
                     },
                     onDelete = { meta ->
-                        coroutineScope.launch {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                presetRepo.delete(meta.name)
-                            }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            presetRepo.delete(meta.name)
                         }
                     },
                     onExport = { meta ->
@@ -621,7 +610,7 @@ fun EditorSurfaceHost(
                     active                = editing,
                     surfaces              = availableSurfaces,
                     selectedSurface       = selectedSurface,
-                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false },
+                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false; clearSlotSelection() },
                     surfaceHasSettings    = surfaceHasSettings(selectedSurface),
                     onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
                     paletteOpen           = paletteOpen,
@@ -631,6 +620,20 @@ fun EditorSurfaceHost(
                     onOpenPresets         = { presetPanelOpen = true },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
                     modifier              = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                )
+            }
+
+            // Selected-slot chrome (Tier 2): handle + orientation menu, full-window
+            // so it is never a layout child of the edited slot.
+            if (editing && !previewing) {
+                SlotSelectionOverlay(
+                    selectedSlot     = selectedSlotState.value,
+                    selectedSlotRect = selectedSlotRect,
+                    handleMenuOpen   = handleMenuOpen,
+                    cursorAnchor     = slotMenuCursor,
+                    controller       = controller,
+                    onOpenHandleMenu = { handleMenuOpen = true },
+                    onDismiss        = { handleMenuOpen = false; slotMenuCursor = null },
                 )
             }
 
@@ -675,7 +678,7 @@ private fun EditModePill(
             // WidthClass, so it tracks the real chip count.
             val compact = maxWidth < 1100.dp
             Surface(
-                color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
+                color   = NxTheme.colors.surface.copy(alpha = 0.94f),
                 shape   = RoundedCornerShape(20.dp),
                 shadowElevation = 6.dp,
             ) {
@@ -683,10 +686,9 @@ private fun EditModePill(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(start = 12.dp, end = if (compact) 8.dp else 4.dp, top = 6.dp, bottom = 6.dp),
                 ) {
-                    Icon(
-                        imageVector        = Icons.Default.Tune,
+                    Symbol(icon = NxIcon.Tune,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.primary,
+                        tint               = NxTheme.colors.primary,
                         modifier           = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(8.dp))
@@ -710,7 +712,7 @@ private fun EditModePill(
                     // surfaces that expose surface-level settings.
                     if (surfaceHasSettings) {
                         ToolChip(
-                            icon     = Icons.Default.Settings,
+                            icon     = NxIcon.Settings,
                             label    = s.editorSurfaceSettings,
                             selected = false,
                             onClick  = onOpenSurfaceSettings,
@@ -724,7 +726,7 @@ private fun EditModePill(
                     // mode. Drag becomes impossible during preview (no
                     // handles), which matches user intent.
                     ToolChip(
-                        icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        icon       = if (previewing) NxIcon.VisibilityOff else NxIcon.Visibility,
                         label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
                         selected   = previewing,
                         onClick    = onTogglePreview,
@@ -734,7 +736,7 @@ private fun EditModePill(
 
                     // Palette toggle.
                     ToolChip(
-                        icon     = Icons.Default.Widgets,
+                        icon     = NxIcon.Widgets,
                         label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
                         selected = paletteOpen,
                         onClick  = onTogglePalette,
@@ -744,7 +746,7 @@ private fun EditModePill(
 
                     // Presets dialog.
                     ToolChip(
-                        icon     = Icons.Default.Inventory2,
+                        icon     = NxIcon.Inventory2,
                         label    = s.editorPresetsTitle,
                         selected = false,
                         onClick  = onOpenPresets,
@@ -759,7 +761,7 @@ private fun EditModePill(
                     // host level. Disabled when no surface is selected so
                     // the chip cannot pretend to be live.
                     ToolChip(
-                        icon        = Icons.Default.RestartAlt,
+                        icon        = NxIcon.RestartAlt,
                         label       = s.editorReset,
                         selected    = false,
                         onClick     = onRequestReset,
@@ -773,7 +775,7 @@ private fun EditModePill(
                         Text(
                             text  = s.editorEscHint,
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                             modifier = Modifier.padding(end = 8.dp),
                         )
                     }
@@ -786,9 +788,9 @@ private fun EditModePill(
 @Composable
 private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
-    val bg = if (active) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+    val bg = if (active) NxTheme.colors.primary.copy(alpha = 0.18f)
              else Color.Transparent
-    val fg = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    val fg = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
     val name = humanSurfaceShortName(surface, s)
     Surface(
         color    = bg,
@@ -801,8 +803,7 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, o
                 .clickable { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
-            Icon(
-                imageVector        = surfaceIcon(surface),
+            Symbol(icon = surfaceIcon(surface),
                 // Compact hides the label, so the icon carries the name for a11y.
                 contentDescription = if (compact) name else null,
                 tint               = fg,
@@ -823,7 +824,7 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, o
 
 @Composable
 private fun ToolChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: IconKey,
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -832,16 +833,16 @@ private fun ToolChip(
     compact: Boolean = false,
 ) {
     val bg = when {
-        !enabled    -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.3f)
-        destructive -> CelestiaTheme.colors.error.copy(alpha = 0.12f)
-        selected    -> CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-        else        -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.6f)
+        !enabled    -> NxTheme.colors.surfaceVariant.copy(alpha = 0.3f)
+        destructive -> NxTheme.colors.error.copy(alpha = 0.12f)
+        selected    -> NxTheme.colors.primary.copy(alpha = 0.18f)
+        else        -> NxTheme.colors.surfaceVariant.copy(alpha = 0.6f)
     }
     val fg = when {
-        !enabled    -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f)
-        destructive -> CelestiaTheme.colors.error
-        selected    -> CelestiaTheme.colors.primary
-        else        -> CelestiaTheme.colors.textPrimary
+        !enabled    -> NxTheme.colors.textSecondary.copy(alpha = 0.45f)
+        destructive -> NxTheme.colors.error
+        selected    -> NxTheme.colors.primary
+        else        -> NxTheme.colors.textPrimary
     }
     Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
         Row(
@@ -850,8 +851,7 @@ private fun ToolChip(
                 .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
-            Icon(
-                imageVector        = icon,
+            Symbol(icon = icon,
                 // Compact hides the label, so the icon carries it for a11y.
                 contentDescription = if (compact) label else null,
                 tint               = fg,
@@ -870,12 +870,14 @@ private fun ToolChip(
     }
 }
 
-private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector.ImageVector =
+private fun surfaceIcon(surface: SurfaceId): IconKey =
     when (surface.value) {
-        "appshell.root"      -> Icons.Default.Dashboard
-        "appshell.leftrail"  -> Icons.AutoMirrored.Filled.ViewSidebar
-        "appshell.rightrail" -> Icons.AutoMirrored.Filled.ViewQuilt
-        else                 -> Icons.Default.Home
+        "appshell.root"      -> NxIcon.Dashboard
+        "appshell.leftrail"  -> NxIcon.ViewSidebar
+        "appshell.rightrail" -> NxIcon.ViewQuilt
+        "appshell.topbar"    -> NxIcon.Layers
+        "appshell.body"      -> NxIcon.ViewQuilt
+        else                 -> NxIcon.Home
     }
 
 private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
@@ -885,9 +887,10 @@ private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = w
     "library"             -> s.editorSurfShortLibrary
     "appshell.leftrail"   -> s.editorSurfShortLeftRail
     "appshell.rightrail"  -> s.editorSurfShortRightRail
+    "appshell.topbar"     -> s.editorSurfShortTopBar
+    "appshell.body"       -> s.editorSurfShortBody
     "about"               -> s.editorSurfShortAbout
     "bg.settings"         -> s.editorSurfShortBg
-    "customization"       -> s.editorSurfShortStyle
     "profile"             -> s.editorSurfShortProfile
     "server.details"      -> s.editorSurfShortServer
     "theme.picker"        -> s.editorSurfShortTheme
@@ -901,9 +904,10 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
     "library"             -> s.editorSurfLibrary
     "appshell.leftrail"   -> s.editorSurfLeftRail
     "appshell.rightrail"  -> s.editorSurfRightRail
+    "appshell.topbar"     -> s.editorSurfTopBar
+    "appshell.body"       -> s.editorSurfBody
     "about"               -> s.editorSurfAbout
     "bg.settings"         -> s.editorSurfBg
-    "customization"       -> s.editorSurfStyle
     "profile"             -> s.editorSurfProfile
     "server.details"      -> s.editorSurfServer
     "theme.picker"        -> s.editorSurfTheme
@@ -932,7 +936,7 @@ private fun EditModeVignette(active: Boolean) {
             .alpha(alpha)
             .border(
                 width = 1.5.dp,
-                color = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+                color = NxTheme.colors.primary.copy(alpha = 0.35f),
                 shape = RoundedCornerShape(0.dp),
             ),
     )
@@ -1006,7 +1010,6 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
         }
         Screen.About                  -> SurfaceId("about")
         Screen.BackgroundSettings     -> SurfaceId("bg.settings")
-        Screen.CustomizationExtension -> SurfaceId("customization")
         Screen.Library                -> SurfaceId("library")
         Screen.Profile                -> SurfaceId("profile")
         is Screen.ServerDetails       -> SurfaceId("server.details")
@@ -1019,8 +1022,10 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
     // screen even when the center is not yet a widget surface. The center
     // surface (when there is one) is first, so it stays the default selection.
     return listOfNotNull(main) + listOf(
+        SurfaceId("appshell.topbar"),
         SurfaceId("appshell.leftrail"),
         SurfaceId("appshell.rightrail"),
+        SurfaceId("appshell.body"),
         SurfaceId("appshell.root"),
     )
 }

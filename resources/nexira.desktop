@@ -12,3 +12,8 @@ StartupWMClass=Nexira
 Categories=Game;
 MimeType=x-scheme-handler/nexira;
 Keywords=launcher;game;hivens;smartycraft;minecraft;
+Actions=recovery;
+
+[Desktop Action recovery]
+Name=Start in recovery mode
+Exec=env BAMF_DESKTOP_FILE_HINT=%k nexira --recovery

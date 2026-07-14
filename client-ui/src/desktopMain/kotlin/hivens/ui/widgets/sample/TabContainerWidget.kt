@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -93,12 +93,12 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         text       = label,
         style      = MaterialTheme.typography.labelMedium,
-        color      = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
+        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
             .clip(MaterialTheme.shapes.small)
             .background(
-                if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.16f)
+                if (selected) NxTheme.colors.primary.copy(alpha = 0.16f)
                 else glassSurfaceAlpha(0.4f),
             )
             .clickable(onClick = onClick)

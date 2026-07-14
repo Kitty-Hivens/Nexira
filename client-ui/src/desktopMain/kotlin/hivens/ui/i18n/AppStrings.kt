@@ -14,10 +14,18 @@ interface AppStrings {
     val loginErrorEmpty: String
     val loginErrorGeneric: String
     val loginRegister: String
+    val loginPlayOffline: String
+    val loginMicrosoft: String
+    val msaTitle: String
+    val msaInstruction: String
+    val msaCopyCode: String
+    val msaOpenBrowser: String
+    val msaWaiting: String
 
     // --- Navigation ---
     val navLogout: String
     val navBack: String
+    val navForward: String
     /** App locale, for date/number formatting in widgets (not the system default). */
     val locale: java.util.Locale
 
@@ -36,6 +44,8 @@ interface AppStrings {
     val launchAbort: String
     val launchRunning: String
     val launchDownloading: String
+    val launchPreparing: String
+    val launchFailed: String
 
     // --- Launcher States ---
     val stateInit: String
@@ -77,6 +87,12 @@ interface AppStrings {
     val settingsThemePicker: String
     val settingsThemePickerSub: String
     val settingsDarkTheme: String
+    val settingsDarkThemeDesc: String
+    val settingsThemeModeTitle: String
+    val settingsThemeModeManual: String
+    val settingsThemeModeSystem: String
+    val settingsThemeModeWallpaper: String
+    val settingsThemeModeSystemUnavailable: String
     val settingsCloseAfterLaunch: String
     val settingsCloseAfterLaunchDesc: String
     val settingsSaved: String
@@ -107,6 +123,16 @@ interface AppStrings {
     val railCollapse: String
     val railExpand: String
 
+    // --- Window chrome (custom title bar caption buttons) ---
+    val windowMinimize: String
+    val windowMaximize: String
+    val windowRestore: String
+    val windowClose: String
+
+    // --- Top-bar breadcrumb ---
+    val crumbHome: String
+    val crumbLoading: String
+
     // --- Pagination ---
     val paginationPrev: String
     val paginationNext: String
@@ -133,8 +159,6 @@ interface AppStrings {
     // --- Destructive-action confirm dialogs ---
     val serverSettingsResetConfirmTitle: String
     val serverSettingsResetConfirmBody: String
-    val customizationResetConfirmTitle: String
-    val customizationResetConfirmBody: String
     val backgroundResetConfirmTitle: String
     val backgroundResetConfirmBody: String
     val logoutConfirmTitle: String
@@ -188,6 +212,8 @@ interface AppStrings {
 
     // --- Console ---
     val consoleTitle: String
+    /** Shown over the empty console (no log lines yet). */
+    val consoleEmptyHint: String
     /** Header showing how many entries pass the active filter, e.g. "Game Output (12/847)". */
     fun consoleHeaderCount(filtered: Int, total: Int): String
     val consoleCopyAll: String
@@ -362,8 +388,6 @@ interface AppStrings {
     val trayStatusIdle: String
     val trayStatusRunning: String
     val trayShow: String
-    val trayServers: String
-    val trayNoServers: String
     /** Title of the one-time OS notification posted the first time the window hides to the tray. */
     val trayHintTitle: String
     /** Body of that hint -- explains the launcher is still running in the tray, not closed. */
@@ -637,6 +661,32 @@ interface AppStrings {
     val settingsCategoryExperimental: String
     val settingsCategoryAdvanced: String
     val settingsCategoryDiagnostics: String
+    val settingsCategoryConsole: String
+
+    // --- Settings > Console section ---
+    val consoleSecDisplay: String
+    val consoleSecColors: String
+    val consoleSecFontSize: String
+    val consoleSecWrap: String
+    val consoleSecGutter: String
+    val consoleSecTimestamps: String
+    val consoleSecBuffer: String
+    val consoleSecColorInfo: String
+    val consoleSecColorWarn: String
+    val consoleSecColorError: String
+    val consoleSecColorAuto: String
+    val consoleSecApplyNote: String
+    val consoleSecHighlightRules: String
+    val consoleSecFilterRules: String
+    val consoleSecAddRule: String
+    val consoleSecRulePattern: String
+    val consoleSecRegex: String
+    val consoleSecBold: String
+    val consoleSecRulesEmpty: String
+    val consoleSecArt: String
+    val consoleSecArtAdd: String
+    val consoleSecArtPaste: String
+    val consoleSecArtEmpty: String
 
     // --- Profile two-column nav labels ---
     val profileCategoryAccount: String
@@ -644,6 +694,27 @@ interface AppStrings {
     val profileCategorySecurity: String
     val profileForgetSavedSignIn: String
     val profileSecurityHint: String
+    val accountsTitle: String
+    val accountRemove: String
+    val accountFaceLabel: String
+    val accountFaceAuto: String
+    val profileSignOutSmartycraft: String
+    val profileSignOutMicrosoft: String
+    val wardrobeTitle: String
+    val wardrobeSignedOut: String
+    val wardrobeUpload: String
+    val wardrobeApplySmartycraft: String
+    val wardrobeEmpty: String
+    val wardrobeSaved: String
+    val wardrobeCapes: String
+    val wardrobeApplyCape: String
+    val wardrobeCapeClanHint: String
+    val wardrobeDefaults: String
+    val wardrobePoseStand: String
+    val wardrobePoseWave: String
+    val wardrobePoseSit: String
+    val wardrobePoseFaceCover: String
+    val wardrobePoseWalk: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String
@@ -652,30 +723,35 @@ interface AppStrings {
     val backgroundLoopOnce: String
 
     // --- Customization extension ---
-    val settingsCustomizationExt: String
-    val settingsCustomizationExtSub: String
-    val customizationTitle: String
-    val customizationSubtitle: String
-    val customizationDensity: String
-    val customizationGlassIntensity: String
-    val customizationAccentOverride: String
     val customizationAccentClear: String
     val customizationSectionVisual: String
     val customizationSectionColors: String
-    val customizationExperimentalToggle: String
-    val customizationExperimentalSub: String
-    val customizationReset: String
     val customizationHexInvalid: String
     val themePickerAccentOverride: String
 
     // --- Browse screen ---
     val browseTitle: String
-    val browseSubtitle: String
+    val browseSearchPlaceholder: String
     val browseEmptyTitle: String
     val browseEmptyMessage: String
     val browseErrorTitle: String
     val browseErrorMessage: String
     val browseRetry: String
+    /** Label on the Library action that imports a pack from a local file. */
+    val browseImport: String
+    val libraryAddAction: String
+    val libraryNewLocalPack: String
+    val libraryImportPack: String
+    val createPackName: String
+    val createPackMc: String
+    val createPackLoader: String
+    val createPackLoaderVersion: String
+    val createPackConfirm: String
+    val createPackCancel: String
+    val createPackShowSnapshots: String
+    val createPackHideSnapshots: String
+    /** Localized label for a Modrinth category id (e.g. `optimization`); brands/unknowns fall back to a humanized form. */
+    fun modrinthCategory(id: String): String
 
     // --- Browse pack detail ---
     val browseDetailErrorTitle: String
@@ -715,6 +791,25 @@ interface AppStrings {
 
     // ── Library / PackDetail / Content tab ──────────────────────────────
     val contentTabUnsupportedOrigin: String
+    val contentDetachTitle: String
+    val contentDetachBody: String
+    /** Tracked mirror packs: optional mods already toggle; detach for the rest. */
+    val contentTrackedOptionalBody: String
+    val contentDetachButton: String
+    val contentAddFiles: String
+    val contentFindProjects: String
+    val contentSearchPlaceholder: String
+    val contentEmpty: String
+    val contentFilterAll: String
+    val contentFilterMods: String
+    val contentFilterResourcePacks: String
+    val contentFilterShaderPacks: String
+    val contentDeleteTitle: String
+    val contentDeleteBody: String
+    val contentActionDetails: String
+    val contentActionOpenPage: String
+    val contentDetailAuthors: String
+    val contentDetailSize: String
     val contentTabFetchErrorTitle: String
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String
@@ -820,8 +915,17 @@ interface AppStrings {
     fun notifPackRunning(packName: String): String
     fun notifPackFailed(packName: String): String
     fun notifPackSessionEnded(packName: String): String
+
+    // --- Notification driver templates (pack install lifecycle) ---
+    fun notifInstallSyncing(packName: String): String
+    fun notifInstallDone(packName: String): String
+    fun notifInstallFailed(packName: String): String
+    fun notifInstallCancelled(packName: String): String
+    val notifActionCancel: String
+
     val notifActionShowConsole: String
     val notifActionStop: String
+    val notifActionPlayOffline: String
     fun notifReasonExitCode(code: Int): String
     val notifReasonInternal: String
     fun notifReasonInternalDetail(detail: String): String
@@ -847,6 +951,7 @@ interface AppStrings {
     val homeQuickContinue: String
     val homeQuickStart: String
     val homeQuickButton: String
+    fun homeHeroPlaytime(hours: Long): String
     val launchTileReady: String
     val launchTileBlocked: String
 
@@ -857,12 +962,6 @@ interface AppStrings {
     val libraryHeaderSubtitle: String
 
     // --- Customization widget labels ---
-    val customGlassAlpha: String
-    val customCardCorner: String
-    val customCardBorder: String
-    val customButtonCorner: String
-    val customAnimSpeed: String
-    val customSoftGlow: String
 
     // --- Layout editor: common actions ---
     val editorClose: String
@@ -886,6 +985,35 @@ interface AppStrings {
     val recoverySafeModeTitle: String
     val recoverySafeModeBody: String
     val recoverySafeModeQuit: String
+
+    // --- Boot recovery mode (module toggles + resets; user-triggered or crash-latched) ---
+    val recoveryTitle: String
+    val recoveryBody: String
+    val recoveryModulesHeading: String
+    val recoveryModuleTray: String
+    val recoveryModuleNotify: String
+    val recoveryModuleSkinema: String
+    val recoveryModuleKeyring: String
+    val recoveryResetsHeading: String
+    val recoveryResetLayout: String
+    val recoveryResetCustomization: String
+    val recoveryResetSettings: String
+    val recoveryContinue: String
+    val recoveryRelaunchFailed: String
+    val recoveryRestartInApp: String
+
+    // Boot-threshold readout (pre-Koin boot screen). Lowercase by design --
+    // a BIOS-style readout, rendered via lowercase() at the call site.
+    val thresholdStageFiles: String
+    val thresholdStageNetwork: String
+    val thresholdStageMigration: String
+    val thresholdStageModules: String
+    val thresholdErrorTitle: String
+    val thresholdOpenLogs: String
+    val thresholdQuit: String
+
+    // Toast shown when the shell reloads itself after a recovered crash.
+    val recoveryReloadedNotice: String
     val editorSave: String
     val editorApply: String
     val editorExport: String
@@ -896,6 +1024,12 @@ interface AppStrings {
     val editorSlotRow: String
     val editorSlotGrid: String
     val editorSlotCanvas: String
+    val editorSlotCubeGrid: String
+    val editorSlotLayoutMenuTitle: String
+    val editorSlotGridColumns: String
+    val editorSlotGridColumnsDecrease: String
+    val editorSlotGridColumnsIncrease: String
+    val editorSlotLayoutHandle: String
 
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String
@@ -952,11 +1086,12 @@ interface AppStrings {
     val editorSurfShortRightRail: String
     val editorSurfShortAbout: String
     val editorSurfShortBg: String
-    val editorSurfShortStyle: String
     val editorSurfShortProfile: String
     val editorSurfShortServer: String
     val editorSurfShortTheme: String
     val editorSurfShortShell: String
+    val editorSurfShortTopBar: String
+    val editorSurfShortBody: String
 
     // --- Layout editor: surface long names ---
     val editorSurfHomeClassic: String
@@ -966,11 +1101,12 @@ interface AppStrings {
     val editorSurfRightRail: String
     val editorSurfAbout: String
     val editorSurfBg: String
-    val editorSurfStyle: String
     val editorSurfProfile: String
     val editorSurfServer: String
     val editorSurfTheme: String
     val editorSurfShell: String
+    val editorSurfTopBar: String
+    val editorSurfBody: String
 
     // --- Music player widgets ---
     val musicPlayerTitle: String
@@ -992,10 +1128,25 @@ interface AppStrings {
     val audioErrorDeviceBusy: String
     val audioErrorPlaybackFailed: String
 
+    // --- Video player ---
+    val videoFullscreen: String
+    val videoExitFullscreen: String
+    val videoMute: String
+    val videoUnmute: String
+    val videoReplay: String
+    val videoError: String
+    val videoLoading: String
+    val videoOpenInBrowser: String
+    val videoSkipBack: String
+    val videoSkipForward: String
+    val videoWidgetEmpty: String
+
     // --- Library pack card ---
     val packCardPlay: String
     val packCardSettings: String
     val packCardMore: String
+    val packCardDeleteTitle: String
+    val packCardDeleteBody: String
     val packCardNeverPlayed: String
     val packCardPlayedJustNow: String
     fun packCardPlayedMinutesAgo(n: Long): String

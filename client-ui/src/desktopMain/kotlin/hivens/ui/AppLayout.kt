@@ -5,55 +5,51 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
+import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
+import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
-import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.screens.settings.SettingsScreen
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.LocalStyle
+import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
-import hivens.ui.widgets.customization.CustomizationSurface
+import hivens.ui.widgets.profile.ProfileSurface
+import hivens.ui.widgets.wardrobe.WardrobeSurface
 import hivens.ui.widgets.serverdetails.ServerDetailsSurface
-import hivens.ui.widgets.themepicker.ThemePickerSurface
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.LocalStyle
-import hivens.ui.theme.CustomTheme
-import hivens.ui.editor.EditorSurfaceHost
-import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalShellContext
 import hivens.ui.widgets.shell.ShellContext
+import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -67,10 +63,19 @@ fun AppLayout(
     onCloseApp: () -> Unit,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
+    onBack: () -> Unit,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onForward: () -> Unit,
+    trail: List<Screen>,
+    onPopTo: (Screen) -> Unit,
     onLogin: (SessionData) -> Unit,
     onLogout: () -> Unit,
     isDarkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
+    themeMode: ThemeMode = ThemeMode.Manual,
+    onThemeModeChanged: (ThemeMode) -> Unit = {},
+    systemThemeAvailable: Boolean = false,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -92,9 +97,10 @@ fun AppLayout(
     }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
 
-    // When custom background is active, make the row transparent so image shows through
-    val rowBackground = if (backgroundSettings.enabled) Color.Transparent
-    else CelestiaTheme.colors.background
+    // Go transparent only when the wallpaper can actually be drawn -- a deleted
+    // image left the row transparent over a blank white window.
+    val rowBackground = if (backgroundSettings.hasUsableImage()) Color.Transparent
+    else NxTheme.colors.background
 
     val bypassHost = protocolConfig.sslBypassHost
     val bypassesList by NetworkState.bypassesState.collectAsState()
@@ -115,9 +121,14 @@ fun AppLayout(
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
-                        when {
-                            session != null -> when (homeView) {
-                                HomeView.Classic -> DashboardScreen(
+                        when (homeView) {
+                            // The classic dashboard IS the SmartyCraft server list, so it
+                            // is genuinely gated on auth. `Loading` is the brief window
+                            // between startup and resolved credentials -- spinner is
+                            // appropriate; `Unauthenticated` is a stable state waiting on
+                            // user input, so it gets the explicit sign-in copy + route.
+                            HomeView.Classic -> when {
+                                session != null -> DashboardScreen(
                                     session               = session,
                                     initialSelectedServer = selectedServer,
                                     onServerSelected      = { selectedServer = it },
@@ -126,23 +137,24 @@ fun AppLayout(
                                     onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
                                     onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
                                 )
-                                HomeView.LibraryFirst -> LibraryScreen(
-                                    appState       = appState,
-                                    onScreenChange = onScreenChange,
-                                )
-                                HomeView.New -> NewHomeScreen(
-                                    appState         = appState,
-                                    onScreenChange   = onScreenChange,
-                                    onSessionUpdated = { currentSession = it },
+                                appState is AppState.Loading -> ContentLoadingPlaceholder()
+                                else -> ContentLoginRequiredPlaceholder(
+                                    onSignIn = { onScreenChange(Screen.Profile) },
                                 )
                             }
-                            // `Loading` is the brief window between startup and resolved
-                            // credentials -- spinner is appropriate. `Unauthenticated` is
-                            // a stable state waiting on user input; show the explicit
-                            // "sign in" copy so the spinning placeholder doesn't read as
-                            // a stuck network request.
-                            appState is AppState.Loading -> ContentLoadingPlaceholder()
-                            else -> ContentLoginRequiredPlaceholder()
+                            // The pack-centric variants run on LOCAL data (pack repo,
+                            // layout graph) and render signed-out; their launch
+                            // affordances degrade per-widget (offline / sign-in)
+                            // instead of gating the whole page on an SC session.
+                            HomeView.LibraryFirst -> LibraryScreen(
+                                appState       = appState,
+                                onScreenChange = onScreenChange,
+                            )
+                            HomeView.New -> NewHomeScreen(
+                                appState         = appState,
+                                onScreenChange   = onScreenChange,
+                                onSessionUpdated = { currentSession = it },
+                            )
                         }
                     }
 
@@ -153,6 +165,9 @@ fun AppLayout(
                             onLogin       = onLogin,
                             onLogout      = onLogout,
                         )
+
+                    Screen.Wardrobe ->
+                        WardrobeSurface(session = currentSession, onBack = onBack)
 
                     Screen.Settings ->
                         SettingsScreen(
@@ -166,7 +181,6 @@ fun AppLayout(
                             uiStyle                      = uiStyle,
                             onUiStyleChanged             = onUiStyleChanged,
                             onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
-                            onOpenCustomizationExtension = { onScreenChange(Screen.CustomizationExtension) },
                             onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
 
@@ -175,38 +189,39 @@ fun AppLayout(
                             currentTheme    = customTheme,
                             onThemeSelected = { newTheme ->
                                 onCustomThemeChanged(newTheme)
-                                onScreenChange(Screen.Settings)
+                                onBack()
                             },
-                            onBack          = { onScreenChange(Screen.Settings) },
-                        )
-
-                    Screen.CustomizationExtension ->
-                        CustomizationSurface(
-                            currentSettings   = customization,
-                            onSettingsChanged = onCustomizationChanged,
-                            onBack            = { onScreenChange(Screen.Settings) },
+                            onBack          = onBack,
                         )
 
                     Screen.About ->
-                        AboutSurface(onBack = { onScreenChange(Screen.Settings) })
+                        AboutSurface(onBack = onBack)
 
                     Screen.BackgroundSettings ->
                         BgSettingsSurface(
                             currentSettings   = backgroundSettings,
                             onSettingsChanged = onBackgroundSettingsChanged,
-                            onBack            = { onScreenChange(Screen.Settings) },
+                            onBack            = onBack,
+                            isDarkTheme       = isDarkTheme,
+                            onToggleDarkTheme = onToggleDarkTheme,
+                            themeMode = themeMode,
+                            onThemeModeChanged = onThemeModeChanged,
+                            systemThemeAvailable = systemThemeAvailable,
+                            uiStyle           = uiStyle,
+                            onUiStyleChanged  = onUiStyleChanged,
+                            onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
 
                     is Screen.ServerSettings ->
                         ServerSettingsScreen(
                             server = screen.server,
-                            onBack = { onScreenChange(Screen.Home) }
+                            onBack = onBack
                         )
 
                     is Screen.ServerDetails ->
                         ServerDetailsSurface(
                             server = screen.server,
-                            onBack = { onScreenChange(Screen.Home) },
+                            onBack = onBack,
                         )
 
                     Screen.Library -> LibraryScreen(
@@ -215,13 +230,16 @@ fun AppLayout(
                     )
 
                     Screen.Browse  -> BrowseScreen(
-                        onOpenPack = { packId -> onScreenChange(Screen.BrowsePackDetail(packId)) },
+                        onOpenPack = { pack ->
+                            onScreenChange(Screen.CataloguePackDetail(pack.origin, pack.id))
+                        },
                     )
 
-                    is Screen.BrowsePackDetail ->
-                        hivens.ui.screens.browse.BrowsePackDetailScreen(
+                    is Screen.CataloguePackDetail ->
+                        hivens.ui.screens.browse.CataloguePackDetailScreen(
+                            origin      = screen.origin,
                             packId      = screen.packId,
-                            onBack      = { onScreenChange(Screen.Browse) },
+                            onBack      = onBack,
                             onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
                         )
 
@@ -229,7 +247,7 @@ fun AppLayout(
                         PackDetailScreen(
                             instanceId = screen.instanceId,
                             appState   = appState,
-                            onBack     = { onScreenChange(Screen.Library) },
+                            onBack     = onBack,
                         )
                 }
             }
@@ -244,6 +262,12 @@ fun AppLayout(
         onLogin         = onLogin,
         sslBypass       = sslBypass,
         centerBody      = centerBody,
+        trail           = trail,
+        canGoBack       = canGoBack,
+        canGoForward    = canGoForward,
+        onBack          = onBack,
+        onForward       = onForward,
+        onPopTo         = onPopTo,
     )
 
     // The editor host wraps the WHOLE shell (rails included) so its decorators
@@ -289,6 +313,7 @@ fun AppSidebar(
     PuppetClick("nav.library")  { onScreenChange(Screen.Library) }
     PuppetClick("nav.browse")   { onScreenChange(Screen.Browse) }
     PuppetClick("nav.profile") { onScreenChange(Screen.Profile) }
+    PuppetClick("nav.wardrobe") { onScreenChange(Screen.Wardrobe) }
     PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
     PuppetClick("nav.about")    { onScreenChange(Screen.About) }
     PuppetClick("nav.console")  {
@@ -310,19 +335,20 @@ fun AppSidebar(
     CompositionLocalProvider(LocalLeftRailContext provides ctx) {
         NavigationRail(
             modifier       = modifier,
-            containerColor = glassSurfaceAlpha(0.35f),
-            contentColor   = CelestiaTheme.colors.textSecondary
+            // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
+            // background now, so its frostTier drives the matte.
+            containerColor = Color.Transparent,
+            contentColor   = NxTheme.colors.textSecondary
         ) {
-            // Per-item spacing keeps the nav icons from jamming together (the
-            // slot's own Column defaults to 0 spacing). No leading spacer: each
-            // item's own height centers its icon with clickable breathing room,
-            // so the top edge has no dead (non-clickable) gap above the first
-            // entry. Spacers are layout, not content -- surface-owned so the
-            // top/bottom widgets need no ColumnScope for the weighted gap, and
-            // fillMaxWidth keeps the slot's Column at rail width so items center.
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 6.dp)
+            // Items sit flush (spacing 0) so the rail is one contiguous column
+            // of clickable slots with no dead gap between buttons. Each NavSlot
+            // is taller than its icon and centers it, so the breathing room is
+            // the slot's own padding -- and stays clickable. No leading spacer
+            // for the same reason; fillMaxWidth keeps the slot's Column at rail
+            // width so items center.
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 0.dp)
             Spacer(Modifier.weight(1f))
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 6.dp)
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 0.dp)
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -336,7 +362,7 @@ private const val SIDEBAR_SURFACE = "appshell.leftrail"
 private fun ContentLoadingPlaceholder() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            color       = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+            color       = NxTheme.colors.primary.copy(alpha = 0.35f),
             modifier    = Modifier.size(28.dp),
             strokeWidth = 2.dp
         )
@@ -344,30 +370,34 @@ private fun ContentLoadingPlaceholder() {
 }
 
 @Composable
-private fun ContentLoginRequiredPlaceholder() {
+private fun ContentLoginRequiredPlaceholder(onSignIn: () -> Unit) {
     val s = hivens.ui.i18n.LocalStrings.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Person,
+            Symbol(icon = NxIcon.Person,
                 contentDescription = null,
-                tint = CelestiaTheme.colors.primary.copy(alpha = 0.45f),
+                tint = NxTheme.colors.primary.copy(alpha = 0.45f),
                 modifier = Modifier.size(48.dp)
             )
             Text(
                 text = s.dashboardLoginRequiredTitle,
                 style = MaterialTheme.typography.titleMedium,
-                color = CelestiaTheme.colors.textPrimary
+                color = NxTheme.colors.textPrimary
             )
             Text(
                 text = s.dashboardLoginRequiredHint,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 360.dp)
+            )
+            NxButton(
+                label   = s.loginButton,
+                onClick = onSignIn,
+                style   = NxButtonStyle.Primary,
             )
         }
     }

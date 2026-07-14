@@ -16,11 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.launcher.smrt.DepGraph
-import hivens.launcher.smrt.ModRoleGroup
+import hivens.core.smrt.DepGraph
+import hivens.core.smrt.ModRoleGroup
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Renders one role group (Recipe viewer / Minimap / Waila / ...).
@@ -46,7 +46,7 @@ fun RoleGroupSection(
         modifier            = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.05f))
+            .background(NxTheme.colors.primary.copy(alpha = 0.05f))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -54,14 +54,14 @@ fun RoleGroupSection(
             Text(
                 text       = roleLabel(group.role, s),
                 style      = MaterialTheme.typography.labelLarge,
-                color      = CelestiaTheme.colors.primary,
+                color      = NxTheme.colors.primary,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(0.dp))
             Text(
                 text  = s.contentTabRoleAltCount(alternatives.size),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
 
@@ -71,7 +71,7 @@ fun RoleGroupSection(
             Text(
                 text  = s.contentTabRoleAlternativesHeader,
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
                 modifier = Modifier.padding(top = 4.dp),
             )
             alternatives.forEach { alt ->

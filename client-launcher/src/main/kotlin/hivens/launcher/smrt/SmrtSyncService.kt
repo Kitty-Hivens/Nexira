@@ -6,6 +6,7 @@ import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
 import hivens.launcher.FileDownloadService
 import hivens.launcher.ProtectedPaths
+import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.util.sha1Of
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ import java.util.Comparator
  */
 class SmrtSyncService(
     private val client: SmrtPackClient,
+    private val modrinth: ModrinthClient,
     private val protectedPaths: ProtectedPaths,
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
@@ -303,7 +305,7 @@ class SmrtSyncService(
         is SmrtSource.SmrtCache  -> source.url
         is SmrtSource.SmrtStatic -> source.url
         is SmrtSource.Modrinth   -> {
-            val v = client.resolveModrinthVersion(source.projectId, source.versionId)
+            val v = modrinth.resolveVersion(source.projectId, source.versionId)
             v.primaryFile().url
         }
         // Unreachable: downloadIfNeeded skips Unknown before resolving a URL.

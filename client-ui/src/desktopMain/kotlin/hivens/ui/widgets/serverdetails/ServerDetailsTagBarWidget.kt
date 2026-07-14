@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -34,13 +34,13 @@ private fun Tag(text: String) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.2f))
+            .background(NxTheme.colors.primary.copy(alpha = 0.2f))
             .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
             text       = text,
             style      = MaterialTheme.typography.bodySmall,
-            color      = CelestiaTheme.colors.primary,
+            color      = NxTheme.colors.primary,
             fontWeight = FontWeight.Bold,
         )
     }

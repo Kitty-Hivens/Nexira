@@ -1,35 +1,26 @@
 package hivens.ui.screens.detail
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,12 +35,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -58,34 +54,54 @@ import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import dev.hivens.skinema.compose.VideoScale
 import hivens.ui.AppState
+import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.RamSelector
+import hivens.ui.components.VideoMedia
+import hivens.ui.components.isVideoUrl
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxCalloutBanner
+import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.PlayButton
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
-import hivens.ui.i18n.LocalStrings
+import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.screens.library.FileBrowserPane
-import hivens.ui.screens.library.PackMetaChip
 import hivens.ui.screens.library.content.ContentTabPane
+import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.originGradient
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.decorativePair
+import hivens.ui.theme.origin
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
+import java.io.File
+import java.nio.file.Path
+import java.time.Duration
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
-import java.io.File
-import java.nio.file.Path
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
@@ -137,77 +153,73 @@ fun PackDetailScreen(
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
 
-    Column(Modifier.fillMaxSize()) {
-        Hero(pack = pack, onBack = onBack)
+    var showSettings by remember(pack.id) { mutableStateOf(false) }
+    val authedSession = (appState as? AppState.Authenticated)?.session
 
-        Column(
-            modifier            = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            MetaRow(pack)
-            val authedSession = (appState as? AppState.Authenticated)?.session
-            PlayBar(
-                pack    = pack,
-                enabled = authedSession != null,
-                onPlay  = {
-                    val session = authedSession ?: return@PlayBar
-                    // Observer first, then launch: the first-non-Idle
-                    // await needs to subscribe before Prepare fires.
+    Column(Modifier.fillMaxSize()) {
+        Hero(
+            pack           = pack,
+            playEnabled    = authedSession != null,
+            onBack         = onBack,
+            onPlay         = {
+                authedSession?.let { session ->
+                    // Observer first, then launch: the first-non-Idle await must
+                    // subscribe before Prepare fires.
                     launchDriver.observe(LaunchTarget.Pack(pack))
                     controller.launchPackInstance(session, pack)
-                },
+                }
+            },
+            onOpenSettings = { showSettings = true },
+            onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
+        )
+
+        // Import/provenance notice (e.g. a CurseForge import whose project/file-id
+        // mods need a manual download). It was only ever written to the instance and
+        // never shown, so a half-populated import read as an empty success.
+        if (pack.notes.isNotBlank()) {
+            NxCalloutBanner(
+                body     = pack.notes,
+                tone     = NxCalloutTone.Info,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
             )
         }
 
-        PrimaryTabRow(
-            selectedTabIndex = tabIndex,
-            containerColor   = Color.Transparent,
-            contentColor     = CelestiaTheme.colors.textPrimary,
-        ) {
-            Tab(
-                selected = tabIndex == 0,
-                onClick  = { tabIndex = 0 },
-                text     = { Text(s.packDetailTabContent, fontWeight = if (tabIndex == 0) FontWeight.Bold else FontWeight.Normal) },
-            )
-            Tab(
-                selected = tabIndex == 1,
-                onClick  = { tabIndex = 1 },
-                text     = { Text(s.packDetailTabFiles, fontWeight = if (tabIndex == 1) FontWeight.Bold else FontWeight.Normal) },
-            )
-            Tab(
-                selected = tabIndex == 2,
-                onClick  = { tabIndex = 2 },
-                text     = { Text(s.packDetailTabWorlds, fontWeight = if (tabIndex == 2) FontWeight.Bold else FontWeight.Normal) },
-            )
-            Tab(
-                selected = tabIndex == 3,
-                onClick  = { tabIndex = 3 },
-                text     = { Text(s.packDetailTabLogs, fontWeight = if (tabIndex == 3) FontWeight.Bold else FontWeight.Normal) },
-            )
-            Tab(
-                selected = tabIndex == 4,
-                onClick  = { tabIndex = 4 },
-                text     = { Text(s.packDetailTabSettings, fontWeight = if (tabIndex == 4) FontWeight.Bold else FontWeight.Normal) },
-            )
-        }
+        PackTabBar(selected = tabIndex, onSelect = { tabIndex = it })
 
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
             when (tabIndex) {
-                0 -> ContentTabPane(instance = pack)
+                0 -> ContentTabPane(
+                    instance = pack,
+                    onDetach = {
+                        // Become a Local instance the user owns; keep where it came
+                        // from in forkedFrom so provenance (and its art) survive.
+                        val detached = pack.copy(
+                            packRef    = pack.packRef.copy(origin = PackOrigin.Local),
+                            forkedFrom = pack.forkedFrom ?: pack.packRef,
+                        )
+                        instance = detached
+                        scope.launch { repo.put(detached) }
+                    },
+                )
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)
-                4 -> PackSettingsTab(
-                    runtime = pack.runtime,
-                    instanceDir = instanceDir,
-                    onRuntimeChange = { rt ->
-                        val updated = pack.copy(runtime = rt)
-                        instance = updated
-                        scope.launch { repo.put(updated) }
-                    },
-                )
             }
         }
+    }
+
+    if (showSettings) {
+        PackSettingsModal(
+            title           = s.packDetailTabSettings,
+            runtime         = pack.runtime,
+            instanceDir     = instanceDir,
+            onRuntimeChange = { rt ->
+                val updated = pack.copy(runtime = rt)
+                instance = updated
+                scope.launch { repo.put(updated) }
+            },
+            onDismiss       = { showSettings = false },
+        )
     }
 }
 
@@ -277,7 +289,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
                 onSelectGeneral = { selectedFile = null },
                 onSelectFile    = { selectedFile = it },
             )
-            HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.3f))
+            HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (source == null) {
                     // A file is selected but still reading -- show the spinner
@@ -326,25 +338,21 @@ private fun PackSettingsTab(
         resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = glassSurfaceAlpha(0.85f)) {
-        Column(Modifier.fillMaxSize().padding(24.dp)) {
-            RamSelector(
-                isAuto = isAutoMode,
-                resolvedAutoMb = resolvedAutoMb,
-                currentMb = memory,
-                onAutoSelected = {
-                    isAutoMode = true
-                    onRuntimeChange(runtime.copy(fixedMemory = false))
-                },
-                onValueChanged = {
-                    memory = it
-                    isAutoMode = false
-                    onRuntimeChange(runtime.copy(memoryMb = it, fixedMemory = true))
-                },
-                modifier = Modifier.widthIn(max = 560.dp),
-            )
-        }
-    }
+    RamSelector(
+        isAuto = isAutoMode,
+        resolvedAutoMb = resolvedAutoMb,
+        currentMb = memory,
+        onAutoSelected = {
+            isAutoMode = true
+            onRuntimeChange(runtime.copy(fixedMemory = false))
+        },
+        onValueChanged = {
+            memory = it
+            isAutoMode = false
+            onRuntimeChange(runtime.copy(memoryMb = it, fixedMemory = true))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 // List the instance's own log files, latest.log pinned first, then by
@@ -383,7 +391,7 @@ private fun LogSessionPicker(
     onSelectFile: (File) -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     var open by remember { mutableStateOf(false) }
 
     val currentLabel = selectedFile?.name ?: s.consoleSessionLive
@@ -397,41 +405,27 @@ private fun LogSessionPicker(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text       = s.consoleSessionPickerLabel(currentLabel),
-                color      = colors.textSecondary,
-                fontSize   = 11.sp,
-                fontFamily = LocalMonoFamily.current,
+                text     = s.consoleSessionPickerLabel(currentLabel),
+                color    = colors.textSecondary,
+                fontSize = 11.sp,
             )
-            Icon(
-                imageVector        = Icons.Default.ArrowDropDown,
+            Symbol(icon = NxIcon.ArrowDropDown,
                 contentDescription = null,
                 tint               = colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
             )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text    = {
-                    Text(
-                        s.consoleSessionLive,
-                        fontFamily = LocalMonoFamily.current,
-                        fontSize   = 11.sp,
-                        color      = if (selectedFile == null) colors.primary else colors.textPrimary,
-                    )
-                },
-                onClick = { onSelectGeneral(); open = false },
+        NxContextMenu(expanded = open, onDismissRequest = { open = false }) {
+            NxMenuItem(
+                label    = s.consoleSessionLive,
+                selected = selectedFile == null,
+                onClick  = { onSelectGeneral(); open = false },
             )
             files.forEach { f ->
-                DropdownMenuItem(
-                    text    = {
-                        Text(
-                            f.name,
-                            fontFamily = LocalMonoFamily.current,
-                            fontSize   = 11.sp,
-                            color      = if (f == selectedFile) colors.primary else colors.textPrimary,
-                        )
-                    },
-                    onClick = { onSelectFile(f); open = false },
+                NxMenuItem(
+                    label    = f.name,
+                    selected = f == selectedFile,
+                    onClick  = { onSelectFile(f); open = false },
                 )
             }
         }
@@ -439,105 +433,280 @@ private fun LogSessionPicker(
 }
 
 @Composable
-private fun Hero(pack: PackInstance, onBack: () -> Unit) {
-    val bg = CelestiaTheme.colors.originGradient(pack.packRef.origin)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(180.dp)
-            .background(bg),
-    ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
-
-        IconButton(
-            onClick  = onBack,
-            modifier = Modifier.padding(12.dp),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
-        }
-
-        Column(
-            modifier              = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 20.dp),
-            verticalArrangement   = Arrangement.Bottom,
-        ) {
-            Text(
-                text       = pack.displayName,
-                style      = MaterialTheme.typography.headlineMedium,
-                color      = Color.White,
-                fontWeight = FontWeight.Bold,
-            )
-            pack.forkedFrom?.let {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text  = "Fork: ${it.origin.name} / ${it.id}" + (it.version?.let { v -> " @ $v" } ?: ""),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MetaRow(pack: PackInstance) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-    ) {
-        PackMetaChip(pack.packRef.origin.name)
-        PackMetaChip(pack.packRef.version ?: "—")
-        PackMetaChip(pack.instanceDirName, emphasis = false)
-    }
-}
-
-@Composable
-private fun PlayBar(
+private fun Hero(
     pack: PackInstance,
-    enabled: Boolean,
+    playEnabled: Boolean,
+    onBack: () -> Unit,
     onPlay: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenFolder: () -> Unit,
 ) {
     val s = LocalStrings.current
+    val art = rememberPackArt(pack)
+    val bannerUrl = art.bannerUrl
+    val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
+    var bannerFullscreen by remember(bannerUrl) { mutableStateOf(false) }
+    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
+    // Floated card treatment: the app's cards round via the cardCorner token,
+    // and a full-bleed square banner read as a foreign element next to them.
     Box(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.7f))
-            .padding(16.dp),
+            .padding(start = 16.dp, top = 8.dp, end = 16.dp)
+            .height(196.dp)
+            .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
     ) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column {
-                Text(
-                    text       = if (enabled) s.packDetailReadyTitle else s.packDetailPlayLoginRequired,
-                    style      = MaterialTheme.typography.titleMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
+        // Pixel-art base -> real banner -> scrim, same layering as the cards.
+        Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
+        if (bannerUrl != null) {
+            if (bannerIsVideo) {
+                VideoMedia(
+                    url          = bannerUrl,
+                    modifier     = Modifier.fillMaxSize(),
+                    autoPlay     = true,
+                    loop         = true,
+                    audio        = false,
+                    startMuted   = true,
+                    showControls = false,
+                    scale        = VideoScale.Cover,
                 )
-                Text(
-                    text  = s.packDetailInstanceDirHint(pack.instanceDirName),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+            } else {
+                AsyncImage(
+                    model              = bannerUrl,
+                    contentDescription = null,
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier.fillMaxSize(),
                 )
             }
-            Button(
-                onClick        = onPlay,
-                enabled        = enabled,
-                shape          = MaterialTheme.shapes.small,
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-                colors         = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
+        }
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (bannerUrl != null) 0.5f else 0.4f)))
+
+        // Top row: folder + settings (end). Back lives in the top-bar breadcrumb
+        // now, so the hero no longer draws its own arrow.
+        Row(
+            modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            Row {
+                if (bannerIsVideo) HeroAction(NxIcon.OpenInFull, s.videoFullscreen) { bannerFullscreen = true }
+                HeroAction(NxIcon.FolderOpen, null, onOpenFolder)
+                HeroAction(NxIcon.Settings, s.packCardSettings, onOpenSettings)
+            }
+        }
+
+        // Bottom row: avatar + name + chips, Play pinned to the end. Sheds the
+        // hours, then the source chip, and collapses Play to an icon as the hero
+        // narrows (right panel open / small window).
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val showPlaytime = maxWidth >= 560.dp
+            val showSource   = maxWidth >= 460.dp
+            val playIconOnly = maxWidth < 500.dp
+            Row(
+                modifier              = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 52.dp, bottom = 20.dp),
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(s.packDetailPlay, fontWeight = FontWeight.Bold)
+                HeroAvatar(iconUrl = art.iconUrl, displayName = pack.displayName, hue = hueA)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text       = pack.displayName,
+                        style      = MaterialTheme.typography.headlineMedium,
+                        color      = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        maxLines   = 2,
+                        overflow   = TextOverflow.Ellipsis,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (showSource) SourceChip(pack.packRef.origin)
+                        pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
+                        if (showPlaytime && pack.playtimeSeconds > 0L) HeroChip(playtimeLabel(pack.playtimeSeconds))
+                        HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
+                    }
+                }
+                PlayButton(
+                    label    = s.packDetailPlay,
+                    onClick  = onPlay,
+                    enabled  = playEnabled,
+                    iconOnly = playIconOnly,
+                )
             }
         }
     }
+    if (bannerFullscreen && bannerUrl != null) {
+        FullscreenVideo(url = bannerUrl, onDismiss = { bannerFullscreen = false })
+    }
+}
+
+@Composable
+private fun HeroAction(icon: IconKey, contentDescription: String?, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Symbol(icon, contentDescription = contentDescription, tint = Color.White)
+    }
+}
+
+/**
+ * Compact pill tab strip, left-aligned -- Material's PrimaryTabRow read too big
+ * and stretched. FlowRow (not Row) so a narrow content area (the right panel
+ * eats width) wraps the trailing pills to a second line instead of clipping
+ * Worlds / Logs off the right edge.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
+    val s = LocalStrings.current
+    val tabs = listOf(
+        NxIcon.Widgets to s.packDetailTabContent,
+        NxIcon.FolderOpen to s.packDetailTabFiles,
+        NxIcon.Public to s.packDetailTabWorlds,
+        NxIcon.Description to s.packDetailTabLogs,
+    )
+    FlowRow(
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement   = Arrangement.spacedBy(6.dp),
+    ) {
+        tabs.forEachIndexed { i, (icon, label) ->
+            val active = i == selected
+            val tint = if (active) Color.White else NxTheme.colors.textSecondary
+            Row(
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .background(if (active) NxTheme.colors.primary else glassSurfaceAlpha(0.5f))
+                    .clickable { onSelect(i) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Symbol(icon, contentDescription = null, tint = tint, size = 16.dp)
+                Text(
+                    text       = label,
+                    style      = MaterialTheme.typography.labelLarge,
+                    color      = tint,
+                    maxLines   = 1,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceChip(origin: PackOrigin) {
+    val label = when (origin) {
+        PackOrigin.Mirror      -> "Mirror"
+        PackOrigin.Modrinth    -> "Modrinth"
+        PackOrigin.Smartycraft -> "SmartyCraft"
+        PackOrigin.Local       -> "Local"
+        PackOrigin.Unknown     -> "Other"
+    }
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(NxTheme.colors.origin(origin).copy(alpha = 0.9f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun HeroChip(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(Color.Black.copy(alpha = 0.4f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f))
+    }
+}
+
+private fun loaderMcLabel(m: CachedManifestSnapshot): String {
+    val loader = m.loaderName
+        .takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
+        ?.replaceFirstChar(Char::uppercase)
+    return listOfNotNull(loader, m.minecraftVersion).joinToString(" ")
+}
+
+private fun playtimeLabel(seconds: Long): String {
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    return if (hours > 0) "${hours}h" else "${minutes}m"
+}
+
+private fun lastPlayedShort(epoch: Long, s: AppStrings): String {
+    if (epoch <= 0L) return s.packCardNeverPlayed
+    val dur = Duration.between(Instant.ofEpochSecond(epoch), Instant.now())
+    return when {
+        dur.toMinutes() < 1  -> s.packCardPlayedJustNow
+        dur.toHours()   < 1  -> s.packCardPlayedMinutesAgo(dur.toMinutes())
+        dur.toDays()    < 1  -> s.packCardPlayedHoursAgo(dur.toHours())
+        dur.toDays()    < 14 -> s.packCardPlayedDaysAgo(dur.toDays())
+        else                 -> s.packCardPlayedLongAgo
+    }
+}
+
+@Composable
+private fun PackSettingsModal(
+    title: String,
+    runtime: InstanceRuntime,
+    instanceDir: Path,
+    onRuntimeChange: (InstanceRuntime) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val scrim = remember { MutableInteractionSource() }
+    val card = remember { MutableInteractionSource() }
+    Box(
+        modifier         = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(interactionSource = scrim, indication = null, onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier
+                .widthIn(max = 620.dp)
+                .fillMaxWidth(0.7f)
+                .clickable(interactionSource = card, indication = null, onClick = {}),
+            shape    = MaterialTheme.shapes.medium,
+            color    = NxTheme.colors.surface,
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onDismiss) { Symbol(NxIcon.Close, contentDescription = null, tint = NxTheme.colors.textSecondary) }
+                }
+                PackSettingsTab(runtime = runtime, instanceDir = instanceDir, onRuntimeChange = onRuntimeChange)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroAvatar(iconUrl: String?, displayName: String, hue: Color) {
+    val initials = displayName
+        .split(' ', '-', '_')
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercaseChar().toString() }
+        .ifEmpty { "?" }
+    SubcomposeAsyncImage(
+        model              = iconUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = Modifier.size(72.dp).clip(RoundedCornerShape(14.dp)),
+        loading            = { Box(Modifier.fillMaxSize().background(hue)) },
+        error              = {
+            Box(Modifier.fillMaxSize().background(hue), contentAlignment = Alignment.Center) {
+                Text(initials, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+        },
+    )
 }
 
 @Composable
@@ -545,9 +714,9 @@ private fun NotFound(onBack: () -> Unit) {
     val s = LocalStrings.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = CelestiaTheme.colors.textPrimary)
-            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
-            Button(onClick = onBack) { Text(s.packDetailNotFoundBack) }
+            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary)
+            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+            NxButton(label = s.packDetailNotFoundBack, onClick = onBack)
         }
     }
 }

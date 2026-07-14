@@ -8,14 +8,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -28,13 +26,14 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
-import androidx.compose.ui.geometry.Offset
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -106,7 +105,7 @@ fun CompactNewsFeed(
                 text       = s.newsTitle,
                 style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
-                color      = CelestiaTheme.colors.textSecondary,
+                color      = NxTheme.colors.textSecondary,
                 modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
             )
             HorizontalDivider(color = glassSurfaceAlpha(0.6f))
@@ -136,7 +135,7 @@ fun CompactNewsFeed(
                         Text(
                             text  = s.newsEmpty,
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                         // Explicit retry covers the "network came back but no
                         // toggle was touched" path -- the LaunchedEffect above
@@ -154,7 +153,7 @@ fun CompactNewsFeed(
                     Text(
                         text  = s.newsEmpty,
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
 
@@ -189,10 +188,9 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
             .background(glassSurfaceAlpha(0.4f))
             .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
     ) {
-        Icon(
-            imageVector        = Icons.Default.Search,
+        Symbol(icon = NxIcon.Search,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+            tint               = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
             modifier           = Modifier.size(14.dp),
         )
         Spacer(Modifier.width(6.dp))
@@ -201,24 +199,23 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
                 value         = query,
                 onValueChange = onQueryChange,
                 singleLine    = true,
-                textStyle     = MaterialTheme.typography.bodySmall.copy(color = CelestiaTheme.colors.textPrimary),
-                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
                 modifier      = Modifier.fillMaxWidth(),
             )
             if (query.isEmpty()) {
                 Text(
                     text  = s.newsFilterPlaceholder,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
                 )
             }
         }
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(20.dp)) {
-                Icon(
-                    imageVector        = Icons.Default.Close,
+                Symbol(icon = NxIcon.Close,
                     contentDescription = s.newsFilterClear,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(12.dp),
                 )
             }
@@ -339,7 +336,7 @@ private fun CompactNewsItem(item: NewsItem) {
             modifier = Modifier
                 .size(38.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(CelestiaTheme.colors.surface)
+                .background(NxTheme.colors.surface)
         ) {
             if (item.imageUrl != null) {
                 AsyncImage(
@@ -359,7 +356,7 @@ private fun CompactNewsItem(item: NewsItem) {
                 text       = item.title,
                 style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 maxLines   = 2,
                 overflow   = TextOverflow.Ellipsis
             )
@@ -367,7 +364,7 @@ private fun CompactNewsItem(item: NewsItem) {
             Text(
                 text  = item.date,
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.primary.copy(alpha = 0.7f)
+                color = NxTheme.colors.primary.copy(alpha = 0.7f)
             )
         }
 
@@ -376,7 +373,7 @@ private fun CompactNewsItem(item: NewsItem) {
             Text(
                 text  = "›",
                 style = MaterialTheme.typography.bodyMedium,
-                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+                color = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
             )
         }
     }

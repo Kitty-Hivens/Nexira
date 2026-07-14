@@ -2,6 +2,7 @@ package hivens.ui.screens.library.content
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,15 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,10 +31,15 @@ import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtRequirement
-import hivens.launcher.smrt.DepGraph
+import hivens.core.smrt.DepGraph
+import hivens.ui.components.SourceBadge
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.theme.NxTheme
 import java.awt.Desktop
 import java.net.URI
 
@@ -91,7 +89,7 @@ fun ModRowPanel(
             if (toggle != null) {
                 Checkbox(
                     checked         = toggle.checked,
-                    onCheckedChange = if (toggle.locked) null else toggle.onToggle,
+                    onCheckedChange = if (toggle.locked) null else { enable -> toggle.onToggle(mod.filename, enable) },
                     enabled         = !toggle.locked,
                     modifier        = Modifier.size(24.dp),
                 )
@@ -100,7 +98,7 @@ fun ModRowPanel(
             Row(
                 modifier              = Modifier
                     .weight(1f)
-                    .clickable { expanded = !expanded },
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { expanded = !expanded },
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -110,7 +108,7 @@ fun ModRowPanel(
                     Text(
                         text           = mod.display?.name ?: mod.filename.removeSuffix(".jar"),
                         style          = MaterialTheme.typography.bodyMedium,
-                        color          = CelestiaTheme.colors.textPrimary.copy(alpha = rowAlpha),
+                        color          = NxTheme.colors.textPrimary.copy(alpha = rowAlpha),
                         fontWeight     = if (emphasis == Emphasis.Primary) FontWeight.SemiBold else FontWeight.Normal,
                         textDecoration = titleDecoration,
                         maxLines       = 1,
@@ -120,17 +118,16 @@ fun ModRowPanel(
                         Text(
                             text  = cat,
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary.copy(alpha = rowAlpha),
+                            color = NxTheme.colors.textSecondary.copy(alpha = rowAlpha),
                         )
                     }
                 }
 
                 SourceBadge(mod.source)
 
-                Icon(
-                    imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(20.dp),
                 )
             }
@@ -150,11 +147,15 @@ enum class Emphasis { Primary, Alternative }
  * checked, disabled box; otherwise [checked] is the optional mod's current state
  * and [onToggle] flips it. Null on a [ModRowPanel] means no checkbox (e.g. a
  * role-group alternative, where selection is its own UI).
+ *
+ * [onToggle] takes the mod's filename so a single hoisted callback can serve
+ * every row -- a per-row closure would change ModToggle's identity each
+ * recompose and stop ModRowPanel from skipping.
  */
 data class ModToggle(
     val checked: Boolean,
     val locked: Boolean,
-    val onToggle: (Boolean) -> Unit,
+    val onToggle: (filename: String, enable: Boolean) -> Unit,
 )
 
 @Composable
@@ -169,14 +170,14 @@ private fun ExpandedDetails(mod: SmrtModEntry, graph: DepGraph) {
             Text(
                 text  = s.contentTabModNoDescription,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
 
         // License + URL chip row.
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             mod.display?.license?.takeIf { it.isNotBlank() }?.let { lic ->
-                MetaChip(text = s.contentTabModLicensePrefix(lic))
+                NxMetaChip(text = s.contentTabModLicensePrefix(lic))
             }
             mod.display?.url?.takeIf { it.isNotBlank() }?.let { url ->
                 LinkChip(text = s.contentTabModUrlLabel, url = url)
@@ -184,7 +185,7 @@ private fun ExpandedDetails(mod: SmrtModEntry, graph: DepGraph) {
             Text(
                 text  = s.contentTabModSizeLabel(mod.sizeBytes / 1024L),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
 
@@ -213,7 +214,7 @@ private fun DependenciesSubsection(mod: SmrtModEntry, graph: DepGraph) {
         modifier              = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
-            .clickable(enabled = !empty) { open = !open }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, enabled = !empty) { open = !open }
             .padding(vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -221,23 +222,22 @@ private fun DependenciesSubsection(mod: SmrtModEntry, graph: DepGraph) {
         Text(
             text  = s.contentTabModDependencies(depEdges.size + missing.size),
             style = MaterialTheme.typography.labelMedium,
-            color = CelestiaTheme.colors.textPrimary,
+            color = NxTheme.colors.textPrimary,
         )
         if (!empty) {
-            Icon(
-                imageVector        = if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            Symbol(icon = if (open) NxIcon.ExpandLess else NxIcon.ExpandMore,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
             )
         }
         if (missing.isNotEmpty()) {
             Spacer(Modifier.width(4.dp))
-            Icon(Icons.Default.Warning, contentDescription = null, tint = CelestiaTheme.colors.error, modifier = Modifier.size(14.dp))
+            Symbol(NxIcon.Warning, contentDescription = null, tint = NxTheme.colors.error, modifier = Modifier.size(14.dp))
             Text(
                 text  = s.contentTabModMissingCount(missing.size),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.error,
+                color = NxTheme.colors.error,
             )
         }
     }
@@ -275,39 +275,17 @@ private fun DependencyRow(filename: String, versionRange: String?, optional: Boo
         Box(
             modifier         = Modifier
                 .size(6.dp)
-                .background(if (missing) CelestiaTheme.colors.error else CelestiaTheme.colors.primary.copy(alpha = 0.7f)),
+                .background(if (missing) NxTheme.colors.error else NxTheme.colors.primary.copy(alpha = 0.7f)),
         )
         Text(
             text  = filename,
             style = MaterialTheme.typography.bodySmall,
-            color = if (missing) CelestiaTheme.colors.error else CelestiaTheme.colors.textPrimary,
+            color = if (missing) NxTheme.colors.error else NxTheme.colors.textPrimary,
         )
-        if (versionRange != null) MetaChip(text = versionRange)
-        if (optional)             MetaChip(text = s.contentTabDepOptional)
-        if (missing)              MetaChip(text = s.contentTabDepMissing, error = true)
+        if (versionRange != null) NxMetaChip(text = versionRange)
+        if (optional)             NxMetaChip(text = s.contentTabDepOptional)
+        if (missing)              NxMetaChip(text = s.contentTabDepMissing, tone = NxMetaChipTone.Error)
     }
-}
-
-@Composable
-private fun MetaChip(text: String, error: Boolean = false) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        shape   = MaterialTheme.shapes.extraSmall,
-        label   = {
-            Text(
-                text  = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (error) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
-            )
-        },
-        colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (error) CelestiaTheme.colors.error.copy(alpha = 0.15f)
-                                     else CelestiaTheme.colors.outline.copy(alpha = 0.2f),
-            disabledLabelColor     = if (error) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
-        ),
-        border  = null,
-    )
 }
 
 @Composable
@@ -315,17 +293,17 @@ private fun LinkChip(text: String, url: String) {
     Row(
         modifier              = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.2f))
+            .background(NxTheme.colors.primary.copy(alpha = 0.2f))
             .clickable { runCatching { Desktop.getDesktop().browse(URI(url)) } }
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(12.dp))
+        Symbol(NxIcon.OpenInNew, contentDescription = null, tint = NxTheme.colors.primary, modifier = Modifier.size(12.dp))
         Text(
             text  = text,
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.primary,
+            color = NxTheme.colors.primary,
             fontWeight = FontWeight.SemiBold,
         )
     }

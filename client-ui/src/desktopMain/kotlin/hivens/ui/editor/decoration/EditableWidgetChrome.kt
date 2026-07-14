@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
@@ -14,26 +13,18 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.FlipToBack
-import androidx.compose.material.icons.filled.FlipToFront
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,12 +41,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -66,15 +61,22 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.canvasDragOffset
 import hivens.ui.editor.canvasResizeSize
+import hivens.ui.editor.cubeDragCell
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalCanvasSlotSizeDp
+import hivens.widget.api.LocalCubeGeometry
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
+import hivens.widget.model.GridCell
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
@@ -123,6 +125,7 @@ fun EditableWidgetChrome(
 
     val isRow = orientation == SlotOrientation.Row
     val isCanvas = orientation == SlotOrientation.Canvas
+    val isCubeGrid = orientation == SlotOrientation.CubeGrid
     // Live placement read from inside the long-lived drag gesture: the
     // pointerInput is keyed only on instanceId so it does not restart
     // mid-drag, and without this the gesture would capture a stale start
@@ -131,6 +134,14 @@ fun EditableWidgetChrome(
     // Live canvas slot size for the move-clamp (published by SlotRenderer's
     // Canvas branch; Zero outside a Canvas slot disables clamping).
     val liveSlotSize = rememberUpdatedState(LocalCanvasSlotSizeDp.current)
+    // Cube-grid move: the widget's current cell + the slot's cell geometry, read
+    // live so the long-lived gesture sees the latest values. cubeDrag is the
+    // in-flight visual translation, committed to a target cell on release.
+    val liveCell = rememberUpdatedState(instance.cell)
+    val cubeGeo = rememberUpdatedState(LocalCubeGeometry.current)
+    var cubeDrag by remember { mutableStateOf(Offset.Zero) }
+    // Cursor anchor for the right-click context menu (null = closed).
+    var menuAnchor by remember { mutableStateOf<Offset?>(null) }
     val resizeCursor = remember { PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)) }
 
     // Drop-indicator hit test. Reading controller.active recomposes on
@@ -176,10 +187,18 @@ fun EditableWidgetChrome(
         label         = "edit-source-alpha",
     )
     val borderAlpha by animateFloatAsState(
-        targetValue   = if (isHovered) 0.50f + depthBoost else 0.10f + depthBoost,
+        // Resting outline in edit mode: every widget's bounds must stay legible, since the
+        // hover affordance buttons that used to advertise "this is an editable widget" were
+        // removed -- without a resting cue the user can't tell a widget from the empty slot
+        // around it (and right-clicks / drags then land on the slot). It strengthens under
+        // the pointer. Drawn inside the widget's bounds (drawWithContent), so no reflow.
+        targetValue   = if (isHovered) 0.55f + depthBoost else 0.22f + depthBoost,
         animationSpec = tween(chromeMotionMs),
         label         = "edit-border-alpha",
     )
+    // Captured here because NxTheme.colors is a @Composable read; the draw lambda
+    // applies the animated alpha (a snapshot read, so it redraws without recomposing).
+    val borderColor = NxTheme.colors.primary
 
     // Bordered widget + hover handles. Box-scoped so the AnimatedVisibility
     // buttons use plain BoxScope `.align` -- no this@Column / this@Row
@@ -187,19 +206,34 @@ fun EditableWidgetChrome(
     val widgetBox: @Composable () -> Unit = {
         Box(
             modifier = Modifier
-                .then(if (isRow) Modifier.padding(horizontal = 4.dp) else Modifier.padding(vertical = 4.dp))
+                // A cube widget owns its whole cell: fill it so the hover border and the
+                // matchParentSize body overlay cover the cell, not just the (smaller)
+                // content -- otherwise a right-click on the empty cell area / gutter falls
+                // through to the slot chrome and opens the layout menu. Edit-mode only
+                // (the decorator is identity in production, so the cell renders as before).
+                .then(if (isCubeGrid) Modifier.fillMaxSize() else Modifier)
+                // Live cube-move translation; zero except while dragging a cube widget.
+                .graphicsLayer { translationX = cubeDrag.x; translationY = cubeDrag.y }
                 .hoverable(interaction)
-                .padding(2.dp)
-                .border(
-                    width = 1.dp,
-                    color = CelestiaTheme.colors.primary.copy(alpha = borderAlpha),
-                    shape = RoundedCornerShape(8.dp),
-                )
+                // Hover border drawn INSIDE the widget's own bounds (drawWithContent,
+                // not Modifier.border on a padded box) so edit mode never reflows the
+                // layout -- the old padding(4) + padding(2) added ~12dp per widget and
+                // shifted the whole surface down on entering edit mode.
+                .drawWithContent {
+                    drawContent()
+                    val strokePx = 1.dp.toPx()
+                    val edge     = strokePx / 2f
+                    val radius   = 8.dp.toPx()
+                    drawRoundRect(
+                        color        = borderColor.copy(alpha = borderAlpha),
+                        topLeft      = Offset(edge, edge),
+                        size         = Size(size.width - strokePx, size.height - strokePx),
+                        cornerRadius = CornerRadius(radius, radius),
+                        style        = Stroke(width = strokePx),
+                    )
+                }
                 .onGloballyPositioned { coords: LayoutCoordinates ->
-                    // Register AFTER padding+border so the hit-test rect includes
-                    // the visible border pad (edge drops land on the widget, not
-                    // the parent slot). Single registration -- the .widgetBounds
-                    // modifier was a redundant duplicate of this.
+                    // Register the widget's own bounds for the drop hit-test.
                     val rect = coords.boundsInWindow()
                     widgetWindowBounds = rect
                     registry.registerWidget(path, instance.instanceId, index, rect)
@@ -216,6 +250,25 @@ fun EditableWidgetChrome(
             Box(
                 Modifier
                     .matchParentSize()
+                    .pointerInput(instance.instanceId) {
+                        // Right-click detection. The drag gesture below starts with
+                        // awaitFirstDown, which fires ONLY on the primary (left) button --
+                        // so a bare right-click never reached the widget and fell through to
+                        // the slot chrome (which opened the layout menu). Detect the secondary
+                        // press with raw events instead, consume it on the Main pass (so the
+                        // slot's Final-pass handler sees it consumed and defers), then open the
+                        // widget context menu at the cursor.
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: continue
+                                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed && !change.isConsumed) {
+                                    change.consume()
+                                    widgetWindowBounds?.let { menuAnchor = it.topLeft + change.position }
+                                }
+                            }
+                        }
+                    }
                     .pointerInput(instance.instanceId, isCanvas) {
                         awaitEachGesture {
                             // requireUnconsumed: yield to the hover affordances
@@ -224,116 +277,84 @@ fun EditableWidgetChrome(
                             val down = awaitFirstDown(requireUnconsumed = true)
                             // Claim the press so a tap never reaches the content.
                             down.consume()
-                            if (isCanvas) {
-                                // Absolute move: apply each frame's delta to the
-                                // current (already-clamped) position and re-seat,
-                                // so dragging past an edge and back responds at
-                                // once -- no dead-zone from an unbounded
-                                // accumulator. canvasDragOffset clamps the output.
-                                val p = liveCanvas.value
-                                var curX = p?.x ?: 0f
-                                var curY = p?.y ?: 0f
-                                drag(down.id) { change ->
-                                    val slot = liveSlotSize.value
-                                    val wb = widgetWindowBounds
-                                    val (nx, ny) = canvasDragOffset(
-                                        curX, curY,
-                                        change.positionChange().x, change.positionChange().y,
-                                        density,
-                                        slotWDp   = slot.width,
-                                        slotHDp   = slot.height,
-                                        widgetWDp = (wb?.width ?: 0f) / density,
-                                        widgetHDp = (wb?.height ?: 0f) / density,
-                                    )
-                                    curX = nx
-                                    curY = ny
-                                    editController.setWidgetOffset(path, instance.instanceId, nx, ny)
-                                    change.consume()
-                                }
-                            } else {
-                                // Flow reorder: drive the existing DnD controller
-                                // once past the touch slop (a tap is swallowed).
-                                val slop = awaitTouchSlopOrCancellation(down.id) { c, _ -> c.consume() }
-                                    ?: return@awaitEachGesture
-                                val bounds = widgetWindowBounds ?: return@awaitEachGesture
-                                controller.begin(
-                                    payload         = DragPayload.ExistingWidget(path, index, instance),
-                                    pointerInWindow = bounds.topLeft + slop.position,
-                                    pickupOffset    = slop.position,
-                                    widgetSize      = Offset(bounds.width, bounds.height),
-                                    ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
-                                )
-                                var last = bounds.topLeft + slop.position
-                                drag(slop.id) { change ->
-                                    val wb = widgetWindowBounds
-                                    if (wb != null) {
-                                        last = wb.topLeft + change.position
-                                        controller.update(last)
+                            when {
+                                isCanvas -> {
+                                    // Absolute move: apply each frame's delta to the
+                                    // current (already-clamped) position and re-seat,
+                                    // so dragging past an edge and back responds at
+                                    // once -- no dead-zone from an unbounded
+                                    // accumulator. canvasDragOffset clamps the output.
+                                    val p = liveCanvas.value
+                                    var curX = p?.x ?: 0f
+                                    var curY = p?.y ?: 0f
+                                    drag(down.id) { change ->
+                                        val slot = liveSlotSize.value
+                                        val wb = widgetWindowBounds
+                                        val (nx, ny) = canvasDragOffset(
+                                            curX, curY,
+                                            change.positionChange().x, change.positionChange().y,
+                                            density,
+                                            slotWDp   = slot.width,
+                                            slotHDp   = slot.height,
+                                            widgetWDp = (wb?.width ?: 0f) / density,
+                                            widgetHDp = (wb?.height ?: 0f) / density,
+                                        )
+                                        curX = nx
+                                        curY = ny
+                                        editController.setWidgetOffset(path, instance.instanceId, nx, ny)
+                                        change.consume()
                                     }
-                                    change.consume()
                                 }
-                                onCommitDrop(last)
-                                controller.end()
+                                isCubeGrid -> {
+                                    // Cube move: follow the pointer live (cubeDrag), then
+                                    // commit to the nearest cell on release. placeWidgetInCell
+                                    // resolves collisions + compacts, so the grid reflows.
+                                    val start = liveCell.value ?: GridCell()
+                                    var acc = Offset.Zero
+                                    drag(down.id) { change ->
+                                        acc += change.positionChange()
+                                        cubeDrag = acc
+                                        change.consume()
+                                    }
+                                    cubeGeo.value?.let { geo ->
+                                        val (col, row) = cubeDragCell(
+                                            start.col, start.row,
+                                            acc.x, acc.y, density,
+                                            geo.cellWidthDp, geo.gutterDp, geo.columns,
+                                        )
+                                        editController.moveWidgetToCell(path, instance.instanceId, col, row, geo.columns)
+                                    }
+                                    cubeDrag = Offset.Zero
+                                }
+                                else -> {
+                                    // Flow reorder: drive the existing DnD controller
+                                    // once past the touch slop (a tap is swallowed).
+                                    val slop = awaitTouchSlopOrCancellation(down.id) { c, _ -> c.consume() }
+                                        ?: return@awaitEachGesture
+                                    val bounds = widgetWindowBounds ?: return@awaitEachGesture
+                                    controller.begin(
+                                        payload         = DragPayload.ExistingWidget(path, index, instance),
+                                        pointerInWindow = bounds.topLeft + slop.position,
+                                        pickupOffset    = slop.position,
+                                        widgetSize      = Offset(bounds.width, bounds.height),
+                                        ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
+                                    )
+                                    var last = bounds.topLeft + slop.position
+                                    drag(slop.id) { change ->
+                                        val wb = widgetWindowBounds
+                                        if (wb != null) {
+                                            last = wb.topLeft + change.position
+                                            controller.update(last)
+                                        }
+                                        change.consume()
+                                    }
+                                    onCommitDrop(last)
+                                    controller.end()
+                                }
                             }
                         }
                     },
             )
-
-            // Hover affordances, stacked vertically at the top-right so they
-            // fit narrow widgets (the 64dp rail) instead of overflowing a row.
-            // Each uses the Release-consume tap pattern so a tap acts without
-            // starting the body drag overlay.
-            Column(
-                modifier            = Modifier.align(Alignment.TopEnd).padding(3.dp),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                // Z-order (Canvas only): bring to front / send to back. Overlap
-                // is meaningful only under free placement.
-                if (isCanvas) {
-                    AnimatedVisibility(
-                        visible = isHovered,
-                        enter   = fadeIn(tween(chromeMotionMs)),
-                        exit    = fadeOut(tween(chromeMotionMs)),
-                    ) {
-                        AffordanceButton(Icons.Default.FlipToFront, s.editorToFront, CelestiaTheme.colors.primary, instance.instanceId) {
-                            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
-                            editController.setWidgetZ(path, instance.instanceId, maxZ + 1)
-                        }
-                    }
-                    AnimatedVisibility(
-                        visible = isHovered,
-                        enter   = fadeIn(tween(chromeMotionMs)),
-                        exit    = fadeOut(tween(chromeMotionMs)),
-                    ) {
-                        AffordanceButton(Icons.Default.FlipToBack, s.editorToBack, CelestiaTheme.colors.primary, instance.instanceId) {
-                            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
-                            editController.setWidgetZ(path, instance.instanceId, minZ - 1)
-                        }
-                    }
-                }
-                AnimatedVisibility(
-                    visible = isHovered,
-                    enter   = fadeIn(tween(chromeMotionMs)),
-                    exit    = fadeOut(tween(chromeMotionMs)),
-                ) {
-                    AffordanceButton(Icons.Default.Tune, s.editorConfigure, CelestiaTheme.colors.primary, instance.instanceId, onEditProps)
-                }
-                AnimatedVisibility(
-                    visible = isHovered && descriptor.removable,
-                    enter   = fadeIn(tween(chromeMotionMs)),
-                    exit    = fadeOut(tween(chromeMotionMs)),
-                ) {
-                    AffordanceButton(Icons.Default.Close, s.editorDelete, CelestiaTheme.colors.error, instance.instanceId, onRemove)
-                }
-                AnimatedVisibility(
-                    visible = isHovered && !descriptor.removable,
-                    enter   = fadeIn(tween(chromeMotionMs)),
-                    exit    = fadeOut(tween(chromeMotionMs)),
-                ) {
-                    AffordanceButton(Icons.Default.DeleteForever, s.editorForceRemove, CelestiaTheme.colors.warnAccent, instance.instanceId) { forceRemoveOpen = true }
-                }
-            }
 
             // SE resize handle (hover-only) -> setWidgetSize. Works on any slot:
             // on a Canvas slot it sizes the free-placed widget; in a flow slot
@@ -341,13 +362,13 @@ fun EditableWidgetChrome(
             // baseline when the placement size is 0 (intrinsic) so the first
             // drag does not jump from nothing.
             AnimatedVisibility(
-                visible  = isHovered,
+                visible  = isHovered && !isCubeGrid,
                 enter    = fadeIn(tween(chromeMotionMs)),
                 exit     = fadeOut(tween(chromeMotionMs)),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
             ) {
                 Surface(
-                    color    = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
+                    color    = NxTheme.colors.primary.copy(alpha = 0.85f),
                     shape    = RoundedCornerShape(5.dp),
                     modifier = Modifier
                         .size(16.dp)
@@ -378,10 +399,9 @@ fun EditableWidgetChrome(
                             }
                         },
                 ) {
-                    Icon(
-                        imageVector        = Icons.Default.OpenInFull,
+                    Symbol(icon = NxIcon.OpenInFull,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.onPrimary,
+                        tint               = NxTheme.colors.onPrimary,
                         modifier           = Modifier.size(11.dp).padding(0.dp),
                     )
                 }
@@ -393,7 +413,7 @@ fun EditableWidgetChrome(
         // Canvas: the widget is positioned by SlotRenderer's outer offset Box.
         // No flow wrapper and no drop bars -- insertion index is meaningless
         // under free placement.
-        isCanvas -> widgetBox()
+        isCanvas || isCubeGrid -> widgetBox()
         isRow -> Row(modifier = Modifier.fillMaxHeight(), verticalAlignment = Alignment.Top) {
             if (showIndicatorBefore) DropIndicator(isRow = true)
             widgetBox()
@@ -406,9 +426,29 @@ fun EditableWidgetChrome(
         }
     }
 
+    // Right-click context menu (replaces the old hover affordance buttons): the
+    // widget's actions, anchored at the cursor. A right-drag in a cube slot resizes
+    // by cells; a right-click with no drag opens this.
+    menuAnchor?.let { anchor ->
+        NxContextMenu(anchorInWindow = anchor, expanded = true, onDismissRequest = { menuAnchor = null }) {
+            WidgetContextMenuContent(
+                isCanvas       = isCanvas,
+                removable      = descriptor.removable,
+                path           = path,
+                instanceId     = instance.instanceId,
+                editController = editController,
+                onConfigure    = { menuAnchor = null; onEditProps() },
+                onRemove       = { menuAnchor = null; onRemove() },
+                onForceRemove  = { menuAnchor = null; forceRemoveOpen = true },
+                onClose        = { menuAnchor = null },
+            )
+        }
+    }
+
     if (forceRemoveOpen) {
         AlertDialog(
             onDismissRequest = { forceRemoveOpen = false },
+            containerColor   = NxTheme.colors.surface,
             title            = { Text(s.editorForceRemoveTitle) },
             text             = {
                 Text(
@@ -420,7 +460,7 @@ fun EditableWidgetChrome(
                 TextButton(onClick = {
                     forceRemoveOpen = false
                     onRemove()
-                }) { Text(s.editorDelete, color = CelestiaTheme.colors.error) }
+                }) { Text(s.editorDelete, color = NxTheme.colors.error) }
             },
             dismissButton = {
                 TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }
@@ -429,53 +469,36 @@ fun EditableWidgetChrome(
     }
 }
 
-// One hover affordance button (z-order / tune / remove / force-remove). Consumes
-// the press AND release so a tap fires the action without the body drag overlay
-// (which arms on any unconsumed down) also nudging the widget.
+// The widget's right-click context menu body (replaces the old hover affordance
+// buttons): configure, z-order on a Canvas, and remove / force-remove. Reads the
+// graph live for the z bounds; each item closes the menu.
 @Composable
-private fun AffordanceButton(
-    icon: ImageVector,
-    description: String,
-    color: Color,
+private fun WidgetContextMenuContent(
+    isCanvas: Boolean,
+    removable: Boolean,
+    path: SlotPath,
     instanceId: String,
-    onTap: () -> Unit,
+    editController: EditModeController,
+    onConfigure: () -> Unit,
+    onRemove: () -> Unit,
+    onForceRemove: () -> Unit,
+    onClose: () -> Unit,
 ) {
-    // Read the latest onTap: the pointerInput is keyed on instanceId so it does
-    // not restart, and the z-order closures capture live graph state (current
-    // min/max z) that would otherwise be stale.
-    val tap by rememberUpdatedState(onTap)
-    Surface(
-        color    = color.copy(alpha = 0.85f),
-        shape    = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .size(20.dp)
-            .pointerInput(instanceId) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        when (event.type) {
-                            // Consume the press so the body drag overlay
-                            // (awaitFirstDown(requireUnconsumed = true)) does not
-                            // also arm; a button tap with a little jitter would
-                            // otherwise nudge the widget under the button.
-                            PointerEventType.Press -> event.changes.forEach { it.consume() }
-                            PointerEventType.Release -> {
-                                tap()
-                                event.changes.forEach { it.consume() }
-                            }
-                            else -> {}
-                        }
-                    }
-                }
-            },
-    ) {
-        Icon(
-            imageVector        = icon,
-            contentDescription = description,
-            tint               = CelestiaTheme.colors.onPrimary,
-            modifier           = Modifier.size(13.dp),
-        )
+    val s = LocalStrings.current
+    val graph = LocalLayoutGraph.current
+    NxMenuItem(s.editorConfigure) { onConfigure() }
+    if (isCanvas) {
+        NxMenuItem(s.editorToFront) {
+            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
+            editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()
+        }
+        NxMenuItem(s.editorToBack) {
+            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
+            editController.setWidgetZ(path, instanceId, minZ - 1); onClose()
+        }
     }
+    if (removable) NxMenuItem(s.editorDelete) { onRemove() }
+    else NxMenuItem(s.editorForceRemove) { onForceRemove() }
 }
 
 // Drop insertion bar. Horizontal (full width, 2dp tall) for a Column
@@ -488,7 +511,7 @@ private fun DropIndicator(isRow: Boolean) {
                 .fillMaxHeight()
                 .width(2.dp)
                 .padding(vertical = 4.dp)
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
     } else {
         Box(
@@ -496,7 +519,7 @@ private fun DropIndicator(isRow: Boolean) {
                 .fillMaxWidth()
                 .height(2.dp)
                 .padding(horizontal = 4.dp)
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
     }
 }

@@ -4,8 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,202 +15,200 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
-import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.components.InitialsAvatar
+import hivens.ui.components.SourceBadge
+import hivens.ui.nx.NxKebabButton
+import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.origin
-import hivens.ui.theme.originGradient
+import hivens.ui.icons.NxIcon
+import hivens.ui.notifications.IndicationCenter
+import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.decorativePair
 import java.time.Duration
 import java.time.Instant
+import kotlin.math.roundToInt
+import org.koin.compose.koinInject
 
 /**
- * One Library row. Banner-as-background (placeholder gradient until
- * AsyncImage plumbing lands -- bannerUrl will be honored when the
- * catalogue service starts populating it from manifests), avatar +
- * title + metadata chips overlaid on top, quick actions on the
- * right. Whole card click-routes to [PackDetailScreen]; the explicit
- * Play / Settings / Overflow buttons short-circuit common actions
- * without the detail hop.
+ * One Library row. Same three-layer background as the Browse card: a
+ * deterministic pixel-art fill (so an art-less instance is never a flat
+ * gradient), the [PackInstance.bannerUrl] image on top when the install
+ * captured one (transparent while loading / on failure, art shows through),
+ * then a dark scrim. Avatar + title + metadata chips overlay it, quick actions
+ * on the right. Whole card click-routes to [PackDetailScreen]; the explicit
+ * Play / Settings / Overflow buttons short-circuit common actions without the
+ * detail hop.
  *
- * Source-badge is the small chip next to the title; it differentiates
- * cards from the four [PackOrigin] values at a glance per
- * [[project_home_library_ia]]'s unified-entity-with-source-badge
- * rule.
- *
- * Sizes are deliberately defaulted, not pinned to a design spec --
- * Atelier visual rework will revisit; this is the working baseline.
+ * Source-badge is the small chip next to the title; it differentiates cards
+ * from the four [PackOrigin] values at a glance per
+ * [[project_home_library_ia]]'s unified-entity-with-source-badge rule.
  */
 @Composable
 fun PackCard(
     instance: PackInstance,
     onOpenDetail: () -> Unit,
-    onPlay: () -> Unit,
-    onSettings: () -> Unit,
-    onMore: () -> Unit,
+    onOpenFolder: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bg = CelestiaTheme.colors.originGradient(instance.packRef.origin)
     val s = LocalStrings.current
+    val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
+    val art = rememberPackArt(instance)
+    val indications: IndicationCenter = koinInject()
+    // Remember the flow: launchIndication() ends in a fresh asStateFlow() wrapper each
+    // call, so collecting it inline would re-subscribe on every recomposition.
+    val indicationFlow = remember(instance.id) { indications.launchIndication(instance.id) }
+    val indication by indicationFlow.collectAsState()
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(bg)
             .clickable(onClick = onOpenDetail),
     ) {
-        // Dim overlay so any future banner image stays legible behind
-        // the title / chips. With the placeholder gradient the dim is
-        // visually redundant but keeps the layering consistent when
-        // bannerUrl support lands.
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+        Box(Modifier.fillMaxSize().pixelArtBackground(instance.id, hueA, hueB))
+        if (art.bannerUrl != null) {
+            AsyncImage(
+                model              = art.bannerUrl,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        }
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (art.bannerUrl != null) 0.45f else 0.32f)))
 
-        Row(
-            modifier              = Modifier.fillMaxSize().padding(14.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            PackAvatar(instance)
-
-            Column(
-                modifier              = Modifier.weight(1f),
-                verticalArrangement   = Arrangement.spacedBy(6.dp),
-            ) {
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text       = instance.displayName,
-                        style      = MaterialTheme.typography.titleMedium,
-                        color      = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines   = 1,
-                        overflow   = TextOverflow.Ellipsis,
-                        modifier   = Modifier.weight(1f, fill = false),
-                    )
-                    SourceBadge(instance.packRef.origin)
-                }
-
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    MetaChip(instance.packRef.version ?: "—")
-                    instance.forkedFrom?.let {
-                        MetaChip("fork", emphasis = true)
-                    }
-                    LastPlayedChip(instance.lastPlayedEpochOrZero)
-                }
-            }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            // Tight card (right panel open + narrow window): drop the source badge
+            // before it eats the title.
+            val showBadge = maxWidth >= 380.dp
 
             Row(
+                modifier              = Modifier.fillMaxSize().padding(14.dp),
                 verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Button(
-                    onClick        = onPlay,
-                    shape          = MaterialTheme.shapes.small,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    colors         = ButtonDefaults.buttonColors(
-                        containerColor = CelestiaTheme.colors.primary,
-                        contentColor   = Color.White,
-                    ),
+                PackAvatar(iconUrl = art.iconUrl, displayName = instance.displayName, hue = hueA)
+
+                Column(
+                    modifier              = Modifier.weight(1f),
+                    verticalArrangement   = Arrangement.spacedBy(6.dp),
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(s.packCardPlay, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text       = instance.displayName,
+                            style      = MaterialTheme.typography.titleMedium,
+                            color      = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines   = 1,
+                            overflow   = TextOverflow.Ellipsis,
+                            modifier   = Modifier.weight(1f, fill = false),
+                        )
+                        if (showBadge) SourceBadge(instance.packRef.origin)
+                    }
+
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        NxMetaChip(instance.packRef.version ?: "—", tone = NxMetaChipTone.OnMedia)
+                        instance.forkedFrom?.let {
+                            NxMetaChip("fork", tone = NxMetaChipTone.OnMediaAccent)
+                        }
+                        LastPlayedChip(instance.lastPlayedEpochOrZero)
+                    }
                 }
-                IconButton(onClick = onSettings) {
-                    Icon(Icons.Default.Settings, contentDescription = s.packCardSettings, tint = Color.White)
-                }
-                IconButton(onClick = onMore) {
-                    Icon(Icons.Default.MoreVert, contentDescription = s.packCardMore, tint = Color.White)
+
+                // No Play / Settings on the card: the whole card opens the detail,
+                // where launch + every setting live. Card keeps only the overflow
+                // (open folder / delete) as out-of-the-way quick actions.
+                NxKebabButton(contentDescription = s.packCardMore, tint = Color.White) { dismiss ->
+                    NxMenuItem(
+                        label   = s.serverSettingsOpenFolder,
+                        icon    = NxIcon.FolderOpen,
+                        onClick = { dismiss(); onOpenFolder() },
+                    )
+                    NxMenuItem(
+                        label       = s.editorDelete,
+                        icon        = NxIcon.Delete,
+                        destructive = true,
+                        onClick     = { dismiss(); onDelete() },
+                    )
                 }
             }
+        }
+
+        // Launch state for this pack, produced by LaunchDriver -- a corner pill so
+        // launching a pack reflects on its card instead of only in a transient toast.
+        indication?.let {
+            LaunchStatusPill(it, Modifier.align(Alignment.TopEnd).padding(10.dp))
         }
     }
 }
 
+/** Compact launch-state pill overlaid on the card while a launch of this pack is in flight. */
 @Composable
-private fun PackAvatar(instance: PackInstance) {
-    val initials = instance.displayName
-        .split(' ', '-', '_')
-        .filter { it.isNotBlank() }
-        .take(2)
-        .joinToString("") { it.first().uppercaseChar().toString() }
-        .ifEmpty { "?" }
-    Box(
-        modifier         = Modifier
-            .size(64.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(CelestiaTheme.colors.origin(instance.packRef.origin)),
-        contentAlignment = Alignment.Center,
+private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
+    val (dotColor, label) = when (indication) {
+        IndicationCenter.LaunchIndication.Preparing -> NxTheme.colors.progressAccent to s.launchPreparing
+        is IndicationCenter.LaunchIndication.Downloading ->
+            NxTheme.colors.progressAccent to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
+        IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
+        IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
+    }
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(dotColor))
         Text(
-            text       = initials,
+            text       = label,
+            style      = MaterialTheme.typography.labelSmall,
             color      = Color.White,
-            style      = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Medium,
+            maxLines   = 1,
         )
     }
 }
 
 @Composable
-private fun SourceBadge(origin: PackOrigin) {
-    val label = when (origin) {
-        PackOrigin.Smartycraft -> "SC"
-        PackOrigin.Mirror      -> "Mirror"
-        PackOrigin.Modrinth    -> "Modrinth"
-        PackOrigin.Local       -> "Local"
-        PackOrigin.Unknown     -> "?"
-    }
-    val color = CelestiaTheme.colors.origin(origin)
-    Box(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(color.copy(alpha = 0.85f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun MetaChip(text: String, emphasis: Boolean = false) {
-    AssistChip(
-        onClick   = {},
-        enabled   = false,
-        shape     = MaterialTheme.shapes.extraSmall,
-        label     = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
-        colors    = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)
-                                     else          Color.Black.copy(alpha = 0.35f),
-            disabledLabelColor     = Color.White,
-        ),
-        border    = null,
+private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
+    SubcomposeAsyncImage(
+        model              = iconUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+        loading            = { Box(Modifier.fillMaxSize().background(hue)) },
+        error              = { InitialsAvatar(displayName, hue) },
     )
 }
 
@@ -218,7 +216,7 @@ private fun MetaChip(text: String, emphasis: Boolean = false) {
 private fun LastPlayedChip(lastPlayedEpoch: Long) {
     val s = LocalStrings.current
     if (lastPlayedEpoch <= 0L) {
-        MetaChip(s.packCardNeverPlayed)
+        NxMetaChip(s.packCardNeverPlayed, tone = NxMetaChipTone.OnMedia)
         return
     }
     val now = Instant.now()
@@ -231,15 +229,11 @@ private fun LastPlayedChip(lastPlayedEpoch: Long) {
         dur.toDays()    < 14  -> s.packCardPlayedDaysAgo(dur.toDays())
         else                  -> s.packCardPlayedLongAgo
     }
-    MetaChip(label)
+    NxMetaChip(label, tone = NxMetaChipTone.OnMedia)
 }
 
-/**
- * Workaround helper for the `requiredJava` chip on the detail screen
- * (PackDetailScreen reuses [MetaChip] via this re-exported alias so
- * it doesn't have to duplicate the chip styling).
- */
+/** The card's on-media meta chip, kept as a named alias for other over-banner surfaces. */
 @Composable
 internal fun PackMetaChip(text: String, emphasis: Boolean = false) {
-    MetaChip(text, emphasis = emphasis)
+    NxMetaChip(text, tone = if (emphasis) NxMetaChipTone.OnMediaAccent else NxMetaChipTone.OnMedia)
 }

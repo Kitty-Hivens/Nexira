@@ -1,4 +1,8 @@
 package hivens.ui.components
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,7 +19,7 @@ import hivens.core.launch.PrepareStage
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import java.text.DecimalFormat
 
 @Composable
@@ -49,13 +53,13 @@ fun LaunchControlPanel(
                 is LaunchState.Idle -> Text(
                     s.launchReady,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 is LaunchState.Prepare -> Text(
                     text  = localizeStage(state.stage, s),
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 is LaunchState.Downloading -> {
@@ -66,12 +70,12 @@ fun LaunchControlPanel(
                         Text(
                             "${s.launchDownloading} ",
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                         Text(
                             "${fmt.format(dlMb)} / ${fmt.format(totMb)} MB (${formatSpeed(state.speedBytesPerSec, fmt)})",
                             style      = MaterialTheme.typography.bodySmall,
-                            color      = CelestiaTheme.colors.primary,
+                            color      = NxTheme.colors.primary,
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -83,13 +87,13 @@ fun LaunchControlPanel(
                 is LaunchState.Error -> Text(
                     s.launchReady,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 is LaunchState.GameRunning -> Text(
                     s.launchRunning,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.success,
+                    color = NxTheme.colors.success,
                 )
             }
         }
@@ -117,15 +121,15 @@ fun LaunchControlPanel(
             if (progress.isNaN()) {
                 LinearProgressIndicator(
                     modifier        = barModifier,
-                    color           = CelestiaTheme.colors.primary,
-                    trackColor      = CelestiaTheme.colors.surface,
+                    color           = NxTheme.colors.primary,
+                    trackColor      = NxTheme.colors.surface,
                 )
             } else {
                 LinearProgressIndicator(
                     progress        = { progress },
                     modifier        = barModifier,
-                    color           = CelestiaTheme.colors.primary,
-                    trackColor      = CelestiaTheme.colors.surface,
+                    color           = NxTheme.colors.primary,
+                    trackColor      = NxTheme.colors.surface,
                     gapSize         = 0.dp,
                     drawStopIndicator = {},
                 )
@@ -146,29 +150,22 @@ fun LaunchControlPanel(
             else                                               -> s.launchButton
         }
 
-        if (state is LaunchState.Idle && af.isActive()) {
-            // Only the PLAY button in idle state is a chaos target.
-            // Abort / Clear-error buttons stay reliable so the game can always be stopped.
-            af.ChaosButton(
-                id       = "launch_play_btn",
-                text     = btnText,
-                onClick  = onLaunch,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-            )
-        } else {
-            CelestiaButton(
-                text    = btnText,
-                enabled = state !is LaunchState.GameRunning,
-                // Pulse when ready to play (Idle, or after an error -- which the
-                // panel now treats as ready, with the failure shown via notification)
-                glowing = state is LaunchState.Idle || state is LaunchState.Error,
-                onClick = {
+        // One play / abort control. The April Fools chaos decorates it through
+        // Flexible when active -- no more idle-only branch. The ready-to-play pulse
+        // returns as a style-gated decoration in #352.
+        Flexible("launch_play_btn", FlexibleKind.Button) {
+            NxButton(
+                label     = btnText,
+                onClick   = {
                     when (state) {
                         is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
                         else                                               -> onLaunch()
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier  = Modifier.fillMaxWidth(),
+                style     = NxButtonStyle.Primary,
+                enabled   = state !is LaunchState.GameRunning,
+                minHeight = 50.dp,
             )
         }
         // Puppet: single action whose semantic depends on the current LaunchState.

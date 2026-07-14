@@ -11,17 +11,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import hivens.auth.AuthProviderRegistry
 import hivens.ui.components.NavItemRowContent
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import org.koin.compose.koinInject
 
 // Vertical category nav for the profile surface. Writes
 // `selectedCategory.value` on tap; the surface composable reads it
@@ -34,12 +37,17 @@ fun ProfileNavWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
     val s = LocalStrings.current
     val style = LocalStyle.current
+    val authRegistry: AuthProviderRegistry = koinInject()
     val current by ctx.selectedCategory
-    val signedIn = ctx.session != null
 
-    // Signed out, only Sign in is meaningful (Account / Skin need an identity).
-    // Signed in, Sign in re-labels to Security (credential management, no form).
-    val categories = if (signedIn) ProfileCategory.entries else listOf(ProfileCategory.SignIn)
+    // Microsoft / multi-account is deferred: its category shows only when a client
+    // id is configured (the device-code provider registers only then). Without one
+    // the profile is a single SmartyCraft section -- no dangling Microsoft tab into
+    // an empty pane.
+    val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
+    val categories = ProfileCategory.entries.filter {
+        it != ProfileCategory.Microsoft || msaConfigured
+    }
 
     Column(
         modifier = Modifier
@@ -49,8 +57,7 @@ fun ProfileNavWidget(instance: WidgetInstance) {
     ) {
         categories.forEach { category ->
             val isSelected = category == current
-            val label = if (category == ProfileCategory.SignIn && signedIn) s.profileCategorySecurity
-                        else category.label(s)
+            val label = category.label(s)
             PuppetClick("profile.category.${category.name}") {
                 ctx.selectedCategory.value = category
             }
@@ -59,8 +66,8 @@ fun ProfileNavWidget(instance: WidgetInstance) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(style.cardCorner))
                     .background(
-                        if (isSelected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-                        else CelestiaTheme.colors.background.copy(alpha = 0.0f),
+                        if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
+                        else NxTheme.colors.background.copy(alpha = 0.0f),
                     )
                     .clickable { ctx.selectedCategory.value = category }
                     .padding(horizontal = 12.dp, vertical = 10.dp),

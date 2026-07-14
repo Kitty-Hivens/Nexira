@@ -58,4 +58,11 @@ data class AuthCapabilities(
      * the user a broken login.
      */
     val supports2FA: Boolean,
+
+    /**
+     * Whether the provider uses the OAuth device-code grant (it also implements
+     * [DeviceCodeAuthProvider]). The login UI shows a "sign in" device-code path
+     * instead of a username/password form when this is true.
+     */
+    val supportsDeviceCode: Boolean = false,
 )

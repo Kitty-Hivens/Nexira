@@ -25,17 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeMute
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -66,34 +55,36 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
 import hivens.widget.api.rememberProps
-import hivens.widget.model.ProvidesService
 import hivens.widget.model.PropLabel
+import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import kotlinx.serialization.Serializable
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
+import java.nio.file.Paths
+import kotlin.io.path.name
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
-import java.nio.file.Paths
-import kotlin.io.path.name
 
-// Mini music player. Drop a WAV / AU / AIFF file, play it through
-// AudioPlayer. The opening pin in the project_achievements vision --
-// the user can compose the launcher into a music-only surface by
-// removing every game widget and keeping this + a clock + the right
-// rail (or nothing). MP3 support arrives with Skinema (FFmpeg
-// via Panama).
+// Mini music player. Drop an audio file, play it through AudioPlayer
+// (Skinema / FFmpeg via Panama -- mp3, flac, ogg, opus, aac, wav). The
+// opening pin in the project_achievements vision -- the user can compose
+// the launcher into a music-only surface by removing every game widget
+// and keeping this + a clock + the right rail (or nothing).
 @Serializable
 data class MusicProps(
     @PropLabel("widget.home.new.music.title") val title: String = "",
@@ -124,7 +115,9 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         scope.launch {
             val picked = withContext(Dispatchers.IO) {
                 FileKit.openFilePicker(
-                    type           = FileKitType.File(extensions = listOf("wav", "au", "aif", "aiff", "snd")),
+                    type           = FileKitType.File(extensions = listOf(
+                        "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "aiff", "aif", "au",
+                    )),
                     dialogSettings = FileKitDialogSettings(title = s.audioPickTrack),
                 )
             }
@@ -142,7 +135,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        CelestiaTheme.colors.surface,
+                        NxTheme.colors.surface,
                         glassSurfaceAlpha(0.55f),
                     ),
                 ),
@@ -158,14 +151,14 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 Text(
                     text       = p.title.ifBlank { s.musicPlayerTitle },
                     style      = MaterialTheme.typography.labelLarge,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text       = currentTitle(state, s),
                     style      = MaterialTheme.typography.titleMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
@@ -174,13 +167,13 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                     Text(
                         text  = audioErrorText((state as PlaybackState.Error).reason, s),
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.error,
+                        color = NxTheme.colors.error,
                     )
                 } else {
                     Text(
                         text     = subtitle(state, s),
                         style    = MaterialTheme.typography.bodySmall,
-                        color    = CelestiaTheme.colors.textSecondary,
+                        color    = NxTheme.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -193,23 +186,25 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         LinearProgressIndicator(
             progress   = { fraction },
             modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-            color      = CelestiaTheme.colors.primary,
-            trackColor = CelestiaTheme.colors.outline.copy(alpha = 0.15f),
+            color      = NxTheme.colors.primary,
+            trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
         )
 
-        // Controls row
+        // Controls row: transport on the left, volume + timecode on the right.
+        // The volume bar is a thin custom track (the Material slider's fat thumb
+        // reads as an out-of-place form control here).
         Row(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier              = Modifier.fillMaxWidth(),
         ) {
             ControlButton(
-                icon            = Icons.Default.FolderOpen,
+                icon            = NxIcon.FolderOpen,
                 contentDesc     = s.audioOpenFile,
                 onClick         = { pickFile() },
             )
             ControlButton(
-                icon         = if (state is PlaybackState.Playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                icon         = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                 contentDesc  = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
                 enabled      = state !is PlaybackState.Idle && state !is PlaybackState.Error,
                 primary      = true,
@@ -218,42 +213,30 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 },
             )
             ControlButton(
-                icon         = Icons.Default.Stop,
+                icon         = NxIcon.Stop,
                 contentDesc  = s.audioStop,
                 enabled      = state is PlaybackState.Playing || state is PlaybackState.Paused,
                 onClick      = { player.stop() },
             )
             Spacer(Modifier.weight(1f))
+            Symbol(icon = volumeIcon(volume),
+                contentDescription = s.audioVolume,
+                tint               = NxTheme.colors.textSecondary,
+                modifier           = Modifier.size(16.dp),
+            )
+            VolumeBar(
+                value         = volume,
+                onValueChange = { player.setVolume(it) },
+                modifier      = Modifier.width(96.dp),
+            )
             val timeline = timelineLabel(state)
             if (timeline.isNotEmpty()) {
                 Text(
                     text  = timeline,
                     style = MaterialTheme.typography.labelSmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
-        }
-
-        // Volume row: icon + bar. Bar is a custom thin track with a
-        // dot thumb that only appears on hover/drag -- the default
-        // Material slider's fat thumb reads as an out-of-place form
-        // control here.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier          = Modifier.fillMaxWidth(),
-        ) {
-            Icon(
-                imageVector        = volumeIcon(volume),
-                contentDescription = s.audioVolume,
-                tint               = CelestiaTheme.colors.textSecondary,
-                modifier           = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            VolumeBar(
-                value         = volume,
-                onValueChange = { player.setVolume(it) },
-                modifier      = Modifier.weight(1f),
-            )
         }
     }
 }
@@ -278,8 +261,10 @@ private fun VolumeBar(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "vol-track-height",
     )
+    // Always faintly visible so the handle is findable without hunting; full
+    // opacity on hover/drag.
     val thumbAlpha by animateFloatAsState(
-        targetValue   = if (active) 1f else 0f,
+        targetValue   = if (active) 1f else 0.65f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "vol-thumb-alpha",
     )
@@ -300,14 +285,19 @@ private fun VolumeBar(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     pressing = true
-                    val w = size.width.coerceAtLeast(1).toFloat()
-                    onValueChange((down.position.x / w).coerceIn(0f, 1f))
-                    drag(down.id) { change ->
-                        val newValue = (change.position.x / w).coerceIn(0f, 1f)
-                        onValueChange(newValue)
-                        change.consume()
+                    // finally: a cancelled/interrupted drag must still release
+                    // the pressed state, or the thumb sticks enlarged.
+                    try {
+                        val w = size.width.coerceAtLeast(1).toFloat()
+                        onValueChange((down.position.x / w).coerceIn(0f, 1f))
+                        drag(down.id) { change ->
+                            val newValue = (change.position.x / w).coerceIn(0f, 1f)
+                            onValueChange(newValue)
+                            change.consume()
+                        }
+                    } finally {
+                        pressing = false
                     }
-                    pressing = false
                 }
             },
         contentAlignment = Alignment.CenterStart,
@@ -318,7 +308,7 @@ private fun VolumeBar(
                 .fillMaxWidth()
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.outline.copy(alpha = 0.20f)),
+                .background(NxTheme.colors.outline.copy(alpha = 0.20f)),
         )
         // Active fill (left edge to current value).
         Box(
@@ -326,7 +316,7 @@ private fun VolumeBar(
                 .fillMaxWidth(value)
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
         // Thumb dot at the active edge -- only visible on hover/press.
         if (widthPx > 0 && thumbAlpha > 0.01f) {
@@ -338,17 +328,17 @@ private fun VolumeBar(
                     .size(thumbSizeDp)
                     .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
-                    .background(CelestiaTheme.colors.primary),
+                    .background(NxTheme.colors.primary),
             )
         }
     }
 }
 
-private fun volumeIcon(volume: Float): androidx.compose.ui.graphics.vector.ImageVector = when {
-    volume <= 0.001f -> Icons.AutoMirrored.Filled.VolumeOff
-    volume < 0.34f   -> Icons.AutoMirrored.Filled.VolumeMute
-    volume < 0.67f   -> Icons.AutoMirrored.Filled.VolumeDown
-    else             -> Icons.AutoMirrored.Filled.VolumeUp
+private fun volumeIcon(volume: Float): IconKey = when {
+    volume <= 0.001f -> NxIcon.VolumeOff
+    volume < 0.34f   -> NxIcon.VolumeMute
+    volume < 0.67f   -> NxIcon.VolumeDown
+    else             -> NxIcon.VolumeUp
 }
 
 @Composable
@@ -357,13 +347,12 @@ private fun AlbumArtBlock(state: PlaybackState) {
         modifier = Modifier
             .size(52.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.18f)),
+            .background(NxTheme.colors.primary.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector        = Icons.Default.MusicNote,
+        Symbol(icon = NxIcon.MusicNote,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.primary,
+            tint               = NxTheme.colors.primary,
             modifier           = Modifier.size(28.dp),
         )
     }
@@ -371,21 +360,21 @@ private fun AlbumArtBlock(state: PlaybackState) {
 
 @Composable
 private fun ControlButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: IconKey,
     contentDesc: String,
     enabled: Boolean = true,
     primary: Boolean = false,
     onClick: () -> Unit,
 ) {
     val bg = when {
-        !enabled -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f)
-        primary  -> CelestiaTheme.colors.primary
-        else     -> CelestiaTheme.colors.surface
+        !enabled -> NxTheme.colors.surfaceVariant.copy(alpha = 0.4f)
+        primary  -> NxTheme.colors.primary
+        else     -> NxTheme.colors.surface
     }
     val tint = when {
-        !enabled -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+        !enabled -> NxTheme.colors.textSecondary.copy(alpha = 0.4f)
         primary  -> Color.White
-        else     -> CelestiaTheme.colors.textPrimary
+        else     -> NxTheme.colors.textPrimary
     }
     Box(
         modifier = Modifier
@@ -395,8 +384,7 @@ private fun ControlButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector        = icon,
+        Symbol(icon = icon,
             contentDescription = contentDesc,
             tint               = tint,
             modifier           = Modifier.size(if (primary) 20.dp else 16.dp),

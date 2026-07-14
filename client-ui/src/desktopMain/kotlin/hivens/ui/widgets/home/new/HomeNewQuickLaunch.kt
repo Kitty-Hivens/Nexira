@@ -7,25 +7,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.nx.NxButton
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -63,7 +57,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         Text(
             text       = label,
             style      = MaterialTheme.typography.labelLarge,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
         )
         Row(
@@ -75,29 +69,22 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 Text(
                     text       = target.displayName,
                     style      = MaterialTheme.typography.titleMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text  = target.packRef.id,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Button(
+            NxButton(
+                label   = qt.buttonLabel ?: p.buttonLabel.ifBlank { s.homeQuickButton },
                 onClick = qt.launch,
                 enabled = qt.canLaunch,
-                shape   = MaterialTheme.shapes.small,
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(p.buttonLabel.ifBlank { s.homeQuickButton }, fontWeight = FontWeight.SemiBold)
-            }
+                icon    = qt.icon,
+            )
         }
     }
 }

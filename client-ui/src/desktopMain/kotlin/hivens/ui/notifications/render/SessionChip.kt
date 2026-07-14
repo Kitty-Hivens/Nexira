@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.MenuOpen
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,11 +24,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.SessionRegistry.ActiveSession
-import hivens.ui.theme.CelestiaTheme
-import org.koin.compose.koinInject
+import hivens.ui.theme.NxTheme
 import java.time.Duration
+import org.koin.compose.koinInject
 
 @Composable
 fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) { // TODO: Function "ActiveSessionsSection" is never used
@@ -44,7 +42,7 @@ fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) { // TODO: F
         Text(
             text       = s.sessionsActiveTitle,
             style      = MaterialTheme.typography.labelSmall,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
         )
         active.values.forEach { session ->
@@ -61,7 +59,7 @@ fun SessionChip(session: ActiveSession) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.surface)
+            .background(NxTheme.colors.surface)
             .clickable { session.showConsole() }
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
@@ -70,34 +68,32 @@ fun SessionChip(session: ActiveSession) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(CelestiaTheme.colors.success)
+                    .background(NxTheme.colors.success)
             )
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text       = session.packDisplayName,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
                     text  = formatUptime(uptime),
                     style = MaterialTheme.typography.labelSmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
             IconButton(onClick = session.showConsole) {
-                Icon(
-                    imageVector       = Icons.AutoMirrored.Default.MenuOpen,
+                Symbol(icon = NxIcon.MenuOpen,
                     contentDescription = s.notifActionShowConsole,
-                    tint              = CelestiaTheme.colors.textSecondary,
+                    tint              = NxTheme.colors.textSecondary,
                 )
             }
             IconButton(onClick = session.abort) {
-                Icon(
-                    imageVector       = Icons.Default.Stop,
+                Symbol(icon = NxIcon.Stop,
                     contentDescription = s.notifActionStop,
-                    tint              = CelestiaTheme.colors.error,
+                    tint              = NxTheme.colors.error,
                 )
             }
         }

@@ -9,10 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,11 +21,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemePresets
 import hivens.widget.api.SlotRenderer
@@ -51,7 +53,6 @@ fun ThemePickerSurface(
     onBack: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val af = LocalAprilFools.current
     val themes = remember { ThemePresets.getAll() }
     // Keyless remember: the local pending selection survives an
     // external currentTheme change (system theme sync, preset
@@ -85,10 +86,9 @@ fun ThemePickerSurface(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                        Symbol(icon = NxIcon.ArrowBack,
                             contentDescription = s.navBack,
-                            tint               = CelestiaTheme.colors.primary,
+                            tint               = NxTheme.colors.primary,
                         )
                     }
                     Spacer(Modifier.width(8.dp))
@@ -96,17 +96,16 @@ fun ThemePickerSurface(
                         text       = s.themePickerTitle,
                         style      = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Black,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                     )
                 }
-                af.ChaosButton(
-                    id      = "theme_picker_apply_btn",
-                    text    = s.themePickerApply,
-                    onClick = { onThemeSelected(selectedTheme.value) },
-                    colors  = ButtonDefaults.buttonColors(
-                        containerColor = CelestiaTheme.colors.primary,
-                    ),
-                )
+                Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label = s.themePickerApply,
+                        onClick = { onThemeSelected(selectedTheme.value) },
+                        style = NxButtonStyle.Primary,
+                    )
+                }
             }
             // Body: two side-by-side slots. Grid is the editable
             // panel; preview reads the same selectedTheme via the

@@ -6,8 +6,7 @@ import kotlinx.serialization.Serializable
  * Auth provider a pack needs the user to be signed in with before
  * the game process is spawned. Carried on
  * [CachedManifestSnapshot.authRequirement] -- null means the pack
- * launches without an auth precondition (vanilla, future offline-only
- * packs).
+ * launches without an auth precondition (vanilla, offline-only packs).
  *
  * The launcher uses this for two things on a Play click:
  *   1. Precondition gate -- if the user is not signed in with the
@@ -19,13 +18,21 @@ import kotlinx.serialization.Serializable
  *      first server join sees a fresh token (a cold mod-load can
  *      take minutes; server-side sessions age out in the meantime).
  *
- * Today the launcher only knows [SmartyCraft]. Additional providers
- * (Mojang, Elyby, OneOf, ...) land alongside the auth SPI
- * extraction; existing serialized snapshots without `authRequirement`
- * stay valid (the field is nullable and defaults to null).
+ * [SmartyCraft] is satisfiable today. [Microsoft] / [Both] route to a
+ * Microsoft account whose provider lands in a later phase; until it is
+ * registered the launcher treats a Microsoft requirement as advisory
+ * (content still launches) rather than blocking. Existing serialized
+ * snapshots without `authRequirement` stay valid (nullable, defaults null).
  */
 @Serializable
 sealed interface PackAuthRequirement {
+    /**
+     * The SmartyCraft game-server id this content joins, or null for content
+     * that needs no SC join (Microsoft-only). Lets the SC-binding path read one
+     * accessor across [SmartyCraft] and [Both] rather than matching each variant.
+     */
+    val scServerId: String?
+
     /**
      * Pack joins a SmartyCraft game server identified by [serverId].
      * The launcher re-runs `authService.login(player, pass, serverId)`
@@ -33,6 +40,8 @@ sealed interface PackAuthRequirement {
      */
     @Serializable
     data class SmartyCraft(val serverId: String) : PackAuthRequirement {
+        override val scServerId: String get() = serverId
+
         companion object {
             /**
              * Stable provider identifier shared by the launcher and
@@ -46,5 +55,26 @@ sealed interface PackAuthRequirement {
              */
             const val PROVIDER_KEY: String = "smartycraft"
         }
+    }
+
+    /**
+     * Licensed play via a Microsoft account (vanilla, Modrinth, CurseForge).
+     * No SmartyCraft join, so [scServerId] is null.
+     */
+    @Serializable
+    data object Microsoft : PackAuthRequirement {
+        override val scServerId: String? get() = null
+
+        const val PROVIDER_KEY: String = "microsoft"
+    }
+
+    /**
+     * Hivens content that needs both a Microsoft account and a SmartyCraft
+     * join at [serverId] -- the SC half drives the same authlib/helper binding
+     * as [SmartyCraft].
+     */
+    @Serializable
+    data class Both(val serverId: String) : PackAuthRequirement {
+        override val scServerId: String get() = serverId
     }
 }

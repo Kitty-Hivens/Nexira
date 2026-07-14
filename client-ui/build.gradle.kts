@@ -2,6 +2,10 @@ import hivens.packaging.PackagingExtension
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -27,17 +31,20 @@ group = "hivens"
 // is a build-time error by design -- changes go in one place only.
 
 kotlin {
+    // KMP modules don't apply the `java` plugin, so the root's toolchain pin
+    // (java-plugin modules only) skips them; set it here so org.gradle.jvm.version
+    // matches the JDK 26 leaf modules instead of falling back to the daemon JVM.
+    jvmToolchain(26)
     jvm("desktop")
 
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 implementation(libs.compose.runtime)
                 implementation(libs.compose.foundation)
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
                 implementation(libs.compose.components.resources)
-                implementation(libs.compose.material.icons.extended)
                 implementation(libs.multiplatform.markdown.m3)
 
                 // Coil pulls `org.jetbrains.skiko` transitively at its own
@@ -61,7 +68,7 @@ kotlin {
             }
         }
 
-        val desktopMain by getting {
+        val desktopMain = getByName("desktopMain") {
             dependencies {
                 implementation(compose.desktop.currentOs)
 
@@ -69,7 +76,10 @@ kotlin {
                 implementation(project(":client-core"))
                 implementation(project(":client-auth"))
                 implementation(project(":client-launcher"))
+                implementation(project(":client-media"))
+                implementation(project(":client-tray"))
                 implementation(project(":widget-api"))
+                implementation(project(":nx-ui"))
 
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)
@@ -77,9 +87,27 @@ kotlin {
                 implementation(libs.koin.compose)
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.logback.classic)
-                implementation(libs.libtray)
+                // libtray now enters transitively via :client-tray; only
+                // libnotify (SystemNotifier) is consumed directly here.
                 implementation(libs.libnotify)
+                // Video / animated-image backgrounds (hivens.ui.background): FFmpeg
+                // via Panama. skinema-compose brings -core + -skiko; the natives are
+                // per-platform classifier jars on the runtime classpath, unpacked to a
+                // per-user cache on first use. Ship one classifier per target tier.
+                implementation(libs.skinema.compose)
+                implementation(libs.skinema.skiko)
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-linux-x64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-linux-arm64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-windows-x64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-macos-arm64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-macos-x64")
                 implementation(libs.ktor.client.core)
+                // In-launcher HTML renderer (hivens.ui.render): jsoup parses, the
+                // markdown lib does md->html. The velocipede before the standalone lib.
+                implementation(libs.jsoup)
+                implementation(libs.markdown.core)
+                // Material You colour science -- wallpaper-seeded palette engine.
+                implementation(libs.material.color.utilities)
             }
         }
 
@@ -117,7 +145,7 @@ kotlin {
         // task `desktopTest`; explicit source-set wiring lets the
         // module declare kotlin-test + coroutines-test deps and pull
         // in fakes from sibling modules.
-        val desktopTest by getting {
+        getByName("desktopTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
@@ -351,6 +379,13 @@ compose.desktop {
             // config-resolve.
             *(providers.gradleProperty("nexiraPuppetPort").orNull
                 ?.let { arrayOf("-Dnexira.puppet.port=$it") }
+                ?: emptyArray()),
+
+            // Boot-threshold dev knob: `-PnexiraBootSlowMs=N` stretches each
+            // boot phase by N ms (hivens.ui.Main) so the threshold screen can
+            // be inspected on a warm machine where real boot is sub-second.
+            *(providers.gradleProperty("nexiraBootSlowMs").orNull
+                ?.let { arrayOf("-Dnexira.boot.slowMs=$it") }
                 ?: emptyArray())
         )
     }
@@ -453,7 +488,7 @@ packaging {
 // would resolve against the Task's own extensions. The config-time .get() snapshot keeps
 // doLast configuration-cache safe -- it closes over a plain List, not the build script.
 val packagingExtension = the<PackagingExtension>()
-val verifyRuntimeModules by tasks.registering {
+val verifyRuntimeModules = tasks.register("verifyRuntimeModules") {
     group = "verification"
     description = "Fails if packaging.modules omits a module the runtime read needs (jdk.management)."
     val modules = packagingExtension.modules.get()
@@ -490,7 +525,7 @@ tasks.named("check") { dependsOn(verifyRuntimeModules) }
 // recomposition audits but wasted IO on every regular compile.
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_25)
+        jvmTarget.set(JvmTarget.JVM_26)
 
         val composeMetricsEnabled = providers.gradleProperty("nexiraComposeMetrics")
             .map { it == "true" }.orElse(false).get()
@@ -502,7 +537,7 @@ tasks.withType<KotlinJvmCompile>().configureEach {
             // compiler restricts typealiases to top level only.
             "-XXLanguage:+NestedTypeAliases",
 
-            // Bytecode: emit default methods directly (legal on jvmTarget=25).
+            // Bytecode: emit default methods directly (legal on jvmTarget=26).
             // Smaller class files, removes the DefaultImpls indirection.
             "-jvm-default=no-compatibility",
 
@@ -557,6 +592,48 @@ tasks.withType<Jar>().configureEach {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+// Strip stale JAR signatures from the ProGuard release output. bcprov-jdk18on
+// (transitive via dev.hivens:libvault) ships signed by BouncyCastle; ProGuard
+// repackages its classes but keeps the original META-INF/*.SF/*.RSA, so the JVM
+// rejects the jar at load with "Invalid signature file digest" and the launcher
+// crashes before main. The `tasks.withType<Jar>` exclude above cannot reach
+// ProGuard's own output, so drop the signature entries once ProGuard has written
+// the jars. We ship unsigned; jpackage / Inno Setup own the outer envelope.
+tasks.matching { it.name == "proguardReleaseJars" }.configureEach {
+    // Resolve to a plain File in this task-config lambda so the doLast captures only
+    // that File (a local), not the Project or the build script object -- either would
+    // break configuration-cache serialization.
+    val outDir = layout.buildDirectory.dir("compose/tmp/main-release/proguard").get().asFile
+    doLast {
+        if (!outDir.isDirectory) return@doLast
+        val sig = Regex("META-INF/[^/]+\\.(SF|RSA|DSA|EC)", RegexOption.IGNORE_CASE)
+        outDir.listFiles { f -> f.extension == "jar" }?.forEach { jar ->
+            var signed = false
+            ZipFile(jar).use { z ->
+                val en = z.entries()
+                while (en.hasMoreElements()) { if (sig.matches(en.nextElement().name)) { signed = true; break } }
+            }
+            if (!signed) return@forEach
+            val tmp = File(jar.parentFile, "${jar.name}.unsigned")
+            ZipFile(jar).use { z ->
+                ZipOutputStream(tmp.outputStream().buffered()).use { out ->
+                    val en = z.entries()
+                    while (en.hasMoreElements()) {
+                        val e = en.nextElement()
+                        if (sig.matches(e.name)) continue
+                        out.putNextEntry(ZipEntry(e.name))
+                        if (!e.isDirectory) z.getInputStream(e).use { it.copyTo(out) }
+                        out.closeEntry()
+                    }
+                }
+            }
+            jar.delete()
+            tmp.renameTo(jar)
+            println("stripSignatures: removed signature entries from ${jar.name}")
+        }
+    }
+}
+
 // ========================================================================
 // BUILD PERFORMANCE
 // ========================================================================
@@ -602,3 +679,14 @@ tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
 // goes unnoticed locally until CI's version reaches a user. CI is
 // the single source of truth; reproduce the steps from
 // build_release.yml directly if you need a local portable.
+
+// Cap glibc's per-thread malloc arenas (Linux/glibc only). The native video
+// pipeline -- FFmpeg via Panama plus Skia across many allocating threads --
+// otherwise lets glibc grow an arena per thread and holds ~2.6 GB RSS at
+// steady state; capping to 2 arenas brings it to ~1.5 GB with no measured cost.
+// It is read by glibc at process start, so it cannot ride jvmArgs (a -D/-XX
+// flag) -- it goes on the run task's environment here, and the AppImage AppRun
+// in CI for the shipped Linux build. A no-op on Windows/macOS allocators.
+tasks.withType<JavaExec>().configureEach {
+    environment("MALLOC_ARENA_MAX", "2")
+}

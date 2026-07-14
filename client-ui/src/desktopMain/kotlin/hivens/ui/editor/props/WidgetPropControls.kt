@@ -11,11 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,10 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxSwitch
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.model.PropChoice
@@ -108,13 +108,14 @@ private fun BoolRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) 
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Switch(
+        NxSwitch(
             checked         = value,
             onCheckedChange = onChange,
-            colors          = SwitchDefaults.colors(checkedThumbColor = CelestiaTheme.colors.primary),
         )
     }
 }
@@ -128,7 +129,9 @@ private fun ColorRow(label: String, hex: String, onChange: (String) -> Unit) {
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(140.dp),
         )
         HexField(
@@ -150,7 +153,9 @@ private fun StringRow(label: String, value: String, onChange: (String) -> Unit) 
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(140.dp),
         )
         Box(
@@ -159,7 +164,7 @@ private fun StringRow(label: String, value: String, onChange: (String) -> Unit) 
                 .height(36.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(glassSurfaceAlpha(0.4f))
-                .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -167,8 +172,8 @@ private fun StringRow(label: String, value: String, onChange: (String) -> Unit) 
                 value         = text,
                 onValueChange = { text = it; onChange(it) },
                 singleLine    = true,
-                textStyle     = TextStyle(color = CelestiaTheme.colors.textPrimary, fontSize = 13.sp),
-                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                textStyle     = TextStyle(color = NxTheme.colors.textPrimary, fontSize = 13.sp),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
                 modifier      = Modifier.fillMaxWidth(),
             )
         }
@@ -185,27 +190,30 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(140.dp),
         )
         Box(modifier = Modifier.weight(1f)) {
             Text(
                 text     = selected,
                 style    = MaterialTheme.typography.bodySmall,
-                color    = CelestiaTheme.colors.textPrimary,
+                color    = NxTheme.colors.textPrimary,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
                     .background(glassSurfaceAlpha(0.4f))
-                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                     .clickable { expanded = true }
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             )
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            NxContextMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { opt ->
-                    DropdownMenuItem(
-                        text    = { Text(opt, style = MaterialTheme.typography.bodySmall) },
-                        onClick = { onChange(opt); expanded = false },
+                    NxMenuItem(
+                        label    = opt,
+                        selected = opt == selected,
+                        onClick  = { onChange(opt); expanded = false },
                     )
                 }
             }

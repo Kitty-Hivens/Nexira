@@ -36,6 +36,29 @@ enum class HomeView {
 @Serializable
 enum class UiStyle { Celestia, Brut }
 
+/**
+ * Which source drives the dark/light choice. Exactly one is active:
+ *
+ * - [Manual] -- the user's own day/night toggle; [SettingsData.isDarkTheme] as set.
+ * - [System] -- follow the OS colour scheme (XDG portal / registry / defaults).
+ * - [Wallpaper] -- follow the wallpaper's average brightness.
+ *
+ * Flipping the day/night toggle while in [System]/[Wallpaper] drops back to
+ * [Manual] -- an explicit choice always wins over an automatic source.
+ */
+@Serializable
+enum class ThemeMode { Manual, System, Wallpaper }
+
+/**
+ * The theme mode a fresh session starts in. Migrates the pre-mode opt-in: a
+ * settings file that enabled [SettingsData.themeFromWallpaper] before
+ * [SettingsData.themeMode] existed decodes with the field's default ([ThemeMode.System]),
+ * so the legacy flag promotes exactly that default to [ThemeMode.Wallpaper] -- a
+ * non-default stored mode is an explicit choice and wins over the flag.
+ */
+fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
+    if (s.themeMode == ThemeMode.System && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
+
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,
@@ -48,6 +71,36 @@ data class SettingsData(
     val memoryMB: Int = 6144,
     val isDarkTheme: Boolean = true,
     /**
+     * Derive the colour palette from the wallpaper (Material You / Monet): the
+     * dominant colour of the background seeds tinted tonal surfaces, so planes
+     * differ by colour, not just lightness. On by default. Off -> the fixed
+     * Celestia palette (and manual theme overrides) apply as before.
+     */
+    val paletteFromWallpaper: Boolean = true,
+    /**
+     * Legacy mirror of `themeMode == Wallpaper`, kept so a downgrade to a build
+     * that predates [themeMode] still honours the wallpaper opt-in. New code
+     * reads [themeMode] and only writes this field in step with it.
+     */
+    val themeFromWallpaper: Boolean = false,
+    /**
+     * Which source drives dark/light -- see [ThemeMode]. [isDarkTheme] stays the
+     * resolved value the automatic sources write through, so everything downstream
+     * (and older builds) keeps reading one boolean. Defaults to following the OS:
+     * where the scheme is unreadable the automatic source just never fires, so a
+     * fresh install falls back to [isDarkTheme]'s own default.
+     */
+    val themeMode: ThemeMode = ThemeMode.System,
+    /**
+     * Replace the OS title bar with the in-app top bar (undecorated window +
+     * custom caption buttons / drag / resize). On by default. Escape hatch: if a
+     * window manager -- or a future native-Wayland JVM, where client-side window
+     * control differs from today's XWayland path -- misbehaves with the custom
+     * chrome, turning this off restores the OS-decorated window. Applies at the
+     * next launch, since `undecorated` is fixed when the window is created.
+     */
+    val useCustomChrome: Boolean = true,
+    /**
      * Hide launcher window to tray after Play. Off by default -- most
      * users want the launcher visible after launch (switch servers,
      * open console). Opt-in for users who want out-of-sight behavior.
@@ -57,8 +110,15 @@ data class SettingsData(
     val savedFileManifest: FileManifest? = null,
     /** BCP-47 language tag: "ru", "en", "de". */
     val locale: String = "en",
-    /** Offline mode: skip authentication, use cached session. */
+    /** Offline mode: skip authentication, play with an offline identity. */
     val isOfflineMode: Boolean = false,
+    /**
+     * The offline-play name chosen via "Play offline". Drives the offline UUID
+     * (vanilla OfflinePlayer:<name>) and lets a restart restore the offline
+     * identity without re-typing. Null = none chosen yet; auto-login then falls
+     * back to the last signed-in name.
+     */
+    val offlinePlayerName: String? = null,
 
     // ── Experimental features ────────────────────────────────────────────
     // Master gates both children -- switching off disables the sub-toggles
@@ -213,4 +273,23 @@ data class SettingsData(
      * subsequent hide. Internal onboarding state -- no Settings UI surfaces it.
      */
     val trayHintShown: Boolean = false,
+
+    /**
+     * Which signed-in account fronts the shell -- the provider id of the chosen
+     * "face", or null for automatic licence-priority (the Microsoft account
+     * before SmartyCraft). With several accounts active at once, this pins whose
+     * name and skin the shell shows; the launch still routes per content.
+     */
+    val preferredFaceProvider: String? = null,
+
+    // -- Boot recovery state (not a user-facing toggle) -------------------
+
+    /**
+     * Modules boot recovery has disabled -- [ModuleId] ids the launcher skips at
+     * startup (tray, notify, skinema, keyring). NOT a normal settings toggle:
+     * written only from the recovery surface, effective on the next boot. Stored
+     * as stable string ids so an id a build does not recognise is ignored rather
+     * than resetting the file. Empty = everything on.
+     */
+    val disabledModules: Set<String> = emptySet(),
 )

@@ -16,11 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,74 +30,133 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
-import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.easter.LocalAprilFools
+import hivens.auth.AccountStore
+import hivens.ui.LoginPanel
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.skin3d.Cycles
+import hivens.ui.skin3d.rememberSkinViewState
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import org.koin.compose.koinInject
 
-// Account tab, skin-forward (option 7): the account panel (name + status,
-// balance + top-up) sits on top, with the 3D skin and its upload/refresh
-// controls directly below. Reads session from LocalProfileContext; online status
-// keeps the token-length sniff from the legacy panel. Logout itself is the
-// left-rail nav entry; the account.logout puppet hook below stays for automation.
+private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
+
+// SmartyCraft profile section (slot "account"). Signed into SmartyCraft it is the
+// skin-forward account view -- name + status, balance + top-up, the 3D skin and
+// its upload/refresh -- with a sign-out. Signed out of SmartyCraft (but present
+// in the shell via another provider) it shows the SmartyCraft sign-in form.
+// Resolves the SmartyCraft account directly rather than the shell face, since the
+// face may belong to a different provider; Microsoft lives in its own section.
 @Widget(id = "profile.account.section", displayName = "widget.profile.account.section")
 @Composable
 fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
-    // The nav only mounts this slot with a session; guard defensively.
-    val session = ctx.session ?: return
-    val s = LocalStrings.current
-    val af = LocalAprilFools.current
+    val credentials: AccountStore = koinInject()
 
-    // Bumped by the skin uploader so the skin re-loads after upload/refresh.
     var refreshKey by remember { mutableIntStateOf(0) }
-    val uploader = rememberSkinUploader(session) { refreshKey++ }
+    val scSession = remember(refreshKey, ctx.session) { credentials.accountFor(SC_KEY) }
 
-    Column(Modifier.fillMaxSize().padding(top = 4.dp)) {
-        Column(Modifier.widthIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            AccountPanel(session)
-
-            // Skin below the panel, with upload + refresh directly under it.
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SkinHero(
-                    session.playerName,
-                    refreshKey,
-                    Modifier.width(190.dp).height(300.dp),
-                    interactive = true,
-                    autoSpin = true,
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.widthIn(max = 520.dp)) {
+            if (scSession == null) {
+                // SmartyCraft uses the username/password form (plus offline); the
+                // Microsoft button is suppressed -- it has its own section.
+                LoginPanel(
+                    onLogin = {
+                        credentials.primarySession()?.let { ctx.onLogin(it) }
+                        refreshKey++
+                    },
+                    showMicrosoft = false,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Same Celestia-styled button as top-up (a chaos target with
-                    // its original puppet id); wraps to its text on one line.
-                    af.ChaosButton(
-                        id = "profile_upload_skin_btn",
-                        text = s.profileUploadSkin,
-                        onClick = uploader.pick,
-                        modifier = Modifier,
-                        colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
-                    )
-                    IconButton(onClick = uploader.refresh) {
-                        Icon(Icons.Default.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textSecondary)
-                    }
-                }
-                SkinUploadStatusLine(uploader.status)
+            } else {
+                SmartyCraftAccount(scSession) { refreshKey++ }
             }
         }
     }
+}
 
-    PuppetClick("account.logout") { ctx.onLogout() }
+@Composable
+private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
+    val ctx = LocalProfileContext.current
+    val credentials: AccountStore = koinInject()
+    val s = LocalStrings.current
+
+    // Bumped by the skin uploader so the skin re-loads after upload/refresh.
+    var skinKey by remember { mutableIntStateOf(0) }
+    val uploader = rememberSkinUploader(session) { skinKey++ }
+
+    // Signing out of SmartyCraft removes its account; if it was the only one, that
+    // is a full logout -- route it through the confirm (which clears + signs out)
+    // so a dismissed dialog leaves the account intact.
+    fun signOut() {
+        if (credentials.listAccounts().size <= 1) {
+            ctx.onLogout()
+            return
+        }
+        credentials.listAccounts().firstOrNull { it.providerId == SC_KEY }
+            ?.let { credentials.removeAccount(it.accountId) }
+        credentials.primarySession()?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+        onChanged()
+    }
+
+    Column(Modifier.fillMaxSize().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        AccountPanel(session)
+
+        // Skin below the panel, with upload + refresh directly under it. The
+        // hero idles (breath + head drift) instead of the turntable spin --
+        // the character inhabits the page; drag still orbits for inspection.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SkinHero(
+                session.playerName,
+                skinKey,
+                Modifier.width(190.dp).height(300.dp),
+                interactive = true,
+                autoSpin = false,
+                state = rememberSkinViewState(initialAnimation = Cycles.idle()),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Flexible("profile_upload_skin_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label = s.profileUploadSkin,
+                        onClick = uploader.pick,
+                        style = NxButtonStyle.Primary,
+                    )
+                }
+                IconButton(onClick = uploader.refresh) {
+                    Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxTheme.colors.textSecondary)
+                }
+            }
+            SkinUploadStatusLine(uploader.status)
+        }
+
+        Flexible("profile_sc_signout_btn", FlexibleKind.Button) {
+            NxButton(
+                label = s.profileSignOutSmartycraft,
+                onClick = { signOut() },
+                modifier = Modifier.widthIn(min = 200.dp),
+                style = NxButtonStyle.Secondary,
+            )
+        }
+        PuppetClick("account.signout.smartycraft") { signOut() }
+        PuppetClick("account.logout") { ctx.onLogout() }
+    }
 }
 
 @Composable
 private fun AccountPanel(session: SessionData) {
     val s = LocalStrings.current
-    val af = LocalAprilFools.current
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Name with the status pill on its right.
@@ -111,7 +165,7 @@ private fun AccountPanel(session: SessionData) {
                 text = session.playerName,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = CelestiaTheme.colors.textPrimary,
+                color = NxTheme.colors.textPrimary,
             )
             Spacer(Modifier.width(12.dp))
             StatusPill(online = session.accessToken.length > 10)
@@ -126,16 +180,14 @@ private fun AccountPanel(session: SessionData) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             BalanceCard(session.balance, Modifier.weight(1f))
-            af.ChaosButton(
-                id = "profile_topup_btn",
-                text = s.profileTopUp,
-                onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
-                modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = glassSurfaceAlpha(0.55f),
-                    contentColor = CelestiaTheme.colors.textPrimary,
-                ),
-            )
+            Flexible("profile_topup_btn", FlexibleKind.Button) {
+                NxButton(
+                    label = s.profileTopUp,
+                    onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
+                    modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
+                    style = NxButtonStyle.Secondary,
+                )
+            }
         }
     }
 }
@@ -144,7 +196,7 @@ private fun AccountPanel(session: SessionData) {
 private fun StatusPill(online: Boolean) {
     val s = LocalStrings.current
     val style = LocalStyle.current
-    val accent = if (online) CelestiaTheme.colors.success else CelestiaTheme.colors.error
+    val accent = if (online) NxTheme.colors.success else NxTheme.colors.error
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(style.cardCorner))
@@ -169,21 +221,21 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Star, s.profileBalance, tint = Color(0xFFFFD700), modifier = Modifier.size(20.dp))
+            Symbol(NxIcon.Star, s.profileBalance, tint = Color(0xFFFFD700), fill = 1f, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
-            Text(s.profileBalance, color = CelestiaTheme.colors.textSecondary)
+            Text(s.profileBalance, color = NxTheme.colors.textSecondary)
         }
         Text(
             text = "$balance ⛃",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = CelestiaTheme.colors.textPrimary,
+            color = NxTheme.colors.textPrimary,
         )
     }
 }

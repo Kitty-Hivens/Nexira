@@ -9,5 +9,13 @@ import hivens.core.data.SessionData
  * launcher's credential manager implements it.
  */
 interface ICredentialStore {
+    /** The active account's session, or null when none is signed in. */
     fun load(): SessionData?
+
+    /**
+     * The session for [providerId]'s account, or null when not signed in with
+     * that provider. Lets the launch pick the account matching the content's
+     * required provider (multi-active: SC + Microsoft + offline coexist).
+     */
+    fun accountFor(providerId: String): SessionData?
 }

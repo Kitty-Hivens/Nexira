@@ -7,17 +7,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
@@ -27,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.widget.model.CanvasPlacement
+import hivens.widget.model.GridCell
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
@@ -96,8 +99,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     val decorator = LocalWidgetDecorator.current
     val emptyDecorator = LocalEmptySlotDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
-    val slotControl = LocalSlotControlDecorator.current
-    val slotDivider = LocalSlotDividerDecorator.current
+    val slotChrome = LocalSlotChromeModifier.current
     val motionMs = LocalSlotMotionMs.current
 
     val content: SlotContent = graph.traverse(path) ?: SlotContent()
@@ -107,37 +109,37 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         // Occupy the slot footprint (inter-slot sizing lives in `modifier`)
         // so an empty slot keeps its place; the empty decorator paints the
         // edit-mode placeholder, or nothing.
-        Box(modifier) { emptyDecorator(address) }
+        Box(slotChrome(path, content).then(modifier)) { emptyDecorator(address) }
         return
     }
 
     when (content.orientation) {
-        SlotOrientation.Row -> Row(modifier.animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            slotControl(path, content)
+        SlotOrientation.Row -> Row(slotChrome(path, content).then(modifier).animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind]
-                if (descriptor != null) {
-                    val sizeMod = canvasSizeModifier(instance.canvas)
-                    when {
-                        // Weight wins over an explicit size in a flow slot: resizing
-                        // a weighted widget must not strip its flex (else the
-                        // weighted center region stops filling between the rails).
-                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                key(instance.instanceId) {
+                    val descriptor = registry[instance.kind]
+                    if (descriptor != null) {
+                        val movable = rememberWidgetMovable(descriptor, instance)
+                        val sizeMod = canvasSizeModifier(instance.canvas)
+                        when {
+                            // Weight wins over an explicit size in a flow slot: resizing
+                            // a weighted widget must not strip its flex (else the
+                            // weighted center region stops filling between the rails).
+                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            sizeMod != null -> Box(sizeMod) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            else -> decorator(address, index, descriptor, instance) { movable() }
                         }
-                        sizeMod != null -> Box(sizeMod) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
-                        }
-                        else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                    } else {
+                        unknownDecorator(address, index, instance)
                     }
-                } else {
-                    unknownDecorator(address, index, instance)
                 }
-                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
-        SlotOrientation.Grid -> Column(modifier.animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            slotControl(path, content)
+        SlotOrientation.Grid -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
             // Non-lazy chunked grid: a Column of equal-width Rows. Reuses the
             // decorator path so chrome + DnD stay consistent; cells are uniform
             // (per-widget weight is ignored in Grid) and the last row is padded
@@ -147,12 +149,15 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                     rowWidgets.forEachIndexed { colIndex, instance ->
                         val index = rowIndex * cols + colIndex
-                        val descriptor = registry[instance.kind]
-                        Box(Modifier.weight(1f)) {
-                            if (descriptor != null) {
-                                decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
-                            } else {
-                                unknownDecorator(address, index, instance)
+                        key(instance.instanceId) {
+                            val descriptor = registry[instance.kind]
+                            Box(Modifier.weight(1f)) {
+                                if (descriptor != null) {
+                                    val movable = rememberWidgetMovable(descriptor, instance)
+                                    decorator(address, index, descriptor, instance) { movable() }
+                                } else {
+                                    unknownDecorator(address, index, instance)
+                                }
                             }
                         }
                     }
@@ -168,80 +173,132 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
             val reportSlotBounds = LocalSlotBoundsReporter.current
             var slotSizeDp by remember { mutableStateOf(Size.Zero) }
             Box(
-                modifier
+                slotChrome(path, content)
+                    .then(modifier)
                     .onSizeChanged { sz ->
                         slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
                     }
                     .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
             ) {
                 CompositionLocalProvider(LocalCanvasSlotSizeDp provides slotSizeDp) {
-                    // Anchor the edit-mode orientation chip to the corner so it
-                    // does not overlap a widget placed at (0,0).
-                    Box(Modifier.align(Alignment.TopStart)) { slotControl(path, content) }
                     // Free canvas: each widget at its absolute dp offset + size,
                     // painted in z-order then index. Overlap is natural in a Box.
                     content.widgets.withIndex()
                         .sortedWith(compareBy({ it.value.canvas?.z ?: 0 }, { it.index }))
                         .forEach { (index, instance) ->
-                            val cp = instance.canvas
-                            val descriptor = registry[instance.kind]
-                            if (descriptor == null) {
-                                Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp)) {
-                                    unknownDecorator(address, index, instance)
+                            key(instance.instanceId) {
+                                val cp = instance.canvas
+                                val descriptor = registry[instance.kind]
+                                if (descriptor == null) {
+                                    Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp)) {
+                                        unknownDecorator(address, index, instance)
+                                    }
+                                } else {
+                                    val movable = rememberWidgetMovable(descriptor, instance)
+                                    val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
+                                        Modifier.size(cp.width.dp, cp.height.dp) else Modifier
+                                    Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
+                                        decorator(address, index, descriptor, instance) { movable() }
+                                    }
                                 }
-                                return@forEach
                             }
-                            val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
-                                Modifier.size(cp.width.dp, cp.height.dp) else Modifier
-                            Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
-                                decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                        }
+                }
+            }
+        }
+        SlotOrientation.CubeGrid -> {
+            // Cube-cell grid: each widget occupies an addressed cell rectangle
+            // (col/row + span). Cell size derives from the measured slot width and
+            // the column count; cells are square (cellH = cellW); `spacing` is the
+            // gutter. Static placement here -- live move/resize land in later phases.
+            val density = LocalDensity.current
+            val reportSlotBounds = LocalSlotBoundsReporter.current
+            var slotSizeDp by remember { mutableStateOf(Size.Zero) }
+            val cols = content.gridColumns.coerceAtLeast(1)
+            Box(
+                slotChrome(path, content)
+                    .then(modifier)
+                    .onSizeChanged { sz ->
+                        slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
+                    }
+                    .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
+            ) {
+                val cellW: Dp =
+                    if (slotSizeDp.width > 0f) ((slotSizeDp.width.dp - spacing * (cols + 1)) / cols).coerceAtLeast(0.dp)
+                    else 0.dp
+                CompositionLocalProvider(
+                    LocalCanvasSlotSizeDp provides slotSizeDp,
+                    LocalCubeGeometry provides CubeGeometry(cellW.value, spacing.value, cols),
+                ) {
+                    content.widgets.withIndex()
+                        .sortedWith(compareBy({ it.value.cell?.z ?: 0 }, { it.index }))
+                        .forEach { (index, instance) ->
+                            key(instance.instanceId) {
+                                val gc      = instance.cell ?: GridCell()
+                                val colSpan = gc.colSpan.coerceIn(1, cols)
+                                val col     = gc.col.coerceIn(0, cols - colSpan)
+                                val rowSpan = gc.rowSpan.coerceAtLeast(1)
+                                val row     = gc.row.coerceAtLeast(0)
+                                val x = spacing + (cellW + spacing) * col
+                                val y = spacing + (cellW + spacing) * row
+                                val w = cellW * colSpan + spacing * (colSpan - 1)
+                                val h = cellW * rowSpan + spacing * (rowSpan - 1)
+                                val descriptor = registry[instance.kind]
+                                Box(Modifier.offset(x, y).size(w, h)) {
+                                    if (descriptor != null) {
+                                        val movable = rememberWidgetMovable(descriptor, instance)
+                                        decorator(address, index, descriptor, instance) { movable() }
+                                    } else {
+                                        unknownDecorator(address, index, instance)
+                                    }
+                                }
                             }
                         }
                 }
             }
         }
         // Column.
-        else -> Column(modifier.animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            slotControl(path, content)
+        else -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind]
-                if (descriptor != null) {
-                    val sizeMod = canvasSizeModifier(instance.canvas)
-                    when {
-                        // Weight wins over an explicit size in a flow slot: resizing
-                        // a weighted widget must not strip its flex (else the
-                        // weighted center region stops filling between the rails).
-                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                key(instance.instanceId) {
+                    val descriptor = registry[instance.kind]
+                    if (descriptor != null) {
+                        val movable = rememberWidgetMovable(descriptor, instance)
+                        val sizeMod = canvasSizeModifier(instance.canvas)
+                        when {
+                            // Weight wins over an explicit size in a flow slot: resizing
+                            // a weighted widget must not strip its flex (else the
+                            // weighted center region stops filling between the rails).
+                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            sizeMod != null -> Box(sizeMod) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            else -> decorator(address, index, descriptor, instance) { movable() }
                         }
-                        sizeMod != null -> Box(sizeMod) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
-                        }
-                        else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                    } else {
+                        unknownDecorator(address, index, instance)
                     }
-                } else {
-                    unknownDecorator(address, index, instance)
                 }
-                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
     }
 }
 
-// Renders a widget, wrapped in its per-instance backing when it has one. The
-// chrome wrap is inside the editor decorator (the drag handle / remove button
-// surround the glass card) but is PRODUCTION styling -- it paints whenever
-// instance.chrome != null, editor mounted or not.
-// Explicit per-widget size for a flow (Row/Column) slot, or null when the
-// widget has no canvas size set -- in which case the slot lays it out as
-// before (weighted or wrap/fill). Lets the editor's resize handle size a
-// widget (e.g. the music player) without switching the slot to Canvas. Only a
-// resized widget carries a size, so untouched layouts are unaffected.
+// Per-widget resize for a flow (Row/Column) slot, applied as a MAXIMUM bound, or
+// null when the widget has no canvas size set. Content that fills (a list, an
+// image) grows to the bound; content that does not (a card, a label, a spacer at
+// its prop height) wraps at its natural size instead of leaving empty space below
+// or beside it -- so dragging the handle past the content no longer inflates the
+// box with phantom padding. A fixed extent only suits the free canvas (which sets
+// Modifier.size directly). Only a resized widget carries a size, so untouched
+// layouts are unaffected.
 private fun canvasSizeModifier(cp: CanvasPlacement?): Modifier? {
     if (cp == null || (cp.width <= 0f && cp.height <= 0f)) return null
     var m: Modifier = Modifier
-    if (cp.width > 0f) m = m.width(cp.width.dp)
-    if (cp.height > 0f) m = m.height(cp.height.dp)
+    if (cp.width > 0f) m = m.widthIn(max = cp.width.dp)
+    if (cp.height > 0f) m = m.heightIn(max = cp.height.dp)
     return m
 }
 
@@ -255,6 +312,24 @@ private fun canvasSizeModifier(cp: CanvasPlacement?): Modifier? {
 private fun Modifier.animatedReflow(motionMs: Int): Modifier =
     if (motionMs > 0) this.then(Modifier.animateContentSize(tween(motionMs))) else this
 
+// Wraps a widget's content in a per-instance movableContentOf so the editor's
+// identity<->chrome decorator swap (a static-local change that relocates content()
+// deeper in the slot tree) MOVES the widget subtree instead of disposing it -- the
+// widget keeps its loaded state (remember / LaunchedEffect) across an edit-mode
+// toggle. rememberUpdatedState feeds the latest descriptor/instance so a prop edit
+// does not force the movable to be recreated. Call inside a key(instanceId) so the
+// movable is per-instance: stable across reorder, cleaned up when the instance leaves.
+@Composable
+private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: WidgetInstance): @Composable () -> Unit {
+    val descriptorState = rememberUpdatedState(descriptor)
+    val instanceState   = rememberUpdatedState(instance)
+    return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
+}
+
+// Renders a widget, wrapped in its per-instance backing when it has one. The
+// chrome wrap is inside the editor decorator (the drag handle / remove button
+// surround the glass card) but is PRODUCTION styling -- it paints whenever
+// instance.chrome != null, editor mounted or not.
 @Composable
 private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
     val chrome = instance.chrome

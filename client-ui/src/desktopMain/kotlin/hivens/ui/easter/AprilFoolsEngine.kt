@@ -25,13 +25,37 @@ object AprilFoolsEngine {
 
     // ─── Entry point ──────────────────────────────────────────────────────────
 
-    suspend fun run(
-        scope: CoroutineScope,
+    // Owns every chaos coroutine: the tilt-drift loop, the event loop, and each
+    // per-event job launched off it. Created by [start], cancelled by [stop], so
+    // teardown is explicit and idempotent rather than implied by whichever
+    // composition scope happened to be passed in. A second [start] drops the
+    // prior engine first, so a shell remount (crash-recovery restart) can never
+    // leave two engines writing the one process-global [ChaosState].
+    @Volatile
+    private var engineScope: CoroutineScope? = null
+
+    /**
+     * Start the chaos engine as a child of [parent] (so it also dies if the
+     * parent scope is cancelled). Idempotent: a re-start cancels the previous
+     * run first. [cursorState] / [windowSize] are sampled live by the events.
+     */
+    fun start(
+        parent: CoroutineScope,
         cursorState: () -> Offset,
         windowSize: () -> IntSize,
-    ) = coroutineScope {
-        launch { runTiltDrift() }
-        launch { runEventLoop(scope, cursorState, windowSize) }
+    ) {
+        stop()
+        val scope = CoroutineScope(parent.coroutineContext + SupervisorJob(parent.coroutineContext[Job]))
+        engineScope = scope
+        scope.launch { runTiltDrift() }
+        scope.launch { runEventLoop(scope, cursorState, windowSize) }
+    }
+
+    /** Cancel every chaos coroutine and reset the global overlay state. */
+    fun stop() {
+        engineScope?.cancel()
+        engineScope = null
+        ChaosState.clean()
     }
 
     // ─── Tilt drift ───────────────────────────────────────────────────────────

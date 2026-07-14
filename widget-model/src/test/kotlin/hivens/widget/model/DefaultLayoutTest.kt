@@ -14,15 +14,17 @@ class DefaultLayoutTest {
         val surfaceIds = graph.surfaces.keys.map { it.value }.toSet()
         assertEquals(
             setOf(
-                // shell-as-surface root (three region widgets in a Row)
+                // shell-as-surface root (Column of top bar + body) and its nested
+                // body (the three region widgets in a Row) + the title-bar surface
                 "appshell.root",
+                "appshell.body",
+                "appshell.topbar",
                 // kernel-3 originals
                 "home.classic", "home.new", "library",
                 "appshell.leftrail", "appshell.rightrail",
                 // Phase B.1 widgetized screens (incremental landing)
                 "about",
                 "bg.settings",
-                "customization",
                 "profile",
                 "server.details",
                 "theme.picker",
@@ -87,7 +89,7 @@ class DefaultLayoutTest {
             assertEquals("nav.entry", it.kind.value, "leftrail items must all be nav.entry")
             it.props["target"]?.jsonPrimitive?.content
         }
-        assertEquals(listOf("Home", "Library", "Browse", "Profile", "Settings", "About"), targets("top"))
+        assertEquals(listOf("Home", "Library", "Browse", "Profile", "Wardrobe", "Settings", "About"), targets("top"))
         assertEquals(listOf("Console", "Logout"), targets("bottom"))
     }
 }

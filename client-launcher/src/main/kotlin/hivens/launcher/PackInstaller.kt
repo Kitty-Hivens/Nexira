@@ -50,11 +50,16 @@ class PackInstaller(
         packId: String,
         summary: SmrtPackSummary,
         manifest: SmrtPackManifest,
+        onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance {
         val instanceId  = UUID.randomUUID().toString()
         val instanceDir = sanitizeInstanceDir("$packId-$instanceId")
         val clientDir   = dataDir.resolve("instances").resolve(instanceDir)
+
+        // Reserve before any bytes land, so a cancel that fires inside sync
+        // still knows which partial dir to remove.
+        onReserveDir(clientDir)
 
         log.info("install: pack={} version={} -> instance={} dir={}",
             packId, manifest.packVersion, instanceId, clientDir)
@@ -88,6 +93,8 @@ class PackInstaller(
                 version = manifest.packVersion,
             ),
             displayName           = summary.displayName,
+            iconUrl               = summary.iconUrl,
+            bannerUrl             = summary.bannerUrl,
             instanceDirName       = instanceDir,
             createdAtEpoch        = Instant.now().epochSecond,
             lastPlayedEpochOrZero = 0L,

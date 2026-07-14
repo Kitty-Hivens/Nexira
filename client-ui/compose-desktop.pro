@@ -48,6 +48,11 @@
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 
+# jsoup optionally speeds its regexes with re2j when present; we don't ship it
+# and jsoup falls back to java.util.regex at runtime, so the dangling references
+# are harmless -- but ProGuard aborts on them without this.
+-dontwarn com.google.re2j.**
+
 # --- Coil 3 (Image Loading) ---
 -keep class coil3.** { *; }
 -keepnames class * implements coil3.ImageLoaderFactory
@@ -60,6 +65,10 @@
 -keep class hivens.ui.MainKt { *; }
 -keep class hivens.ui.** { *; }
 -keep class hivens.launcher.** { *; }
+# Credential store + media resolvers moved out of hivens.launcher into their own
+# modules; without these they silently fall out of the keep set (release-only breakage).
+-keep class hivens.auth.** { *; }
+-keep class hivens.media.** { *; }
 -keep class hivens.core.** { *; }
 
 # --- Serialization & Data Classes ---
@@ -138,6 +147,43 @@
 # invokeExact descriptors read as unresolved library members).
 -keep class dev.hivens.libnotify.** { *; }
 -dontwarn dev.hivens.libnotify.**
+
+# ── libvault: same Panama treatment as libtray + libnotify ────────────────
+# The keyring lib (Secret Service / Credential Manager / Keychain via FFM)
+# reaches the uber jar transitively through client-launcher. Its per-platform
+# bindings call MethodHandle.invokeExact(MemorySegment...) -- signature-
+# polymorphic intrinsics ProGuard reports as unresolved library members and
+# then aborts on. Same keep + dontwarn as the rest of the dev.hivens family.
+-keep class dev.hivens.libvault.** { *; }
+-dontwarn dev.hivens.libvault.**
+
+# ── skinema: same Panama treatment as libtray + libnotify ─────────────────
+# The media engine (FFmpeg/libwebp/libass via FFM) downcalls through
+# MethodHandle.invokeExact(MemorySegment...) and registers upcall stubs the
+# same way -- methods with no source call sites that ProGuard would strip,
+# breaking native init at runtime (a release-only failure). The -skiko bridge
+# and the natives loader live under the same root, so one wildcard covers them.
+-keep class dev.hivens.skinema.** { *; }
+-dontwarn dev.hivens.skinema.**
+
+# ── HoldKeyProbe: our own Project Panama libX11 downcalls ─────────────────
+# The hold-Shift-at-launch recovery gesture reads the X keymap over a short-lived
+# libX11 connection via FFM. MethodHandle.invoke(MemorySegment...) is signature-
+# polymorphic, so ProGuard sees a concrete descriptor, reports the invoke as an
+# unresolved MethodHandle member, and aborts. Same keep + dontwarn as the
+# dev.hivens Panama family, but this caller lives in our own tree.
+-keep class hivens.ui.bootstrap.HoldKeyProbe { *; }
+-dontwarn hivens.ui.bootstrap.HoldKeyProbe
+
+# ── Bouncy Castle: keep the whole crypto engine intact ────────────────────
+# bcprov-jdk18on arrives transitively through dev.hivens:libvault (the encrypted
+# credential vault). It registers algorithms reflectively, so shrinking it to the
+# statically-reachable classes breaks provider init at runtime; keep it whole. Its
+# original BouncyCastle signature is stripped from the ProGuard output separately
+# (build.gradle.kts stripSignatures) -- shrinking already invalidated it, and the
+# JVM rejects a repackaged signed jar with "Invalid signature file digest".
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
 
 # ── dbus-java: ServiceLoader-resolved transport providers ─────────────────
 # Linux fielded report (file picker silently broken on AppImage): filekit's

@@ -20,11 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,7 +37,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
@@ -53,9 +50,9 @@ import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetChrome
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
+import kotlin.math.roundToInt
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
-import kotlin.math.roundToInt
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -153,7 +150,7 @@ private fun PropPanelBody(
             .clip(RoundedCornerShape(14.dp))
             // Solid surface, no glass: a settings panel must stay readable and
             // not composite with the layers it floats over.
-            .background(CelestiaTheme.colors.surface),
+            .background(NxTheme.colors.surface),
     ) {
         Row(
             verticalAlignment     = Alignment.CenterVertically,
@@ -163,25 +160,23 @@ private fun PropPanelBody(
                 .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector        = Icons.Default.Tune,
+                Symbol(icon = NxIcon.Tune,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.primary,
+                    tint               = NxTheme.colors.primary,
                     modifier           = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text       = s.widgetLabel(descriptor.displayName),
                     style      = MaterialTheme.typography.titleSmall,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector        = Icons.Default.Close,
+                Symbol(icon = NxIcon.Close,
                     contentDescription = s.editorClose,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -220,7 +215,7 @@ private fun PropPanelBody(
             Text(
                 text       = s.editorBackingTitle,
                 style      = MaterialTheme.typography.labelMedium,
-                color      = CelestiaTheme.colors.textSecondary,
+                color      = NxTheme.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
             val chrome = instance.chrome ?: WidgetChrome()
@@ -239,7 +234,7 @@ private fun PropPanelBody(
                 Text(
                     text  = s.editorBackingNoGlassHint,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                 )
             }
             LabeledSlider(
@@ -301,7 +296,7 @@ private fun PropPanelBody(
             },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
-            Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+            Symbol(NxIcon.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(s.editorResetToDefault, style = MaterialTheme.typography.labelMedium)
         }

@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -37,7 +37,7 @@ fun SpacerWidget(instance: WidgetInstance) {
         Spacer(Modifier.fillMaxWidth().height(h))
         return
     }
-    val lineColor = CelestiaTheme.colors.outline.copy(alpha = 0.35f)
+    val lineColor = NxTheme.colors.outline.copy(alpha = 0.35f)
     Canvas(
         modifier = Modifier
             .fillMaxWidth()

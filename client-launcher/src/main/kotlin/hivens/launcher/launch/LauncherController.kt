@@ -1,6 +1,7 @@
 package hivens.launcher.launch
 
 import hivens.auth.AuthProvider
+import hivens.auth.AuthProviderRegistry
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
@@ -9,6 +10,7 @@ import hivens.core.api.dto.smrt.toDomain
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.ContentToggle
 import hivens.core.data.LauncherLogType
+import hivens.core.data.OfflineIdentity
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
@@ -56,6 +58,7 @@ import kotlinx.coroutines.slf4j.MDCContext
  */
 class LauncherController(
     private val authService: AuthProvider,
+    private val authProviderRegistry: AuthProviderRegistry,
     private val credentialsManager: ICredentialStore,
     private val settingsService: ISettingsService,
     private val downloadService: IFileDownloadService,
@@ -203,6 +206,8 @@ class LauncherController(
             val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> SpawnResult,
             /** Runs once after the process spawns. [launchInternal] guards it, so it never fails the launch. */
             val onSpawned: (suspend () -> Unit)? = null,
+            /** Runs once after the game process exits, with the session length in seconds. Guarded like [onSpawned]. */
+            val onExit: (suspend (sessionSeconds: Long) -> Unit)? = null,
         ) : Prepared
 
         data object Bail : Prepared
@@ -271,6 +276,7 @@ class LauncherController(
                         prepared.onSpawned?.let { hook ->
                             runCatching { hook() }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
                         }
+                        val sessionStart = Instant.now().epochSecond
 
                         // Reads its OWN captured abortToken, never the
                         // currentAbortToken field -- see that field's KDoc for the
@@ -278,6 +284,10 @@ class LauncherController(
                         val exitCode = handle.awaitExit()
                         runningHandle = null
                         ActionRing.record("Game exited: $label (code $exitCode)")
+                        prepared.onExit?.let { hook ->
+                            val secs = (Instant.now().epochSecond - sessionStart).coerceAtLeast(0)
+                            runCatching { hook(secs) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
+                        }
 
                         if (exitCode != 0 && !abortToken.get()) {
                             fail(LaunchError.ExitCode(exitCode))
@@ -322,13 +332,22 @@ class LauncherController(
 
         if (isOffline) {
             emit(LaunchLogEvent.OfflineSkipAuth)
-            // In offline mode, use whatever session we have (or a stub)
-            if (session.accessToken.isBlank()) {
-                session = session.copy(accessToken = "offline")
-            }
+            // Offline: no SC auth, so the bound server cannot be joined -- the
+            // client still launches for singleplayer/LAN. Mint a proper offline
+            // identity (vanilla OfflinePlayer UUID, blank token -> "0" in argv +
+            // userType legacy) rather than carrying a stale/garbage session.
+            ActionRing.record(
+                "Offline launch of '$targetServerId': singleplayer only, the server cannot be joined without auth",
+            )
+            session = session.copy(
+                uuid = if (session.offline) session.uuid else OfflineIdentity.dashlessUuidFor(session.playerName),
+                accessToken = "",
+                offline = true,
+            )
         } else {
             try {
-                val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
+                val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
+                    ?: session.cachedPassword
                 if (!pass.isNullOrEmpty()) {
                     session = authService.login(session.playerName, pass, targetServerId)
                     onSessionRefreshed?.invoke(session)
@@ -539,8 +558,7 @@ class LauncherController(
 
         // 3. Auth requirement: refresh the session right before spawn. Mirrors
         // the SC server path's pre-spawn re-auth.
-        val authRequirement = manifestSnapshot.authRequirement
-            ?: fallbackAuthRequirement(refreshedInstance)
+        val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
         var session = currentSession
         if (authRequirement != null) {
             setStage(PrepareStage.AUTH, 0.4f)
@@ -565,9 +583,9 @@ class LauncherController(
                 launcherService.launchPackClient(
                     sessionData          = session,
                     // Carry the EFFECTIVE requirement (manifest value or the
-                    // name-based fallback) so the service's SC-binding step sees it;
-                    // the raw snapshot's authRequirement is null for packs whose
-                    // mirror manifest has no auth block yet (e.g. Industrial).
+                    // router's origin-derived one) so the service's SC-binding step
+                    // sees it; the raw snapshot's authRequirement is null for packs
+                    // whose mirror manifest has no auth block yet (e.g. Industrial).
                     manifest             = manifestSnapshot.copy(authRequirement = authRequirement),
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
@@ -592,6 +610,15 @@ class LauncherController(
                 packRepository.put(
                     refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
                 )
+            },
+            onExit = { secs ->
+                // Re-read the persisted instance (onSpawned wrote lastPlayed; the
+                // user may have edited it mid-session) and add the session onto
+                // THAT, so neither write clobbers the other. Skip when it's gone --
+                // never resurrect an instance deleted while it ran.
+                packRepository.get(refreshedInstance.id)?.let { current ->
+                    packRepository.put(current.copy(playtimeSeconds = current.playtimeSeconds + secs))
+                }
             },
         )
     }
@@ -639,80 +666,94 @@ class LauncherController(
     }
 
     /**
-     * Run the pack-side auth refresh, mirroring the SC server-list
-     * path's pre-spawn re-auth (see [launch], around the AUTH stage).
-     * Returns the refreshed [SessionData], a 2FA-fallback session
-     * with the cached manifest attached, or null after [fail] has
-     * already set the error state -- the caller bails on null.
-     *
-     * Precondition: missing player + password for an SC requirement
-     * fails with [LaunchError.MissingAuthProvider] rather than
-     * spawning the game and waiting for the SC join to reject the
-     * stale token; the surface is friendlier and the diagnosis is
-     * unambiguous.
+     * Pack-side pre-spawn auth, dispatched by the pack's [PackAuthRequirement].
+     * A requirement is enforced only for a provider the [authProviderRegistry] can
+     * satisfy: SC-bound requirements ([PackAuthRequirement.SmartyCraft], and the SC
+     * half of [PackAuthRequirement.Both]) re-auth via [prepareScAuth] when SC is
+     * registered; [PackAuthRequirement.Microsoft] -- and any SC requirement whose
+     * provider is somehow absent -- is advisory, so the pack launches with the
+     * current session. A newly registered provider activates its gate on its own.
      */
     private suspend fun preparePackAuth(
         requirement: PackAuthRequirement,
         currentSession: SessionData,
         instance: PackInstance,
     ): SessionData? {
-        when (requirement) {
-            is PackAuthRequirement.SmartyCraft -> {
-                val saved = credentialsManager.load()
-                val pass = saved?.cachedPassword ?: currentSession.cachedPassword
-                val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
-                if (playerName.isBlank() || pass.isNullOrEmpty()) {
-                    ActionRing.record(
-                        "Pack launch ${instance.displayName}: missing SC credentials for '${requirement.serverId}'",
-                    )
-                    fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
-                    return null
+        val scSatisfiable = authProviderRegistry.contains(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+        return when (requirement) {
+            is PackAuthRequirement.SmartyCraft ->
+                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+            is PackAuthRequirement.Both ->
+                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+            PackAuthRequirement.Microsoft ->
+                if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) {
+                    currentSession // no Microsoft provider configured -> advisory (Phase A behavior)
+                } else {
+                    credentialsManager.accountFor(PackAuthRequirement.Microsoft.PROVIDER_KEY)
+                        ?: run {
+                            ActionRing.record(
+                                "Pack launch ${instance.displayName}: Microsoft account required, none signed in",
+                            )
+                            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.Microsoft.PROVIDER_KEY))
+                            null
+                        }
                 }
-                return try {
-                    val fresh = authService.login(playerName, pass, requirement.serverId)
-                    emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
-                    fresh
-                } catch (_: TwoFactorRequiredException) {
-                    val cached = manifestCache.loadManifest(requirement.serverId)
-                    if (cached != null) {
-                        ActionRing.record(
-                            "Pack launch ${instance.displayName}: 2FA account, using cached manifest for '${requirement.serverId}'",
-                        )
-                        currentSession.copy(fileManifest = cached)
-                    } else {
-                        ActionRing.record(
-                            "Pack launch ${instance.displayName}: 2FA + no cached manifest for '${requirement.serverId}' -- re-login required",
-                        )
-                        fail(LaunchError.TwoFactorExpired)
-                        null
-                    }
-                } catch (e: Exception) {
-                    // Non-2FA login failure: log + keep the existing
-                    // session. Same graceful-degradation as the SC
-                    // server path -- a real expired token surfaces as
-                    // a more specific reject from the game itself.
-                    emit(LaunchLogEvent.AuthFailed(e.message))
-                    currentSession
-                }
-            }
         }
     }
 
     /**
-     * Synthesize an [PackAuthRequirement] for SC-bound packs whose
-     * mirror manifest has not yet been updated with an explicit
-     * `auth` block. Recognises the shipping SC pack identities by
-     * name; new packs added here as they go live until the mirror
-     * authors fill in `auth: { kind: smartycraft, server_id: ... }`
-     * and this map drains naturally.
+     * SmartyCraft pre-spawn re-auth for an SC-bound pack, mirroring the SC
+     * server-list path's pre-spawn re-auth (see [launch], around the AUTH stage).
+     * Returns the refreshed [SessionData], a 2FA-fallback session with the cached
+     * manifest attached, or null after [fail] has already set the error state -- the
+     * caller bails on null.
+     *
+     * Precondition: missing player + password fails with
+     * [LaunchError.MissingAuthProvider] rather than spawning the game and waiting
+     * for the SC join to reject the stale token; the surface is friendlier and the
+     * diagnosis is unambiguous.
      */
-    private fun fallbackAuthRequirement(instance: PackInstance): PackAuthRequirement? {
-        val matchesIndustrial = listOf(instance.displayName, instance.packRef.id)
-            .any { it.equals("Industrial", ignoreCase = true) }
-        return if (matchesIndustrial) {
-            PackAuthRequirement.SmartyCraft("Industrial")
-        } else {
-            null
+    private suspend fun prepareScAuth(
+        serverId: String,
+        currentSession: SessionData,
+        instance: PackInstance,
+    ): SessionData? {
+        // Multi-active: an SC-bound pack always uses the SmartyCraft account,
+        // regardless of which account is the chrome "primary".
+        val saved = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+        val pass = saved?.cachedPassword ?: currentSession.cachedPassword
+        val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
+        if (playerName.isBlank() || pass.isNullOrEmpty()) {
+            ActionRing.record(
+                "Pack launch ${instance.displayName}: missing SC credentials for '$serverId'",
+            )
+            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
+            return null
+        }
+        return try {
+            val fresh = authService.login(playerName, pass, serverId)
+            emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
+            fresh
+        } catch (_: TwoFactorRequiredException) {
+            val cached = manifestCache.loadManifest(serverId)
+            if (cached != null) {
+                ActionRing.record(
+                    "Pack launch ${instance.displayName}: 2FA account, using cached manifest for '$serverId'",
+                )
+                currentSession.copy(fileManifest = cached)
+            } else {
+                ActionRing.record(
+                    "Pack launch ${instance.displayName}: 2FA + no cached manifest for '$serverId' -- re-login required",
+                )
+                fail(LaunchError.TwoFactorExpired)
+                null
+            }
+        } catch (e: Exception) {
+            // Non-2FA login failure: log + keep the existing session. Same
+            // graceful-degradation as the SC server path -- a real expired token
+            // surfaces as a more specific reject from the game itself.
+            emit(LaunchLogEvent.AuthFailed(e.message))
+            currentSession
         }
     }
 

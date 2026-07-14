@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
@@ -62,7 +62,7 @@ data class NotesState(
 fun NotesWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<NotesProps>()
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     var notes by instance.rememberWidgetState { NotesState() }
 
     AdaptiveWidget(referenceWidth = 220.dp, referenceHeight = 180.dp) { scale ->

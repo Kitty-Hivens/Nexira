@@ -2,6 +2,11 @@ package hivens.launcher.security
 
 import hivens.core.security.IKeyringStorage
 import org.slf4j.LoggerFactory
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Picks an [IKeyringStorage] impl for the current platform, probing
@@ -51,15 +56,46 @@ object KeyringStorageFactory {
         }
     }
 
-    private inline fun tryProbe(label: String, factory: () -> IKeyringStorage): IKeyringStorage? {
+    /**
+     * libsecret / Keychain / WinCred probes write+read a test secret -- milliseconds on a
+     * healthy store. But a LOCKED Secret Service with no prompt agent (common on minimal
+     * Wayland WMs: Hyprland / sway / i3) makes the synchronous native call block forever,
+     * and system() is resolved on the AWT thread during first composition -- so an unbounded
+     * probe freezes startup with no window ever appearing. Cap it: past the deadline the
+     * backend counts as unavailable and CredentialsManager falls back to its AES-GCM file.
+     */
+    private const val PROBE_TIMEOUT_MS = 1500L
+
+    private fun tryProbe(label: String, factory: () -> IKeyringStorage): IKeyringStorage? {
         return runCatching {
-            val impl = factory()
-            if (impl.isAvailable()) impl else null
+            probeWithTimeout(PROBE_TIMEOUT_MS) { factory().takeIf { it.isAvailable() } }
         }.onFailure {
-            // Native lib missing (UnsatisfiedLinkError) or DBus daemon
-            // down. INFO not WARN -- expected outcome on headless CI /
-            // minimal Linux.
+            // Native lib missing (UnsatisfiedLinkError) or DBus daemon down. INFO not WARN
+            // -- expected outcome on headless CI / minimal Linux.
             log.info("Keyring probe {} unavailable: {}", label, it.message ?: it.javaClass.simpleName)
         }.getOrNull()
+    }
+
+    /**
+     * Runs [block] on a throwaway daemon thread, waiting at most [timeoutMs]. Returns the
+     * result, or null if it does not finish in time -- the backstop against a native keyring
+     * call that never returns. The stranded worker is a daemon (native FFI ignores interrupt
+     * so it cannot be force-cancelled, but it dies with the JVM). Re-throws the block's own
+     * exception so the caller's runCatching still sees missing-library failures.
+     */
+    internal fun <T> probeWithTimeout(timeoutMs: Long, block: () -> T): T? {
+        val exec = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "keyring-probe").apply { isDaemon = true }
+        }
+        return try {
+            exec.submit(Callable { block() }).get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: TimeoutException) {
+            log.warn("Keyring probe exceeded {}ms -- backend likely locked with no prompter; using fallback", timeoutMs)
+            null
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        } finally {
+            exec.shutdownNow()
+        }
     }
 }

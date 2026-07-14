@@ -395,6 +395,9 @@ class SmartyCraftAuthProviderTest {
             SmartyCraftAuthProvider(proto).login("user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
+        // Network-shaped: the auto-login coordinator retries on this flag;
+        // a server-side rejection must never carry it.
+        assertTrue(ex.isNetworkError)
     }
 
     @Test
@@ -403,6 +406,24 @@ class SmartyCraftAuthProviderTest {
             .login("user", "pass", "Industrial")
         assertEquals("TestPlayer", session.playerName)
         assertNotNull(session.accessToken)
+    }
+
+    @Test
+    fun `login maps the clan tag and marks it resolved`() = runTest {
+        val session = SmartyCraftAuthProvider(protocol(ok().copy(clan = "ANIME")))
+            .login("user", "pass", "Industrial")
+        assertEquals("ANIME", session.clan)
+        assertTrue(session.clanResolved)
+    }
+
+    @Test
+    fun `login marks a clan-less account resolved too`() = runTest {
+        // clan == null + clanResolved == true is the reliable "definitely no
+        // clan" signal the cape gate hides on; only PRE-FIELD persisted
+        // sessions carry clanResolved == false (the fail-open case).
+        val session = SmartyCraftAuthProvider(protocol(ok())).login("user", "pass", "Industrial")
+        assertEquals(null, session.clan)
+        assertTrue(session.clanResolved)
     }
 
     @Test

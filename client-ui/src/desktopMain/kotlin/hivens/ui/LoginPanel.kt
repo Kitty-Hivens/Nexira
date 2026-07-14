@@ -1,7 +1,6 @@
 package hivens.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -20,21 +19,29 @@ import androidx.compose.ui.unit.dp
 import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.AuthStatus
 import hivens.auth.AuthProvider
+import hivens.auth.OfflineAuthProvider
 import hivens.core.data.SessionData
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
-import hivens.ui.easter.LocalAprilFools
+import hivens.ui.components.MicrosoftSignInButton
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxCalloutBanner
+import hivens.ui.nx.NxCalloutTone
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.platform.SystemActions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,14 +50,19 @@ import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 
 @Composable
-fun LoginPanel(onLogin: (SessionData) -> Unit) {
+fun LoginPanel(
+    onLogin: (SessionData) -> Unit,
+    showOffline: Boolean = true,
+    showMicrosoft: Boolean = true,
+) {
     val authService: AuthProvider              = koinInject()
     val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
-    val credentialsManager: CredentialsManager = koinInject()
+    val credentialsManager: AccountStore = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
+    val offlineProvider: OfflineAuthProvider   = koinInject()
+    val settingsService: ISettingsService      = koinInject()
     val s            = LocalStrings.current
-    val af           = LocalAprilFools.current
     val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -80,13 +92,13 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var twoFactorUnsupported  by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor        = CelestiaTheme.colors.textPrimary,
-        unfocusedTextColor      = CelestiaTheme.colors.textPrimary,
-        focusedBorderColor      = CelestiaTheme.colors.primary,
-        unfocusedBorderColor    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.22f),
-        focusedLabelColor       = CelestiaTheme.colors.primary,
-        unfocusedLabelColor     = CelestiaTheme.colors.textSecondary,
-        cursorColor             = CelestiaTheme.colors.primary,
+        focusedTextColor        = NxTheme.colors.textPrimary,
+        unfocusedTextColor      = NxTheme.colors.textPrimary,
+        focusedBorderColor      = NxTheme.colors.primary,
+        unfocusedBorderColor    = NxTheme.colors.textSecondary.copy(alpha = 0.22f),
+        focusedLabelColor       = NxTheme.colors.primary,
+        unfocusedLabelColor     = NxTheme.colors.textSecondary,
+        cursorColor             = NxTheme.colors.primary,
         focusedContainerColor   = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
@@ -150,6 +162,24 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 hivens.core.diag.ActionRing.record("Login failed (generic): user=$login msg=${e.message?.take(80)}")
                 errorMessage = e.message ?: s.loginErrorGeneric
             }
+        }
+    }
+
+    fun playOffline() {
+        val name = login.trim()
+        if (name.isEmpty()) { errorMessage = s.loginErrorEmpty; return }
+        focusManager.clearFocus()
+        errorMessage = null
+        scope.launch {
+            val session = withContext(Dispatchers.IO) {
+                val sess = offlineProvider.login(name, "", "")
+                // Remember the offline name so a restart -- or the Settings offline
+                // toggle -- restores this identity without re-typing.
+                settingsService.saveSettings(settingsService.getSettings().copy(offlinePlayerName = name))
+                sess
+            }
+            hivens.core.diag.ActionRing.record("Play offline: name=$name")
+            onLogin(session)
         }
     }
 
@@ -226,37 +256,16 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             text       = s.loginTitle,
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color      = CelestiaTheme.colors.textPrimary
+            color      = NxTheme.colors.textPrimary
         )
 
         // ── SSL warning banner ────────────────────────────────────────────
         if (sslWarning) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            NxCalloutBanner(
+                tone  = NxCalloutTone.Warning,
+                title = s.sslWarningTitle,
+                body  = s.sslWarningBody,
             ) {
-                Text(
-                    text       = "⚠ ${s.sslWarningTitle}",
-                    style      = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color      = CelestiaTheme.colors.warnAccent
-                )
-                Text(
-                    text  = s.sslWarningBody,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
-                )
                 // Trust-duration prompt + 3 grant buttons. Each click both
                 // grants the bypass for that duration AND retries login --
                 // single-click UX. Cancel button is on its own row above so
@@ -267,14 +276,14 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape    = MaterialTheme.shapes.small
                 ) {
-                    Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.sslWarningCancel, color = NxTheme.colors.textSecondary)
                 }
                 Text(
                     text  = s.sslWarningTrustPrompt,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
-                val acceptColors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.warnAccent)
+                val acceptColors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.warnAccent)
                 fun acceptFor(unit: java.time.temporal.ChronoUnit, amount: Long, label: String) {
                     // 100-year future for "always" -- long enough that no user
                     // will outlive it, short enough to not overflow ISO-8601
@@ -314,38 +323,17 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
 
         // ── 2FA unsupported banner ────────────────────────────────────────
         if (twoFactorUnsupported) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            NxCalloutBanner(
+                tone  = NxCalloutTone.Warning,
+                title = s.auth2faUnsupportedTitle,
+                body  = s.auth2faUnsupportedBody,
             ) {
-                Text(
-                    text       = s.auth2faUnsupportedTitle,
-                    style      = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color      = CelestiaTheme.colors.warnAccent
-                )
-                Text(
-                    text  = s.auth2faUnsupportedBody,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
-                )
                 OutlinedButton(
                     onClick  = { twoFactorUnsupported = false },
                     modifier = Modifier.align(Alignment.End),
                     shape    = MaterialTheme.shapes.small,
                 ) {
-                    Text(s.auth2faUnsupportedDismiss, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.auth2faUnsupportedDismiss, color = NxTheme.colors.textSecondary)
                 }
             }
         }
@@ -355,11 +343,11 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             Text(
                 text     = errorMessage ?: "",
                 style    = MaterialTheme.typography.bodySmall,
-                color    = CelestiaTheme.colors.error,
+                color    = NxTheme.colors.error,
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = CelestiaTheme.colors.error.copy(alpha = 0.08f),
+                        color = NxTheme.colors.error.copy(alpha = 0.08f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(8.dp)
@@ -410,14 +398,14 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 checked         = rememberMe,
                 onCheckedChange = { rememberMe = it },
                 colors          = CheckboxDefaults.colors(
-                    checkedColor   = CelestiaTheme.colors.primary,
-                    uncheckedColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+                    checkedColor   = NxTheme.colors.primary,
+                    uncheckedColor = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
                 )
             )
             Text(
                 text  = s.loginRemember,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary
+                color = NxTheme.colors.textSecondary
             )
         }
         PuppetToggle("login.rememberMe", rememberMe) { rememberMe = it }
@@ -430,7 +418,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 modifier  = Modifier.fillMaxWidth().height(42.dp),
                 shape     = MaterialTheme.shapes.small,
                 colors    = ButtonDefaults.buttonColors(
-                    disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+                    disabledContainerColor = NxTheme.colors.primary.copy(alpha = 0.5f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
@@ -441,33 +429,51 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 )
             }
         } else {
-            af.ChaosButton(
-                id       = "login_submit_btn",
-                text     = s.loginButton,
-                onClick  = { doLogin() },
-                modifier = Modifier.fillMaxWidth().height(42.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                ),
-            )
+            Flexible("login_submit_btn", FlexibleKind.Button) {
+                NxButton(
+                    label     = s.loginButton,
+                    onClick   = { doLogin() },
+                    modifier  = Modifier.fillMaxWidth(),
+                    style     = NxButtonStyle.Primary,
+                    minHeight = 42.dp,
+                )
+            }
         }
         PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
         // REGISTER -- chaos target
-        af.ChaosButton(
-            id      = "login_register_btn",
-            text    = s.loginRegister,
-            onClick = {
-                SystemActions.openUrl("${protocolConfig.baseUrl}/register")
-            },
-            modifier = Modifier.fillMaxWidth().height(42.dp),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                contentColor   = CelestiaTheme.colors.primary,
-            ),
-        )
+        Flexible("login_register_btn", FlexibleKind.Button) {
+            NxButton(
+                label     = s.loginRegister,
+                onClick   = { SystemActions.openUrl("${protocolConfig.baseUrl}/register") },
+                modifier  = Modifier.fillMaxWidth(),
+                style     = NxButtonStyle.Tertiary,
+                minHeight = 42.dp,
+            )
+        }
         PuppetClick("login.register") {
             SystemActions.openUrl("${protocolConfig.baseUrl}/register")
+        }
+
+        // PLAY OFFLINE -- offline identity, no network. Reuses the username field
+        // as the offline name and remembers it for next time.
+        if (showOffline) {
+            Flexible("login_offline_btn", FlexibleKind.Button) {
+                NxButton(
+                    label     = s.loginPlayOffline,
+                    onClick   = { playOffline() },
+                    modifier  = Modifier.fillMaxWidth(),
+                    style     = NxButtonStyle.Tertiary,
+                    minHeight = 42.dp,
+                )
+            }
+            PuppetClick("login.playOffline") { playOffline() }
+        }
+
+        // SIGN IN WITH MICROSOFT -- present only when a client id is configured
+        // (the provider registers and advertises device-code capability then).
+        if (showMicrosoft) {
+            MicrosoftSignInButton(onSignedIn = onLogin, rememberAccount = rememberMe)
         }
     }
 }
