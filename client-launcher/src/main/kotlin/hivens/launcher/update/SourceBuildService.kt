@@ -146,7 +146,7 @@ class SourceBuildService(
             ?.maxByOrNull { it.lastModified() }
 
     private fun run(command: List<String>, onProgress: (Progress) -> Unit, extraEnv: Map<String, String> = emptyMap()) {
-        onProgress(Progress.Line("\$ ${command.joinToString(" ")}"))
+        onProgress(Progress.Line($$"$ $${command.joinToString(" ")}"))
         val pb = ProcessBuilder(command).redirectErrorStream(true)
         if (workspace.isDirectory) pb.directory(workspace)
         pb.environment().putAll(extraEnv)
