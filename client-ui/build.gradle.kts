@@ -2,6 +2,10 @@ import hivens.packaging.PackagingExtension
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -586,6 +590,48 @@ tasks.withType<Jar>().configureEach {
     isReproducibleFileOrder = true
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Strip stale JAR signatures from the ProGuard release output. bcprov-jdk18on
+// (transitive via dev.hivens:libvault) ships signed by BouncyCastle; ProGuard
+// repackages its classes but keeps the original META-INF/*.SF/*.RSA, so the JVM
+// rejects the jar at load with "Invalid signature file digest" and the launcher
+// crashes before main. The `tasks.withType<Jar>` exclude above cannot reach
+// ProGuard's own output, so drop the signature entries once ProGuard has written
+// the jars. We ship unsigned; jpackage / Inno Setup own the outer envelope.
+tasks.matching { it.name == "proguardReleaseJars" }.configureEach {
+    // Resolve to a plain File in this task-config lambda so the doLast captures only
+    // that File (a local), not the Project or the build script object -- either would
+    // break configuration-cache serialization.
+    val outDir = layout.buildDirectory.dir("compose/tmp/main-release/proguard").get().asFile
+    doLast {
+        if (!outDir.isDirectory) return@doLast
+        val sig = Regex("META-INF/[^/]+\\.(SF|RSA|DSA|EC)", RegexOption.IGNORE_CASE)
+        outDir.listFiles { f -> f.extension == "jar" }?.forEach { jar ->
+            var signed = false
+            ZipFile(jar).use { z ->
+                val en = z.entries()
+                while (en.hasMoreElements()) { if (sig.matches(en.nextElement().name)) { signed = true; break } }
+            }
+            if (!signed) return@forEach
+            val tmp = File(jar.parentFile, "${jar.name}.unsigned")
+            ZipFile(jar).use { z ->
+                ZipOutputStream(tmp.outputStream().buffered()).use { out ->
+                    val en = z.entries()
+                    while (en.hasMoreElements()) {
+                        val e = en.nextElement()
+                        if (sig.matches(e.name)) continue
+                        out.putNextEntry(ZipEntry(e.name))
+                        if (!e.isDirectory) z.getInputStream(e).use { it.copyTo(out) }
+                        out.closeEntry()
+                    }
+                }
+            }
+            jar.delete()
+            tmp.renameTo(jar)
+            println("stripSignatures: removed signature entries from ${jar.name}")
+        }
+    }
 }
 
 // ========================================================================
