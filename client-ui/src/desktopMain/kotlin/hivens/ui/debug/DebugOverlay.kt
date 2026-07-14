@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -35,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.io.File
 import hivens.config.Branding
 import hivens.ui.theme.NxTheme
 
@@ -48,6 +51,8 @@ private val SLOT_STROKE = Color(0xFF4FC3F7)   // cyan -- slot outlines
 private val WIDGET_STROKE = Color(0xFFFFB74D) // amber -- widget outlines
 private val LABEL_BG = Color(0xC0000000)
 private val LABEL_STYLE = TextStyle(fontSize = 9.sp, color = Color(0xFFECECEC))
+private val RULER = Color(0xFF66BB6A)         // green -- spacing measures
+private val RULER_STYLE = TextStyle(fontSize = 8.sp, color = Color(0xFFB9F6CA))
 
 /**
  * Root of the dev UI-debug overlay. Draws nothing (and costs nothing) unless the
@@ -88,11 +93,50 @@ fun DebugOverlay(state: DebugOverlayState) {
                 )
                 drawText(measured, topLeft = r.topLeft + Offset(3f, 0f))
             }
+            // Spacing rulers: pairwise gaps between adjacent widget rects (each
+            // adjacency drawn once -- the reverse pair yields a negative gap and is
+            // skipped; gaps over the threshold are cross-layout distance, not rhythm).
+            if (state.spacingRulers) {
+                val wr = state.bounds.nodes.values.toList()
+                    .asSequence()
+                    .filter { it.kind == DebugNodeKind.Widget }
+                    .map { it.rect.translate(-overlayOrigin.x, -overlayOrigin.y) }
+                    .filter { it.width > 0f && it.height > 0f }
+                    .toList()
+                val thresh = 80f
+                for (i in wr.indices) for (j in wr.indices) {
+                    if (i == j) continue
+                    val a = wr[i]; val b = wr[j]
+                    val xOverlap = minOf(a.right, b.right) - maxOf(a.left, b.left)
+                    if (xOverlap > 4f) {
+                        val vGap = b.top - a.bottom
+                        if (vGap > 0.5f && vGap <= thresh) {
+                            val x = maxOf(a.left, b.left) + xOverlap / 2f
+                            drawLine(RULER, Offset(x, a.bottom), Offset(x, b.top), strokeWidth = 1f)
+                            val lbl = measurer.measure(vGap.toInt().toString(), style = RULER_STYLE)
+                            drawText(lbl, topLeft = Offset(x + 2f, (a.bottom + b.top) / 2f - lbl.size.height / 2f))
+                        }
+                    }
+                    val yOverlap = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
+                    if (yOverlap > 4f) {
+                        val hGap = b.left - a.right
+                        if (hGap > 0.5f && hGap <= thresh) {
+                            val y = maxOf(a.top, b.top) + yOverlap / 2f
+                            drawLine(RULER, Offset(a.right, y), Offset(b.left, y), strokeWidth = 1f)
+                            val lbl = measurer.measure(hGap.toInt().toString(), style = RULER_STYLE)
+                            drawText(lbl, topLeft = Offset((a.right + b.left) / 2f - lbl.size.width / 2f, y + 2f))
+                        }
+                    }
+                }
+            }
         }
         DebugControlPanel(
             state = state,
             modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
         )
+        if (state.perfHud) {
+            PerfHud(Modifier.align(Alignment.TopEnd).padding(12.dp))
+        }
     }
 }
 
@@ -137,3 +181,65 @@ private fun FacetRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
         Text(label, color = PANEL_FG, fontSize = 11.sp)
     }
 }
+
+@Composable
+private fun PerfHud(modifier: Modifier) {
+    var fps by remember { mutableStateOf(0) }
+    var frameMs10 by remember { mutableStateOf(0) } // tenths of a ms
+    var heapUsed by remember { mutableStateOf(0L) }
+    var heapMax by remember { mutableStateOf(0L) }
+    var rss by remember { mutableStateOf(-1L) }
+    val renderApi = remember { runCatching { System.getProperty("skiko.renderApi") }.getOrNull() ?: "?" }
+
+    // One frame-clock loop: accumulate deltas, recompute every ~0.5s so the HUD
+    // recomposes twice a second rather than every frame.
+    LaunchedEffect(Unit) {
+        var frames = 0
+        var accumNs = 0L
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (last != 0L) {
+                    accumNs += now - last
+                    frames++
+                    if (accumNs >= 500_000_000L) {
+                        fps = (frames * 1_000_000_000.0 / accumNs).toInt()
+                        frameMs10 = ((accumNs / frames) / 100_000L).toInt()
+                        val rt = Runtime.getRuntime()
+                        heapUsed = (rt.totalMemory() - rt.freeMemory()) shr 20
+                        heapMax = rt.maxMemory() shr 20
+                        rss = readRssMb()
+                        accumNs = 0
+                        frames = 0
+                    }
+                }
+                last = now
+            }
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .background(PANEL_BG, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.End,
+    ) {
+        HudLine("$fps fps  ${frameMs10 / 10}.${frameMs10 % 10} ms")
+        HudLine("heap $heapUsed / $heapMax MB")
+        if (rss >= 0) HudLine("rss $rss MB")
+        HudLine(renderApi)
+    }
+}
+
+@Composable
+private fun HudLine(text: String) {
+    Text(text, color = PANEL_FG, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+}
+
+// Linux resident set size (MB) from /proc; -1 elsewhere or on any read failure.
+private fun readRssMb(): Long = runCatching {
+    File("/proc/self/status").useLines { lines ->
+        lines.firstOrNull { it.startsWith("VmRSS:") }
+            ?.trim()?.split(Regex("\\s+"))?.getOrNull(1)?.toLong()?.shr(10) ?: -1L
+    }
+}.getOrDefault(-1L)
