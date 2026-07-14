@@ -968,14 +968,14 @@ internal fun ConsoleContent(
         // process's stdin via gameConsole.sendCommand, pushes it onto
         // cmdHistory, clears the input. Up / Down step through history
         // (most-recent first). Esc clears or blurs.
-        if (isLive && gameConsole.canSendCommands) {
+        if (isLive && (gameConsole.canSendCommands || gameConsole.hasLocalCommands)) {
             CommandInputRow(
                 value            = cmdInput,
                 onValueChange    = { cmdInput = it; cmdHistoryIdx = -1 },
                 onSubmit         = {
                     val txt = cmdInput.trim()
                     if (txt.isNotEmpty()) {
-                        gameConsole.sendCommand(txt)
+                        gameConsole.submitConsoleInput(txt)
                         // Echo the command into the buffer so the user
                         // sees what they typed -- the game's stdout
                         // reply lands on its own subsequent lines.

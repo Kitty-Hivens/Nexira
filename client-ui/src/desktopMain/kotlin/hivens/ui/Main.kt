@@ -57,6 +57,7 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
+import hivens.ui.debug.DebugOverlayState
 import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
@@ -83,6 +84,9 @@ val uiModule = module {
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
     single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
     single { GameConsoleService(get()) }
+    // Dev UI-debug overlay switchboard. Process-lifetime so the toggle survives
+    // shell recomposition + the crash-restart loop; inert on release builds.
+    single { DebugOverlayState() }
 
     // System tray (client-tray seam): one libtray-backed impl. A plain single, so
     // client-cli -- which never injects it -- never loads libtray's natives.
