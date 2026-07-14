@@ -41,7 +41,7 @@ object OptionalContentRules {
      * `default_enabled`.
      *
      * A toggle is matched by [SmrtModEntry.stableKey] first, then by [filename]
-     * as a fallback so state persisted before stable keys existed (#339) still
+     * as a fallback so state persisted before stable keys existed still
      * applies until it is rewritten on the next toggle.
      */
     fun enabledState(mods: List<SmrtModEntry>, toggles: List<ContentToggle>): Map<String, Boolean> {
