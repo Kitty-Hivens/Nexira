@@ -175,6 +175,16 @@
 -keep class hivens.ui.bootstrap.HoldKeyProbe { *; }
 -dontwarn hivens.ui.bootstrap.HoldKeyProbe
 
+# ── Bouncy Castle: keep the whole crypto engine intact ────────────────────
+# bcprov-jdk18on arrives transitively through dev.hivens:libvault (the encrypted
+# credential vault). It registers algorithms reflectively, so shrinking it to the
+# statically-reachable classes breaks provider init at runtime; keep it whole. Its
+# original BouncyCastle signature is stripped from the ProGuard output separately
+# (build.gradle.kts stripSignatures) -- shrinking already invalidated it, and the
+# JVM rejects a repackaged signed jar with "Invalid signature file digest".
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
+
 # ── dbus-java: ServiceLoader-resolved transport providers ─────────────────
 # Linux fielded report (file picker silently broken on AppImage): filekit's
 # XdgFilePickerPortal calls `DBusConnectionBuilder.forSessionBus()` which
