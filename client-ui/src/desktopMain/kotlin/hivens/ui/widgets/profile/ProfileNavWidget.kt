@@ -44,7 +44,7 @@ fun ProfileNavWidget(instance: WidgetInstance) {
     // id is configured (the device-code provider registers only then). Without one
     // the profile is a single SmartyCraft section -- no dangling Microsoft tab into
     // an empty pane.
-    val msaConfigured = remember { authRegistry.all.any { it.capabilities.supportsDeviceCode } }
+    val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
     val categories = ProfileCategory.entries.filter {
         it != ProfileCategory.Microsoft || msaConfigured
     }

@@ -67,7 +67,7 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
     val authRegistry: AuthProviderRegistry = koinInject()
 
     // The device-code provider is registered only when a client id is configured.
-    val msaConfigured = remember { authRegistry.all.any { it.capabilities.supportsDeviceCode } }
+    val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
     var refreshKey by remember { mutableIntStateOf(0) }
     val msSession = remember(refreshKey, ctx.session) { credentials.accountFor(MS_KEY) }
 
