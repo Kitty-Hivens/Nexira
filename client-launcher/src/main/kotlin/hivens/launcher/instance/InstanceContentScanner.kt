@@ -186,7 +186,7 @@ class InstanceContentScanner {
     private fun parseForgeToml(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
         val text = zip.getInputStream(entry).readBytes().decodeToString()
         val name = TOML_DISPLAY_NAME.find(text)?.groupValues?.get(1)
-        val version = TOML_VERSION.find(text)?.groupValues?.get(1)?.takeIf { !it.startsWith("\${") }
+        val version = TOML_VERSION.find(text)?.groupValues?.get(1)?.takeIf { !it.startsWith($$"${") }
         val logo = TOML_LOGO.find(text)?.groupValues?.get(1)
         val homepage = TOML_DISPLAY_URL.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
         val license = TOML_LICENSE.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
