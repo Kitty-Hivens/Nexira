@@ -26,7 +26,7 @@ lives in this English file.
 
 ## [Unreleased]
 
-## [2.4.0] - 2026-07-14
+## [2.4.0-preview] - 2026-07-14
 
 2.4.0 opens the launcher onto the wider modding world. A new Browse tab searches and installs Modrinth modpacks, imports a `.mrpack` / a CurseForge zip / a foreign launcher's instance, or builds a pack from scratch; a Wardrobe manages your skins and capes over a reworked 3D character stack; the launcher can follow your desktop's colour scheme; and a boot screen plus a recovery mode carry a start that goes wrong. Underneath, the whole interface moves onto a single `:nx-ui` design system, the launch engine splits into headless modules with a native CLI, and the build moves to Java 26. Microsoft / multi-account infrastructure lands but stays gated off pending a later release.
 
