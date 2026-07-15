@@ -187,25 +187,9 @@ object EnglishStrings : AppStrings {
     override fun updateVersion(version: String) = "Version $version"
     override val updateDetails         = "Details"
 
-    // Update manager
-    override val updateManagerTitle          = "Update manager"
-    override val updateManagerChannel        = "Channel"
-    override val updateChannelRelease        = "Release"
-    override val updateChannelBeta           = "Beta"
-    override val updateChannelAlpha          = "Alpha"
-    override val updateChannelDev            = "Dev"
-    override val updateChannelGit            = "Git"
-    override val updateManagerCurrentTag     = "current"
-    override val updateManagerInstall        = "Install"
-    override val updateManagerRollback       = "Roll back"
-    override val updateManagerBuild          = "Build & install"
+    // Desktop entry install (Advanced)
     override val updateManagerInstallDesktop = "Install .desktop entry"
     override val updateManagerDesktopDone    = "Desktop entry installed"
-    override val updateManagerEmpty          = "No versions found"
-    override val updateManagerNeedsExperimental = "Enable experimental features in Settings to use source channels."
-    override val updateManagerBuilding       = "Building from source..."
-    override val updateManagerOpenHint       = "Open update manager"
-    override fun updateManagerNeedsTools(tools: String) = "Requires developer tools: $tools"
 
     // Console
     override val consoleTitle = "Debug Console"

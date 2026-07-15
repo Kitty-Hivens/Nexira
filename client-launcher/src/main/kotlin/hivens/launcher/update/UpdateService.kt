@@ -5,7 +5,6 @@ import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.LauncherUpdate
 import hivens.core.data.ReleaseChannel
-import hivens.core.data.ReleaseEntry
 import hivens.core.data.ReleaseManifest
 import hivens.core.data.UpdateChannelMeta
 import hivens.core.platform.Arch
@@ -39,11 +38,6 @@ class UpdateService(
     private val httpClient get() = clientProvider.current
     private val updateDir = dataDirectory.resolve("updates")
     private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
-
-    // Raw releases from the last fetchReleasesPage() call, so prepareUpdate()
-    // can resolve a manager-picked version without re-listing.
-    @Volatile
-    private var cachedReleases: List<GitHubRelease> = emptyList()
 
     companion object {
         private const val GITHUB_REPO          = "Kitty-Hivens/Nexira"
@@ -225,10 +219,8 @@ class UpdateService(
     /**
      * One page (the most recent [PRERELEASE_PAGE_SIZE]) of `/releases`,
      * newest first, drafts dropped. Single chokepoint for the list endpoint:
-     * the prerelease auto-check, the changelog assembly, and the manager
-     * listing all go through here, and the raw result is cached so
-     * [prepareUpdate] can resolve a picked version without re-listing.
-     * Empty on any network/parse failure.
+     * the prerelease auto-check and the changelog assembly both go through
+     * here. Empty on any network/parse failure.
      */
     internal suspend fun fetchReleasesPage(): List<GitHubRelease> = try {
         val response = httpClient.get(GITHUB_API_RELEASES) {
@@ -241,7 +233,6 @@ class UpdateService(
         } else {
             json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
                 .filter { !it.draft }
-                .also { cachedReleases = it }
         }
     } catch (e: Exception) {
         logger.warn("Failed to list GitHub releases", e)
@@ -390,53 +381,6 @@ class UpdateService(
             isMandatory = isMandatory,
             mandatoryReason = mandatoryReason,
         )
-    }
-
-    /**
-     * Lists releases for the update manager, newest first. Channel selection is
-     * cumulative -- the chosen tier plus every stabler one (Alpha -> alpha + beta
-     * + release). dev/git build from source, so for the GitHub listing they clamp
-     * to Alpha (the user still sees every published build and builds from source
-     * separately). Empty on any network/parse failure.
-     */
-    suspend fun listReleases(channel: ReleaseChannel): List<ReleaseEntry> = withContext(Dispatchers.IO) {
-        val maxRank = minOf(channel.ordinal, ReleaseChannel.Alpha.ordinal)
-        val current = currentVersion
-        fetchReleasesPage()
-            .map { it to ReleaseChannel.classify(it.tagName.removePrefix("v")) }
-            .filter { (_, ch) -> ch.ordinal <= maxRank }
-            .map { (release, ch) ->
-                ReleaseEntry(
-                    version = release.tagName,
-                    channel = ch,
-                    isCurrent = compareVersions(release.tagName.removePrefix("v"), current) == 0,
-                    installable = findAssetForCurrentOS(release.assets) != null,
-                    releasePageUrl = "$GITHUB_RELEASE_PAGE/${release.tagName}",
-                )
-            }
-            .sortedWith(Comparator { a, b ->
-                compareVersions(b.version.removePrefix("v"), a.version.removePrefix("v"))
-            })
-    }
-
-    /**
-     * Resolves a manager-picked [version] (newer OR older, for a rollback) into a
-     * verifiable [LauncherUpdate]: finds it among the releases cached by the last
-     * [fetchReleasesPage], fetches its manifest, and runs the same asset + SHA-256 gate
-     * as the auto-check. Null when the version is unknown, ships no asset for this
-     * OS, or pins no checksum. Installing an older version is a rollback -- there
-     * is deliberately no downgrade guard.
-     */
-    suspend fun prepareUpdate(version: String): LauncherUpdate? = withContext(Dispatchers.IO) {
-        val release = cachedReleases.firstOrNull { it.tagName == version } ?: run {
-            logger.warn("prepareUpdate: version {} not in the cached release list", version)
-            return@withContext null
-        }
-        val manifest = tryFetchManifest(release) ?: run {
-            logger.warn("prepareUpdate: release {} ships no manifest; cannot verify", version)
-            return@withContext null
-        }
-        buildUpdate(release, manifest, changelog = extractWhatsChanged(release.body))
     }
 
     // ========== INTERNAL (visible for testing) ==========
