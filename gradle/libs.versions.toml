@@ -79,10 +79,17 @@ libvault          = "0.2.1"
 # Replaces the in-tree Skia-Codec animation path in CustomBackground and adds
 # video wallpapers. dev.hivens family, mavenCentral; decode-only LGPL FFmpeg +
 # libwebp + libass ship in per-platform skinema-natives classifier jars.
-# 0.6.2: the Windows natives bundle now ships liblzma-5.dll, which avcodec
-# hard-imports -- a clean Windows box could not load avcodec without it
-# (Linux/macOS unaffected). Decode-only patch, no API change from 0.6.1.
-skinema           = "0.6.2"
+# 0.7.0: packaging only -- no API change and no decode change from 0.6.2. The
+# natives moved off the library's version line onto their own (skinemaNatives
+# below), so these two versions no longer match and are not meant to.
+skinema           = "0.7.0"
+
+# The natives are versioned as the FFmpeg build they carry plus a repack
+# revision, not as the library: skinema names the natives version it pairs
+# with in its release notes, and that version stays put across library
+# releases that do not touch the bundles. 8.1.1-1 is the same FFmpeg 8.1.1
+# that shipped with skinema 0.6.2, liblzma-5.dll fix included.
+skinemaNatives    = "8.1.1-1"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
