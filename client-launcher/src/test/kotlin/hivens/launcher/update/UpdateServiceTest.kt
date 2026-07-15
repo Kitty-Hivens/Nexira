@@ -34,12 +34,14 @@ class UpdateServiceTest {
     private fun fakeSettings(
         experimentalFeaturesEnabled: Boolean = true,
         mandatoryUpdatesEnabled: Boolean = true,
-        updateChannel: ReleaseChannel = ReleaseChannel.Release  // Release so existing /releases/latest mocks work
+        updateChannel: ReleaseChannel = ReleaseChannel.Release,  // Release so existing /releases/latest mocks work
+        nightlyChannel: Boolean = false
     ): ISettingsService = FakeSettingsService(
         SettingsData(
             experimentalFeaturesEnabled = experimentalFeaturesEnabled,
             mandatoryUpdatesEnabled = mandatoryUpdatesEnabled,
-            updateChannel = updateChannel
+            updateChannel = updateChannel,
+            nightlyChannel = nightlyChannel
         )
     )
 
@@ -798,6 +800,62 @@ class UpdateServiceTest {
         val update = svc.checkForUpdate()
         assertNotNull(update)
         assertEquals("v99.0.0", update.version)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Nightly channel (separate axis from the pre-release toggle)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `a nightly build self-bootstraps onto nightlies with the pre-release channel off`() = runTest {
+        // Running a nightly build IS the opt-in: classify(currentVersion)==Nightly
+        // must flip BOTH includePrereleases (so the /releases list is fetched, not
+        // /releases/latest which drops prereleases) AND the candidate filter. With
+        // updateChannel=Release and only that flip missing, a nightly build would
+        // silently stop tracking nightlies. /releases/latest is wired to fail to
+        // prove the list path is taken.
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly.42")
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$nightly]"),
+            settings = fakeSettings(updateChannel = ReleaseChannel.Release),
+            currentVersion = "2.5.0-nightly.10",
+        )
+        val update = svc.checkForUpdate()
+        assertNotNull(update, "a nightly build must keep tracking newer nightlies")
+        assertEquals("v2.5.0-nightly.42", update.version)
+    }
+
+    @Test
+    fun `nightlyChannel flag opts a stable build into nightlies`() = runTest {
+        // The config bit alone (no nightly build, channel still Release) pulls the
+        // newest nightly.
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly.42")
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$nightly]"),
+            settings = fakeSettings(nightlyChannel = true),
+        )
+        val update = svc.checkForUpdate()
+        assertNotNull(update, "the nightlyChannel flag must fetch the list and accept a nightly")
+        assertEquals("v2.5.0-nightly.42", update.version)
+    }
+
+    @Test
+    fun `pre-release channel without nightly opt-in skips a nightly for the older preview`() = runTest {
+        // A plain Beta user must NOT be dragged onto a nightly: the newest list
+        // entry is a nightly, but the candidate filter skips it and lands on the
+        // RC below. Without the filter the Beta user would silently ride nightlies.
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly.42")
+        val rc = githubReleaseJson(tagName = "v2.4.0-rc1")
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$nightly,$rc]"),
+            settings = fakeSettings(updateChannel = ReleaseChannel.Beta),
+        )
+        val update = svc.checkForUpdate()
+        assertNotNull(update)
+        assertEquals("v2.4.0-rc1", update.version, "Beta skips the nightly and takes the newest non-nightly")
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
