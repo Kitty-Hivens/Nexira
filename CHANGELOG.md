@@ -26,6 +26,27 @@ lives in this English file.
 
 ## [Unreleased]
 
+### Added
+- Nightly builds: a `Nightly` workflow cuts `v<base>-nightly<commit-count>` off dev on a 03:00 UTC schedule and pushes the tag with a PAT -- the default `GITHUB_TOKEN` cannot be used, since GitHub suppresses workflow triggers on its own pushes and the Release workflow would never fire -- and Release builds it with its review gate bypassed for `-nightly` tags while the test job still gates the artefacts. The tag's base is the version currently in flight: the highest numeric base among non-nightly tags, bumped a patch only once that base carries a final tag. git's version sort is deliberately not used to find it, as without `versionsort.suffix` it ranks `v2.3.4-beta5` above `v2.3.4` and the base would stay pinned to a prerelease after its final shipped.
+- `ReleaseChannel.Nightly` classifies a `-nightly` tag, and a `nightlyChannel` flag in `SettingsData` opts into them; `UpdateService.checkForUpdate` also treats a running nightly as opted in, so an install that arrived as a nightly keeps tracking them without the flag being set. Either forces the `/releases` list fetch, because `/releases/latest` drops prereleases entirely.
+- Dev-only UI-debug overlay on F9 or the `uidebug` console command (`hivens.ui.debug`): slot / widget bounds with labels and sizes, spacing rulers, a recomposition tint and a perf HUD, drawn through `LocalWidgetDecorator` / `LocalSlotChromeModifier` and gated off release builds by `ReleaseChannel.classify`.
+
+### Changed
+- A single "Pre-releases" toggle in the Advanced settings section replaces the update-manager window's channel picker, mapping `updateChannel` between `Release` and `Beta`. The `.desktop`-entry install button moves there as a carry-over, pending a proper cross-platform OS-integration affordance.
+- Mandatory-update enforcement (`mandatoryUpdatesEnabled`) defaults off, so a mandatory floor advises rather than forces unless the user opts in.
+- `UpdateService.compareVersions` ranks prerelease tiers through an explicit ladder (`preview` < `alpha` < `beta` < `rc` < `nightly`) instead of comparing suffix text, which ordered them by accident of the alphabet and placed `nightly` below `preview` -- a preview install opting into nightlies was offered nothing at all. Two builds on one tier, or a suffix off the ladder, still fall through to natural token order, and a tag with no suffix keeps outranking every tier, which is what stops a nightly install from being trapped on nightlies with no way back.
+- skinema 0.7.0 stops versioning the native bundles with the library: they now carry the FFmpeg build plus a repack revision (`8.1.1-1`) on their own `skinemaNatives` line. Packaging only -- no API or decode change from 0.6.2.
+- Only the host platform's `skinema-natives` decode classifier ships instead of all five, leaving the bundle the running JVM can actually load.
+
+### Fixed
+- A nightly install with pre-releases off fell back to `/releases/latest`, which drops prereleases, so it never saw a newer nightly and would silently stop updating; the nightly opt-in now forces the list fetch as well as the candidate filter.
+- Windows arm64 hosts resolved the `decode-windows-x64` native bundle and handed x86_64 DLLs to an arm64 JVM, which cannot load them; the host-classifier switch now selects `decode-windows-arm64` when the host reports aarch64.
+- `SmartyModPlanner` logged the same inert info line whether a server manifest carried no Smarty at all or carried a Smarty-looking jar that no active name matched, leaving the surveillance mod running unnoticed. The miss now warns on its own, naming the unmatched jar and pointing at `smarty_names` in `smrt-helper.json`; the name match itself is fixed by descriptor data on the mirror (#413).
+
+### Removed
+- The update-manager window and its backend: manual version pick, rollback to an older release (`UpdateService.prepareUpdate`), the per-channel release listing (`listReleases` + `ReleaseEntry`), and build-from-source for the `dev` / `git` channels (`SourceBuildService`). The tier model reaches the same builds through the Pre-releases toggle and the nightly flag, but rolling back or building from source now needs a manual install.
+- Unused `coil-compose` / `coil-network-okhttp` catalog aliases: nothing resolved them, since the KMP source set must exclude Coil's skiko copy and `implementation(<catalog accessor>) { ... }` is rejected there (a Provider where a String is expected), so `client-ui` builds the coordinates off `libs.versions.coil`.
+
 ## [2.4.0-preview] - 2026-07-14
 
 2.4.0 opens the launcher onto the wider modding world. A new Browse tab searches and installs Modrinth modpacks, imports a `.mrpack` / a CurseForge zip / a foreign launcher's instance, or builds a pack from scratch; a Wardrobe manages your skins and capes over a reworked 3D character stack; the launcher can follow your desktop's colour scheme; and a boot screen plus a recovery mode carry a start that goes wrong. Underneath, the whole interface moves onto a single `:nx-ui` design system, the launch engine splits into headless modules with a native CLI, and the build moves to Java 26. Microsoft / multi-account infrastructure lands but stays gated off pending a later release.
