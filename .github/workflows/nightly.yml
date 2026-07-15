@@ -1,6 +1,6 @@
 name: Nightly
 
-# Cuts a nightly prerelease off dev. Computes v<next-minor>-nightly.<commit-count>,
+# Cuts a nightly prerelease off dev. Computes v<next-minor>-nightly<commit-count>,
 # pushes that tag with a PAT, and the Release workflow (v*.*.* trigger) builds and
 # publishes it -- its review gate is bypassed for -nightly tags. A tag pushed with
 # the default GITHUB_TOKEN would NOT trigger Release (GitHub's anti-recursion rule),
@@ -34,7 +34,7 @@ jobs:
       - name: Skip if dev HEAD already has a nightly tag
         id: guard
         run: |
-          existing=$(git tag --points-at HEAD -l 'v*-nightly.*' | head -1)
+          existing=$(git tag --points-at HEAD -l 'v*-nightly*' | head -1)
           if [ -n "$existing" ]; then
             echo "dev HEAD already tagged $existing -- no new commits, nothing to cut"
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -53,8 +53,11 @@ jobs:
           base=${latest#v}; base=${base%%-*}
           IFS=. read -r maj min _ <<< "$base"
           nextbase="${maj}.$((min + 1)).0"
+          # No dot before the count: matches the repo's existing suffix style
+          # (v2.3.4-beta5), which the launcher's natural-order comparator already
+          # handles by splitting a suffix into text + number runs.
           count=$(git rev-list --count HEAD)
-          echo "tag=v${nextbase}-nightly.${count}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${nextbase}-nightly${count}" >> "$GITHUB_OUTPUT"
 
       - name: Tag and push
         if: steps.guard.outputs.skip != 'true'
