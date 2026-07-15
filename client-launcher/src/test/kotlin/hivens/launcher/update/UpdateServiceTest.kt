@@ -858,63 +858,6 @@ class UpdateServiceTest {
         assertEquals("v2.4.0-rc1", update.version, "Beta skips the nightly and takes the newest non-nightly")
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // listReleases / prepareUpdate (update manager)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    private fun releasesListJson(vararg tags: String): String =
-        "[" + tags.joinToString(",") { githubReleaseJson(tagName = it) } + "]"
-
-    @Test
-    fun `listReleases Alpha is cumulative and newest-first`() = runTest {
-        val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
-        )
-        val list = svc.listReleases(ReleaseChannel.Alpha)
-        assertEquals(listOf("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0"), list.map { it.version })
-        assertEquals(
-            listOf(ReleaseChannel.Alpha, ReleaseChannel.Beta, ReleaseChannel.Release),
-            list.map { it.channel },
-        )
-    }
-
-    @Test
-    fun `listReleases Release shows only stable`() = runTest {
-        val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
-        )
-        assertEquals(listOf("v2.0.0"), svc.listReleases(ReleaseChannel.Release).map { it.version })
-    }
-
-    @Test
-    fun `listReleases Beta excludes alpha`() = runTest {
-        val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
-        )
-        assertEquals(listOf("v2.5.0-beta2", "v2.0.0"), svc.listReleases(ReleaseChannel.Beta).map { it.version })
-    }
-
-    @Test
-    fun `prepareUpdate resolves an older cached version for rollback`() = runTest {
-        val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0", "v2.0.0")),
-        )
-        svc.listReleases(ReleaseChannel.Release)  // populate the cache
-        val update = svc.prepareUpdate("v2.0.0")
-        assertNotNull(update, "a cached version with an OS asset + manifest must resolve")
-        assertEquals("v2.0.0", update.version)
-        assertTrue(update.checksum.isNotBlank())
-    }
-
-    @Test
-    fun `prepareUpdate returns null for an unknown version`() = runTest {
-        val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v2.0.0")),
-        )
-        svc.listReleases(ReleaseChannel.Release)
-        assertNull(svc.prepareUpdate("v9.9.9"))
-    }
-
     @Test
     fun `experimental master OFF forces both children OFF`() = runTest {
         // Master off -> prereleases off (so /releases/latest is the path, not

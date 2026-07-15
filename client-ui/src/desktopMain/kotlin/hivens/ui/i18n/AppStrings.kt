@@ -190,25 +190,9 @@ interface AppStrings {
     fun updateVersion(version: String): String
     val updateDetails: String
 
-    // --- Update manager ---
-    val updateManagerTitle: String
-    val updateManagerChannel: String
-    val updateChannelRelease: String
-    val updateChannelBeta: String
-    val updateChannelAlpha: String
-    val updateChannelDev: String
-    val updateChannelGit: String
-    val updateManagerCurrentTag: String
-    val updateManagerInstall: String
-    val updateManagerRollback: String
-    val updateManagerBuild: String
+    // --- Desktop entry install (Advanced) ---
     val updateManagerInstallDesktop: String
     val updateManagerDesktopDone: String
-    val updateManagerEmpty: String
-    val updateManagerNeedsExperimental: String
-    val updateManagerBuilding: String
-    val updateManagerOpenHint: String
-    fun updateManagerNeedsTools(tools: String): String
 
     // --- Console ---
     val consoleTitle: String
