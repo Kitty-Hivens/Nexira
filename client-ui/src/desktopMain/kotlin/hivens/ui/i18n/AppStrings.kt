@@ -399,6 +399,9 @@ interface AppStrings {
     val settingsSectionExperimental: String
     val settingsExperimentalMaster: String
     val settingsExperimentalMasterDesc: String
+    val settingsSectionUpdates: String
+    val settingsPreReleases: String
+    val settingsPreReleasesDesc: String
     val settingsMandatoryUpdates: String
     val settingsMandatoryUpdatesDesc: String
     val settingsAutoSyncAllPacks: String

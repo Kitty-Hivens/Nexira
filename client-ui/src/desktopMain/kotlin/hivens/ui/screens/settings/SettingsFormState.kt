@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import hivens.core.data.ReleaseChannel
 import hivens.core.data.SettingsData
 
 /**
@@ -43,6 +44,10 @@ internal class SettingsFormState(initial: SettingsData) {
     var strictModVerification  by mutableStateOf(initial.strictModVerification)
     var useNetworkAgent        by mutableStateOf(initial.useNetworkAgent)
     var useSmartycraftAuthLib  by mutableStateOf(initial.useSmartycraftAuthLib)
+    // Simple pre-releases toggle: ON maps updateChannel to Beta (previews + betas),
+    // OFF to Release. The old 5-channel picker is gone; nightly is a separate config
+    // flag (SettingsData.nightlyChannel), never surfaced here.
+    var preReleasesEnabled     by mutableStateOf(initial.updateChannel != ReleaseChannel.Release)
 
     /**
      * Build a [SettingsData] suitable for persistence by overlaying this
@@ -71,6 +76,7 @@ internal class SettingsFormState(initial: SettingsData) {
             strictModVerification       = strictModVerification,
             useNetworkAgent             = useNetworkAgent,
             useSmartycraftAuthLib       = useSmartycraftAuthLib,
+            updateChannel               = if (preReleasesEnabled) ReleaseChannel.Beta else ReleaseChannel.Release,
         )
     }
 }
