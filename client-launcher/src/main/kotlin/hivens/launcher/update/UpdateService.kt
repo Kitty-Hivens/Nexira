@@ -56,6 +56,29 @@ class UpdateService(
         private const val META_CHECK_INTERVAL_MINUTES = 5L
         private const val MANIFEST_ASSET_NAME  = "release-manifest.json"
 
+        /**
+         * Prerelease tiers, least to most stable -- the ladder a tester walks:
+         * preview -> alpha -> beta -> rc -> release. Within one base version that
+         * is also the order they are cut in, so it doubles as "which build is
+         * newer" here.
+         *
+         * Lexical order on the suffix text gave alpha < beta < rc for free, but it
+         * ranked `nightly` below `preview` purely because 'n' < 'p' -- a preview
+         * install opting into nightlies would be offered nothing.
+         *
+         * `nightly` tops the ladder: it is cut from the dev tip, not a milestone.
+         * A tag with NO suffix still beats every tier here (see [compareVersions]),
+         * which is deliberate -- ranking nightly over a release would trap a
+         * nightly install on nightlies with no way back except a manual reinstall.
+         */
+        private val SUFFIX_RANK = mapOf(
+            "preview" to 0,
+            "alpha"   to 1,
+            "beta"    to 2,
+            "rc"      to 3,
+            "nightly" to 4,
+        )
+
         // ── Out-of-band channel metadata ──────────────────────────────────────
         // Lives on the `stable` branch so it can be edited via a single PR
         // without cutting a new release. Any launcher hitting this URL bypasses
@@ -617,7 +640,18 @@ class UpdateService(
      * text tokens -- arbitrary but deterministic; we don't expect to hit this
      * case for any real Nexira version string.
      */
+    // Leading letters of a suffix: "nightly1219" -> "nightly", "rc1" -> "rc",
+    // "beta4-17-g5c1a7ee" -> "beta".
+    private fun suffixTier(s: String): String = s.takeWhile { it.isLetter() }.lowercase()
+
     private fun compareSuffixNatural(s1: String, s2: String): Int {
+        val rank1 = SUFFIX_RANK[suffixTier(s1)]
+        val rank2 = SUFFIX_RANK[suffixTier(s2)]
+        // Two different known tiers: the ladder decides outright. Same tier, or a
+        // suffix that is not on the ladder at all (a hand-cut one), falls through
+        // to natural token order below -- that is what keeps beta20 above beta3.
+        if (rank1 != null && rank2 != null && rank1 != rank2) return rank1.compareTo(rank2)
+
         val tokens1 = tokenizeSuffix(s1)
         val tokens2 = tokenizeSuffix(s2)
         val limit = maxOf(tokens1.size, tokens2.size)
