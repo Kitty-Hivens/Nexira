@@ -1,0 +1,79 @@
+name: Nightly
+
+# Cuts a nightly prerelease off dev. Computes v<next-minor>-nightly<commit-count>,
+# pushes that tag with a PAT, and the Release workflow (v*.*.* trigger) builds and
+# publishes it -- its review gate is bypassed for -nightly tags. A tag pushed with
+# the default GITHUB_TOKEN would NOT trigger Release (GitHub's anti-recursion rule),
+# hence the PAT. Skips when dev HEAD already carries a nightly tag (no new commits).
+#
+# One-time setup: add a repo secret NIGHTLY_RELEASE_PAT -- a fine-grained PAT with
+# Contents: write on this repo. Scheduled runs execute from the default branch, so
+# this file must reach stable for the cron to fire; workflow_dispatch runs it now.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC nightly
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Cut nightly tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0 # full history + tags: commit count + base lookup
+          token: ${{ secrets.NIGHTLY_RELEASE_PAT }}
+
+      - name: Skip if dev HEAD already has a nightly tag
+        id: guard
+        run: |
+          existing=$(git tag --points-at HEAD -l 'v*-nightly*' | head -1)
+          if [ -n "$existing" ]; then
+            echo "dev HEAD already tagged $existing -- no new commits, nothing to cut"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute version
+        if: steps.guard.outputs.skip != 'true'
+        id: ver
+        run: |
+          # Highest version any non-nightly tag names, compared on the numeric base
+          # alone. git's version sort is deliberately NOT used to pick it: with no
+          # versionsort.suffix configured it ranks v2.3.4-beta5 ABOVE v2.3.4, so
+          # "newest tag" would stay pinned to a prerelease after its final shipped.
+          # Excluding nightly tags keeps the base from climbing every night.
+          base=$(git tag -l 'v*' | grep -v nightly | sed 's/^v//; s/-.*//' | sort -V -u | tail -1)
+          if git rev-parse -q --verify "refs/tags/v${base}" > /dev/null; then
+            # That version already shipped final -- dev is heading for the next one.
+            # Patch, not minor: minor bumps are rare and a later x.y+1 prerelease
+            # moves the base on its own once it is tagged.
+            IFS=. read -r maj min patch <<< "$base"
+            nextbase="${maj}.${min}.$((patch + 1))"
+          else
+            # Only prereleases carry this base, so the version is still in flight
+            # and dev's nightlies are building toward it.
+            nextbase="$base"
+          fi
+          # No dot before the count: matches the repo's existing suffix style
+          # (v2.3.4-beta5). The launcher ranks the nightly tier above every other
+          # prerelease, so a preview install can still reach these.
+          count=$(git rev-list --count HEAD)
+          echo "tag=v${nextbase}-nightly${count}" >> "$GITHUB_OUTPUT"
+
+      - name: Tag and push
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.tag }}" -m "Nightly ${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"
+          echo "Cut ${{ steps.ver.outputs.tag }} -- the Release workflow takes it from here."

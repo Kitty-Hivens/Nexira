@@ -44,6 +44,12 @@ import hivens.core.diag.ActionRing
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.network.NetworkState
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.ui.debug.DebugOverlay
+import hivens.ui.debug.DebugOverlayState
+import hivens.ui.debug.IdentitySlotChromeModifier
+import hivens.ui.debug.IdentityWidgetDecorator
+import hivens.widget.api.LocalSlotChromeModifier
+import hivens.widget.api.LocalWidgetDecorator
 import hivens.ui.diag.SkinemaGate
 import hivens.ui.diag.UiRecoverySignal
 import hivens.auth.AccountStore
@@ -239,6 +245,7 @@ fun FrameWindowScope.AppShellContent(
     val controller: LauncherController         = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
+    val debugOverlay: DebugOverlayState        = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
@@ -252,6 +259,16 @@ fun FrameWindowScope.AppShellContent(
     val applicationScope: CoroutineScope        = koinInject()
 
     val settings = remember { settingsService.getSettings() }
+
+    // Dev-only: also expose the UI-debug overlay through a console command (F9 is
+    // the primary toggle). Registered once; the console service is a process
+    // singleton, and registration is a no-op guard on a release build.
+    LaunchedEffect(Unit) {
+        if (debugOverlay.available) {
+            gameConsole.registerLocalCommand("uidebug") { debugOverlay.toggle() }
+            gameConsole.registerLocalCommand("ui-debug") { debugOverlay.toggle() }
+        }
+    }
 
     // Native maximize/restore for the undecorated window -- the WM owns the
     // geometry and reports the real maximized state back through WindowMaximizer's
@@ -676,6 +693,12 @@ fun FrameWindowScope.AppShellContent(
                     if (ev.type == KeyEventType.KeyUp) editModeController.requestRightRailToggle()
                     true
                 }
+                // F9 toggles the dev UI-debug overlay. Only claimed on a non-release
+                // build (debugOverlay.available); otherwise the key falls through.
+                debugOverlay.available && ev.key == Key.F9 -> {
+                    if (ev.type == KeyEventType.KeyUp) debugOverlay.toggle()
+                    true
+                }
                 else -> false
             }
         }
@@ -794,6 +817,17 @@ fun FrameWindowScope.AppShellContent(
                 LocalWidgetDataRegistry                  provides widgetDataRegistry,
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,
                 LocalWidgetStateHost                     provides widgetStateStore,
+                // Dev UI-debug seams: report-only bounds instrumentation, mounted
+                // ONLY while a non-release build has the overlay on AND a facet needs
+                // it -- else identity, so a dev build with the overlay off runs the
+                // exact release tree (and the perf HUD then measures a clean UI).
+                // EditorSurfaceHost chains through these when not editing.
+                LocalWidgetDecorator                     provides
+                    if (debugOverlay.available && debugOverlay.enabled && debugOverlay.needsDecorators)
+                        debugOverlay.widgetDecorator else IdentityWidgetDecorator,
+                LocalSlotChromeModifier                  provides
+                    if (debugOverlay.available && debugOverlay.enabled && debugOverlay.needsDecorators)
+                        debugOverlay.slotChrome else IdentitySlotChromeModifier,
                 LocalWidgetChromeRenderer                provides chromeRenderer,
                 LocalWindowState                         provides windowState,
                 LocalWindowMaximizer                     provides maximizer,
@@ -922,6 +956,18 @@ fun FrameWindowScope.AppShellContent(
                     UpdateManager()
                 }
                 } // end ThemeRevealHost
+            }
+            // Dev UI-debug overlay: top of the shell Box z-order (above AppRoot and
+            // NotificationStack), its own NxTheme wrap so the accent tracks the style.
+            // Inert unless a non-release build has the master toggle on.
+            NxTheme(
+                useDarkTheme = isDarkTheme,
+                customTheme  = customTheme,
+                style        = effectiveStyle,
+                paletteSeed  = wallpaperSeed,
+                paletteFromWallpaper = paletteFromWallpaper,
+            ) {
+                DebugOverlay(debugOverlay)
             }
             // Synthetic resize grips -- undecorated drops the native border. Only
             // with custom chrome (else the OS frame resizes); self-gates to

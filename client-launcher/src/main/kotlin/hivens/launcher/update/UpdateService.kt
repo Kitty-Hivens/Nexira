@@ -5,7 +5,6 @@ import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.LauncherUpdate
 import hivens.core.data.ReleaseChannel
-import hivens.core.data.ReleaseEntry
 import hivens.core.data.ReleaseManifest
 import hivens.core.data.UpdateChannelMeta
 import hivens.core.platform.Arch
@@ -40,11 +39,6 @@ class UpdateService(
     private val updateDir = dataDirectory.resolve("updates")
     private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
 
-    // Raw releases from the last fetchReleasesPage() call, so prepareUpdate()
-    // can resolve a manager-picked version without re-listing.
-    @Volatile
-    private var cachedReleases: List<GitHubRelease> = emptyList()
-
     companion object {
         private const val GITHUB_REPO          = "Kitty-Hivens/Nexira"
         private const val GITHUB_API_LATEST    = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
@@ -61,6 +55,29 @@ class UpdateService(
          */
         private const val META_CHECK_INTERVAL_MINUTES = 5L
         private const val MANIFEST_ASSET_NAME  = "release-manifest.json"
+
+        /**
+         * Prerelease tiers, least to most stable -- the ladder a tester walks:
+         * preview -> alpha -> beta -> rc -> release. Within one base version that
+         * is also the order they are cut in, so it doubles as "which build is
+         * newer" here.
+         *
+         * Lexical order on the suffix text gave alpha < beta < rc for free, but it
+         * ranked `nightly` below `preview` purely because 'n' < 'p' -- a preview
+         * install opting into nightlies would be offered nothing.
+         *
+         * `nightly` tops the ladder: it is cut from the dev tip, not a milestone.
+         * A tag with NO suffix still beats every tier here (see [compareVersions]),
+         * which is deliberate -- ranking nightly over a release would trap a
+         * nightly install on nightlies with no way back except a manual reinstall.
+         */
+        private val SUFFIX_RANK = mapOf(
+            "preview" to 0,
+            "alpha"   to 1,
+            "beta"    to 2,
+            "rc"      to 3,
+            "nightly" to 4,
+        )
 
         // ── Out-of-band channel metadata ──────────────────────────────────────
         // Lives on the `stable` branch so it can be edited via a single PR
@@ -116,7 +133,15 @@ class UpdateService(
             // prerelease; Release stays on /releases/latest. dev/git build-from-
             // source is a manual action in the update manager -- the auto-check
             // still surfaces the newest GitHub build for the channel.
-            val includePrereleases = channel.ordinal >= ReleaseChannel.Beta.ordinal
+            // Nightly is a SEPARATE axis from the pre-release channel: opted into via
+            // the nightlyChannel flag or by running a nightly build (self-bootstrap).
+            val nightlyEnabled = settings.nightlyChannel ||
+                ReleaseChannel.classify(currentVersion) == ReleaseChannel.Nightly
+            // Fetch the full /releases list (prereleases included) when on a pre-release
+            // channel OR opted into nightlies -- either needs the list, not
+            // /releases/latest (which drops prereleases). Nightlies are then filtered
+            // from the candidate below unless nightlyEnabled.
+            val includePrereleases = channel.ordinal >= ReleaseChannel.Beta.ordinal || nightlyEnabled
             val mandatoryEnabled = settings.experimentalFeaturesEnabled && settings.mandatoryUpdatesEnabled
 
             logger.info(
@@ -131,8 +156,11 @@ class UpdateService(
             val releasesPage = if (includePrereleases) fetchReleasesPage() else null
             val release = (
                 if (releasesPage != null) {
-                    releasesPage.firstOrNull() ?: run {
-                        logger.warn("No non-draft releases found in /releases response")
+                    releasesPage.firstOrNull { entry ->
+                        nightlyEnabled ||
+                            ReleaseChannel.classify(entry.tagName.removePrefix("v")) != ReleaseChannel.Nightly
+                    } ?: run {
+                        logger.warn("No eligible release found in /releases response")
                         null
                     }
                 } else {
@@ -214,10 +242,8 @@ class UpdateService(
     /**
      * One page (the most recent [PRERELEASE_PAGE_SIZE]) of `/releases`,
      * newest first, drafts dropped. Single chokepoint for the list endpoint:
-     * the prerelease auto-check, the changelog assembly, and the manager
-     * listing all go through here, and the raw result is cached so
-     * [prepareUpdate] can resolve a picked version without re-listing.
-     * Empty on any network/parse failure.
+     * the prerelease auto-check and the changelog assembly both go through
+     * here. Empty on any network/parse failure.
      */
     internal suspend fun fetchReleasesPage(): List<GitHubRelease> = try {
         val response = httpClient.get(GITHUB_API_RELEASES) {
@@ -230,7 +256,6 @@ class UpdateService(
         } else {
             json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
                 .filter { !it.draft }
-                .also { cachedReleases = it }
         }
     } catch (e: Exception) {
         logger.warn("Failed to list GitHub releases", e)
@@ -379,53 +404,6 @@ class UpdateService(
             isMandatory = isMandatory,
             mandatoryReason = mandatoryReason,
         )
-    }
-
-    /**
-     * Lists releases for the update manager, newest first. Channel selection is
-     * cumulative -- the chosen tier plus every stabler one (Alpha -> alpha + beta
-     * + release). dev/git build from source, so for the GitHub listing they clamp
-     * to Alpha (the user still sees every published build and builds from source
-     * separately). Empty on any network/parse failure.
-     */
-    suspend fun listReleases(channel: ReleaseChannel): List<ReleaseEntry> = withContext(Dispatchers.IO) {
-        val maxRank = minOf(channel.ordinal, ReleaseChannel.Alpha.ordinal)
-        val current = currentVersion
-        fetchReleasesPage()
-            .map { it to ReleaseChannel.classify(it.tagName.removePrefix("v")) }
-            .filter { (_, ch) -> ch.ordinal <= maxRank }
-            .map { (release, ch) ->
-                ReleaseEntry(
-                    version = release.tagName,
-                    channel = ch,
-                    isCurrent = compareVersions(release.tagName.removePrefix("v"), current) == 0,
-                    installable = findAssetForCurrentOS(release.assets) != null,
-                    releasePageUrl = "$GITHUB_RELEASE_PAGE/${release.tagName}",
-                )
-            }
-            .sortedWith(Comparator { a, b ->
-                compareVersions(b.version.removePrefix("v"), a.version.removePrefix("v"))
-            })
-    }
-
-    /**
-     * Resolves a manager-picked [version] (newer OR older, for a rollback) into a
-     * verifiable [LauncherUpdate]: finds it among the releases cached by the last
-     * [fetchReleasesPage], fetches its manifest, and runs the same asset + SHA-256 gate
-     * as the auto-check. Null when the version is unknown, ships no asset for this
-     * OS, or pins no checksum. Installing an older version is a rollback -- there
-     * is deliberately no downgrade guard.
-     */
-    suspend fun prepareUpdate(version: String): LauncherUpdate? = withContext(Dispatchers.IO) {
-        val release = cachedReleases.firstOrNull { it.tagName == version } ?: run {
-            logger.warn("prepareUpdate: version {} not in the cached release list", version)
-            return@withContext null
-        }
-        val manifest = tryFetchManifest(release) ?: run {
-            logger.warn("prepareUpdate: release {} ships no manifest; cannot verify", version)
-            return@withContext null
-        }
-        buildUpdate(release, manifest, changelog = extractWhatsChanged(release.body))
     }
 
     // ========== INTERNAL (visible for testing) ==========
@@ -662,7 +640,18 @@ class UpdateService(
      * text tokens -- arbitrary but deterministic; we don't expect to hit this
      * case for any real Nexira version string.
      */
+    // Leading letters of a suffix: "nightly1219" -> "nightly", "rc1" -> "rc",
+    // "beta4-17-g5c1a7ee" -> "beta".
+    private fun suffixTier(s: String): String = s.takeWhile { it.isLetter() }.lowercase()
+
     private fun compareSuffixNatural(s1: String, s2: String): Int {
+        val rank1 = SUFFIX_RANK[suffixTier(s1)]
+        val rank2 = SUFFIX_RANK[suffixTier(s2)]
+        // Two different known tiers: the ladder decides outright. Same tier, or a
+        // suffix that is not on the ladder at all (a hand-cut one), falls through
+        // to natural token order below -- that is what keeps beta20 above beta3.
+        if (rank1 != null && rank2 != null && rank1 != rank2) return rank1.compareTo(rank2)
+
         val tokens1 = tokenizeSuffix(s1)
         val tokens2 = tokenizeSuffix(s2)
         val limit = maxOf(tokens1.size, tokens2.size)

@@ -184,25 +184,9 @@ object RussianStrings : AppStrings {
     override fun updateVersion(version: String) = "Версия $version"
     override val updateDetails         = "Подробнее"
 
-    // Update manager
-    override val updateManagerTitle          = "Управление обновлениями"
-    override val updateManagerChannel        = "Канал"
-    override val updateChannelRelease        = "Релиз"
-    override val updateChannelBeta           = "Бета"
-    override val updateChannelAlpha          = "Альфа"
-    override val updateChannelDev            = "Dev"
-    override val updateChannelGit            = "Git"
-    override val updateManagerCurrentTag     = "текущая"
-    override val updateManagerInstall        = "Установить"
-    override val updateManagerRollback       = "Откатиться"
-    override val updateManagerBuild          = "Собрать и установить"
+    // Desktop entry install (Advanced)
     override val updateManagerInstallDesktop = "Установить ярлык .desktop"
     override val updateManagerDesktopDone    = "Ярлык установлен"
-    override val updateManagerEmpty          = "Версии не найдены"
-    override val updateManagerNeedsExperimental = "Включите экспериментальные функции в настройках, чтобы собирать из исходников."
-    override val updateManagerBuilding       = "Сборка из исходников..."
-    override val updateManagerOpenHint       = "Открыть менеджер обновлений"
-    override fun updateManagerNeedsTools(tools: String) = "Нужны инструменты разработчика: $tools"
 
     // Console
     override val consoleTitle = "Консоль отладки"
@@ -382,6 +366,9 @@ object RussianStrings : AppStrings {
     override val settingsSectionExperimental    = "Экспериментальные функции"
     override val settingsExperimentalMaster     = "Экспериментальные функции"
     override val settingsExperimentalMasterDesc = "Главный выключатель. Если выключить, оба переключателя ниже принудительно гасятся, независимо от их сохранённых значений."
+    override val settingsSectionUpdates      = "Обновления"
+    override val settingsPreReleases         = "Пре-релизы"
+    override val settingsPreReleasesDesc     = "Получать бета-сборки до перевода в стабильные."
     override val settingsMandatoryUpdates       = "Обязательные обновления"
     override val settingsMandatoryUpdatesDesc   = "Блокировать запуск до установки критических обновлений, когда ломается совместимость с протоколом. Сейчас включено по умолчанию."
     override val settingsAutoSyncAllPacks       = "Автосинхронизация всех сборок при запуске"

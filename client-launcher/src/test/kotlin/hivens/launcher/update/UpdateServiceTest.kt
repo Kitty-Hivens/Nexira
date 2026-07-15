@@ -34,12 +34,14 @@ class UpdateServiceTest {
     private fun fakeSettings(
         experimentalFeaturesEnabled: Boolean = true,
         mandatoryUpdatesEnabled: Boolean = true,
-        updateChannel: ReleaseChannel = ReleaseChannel.Release  // Release so existing /releases/latest mocks work
+        updateChannel: ReleaseChannel = ReleaseChannel.Release,  // Release so existing /releases/latest mocks work
+        nightlyChannel: Boolean = false
     ): ISettingsService = FakeSettingsService(
         SettingsData(
             experimentalFeaturesEnabled = experimentalFeaturesEnabled,
             mandatoryUpdatesEnabled = mandatoryUpdatesEnabled,
-            updateChannel = updateChannel
+            updateChannel = updateChannel,
+            nightlyChannel = nightlyChannel
         )
     )
 
@@ -244,13 +246,38 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `compareVersions orders prerelease suffixes lexicographically`() {
+    fun `compareVersions orders prerelease tiers by the ladder, not lexically`() {
         val svc = createService("{}")
-        // SemVer-ish: alpha < beta < rc, and rc1 < rc2. Lex compare on the
-        // suffix string is sufficient for the launcher's release cadence.
-        assertTrue(svc.compareVersions("1.3.0-rc2", "1.3.0-rc1") > 0)
+        // The ladder a tester walks, least to most stable: preview -> alpha ->
+        // beta -> rc -> release. Within one base that is also the order they get
+        // cut in, so it doubles as "which is newer".
+        assertTrue(svc.compareVersions("1.3.0-alpha", "1.3.0-preview") > 0)
         assertTrue(svc.compareVersions("1.3.0-beta", "1.3.0-alpha") > 0)
         assertTrue(svc.compareVersions("1.3.0-rc1", "1.3.0-beta3") > 0)
+        // Within one tier, natural order still decides.
+        assertTrue(svc.compareVersions("1.3.0-rc2", "1.3.0-rc1") > 0)
+    }
+
+    @Test
+    fun `a nightly outranks every prerelease tier at the same base`() {
+        val svc = createService("{}")
+        // The reason the ladder exists: lexically "nightly" < "preview", so a
+        // preview install opting into nightlies would be offered nothing at all.
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-preview") > 0)
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-alpha2") > 0)
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-beta5") > 0)
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-rc1") > 0)
+        // Nightlies still order numerically among themselves.
+        assertTrue(svc.compareVersions("2.4.0-nightly1220", "2.4.0-nightly1219") > 0)
+    }
+
+    @Test
+    fun `a shipped release outranks a nightly on the same base`() {
+        val svc = createService("{}")
+        // Deliberate: ranking nightly over a release would trap a nightly install
+        // on nightlies forever, since "am I on a nightly" is derived from the
+        // running version. The release must stay reachable.
+        assertTrue(svc.compareVersions("2.4.0", "2.4.0-nightly1219") > 0)
     }
 
     @Test
@@ -801,60 +828,59 @@ class UpdateServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // listReleases / prepareUpdate (update manager)
+    // Nightly channel (separate axis from the pre-release toggle)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    private fun releasesListJson(vararg tags: String): String =
-        "[" + tags.joinToString(",") { githubReleaseJson(tagName = it) } + "]"
-
     @Test
-    fun `listReleases Alpha is cumulative and newest-first`() = runTest {
+    fun `a nightly build self-bootstraps onto nightlies with the pre-release channel off`() = runTest {
+        // Running a nightly build IS the opt-in: classify(currentVersion)==Nightly
+        // must flip BOTH includePrereleases (so the /releases list is fetched, not
+        // /releases/latest which drops prereleases) AND the candidate filter. With
+        // updateChannel=Release and only that flip missing, a nightly build would
+        // silently stop tracking nightlies. /releases/latest is wired to fail to
+        // prove the list path is taken.
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly42")
         val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$nightly]"),
+            settings = fakeSettings(updateChannel = ReleaseChannel.Release),
+            currentVersion = "2.5.0-nightly10",
         )
-        val list = svc.listReleases(ReleaseChannel.Alpha)
-        assertEquals(listOf("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0"), list.map { it.version })
-        assertEquals(
-            listOf(ReleaseChannel.Alpha, ReleaseChannel.Beta, ReleaseChannel.Release),
-            list.map { it.channel },
-        )
+        val update = svc.checkForUpdate()
+        assertNotNull(update, "a nightly build must keep tracking newer nightlies")
+        assertEquals("v2.5.0-nightly42", update.version)
     }
 
     @Test
-    fun `listReleases Release shows only stable`() = runTest {
+    fun `nightlyChannel flag opts a stable build into nightlies`() = runTest {
+        // The config bit alone (no nightly build, channel still Release) pulls the
+        // newest nightly.
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly42")
         val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$nightly]"),
+            settings = fakeSettings(nightlyChannel = true),
         )
-        assertEquals(listOf("v2.0.0"), svc.listReleases(ReleaseChannel.Release).map { it.version })
+        val update = svc.checkForUpdate()
+        assertNotNull(update, "the nightlyChannel flag must fetch the list and accept a nightly")
+        assertEquals("v2.5.0-nightly42", update.version)
     }
 
     @Test
-    fun `listReleases Beta excludes alpha`() = runTest {
+    fun `pre-release channel without nightly opt-in skips a nightly for the older preview`() = runTest {
+        // A plain Beta user must NOT be dragged onto a nightly: the newest list
+        // entry is a nightly, but the candidate filter skips it and lands on the
+        // RC below. Without the filter the Beta user would silently ride nightlies.
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly42")
+        val rc = githubReleaseJson(tagName = "v2.4.0-rc1")
         val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$nightly,$rc]"),
+            settings = fakeSettings(updateChannel = ReleaseChannel.Beta),
         )
-        assertEquals(listOf("v2.5.0-beta2", "v2.0.0"), svc.listReleases(ReleaseChannel.Beta).map { it.version })
-    }
-
-    @Test
-    fun `prepareUpdate resolves an older cached version for rollback`() = runTest {
-        val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0", "v2.0.0")),
-        )
-        svc.listReleases(ReleaseChannel.Release)  // populate the cache
-        val update = svc.prepareUpdate("v2.0.0")
-        assertNotNull(update, "a cached version with an OS asset + manifest must resolve")
-        assertEquals("v2.0.0", update.version)
-        assertTrue(update.checksum.isNotBlank())
-    }
-
-    @Test
-    fun `prepareUpdate returns null for an unknown version`() = runTest {
-        val svc = createService(
-            MockResponse(urlContains = "releases", body = releasesListJson("v2.0.0")),
-        )
-        svc.listReleases(ReleaseChannel.Release)
-        assertNull(svc.prepareUpdate("v9.9.9"))
+        val update = svc.checkForUpdate()
+        assertNotNull(update)
+        assertEquals("v2.4.0-rc1", update.version, "Beta skips the nightly and takes the newest non-nightly")
     }
 
     @Test

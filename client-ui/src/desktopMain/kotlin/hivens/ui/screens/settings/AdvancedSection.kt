@@ -14,10 +14,12 @@ import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.update.DesktopIntegration
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSection
+import hivens.ui.nx.NxToggle
 import hivens.ui.theme.NxTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -27,6 +29,7 @@ import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -41,12 +44,41 @@ private val log = LoggerFactory.getLogger("AdvancedSection")
  * is consulted), so this screen only persists the intent and prompts to restart.
  */
 @Composable
-internal fun AdvancedSection(paths: PlatformPaths) {
+internal fun AdvancedSection(paths: PlatformPaths, form: SettingsFormState, save: () -> Unit) {
     val s = LocalStrings.current
+    val desktop: DesktopIntegration = koinInject()
 
     var pendingTarget by remember { mutableStateOf<Path?>(null) }
     var showError     by remember { mutableStateOf<String?>(null) }
+    var desktopDone   by remember { mutableStateOf(false) }
     val moveScope     = rememberCoroutineScope()
+
+    NxSection(s.settingsSectionUpdates) {
+        NxToggle(
+            label       = s.settingsPreReleases,
+            checked     = form.preReleasesEnabled,
+            description = s.settingsPreReleasesDesc,
+        ) { form.preReleasesEnabled = it; save() }
+
+        // Carry-over from the removed update-manager window: install a .desktop menu
+        // entry (Linux/AppImage). A plain relocated action, NOT a designed OS-
+        // integration feature -- that redesign is a separate task.
+        if (desktop.isSupported()) {
+            NxButton(
+                label   = if (desktopDone) s.updateManagerDesktopDone else s.updateManagerInstallDesktop,
+                style   = NxButtonStyle.Secondary,
+                compact = true,
+                enabled = !desktopDone,
+                onClick = {
+                    moveScope.launch {
+                        withContext(Dispatchers.IO) { desktop.installEntry() }
+                            .onSuccess { desktopDone = true }
+                            .onFailure { log.warn("desktop entry install failed", it) }
+                    }
+                },
+            )
+        }
+    }
 
     NxSection(s.settingsSectionDataDir) {
         Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
