@@ -10,6 +10,9 @@ import kotlinx.serialization.Serializable
  *
  * - [Release], [Beta], [Alpha] are GitHub releases, classified by the tag's
  *   prerelease suffix ([classify]).
+ * - [Nightly] is a prebuilt CI nightly (the `-nightly` suffix). A CLASSIFICATION,
+ *   not a user-picked channel -- opted into via the `nightlyChannel` config flag or
+ *   implicitly by running a nightly build.
  * - [Dev], [Git] are NOT releases -- they build the launcher from the
  *   repository. `git` builds the stable branch / latest tag; `dev` also pulls
  *   the `dev` branch. Both need a local toolchain (git + JDK + gradle) and are
@@ -21,7 +24,8 @@ enum class ReleaseChannel {
     Beta,
     Alpha,
     Dev,
-    Git;
+    Git,
+    Nightly;
 
     /** Build the launcher from source rather than downloading a release asset. */
     val isSourceBuild: Boolean get() = this == Dev || this == Git
@@ -46,10 +50,11 @@ enum class ReleaseChannel {
             if (v.endsWith("-dirty") || SOURCE_DESCRIBE.containsMatchIn(v)) return Dev
             val suffix = v.substringAfter('-', "")
             return when {
-                suffix.isEmpty()           -> Release
-                suffix.startsWith("alpha") -> Alpha
-                suffix.startsWith("dev")   -> Dev
-                else                       -> Beta
+                suffix.isEmpty()             -> Release
+                suffix.startsWith("nightly") -> Nightly
+                suffix.startsWith("alpha")   -> Alpha
+                suffix.startsWith("dev")     -> Dev
+                else                         -> Beta
             }
         }
     }

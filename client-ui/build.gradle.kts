@@ -90,17 +90,27 @@ kotlin {
                 // libtray now enters transitively via :client-tray; only
                 // libnotify (SystemNotifier) is consumed directly here.
                 implementation(libs.libnotify)
-                // Video / animated-image backgrounds (hivens.ui.background): FFmpeg
-                // via Panama. skinema-compose brings -core + -skiko; the natives are
-                // per-platform classifier jars on the runtime classpath, unpacked to a
-                // per-user cache on first use. Ship one classifier per target tier.
+                // Video / animated-image backgrounds (hivens.ui.background): FFmpeg via
+                // Panama. skinema-compose brings -core + -skiko; the decode natives are
+                // per-platform classifier jars, unpacked to a per-user cache on first use.
+                // Each distributable is packaged on its own-OS runner (jpackage and
+                // packageReleaseUberJarForCurrentOS are host-only), so ship ONLY the host
+                // classifier -- bundling every classifier put ~35 MB of other-platform natives
+                // into every package (the Linux AppImage was carrying the Windows + both macOS
+                // libraries). providers.systemProperty keeps the read config-cache-correct.
                 implementation(libs.skinema.compose)
                 implementation(libs.skinema.skiko)
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-linux-x64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-linux-arm64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-windows-x64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-macos-arm64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-macos-x64")
+                val hostOs = providers.systemProperty("os.name").get().lowercase()
+                val hostArch = providers.systemProperty("os.arch").get().lowercase()
+                val hostArm64 = hostArch == "aarch64" || hostArch == "arm64"
+                val skinemaNativeClassifier = when {
+                    hostOs.contains("linux")   -> if (hostArm64) "decode-linux-arm64" else "decode-linux-x64"
+                    hostOs.contains("windows") -> if (hostArm64) "decode-windows-arm64" else "decode-windows-x64"
+                    hostOs.contains("mac") || hostOs.contains("darwin") ->
+                        if (hostArm64) "decode-macos-arm64" else "decode-macos-x64"
+                    else -> error("skinema-natives: no decode classifier for host OS '$hostOs' (arch '$hostArch')")
+                }
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinemaNatives.get()}:$skinemaNativeClassifier")
                 implementation(libs.ktor.client.core)
                 // In-launcher HTML renderer (hivens.ui.render): jsoup parses, the
                 // markdown lib does md->html. The velocipede before the standalone lib.

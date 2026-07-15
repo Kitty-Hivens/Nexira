@@ -257,7 +257,12 @@ fun EditorSurfaceHost(
     // address of the widget being rendered; chrome uses it both as the
     // registry key for drop-target bounds and to compose into nested
     // slots correctly.
-    val chromeDecorator: WidgetDecorator = remember(state, previewing) {
+    // When NOT editing, chain to whatever the shell root provided (the dev-debug
+    // decorator, or identity) instead of hardcoding identity: this host wraps the
+    // entire widget tree, so a hardcoded identity here shadows that root decorator
+    // everywhere and makes the debug overlay's slot/widget instrumentation inert.
+    val parentWidgetDecorator = LocalWidgetDecorator.current
+    val chromeDecorator: WidgetDecorator = remember(state, previewing, parentWidgetDecorator) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
             decorator@{ address, index, descriptor, instance, content ->
@@ -329,7 +334,7 @@ fun EditorSurfaceHost(
                 )
             }
         } else {
-            { _, _, _, _, content -> content() }
+            parentWidgetDecorator
         }
     }
 
@@ -373,7 +378,8 @@ fun EditorSurfaceHost(
     // bounds for the handle anchor, and routes a background / right-click press to
     // selection + the layout menu. Identity off / previewing / foreign surface, so
     // other surfaces and production pay nothing.
-    val slotChromeFactory: SlotChromeModifier = remember(state, previewing) {
+    val parentSlotChrome = LocalSlotChromeModifier.current
+    val slotChromeFactory: SlotChromeModifier = remember(state, previewing, parentSlotChrome) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
             { path, _ ->
@@ -390,7 +396,7 @@ fun EditorSurfaceHost(
                 }
             }
         } else {
-            { _, _ -> Modifier }
+            parentSlotChrome
         }
     }
 

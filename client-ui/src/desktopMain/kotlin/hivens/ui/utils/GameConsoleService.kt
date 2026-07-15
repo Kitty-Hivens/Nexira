@@ -76,6 +76,14 @@ class GameConsoleService(
     val canSendCommands: Boolean get() = _commandSink != null
 
     /**
+     * In-launcher console commands (e.g. the dev `uidebug` toggle), matched before
+     * a typed line is forwarded to the game. UI-thread only: registered once at
+     * shell mount, read on submit -- no cross-thread access, so no synchronization.
+     */
+    private val localCommands = LinkedHashMap<String, () -> Unit>()
+    val hasLocalCommands: Boolean get() = localCommands.isNotEmpty()
+
+    /**
      * In-memory sliding-window cap. `ConsoleSettings.maxInMemoryLines` drives
      * this at runtime; read by the drainer thread on every trim, written from
      * the UI thread -- @Volatile for cross-thread visibility (a late-applied
@@ -379,6 +387,22 @@ class GameConsoleService(
         val payload = text.trimEnd('\n', '\r')
         if (payload.isEmpty()) return
         _commandSink?.invoke(payload)
+    }
+
+    fun registerLocalCommand(name: String, handler: () -> Unit) {
+        localCommands[name.trim().lowercase()] = handler
+    }
+
+    /**
+     * Route a typed console line: a registered in-launcher command runs locally and
+     * returns true; anything else is forwarded to the game's stdin (a no-op when no
+     * game is running).
+     */
+    fun submitConsoleInput(text: String): Boolean {
+        val local = localCommands[text.trim().lowercase()]
+        if (local != null) { local(); return true }
+        sendCommand(text)
+        return false
     }
 
     /**

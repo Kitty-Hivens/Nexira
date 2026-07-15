@@ -19,7 +19,6 @@ import hivens.core.jvm.SystemHardware
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.update.UpdateService
 import hivens.ui.components.UpdateDialog
-import hivens.ui.components.UpdateManagerDialog
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.layout.AdaptiveWidth
 import hivens.ui.layout.WidthClass
@@ -62,7 +61,6 @@ fun AboutSurface(onBack: () -> Unit) {
 
     val updateState       = remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
     val showUpdateDialog  = remember { mutableStateOf(false) }
-    val showUpdateManager = remember { mutableStateOf(false) }
 
     // OrNull (not the sizing fallback): the System-info card shows "Unknown" on a 0,
     // so a broken runtime reads as unknown rather than a fabricated 16 GB.
@@ -113,11 +111,10 @@ fun AboutSurface(onBack: () -> Unit) {
         }
     }
 
-    val ctx = remember(updateState, showUpdateDialog, showUpdateManager, triggerUpdateCheck, systemRam, swapMb, cpu, displayInfo, renderer) {
+    val ctx = remember(updateState, showUpdateDialog, triggerUpdateCheck, systemRam, swapMb, cpu, displayInfo, renderer) {
         AboutContext(
             updateState        = updateState,
             showUpdateDialog   = showUpdateDialog,
-            showUpdateManager  = showUpdateManager,
             triggerUpdateCheck = triggerUpdateCheck,
             systemRam          = systemRam,
             swapMb             = swapMb,
@@ -156,14 +153,7 @@ fun AboutSurface(onBack: () -> Unit) {
         )
     }
 
-    // Full update manager (channels, version picker/rollback, .desktop,
-    // build-from-source) -- opened from the version "i" in the update panel.
-    if (showUpdateManager.value) {
-        UpdateManagerDialog(onDismiss = { showUpdateManager.value = false })
-    }
-
     PuppetScreen("About")
-    PuppetClick("about.openUpdateManager") { showUpdateManager.value = true }
     PuppetClick("about.back") { onBack() }
     PuppetClick("about.checkUpdates", enabled = updateState.value is UpdateCheckState.Idle) {
         triggerUpdateCheck()
