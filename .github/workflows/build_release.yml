@@ -67,6 +67,9 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   review-gate:
     name: Review Gate
+    # Nightlies are unreviewed bleeding-dev builds (tagged off dev HEAD, no PR),
+    # so the gate is skipped for -nightly tags. It still guards every real release.
+    if: ${{ !contains(github.ref_name, 'nightly') }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
@@ -152,6 +155,9 @@ jobs:
     name: Run Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: review-gate
+    # Run when the gate PASSED or was SKIPPED (nightly), but not when it FAILED
+    # (an unreviewed stable release) -- a real failure still blocks the pipeline.
+    if: ${{ always() && needs.review-gate.result != 'failure' }}
     # fail-fast: false — one OS failing shouldn't kill the others; we want
     # to see ALL platform-specific failures in one run, not race-of-the-first.
     # shell: bash so steps work identically on Windows runners (PowerShell's
