@@ -4,7 +4,7 @@
 
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
-kotlin            = "2.4.0"
+kotlin            = "2.4.10"
 compose           = "1.11.1"
 buildconfigPlugin = "6.0.10"
 versionsPlugin    = "0.54.0"
