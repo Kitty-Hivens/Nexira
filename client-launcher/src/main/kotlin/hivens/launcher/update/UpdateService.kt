@@ -116,12 +116,15 @@ class UpdateService(
             // prerelease; Release stays on /releases/latest. dev/git build-from-
             // source is a manual action in the update manager -- the auto-check
             // still surfaces the newest GitHub build for the channel.
-            val includePrereleases = channel.ordinal >= ReleaseChannel.Beta.ordinal
-            // Nightlies are opted into separately (the nightlyChannel flag, or by
-            // running a nightly build) -- NOT part of the plain pre-release channel,
-            // so they are filtered out of the candidate below unless opted in.
+            // Nightly is a SEPARATE axis from the pre-release channel: opted into via
+            // the nightlyChannel flag or by running a nightly build (self-bootstrap).
             val nightlyEnabled = settings.nightlyChannel ||
                 ReleaseChannel.classify(currentVersion) == ReleaseChannel.Nightly
+            // Fetch the full /releases list (prereleases included) when on a pre-release
+            // channel OR opted into nightlies -- either needs the list, not
+            // /releases/latest (which drops prereleases). Nightlies are then filtered
+            // from the candidate below unless nightlyEnabled.
+            val includePrereleases = channel.ordinal >= ReleaseChannel.Beta.ordinal || nightlyEnabled
             val mandatoryEnabled = settings.experimentalFeaturesEnabled && settings.mandatoryUpdatesEnabled
 
             logger.info(
