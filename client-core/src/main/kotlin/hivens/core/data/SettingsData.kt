@@ -147,6 +147,14 @@ data class SettingsData(
     val updateChannel: ReleaseChannel = ReleaseChannel.Release,
 
     /**
+     * Opt into nightly prereleases on top of pre-releases being enabled. Config-only,
+     * no UI -- editing the file, or running a nightly build (which classifies as
+     * [ReleaseChannel.Nightly] and enables this implicitly), is the opt-in. Nightlies
+     * are raw bleeding-dev, deliberately not offered to the pre-releases-toggle audience.
+     */
+    val nightlyChannel: Boolean = false,
+
+    /**
      * Sync all installed server packs in background on startup.
      * "Installed" means a non-empty `clients/<server>/` directory --
      * never triggers a many-GB first-time pack download out of nowhere.
