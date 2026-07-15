@@ -110,7 +110,7 @@ kotlin {
                         if (hostArm64) "decode-macos-arm64" else "decode-macos-x64"
                     else -> error("skinema-natives: no decode classifier for host OS '$hostOs' (arch '$hostArch')")
                 }
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:$skinemaNativeClassifier")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinemaNatives.get()}:$skinemaNativeClassifier")
                 implementation(libs.ktor.client.core)
                 // In-launcher HTML renderer (hivens.ui.render): jsoup parses, the
                 // markdown lib does md->html. The velocipede before the standalone lib.
