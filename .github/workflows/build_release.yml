@@ -67,15 +67,20 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   review-gate:
     name: Review Gate
-    # Nightlies are unreviewed bleeding-dev builds (tagged off dev HEAD, no PR),
-    # so the gate is skipped for -nightly tags. It still guards every real release.
-    if: ${{ !contains(github.ref_name, 'nightly') }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
       contents: read
     steps:
       - name: Verify HEAD originates from a reviewed PR
+        # Nightlies are unreviewed bleeding-dev builds (tagged off dev HEAD, no
+        # PR of their own), so the check is skipped for -nightly tags while the
+        # job itself still passes. The condition sits on the STEP, not the job:
+        # a skipped JOB is inherited by everything downstream through the
+        # implicit success() over the whole needs chain, so gating the job
+        # silently skipped changelog and every build under it -- a green run
+        # that shipped nothing. The gate still guards every real release.
+        if: ${{ !contains(github.ref_name, 'nightly') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_SHA:   ${{ github.sha }}
@@ -155,9 +160,6 @@ jobs:
     name: Run Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: review-gate
-    # Run when the gate PASSED or was SKIPPED (nightly), but not when it FAILED
-    # (an unreviewed stable release) -- a real failure still blocks the pipeline.
-    if: ${{ always() && needs.review-gate.result != 'failure' }}
     # fail-fast: false — one OS failing shouldn't kill the others; we want
     # to see ALL platform-specific failures in one run, not race-of-the-first.
     # shell: bash so steps work identically on Windows runners (PowerShell's
