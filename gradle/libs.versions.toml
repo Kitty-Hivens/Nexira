@@ -33,6 +33,10 @@ markdownRenderer  = "0.43.0"
 markdown          = "0.7.7"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
 jsoup             = "1.22.2"
+# Coil 3 -- async image loading (pack + mod icons, Browse cards). Deliberately no
+# library aliases: the KMP source-set block has to exclude Coil's skiko copy, and
+# implementation(<catalog accessor>) { ... } is rejected there (Provider vs String),
+# so client-ui builds the coordinates off this version instead.
 coil              = "3.5.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
@@ -143,8 +147,6 @@ compose-components-resources    = { group = "org.jetbrains.compose.components", 
 multiplatform-markdown-m3       = { group = "com.mikepenz",        name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 markdown-core                   = { group = "org.jetbrains",       name = "markdown",            version.ref = "markdown" }
 jsoup                           = { group = "org.jsoup",           name = "jsoup",               version.ref = "jsoup" }
-coil-compose                    = { group = "io.coil-kt.coil3",    name = "coil-compose",        version.ref = "coil" }
-coil-network-okhttp             = { group = "io.coil-kt.coil3",    name = "coil-network-okhttp", version.ref = "coil" }
 material-color-utilities        = { group = "com.materialkolor",   name = "material-color-utilities", version.ref = "materialColorUtils" }
 filekit-core                    = { group = "io.github.vinceglb", name = "filekit-core",         version.ref = "filekit" }
 filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "filekit-dialogs-compose", version.ref = "filekit" }
