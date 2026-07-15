@@ -246,13 +246,38 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `compareVersions orders prerelease suffixes lexicographically`() {
+    fun `compareVersions orders prerelease tiers by the ladder, not lexically`() {
         val svc = createService("{}")
-        // SemVer-ish: alpha < beta < rc, and rc1 < rc2. Lex compare on the
-        // suffix string is sufficient for the launcher's release cadence.
-        assertTrue(svc.compareVersions("1.3.0-rc2", "1.3.0-rc1") > 0)
+        // The ladder a tester walks, least to most stable: preview -> alpha ->
+        // beta -> rc -> release. Within one base that is also the order they get
+        // cut in, so it doubles as "which is newer".
+        assertTrue(svc.compareVersions("1.3.0-alpha", "1.3.0-preview") > 0)
         assertTrue(svc.compareVersions("1.3.0-beta", "1.3.0-alpha") > 0)
         assertTrue(svc.compareVersions("1.3.0-rc1", "1.3.0-beta3") > 0)
+        // Within one tier, natural order still decides.
+        assertTrue(svc.compareVersions("1.3.0-rc2", "1.3.0-rc1") > 0)
+    }
+
+    @Test
+    fun `a nightly outranks every prerelease tier at the same base`() {
+        val svc = createService("{}")
+        // The reason the ladder exists: lexically "nightly" < "preview", so a
+        // preview install opting into nightlies would be offered nothing at all.
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-preview") > 0)
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-alpha2") > 0)
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-beta5") > 0)
+        assertTrue(svc.compareVersions("2.4.0-nightly1219", "2.4.0-rc1") > 0)
+        // Nightlies still order numerically among themselves.
+        assertTrue(svc.compareVersions("2.4.0-nightly1220", "2.4.0-nightly1219") > 0)
+    }
+
+    @Test
+    fun `a shipped release outranks a nightly on the same base`() {
+        val svc = createService("{}")
+        // Deliberate: ranking nightly over a release would trap a nightly install
+        // on nightlies forever, since "am I on a nightly" is derived from the
+        // running version. The release must stay reachable.
+        assertTrue(svc.compareVersions("2.4.0", "2.4.0-nightly1219") > 0)
     }
 
     @Test
