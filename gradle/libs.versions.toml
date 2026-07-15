@@ -10,7 +10,7 @@ buildconfigPlugin = "6.0.10"
 versionsPlugin    = "0.54.0"
 # ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
 # the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
-# against the Kotlin 2.4.0 toolchain here (:widget-processor / :client-ui
+# against the Kotlin 2.4.10 toolchain here (:widget-processor / :client-ui
 # kspKotlinDesktop both green). Bump when a newer KSP ships; it does not need to
 # match the Kotlin minor.
 ksp               = "2.3.10"
