@@ -1,0 +1,66 @@
+name: Nightly
+
+# Cuts a nightly prerelease off dev. Computes v<next-minor>-nightly.<commit-count>,
+# pushes that tag with a PAT, and the Release workflow (v*.*.* trigger) builds and
+# publishes it -- its review gate is bypassed for -nightly tags. A tag pushed with
+# the default GITHUB_TOKEN would NOT trigger Release (GitHub's anti-recursion rule),
+# hence the PAT. Skips when dev HEAD already carries a nightly tag (no new commits).
+#
+# One-time setup: add a repo secret NIGHTLY_RELEASE_PAT -- a fine-grained PAT with
+# Contents: write on this repo. Scheduled runs execute from the default branch, so
+# this file must reach stable for the cron to fire; workflow_dispatch runs it now.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC nightly
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Cut nightly tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0 # full history + tags: commit count + base lookup
+          token: ${{ secrets.NIGHTLY_RELEASE_PAT }}
+
+      - name: Skip if dev HEAD already has a nightly tag
+        id: guard
+        run: |
+          existing=$(git tag --points-at HEAD -l 'v*-nightly.*' | head -1)
+          if [ -n "$existing" ]; then
+            echo "dev HEAD already tagged $existing -- no new commits, nothing to cut"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute version
+        if: steps.guard.outputs.skip != 'true'
+        id: ver
+        run: |
+          # Base = highest NON-nightly tag with its minor bumped, so nightlies sort
+          # above the current release/preview and below the eventual x.(y+1).0 final.
+          # Excluding nightly tags keeps the base from climbing each night.
+          latest=$(git tag -l 'v*' --sort=-v:refname | grep -v nightly | head -1)
+          base=${latest#v}; base=${base%%-*}
+          IFS=. read -r maj min _ <<< "$base"
+          nextbase="${maj}.$((min + 1)).0"
+          count=$(git rev-list --count HEAD)
+          echo "tag=v${nextbase}-nightly.${count}" >> "$GITHUB_OUTPUT"
+
+      - name: Tag and push
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.tag }}" -m "Nightly ${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"
+          echo "Cut ${{ steps.ver.outputs.tag }} -- the Release workflow takes it from here."
