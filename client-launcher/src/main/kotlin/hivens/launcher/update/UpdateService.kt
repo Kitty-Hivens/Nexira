@@ -117,6 +117,11 @@ class UpdateService(
             // source is a manual action in the update manager -- the auto-check
             // still surfaces the newest GitHub build for the channel.
             val includePrereleases = channel.ordinal >= ReleaseChannel.Beta.ordinal
+            // Nightlies are opted into separately (the nightlyChannel flag, or by
+            // running a nightly build) -- NOT part of the plain pre-release channel,
+            // so they are filtered out of the candidate below unless opted in.
+            val nightlyEnabled = settings.nightlyChannel ||
+                ReleaseChannel.classify(currentVersion) == ReleaseChannel.Nightly
             val mandatoryEnabled = settings.experimentalFeaturesEnabled && settings.mandatoryUpdatesEnabled
 
             logger.info(
@@ -131,8 +136,11 @@ class UpdateService(
             val releasesPage = if (includePrereleases) fetchReleasesPage() else null
             val release = (
                 if (releasesPage != null) {
-                    releasesPage.firstOrNull() ?: run {
-                        logger.warn("No non-draft releases found in /releases response")
+                    releasesPage.firstOrNull { entry ->
+                        nightlyEnabled ||
+                            ReleaseChannel.classify(entry.tagName.removePrefix("v")) != ReleaseChannel.Nightly
+                    } ?: run {
+                        logger.warn("No eligible release found in /releases response")
                         null
                     }
                 } else {
