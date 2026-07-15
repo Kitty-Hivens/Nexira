@@ -48,11 +48,11 @@ jobs:
     outputs:
       appimage_name: ${{ steps.appimage.outputs.name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -77,7 +77,7 @@ jobs:
           echo "key=appimagetool-continuous-x86_64-${updated}" >> "$GITHUB_OUTPUT"
 
       - name: Cache appimagetool
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: appimagetool
           key: ${{ steps.appimagetool-key.outputs.key }}
@@ -134,7 +134,7 @@ jobs:
           ls -la "${NAME}"
 
       - name: Upload AppImage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pr-appimage
           path: ${{ steps.appimage.outputs.name }}
@@ -236,7 +236,7 @@ jobs:
         run: ${{ matrix.install_cmd }}
 
       - name: Download AppImage from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: pr-appimage
           path: /tmp/nexira
@@ -347,7 +347,7 @@ jobs:
 
       - name: Upload stdout and log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pr-portability-stdout-${{ matrix.distro_name }}
           path: |
