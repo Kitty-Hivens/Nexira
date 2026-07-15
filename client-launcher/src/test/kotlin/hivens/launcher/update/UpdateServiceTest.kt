@@ -814,23 +814,23 @@ class UpdateServiceTest {
         // updateChannel=Release and only that flip missing, a nightly build would
         // silently stop tracking nightlies. /releases/latest is wired to fail to
         // prove the list path is taken.
-        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly.42")
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly42")
         val svc = createService(
             MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
             MockResponse(urlContains = "releases",        body = "[$nightly]"),
             settings = fakeSettings(updateChannel = ReleaseChannel.Release),
-            currentVersion = "2.5.0-nightly.10",
+            currentVersion = "2.5.0-nightly10",
         )
         val update = svc.checkForUpdate()
         assertNotNull(update, "a nightly build must keep tracking newer nightlies")
-        assertEquals("v2.5.0-nightly.42", update.version)
+        assertEquals("v2.5.0-nightly42", update.version)
     }
 
     @Test
     fun `nightlyChannel flag opts a stable build into nightlies`() = runTest {
         // The config bit alone (no nightly build, channel still Release) pulls the
         // newest nightly.
-        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly.42")
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly42")
         val svc = createService(
             MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
             MockResponse(urlContains = "releases",        body = "[$nightly]"),
@@ -838,7 +838,7 @@ class UpdateServiceTest {
         )
         val update = svc.checkForUpdate()
         assertNotNull(update, "the nightlyChannel flag must fetch the list and accept a nightly")
-        assertEquals("v2.5.0-nightly.42", update.version)
+        assertEquals("v2.5.0-nightly42", update.version)
     }
 
     @Test
@@ -846,7 +846,7 @@ class UpdateServiceTest {
         // A plain Beta user must NOT be dragged onto a nightly: the newest list
         // entry is a nightly, but the candidate filter skips it and lands on the
         // RC below. Without the filter the Beta user would silently ride nightlies.
-        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly.42")
+        val nightly = githubReleaseJson(tagName = "v2.5.0-nightly42")
         val rc = githubReleaseJson(tagName = "v2.4.0-rc1")
         val svc = createService(
             MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),

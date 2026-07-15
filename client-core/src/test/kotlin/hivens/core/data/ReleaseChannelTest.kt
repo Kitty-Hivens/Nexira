@@ -18,6 +18,8 @@ class ReleaseChannelTest {
         assertEquals(ReleaseChannel.Beta,    ReleaseChannel.classify("2.3.4-rc2"))
         assertEquals(ReleaseChannel.Alpha,   ReleaseChannel.classify("2.3.4-alpha"))
         assertEquals(ReleaseChannel.Alpha,   ReleaseChannel.classify("2.3.4-Alpha.3"))
+        // CI nightly: `-nightly<commit-count>`, no dot, matching the -beta5 style.
+        assertEquals(ReleaseChannel.Nightly, ReleaseChannel.classify("2.5.0-nightly1218"))
     }
 
     @Test
@@ -26,6 +28,11 @@ class ReleaseChannelTest {
         assertEquals(ReleaseChannel.Dev, ReleaseChannel.classify("2.3.4-beta4-17-g5c1a7ee"))
         assertEquals(ReleaseChannel.Dev, ReleaseChannel.classify("2.3.4-dirty"))
         assertEquals(ReleaseChannel.Dev, ReleaseChannel.classify("0.0.0-dev"))
+        // Building from source off a nightly tag stays a source build: the
+        // describe/dirty check must win over the -nightly suffix, otherwise the
+        // "never auto-update a source build" guard would leak.
+        assertEquals(ReleaseChannel.Dev, ReleaseChannel.classify("2.5.0-nightly1218-5-gabc1234-dirty"))
+        assertEquals(ReleaseChannel.Dev, ReleaseChannel.classify("2.5.0-nightly1218-5-gabc1234"))
     }
 
     @Test
