@@ -4,6 +4,8 @@ import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
+import hivens.core.io.InstanceMutationLock
+import hivens.core.io.fileOpRetry
 import hivens.launcher.FileDownloadService
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
@@ -50,62 +52,68 @@ class SmrtSyncService(
         progress: ((current: Int, total: Int, filename: String) -> Unit)? = null,
         enabledState: Map<String, Boolean> = emptyMap(),
     ) = withContext(Dispatchers.IO) {
-        val manifest = client.fetchManifest(packId)
-        log.info(
-            "smrt sync: pack={}, pack_version={}, mods={}, assets={}",
-            manifest.packId, manifest.packVersion,
-            manifest.mods.size, manifest.assets.size,
-        )
-
-        if (manifest.schemaVersion != EXPECTED_SCHEMA) {
-            throw IOException(
-                "smrt mirror manifest schema_version=${manifest.schemaVersion}, " +
-                    "expected $EXPECTED_SCHEMA. Update Nexira or the mirror version mismatched."
-            )
-        }
-
-        Files.createDirectories(clientDir)
-
-        // Wipe mods/ when the previous sync used a different source
-        // (SC's mods/{mcversion}/ layout vs mirror's flat mods/).
-        // Forge scans both trees, a duplicate jar loads its coremod
-        // twice, and stacking ASM transformers (FoamFix hashCode
-        // patch) recurse into StackOverflowError on the second pass.
-        // The marker is per-clientDir so each pack tracks its own
-        // source independently.
-        val marker = clientDir.resolve(SOURCE_MARKER_FILE)
-        val previousSource = readSourceMarker(marker)
-        if (previousSource != SOURCE_MIRROR) {
+        // Serialize against a concurrent structural mutation of this instance (an
+        // optional-content toggle relabel), so a rename can't land between the
+        // existence check and the move below. Reads are not gated -- they open
+        // delete-shared and cannot corrupt a rename.
+        InstanceMutationLock.withLock(clientDir) {
+            val manifest = client.fetchManifest(packId)
             log.info(
-                "smrt sync: source change ({} -> {}), wiping mods/",
-                previousSource ?: "<none>", SOURCE_MIRROR,
+                "smrt sync: pack={}, pack_version={}, mods={}, assets={}",
+                manifest.packId, manifest.packVersion,
+                manifest.mods.size, manifest.assets.size,
             )
-            wipeModsDir(clientDir)
+
+            if (manifest.schemaVersion != EXPECTED_SCHEMA) {
+                throw IOException(
+                    "smrt mirror manifest schema_version=${manifest.schemaVersion}, " +
+                        "expected $EXPECTED_SCHEMA. Update Nexira or the mirror version mismatched."
+                )
+            }
+
+            Files.createDirectories(clientDir)
+
+            // Wipe mods/ when the previous sync used a different source
+            // (SC's mods/{mcversion}/ layout vs mirror's flat mods/).
+            // Forge scans both trees, a duplicate jar loads its coremod
+            // twice, and stacking ASM transformers (FoamFix hashCode
+            // patch) recurse into StackOverflowError on the second pass.
+            // The marker is per-clientDir so each pack tracks its own
+            // source independently.
+            val marker = clientDir.resolve(SOURCE_MARKER_FILE)
+            val previousSource = readSourceMarker(marker)
+            if (previousSource != SOURCE_MIRROR) {
+                log.info(
+                    "smrt sync: source change ({} -> {}), wiping mods/",
+                    previousSource ?: "<none>", SOURCE_MIRROR,
+                )
+                wipeModsDir(clientDir)
+            }
+
+            val total = manifest.mods.size + manifest.assets.size
+            var current = 0
+
+            for (mod in manifest.mods) {
+                current++
+                progress?.invoke(current, total, mod.filename)
+                val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+                syncMod(mod, clientDir, enabled)
+            }
+            for (asset in manifest.assets) {
+                current++
+                progress?.invoke(current, total, asset.dest)
+                syncAsset(asset, clientDir)
+            }
+
+            // Drop manifest-removed mods and catch foreign payloads that
+            // the wipe missed (an SC sync ran between two mirror syncs
+            // without touching the marker, so the wipe gate saw a stale
+            // "mirror" value). Only top-level mods/{expected_filename}
+            // entries survive.
+            pruneOrphanMods(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+
+            writeSourceMarker(marker, SOURCE_MIRROR)
         }
-
-        val total = manifest.mods.size + manifest.assets.size
-        var current = 0
-
-        for (mod in manifest.mods) {
-            current++
-            progress?.invoke(current, total, mod.filename)
-            val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
-            syncMod(mod, clientDir, enabled)
-        }
-        for (asset in manifest.assets) {
-            current++
-            progress?.invoke(current, total, asset.dest)
-            syncAsset(asset, clientDir)
-        }
-
-        // Drop manifest-removed mods and catch foreign payloads that
-        // the wipe missed (an SC sync ran between two mirror syncs
-        // without touching the marker, so the wipe gate saw a stale
-        // "mirror" value). Only top-level mods/{expected_filename}
-        // entries survive.
-        pruneOrphanMods(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
-
-        writeSourceMarker(marker, SOURCE_MIRROR)
     }
 
     /**
@@ -115,9 +123,10 @@ class SmrtSyncService(
      * name (and thus whether Forge loads it) changes. A variant that is missing
      * on disk is left for the next full sync to fetch.
      */
-    override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
+    override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String> {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return
+        if (!Files.isDirectory(modsDir)) return emptyList()
+        val failed = mutableListOf<String>()
         for (mod in mods) {
             val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
             val active = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
@@ -125,10 +134,22 @@ class SmrtSyncService(
             val from = if (enabled) disabled else active
             val to = if (enabled) active else disabled
             if (Files.exists(from) && !Files.exists(to)) {
-                runCatching { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) }
-                    .onFailure { log.warn("smrt relabel: failed to move {} -> {}", from, to, it) }
+                runCatching {
+                    fileOpRetry("smrt relabel ${mod.filename}") {
+                        Files.move(from, to, StandardCopyOption.REPLACE_EXISTING)
+                    }
+                }.onFailure {
+                    // A lock that outlives the retry means a holder we can't evict --
+                    // typically the running game's classloader, which on Windows keeps
+                    // the jar open without delete-sharing. The intent is already
+                    // persisted in optionalContent, so the next launch's sync applies
+                    // it; record the file instead of pretending the flip took effect.
+                    failed += mod.filename
+                    log.warn("smrt relabel: {} still held after retries; applies on next launch", mod.filename)
+                }
             }
         }
+        return failed
     }
 
     private fun pruneOrphanMods(clientDir: Path, expected: Set<String>) {
@@ -142,7 +163,7 @@ class SmrtSyncService(
                         jar.fileName.toString() in expected
                     if (!isCanonical) {
                         runCatching {
-                            Files.delete(jar)
+                            fileOpRetry("smrt prune $jar") { Files.delete(jar) }
                             removed++
                             log.debug("smrt sync: pruned orphan jar {}", jar)
                         }.onFailure { log.warn("smrt sync: failed to prune {}", jar, it) }
@@ -161,7 +182,7 @@ class SmrtSyncService(
                 .forEach { p ->
                     if (p == modsDir) return@forEach
                     runCatching {
-                        Files.delete(p)
+                        fileOpRetry("smrt wipe $p") { Files.delete(p) }
                         removed++
                     }.onFailure { log.warn("smrt sync: failed to wipe {}", p, it) }
                 }
@@ -198,10 +219,10 @@ class SmrtSyncService(
 
         if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
             Files.createDirectories(dest.parent)
-            Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING)
+            fileOpRetry("smrt sync move ${mod.filename}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
             return
         }
-        runCatching { Files.deleteIfExists(stale) }
+        runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
         downloadIfNeeded(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
@@ -284,7 +305,7 @@ class SmrtSyncService(
             // Loud failure: delete the bad bytes so a retry refetches,
             // and surface the mismatch to the user instead of silently
             // serving wrong content.
-            runCatching { Files.deleteIfExists(dest) }
+            runCatching { fileOpRetry("smrt drop bad download $label") { Files.deleteIfExists(dest) } }
             throw IOException(
                 "$label sha1 mismatch after download: expected $expectedSha1, got $onDiskSha"
             )
@@ -343,25 +364,27 @@ class SmrtSyncService(
         }
         // Non-atomic REPLACE_EXISTING on FAT32/SMB can leave a 0-byte
         // dest after power loss; Forge then classloads garbage.
-        try {
-            Files.move(
-                tmp,
-                dest,
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        } catch (_: AtomicMoveNotSupportedException) {
-            log.warn(
-                "Filesystem at {} does not support ATOMIC_MOVE; non-atomic fallback may leave a 0-byte file on crash",
-                dest.parent,
-            )
-            Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
-        } catch (_: FileAlreadyExistsException) {
-            // Java spec allows ATOMIC_MOVE to ignore REPLACE_EXISTING; some
-            // providers then refuse and raise FileAlreadyExistsException
-            // when dest already exists. Re-sync over an existing jar would
-            // hard-fail without this fallback.
-            Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
+        fileOpRetry("smrt download commit ${dest.fileName}") {
+            try {
+                Files.move(
+                    tmp,
+                    dest,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                log.warn(
+                    "Filesystem at {} does not support ATOMIC_MOVE; non-atomic fallback may leave a 0-byte file on crash",
+                    dest.parent,
+                )
+                Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: FileAlreadyExistsException) {
+                // Java spec allows ATOMIC_MOVE to ignore REPLACE_EXISTING; some
+                // providers then refuse and raise FileAlreadyExistsException
+                // when dest already exists. Re-sync over an existing jar would
+                // hard-fail without this fallback.
+                Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
+            }
         }
     }
 
