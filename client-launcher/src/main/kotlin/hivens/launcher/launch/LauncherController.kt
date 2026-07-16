@@ -17,6 +17,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
+import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -91,14 +92,23 @@ class LauncherController(
         val updated = instance.copy(optionalContent = toggles)
         packRepository.put(updated)
         val clientDir = dataDirectory.resolve("instances").resolve(instance.instanceDirName)
-        withContext(Dispatchers.IO) {
-            smrtSyncService.relabel(
-                clientDir,
-                manifest.mods,
-                OptionalContentRules.enabledState(manifest.mods, toggles),
-            )
+        val deferred = withContext(Dispatchers.IO) {
+            InstanceMutationLock.withLock(clientDir) {
+                smrtSyncService.relabel(
+                    clientDir,
+                    manifest.mods,
+                    OptionalContentRules.enabledState(manifest.mods, toggles),
+                )
+            }
         }
-        ActionRing.record("Optional content updated: ${instance.displayName}")
+        if (deferred.isEmpty()) {
+            ActionRing.record("Optional content updated: ${instance.displayName}")
+        } else {
+            // The selection is saved; only the on-disk flip could not land now (a
+            // live holder keeps the jar -- the running game on Windows). It applies
+            // on the next launch's sync, so tell the user rather than imply it took.
+            ActionRing.record("${instance.displayName}: ${deferred.size} content change(s) apply after the game restarts")
+        }
         return updated
     }
 

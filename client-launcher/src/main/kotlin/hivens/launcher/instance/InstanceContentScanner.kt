@@ -11,7 +11,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.zip.ZipFile
+import hivens.core.io.openSharedZip
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipFile
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
@@ -120,7 +122,7 @@ class InstanceContentScanner {
     }
 
     /** Fabric/Quilt first (the common modern case), then a light Forge/NeoForge TOML read. */
-    private fun readModMeta(file: Path): Meta? = ZipFile(file.toFile()).use { zip ->
+    private fun readModMeta(file: Path): Meta? = openSharedZip(file).use { zip ->
         zip.getEntry("fabric.mod.json")?.let { return parseFabric(zip, it) }
         zip.getEntry("quilt.mod.json")?.let { return parseQuilt(zip, it) }
         (zip.getEntry("META-INF/neoforge.mods.toml") ?: zip.getEntry("META-INF/mods.toml"))
@@ -128,7 +130,7 @@ class InstanceContentScanner {
         null
     }
 
-    private fun parseFabric(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
+    private fun parseFabric(zip: ZipFile, entry: ZipArchiveEntry): Meta {
         val root = json.parseToJsonElement(zip.getInputStream(entry).readBytes().decodeToString()).jsonObject
         val name = root["name"]?.jsonPrimitive?.contentOrNull
         val version = root["version"]?.jsonPrimitive?.contentOrNull
@@ -153,7 +155,7 @@ class InstanceContentScanner {
         )
     }
 
-    private fun parseQuilt(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
+    private fun parseQuilt(zip: ZipFile, entry: ZipArchiveEntry): Meta {
         val loader = json.parseToJsonElement(zip.getInputStream(entry).readBytes().decodeToString())
             .jsonObject["quilt_loader"]?.jsonObject
         val meta = loader?.get("metadata")?.jsonObject
@@ -183,7 +185,7 @@ class InstanceContentScanner {
      * show. Dependencies are left out here: forge/neoforge `[[dependencies.<modid>]]`
      * blocks need section-aware parsing the flat line scan can't do reliably.
      */
-    private fun parseForgeToml(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
+    private fun parseForgeToml(zip: ZipFile, entry: ZipArchiveEntry): Meta {
         val text = zip.getInputStream(entry).readBytes().decodeToString()
         val name = TOML_DISPLAY_NAME.find(text)?.groupValues?.get(1)
         val version = TOML_VERSION.find(text)?.groupValues?.get(1)?.takeIf { !it.startsWith($$"${") }
@@ -214,7 +216,7 @@ class InstanceContentScanner {
     }
 
     /** Resource pack: `pack.mcmeta` description + `pack.png` icon. */
-    private fun readPackMeta(file: Path): Meta? = ZipFile(file.toFile()).use { zip ->
+    private fun readPackMeta(file: Path): Meta? = openSharedZip(file).use { zip ->
         val description = zip.getEntry("pack.mcmeta")?.let {
             runCatching {
                 json.parseToJsonElement(zip.getInputStream(it).readBytes().decodeToString())
@@ -235,12 +237,12 @@ class InstanceContentScanner {
      * letter. Returns null when the archive truly has no recognizable icon.
      */
     fun probeJarIcon(file: Path): ByteArray? = runCatching {
-        ZipFile(file.toFile()).use { zip ->
+        openSharedZip(file).use { zip ->
             for (name in ICON_CANDIDATES) {
                 val entry = zip.getEntry(name) ?: continue
                 return@use zip.getInputStream(entry).readBytes()
             }
-            val nested = zip.entries().asSequence().firstOrNull {
+            val nested = zip.entries.iterator().asSequence().firstOrNull {
                 !it.isDirectory && it.name.startsWith("assets/") && it.name.endsWith("/icon.png")
             }
             nested?.let { zip.getInputStream(it).readBytes() }

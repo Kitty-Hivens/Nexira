@@ -1,5 +1,6 @@
 package hivens.launcher.smrt
 
+import hivens.core.io.fileOpRetry
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -31,7 +32,7 @@ object ModInjector {
             val modsDir = baseDir.resolve("mods")
             Files.createDirectories(modsDir)
             val dest = modsDir.resolve(jar.fileName.toString())
-            Files.copy(jar, dest, StandardCopyOption.REPLACE_EXISTING)
+            fileOpRetry("open-smrt inject ${jar.fileName}") { Files.copy(jar, dest, StandardCopyOption.REPLACE_EXISTING) }
             logger.info("open-smrt helper: injected {}", dest.fileName)
         }.onFailure { logger.warn("open-smrt helper: failed to inject {}", jar, it) }
     }
@@ -56,7 +57,7 @@ object ModInjector {
                     .forEach { jar ->
                         if (patterns.any { it.matches(jar.fileName.toString()) }) {
                             runCatching {
-                                Files.delete(jar)
+                                fileOpRetry("Smarty strip $jar") { Files.delete(jar) }
                                 removed++
                                 logger.debug("Smarty strip: removed {}", jar)
                             }.onFailure { logger.warn("Smarty strip: failed to remove {}", jar, it) }
