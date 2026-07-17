@@ -805,14 +805,14 @@ val appModule = module {
         SmartyCraftServerListService(get(), get(), get(), dashboardCache())
     }
 
-    // JSON-on-disk pack registry. Persists installed PackInstances
-    // to <dataDir>/packs.json so Library reflects real state across
-    // launches. Empty file -> empty list (cold start UX is the
-    // Library Empty CTA pointing at Browse).
+    // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
+    // entry per id so a mutation is an O(1) put, not a full-file rewrite. Migrates a
+    // legacy packs.json on first open (renamed to *.migrated). Empty -> empty list.
     single<IPackRepository> {
         val dataDir: Path = get()
-        JsonPackRepository(
-            file = dataDir.resolve(Storage.PACKS_FILE),
+        XodusPackRepository(
+            dbDir = dataDir.resolve("db"),
+            legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
             json = get(),
         )
     }
