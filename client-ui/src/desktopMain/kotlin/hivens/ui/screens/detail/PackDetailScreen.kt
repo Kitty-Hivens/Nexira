@@ -2,7 +2,6 @@ package hivens.ui.screens.detail
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,24 +44,16 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.interfaces.IPackRepository
-import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.CachedManifestSnapshot
-import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
-import hivens.core.update.UpdateCheck
-import hivens.core.jvm.AutomaticHeap
-import hivens.core.jvm.SystemMemory
-import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.update.PackAutoUpdateService
-import hivens.launcher.update.PackUpdateService
 import dev.hivens.skinema.compose.VideoScale
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
-import hivens.ui.components.RamSelector
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isVideoUrl
 import hivens.ui.customization.glassSurfaceAlpha
@@ -73,8 +64,6 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxRow
-import hivens.ui.nx.NxSection
-import hivens.ui.nx.NxToggle
 import hivens.ui.nx.NxCalloutTone
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
@@ -88,6 +77,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.ConsoleContent
+import hivens.ui.screens.detail.settings.PackSettingsWindow
 import hivens.ui.screens.ConsoleSource
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.screens.library.FileBrowserPane
@@ -222,18 +212,11 @@ fun PackDetailScreen(
     }
 
     if (showSettings) {
-        PackSettingsModal(
-            title           = s.packDetailTabSettings,
-            pack            = pack,
-            runtime         = pack.runtime,
-            instanceDir     = instanceDir,
-            onRuntimeChange = { rt ->
-                val updated = pack.copy(runtime = rt)
-                instance = updated
-                scope.launch { repo.put(updated) }
-            },
+        PackSettingsWindow(
+            pack             = pack,
+            instanceDir      = instanceDir,
             onInstanceChange = { instance = it },
-            onDismiss       = { showSettings = false },
+            onDismiss        = { showSettings = false },
         )
     }
 }
@@ -319,162 +302,6 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
                         },
                         source = source,
                     )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Settings tab: per-instance runtime. RAM only for now -- Auto (the machine-aware
- * Automatic baseline, refined by the adaptive sizer) vs a pinned value. Persists each
- * change through [onRuntimeChange]; the Auto chip shows what the next launch will use.
- */
-@Composable
-private fun PackSettingsTab(
-    runtime: InstanceRuntime,
-    instanceDir: Path,
-    onRuntimeChange: (InstanceRuntime) -> Unit,
-) {
-    val profilerStore: ProfilerProfileStore = koinInject()
-    val settingsService: ISettingsService = koinInject()
-
-    // Keyed on the stable instanceDir, not runtime: the tab's own edits mutate runtime,
-    // and re-seeding on those would fight an in-progress edit. Reset only when the
-    // displayed instance changes (which also remounts the screen via the nav Crossfade).
-    var isAutoMode by remember(instanceDir) { mutableStateOf(!runtime.fixedMemory) }
-    var memory by remember(instanceDir) { mutableStateOf(if (runtime.memoryMb > 0) runtime.memoryMb else 4096) }
-    var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
-
-    LaunchedEffect(instanceDir) {
-        val settings = settingsService.getSettings()
-        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
-        val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(instanceDir)?.derivedHeapMb } else null
-        resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
-    }
-
-    RamSelector(
-        isAuto = isAutoMode,
-        resolvedAutoMb = resolvedAutoMb,
-        currentMb = memory,
-        onAutoSelected = {
-            isAutoMode = true
-            onRuntimeChange(runtime.copy(fixedMemory = false))
-        },
-        onValueChanged = {
-            memory = it
-            isAutoMode = false
-            onRuntimeChange(runtime.copy(memoryMb = it, fixedMemory = true))
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-/**
- * Version + updates for a mirror instance: current build, follow-latest vs pinned,
- * a manual check with the compat-graded result, an apply, and the retained build
- * list for a switch or rollback. All actions run on the app-scoped [PackUpdateService];
- * the committed instance flows back via [onInstanceChange] so the hero refreshes.
- */
-@Composable
-private fun PackVersionTab(pack: PackInstance, onInstanceChange: (PackInstance) -> Unit) {
-    val s = LocalStrings.current
-    val colors = NxTheme.colors
-    val updater: PackUpdateService = koinInject()
-    val repo: IPackRepository = koinInject()
-    val scope = rememberCoroutineScope()
-
-    var busy by remember(pack.id) { mutableStateOf(false) }
-    var check by remember(pack.id) { mutableStateOf<UpdateCheck?>(null) }
-    var message by remember(pack.id) { mutableStateOf<String?>(null) }
-    var versions by remember(pack.id) { mutableStateOf<List<String>>(emptyList()) }
-
-    val current = pack.pinnedPackVersion ?: pack.packRef.version ?: "?"
-
-    LaunchedEffect(pack.id) {
-        versions = runCatching { updater.availableVersions(pack) }.getOrDefault(emptyList())
-    }
-
-    fun apply(target: String?) {
-        if (busy) return
-        scope.launch {
-            busy = true
-            message = null
-            runCatching { updater.applyUpdate(pack, target, null) }
-                .onSuccess {
-                    repo.get(pack.id)?.let(onInstanceChange)
-                    check = null
-                    versions = runCatching { updater.availableVersions(pack) }.getOrDefault(versions)
-                }
-                .onFailure { message = it.message ?: s.packVersionCheckFailed }
-            busy = false
-        }
-    }
-
-    NxSection(s.packVersionSection) {
-        NxRow(title = s.packVersionInstalled, subtitle = current) {
-            NxButton(
-                label = if (busy) s.packVersionWorking else s.packVersionCheck,
-                onClick = {
-                    if (busy) return@NxButton
-                    scope.launch {
-                        busy = true
-                        message = null
-                        check = runCatching { updater.checkForUpdate(pack) }
-                            .getOrElse { message = s.packVersionCheckFailed; null }
-                        busy = false
-                    }
-                },
-                style = NxButtonStyle.Secondary,
-                enabled = !busy,
-                compact = true,
-            )
-        }
-
-        NxToggle(
-            s.packVersionFollowLatest,
-            pack.followLatest,
-            description = s.packVersionFollowLatestDesc,
-            icon = NxIcon.Sync,
-        ) { enabled ->
-            val updated = pack.copy(followLatest = enabled)
-            onInstanceChange(updated)
-            scope.launch { repo.put(updated) }
-        }
-
-        when (val c = check) {
-            UpdateCheck.UpToDate -> Text(
-                s.packVersionUpToDate,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary,
-            )
-            is UpdateCheck.Available -> NxRow(
-                title = s.packVersionAvailable(c.toVersion),
-                subtitle = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
-            ) {
-                NxButton(s.packVersionUpdateNow, onClick = { apply(null) }, enabled = !busy, compact = true)
-            }
-            null -> Unit
-        }
-
-        message?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = colors.error)
-        }
-
-        if (versions.size > 1) {
-            Text(s.packVersionOtherBuilds, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-            versions.forEach { v ->
-                val isCurrent = v == current
-                NxRow(title = v, subtitle = if (isCurrent) s.packVersionCurrentTag else null) {
-                    if (!isCurrent) {
-                        NxButton(
-                            s.packVersionSwitch,
-                            onClick = { apply(v) },
-                            style = NxButtonStyle.Tertiary,
-                            enabled = !busy,
-                            compact = true,
-                        )
-                    }
                 }
             }
         }
@@ -786,51 +613,6 @@ private fun lastPlayedShort(epoch: Long, s: AppStrings): String {
         dur.toDays()    < 1  -> s.packCardPlayedHoursAgo(dur.toHours())
         dur.toDays()    < 14 -> s.packCardPlayedDaysAgo(dur.toDays())
         else                 -> s.packCardPlayedLongAgo
-    }
-}
-
-@Composable
-private fun PackSettingsModal(
-    title: String,
-    pack: PackInstance,
-    runtime: InstanceRuntime,
-    instanceDir: Path,
-    onRuntimeChange: (InstanceRuntime) -> Unit,
-    onInstanceChange: (PackInstance) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val scrim = remember { MutableInteractionSource() }
-    val card = remember { MutableInteractionSource() }
-    Box(
-        modifier         = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(interactionSource = scrim, indication = null, onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier
-                .widthIn(max = 620.dp)
-                .fillMaxWidth(0.7f)
-                .clickable(interactionSource = card, indication = null, onClick = {}),
-            shape    = MaterialTheme.shapes.medium,
-            color    = NxTheme.colors.surface,
-        ) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically,
-                ) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss) { Symbol(NxIcon.Close, contentDescription = null, tint = NxTheme.colors.textSecondary) }
-                }
-                PackSettingsTab(runtime = runtime, instanceDir = instanceDir, onRuntimeChange = onRuntimeChange)
-                if (pack.packRef.origin == PackOrigin.Mirror) {
-                    PackVersionTab(pack = pack, onInstanceChange = onInstanceChange)
-                }
-            }
-        }
     }
 }
 

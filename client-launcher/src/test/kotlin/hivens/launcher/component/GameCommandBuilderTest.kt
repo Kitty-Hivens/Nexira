@@ -778,4 +778,50 @@ class GameCommandBuilderTest {
         assertTrue(cmd.none { it.startsWith("-javaagent:") }, "no -javaagent without paths")
         assertTrue(cmd.none { it.startsWith("-Dnexira.profiler.out=") }, "no out-property without paths")
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // buildPackCommand -- optional game-window geometry
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private fun packCommandWindow(width: Int?, height: Int?, fullScreen: Boolean) = builder.buildPackCommand(
+        javaExec = "/usr/bin/java",
+        memoryMB = 4096,
+        gameDir = Path.of("/tmp/instances/Industrial"),
+        sharedAssetsDir = Path.of("/tmp/shared/assets"),
+        sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+        nativesDirName = "bin/natives-1.12.2",
+        versionLabel = "Forge 1.12.2",
+        javaMajor = 8,
+        runtime = forgeRuntime(),
+        session = session(),
+        jvmArgsOverride = null,
+        windowWidth = width,
+        windowHeight = height,
+        fullScreen = fullScreen,
+    )
+
+    @Test
+    fun `buildPackCommand omits window geometry when no size is given`() {
+        val cmd = packCommand()
+        assertFalse(cmd.contains("--width"), "no --width by default")
+        assertFalse(cmd.contains("--height"), "no --height by default")
+        assertFalse(cmd.contains("--fullscreen"), "no --fullscreen by default")
+    }
+
+    @Test
+    fun `buildPackCommand emits width and height when a size is given`() {
+        val cmd = packCommandWindow(width = 1280, height = 720, fullScreen = false)
+        assertEquals("1280", cmd[cmd.indexOf("--width") + 1])
+        assertEquals("720", cmd[cmd.indexOf("--height") + 1])
+        assertFalse(cmd.contains("--fullscreen"))
+    }
+
+    @Test
+    fun `buildPackCommand emits fullscreen and drops the size in fullscreen mode`() {
+        // Fullscreen wins: the client ignores an explicit size, so we do not pass one.
+        val cmd = packCommandWindow(width = 1280, height = 720, fullScreen = true)
+        assertTrue(cmd.contains("--fullscreen"))
+        assertFalse(cmd.contains("--width"))
+        assertFalse(cmd.contains("--height"))
+    }
 }
