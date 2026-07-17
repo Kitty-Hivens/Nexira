@@ -390,6 +390,8 @@ interface AppStrings {
     val settingsMandatoryUpdatesDesc: String
     val settingsAutoSyncAllPacks: String
     val settingsAutoSyncAllPacksDesc: String
+    val settingsAutoUpdatePacks: String
+    val settingsAutoUpdatePacksDesc: String
     val settingsJvmBuilder: String
     val settingsJvmBuilderDesc: String
     val settingsAdaptiveMemory: String
