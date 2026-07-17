@@ -1,6 +1,7 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -73,6 +74,12 @@ class SmrtPackClient(
     suspend fun listPacks(): SmrtPackListing {
         val url = "$mirrorBase/v1/packs"
         return caches.listing.get(url) { getJson(url) }
+    }
+
+    /** The build versions the mirror retains for a pack; ordering is the caller's. */
+    suspend fun listVersions(packId: String): List<String> {
+        val url = "$mirrorBase/v1/packs/$packId/manifest/versions"
+        return getJson<SmrtManifestVersions>(url).versions
     }
 
     /**

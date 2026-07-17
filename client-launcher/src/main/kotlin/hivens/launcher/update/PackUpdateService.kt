@@ -16,6 +16,7 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdateReconciler
 import hivens.core.update.classifyCompat
+import hivens.core.update.comparePackVersions
 import hivens.core.update.isNewerPackVersion
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.smrt.SmrtPackClient
@@ -178,6 +179,11 @@ class PackUpdateService(
                 optionalContent = OptionalContentRules.togglesFrom(target.mods, enabledState),
             )
         )
+    }
+
+    /** The mirror's available builds for [instance], newest first, for a version switch or rollback. */
+    suspend fun availableVersions(instance: PackInstance): List<String> = withContext(Dispatchers.IO) {
+        client.listVersions(instance.packRef.id).sortedWith { a, b -> comparePackVersions(b, a) }
     }
 
     /** Snapshots [instance] can be rolled back to, newest first. */
