@@ -71,6 +71,9 @@ import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
+import hivens.launcher.instance.CachedScan
+import hivens.launcher.instance.ContentScanCache
+import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
@@ -461,6 +464,11 @@ val authModule = module {
 val cacheModule = module {
     single<Clock> { SystemClock }
     single { CacheFactory(rootDir = get<Path>().resolve("cache"), json = get(), scope = get(), clock = get()) }
+    // Content-scan cache (Xodus-backed) + the scanner that reads it, so re-opening a
+    // pack's Content tab reads parsed mod metadata from the DB instead of re-cracking
+    // every jar. Keyed by canonical path, validated by size+mtime.
+    single { ContentScanCache(get<CacheFactory>().diskStore("content-scan", CachedScan.serializer())) }
+    single { InstanceContentScanner(get()) }
     single { smrtPackCaches() }
     single { modrinthCaches() }
 }
