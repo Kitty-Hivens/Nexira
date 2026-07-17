@@ -34,3 +34,29 @@ fun FileManifest.flatten(): Map<String, FileData> {
     walk(this, "")
     return result
 }
+
+/**
+ * Inverse of [flatten]: rebuild the nested tree from flat `a/b/c` -> [FileData]
+ * entries. Every `path -> data` pair round-trips (`flatten(fileManifestOf(m))`
+ * reproduces `m`'s entries); iteration order may differ because [flatten] emits
+ * root files before recursing into subdirectories. Empty path segments (a
+ * leading, trailing, or doubled `/`) are dropped so a stray separator cannot
+ * create a nameless node.
+ */
+fun fileManifestOf(entries: Map<String, FileData>): FileManifest {
+    val files = LinkedHashMap<String, FileData>()
+    val subtrees = LinkedHashMap<String, LinkedHashMap<String, FileData>>()
+    for ((path, data) in entries) {
+        val segments = path.split('/').filter { it.isNotEmpty() }
+        if (segments.isEmpty()) continue
+        if (segments.size == 1) {
+            files[segments[0]] = data
+        } else {
+            subtrees.getOrPut(segments[0]) { LinkedHashMap() }[segments.drop(1).joinToString("/")] = data
+        }
+    }
+    return FileManifest(
+        directories = subtrees.mapValues { (_, sub) -> fileManifestOf(sub) },
+        files = files,
+    )
+}
