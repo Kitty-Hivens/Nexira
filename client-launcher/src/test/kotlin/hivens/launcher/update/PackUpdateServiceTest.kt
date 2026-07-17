@@ -70,9 +70,9 @@ class PackUpdateServiceTest {
     private fun asset(dest: String, bytes: ByteArray, url: String) =
         """{"dest":"$dest","sha1":"${sha1(bytes)}","size_bytes":${bytes.size},"required":true,"source":{"type":"smrt_static","url":"$url"}}"""
 
-    private fun manifest(version: String, mods: List<String>, assets: List<String>) =
+    private fun manifest(version: String, mods: List<String>, assets: List<String>, mc: String = "1.20.1") =
         """{"schema_version":2,"pack_id":"test","pack_version":"$version","generated_at":"now",
-            "minecraft":{"version":"1.20.1"},"loader":{"name":"fabric","version":"0.19.2"},"java":{"major":17},
+            "minecraft":{"version":"$mc"},"loader":{"name":"fabric","version":"0.19.2"},"java":{"major":17},
             "mods":[${mods.joinToString(",")}],"assets":[${assets.joinToString(",")}]}"""
 
     private fun summary(latest: String) =
@@ -125,9 +125,25 @@ class PackUpdateServiceTest {
         private val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR, json)
         val sync = SmrtSyncService(client, ModrinthClient(provider, json), protectedPaths)
-        val service = PackUpdateService(client, sync, repo, protectedPaths, dataDir)
+        private val snapshots = PackSnapshotService(dataDir, json)
+        val service = PackUpdateService(client, sync, repo, protectedPaths, snapshots, dataDir)
 
         fun serveV2() { manifestBody = v2Body }
+
+        // An amber v2: same content as v2 but MC 1.20.1 -> 1.20.2, so classifyCompat
+        // grades it McBump and the driver snapshots before applying. [reqShaBytes]
+        // seeds req.jar's declared sha1 -- pass corrupt bytes to force a mismatch.
+        private fun amberV2(reqShaBytes: ByteArray) = manifest(
+            V2,
+            listOf(
+                mod("req.jar", reqShaBytes, REQ_V2_URL, required = true, defaultEnabled = true),
+                mod("optB.jar", OPTB_V2, OPTB_V2_URL, required = false, defaultEnabled = true),
+            ),
+            listOf(asset("config/x.cfg", CFG, CFG_URL), asset("config/new.cfg", NEWCFG, NEWCFG_URL)),
+            mc = "1.20.2",
+        )
+        fun serveAmberV2() { manifestBody = amberV2(REQ_V2) }
+        fun serveCorruptAmberV2() { manifestBody = amberV2("WRONG-SHA".toByteArray()) }
 
         /** Install v1 with optB toggled off, and record the resulting instance. */
         suspend fun installV1(): PackInstance {
@@ -211,6 +227,55 @@ class PackUpdateServiceTest {
         // Still serving v1; applying "latest" (v1) must not fetch/write.
         val outcome = h.service.applyUpdate(instance)
         assertTrue(outcome is UpdateOutcome.AlreadyCurrent)
+    }
+
+    @Test
+    fun `amber update snapshots and rollback restores the previous build`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        h.serveAmberV2()
+        assertTrue(h.service.applyUpdate(instance) is UpdateOutcome.Applied)
+
+        // A structural (MC) change took one snapshot; v2 is live.
+        val snaps = h.service.listSnapshots(instance)
+        assertEquals(1, snaps.size)
+        assertEquals(V1, snaps.first().fromVersion)
+        assertEquals("REQ-V2", readText(h.clientDir.resolve("mods/req.jar")))
+        assertFalse(Files.exists(h.clientDir.resolve("mods/drop.jar")))
+        assertTrue(Files.exists(h.clientDir.resolve("config/new.cfg")))
+
+        val restored = h.service.rollback(instance, snaps.first().id)
+
+        // Files and metadata are back to v1.
+        assertEquals(V1, restored.pinnedPackVersion)
+        assertEquals(V1, h.repo.get("i1")!!.pinnedPackVersion)
+        assertEquals("REQ-V1", readText(h.clientDir.resolve("mods/req.jar")))
+        assertEquals("DROP", readText(h.clientDir.resolve("mods/drop.jar")))               // deleted mod restored
+        assertEquals("OPTB-V1", readText(h.clientDir.resolve("mods/optB.jar.disabled")))   // optional stays off, old bytes
+        assertFalse(Files.exists(h.clientDir.resolve("config/new.cfg")))                   // added asset removed
+    }
+
+    @Test
+    fun `a failed amber apply auto-reverts to the snapshot`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        h.serveCorruptAmberV2()
+
+        var threw = false
+        try {
+            h.service.applyUpdate(instance)
+        } catch (_: Exception) {
+            threw = true
+        }
+        assertTrue(threw, "a sha1 mismatch must surface")
+
+        // Auto-revert left the instance on v1 -- files and metadata intact.
+        assertEquals("REQ-V1", readText(h.clientDir.resolve("mods/req.jar")))
+        assertEquals("DROP", readText(h.clientDir.resolve("mods/drop.jar")))
+        assertFalse(Files.exists(h.clientDir.resolve("config/new.cfg")))
+        assertEquals(V1, h.repo.get("i1")!!.pinnedPackVersion)
+        // The failed snapshot was cleaned up.
+        assertTrue(h.service.listSnapshots(instance).isEmpty())
     }
 
     private companion object {
