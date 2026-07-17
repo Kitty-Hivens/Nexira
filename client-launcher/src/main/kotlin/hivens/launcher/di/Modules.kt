@@ -73,6 +73,7 @@ import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
@@ -552,6 +553,8 @@ val mirrorModule = module {
     // is pulled from the SC client distribution, same source as the server-list sync.
     single { SmrtAuthlibSwapper(get(), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
+    // Instance-level mutations that reach past the registry (full delete, detach).
+    single { PackInstanceService(repository = get(), dataDir = get()) }
     // Update write side: moves an installed mirror instance to another build
     // (forward update or version switch) via the reconcile engine. Concrete
     // SmrtPackClient for the summary/version-list poll the interface slice lacks.

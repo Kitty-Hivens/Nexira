@@ -877,6 +877,68 @@ interface AppStrings {
     val packVersionCurrentTag: String
     val packVersionUpdateBadge: String
     val packVersionCheckFailed: String
+
+    // Pack settings window (floating, section rail)
+    val packSettingsTitle: String
+    val packSettingsClose: String
+    val packSettingsCategoryGeneral: String
+    val packSettingsCategoryRuntime: String
+    val packSettingsCategoryVersion: String
+    val packSettingsCategoryContent: String
+    val packSettingsCategoryData: String
+    // General
+    val packSettingsIdentity: String
+    val packSettingsName: String
+    val packSettingsNamePlaceholder: String
+    val packSettingsNotes: String
+    val packSettingsNotesPlaceholder: String
+    val packSettingsSource: String
+    fun packSettingsForkedFrom(name: String): String
+    val packSettingsPackId: String
+    // Runtime
+    val packSettingsMemory: String
+    val packSettingsEnvironment: String
+    val packSettingsJava: String
+    fun packSettingsJavaManaged(major: Int): String
+    val packSettingsJavaCustom: String
+    val packSettingsJavaPathPlaceholder: String
+    val packSettingsJavaReset: String
+    val packSettingsJvmArgs: String
+    val packSettingsJvmArgsDefault: String
+    val packSettingsJvmArgsEdit: String
+    val packSettingsWindow: String
+    val packSettingsWindowOverride: String
+    val packSettingsWindowOverrideDesc: String
+    val packSettingsWidth: String
+    val packSettingsHeight: String
+    val packSettingsFullscreen: String
+    // Content
+    val packSettingsOptional: String
+    val packSettingsOptionalNone: String
+    val packSettingsDependencies: String
+    val packSettingsDependenciesNone: String
+    fun packSettingsMissing(name: String): String
+    val packSettingsContentUnavailable: String
+    val packSettingsContentLoading: String
+    // Data
+    val packSettingsStorage: String
+    val packSettingsFolder: String
+    val packSettingsOpenFolder: String
+    val packSettingsSizeComputing: String
+    val packSettingsDetach: String
+    val packSettingsDetachDesc: String
+    val packSettingsDetachAction: String
+    val packSettingsRepair: String
+    val packSettingsRepairDesc: String
+    val packSettingsRepairAction: String
+    val packSettingsRepairDone: String
+    val packSettingsDangerZone: String
+    val packSettingsDelete: String
+    val packSettingsDeleteDesc: String
+    // Version -- restore points
+    val packVersionSnapshots: String
+    val packVersionRestore: String
+    val packVersionSnapshotsHint: String
     val consoleSessionLive: String
     fun consoleSessionPickerLabel(current: String): String
 

@@ -293,6 +293,9 @@ internal class GameCommandBuilder(
         agentJarPath: Path? = null,
         metricsOutPath: Path? = null,
         authlibAgentJarPath: Path? = null,
+        windowWidth: Int? = null,
+        windowHeight: Int? = null,
+        fullScreen: Boolean = false,
     ): List<String> {
         val args = ArrayList<String>()
         args.add(javaExec)
@@ -350,9 +353,26 @@ internal class GameCommandBuilder(
         args.add("--assetsDir"); args.add(sharedAssetsDir.toAbsolutePath().toString())
         args.add("--assetIndex"); args.add(runtime.assetIndexId)
         addSessionAuthArgs(args, session)
+        addWindowArgs(args, windowWidth, windowHeight, fullScreen)
         args.addAll(runtime.gameArgs)
 
         return args
+    }
+
+    /**
+     * Optional game-window geometry. Fullscreen wins (the client ignores an
+     * explicit size in that mode); otherwise a non-null width/height emits
+     * `--width`/`--height`. A null size means "keep the client's own remembered
+     * size" -- the pack path only passes a value when the instance opted into a
+     * window-size override, so an untouched instance launches unchanged.
+     */
+    private fun addWindowArgs(args: MutableList<String>, width: Int?, height: Int?, fullScreen: Boolean) {
+        if (fullScreen) {
+            args.add("--fullscreen")
+            return
+        }
+        if (width != null && width > 0) { args.add("--width"); args.add(width.toString()) }
+        if (height != null && height > 0) { args.add("--height"); args.add(height.toString()) }
     }
 
     /**
