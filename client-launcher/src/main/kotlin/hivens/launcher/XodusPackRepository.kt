@@ -6,6 +6,7 @@ import jetbrains.exodus.ArrayByteIterable
 import jetbrains.exodus.ByteIterable
 import jetbrains.exodus.bindings.StringBinding
 import jetbrains.exodus.env.Environment
+import jetbrains.exodus.env.EnvironmentConfig
 import jetbrains.exodus.env.Environments
 import jetbrains.exodus.env.Store
 import jetbrains.exodus.env.StoreConfig
@@ -48,9 +49,12 @@ class XodusPackRepository(
     private val log = LoggerFactory.getLogger(XodusPackRepository::class.java)
     private val env: Environment = run {
         Files.createDirectories(dbDir)
-        Environments.newInstance(dbDir.toFile())
+        // Durable (fsync'd) commits: the registry is the user's installed-pack library,
+        // so an install must survive a power loss -- unlike the disposable caches.
+        Environments.newInstance(dbDir.toFile(), EnvironmentConfig().setLogDurableWrite(true))
     }
     private val mutex = Mutex()
+    private val shutdownHook = Thread { close() }
 
     // Set true when the DB schema is ahead of this build's: read best-effort, never
     // write back, so an older binary can't downgrade and clobber newer data.
@@ -60,7 +64,7 @@ class XodusPackRepository(
     private val state: MutableStateFlow<List<PackInstance>> = MutableStateFlow(load())
 
     init {
-        Runtime.getRuntime().addShutdownHook(Thread { close() })
+        Runtime.getRuntime().addShutdownHook(shutdownHook)
     }
 
     override fun observe(): Flow<List<PackInstance>> = state.asStateFlow()
@@ -69,38 +73,46 @@ class XodusPackRepository(
 
     override suspend fun put(instance: PackInstance) {
         mutex.withLock {
+            val previous = state.value
             state.update { current ->
                 if (current.any { it.id == instance.id }) current.map { if (it.id == instance.id) instance else it }
                 else current + instance
             }
-            withContext(Dispatchers.IO) { writeInstance(instance) }
+            // Keep memory and disk in lockstep: if the durable write fails, revert the
+            // in-memory state so the UI never claims an install the DB never got.
+            if (!withContext(Dispatchers.IO) { writeInstance(instance) }) state.value = previous
         }
     }
 
     override suspend fun delete(id: String) {
         mutex.withLock {
+            val previous = state.value
             state.update { it.filterNot { i -> i.id == id } }
-            withContext(Dispatchers.IO) { deleteInstance(id) }
+            if (!withContext(Dispatchers.IO) { deleteInstance(id) }) state.value = previous
         }
     }
 
-    /** Closes the environment (idempotent). Runs on JVM shutdown. */
+    /** Closes the environment and drops its shutdown hook. Idempotent. Runs on JVM shutdown. */
     fun close() {
+        // removeShutdownHook throws once shutdown is underway (i.e. when the hook itself
+        // calls close); swallow it -- removal only matters on the explicit-close path.
+        runCatching { Runtime.getRuntime().removeShutdownHook(shutdownHook) }
         runCatching { if (env.isOpen) env.close() }
     }
 
-    private fun writeInstance(instance: PackInstance) {
-        if (readOnly) return
-        runCatching {
+    /** @return true on success (or when read-only). A failure is logged; the caller reverts state. */
+    private fun writeInstance(instance: PackInstance): Boolean {
+        if (readOnly) return true
+        return runCatching {
             val bytes = json.encodeToString(PackInstance.serializer(), instance).encodeToByteArray()
             env.executeInTransaction { txn -> instances(txn).put(txn, key(instance.id), ArrayByteIterable(bytes)) }
-        }.onFailure { log.error("registry write failed for {}", instance.id, it) }
+        }.onFailure { log.error("registry write failed for {}", instance.id, it) }.isSuccess
     }
 
-    private fun deleteInstance(id: String) {
-        if (readOnly) return
-        runCatching { env.executeInTransaction { txn -> instances(txn).delete(txn, key(id)) } }
-            .onFailure { log.error("registry delete failed for {}", id, it) }
+    private fun deleteInstance(id: String): Boolean {
+        if (readOnly) return true
+        return runCatching { env.executeInTransaction { txn -> instances(txn).delete(txn, key(id)) } }
+            .onFailure { log.error("registry delete failed for {}", id, it) }.isSuccess
     }
 
     private fun load(): List<PackInstance> {
@@ -122,11 +134,17 @@ class XodusPackRepository(
 
     private fun migrateLegacyIfNeeded() {
         if (readOnly || metaGet(MIGRATED_KEY) != null) return
-        val legacy = if (Files.isRegularFile(legacyPacksFile)) {
-            runCatching { json.decodeFromString(LegacyPacksFile.serializer(), Files.readString(legacyPacksFile)).instances }
-                .getOrElse { e -> log.error("registry: legacy packs.json unreadable; migrating empty", e); emptyList() }
-        } else {
-            emptyList()
+        val legacy: List<PackInstance> = when {
+            !Files.isRegularFile(legacyPacksFile) -> emptyList()
+            else -> runCatching {
+                json.decodeFromString(LegacyPacksFile.serializer(), Files.readString(legacyPacksFile)).instances
+            }.getOrElse { e ->
+                // Present but unreadable: do NOT mark migrated or touch packs.json. A
+                // transient IO/parse failure must retry next launch -- never silently
+                // drop the user's registry into an empty DB.
+                log.error("registry: packs.json present but unreadable; leaving migration for a later launch", e)
+                return
+            }
         }
         env.executeInTransaction { txn ->
             val inst = instances(txn)
