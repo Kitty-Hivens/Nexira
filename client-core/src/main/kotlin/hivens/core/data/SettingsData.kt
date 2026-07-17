@@ -50,6 +50,18 @@ enum class UiStyle { Celestia, Brut }
 enum class ThemeMode { Manual, System, Wallpaper }
 
 /**
+ * What the auto-updater does when a pending pack update is graded amber (a
+ * Minecraft or loader change that could invalidate worlds/configs). Green
+ * updates always apply automatically; this governs only the risky ones.
+ *
+ * - [Ask] -- do not auto-apply; surface it so the user applies it deliberately.
+ * - [SnapshotThenApply] -- apply automatically (a snapshot is always taken first).
+ * - [Hold] -- never auto-apply amber; leave the instance on its current build.
+ */
+@Serializable
+enum class AmberUpdatePolicy { Ask, SnapshotThenApply, Hold }
+
+/**
  * The theme mode a fresh session starts in. Migrates the pre-mode opt-in: a
  * settings file that enabled [SettingsData.themeFromWallpaper] before
  * [SettingsData.themeMode] existed decodes with the field's default ([ThemeMode.System]),
@@ -165,6 +177,17 @@ data class SettingsData(
      * grade convenience for users with many servers installed.
      */
     val autoSyncAllPacks: Boolean = false,
+
+    /**
+     * Auto-update installed mirror packs to the latest build in the background.
+     * A green (safe re-sync) update applies silently; an amber (MC/loader change)
+     * update follows [amberUpdatePolicy]. On by default -- a stale pack desyncs
+     * from the live server. Per-instance opt-out is `PackInstance.followLatest`.
+     */
+    val autoUpdatePacks: Boolean = true,
+
+    /** How the auto-updater treats an amber (structural) pending update. See [AmberUpdatePolicy]. */
+    val amberUpdatePolicy: AmberUpdatePolicy = AmberUpdatePolicy.Ask,
 
     /**
      * Reveals the visual JVM-args builder in the per-server constructor.

@@ -178,7 +178,7 @@ class PackUpdateServiceTest {
         assertTrue(Files.exists(h.clientDir.resolve("mods/drop.jar")))
 
         h.serveV2()
-        val outcome = h.service.applyUpdate(instance)
+        val outcome = h.service.applyUpdate(instance, null, null)
         assertTrue(outcome is UpdateOutcome.Applied)
 
         // Required mod re-downloaded to the new bytes.
@@ -225,7 +225,7 @@ class PackUpdateServiceTest {
         val h = Harness()
         val instance = h.installV1()
         // Still serving v1; applying "latest" (v1) must not fetch/write.
-        val outcome = h.service.applyUpdate(instance)
+        val outcome = h.service.applyUpdate(instance, null, null)
         assertTrue(outcome is UpdateOutcome.AlreadyCurrent)
     }
 
@@ -234,7 +234,7 @@ class PackUpdateServiceTest {
         val h = Harness()
         val instance = h.installV1()
         h.serveAmberV2()
-        assertTrue(h.service.applyUpdate(instance) is UpdateOutcome.Applied)
+        assertTrue(h.service.applyUpdate(instance, null, null) is UpdateOutcome.Applied)
 
         // A structural (MC) change took one snapshot; v2 is live.
         val snaps = h.service.listSnapshots(instance)
@@ -263,7 +263,7 @@ class PackUpdateServiceTest {
 
         var threw = false
         try {
-            h.service.applyUpdate(instance)
+            h.service.applyUpdate(instance, null, null)
         } catch (_: Exception) {
             threw = true
         }
