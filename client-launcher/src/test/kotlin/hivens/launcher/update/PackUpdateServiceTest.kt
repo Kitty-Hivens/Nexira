@@ -95,6 +95,7 @@ class PackUpdateServiceTest {
             listOf(asset("config/x.cfg", CFG, CFG_URL)),
         )
         var summaryBody = summary(V1)
+        var versionsBody = """{"schema_version":2,"versions":["2026.02.02","2026.01.01"]}"""
 
         private val v2Body = manifest(
             V2,
@@ -112,6 +113,7 @@ class PackUpdateServiceTest {
             when (req.url.toString()) {
                 MANIFEST_URL -> respond(manifestBody, HttpStatusCode.OK, jsonHeaders)
                 SUMMARY_URL -> respond(summaryBody, HttpStatusCode.OK, jsonHeaders)
+                VERSIONS_URL -> respond(versionsBody, HttpStatusCode.OK, jsonHeaders)
                 REQ_V1_URL -> respond(ByteReadChannel(REQ_V1), HttpStatusCode.OK)
                 REQ_V2_URL -> respond(ByteReadChannel(REQ_V2), HttpStatusCode.OK)
                 OPTB_V1_URL -> respond(ByteReadChannel(OPTB_V1), HttpStatusCode.OK)
@@ -230,6 +232,13 @@ class PackUpdateServiceTest {
     }
 
     @Test
+    fun `availableVersions lists builds newest first`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        assertEquals(listOf("2026.02.02", "2026.01.01"), h.service.availableVersions(instance))
+    }
+
+    @Test
     fun `amber update snapshots and rollback restores the previous build`() = runTest {
         val h = Harness()
         val instance = h.installV1()
@@ -282,6 +291,7 @@ class PackUpdateServiceTest {
         const val MIRROR = "https://mirror.test"
         const val MANIFEST_URL = "https://mirror.test/v1/packs/test/manifest"
         const val SUMMARY_URL = "https://mirror.test/v1/packs/test"
+        const val VERSIONS_URL = "https://mirror.test/v1/packs/test/manifest/versions"
         const val REQ_V1_URL = "https://mirror.test/dl/req-v1"
         const val REQ_V2_URL = "https://mirror.test/dl/req-v2"
         const val OPTB_V1_URL = "https://mirror.test/dl/optb-v1"
