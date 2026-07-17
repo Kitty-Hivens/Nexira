@@ -81,6 +81,7 @@ import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.PackUpdateService
 import hivens.launcher.update.DesktopIntegration
@@ -556,6 +557,16 @@ val mirrorModule = module {
             protectedPaths = get(),
             snapshotService = get(),
             dataDir = get(),
+        )
+    }
+    // Background auto-updater over installed mirror instances. Reads the current
+    // auto-update policy each pass via the settings service.
+    single {
+        val settings = get<ISettingsService>()
+        PackAutoUpdateService(
+            repository = get(),
+            updater = get<PackUpdateService>(),
+            settingsProvider = { settings.getSettings() },
         )
     }
     single {

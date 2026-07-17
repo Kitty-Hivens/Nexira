@@ -11,6 +11,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.flatten
 import hivens.core.io.InstanceMutationLock
 import hivens.core.update.PackSnapshot
+import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdateReconciler
@@ -49,7 +50,7 @@ class PackUpdateService(
     private val protectedPaths: ProtectedPaths,
     private val snapshotService: PackSnapshotService,
     private val dataDir: Path,
-) {
+) : PackUpdater {
     private val log = LoggerFactory.getLogger(PackUpdateService::class.java)
 
     private fun clientDirOf(instance: PackInstance): Path =
@@ -63,7 +64,7 @@ class PackUpdateService(
      * do? Advisory -- it scans disk without the mutation lock; the authoritative
      * plan is recomputed under the lock in [applyUpdate].
      */
-    suspend fun checkForUpdate(instance: PackInstance): UpdateCheck = withContext(Dispatchers.IO) {
+    override suspend fun checkForUpdate(instance: PackInstance): UpdateCheck = withContext(Dispatchers.IO) {
         val packId = instance.packRef.id
         val latest = client.fetchSummary(packId).latestPackVersion
         val current = currentVersionOf(instance)
@@ -80,10 +81,10 @@ class PackUpdateService(
      * self-consistent, then commits the new baseline, version, cached snapshot,
      * and carried-over optional-toggle set.
      */
-    suspend fun applyUpdate(
+    override suspend fun applyUpdate(
         instance: PackInstance,
-        targetVersion: String? = null,
-        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+        targetVersion: String?,
+        progress: ((current: Int, total: Int, path: String) -> Unit)?,
     ): UpdateOutcome {
         val packId = instance.packRef.id
         val target = if (targetVersion != null) {
