@@ -3,6 +3,7 @@ package hivens.launcher.update
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.fileManifestOf
+import hivens.core.data.flatten
 import hivens.launcher.util.sha1Of
 import java.nio.file.Files
 import java.nio.file.Path
@@ -28,6 +29,23 @@ fun scanInstanceState(clientDir: Path, canonicalPaths: Set<String>): FileManifes
         entries[path] = FileData(sha1 = sha1Of(onDisk), size = Files.size(onDisk))
     }
     return fileManifestOf(entries)
+}
+
+/**
+ * The concrete relative paths under an instance dir that applying an update could
+ * create, modify, or delete for a canonical file set: each canonical path, its
+ * `.new` conflict sibling, and the `.disabled` variant for a mod. Bounds what a
+ * snapshot captures and what a rollback may remove -- worlds and user-added files,
+ * being outside the baseline/target manifests, never appear here.
+ */
+fun managedRealPaths(baseline: FileManifest?, target: FileManifest): Set<String> {
+    val out = LinkedHashSet<String>()
+    for (path in baseline?.flatten()?.keys.orEmpty() + target.flatten().keys) {
+        out += path
+        out += "$path.new"
+        if (path.startsWith("mods/")) out += "$path.disabled"
+    }
+    return out
 }
 
 /**

@@ -5,10 +5,12 @@ import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.dto.smrt.toDomain
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.FileManifest
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.data.flatten
 import hivens.core.io.InstanceMutationLock
+import hivens.core.update.PackSnapshot
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdateReconciler
@@ -21,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import java.time.Instant
+import java.util.UUID
 
 /**
  * Drives a mirror pack instance from its installed build to another one -- a
@@ -43,6 +47,7 @@ class PackUpdateService(
     private val syncService: SmrtSyncService,
     private val repository: IPackRepository,
     private val protectedPaths: ProtectedPaths,
+    private val snapshotService: PackSnapshotService,
     private val dataDir: Path,
 ) {
     private val log = LoggerFactory.getLogger(PackUpdateService::class.java)
@@ -108,8 +113,26 @@ class PackUpdateService(
                     targetLoaderVersion = target.loader.version,
                 )
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
-                syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
-                commit(fresh, target, enabledState)
+                // A structural (amber) change can invalidate configs or worlds, so
+                // snapshot the pack-managed files first and auto-revert if apply throws.
+                val managed = managedRealPaths(fresh.installedManifest, targetManifest)
+                val snapshot = if (!compat.isSafe) {
+                    val now = Instant.now().toEpochMilli()
+                    snapshotService.capture(clientDir, fresh, managed, "$now-${UUID.randomUUID().toString().take(8)}", now)
+                } else {
+                    null
+                }
+                try {
+                    syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
+                    commit(fresh, target, enabledState)
+                } catch (e: Throwable) {
+                    if (snapshot != null) {
+                        repository.put(snapshotService.restore(clientDir, fresh.instanceDirName, snapshot.id, managed))
+                        snapshotService.delete(fresh.instanceDirName, snapshot.id)
+                    }
+                    throw e
+                }
+                if (snapshot != null) snapshotService.prune(fresh.instanceDirName, KEEP_SNAPSHOTS)
                 log.info(
                     "update: pack={} {} -> {} ({} add, {} update, {} delete, {} conflict, compat={})",
                     packId, currentVersionOf(fresh), target.packVersion,
@@ -154,5 +177,31 @@ class PackUpdateService(
                 optionalContent = OptionalContentRules.togglesFrom(target.mods, enabledState),
             )
         )
+    }
+
+    /** Snapshots [instance] can be rolled back to, newest first. */
+    fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
+        snapshotService.list(instance.instanceDirName)
+
+    /**
+     * Roll [instance] back to snapshot [snapshotId]: restore the captured files
+     * and the pre-update instance record under the mutation lock. Returns the
+     * restored instance.
+     */
+    suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance {
+        val clientDir = clientDirOf(instance)
+        return InstanceMutationLock.withLock(clientDir) {
+            withContext(Dispatchers.IO) {
+                val current = repository.get(instance.id) ?: instance
+                val managed = managedRealPaths(null, current.installedManifest ?: FileManifest())
+                val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
+                repository.put(restored)
+                restored
+            }
+        }
+    }
+
+    private companion object {
+        private const val KEEP_SNAPSHOTS = 3
     }
 }
