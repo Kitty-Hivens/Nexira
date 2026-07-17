@@ -48,10 +48,9 @@ interface ServerListCacheStore {
  * { "schema_version": 1, "servers": [ <ServerProfile>, ... ] }
  * ```
  *
- * The versioned envelope mirrors [JsonPackRepository] so the same
- * schema-evolution story applies: a future bump branches on
- * `schema_version` cleanly instead of guessing whether a bare array
- * is "valid empty" or "v0 corruption".
+ * The versioned envelope keeps a clean schema-evolution story: a future
+ * bump branches on `schema_version` instead of guessing whether a bare
+ * array is "valid empty" or "v0 corruption".
  *
  * Behaviour contract:
  *  - Missing file -> empty list, no log noise (cold start).

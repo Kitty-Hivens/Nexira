@@ -71,7 +71,6 @@ import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
-import hivens.launcher.instance.CachedScan
 import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.catalogue.MirrorPackCatalogue
@@ -467,7 +466,7 @@ val cacheModule = module {
     // Content-scan cache (Xodus-backed) + the scanner that reads it, so re-opening a
     // pack's Content tab reads parsed mod metadata from the DB instead of re-cracking
     // every jar. Keyed by canonical path, validated by size+mtime.
-    single { ContentScanCache(get<CacheFactory>().diskStore("content-scan", CachedScan.serializer())) }
+    single { ContentScanCache(get<CacheFactory>().environment(), "content-scan", get()) }
     single { InstanceContentScanner(get()) }
     single { smrtPackCaches() }
     single { modrinthCaches() }

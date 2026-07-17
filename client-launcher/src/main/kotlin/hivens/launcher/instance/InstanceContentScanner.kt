@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import hivens.core.io.SharedZip
@@ -66,11 +67,26 @@ class InstanceContentScanner(private val cache: ContentScanCache? = null) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     suspend fun scan(instanceDir: Path): List<InstalledContent> = withContext(Dispatchers.IO) {
-        buildList {
+        val items = buildList {
             addAll(scanArchives(instanceDir.resolve("mods"), ContentKind.Mod))
             addAll(scanArchives(instanceDir.resolve("resourcepacks"), ContentKind.ResourcePack))
             addAll(scanArchives(instanceDir.resolve("shaderpacks"), ContentKind.ShaderPack))
         }.sortedBy { it.displayName.lowercase() }
+        // Drop cache entries for files that disappeared since the last scan (a removed
+        // mod). Edits overwrite in place (same key), so only deletions leave orphans.
+        cache?.let { c ->
+            val current = items.mapTo(HashSet()) {
+                instanceDir.resolve(folderFor(it.kind)).resolve(it.fileName).normalize().toString()
+            }
+            c.retain(instanceDir.normalize().toString() + File.separator, current)
+        }
+        items
+    }
+
+    private fun folderFor(kind: ContentKind): String = when (kind) {
+        ContentKind.Mod -> "mods"
+        ContentKind.ResourcePack -> "resourcepacks"
+        ContentKind.ShaderPack -> "shaderpacks"
     }
 
     private fun scanArchives(dir: Path, kind: ContentKind): List<InstalledContent> {
@@ -101,7 +117,7 @@ class InstanceContentScanner(private val cache: ContentScanCache? = null) {
         val mtime = Files.getLastModifiedTime(file).toMillis()
         // Key on the canonical (enabled) path so an optional-toggle rename keeps the
         // entry; validate by size+mtime so a real content change re-parses.
-        val cacheKey = file.parent.resolve(fileName).toString()
+        val cacheKey = file.parent.resolve(fileName).normalize().toString()
 
         val meta: Meta? = when (val hit = cache?.lookup(cacheKey, size, mtime)) {
             null -> when (kind) {

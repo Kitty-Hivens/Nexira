@@ -1,6 +1,5 @@
 package hivens.launcher.instance
 
-import hivens.launcher.cache.XodusDiskStore
 import jetbrains.exodus.env.Environment
 import jetbrains.exodus.env.Environments
 import kotlinx.coroutines.test.runTest
@@ -33,7 +32,7 @@ class ContentScanCacheTest {
         dir.toFile().deleteRecursively()
     }
 
-    private fun cache() = ContentScanCache(XodusDiskStore(env, "content-scan", CachedScan.serializer(), json))
+    private fun cache() = ContentScanCache(env, "content-scan", json)
 
     @Test
     fun `put then lookup hits on matching size and mtime`() {
@@ -64,6 +63,20 @@ class ContentScanCacheTest {
     }
 
     @Test
+    fun `retain drops deleted-file entries but keeps current and a sibling instance`() {
+        val c = cache()
+        c.put("/inst/A/mods/keep.jar", 1L, 1L, CachedMeta(name = "Keep"))
+        c.put("/inst/A/mods/gone.jar", 1L, 1L, CachedMeta(name = "Gone"))
+        c.put("/inst/A2/mods/other.jar", 1L, 1L, CachedMeta(name = "Other")) // shares the "A" name prefix
+
+        c.retain("/inst/A/", setOf("/inst/A/mods/keep.jar"))
+
+        assertEquals("Keep", c.lookup("/inst/A/mods/keep.jar", 1L, 1L)?.meta?.name)
+        assertNull(c.lookup("/inst/A/mods/gone.jar", 1L, 1L))
+        assertEquals("Other", c.lookup("/inst/A2/mods/other.jar", 1L, 1L)?.meta?.name) // sibling untouched
+    }
+
+    @Test
     fun `scanning a jar populates the cache with its parsed name`() = runTest {
         val instance = Files.createTempDirectory("inst")
         val mods = Files.createDirectories(instance.resolve("mods"))
@@ -79,7 +92,7 @@ class ContentScanCacheTest {
 
         val size = Files.size(jar)
         val mtime = Files.getLastModifiedTime(jar).toMillis()
-        assertEquals("Cool Mod", c.lookup(jar.toString(), size, mtime)?.meta?.name)
+        assertEquals("Cool Mod", c.lookup(jar.normalize().toString(), size, mtime)?.meta?.name)
         instance.toFile().deleteRecursively()
     }
 }
