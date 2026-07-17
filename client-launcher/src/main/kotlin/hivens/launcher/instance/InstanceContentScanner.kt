@@ -60,7 +60,7 @@ class InstalledContent(
  * and from-scratch instances all read the same way -- the Content tab no longer
  * depends on a server manifest. One corrupt archive is logged and skipped.
  */
-class InstanceContentScanner {
+class InstanceContentScanner(private val cache: ContentScanCache? = null) {
 
     private val log = LoggerFactory.getLogger(InstanceContentScanner::class.java)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -98,11 +98,18 @@ class InstanceContentScanner {
         val enabled = !rawName.endsWith(DISABLED)
         val fileName = rawName.removeSuffix(DISABLED)
         val size = Files.size(file)
+        val mtime = Files.getLastModifiedTime(file).toMillis()
+        // Key on the canonical (enabled) path so an optional-toggle rename keeps the
+        // entry; validate by size+mtime so a real content change re-parses.
+        val cacheKey = file.parent.resolve(fileName).toString()
 
-        val meta = when (kind) {
-            ContentKind.Mod -> readModMeta(file)
-            ContentKind.ResourcePack -> readPackMeta(file)
-            ContentKind.ShaderPack -> null
+        val meta: Meta? = when (val hit = cache?.lookup(cacheKey, size, mtime)) {
+            null -> when (kind) {
+                ContentKind.Mod -> readModMeta(file)
+                ContentKind.ResourcePack -> readPackMeta(file)
+                ContentKind.ShaderPack -> null
+            }.also { cache?.put(cacheKey, size, mtime, it?.toCached()) }
+            else -> hit.meta?.toMeta()
         }
         return InstalledContent(
             kind        = kind,
@@ -262,6 +269,12 @@ class InstanceContentScanner {
         val authors: List<String> = emptyList(),
         val dependencies: List<String> = emptyList(),
     )
+
+    private fun Meta.toCached() =
+        CachedMeta(name, version, description, icon, homepageUrl, license, authors, dependencies)
+
+    private fun CachedMeta.toMeta() =
+        Meta(name, version, description, icon, homepageUrl, license, authors, dependencies)
 
     private companion object {
         const val DISABLED = ".disabled"

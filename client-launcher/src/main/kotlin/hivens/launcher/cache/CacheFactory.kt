@@ -3,6 +3,7 @@ package hivens.launcher.cache
 import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
 import hivens.core.cache.DefaultCache
+import hivens.core.cache.DiskStore
 import hivens.core.cache.NoOpDiskStore
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
@@ -50,4 +51,12 @@ class CacheFactory(
     /** In-memory only (no disk persistence) -- single-flight + TTL + SWR, no serializer needed. */
     fun <V> createInMemory(namespace: String, config: CacheConfig<V>): Cache<V> =
         DefaultCache(NoOpDiskStore(), config, scope, clock, namespace, ioDispatcher)
+
+    /**
+     * A raw [DiskStore] over the shared cache environment for a keyed store that is
+     * NOT a TTL/SWR fetch cache -- e.g. the content-scan cache, validated by the
+     * file's own size+mtime rather than a clock.
+     */
+    fun <V> diskStore(namespace: String, serializer: KSerializer<V>): DiskStore<V> =
+        XodusDiskStore(env, namespace, serializer, json)
 }

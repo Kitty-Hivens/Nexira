@@ -112,7 +112,7 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
     val instanceDir = remember(instance.instanceDirName) {
         paths.dataDir.resolve("instances").resolve(instance.instanceDirName)
     }
-    val scanner = remember { InstanceContentScanner() }
+    val scanner: InstanceContentScanner = koinInject()
     val manager = remember { InstanceContentManager() }
     val mirrorClient: IMirrorPackClient = koinInject()
     val controller: LauncherController = koinInject()
