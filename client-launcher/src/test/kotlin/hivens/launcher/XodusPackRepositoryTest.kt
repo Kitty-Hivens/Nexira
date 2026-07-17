@@ -79,4 +79,34 @@ class XodusPackRepositoryTest {
         assertTrue(Files.exists(d.resolve("packs.json.migrated")))
         assertTrue(!Files.exists(d.resolve("packs.json")))
     }
+
+    @Test
+    fun `an unreadable packs json is not marked migrated and retries next launch`() = runTest {
+        val d = tempData()
+        Files.writeString(d.resolve("packs.json"), "{ not valid json")
+        val r1 = repo(d)
+        assertTrue(r1.list().isEmpty())
+        assertTrue(Files.exists(d.resolve("packs.json")))          // kept, NOT renamed
+        assertTrue(!Files.exists(d.resolve("packs.json.migrated")))
+        r1.close()
+
+        // Repaired file: the retry migrates it instead of having lost the data.
+        Files.writeString(
+            d.resolve("packs.json"),
+            """{"schema_version":1,"instances":[${json.encodeToString(PackInstance.serializer(), instance("recovered"))}]}""",
+        )
+        val r2 = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json).also { repos.add(it) }
+        assertEquals(listOf("recovered"), r2.list().map { it.id })
+        assertTrue(Files.exists(d.resolve("packs.json.migrated")))
+    }
+
+    @Test
+    fun `a failed write rolls back the in-memory state`() = runTest {
+        val r = repo(tempData())
+        r.put(instance("a"))
+        r.close() // closing the env makes the next write throw
+        r.put(instance("b"))
+        assertNull(r.get("b"))
+        assertEquals(listOf("a"), r.list().map { it.id })
+    }
 }
