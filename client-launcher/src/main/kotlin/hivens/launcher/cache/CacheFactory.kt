@@ -3,7 +3,6 @@ package hivens.launcher.cache
 import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
 import hivens.core.cache.DefaultCache
-import hivens.core.cache.DiskStore
 import hivens.core.cache.NoOpDiskStore
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
@@ -35,12 +34,23 @@ class CacheFactory(
     // JSON file per key. Pure-JVM (no JNA/JNI), so it fits the no-native-in-launcher
     // policy. Opened on first use; closed on JVM shutdown (and the OS releases the
     // dir lock on process death even if that hook is skipped).
+    private var shutdownHook: Thread? = null
     private val env: Environment by lazy {
         val dir = rootDir.resolve("xodus")
         Files.createDirectories(dir)
         Environments.newInstance(dir.toFile()).also { e ->
-            Runtime.getRuntime().addShutdownHook(Thread { runCatching { e.close() } })
+            val hook = Thread { runCatching { e.close() } }
+            shutdownHook = hook
+            Runtime.getRuntime().addShutdownHook(hook)
         }
+    }
+
+    /** Closes the cache environment and drops its shutdown hook. No-op if it was never opened. */
+    fun close() {
+        val hook = shutdownHook ?: return
+        runCatching { Runtime.getRuntime().removeShutdownHook(hook) }
+        runCatching { env.close() }
+        shutdownHook = null
     }
 
     fun <V> create(namespace: String, serializer: KSerializer<V>, config: CacheConfig<V>): Cache<V> {
@@ -52,11 +62,6 @@ class CacheFactory(
     fun <V> createInMemory(namespace: String, config: CacheConfig<V>): Cache<V> =
         DefaultCache(NoOpDiskStore(), config, scope, clock, namespace, ioDispatcher)
 
-    /**
-     * A raw [DiskStore] over the shared cache environment for a keyed store that is
-     * NOT a TTL/SWR fetch cache -- e.g. the content-scan cache, validated by the
-     * file's own size+mtime rather than a clock.
-     */
-    fun <V> diskStore(namespace: String, serializer: KSerializer<V>): DiskStore<V> =
-        XodusDiskStore(env, namespace, serializer, json)
+    /** The shared cache environment, for a caller that needs a bespoke store (e.g. the content-scan cache). */
+    fun environment(): Environment = env
 }
