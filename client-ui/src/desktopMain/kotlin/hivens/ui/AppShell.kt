@@ -39,6 +39,7 @@ import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
 import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.AutoSyncService
+import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.ServerListCacheStore
 import hivens.core.diag.ActionRing
 import hivens.launcher.bootstrap.AutoLoginCoordinator
@@ -457,6 +458,7 @@ fun FrameWindowScope.AppShellContent(
 
         val dataDirectory: java.nio.file.Path = koinInject()
         val autoSyncService: AutoSyncService = koinInject()
+        val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory) }
         var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
@@ -578,6 +580,15 @@ fun FrameWindowScope.AppShellContent(
             ) {
                 applicationScope.launch {
                     autoSyncService.syncAll(dashboardServers)
+                }
+            }
+
+            // Background auto-update of installed mirror packs -- same experimental
+            // gating as auto-sync, a separate axis (packs, not SC servers). The
+            // service is a singleton and reads the current policy each pass.
+            if (settings.experimentalFeaturesEnabled && settings.autoUpdatePacks) {
+                applicationScope.launch {
+                    packAutoUpdateService.runOnce()
                 }
             }
         }

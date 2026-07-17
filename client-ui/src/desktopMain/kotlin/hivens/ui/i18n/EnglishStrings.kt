@@ -374,6 +374,8 @@ object EnglishStrings : AppStrings {
     override val settingsMandatoryUpdatesDesc   = "Block startup until critical updates are installed when the upstream protocol breaks. Currently ON by default."
     override val settingsAutoSyncAllPacks       = "Auto-sync installed packs on launch"
     override val settingsAutoSyncAllPacksDesc   = "Quietly refresh every server pack you've already installed when the launcher starts. Costs background bandwidth — useful if you switch between many servers and want fresh state without clicking each one."
+    override val settingsAutoUpdatePacks        = "Auto-update installed packs"
+    override val settingsAutoUpdatePacksDesc    = "Keep installed mirror packs on the latest build. Safe updates apply in the background; a Minecraft or loader change waits for you to confirm. Turn off to update packs by hand."
     override val settingsJvmBuilder             = "Visual JVM args builder"
     override val settingsJvmBuilderDesc         = "Reveals a 'Build args' button in the per-server constructor. Pick a GC algorithm, tune heap regions, enable AppCDS or JFR profiling — without memorizing flags. Curated presets cover Aikar's recipe, GTNH-class heavy modded, ZGC for huge heaps, and more."
     override val settingsAdaptiveMemory         = "Adaptive memory"

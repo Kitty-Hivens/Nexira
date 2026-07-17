@@ -35,6 +35,7 @@ internal class SettingsFormState(initial: SettingsData) {
     var experimentalEnabled    by mutableStateOf(initial.experimentalFeaturesEnabled)
     var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
     var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
+    var autoUpdatePacks        by mutableStateOf(initial.autoUpdatePacks)
     var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
     var adaptiveMemoryEnabled  by mutableStateOf(initial.adaptiveMemoryEnabled)
     var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
@@ -68,6 +69,7 @@ internal class SettingsFormState(initial: SettingsData) {
             experimentalFeaturesEnabled = experimentalEnabled,
             mandatoryUpdatesEnabled     = mandatoryUpdates,
             autoSyncAllPacks            = autoSyncAllPacks,
+            autoUpdatePacks             = autoUpdatePacks,
             jvmBuilderEnabled           = jvmBuilderEnabled,
             adaptiveMemoryEnabled       = adaptiveMemoryEnabled,
             forceProxyMode              = forceProxyMode,

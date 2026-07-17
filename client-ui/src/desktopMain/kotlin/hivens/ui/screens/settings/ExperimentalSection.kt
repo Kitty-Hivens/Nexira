@@ -53,6 +53,11 @@ internal fun ExperimentalSection(
         }
         PuppetToggle("settings.autoSyncAllPacks", form.autoSyncAllPacks, enabled = form.experimentalEnabled) { form.autoSyncAllPacks = it; save() }
 
+        NxToggle(s.settingsAutoUpdatePacks, form.experimentalEnabled && form.autoUpdatePacks, description = s.settingsAutoUpdatePacksDesc, icon = NxIcon.CloudDownload, enabled = form.experimentalEnabled) {
+            form.autoUpdatePacks = it; save()
+        }
+        PuppetToggle("settings.autoUpdatePacks", form.autoUpdatePacks, enabled = form.experimentalEnabled) { form.autoUpdatePacks = it; save() }
+
         NxToggle(s.settingsJvmBuilder, form.experimentalEnabled && form.jvmBuilderEnabled, description = s.settingsJvmBuilderDesc, icon = NxIcon.Tune, enabled = form.experimentalEnabled) {
             form.jvmBuilderEnabled = it; save()
         }
