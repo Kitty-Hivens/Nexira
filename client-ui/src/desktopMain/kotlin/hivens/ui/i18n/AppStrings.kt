@@ -861,6 +861,22 @@ interface AppStrings {
     val packDetailTabWorlds: String
     val packDetailTabLogs: String
     val packDetailTabSettings: String
+    val packVersionSection: String
+    val packVersionInstalled: String
+    val packVersionCheck: String
+    val packVersionWorking: String
+    val packVersionUpToDate: String
+    fun packVersionAvailable(version: String): String
+    val packVersionSafe: String
+    val packVersionNeedsCare: String
+    val packVersionUpdateNow: String
+    val packVersionFollowLatest: String
+    val packVersionFollowLatestDesc: String
+    val packVersionOtherBuilds: String
+    val packVersionSwitch: String
+    val packVersionCurrentTag: String
+    val packVersionUpdateBadge: String
+    val packVersionCheckFailed: String
     val consoleSessionLive: String
     fun consoleSessionPickerLabel(current: String): String
 
