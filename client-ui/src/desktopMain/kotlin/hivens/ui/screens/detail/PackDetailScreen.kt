@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,11 +50,15 @@ import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.UpdateCheck
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.update.PackAutoUpdateService
+import hivens.launcher.update.PackUpdateService
 import dev.hivens.skinema.compose.VideoScale
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
@@ -65,7 +70,11 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
+import hivens.ui.nx.NxRow
+import hivens.ui.nx.NxSection
+import hivens.ui.nx.NxToggle
 import hivens.ui.nx.NxCalloutTone
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
@@ -127,6 +136,8 @@ fun PackDetailScreen(
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
+    val packAutoUpdate: PackAutoUpdateService = koinInject()
+    val autoUpdateStatuses by packAutoUpdate.statuses.collectAsState()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
     var resolved by remember { mutableStateOf(false) }
     LaunchedEffect(instanceId) {
@@ -171,6 +182,8 @@ fun PackDetailScreen(
             },
             onOpenSettings = { showSettings = true },
             onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
+            versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
+            updateBadge    = autoUpdateStatuses[pack.id] is PackUpdateStatus.Pending,
         )
 
         // Import/provenance notice (e.g. a CurseForge import whose project/file-id
@@ -211,6 +224,7 @@ fun PackDetailScreen(
     if (showSettings) {
         PackSettingsModal(
             title           = s.packDetailTabSettings,
+            pack            = pack,
             runtime         = pack.runtime,
             instanceDir     = instanceDir,
             onRuntimeChange = { rt ->
@@ -218,6 +232,7 @@ fun PackDetailScreen(
                 instance = updated
                 scope.launch { repo.put(updated) }
             },
+            onInstanceChange = { instance = it },
             onDismiss       = { showSettings = false },
         )
     }
@@ -355,6 +370,117 @@ private fun PackSettingsTab(
     )
 }
 
+/**
+ * Version + updates for a mirror instance: current build, follow-latest vs pinned,
+ * a manual check with the compat-graded result, an apply, and the retained build
+ * list for a switch or rollback. All actions run on the app-scoped [PackUpdateService];
+ * the committed instance flows back via [onInstanceChange] so the hero refreshes.
+ */
+@Composable
+private fun PackVersionTab(pack: PackInstance, onInstanceChange: (PackInstance) -> Unit) {
+    val s = LocalStrings.current
+    val colors = NxTheme.colors
+    val updater: PackUpdateService = koinInject()
+    val repo: IPackRepository = koinInject()
+    val scope = rememberCoroutineScope()
+
+    var busy by remember(pack.id) { mutableStateOf(false) }
+    var check by remember(pack.id) { mutableStateOf<UpdateCheck?>(null) }
+    var message by remember(pack.id) { mutableStateOf<String?>(null) }
+    var versions by remember(pack.id) { mutableStateOf<List<String>>(emptyList()) }
+
+    val current = pack.pinnedPackVersion ?: pack.packRef.version ?: "?"
+
+    LaunchedEffect(pack.id) {
+        versions = runCatching { updater.availableVersions(pack) }.getOrDefault(emptyList())
+    }
+
+    fun apply(target: String?) {
+        if (busy) return
+        scope.launch {
+            busy = true
+            message = null
+            runCatching { updater.applyUpdate(pack, target, null) }
+                .onSuccess {
+                    repo.get(pack.id)?.let(onInstanceChange)
+                    check = null
+                    versions = runCatching { updater.availableVersions(pack) }.getOrDefault(versions)
+                }
+                .onFailure { message = it.message ?: s.packVersionCheckFailed }
+            busy = false
+        }
+    }
+
+    NxSection(s.packVersionSection) {
+        NxRow(title = s.packVersionInstalled, subtitle = current) {
+            NxButton(
+                label = if (busy) s.packVersionWorking else s.packVersionCheck,
+                onClick = {
+                    if (busy) return@NxButton
+                    scope.launch {
+                        busy = true
+                        message = null
+                        check = runCatching { updater.checkForUpdate(pack) }
+                            .getOrElse { message = s.packVersionCheckFailed; null }
+                        busy = false
+                    }
+                },
+                style = NxButtonStyle.Secondary,
+                enabled = !busy,
+                compact = true,
+            )
+        }
+
+        NxToggle(
+            s.packVersionFollowLatest,
+            pack.followLatest,
+            description = s.packVersionFollowLatestDesc,
+            icon = NxIcon.Sync,
+        ) { enabled ->
+            val updated = pack.copy(followLatest = enabled)
+            onInstanceChange(updated)
+            scope.launch { repo.put(updated) }
+        }
+
+        when (val c = check) {
+            UpdateCheck.UpToDate -> Text(
+                s.packVersionUpToDate,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+            )
+            is UpdateCheck.Available -> NxRow(
+                title = s.packVersionAvailable(c.toVersion),
+                subtitle = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
+            ) {
+                NxButton(s.packVersionUpdateNow, onClick = { apply(null) }, enabled = !busy, compact = true)
+            }
+            null -> Unit
+        }
+
+        message?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = colors.error)
+        }
+
+        if (versions.size > 1) {
+            Text(s.packVersionOtherBuilds, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            versions.forEach { v ->
+                val isCurrent = v == current
+                NxRow(title = v, subtitle = if (isCurrent) s.packVersionCurrentTag else null) {
+                    if (!isCurrent) {
+                        NxButton(
+                            s.packVersionSwitch,
+                            onClick = { apply(v) },
+                            style = NxButtonStyle.Tertiary,
+                            enabled = !busy,
+                            compact = true,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // List the instance's own log files, latest.log pinned first, then by
 // recency: the logs dir's .log files plus crash-reports .txt / .log.
 // These are the logs the game itself wrote -- the ones a user expects
@@ -440,6 +566,8 @@ private fun Hero(
     onPlay: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenFolder: () -> Unit,
+    versionLabel: String?,
+    updateBadge: Boolean,
 ) {
     val s = LocalStrings.current
     val art = rememberPackArt(pack)
@@ -520,6 +648,8 @@ private fun Hero(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (showSource) SourceChip(pack.packRef.origin)
                         pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
+                        versionLabel?.let { HeroChip("v$it") }
+                        if (updateBadge) HeroUpdateBadge(s.packVersionUpdateBadge)
                         if (showPlaytime && pack.playtimeSeconds > 0L) HeroChip(playtimeLabel(pack.playtimeSeconds))
                         HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
                     }
@@ -622,6 +752,18 @@ private fun HeroChip(text: String) {
     }
 }
 
+@Composable
+private fun HeroUpdateBadge(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(NxTheme.colors.primary)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
 private fun loaderMcLabel(m: CachedManifestSnapshot): String {
     val loader = m.loaderName
         .takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
@@ -650,9 +792,11 @@ private fun lastPlayedShort(epoch: Long, s: AppStrings): String {
 @Composable
 private fun PackSettingsModal(
     title: String,
+    pack: PackInstance,
     runtime: InstanceRuntime,
     instanceDir: Path,
     onRuntimeChange: (InstanceRuntime) -> Unit,
+    onInstanceChange: (PackInstance) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scrim = remember { MutableInteractionSource() }
@@ -682,6 +826,9 @@ private fun PackSettingsModal(
                     IconButton(onClick = onDismiss) { Symbol(NxIcon.Close, contentDescription = null, tint = NxTheme.colors.textSecondary) }
                 }
                 PackSettingsTab(runtime = runtime, instanceDir = instanceDir, onRuntimeChange = onRuntimeChange)
+                if (pack.packRef.origin == PackOrigin.Mirror) {
+                    PackVersionTab(pack = pack, onInstanceChange = onInstanceChange)
+                }
             }
         }
     }
