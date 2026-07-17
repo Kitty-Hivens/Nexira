@@ -81,6 +81,7 @@ import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.update.PackUpdateService
 import hivens.launcher.update.DesktopIntegration
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
@@ -542,6 +543,18 @@ val mirrorModule = module {
     // is pulled from the SC client distribution, same source as the server-list sync.
     single { SmrtAuthlibSwapper(get(), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
+    // Update write side: moves an installed mirror instance to another build
+    // (forward update or version switch) via the reconcile engine. Concrete
+    // SmrtPackClient for the summary/version-list poll the interface slice lacks.
+    single {
+        PackUpdateService(
+            client = get<SmrtPackClient>(),
+            syncService = get(),
+            repository = get(),
+            protectedPaths = get(),
+            dataDir = get(),
+        )
+    }
     single {
         MrpackInstaller(
             clientProvider = get(named("direct")),

@@ -2,10 +2,12 @@ package hivens.launcher.smrt
 
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
+import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
+import hivens.core.update.UpdatePlan
 import hivens.launcher.FileDownloadService
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
@@ -114,6 +116,82 @@ class SmrtSyncService(
 
             writeSourceMarker(marker, SOURCE_MIRROR)
         }
+    }
+
+    /**
+     * Applies a precomputed [UpdateReconciler] plan against an already-fetched
+     * [manifest]. The CALLER must hold [InstanceMutationLock] for [clientDir]:
+     * this method deliberately does not take it, because [sync] does and the lock
+     * is not reentrant; the update driver holds it across scan + reconcile + apply.
+     *
+     * - toAdd / toUpdate: download the target file. For a mod, [enabledState]
+     *   decides active (`mods/<name>`) vs disabled (`mods/<name>.disabled`) and the
+     *   stale variant is dropped first, so a user's optional-off choice is kept.
+     * - conflicts: the pack's version is written beside the user's edit as
+     *   `<path>.new`; the user's file is never overwritten.
+     * - toDelete: removed (both variants for a mod path).
+     * - skippedProtected: never touched.
+     *
+     * sha1 is verified after every download (a mismatch throws and drops the bad
+     * bytes), same as [sync].
+     */
+    suspend fun applyUpdate(
+        clientDir: Path,
+        manifest: SmrtPackManifest,
+        plan: UpdatePlan,
+        enabledState: Map<String, Boolean> = emptyMap(),
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+    ) = withContext(Dispatchers.IO) {
+        val index = buildEntryIndex(manifest)
+        val total = plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size + plan.toDelete.size
+        var current = 0
+
+        for (path in plan.toAdd + plan.toUpdate) {
+            current++
+            progress?.invoke(current, total, path)
+            val entry = index[path] ?: continue
+            if (path.startsWith(MODS_PREFIX)) {
+                val filename = path.removePrefix(MODS_PREFIX)
+                val enabled = enabledState[filename] ?: true
+                val active = resolveSafe(clientDir, path, "mod $filename")
+                val disabled = resolveSafe(clientDir, "$path.disabled", "mod $filename")
+                val dest = if (enabled) active else disabled
+                val stale = if (enabled) disabled else active
+                runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
+                downloadIfNeeded(dest, entry.sha1, entry.size, entry.source, "mod $filename")
+            } else {
+                val dest = resolveSafe(clientDir, path, "asset $path")
+                downloadIfNeeded(dest, entry.sha1, entry.size, entry.source, "asset $path")
+            }
+        }
+
+        for (path in plan.conflicts) {
+            current++
+            progress?.invoke(current, total, path)
+            val entry = index[path] ?: continue
+            val dest = resolveSafe(clientDir, "$path.new", "conflict $path")
+            downloadIfNeeded(dest, entry.sha1, entry.size, entry.source, "conflict $path")
+        }
+
+        for (path in plan.toDelete) {
+            current++
+            progress?.invoke(current, total, path)
+            val target = resolveSafe(clientDir, path, "prune $path")
+            runCatching { fileOpRetry("update prune $path") { Files.deleteIfExists(target) } }
+            if (path.startsWith(MODS_PREFIX)) {
+                val disabled = resolveSafe(clientDir, "$path.disabled", "prune $path")
+                runCatching { fileOpRetry("update prune $path disabled") { Files.deleteIfExists(disabled) } }
+            }
+        }
+    }
+
+    private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
+
+    private fun buildEntryIndex(manifest: SmrtPackManifest): Map<String, ResolvableEntry> {
+        val index = LinkedHashMap<String, ResolvableEntry>()
+        for (mod in manifest.mods) index["$MODS_PREFIX${mod.filename}"] = ResolvableEntry(mod.source, mod.sha1, mod.sizeBytes)
+        for (asset in manifest.assets) index[asset.dest] = ResolvableEntry(asset.source, asset.sha1, asset.sizeBytes)
+        return index
     }
 
     /**
@@ -398,5 +476,6 @@ class SmrtSyncService(
 
         private const val SOURCE_MARKER_FILE = ".nexira-sync-source"
         private const val SOURCE_MIRROR = "mirror"
+        private const val MODS_PREFIX = "mods/"
     }
 }
