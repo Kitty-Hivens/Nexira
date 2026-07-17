@@ -9,6 +9,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.flatten
+import hivens.core.update.CompatChange
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
 import hivens.launcher.ProtectedPaths
@@ -112,6 +113,7 @@ class PackUpdateServiceTest {
         private val engine = MockEngine { req ->
             when (req.url.toString()) {
                 MANIFEST_URL -> respond(manifestBody, HttpStatusCode.OK, jsonHeaders)
+                MANIFEST_V2_URL -> respond(v2Body, HttpStatusCode.OK, jsonHeaders)
                 SUMMARY_URL -> respond(summaryBody, HttpStatusCode.OK, jsonHeaders)
                 VERSIONS_URL -> respond(versionsBody, HttpStatusCode.OK, jsonHeaders)
                 REQ_V1_URL -> respond(ByteReadChannel(REQ_V1), HttpStatusCode.OK)
@@ -146,6 +148,18 @@ class PackUpdateServiceTest {
         )
         fun serveAmberV2() { manifestBody = amberV2(REQ_V2) }
         fun serveCorruptAmberV2() { manifestBody = amberV2("WRONG-SHA".toByteArray()) }
+
+        // v2 where optB flips optional -> required with the SAME bytes/url as v1 (a routine
+        // curation change): no toUpdate entry, so only the final relabel pass can place it.
+        private fun v2OptRequired() = manifest(
+            V2,
+            listOf(
+                mod("req.jar", REQ_V2, REQ_V2_URL, required = true, defaultEnabled = true),
+                mod("optB.jar", OPTB_V1, OPTB_V1_URL, required = true, defaultEnabled = true),
+            ),
+            listOf(asset("config/x.cfg", CFG, CFG_URL)),
+        )
+        fun serveV2OptRequired() { manifestBody = v2OptRequired() }
 
         /** Install v1 with optB toggled off, and record the resulting instance. */
         suspend fun installV1(): PackInstance {
@@ -182,6 +196,8 @@ class PackUpdateServiceTest {
         h.serveV2()
         val outcome = h.service.applyUpdate(instance, null, null)
         assertTrue(outcome is UpdateOutcome.Applied)
+        // Even a green update with changes snapshots now, so a mid-apply failure can revert.
+        assertTrue(h.service.listSnapshots(instance).isNotEmpty())
 
         // Required mod re-downloaded to the new bytes.
         assertEquals("REQ-V2", readText(h.clientDir.resolve("mods/req.jar")))
@@ -255,8 +271,9 @@ class PackUpdateServiceTest {
 
         val restored = h.service.rollback(instance, snaps.first().id)
 
-        // Files and metadata are back to v1.
+        // Files and metadata are back to v1; a rollback also pins (stops following latest).
         assertEquals(V1, restored.pinnedPackVersion)
+        assertEquals(false, restored.followLatest)
         assertEquals(V1, h.repo.get("i1")!!.pinnedPackVersion)
         assertEquals("REQ-V1", readText(h.clientDir.resolve("mods/req.jar")))
         assertEquals("DROP", readText(h.clientDir.resolve("mods/drop.jar")))               // deleted mod restored
@@ -287,9 +304,46 @@ class PackUpdateServiceTest {
         assertTrue(h.service.listSnapshots(instance).isEmpty())
     }
 
+    @Test
+    fun `an optional flipped to required is placed active even with unchanged bytes`() = runTest {
+        val h = Harness()
+        val instance = h.installV1() // optB off -> mods/optB.jar.disabled (OPTB-V1)
+        assertTrue(Files.exists(h.clientDir.resolve("mods/optB.jar.disabled")))
+
+        h.serveV2OptRequired()
+        assertTrue(h.service.applyUpdate(instance, null, null) is UpdateOutcome.Applied)
+
+        // Same bytes but now required: the final relabel pass must move it to the active name.
+        assertTrue(Files.exists(h.clientDir.resolve("mods/optB.jar")))
+        assertFalse(Files.exists(h.clientDir.resolve("mods/optB.jar.disabled")))
+        assertEquals("OPTB-V1", readText(h.clientDir.resolve("mods/optB.jar")))
+    }
+
+    @Test
+    fun `a null-baseline instance grades amber`() = runTest {
+        val h = Harness()
+        val preBaseline = h.installV1().copy(installedManifest = null) // predates the baseline field
+        h.repo.put(preBaseline)
+        h.summaryBody = summary(V2)
+        h.serveV2()
+
+        val check = h.service.checkForUpdate(preBaseline)
+        assertTrue(check is UpdateCheck.Available)
+        assertEquals(CompatChange.Unknown, check.compat)
+    }
+
+    @Test
+    fun `an explicit version switch stops following latest`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        assertTrue(h.service.applyUpdate(instance, V2, null) is UpdateOutcome.Applied)
+        assertEquals(false, h.repo.get("i1")!!.followLatest)
+    }
+
     private companion object {
         const val MIRROR = "https://mirror.test"
         const val MANIFEST_URL = "https://mirror.test/v1/packs/test/manifest"
+        const val MANIFEST_V2_URL = "https://mirror.test/v1/packs/test/manifest/2026.02.02"
         const val SUMMARY_URL = "https://mirror.test/v1/packs/test"
         const val VERSIONS_URL = "https://mirror.test/v1/packs/test/manifest/versions"
         const val REQ_V1_URL = "https://mirror.test/dl/req-v1"

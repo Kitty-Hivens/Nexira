@@ -183,6 +183,11 @@ class SmrtSyncService(
                 runCatching { fileOpRetry("update prune $path disabled") { Files.deleteIfExists(disabled) } }
             }
         }
+
+        // Place every mod at active / .disabled per enabledState even when its bytes did
+        // not change: an optional flipped to required (or back) has no toAdd/toUpdate entry
+        // but must still move, or a now-required mod would launch missing.
+        relabel(clientDir, manifest.mods, enabledState)
     }
 
     private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)

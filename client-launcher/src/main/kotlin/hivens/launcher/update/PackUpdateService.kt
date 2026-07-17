@@ -14,6 +14,7 @@ import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
+import hivens.core.update.CompatChange
 import hivens.core.update.UpdateReconciler
 import hivens.core.update.classifyCompat
 import hivens.core.update.comparePackVersions
@@ -108,17 +109,13 @@ class PackUpdateService(
                     current = scanInstanceState(clientDir, paths),
                     isProtected = protectedPaths::isProtected,
                 )
-                val compat = classifyCompat(
-                    installed = fresh.cachedManifest,
-                    targetMinecraft = target.minecraft.version,
-                    targetLoaderName = target.loader.name,
-                    targetLoaderVersion = target.loader.version,
-                )
+                val compat = gradeCompat(fresh, target)
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
-                // A structural (amber) change can invalidate configs or worlds, so
-                // snapshot the pack-managed files first and auto-revert if apply throws.
+                // Snapshot the pack-managed files before ANY change so a failed apply
+                // auto-reverts and a structural / no-baseline update stays recoverable
+                // (hardlinks make it cheap; a label-only no-op skips it).
                 val managed = managedRealPaths(fresh.installedManifest, targetManifest)
-                val snapshot = if (!compat.isSafe) {
+                val snapshot = if (!plan.isEmpty) {
                     val now = Instant.now().toEpochMilli()
                     snapshotService.capture(clientDir, fresh, managed, "$now-${UUID.randomUUID().toString().take(8)}", now)
                 } else {
@@ -126,7 +123,7 @@ class PackUpdateService(
                 }
                 try {
                     syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
-                    commit(fresh, target, enabledState)
+                    commit(fresh, target, enabledState, pinExplicit = targetVersion != null)
                 } catch (e: Throwable) {
                     if (snapshot != null) {
                         repository.put(snapshotService.restore(clientDir, fresh.instanceDirName, snapshot.id, managed))
@@ -154,20 +151,38 @@ class PackUpdateService(
             current = scanInstanceState(clientDirOf(instance), paths),
             isProtected = protectedPaths::isProtected,
         )
-        val compat = classifyCompat(
-            installed = instance.cachedManifest,
-            targetMinecraft = target.minecraft.version,
-            targetLoaderName = target.loader.name,
-            targetLoaderVersion = target.loader.version,
-        )
-        return UpdateCheck.Available(currentVersionOf(instance), target.packVersion, compat, plan)
+        return UpdateCheck.Available(currentVersionOf(instance), target.packVersion, gradeCompat(instance, target), plan)
     }
 
-    private suspend fun commit(instance: PackInstance, target: SmrtPackManifest, enabledState: Map<String, Boolean>) {
+    /**
+     * Grades how structural the change is. A null baseline (a pre-baseline or
+     * non-mirror install) is treated as [CompatChange.Unknown] -- the reconcile
+     * cannot tell a user edit from a pack change, so it must snapshot before and be
+     * held under the amber policy rather than silently overwriting a hand-edited config.
+     */
+    private fun gradeCompat(instance: PackInstance, target: SmrtPackManifest): CompatChange =
+        if (instance.installedManifest == null) {
+            CompatChange.Unknown
+        } else {
+            classifyCompat(instance.cachedManifest, target.minecraft.version, target.loader.name, target.loader.version)
+        }
+
+    /**
+     * Persist the applied build. [pinExplicit] (a switch/rollback to a specific
+     * version) also stops following latest, so the auto-updater does not undo a
+     * deliberate downgrade on the next startup.
+     */
+    private suspend fun commit(
+        instance: PackInstance,
+        target: SmrtPackManifest,
+        enabledState: Map<String, Boolean>,
+        pinExplicit: Boolean,
+    ) {
         repository.put(
             instance.copy(
                 packRef = instance.packRef.copy(version = target.packVersion),
                 pinnedPackVersion = target.packVersion,
+                followLatest = if (pinExplicit) false else instance.followLatest,
                 installedManifest = target.toBaselineManifest(),
                 cachedManifest = CachedManifestSnapshot(
                     minecraftVersion = target.minecraft.version,
@@ -202,8 +217,11 @@ class PackUpdateService(
                 val current = repository.get(instance.id) ?: instance
                 val managed = managedRealPaths(null, current.installedManifest ?: FileManifest())
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
-                repository.put(restored)
-                restored
+                // A rollback is a deliberate pin: stop following latest so the update we
+                // just undid is not re-applied on the next startup.
+                val pinned = restored.copy(followLatest = false)
+                repository.put(pinned)
+                pinned
             }
         }
     }
