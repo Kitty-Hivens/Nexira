@@ -338,6 +338,15 @@ compose.desktop {
             // the launcher would show up as "java" in the taskbar.
             "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
 
+            // Xodus (the registry + disk caches) reflects into
+            // sun.nio.ch.FileChannelImpl.setUninterruptible() to keep its DB file
+            // channels from being closed when a thread doing store IO is
+            // interrupted (a cancelled coroutine). Without this package open it
+            // falls back to interruptible channels -- an interrupt mid-write can
+            // corrupt the environment -- and logs a full InaccessibleObjectException
+            // at boot.
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+
             // X11/Linux desktop tuning. macOS/Windows JVMs silently ignore
             // these properties (XToolkit code path is not even loaded), so
             // shipping them unconditionally is noise rather than wrong. If
@@ -457,6 +466,8 @@ packaging {
     // commit; jna.nosys was a dorkbox/JBR rudiment, also dropped.
     jvmArgs.set(listOf(
         "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+        // Xodus uninterruptible file channels (DB integrity under thread interrupts).
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
         "--enable-native-access=ALL-UNNAMED",
         "-Dawt.useSystemAAFontSettings=on",
         "-Djdk.gtk.version=3",
