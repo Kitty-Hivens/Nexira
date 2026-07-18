@@ -90,9 +90,11 @@ fun PackSettingsWindow(
     ) {
         NxSurface(
             level = NxSurfaceLevel.Raised,
-            // Opaque, not frosted: over the scrim a glass alpha reads as a
-            // see-through window. A settings surface is a solid plane.
+            // Clear + fully opaque: no frost coat (glass off) and a solid body
+            // (opaque forces alpha 1 instead of the 0.92 dark bleed-through), so
+            // the scrim never reads through the window.
             glass = false,
+            opaque = true,
             modifier = Modifier
                 .widthIn(max = 1320.dp)
                 .heightIn(max = 940.dp)
