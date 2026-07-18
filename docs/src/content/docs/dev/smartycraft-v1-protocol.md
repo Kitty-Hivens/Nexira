@@ -4,7 +4,7 @@ description: Empirically captured wire spec of the SmartyCraft launcher protocol
 ---
 
 Empirically captured 2026-05-14 against live `https://www.smartycraft.ru`
-using user account NoLikeHumans + analysis of smrt-deco source.
+using a test account + analysis of smrt-deco source.
 Direct connection (no SOCKS5 proxy). All requests POST to
 `/launcher2/index.php` with `Content-Type: application/x-www-form-urlencoded`.
 
