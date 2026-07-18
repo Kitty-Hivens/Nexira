@@ -1,6 +1,11 @@
 package hivens.ui.screens.detail.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
@@ -54,7 +59,11 @@ class PackSettingsWindowRenderTest {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
             NxTheme(useDarkTheme = true) {
-                PackSettingsWindow(pack = pack, instanceDir = Path.of("/tmp/render"), onInstanceChange = {}, onDismiss = {})
+                // A vivid backdrop so any bleed-through of the overlay surface shows
+                // up as a pink tint -- proves the window is actually opaque.
+                Box(Modifier.fillMaxSize().background(Color(0xFFE91E63))) {
+                    PackSettingsWindow(pack = pack, instanceDir = Path.of("/tmp/render"), onInstanceChange = {}, onDismiss = {})
+                }
             }
         }
         try {

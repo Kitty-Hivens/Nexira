@@ -832,7 +832,7 @@ object GermanStrings : AppStrings {
     override val packVersionUpdateNow           = "Jetzt aktualisieren"
     override val packVersionFollowLatest        = "Neuestem folgen"
     override val packVersionFollowLatestDesc    = "Dieses Pack automatisch auf den neuesten Build aktualisieren."
-    override val packVersionOtherBuilds         = "Andere Builds"
+    override val packVersionOtherBuilds         = "Andere Versionen"
     override val packVersionSwitch              = "Wechseln"
     override val packVersionCurrentTag          = "Aktuell"
     override val packVersionUpdateBadge         = "Update"

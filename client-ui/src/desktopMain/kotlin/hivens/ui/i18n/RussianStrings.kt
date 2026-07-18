@@ -836,7 +836,7 @@ object RussianStrings : AppStrings {
     override val packVersionUpdateNow           = "Обновить"
     override val packVersionFollowLatest        = "Следовать за последней"
     override val packVersionFollowLatestDesc    = "Автообновлять этот пак до новейшей сборки."
-    override val packVersionOtherBuilds         = "Другие сборки"
+    override val packVersionOtherBuilds         = "Другие версии"
     override val packVersionSwitch              = "Переключить"
     override val packVersionCurrentTag          = "Текущая"
     override val packVersionUpdateBadge         = "Обновление"

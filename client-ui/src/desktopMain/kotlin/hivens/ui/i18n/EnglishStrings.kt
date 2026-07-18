@@ -834,7 +834,7 @@ object EnglishStrings : AppStrings {
     override val packVersionUpdateNow           = "Update now"
     override val packVersionFollowLatest        = "Follow latest"
     override val packVersionFollowLatestDesc    = "Auto-update this pack to the newest build."
-    override val packVersionOtherBuilds         = "Other builds"
+    override val packVersionOtherBuilds         = "Other versions"
     override val packVersionSwitch              = "Switch"
     override val packVersionCurrentTag          = "Current"
     override val packVersionUpdateBadge         = "Update"

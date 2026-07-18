@@ -126,15 +126,16 @@ internal fun PackVersionSection(pack: PackInstance, onInstanceChange: (PackInsta
             onInstanceChange(updated)
             scope.launch { repo.put(updated) }
         }
+        // Up-to-date is a quiet one-liner inside the section, not a banner block --
+        // a full callout for "nothing to do" only shoved the version list down.
+        if (check == UpdateCheck.UpToDate) {
+            Text(s.packVersionUpToDate, style = MaterialTheme.typography.bodySmall, color = colors.success)
+        }
     }
 
-    when (val c = check) {
-        UpdateCheck.UpToDate -> NxCalloutBanner(
-            body = s.packVersionUpToDate,
-            tone = NxCalloutTone.Info,
-            icon = NxIcon.CheckCircle,
-        )
-        is UpdateCheck.Available -> NxCalloutBanner(
+    // Only an actual available update earns a prominent banner.
+    (check as? UpdateCheck.Available)?.let { c ->
+        NxCalloutBanner(
             title = s.packVersionAvailable(c.toVersion),
             body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
             tone = if (c.compat.isSafe) NxCalloutTone.Info else NxCalloutTone.Warning,
@@ -150,7 +151,6 @@ internal fun PackVersionSection(pack: PackInstance, onInstanceChange: (PackInsta
                 NxButton(s.packVersionUpdateNow, onClick = { apply(null) }, enabled = !busy, compact = true)
             }
         }
-        null -> Unit
     }
 
     message?.let {
