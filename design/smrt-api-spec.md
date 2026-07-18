@@ -67,8 +67,21 @@ Optional, additive-only metadata on both mod and asset entries. Clients ignore t
 - `incompatible_with` -- array of `filename` (for mods) or `dest` (for assets) strings. Two entries in this list are mutually exclusive; a launcher may render a `minimap` category whose members are pair-wise incompatible as a radio group rather than checkboxes.
 - `license` -- SPDX identifier where known (e.g. `MIT`, `LGPL-3.0-only`, `CC-BY-NC-SA-3.0`). Lets a launcher flag non-redistributable mods to the user. Absent for proprietary mods without an SPDX-compatible declaration.
 - `url` -- source / project / wiki link. Used for a "Learn more" affordance. Preferred sources in order: the mod's own `mcmod.info`/`mods.toml` URL, the Modrinth project's `source_url`, the CurseForge project page.
+- `presence` -- the mod's presence class in this pack: `required`, `optional_client`, `optional_server`, `optional_both`, or `coremod`. Computed at build time from the mod's side/match-policy classification plus the pack's dependency graph (see "Mod presence classes" below). Absent = unclassified, and on every manifest built before the field landed.
 
 The block is purely advisory. It does not affect handshake, download routing, or file resolution -- only how a launcher shows the entry. Adding or removing `display` fields is forward-compatible and does not bump `schema_version`.
+
+### Mod presence classes
+
+`display.presence` collapses two orthogonal facts the mirror derives per mod -- the side its code executes on (client / server / both) and whether joining a server requires both sides to carry it (`must_match` vs `tolerant`) -- plus the pack's dependency graph, into one launcher-facing value:
+
+- `required` -- the mod must be installed: it either requires itself on both sides to join (a content mod), or it is a transitive hard dependency of a required or default-enabled mod. Consistent with `mods[].required = true`.
+- `optional_client` -- a client-side mod; toggleable. **Invariant: a client-side mod is never `required`** -- the mirror refuses to build a manifest that would force-install one.
+- `optional_server` -- a server-side mod; never required for the client. When such a mod appears in a client manifest at all it ships `default_enabled = false`.
+- `optional_both` -- runs on both sides but tolerates the other side lacking it (`acceptableRemoteVersions = "*"` / `displayTest = NONE`-class mods, item viewers, map mods with optional server components); toggleable unless the dependency graph pulls it in.
+- `coremod` -- the jar is not a mod at all (a bare ASM transformer / loading plugin / library with no mod identity); always toggleable.
+
+`mods[].required` remains the enforcing flag; `presence` is the advisory explanation and the two are consistent by construction. Side/match-policy provenance is Modrinth's project environment flags for a Modrinth-identified mod, else bytecode-derived classification; the value is per-artifact, so two versions of one mod can legitimately differ. Clients that do not know the field ignore it (standard display-block rule); unknown future values must degrade to "no badge", not to an error.
 
 ### Source
 
@@ -149,7 +162,8 @@ GET /v1/packs/{pack_id}/manifest/{version}   -> specific version
         "category": "performance",
         "incompatible_with": ["OptiFine.jar"],
         "license": "LGPL-3.0-only",
-        "url": "https://github.com/CaffeineMC/sodium-fabric"
+        "url": "https://github.com/CaffeineMC/sodium-fabric",
+        "presence": "optional_client"
       }
     }
   ],
