@@ -199,6 +199,9 @@ class PackUpdateServiceTest {
         assertTrue(outcome is UpdateOutcome.Applied)
         // Even a green update with changes snapshots now, so a mid-apply failure can revert.
         assertTrue(h.service.listSnapshots(instance).isNotEmpty())
+        // The in-flight apply marker is cleared after commit -- no stale journal to
+        // trigger a false rollback on the next start.
+        assertTrue(h.journal.listPending().isEmpty(), "apply marker cleared after commit")
 
         // Required mod re-downloaded to the new bytes.
         assertEquals("REQ-V2", readText(h.clientDir.resolve("mods/req.jar")))
@@ -303,6 +306,9 @@ class PackUpdateServiceTest {
         assertEquals(V1, h.repo.get("i1")!!.pinnedPackVersion)
         // The failed snapshot was cleaned up.
         assertTrue(h.service.listSnapshots(instance).isEmpty())
+        // The in-flight apply marker is cleared after the in-process revert, so the
+        // startup recovery does not try to roll back an already-reverted instance.
+        assertTrue(h.journal.listPending().isEmpty(), "apply marker cleared after auto-revert")
     }
 
     @Test
