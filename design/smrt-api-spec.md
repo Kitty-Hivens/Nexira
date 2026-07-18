@@ -49,6 +49,15 @@ A version string of the form `YYYY.MM.DD[.N]` (no zero-padding on `N`), assigned
 
 Ordering is **numeric tuple comparison with missing trailing segments treated as 0**: split on `.`, parse each segment as an integer, pad the shorter tuple with trailing zeros to match the longer one, then compare element-wise. Concretely this means `2026.05.22.10` sorts after `2026.05.22.2` (the breaking case for string sort), and a non-canonical `2026.05.22.0` (which the mirror will not produce) would compare equal to `2026.05.22`. String / lexicographic sort is unsafe (`.10` < `.2` under string sort); clients and the mirror must use this tuple comparison for ordering. Clients pin to a version when installed; updates compute the diff against the new version's manifest.
 
+### Version channel
+
+Every pack version belongs to exactly one **channel**, derived from the version string itself -- there is no separate stored flag:
+
+- `snapshot` -- the version starts with the `SNAPSHOT-` prefix. The panel's build pipeline stamps every build it produces as `SNAPSHOT-<semver>-<YYYY.MM.DD>[.N]` (the semver part is the config's hand-bumped line, `0.0.0` until first release; the date and same-day counter advance automatically).
+- `release` -- everything else, i.e. the bare `YYYY.MM.DD[.N]` operator-published form described above.
+
+The wire carries the derived channel wherever versions are listed (`channel` on each `builds[]` entry of the versions listing, `latest_channel` on a pack summary), so clients never re-implement the prefix rule; the prefix rule is still normative for clients that need to classify a version string they produced or stored locally. Tuple comparison is only meaningful within the release channel -- snapshot strings do not parse as numeric tuples. Cross-channel ordering, where a client needs it, uses the build timestamps (`built_at`), which the mirror guarantees on every build entry.
+
 ### Mod entry
 
 One entry in a pack manifest's `mods` array. Identified by `filename` (the destination name in the client's `mods/` directory). Carries the canonical SHA-1, expected size, required/optional flag, a single `source` pointer, and an optional `display` block with human-readable metadata for the launcher UI.
@@ -258,6 +267,8 @@ GET /v1/packs
       "tagline": "Production-grade tech progression on 1.12.2",
       "minecraft_version": "1.12.2",
       "latest_pack_version": "2026.05.22",
+      "latest_built_at": "2026-05-22T03:02:11Z",
+      "latest_channel": "release",
       "tags": ["tech", "industrial", "1.12.2"],
       "featured": false
     }
@@ -266,6 +277,49 @@ GET /v1/packs
 ```
 
 Pack summaries for the home-screen carousel. Full manifest fetched on demand.
+
+`latest_built_at` (the latest manifest's `generated_at`) and `latest_channel` (see "Version channel") are derived by the mirror at read time from the latest manifest -- they are never persisted in the summary and can never drift from the manifest they describe. Both are absent when the pack has no readable build; clients treat absence as "no date to show", not an error. The same two fields appear on `GET /v1/packs/{pack_id}` and on community pack summaries.
+
+### Manifest versions listing
+
+```
+GET /v1/packs/{pack_id}/manifest/versions
+```
+
+```json
+{
+  "schema_version": 2,
+  "pack_id": "Industrial",
+  "latest": "SNAPSHOT-0.0.0-2026.07.18",
+  "versions": ["2026.05.22", "2026.05.23.1", "SNAPSHOT-0.0.0-2026.07.18"],
+  "builds": [
+    {
+      "version": "SNAPSHOT-0.0.0-2026.07.18",
+      "channel": "snapshot",
+      "built_at": "2026-07-18T20:04:36Z",
+      "fingerprint": "9a41c2f0e7d3b8a6c5f4e2d1b0a9c8e7f6d5c4b3",
+      "mods_count": 94,
+      "assets_count": 3
+    },
+    {
+      "version": "2026.05.23.1",
+      "channel": "release",
+      "built_at": "2026-05-23T14:10:02Z",
+      "fingerprint": "5e8d3c2b1a0f9e8d7c6b5a4d3e2f1c0b9a8d7e6f",
+      "mods_count": 90,
+      "assets_count": 3
+    }
+  ]
+}
+```
+
+Every build the mirror retains for the pack, in two shapes over the same version set:
+
+- `versions` -- bare labels, **oldest first**. The original wire shape, kept so clients that predate `builds` keep decoding; new clients should ignore it.
+- `builds` -- one entry per retained build, **newest first by `built_at`**. `channel` and `built_at` are as defined under "Version channel"; `fingerprint` is the manifest's content fingerprint where present (absent on manifests built before the field landed), and `mods_count` / `assets_count` are the array lengths of that build's manifest.
+- `latest` -- the version the mirror's `latest` pointer currently resolves to (what `GET .../manifest` serves); absent when the pack has no published build.
+
+A version picker renders `builds` as-is; an updater that only needs "did latest change?" compares `latest` (or the summary's `latest_pack_version`) by string equality and then fetches that build's manifest.
 
 ### Server metadata
 
@@ -327,7 +381,7 @@ GET /v1/featured
 | GET    | `/v1/packs/{pack_id}`                    | Single pack summary.                                                                                                                 |
 | GET    | `/v1/packs/{pack_id}/manifest`           | Latest manifest for the pack.                                                                                                        |
 | GET    | `/v1/packs/{pack_id}/manifest/{version}` | Specific historical manifest.                                                                                                        |
-| GET    | `/v1/packs/{pack_id}/manifest/versions`  | List of available manifest versions for the pack.                                                                                    |
+| GET    | `/v1/packs/{pack_id}/manifest/versions`  | Every retained build: bare labels plus per-build metadata (`channel`, `built_at`, `fingerprint`, counts) and the current `latest`.    |
 | GET    | `/v1/packs/{pack_id}/static/{rel_path}`  | Curated static asset under the pack (mod configs, custom options, RPs, Nexira UI overrides).                                         |
 | GET    | `/v1/servers`                            | List all curated SC servers.                                                                                                         |
 | GET    | `/v1/servers/{server_id}`                | Single server metadata.                                                                                                              |
