@@ -61,18 +61,15 @@ done < "$CHECKSUMS_FILE"
     printf '%s\n\n' "$HIGHLIGHTS"
   fi
 
+  # Only officially-supported platforms are listed. The Intel macOS DMG is a
+  # community build uploaded out-of-band by build-macos-x86_64-community.yml, so
+  # a `-x86_64-community.dmg` asset may appear on the release without a row here.
   printf '## Downloads\n\n'
-  printf '| Platform | Tier | File |\n|---|---|---|\n'
-  printf '| Windows Installer | tier-1 | [`Nexira-%s-Setup.exe`](%s/Nexira-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| Windows Portable  | tier-1 | [`Nexira-%s-Windows-Portable.zip`](%s/Nexira-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| Linux AppImage    | tier-1 | [`Nexira-%s-x86_64.AppImage`](%s/Nexira-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| macOS Apple Silicon | tier-1 | [`Nexira-%s-aarch64.dmg`](%s/Nexira-%s-aarch64.dmg) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| macOS Intel       | community | [`Nexira-%s-x86_64-community.dmg`](%s/Nexira-%s-x86_64-community.dmg) ※ |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-
-  printf '> ※ The Intel macOS DMG is built and uploaded asynchronously by the maintainer\n'
-  printf '> via the `build-macos-x86_64-community.yml` workflow once macos-13 capacity\n'
-  printf '> is available. Expect a delay of hours to days after the rest of the assets\n'
-  printf '> appear; community-tier means best-effort with no validation SLA.\n\n'
+  printf '| Platform | File |\n|---|---|\n'
+  printf '| Windows Installer | [`Nexira-%s-Setup.exe`](%s/Nexira-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Windows Portable  | [`Nexira-%s-Windows-Portable.zip`](%s/Nexira-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Linux AppImage    | [`Nexira-%s-x86_64.AppImage`](%s/Nexira-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Apple Silicon | [`Nexira-%s-aarch64.dmg`](%s/Nexira-%s-aarch64.dmg) |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
 
   printf '<details>\n<summary>SHA256 Checksums</summary>\n\n'
   printf '| File | SHA256 |\n|---|---|\n'
