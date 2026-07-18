@@ -90,11 +90,14 @@ fun PackSettingsWindow(
     ) {
         NxSurface(
             level = NxSurfaceLevel.Raised,
+            // Opaque, not frosted: over the scrim a glass alpha reads as a
+            // see-through window. A settings surface is a solid plane.
+            glass = false,
             modifier = Modifier
-                .widthIn(max = 940.dp)
-                .heightIn(max = 700.dp)
-                .fillMaxWidth(0.84f)
-                .fillMaxHeight(0.86f)
+                .widthIn(max = 1320.dp)
+                .heightIn(max = 940.dp)
+                .fillMaxWidth(0.88f)
+                .fillMaxHeight(0.90f)
                 .clip(RoundedCornerShape(style.cardCorner))
                 .clickable(card, indication = null, onClick = {}),
         ) {
