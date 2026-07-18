@@ -39,6 +39,7 @@ class CachedSmrtPackClientTest {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val mirror = "https://mirror.test"
     private lateinit var dir: Path
+    private var factory: CacheFactory? = null
 
     @BeforeTest
     fun setUp() {
@@ -48,6 +49,11 @@ class CachedSmrtPackClientTest {
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
+        // Release the Xodus handles before deleting the dir -- Windows can't
+        // remove a file another handle still holds open (POSIX unlink-open hides
+        // this on Linux/macOS), so an unclosed env fails tearDown only there.
+        factory?.close()
+        factory = null
         dir.deleteRecursively()
     }
 
@@ -86,6 +92,7 @@ class CachedSmrtPackClientTest {
             clock = clock,
             ioDispatcher = UnconfinedTestDispatcher(testScheduler),
         )
+        factory = f
         return SmrtPackCaches(
             listing = f.create("pack-listing", SmrtPackListing.serializer(), listingConfig),
             summary = PassthroughCache(),
