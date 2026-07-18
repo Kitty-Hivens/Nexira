@@ -39,6 +39,7 @@ import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
 import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.AutoSyncService
+import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.ServerListCacheStore
 import hivens.core.diag.ActionRing
@@ -459,6 +460,7 @@ fun FrameWindowScope.AppShellContent(
         val dataDirectory: java.nio.file.Path = koinInject()
         val autoSyncService: AutoSyncService = koinInject()
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
+        val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory) }
         var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
@@ -582,6 +584,11 @@ fun FrameWindowScope.AppShellContent(
                     autoSyncService.syncAll(dashboardServers)
                 }
             }
+
+            // Roll back any update a hard crash (kill / power loss / OOM) interrupted
+            // before anything else touches instances -- runs regardless of the
+            // auto-update setting, since a half-applied instance must be repaired.
+            applicationScope.launch { applyRecovery.recoverInterrupted() }
 
             // Background auto-update of installed mirror packs -- same experimental
             // gating as auto-sync, a separate axis (packs, not SC servers). The

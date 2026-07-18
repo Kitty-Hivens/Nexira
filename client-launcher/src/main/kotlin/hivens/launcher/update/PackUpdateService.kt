@@ -51,6 +51,7 @@ class PackUpdateService(
     private val repository: IPackRepository,
     private val protectedPaths: ProtectedPaths,
     private val snapshotService: PackSnapshotService,
+    private val journal: ApplyJournal,
     private val dataDir: Path,
 ) : PackUpdater {
     private val log = LoggerFactory.getLogger(PackUpdateService::class.java)
@@ -121,13 +122,31 @@ class PackUpdateService(
                 } else {
                     null
                 }
+                // Journal the in-flight apply (snapshot id + managed set) BEFORE the
+                // first file write, so a hard crash between here and the commit is
+                // rolled back on the next start instead of leaving a half-updated pack.
+                if (snapshot != null) {
+                    journal.begin(
+                        PendingApply(
+                            instanceId = fresh.id,
+                            instanceDirName = fresh.instanceDirName,
+                            snapshotId = snapshot.id,
+                            fromVersion = currentVersionOf(fresh),
+                            toVersion = target.packVersion,
+                            managedPaths = managed.toList(),
+                            startedAtEpoch = snapshot.createdAtEpoch,
+                        )
+                    )
+                }
                 try {
                     syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
                     commit(fresh, target, enabledState, pinExplicit = targetVersion != null)
+                    if (snapshot != null) journal.complete(fresh.instanceDirName)
                 } catch (e: Throwable) {
                     if (snapshot != null) {
                         repository.put(snapshotService.restore(clientDir, fresh.instanceDirName, snapshot.id, managed))
                         snapshotService.delete(fresh.instanceDirName, snapshot.id)
+                        journal.complete(fresh.instanceDirName)
                     }
                     throw e
                 }

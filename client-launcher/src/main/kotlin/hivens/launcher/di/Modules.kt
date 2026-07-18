@@ -84,6 +84,8 @@ import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.PackUpdateService
@@ -559,6 +561,9 @@ val mirrorModule = module {
     // (forward update or version switch) via the reconcile engine. Concrete
     // SmrtPackClient for the summary/version-list poll the interface slice lacks.
     single { PackSnapshotService(dataDir = get(), json = get()) }
+    single { ApplyJournal(dataDir = get(), json = get()) }
+    // Startup rollback for updates a hard crash interrupted (journal + snapshot).
+    single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get()) }
     single {
         PackUpdateService(
             client = get<SmrtPackClient>(),
@@ -566,6 +571,7 @@ val mirrorModule = module {
             repository = get(),
             protectedPaths = get(),
             snapshotService = get(),
+            journal = get(),
             dataDir = get(),
         )
     }
