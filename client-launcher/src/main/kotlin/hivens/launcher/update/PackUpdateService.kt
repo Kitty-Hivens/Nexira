@@ -144,8 +144,15 @@ class PackUpdateService(
                     if (snapshot != null) journal.complete(fresh.instanceDirName)
                 } catch (e: Throwable) {
                     if (snapshot != null) {
-                        repository.put(snapshotService.restore(clientDir, fresh.instanceDirName, snapshot.id, managed))
-                        snapshotService.delete(fresh.instanceDirName, snapshot.id)
+                        try {
+                            repository.put(snapshotService.restore(clientDir, fresh.instanceDirName, snapshot.id, managed))
+                            snapshotService.delete(fresh.instanceDirName, snapshot.id)
+                        } catch (re: Throwable) {
+                            // Apply failed AND the auto-rollback failed: keep the snapshot
+                            // for a manual restore and surface both errors, don't mask the
+                            // original apply failure with the restore one.
+                            e.addSuppressed(re)
+                        }
                         journal.complete(fresh.instanceDirName)
                     }
                     throw e

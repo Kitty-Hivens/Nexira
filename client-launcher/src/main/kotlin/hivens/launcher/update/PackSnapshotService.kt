@@ -79,17 +79,34 @@ class PackSnapshotService(
         val record = readRecord(dir)
         val capturedSet = record.capturedPaths.toSet()
 
+        // Track every path the restore could not reconcile: a failed rollback that
+        // silently reported success left the instance half-updated with the registry
+        // claiming it was rolled back. Surfacing it lets the caller keep the snapshot
+        // (for a manual retry) and tell the user rather than trust a broken state.
+        val failures = ArrayList<String>()
+
         for (rel in managedRealPaths) {
             if (rel in capturedSet) continue
             val live = root.resolve(rel).normalize()
-            if (live.startsWith(root)) runCatching { Files.deleteIfExists(live) }
+            if (live.startsWith(root)) {
+                runCatching { Files.deleteIfExists(live) }.onFailure { failures += "delete $rel" }
+            }
         }
         for (rel in record.capturedPaths) {
             val src = dir.resolve("files").resolve(rel)
             val dst = root.resolve(rel).normalize()
-            if (!dst.startsWith(root) || !Files.isRegularFile(src)) continue
+            if (!dst.startsWith(root)) continue
+            if (!Files.isRegularFile(src)) {
+                failures += "restore $rel (snapshot bytes missing)"
+                continue
+            }
             Files.createDirectories(dst.parent)
-            linkOrCopy(src, dst, replace = true)
+            runCatching { linkOrCopy(src, dst, replace = true) }.onFailure { failures += "restore $rel" }
+        }
+
+        if (failures.isNotEmpty()) {
+            log.error("snapshot: restore of {} from {} left {} item(s) unresolved: {}", instanceDirName, id, failures.size, failures)
+            throw SnapshotRestoreException(instanceDirName, id, failures)
         }
         log.info("snapshot: restored instance {} from {}", instanceDirName, id)
         return record.instance
@@ -146,3 +163,15 @@ class PackSnapshotService(
         fun toPublic() = PackSnapshot(id, createdAtEpoch, fromVersion)
     }
 }
+
+/**
+ * A snapshot restore that could not fully reconstruct the pre-update state: a
+ * captured file could not be put back, or an apply-created file could not be
+ * removed. [failures] names the unresolved paths. The snapshot is left intact so a
+ * manual restore can retry rather than the caller trusting a half-restored state.
+ */
+class SnapshotRestoreException(
+    val instanceDirName: String,
+    val snapshotId: String,
+    val failures: List<String>,
+) : Exception("snapshot restore of $instanceDirName from $snapshotId left ${failures.size} item(s) unresolved: $failures")
