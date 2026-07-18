@@ -130,7 +130,8 @@ class PackUpdateServiceTest {
         val client = SmrtPackClient(provider, MIRROR, json)
         val sync = SmrtSyncService(client, ModrinthClient(provider, json), protectedPaths)
         private val snapshots = PackSnapshotService(dataDir, json)
-        val service = PackUpdateService(client, sync, repo, protectedPaths, snapshots, dataDir)
+        val journal = ApplyJournal(dataDir, json)
+        val service = PackUpdateService(client, sync, repo, protectedPaths, snapshots, journal, dataDir)
 
         fun serveV2() { manifestBody = v2Body }
 
