@@ -42,14 +42,18 @@ import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 
+/** Corner of the Play plate under a rounded style -- a rounded rectangle
+ *  between a bare rectangle and a full stadium, not a pill. */
+private val PLATE_CORNER = 12.dp
+
 /**
- * The launch call-to-action on the pack-detail hero. A low pill in static
- * monochrome ink -- black plate in a dark theme, white in a light one --
- * deliberately NOT the palette accent: the hero ground is arbitrary art behind
- * a dark scrim, and a stable ink reads on all of it while an accent fill
- * fought both the art and the neighbouring chips. The pill follows the style
- * axis the way NxSwitch does: a full capsule under a rounded style, the
- * style's own hard edge under a square one.
+ * The launch call-to-action on the pack-detail hero and the home launch
+ * widgets. A low plate in static monochrome ink -- `#121318` in a dark theme,
+ * white in a light one -- deliberately NOT the palette accent: the hero ground
+ * is arbitrary art behind a dark scrim, and a stable ink reads on all of it
+ * where an accent fill fought both the art and the neighbouring chips. The
+ * corner follows the style axis: a rounded rectangle under a rounded style,
+ * the style's own hard edge under a square one.
  *
  * One button, three moments, zero launch-state knowledge of its own: the
  * caller swaps [label] / [icon] / [onClick] per state, and [busy] renders the
@@ -59,6 +63,11 @@ import hivens.ui.theme.NxTheme
  * because the ghost reads against the hero's scrim, not against the theme.
  * [iconOnly] drops the label for tight layouts; [compact] is the smaller
  * sizing.
+ *
+ * The press-compress rides a graphics layer only WHILE it animates: an
+ * always-on layer resamples the button as an offscreen texture, which softens
+ * every edge and the glyph on a fractional-DPI display. At rest the plate
+ * draws straight into the window, so it stays crisp.
  */
 @Composable
 fun PlayButton(
@@ -72,11 +81,9 @@ fun PlayButton(
     compact: Boolean = false,
 ) {
     val style = LocalStyle.current
-    val shape =
-        if (style.buttonCorner > 0.dp) RoundedCornerShape(percent = 50)
-        else RoundedCornerShape(style.buttonCorner)
+    val shape = RoundedCornerShape(if (style.buttonCorner > 0.dp) PLATE_CORNER else 0.dp)
     val darkTheme = NxTheme.colors.background.luminance() < 0.5f
-    val ink = if (darkTheme) Color.Black else Color.White
+    val ink = if (darkTheme) Color(0xFF121318) else Color.White
     val inkContent = if (darkTheme) Color.White else Color.Black
 
     val interaction = remember { MutableInteractionSource() }
@@ -86,8 +93,8 @@ fun PlayButton(
 
     val fillTarget = when {
         !enabled               -> Color.Transparent
-        busy                   -> ink.copy(alpha = 0.75f)
-        pressed && interactive -> lerp(ink, inkContent, 0.05f)
+        busy                   -> ink.copy(alpha = 0.78f)
+        pressed && interactive -> lerp(ink, inkContent, 0.16f)
         hovered && interactive -> lerp(ink, inkContent, 0.10f)
         else                   -> ink
     }
@@ -115,9 +122,9 @@ fun PlayButton(
     } else if (busy) 0.75f else 1f
 
     val ghost = Color.White.copy(alpha = 0.38f)
-    // A faint ring in the opposite ink holds the pill's edge when the ground
-    // behind it drifts toward the fill's own tone (dark art under a black
-    // pill, pale art under a white one).
+    // A faint ring in the opposite ink holds the plate's edge when the ground
+    // behind it drifts toward the fill's own tone (dark art under the dark
+    // plate, pale art under a white one).
     val ring = inkContent.copy(alpha = 0.18f)
     val content = when {
         !enabled -> Color.White.copy(alpha = 0.55f)
@@ -138,10 +145,12 @@ fun PlayButton(
 
     Row(
         modifier = modifier
-            .graphicsLayer {
-                scaleX = plateScale
-                scaleY = plateScale
-            }
+            .then(
+                // Layer present only while the compress is mid-animation; at
+                // rest (scale == 1f) there is no offscreen texture to resample.
+                if (plateScale != 1f) Modifier.graphicsLayer { scaleX = plateScale; scaleY = plateScale }
+                else Modifier,
+            )
             .clip(shape)
             .background(fill)
             .let { if (enabled) it.border(1.dp, ring, shape) else it.border(1.5.dp, ghost, shape) }

@@ -32,9 +32,6 @@ import hivens.ui.effects.pixelArtBackground
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
-import hivens.ui.nx.NxButton
-import hivens.ui.nx.NxButtonStyle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.NxTheme
@@ -148,14 +145,7 @@ fun HomeNewHero(instance: WidgetInstance) {
                 }
             }
             Flexible("home_hero_play_btn", FlexibleKind.Button) {
-                NxButton(
-                    label     = qt.buttonLabel ?: s.homeQuickButton,
-                    icon      = qt.icon,
-                    onClick   = qt.launch,
-                    enabled   = qt.canLaunch,
-                    style     = NxButtonStyle.Primary,
-                    minHeight = 44.dp,
-                )
+                QuickLaunchButton(qt = qt, defaultLabel = s.homeQuickButton)
             }
         }
 
