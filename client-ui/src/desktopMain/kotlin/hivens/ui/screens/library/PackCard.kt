@@ -47,6 +47,7 @@ import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.notifications.IndicationCenter
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
@@ -80,6 +81,7 @@ fun PackCard(
     val s = LocalStrings.current
     val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
     val art = rememberPackArt(instance)
+    PuppetClick("library.pack.${instance.id}") { onOpenDetail() }
     val indications: IndicationCenter = koinInject()
     // Remember the flow: launchIndication() ends in a fresh asStateFlow() wrapper each
     // call, so collecting it inline would re-subscribe on every recomposition.
