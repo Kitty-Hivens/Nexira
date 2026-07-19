@@ -18,8 +18,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Wire shape of a v2 smrt mirror pack manifest. Mirrors the spec in
- * `design/smrt-api-spec.md`. Unknown fields are
+ * Wire shape of a v2 smrt mirror pack manifest. Mirrors the
+ * API spec in the smrt mirror repo (`Kitty-Hivens/smrt`,
+ * `docs/api.md`). Unknown fields are
  * tolerated (Json is configured with `ignoreUnknownKeys = true`) so a
  * future server-side `display` extension or fresh source variant does
  * not crash this client.
