@@ -25,8 +25,10 @@ import java.util.Map;
  * Modern (authlib 6.x+) join is already redirected by
  * {@code -Dminecraft.api.session.host}; there this covers what the properties
  * cannot: the texture whitelist (a hardcoded list with no system-property
- * override) and the join-response parsing, which SC's non-Yggdrasil reply
- * would otherwise abort (see {@link #tolerateJoinResponse}). Every failure is
+ * override), the join-response parsing, which SC's non-Yggdrasil reply would
+ * otherwise abort (see {@link #tolerateJoinResponse}), and the skin signature
+ * verdict, which SC's dummy signature would otherwise mark invalid so the
+ * client drops every skin (see {@link #forceSignedTextures}). Every failure is
  * swallowed -- an agent must never take the game down.
  */
 public final class AuthlibRedirectAgent {
@@ -40,6 +42,10 @@ public final class AuthlibRedirectAgent {
     private static final String JOIN_METHOD = "joinServer";
     private static final String MCE_CLASS = "com/mojang/authlib/exceptions/MinecraftClientException";
     private static final String MCE_TO_AUTH = "toAuthenticationException";
+    private static final String UNPACK_METHOD = "unpackTextures";
+    private static final String SIG_STATE_CLASS = "com/mojang/authlib/SignatureState";
+    private static final String SIG_STATE_SIGNED = "SIGNED";
+    private static final String SIG_STATE_METHOD = "getPropertySignatureState";
 
     private static final String DEFAULT_HOST = "www.smartycraft.ru";
 
@@ -113,6 +119,7 @@ public final class AuthlibRedirectAgent {
                 if (session) {
                     out = acceptUnsignedTextures(out);
                     out = tolerateJoinResponse(out);
+                    out = forceSignedTextures(out);
                 }
                 return out == classfileBuffer ? null : out;
             } catch (Throwable ignored) {
@@ -305,6 +312,126 @@ public final class AuthlibRedirectAgent {
             pc += insnLen(b, codeStart, pc);
         }
         return -1;
+    }
+
+    /**
+     * Replicates SmartyCraft's own authlib patch for the modern (6.x+) skin path.
+     * SC serves texture properties with a dummy one-byte signature, so vanilla
+     * {@code unpackTextures} computes {@link com.mojang.authlib.SignatureState#INVALID}
+     * (verification throws "Bad signature length: got 1 but was expecting 512") and
+     * hands that state to the client's SkinManager, which then drops the skin --
+     * every SC player renders as a default Steve/Alex while the join itself works.
+     * SC's patched jar replaces the {@code getPropertySignatureState(property)} call
+     * at the top of {@code unpackTextures} with a constant {@code SignatureState.SIGNED};
+     * this rewrites vanilla to the same effect in place: the three bytes
+     * {@code aload_0 ; aload_1 ; invokevirtual getPropertySignatureState} become
+     * {@code nop ; nop ; getstatic SignatureState.SIGNED}, and the existing
+     * {@code astore} stores SIGNED. The whitelist / http-scheme checks that follow
+     * are untouched (the agent already repoints the texture domain), so only the
+     * signature verdict changes.
+     *
+     * Length-, stack- and frame-preserving: both the removed call and the inserted
+     * getstatic leave exactly one {@code SignatureState} on the stack for the store,
+     * and the edit sits before {@code unpackTextures}'s decode try-block so no
+     * exception table or stack-map entry moves. The {@code SignatureState.SIGNED}
+     * field is already in the pool (vanilla {@code getPropertySignatureState} returns
+     * it), so no constant is added. A class with no {@code unpackTextures} or no
+     * SIGNED field (legacy authlib) is returned untouched silently; an
+     * {@code unpackTextures} whose call shape moved leaves a stderr breadcrumb.
+     */
+    static byte[] forceSignedTextures(byte[] classBytes) {
+        int cpCount = u2(classBytes, 8);
+        String[] utf8 = new String[cpCount];
+        int[] tags = new int[cpCount];
+        int[] refA = new int[cpCount];
+        int[] refB = new int[cpCount];
+        int p = readConstantPool(classBytes, utf8, tags, refA, refB);
+        int signedIdx = findSignedStateFieldref(utf8, tags, refA, refB);
+        if (signedIdx < 0) return classBytes; // not the modern session-service shape
+        p += 6; // access_flags + this_class + super_class
+        int ifaces = u2(classBytes, p); p += 2 + ifaces * 2;
+        int fields = u2(classBytes, p); p += 2;
+        for (int f = 0; f < fields; f++) p = skipMember(classBytes, p, utf8, null);
+        int methods = u2(classBytes, p); p += 2;
+        boolean unpackSeen = false;
+        for (int m = 0; m < methods; m++) {
+            p += 2; // access_flags
+            int nameIdx = u2(classBytes, p); p += 2;
+            p += 2; // descriptor
+            int attrs = u2(classBytes, p); p += 2;
+            boolean target = UNPACK_METHOD.equals(utf8[nameIdx]);
+            if (target) unpackSeen = true;
+            for (int a = 0; a < attrs; a++) {
+                int anIdx = u2(classBytes, p); p += 2;
+                int alen = u4(classBytes, p); p += 4;
+                if (target && "Code".equals(utf8[anIdx])) {
+                    int at = findSignatureStateCall(classBytes, p + 8, u4(classBytes, p + 4), tags, refA, refB, utf8);
+                    if (at >= 0) {
+                        byte[] copy = classBytes.clone();
+                        copy[at]     = 0x00;                      // aload_0 -> nop
+                        copy[at + 1] = 0x00;                      // aload_1 -> nop
+                        copy[at + 2] = (byte) 0xB2;               // invokevirtual -> getstatic
+                        copy[at + 3] = (byte) ((signedIdx >> 8) & 0xFF);
+                        copy[at + 4] = (byte) (signedIdx & 0xFF); // ... SignatureState.SIGNED
+                        return copy;
+                    }
+                }
+                p += alen;
+            }
+        }
+        if (unpackSeen) {
+            System.err.println("[authlib-agent] modern unpackTextures present but its signature-state call "
+                + "was not found; SmartyCraft skins will render as default (invalid signature)");
+        }
+        return classBytes;
+    }
+
+    /**
+     * Absolute offset of the {@code aload_0} that begins
+     * {@code aload_0 ; aload_1 ; invokevirtual getPropertySignatureState}, or -1.
+     * Matching the aload_0/aload_1 prefix pins it to the {@code this.getProperty...
+     * (property)} call the store consumes, not some other reference to the method.
+     */
+    private static int findSignatureStateCall(byte[] b, int codeStart, int codeLen,
+                                              int[] tags, int[] refA, int[] refB, String[] utf8) {
+        int pc = 0;
+        while (pc < codeLen) {
+            int op = b[codeStart + pc] & 0xFF;
+            // invokevirtual (real authlib) or invokespecial (a build that emits
+            // the private-method call as B7) -- identical stack effect, and the
+            // rewrite replaces the opcode with getstatic regardless.
+            if ((op == 0xB6 || op == 0xB7) && pc >= 2                  // room for the aload_0/aload_1 prefix
+                    && (b[codeStart + pc - 2] & 0xFF) == 0x2A          // aload_0
+                    && (b[codeStart + pc - 1] & 0xFF) == 0x2B          // aload_1
+                    && isNamedMethodref(u2(b, codeStart + pc + 1), SIG_STATE_METHOD, tags, refA, refB, utf8)) {
+                return codeStart + pc - 2;
+            }
+            pc += insnLen(b, codeStart, pc);
+        }
+        return -1;
+    }
+
+    /** Pool index of the {@code SignatureState.SIGNED} Fieldref, or -1. */
+    private static int findSignedStateFieldref(String[] utf8, int[] tags, int[] refA, int[] refB) {
+        for (int i = 1; i < tags.length; i++) {
+            if (tags[i] != 9) continue; // Fieldref
+            int classIdx = refA[i];
+            int natIdx = refB[i];
+            if (classIdx <= 0 || classIdx >= tags.length || tags[classIdx] != 7) continue;
+            if (natIdx <= 0 || natIdx >= tags.length || tags[natIdx] != 12) continue;
+            if (SIG_STATE_CLASS.equals(utf8[refA[classIdx]]) && SIG_STATE_SIGNED.equals(utf8[refA[natIdx]])) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Whether pool entry [idx] is a Methodref whose method name is [name]. */
+    private static boolean isNamedMethodref(int idx, String name, int[] tags, int[] refA, int[] refB, String[] utf8) {
+        if (idx <= 0 || idx >= tags.length || tags[idx] != 10) return false;
+        int natIdx = refB[idx];
+        if (natIdx <= 0 || natIdx >= tags.length || tags[natIdx] != 12) return false;
+        return name.equals(utf8[refA[natIdx]]);
     }
 
     /** Whether pool entry [idx] is a Methodref to {@code MinecraftClientException.toAuthenticationException}. */
