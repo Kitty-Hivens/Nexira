@@ -1,7 +1,6 @@
 package hivens.ui.threshold
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -50,9 +49,7 @@ import java.awt.Desktop
 import java.nio.file.Path
 import kotlin.concurrent.thread
 import kotlin.math.floor
-import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sqrt
 
 // Pixel-game boot readout: thick block frame with stepped corners, the fill
 // made of discrete segments -- the reference is the classic 8/16-bit loading
@@ -83,27 +80,25 @@ private const val BAR_CENTER_Y = 0.62f
 // The beat budget, all frame-clock driven (no wall-clock delay anywhere, so an
 // off-screen scene addresses any frame of the beat deterministically). The
 // readout ALWAYS shows: a warm boot plays the condensed column instead of
-// skipping -- the launch gets a signature beat, never a flicker or a bare veil.
-private const val FLOOR_MS = 350f         // minimum readout screen time before the beat
-private const val WARM_BOOT_MS = 400f     // Ready earlier than this = condensed timings
+// skipping -- never a flicker, never a bare veil. The exit itself is DELIBERATELY
+// minimal: full bar, one breath, then everything dissolves together in one quick
+// dither lift -- the theatrical radial wave read as too much and was cut
+// (DitherVeil still carries the wave mode should taste swing back).
+private const val FLOOR_MS = 350f         // minimum readout screen time before the exit
+private const val WARM_BOOT_MS = 400f     // Ready earlier than this = condensed hold
 private const val HOLD_WARM_MS = 120f
 private const val HOLD_COLD_MS = 180f
-private const val TEXT_FADE_WARM_MS = 100
-private const val TEXT_FADE_COLD_MS = 160
-private const val DECAY_WARM_MS = 150
-private const val DECAY_COLD_MS = 200
-private const val WAVE_WARM_MS = 350
-private const val WAVE_COLD_MS = 550
+private const val EXIT_FADE_MS = 120
+private const val VEIL_LIFT_MS = 220
 
 /**
  * The boot-threshold screen, composed OVER the (not-yet or just-mounted)
  * shell inside the same window. Opaque while boot runs -- which also masks
- * the shell's expensive first composition -- then plays the exit beat:
- * the bar completes, one breath, the stage/percent text dims, the bar
- * disassembles cell by cell, and the darkness dissolves as a radial dither
- * wave from the bar outward, revealing the live shell beneath. A luminance
- * transition throughout: only darkness is removed, nothing flashes.
- * Calls [onDone] when nothing is left to draw; the host removes it.
+ * the shell's expensive first composition -- then exits briefly and cleanly:
+ * the bar completes, one breath, and the whole readout dissolves with the
+ * dark veil in one quick dither lift, revealing the live shell beneath. A
+ * luminance transition: only darkness is removed, nothing flashes. Calls
+ * [onDone] when nothing is left to draw; the host removes it.
  *
  * Tier-0 by construction: no Koin, no NxTheme, no widget kernel. Strings
  * arrive pre-resolved from the settings peek.
@@ -161,12 +156,10 @@ fun ThresholdOverlay(
         }
     }
 
-    // Exit drivers, deliberately split: the text dims first, the bar (frame +
-    // segments) disassembles second, the veil wave runs third, overlapping the
-    // tail of the disassembly -- one shared fade would smear the beats together.
-    val textFade = remember { Animatable(1f) }
-    val decay = remember { Animatable(0f) }
-    val wave = remember { Animatable(0f) }
+    // Exit drivers: the readout fades slightly ahead of the veil so the bar is
+    // gone before the shell fully shows through, but both read as one motion.
+    val exitFade = remember { Animatable(1f) }
+    val veil = remember { Animatable(1f) }
     LaunchedEffect(ready) {
         if (!ready) return@LaunchedEffect
         // Gate: a truly full bar AND the readout's floor of screen time -- a
@@ -184,12 +177,8 @@ fun ThresholdOverlay(
             }
             if (done) break
         }
-        textFade.animateTo(0f, tween(if (condensed) TEXT_FADE_WARM_MS else TEXT_FADE_COLD_MS))
-        launch { decay.animateTo(1f, tween(if (condensed) DECAY_WARM_MS else DECAY_COLD_MS, easing = LinearEasing)) }
-        // The wave starts at the disassembly's midpoint so the bar's last cells
-        // vanish INTO the advancing front instead of after it.
-        snapshotFlow { decay.value }.first { it >= 0.5f }
-        wave.animateTo(1f, tween(if (condensed) WAVE_WARM_MS else WAVE_COLD_MS, easing = LinearOutSlowInEasing))
+        launch { exitFade.animateTo(0f, tween(EXIT_FADE_MS)) }
+        veil.animateTo(0f, tween(VEIL_LIFT_MS, easing = LinearOutSlowInEasing))
         onDone()
     }
 
@@ -201,51 +190,32 @@ fun ThresholdOverlay(
         val barHeight = UNIT * 9
         val barTop    = maxHeight * BAR_CENTER_Y - barHeight / 2
 
-        // Monotonic front clamp across draws: a mid-wave window shrink would
-        // otherwise pull the front radius back and re-darken revealed shell.
-        // A plain holder, not State -- written and read during draw only.
-        val frontClamp = remember { FloatArray(1) }
-
         Canvas(Modifier.fillMaxSize()) {
             val u = UNIT.toPx()
             val frameRect = Rect(
                 Offset((size.width - barWidth.toPx()) / 2f, barTop.toPx()),
                 Size(barWidth.toPx(), barHeight.toPx()),
             )
-            val origin = Offset(size.width / 2f, size.height * BAR_CENTER_Y)
 
             // The dark veil: fully opaque while boot runs (masking the shell's
-            // first composition), then dissolved by the exit beat as a radial
-            // dither wave from the bar outward -- darkness leaves cell by cell
-            // on the pixel grid. Shader unavailable -> plain alpha ramp.
-            val lift = wave.value
+            // first composition), lifted by the exit as a Bayer-dither dissolve
+            // -- darkness leaves cell by cell on the pixel grid. Shader
+            // unavailable -> plain alpha ramp. Per-frame brush creation is
+            // LOAD-BEARING: the framework caches a ShaderBrush's shader keyed
+            // only by size, so a remembered brush with mutated uniforms would
+            // freeze the lift on its first frame.
+            val lift = 1f - veil.value
             if (lift < 1f) {
-                if (lift <= 0f) {
-                    drawRect(pal.field)
-                } else {
-                    val band = 6 * u
-                    val maxDist = sqrt(
-                        max(origin.x, size.width - origin.x).let { it * it } +
-                            max(origin.y, size.height - origin.y).let { it * it },
-                    )
-                    // front = 1 must clear every jittered cell (maxDist + the
-                    // jitter band + one cell), or the unmount pops residue.
-                    val target = lift * (maxDist + band + u)
-                    val frontPx = max(target, frontClamp[0])
-                    frontClamp[0] = frontPx
-                    // Per-frame brush creation is LOAD-BEARING: the framework
-                    // caches a ShaderBrush's shader keyed only by size, so a
-                    // remembered brush with mutated uniforms would freeze the
-                    // wave on its first frame.
-                    val brush = DitherVeil.waveBrush(origin, frontPx, band, u, pal.field)
-                    if (brush != null) drawRect(brush = brush) else drawRect(pal.field.copy(alpha = 1f - lift))
+                val ditherBrush = if (lift > 0f) DitherVeil.brush(lift, u, pal.field) else null
+                when {
+                    ditherBrush != null && lift > 0f -> drawRect(brush = ditherBrush)
+                    lift > 0f                        -> drawRect(pal.field.copy(alpha = veil.value))
+                    else                             -> drawRect(pal.field)
                 }
             }
 
-            // Readout: frame + segments disassemble on [decay] in quantized
-            // steps (the frame dims through four discrete levels, segments
-            // unlight from the right), texts follow their own fade.
-            val frameAlpha = entryAlpha.value * (floor((1f - decay.value) * 4f) / 4f)
+            // Readout: frame + segments follow the shared exit fade.
+            val frameAlpha = entryAlpha.value * exitFade.value
             if (frameAlpha > 0f) {
                 drawPixelFrame(frameRect, u, pal.frame.copy(alpha = 0.92f * frameAlpha))
                 // Fill: discrete segments on the pixel grid, each 3 units wide
@@ -258,10 +228,8 @@ fun ThresholdOverlay(
                 val segStride = 4 * u
                 val segCount = floor((inner.width + u) / segStride).toInt().coerceAtLeast(1)
                 val fillFraction = if (failed != null) 0f else bar
-                val litFromBar = floor(fillFraction * segCount).toInt()
-                val litFromDecay = floor((1f - decay.value) * segCount).toInt()
-                val lit = min(litFromBar, litFromDecay).coerceIn(0, segCount)
-                val alpha = if (failed != null) 0.25f * entryAlpha.value else entryAlpha.value
+                val lit = floor(fillFraction * segCount).toInt().coerceIn(0, segCount)
+                val alpha = if (failed != null) 0.25f * frameAlpha else frameAlpha
                 for (i in 0 until lit) {
                     drawPixelSegment(
                         Rect(
@@ -280,7 +248,7 @@ fun ThresholdOverlay(
             // Stage readout left + honest percent right, both on the bar's own
             // edges, pixel font. Percent shows the displayed (smoothed) value --
             // the same thing the segments show.
-            val textAlpha = entryAlpha.value * textFade.value
+            val textAlpha = entryAlpha.value * exitFade.value
             Box(
                 modifier = Modifier.fillMaxWidth().height(labelRowSpace),
                 contentAlignment = Alignment.BottomCenter,

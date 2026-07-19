@@ -75,14 +75,14 @@ class ThresholdOverlayRenderTest {
             // Walk the frame clock in ~16ms steps; the beat needs continuous
             // frames for BarMotion ticks and the frame-accumulated hold.
             // Warm-boot timeline with the 0.995 snap: bar full ~370ms, hold to
-            // ~490, text fade to ~590, decay 590-740, wave ~665-1015.
+            // ~490, exit fade + veil lift ~490-710.
             var t = 0L
             while (t < 200) { renderAt(t); t += 16 }
             val entry = captureAt(200)
-            while (t < 800) { renderAt(t); t += 16 }
-            val midWave = captureAt(800)
-            while (t < 1300) { renderAt(t); t += 16 }
-            val end = captureAt(1300)
+            while (t < 560) { renderAt(t); t += 16 }
+            val midWave = captureAt(560)
+            while (t < 1000) { renderAt(t); t += 16 }
+            val end = captureAt(1000)
             return Frames(entry, midWave, end)
         } finally {
             scene.close()
@@ -94,6 +94,19 @@ class ThresholdOverlayRenderTest {
 
     private fun close(a: Color, b: Color, tolerance: Float = 0.06f): Boolean =
         abs(a.red - b.red) < tolerance && abs(a.green - b.green) < tolerance && abs(a.blue - b.blue) < tolerance
+
+    /** Fraction of a sampled grid showing the backdrop (away from the bar's own pixels). */
+    private fun clearRatio(img: java.awt.image.BufferedImage, w: Int, h: Int): Float {
+        var cleared = 0
+        var total = 0
+        for (gx in 1..19) {
+            for (gy in 1 until 8) {   // upper half only: keeps clear of the bar area
+                total++
+                if (close(img.colorAt(gx * w / 20, gy * h / 20), backdrop)) cleared++
+            }
+        }
+        return cleared.toFloat() / total
+    }
 
     @Test
     fun `dark palette walks the full beat`() {
@@ -109,10 +122,10 @@ class ThresholdOverlayRenderTest {
         val firstSegX = w / 2 - 176 // inside the first lit segment (bar is 384px wide: 64 units * 6px)
         assertTrue(close(entry.colorAt(firstSegX, originY), pal.fill), "entry: first segment lit")
 
-        // Mid-wave: the front has cleared the origin (backdrop shows through),
-        // the far corner is still veiled.
-        assertTrue(close(midWave.colorAt(w / 2, originY), backdrop), "mid-wave: origin cleared to backdrop")
-        assertTrue(close(midWave.colorAt(8, 8), pal.field), "mid-wave: far corner still veiled")
+        // Mid-lift: the uniform dither has cleared part of the field -- the
+        // sampled clear ratio sits strictly between "all veil" and "all shell".
+        val ratio = clearRatio(midWave, w, h)
+        assertTrue(ratio in 0.10f..0.90f, "mid-lift: partial dissolve, got $ratio")
 
         // End: nothing of the overlay remains anywhere.
         for ((x, y) in listOf(8 to 8, w - 8 to 8, 8 to h - 8, w - 8 to h - 8, w / 2 to originY)) {
@@ -129,8 +142,8 @@ class ThresholdOverlayRenderTest {
         val originY = (h * 0.62f).toInt()
 
         assertTrue(close(entry.colorAt(8, 8), pal.field), "entry: corner is the pale field")
-        assertTrue(close(midWave.colorAt(w / 2, originY), backdrop), "mid-wave: origin cleared")
-        assertTrue(close(midWave.colorAt(8, 8), pal.field), "mid-wave: corner veiled")
+        val ratio = clearRatio(midWave, w, h)
+        assertTrue(ratio in 0.10f..0.90f, "mid-lift: partial dissolve, got $ratio")
         assertTrue(close(end.colorAt(w / 2, originY), backdrop), "end: cleared")
     }
 }
