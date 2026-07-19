@@ -152,12 +152,18 @@ class InstanceContentScanner(
         )
     }
 
-    /** Fabric/Quilt first (the common modern case), then a light Forge/NeoForge TOML read. */
+    /**
+     * TOML first when present: forge-only jars routinely ship a dummy
+     * fabric.mod.json stub ("not a fabric mod") to scold a wrong-loader launch,
+     * and reading it first put the stub's garbage on the row. A genuine
+     * dual-loader jar describes the same mod in both files, so preferring the
+     * TOML loses nothing there.
+     */
     private fun readModMeta(file: Path): Meta? = openSharedZip(file).use { zip ->
-        zip.readEntry("fabric.mod.json")?.let { return parseFabric(zip, it) }
-        zip.readEntry("quilt.mod.json")?.let { return parseQuilt(zip, it) }
         (zip.readEntry("META-INF/neoforge.mods.toml") ?: zip.readEntry("META-INF/mods.toml"))
             ?.let { return parseForgeToml(zip, it) }
+        zip.readEntry("fabric.mod.json")?.let { return parseFabric(zip, it) }
+        zip.readEntry("quilt.mod.json")?.let { return parseQuilt(zip, it) }
         null
     }
 
@@ -213,23 +219,38 @@ class InstanceContentScanner(
 
     /**
      * TOML has no bundled parser; a `key = "value"` line scan covers the fields we
-     * show. Dependencies are left out here: forge/neoforge `[[dependencies.<modid>]]`
-     * blocks need section-aware parsing the flat line scan can't do reliably.
+     * show. Values match by their OWN quote style, so an apostrophe inside a
+     * double-quoted name ("Brewin' And Chewin'") no longer truncates the capture.
+     * A `${file.jarVersion}` version placeholder resolves the way the loader
+     * resolves it: from the manifest's Implementation-Version. Dependencies are
+     * left out here: forge/neoforge `[[dependencies.<modid>]]` blocks need
+     * section-aware parsing the flat line scan can't do reliably.
      */
     private fun parseForgeToml(zip: SharedZip, bytes: ByteArray): Meta {
         val text = bytes.decodeToString()
-        val name = TOML_DISPLAY_NAME.find(text)?.groupValues?.get(1)
-        val version = TOML_VERSION.find(text)?.groupValues?.get(1)?.takeIf { !it.startsWith($$"${") }
-        val logo = TOML_LOGO.find(text)?.groupValues?.get(1)
-        val homepage = TOML_DISPLAY_URL.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
-        val license = TOML_LICENSE.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
-        val authors = TOML_AUTHORS.find(text)?.groupValues?.get(1)
+        val name = TOML_DISPLAY_NAME.tomlValue(text)
+        val version = TOML_VERSION.tomlValue(text)
+            ?.let { raw -> if (raw.startsWith($$"${")) manifestImplementationVersion(zip) else raw }
+            ?.takeIf { it.isNotBlank() }
+        val logo = TOML_LOGO.tomlValue(text)
+        val homepage = TOML_DISPLAY_URL.tomlValue(text)?.takeIf { it.isNotBlank() }
+        val license = TOML_LICENSE.tomlValue(text)?.takeIf { it.isNotBlank() }
+        val authors = TOML_AUTHORS.tomlValue(text)
             ?.split(',')?.map { it.trim() }?.filter { it.isNotBlank() }.orEmpty()
         return Meta(
             name, version, null, logo?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = license, authors = authors,
         )
     }
+
+    /** The value the loader substitutes for `${file.jarVersion}`. */
+    private fun manifestImplementationVersion(zip: SharedZip): String? =
+        zip.readEntry("META-INF/MANIFEST.MF")?.decodeToString()
+            ?.lineSequence()
+            ?.firstOrNull { it.startsWith("Implementation-Version:") }
+            ?.substringAfter(':')
+            ?.trim()
+            ?.ifBlank { null }
 
     /** A field that may be a bare string OR an array of strings -- take the first usable value. */
     private fun firstString(el: JsonElement?): String? {
@@ -312,12 +333,20 @@ class InstanceContentScanner(
 
     private companion object {
         const val DISABLED = ".disabled"
-        val TOML_DISPLAY_NAME = Regex("""displayName\s*=\s*["']([^"']*)["']""")
-        val TOML_VERSION = Regex("""\bversion\s*=\s*["']([^"']*)["']""")
-        val TOML_LOGO = Regex("""logoFile\s*=\s*["']([^"']*)["']""")
-        val TOML_DISPLAY_URL = Regex("""displayURL\s*=\s*["']([^"']*)["']""")
-        val TOML_LICENSE = Regex("""(?m)^\s*license\s*=\s*["']([^"']*)["']""")
-        val TOML_AUTHORS = Regex("""authors\s*=\s*["']([^"']*)["']""")
+
+        /** `key = "value"` / `key = 'value'`, each quote style closed by its own kind. */
+        fun tomlString(prefix: String) = Regex("""$prefix\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+
+        /** The captured value of a [tomlString] match: whichever quote group matched. */
+        fun Regex.tomlValue(text: String): String? =
+            find(text)?.let { m -> m.groups[1]?.value ?: m.groups[2]?.value }
+
+        val TOML_DISPLAY_NAME = tomlString("displayName")
+        val TOML_VERSION = tomlString("""\bversion""")
+        val TOML_LOGO = tomlString("logoFile")
+        val TOML_DISPLAY_URL = tomlString("displayURL")
+        val TOML_LICENSE = tomlString("""(?m)^\s*license""")
+        val TOML_AUTHORS = tomlString("authors")
         val ICON_CANDIDATES = listOf("icon.png", "pack.png", "logo.png", "icon.jpg", "logo.jpg")
         // Platform / loader ids that are always present and add no signal to a "requires" list.
         val PLATFORM_DEPS = setOf("minecraft", "java", "fabricloader", "quilt_loader", "quilted_fabric_api")

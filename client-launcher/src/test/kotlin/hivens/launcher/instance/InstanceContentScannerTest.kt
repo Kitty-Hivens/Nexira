@@ -79,6 +79,56 @@ class InstanceContentScannerTest {
     }
 
     @Test
+    fun `toml display name keeps apostrophes inside double quotes`() = runBlocking {
+        zip(dir.resolve("mods").resolve("brewin.jar"), mapOf(
+            "META-INF/mods.toml" to """
+                modId = "brewin"
+                version = "4.4.2"
+                displayName = "Brewin' And Chewin'"
+                authors = "Mim's Friends, Someone"
+            """.trimIndent().toByteArray(),
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+        assertEquals("Brewin' And Chewin'", item.displayName)
+        assertEquals("4.4.2", item.version)
+        assertEquals(listOf("Mim's Friends", "Someone"), item.authors)
+    }
+
+    @Test
+    fun `a dummy fabric stub loses to the real toml`() = runBlocking {
+        zip(dir.resolve("mods").resolve("forgemod.jar"), mapOf(
+            "fabric.mod.json" to """{"id":"stub","name":"NOT A FABRIC MOD","version":"not a fabric mod"}""".toByteArray(),
+            "META-INF/neoforge.mods.toml" to """
+                modId = "realmod"
+                version = "2.0.0"
+                displayName = "Real Mod"
+            """.trimIndent().toByteArray(),
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+        assertEquals("Real Mod", item.displayName)
+        assertEquals("2.0.0", item.version)
+    }
+
+    @Test
+    fun `jarVersion placeholder resolves from the manifest`() = runBlocking {
+        val placeholder = "\${file.jarVersion}"
+        zip(dir.resolve("mods").resolve("arsnouveau.jar"), mapOf(
+            "META-INF/neoforge.mods.toml" to """
+                modId = "ars"
+                version = "$placeholder"
+                displayName = "Ars Nouveau"
+            """.trimIndent().toByteArray(),
+            "META-INF/MANIFEST.MF" to "Manifest-Version: 1.0\nImplementation-Version: 5.9.2\n".toByteArray(),
+        ))
+
+        val item = InstanceContentScanner().scan(dir).single()
+        assertEquals("Ars Nouveau", item.displayName)
+        assertEquals("5.9.2", item.version)
+    }
+
+    @Test
     fun `bound icon processor rewrites both the returned item and the cached entry`() = runBlocking {
         val mods = dir.resolve("mods")
         val jar = mods.resolve("big-icon.jar")
