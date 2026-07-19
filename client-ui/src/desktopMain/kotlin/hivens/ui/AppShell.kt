@@ -192,9 +192,12 @@ sealed class Screen {
      * detail screen resolves it via [hivens.core.api.interfaces.IPackRepository]
      * so the Screen sealed class stays free of domain types and the
      * back-stack item stays small (a UUID string, not a PackInstance
-     * graph).
+     * graph). [openSettings] restores the settings overlay on arrival --
+     * stamped onto the back-stack entry when the user drills from the
+     * settings window into the versions screen, so Back lands them in
+     * the settings they left, not on the bare pack page.
      */
-    data class PackDetail    (val instanceId: String) : Screen()
+    data class PackDetail    (val instanceId: String, val openSettings: Boolean = false) : Screen()
 
     /**
      * Version manager for an installed mirror pack: the retained build list,
@@ -1241,6 +1244,7 @@ fun AppRoot(
                 onCloseApp = onCloseApp,
                 currentScreen = backStack.current,
                 onScreenChange = backStack::navigate,
+                onReplaceScreen = backStack::replaceCurrent,
                 onBack = { backStack.back() },
                 canGoBack = backStack.canGoBack,
                 canGoForward = backStack.canGoForward,

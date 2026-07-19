@@ -118,7 +118,8 @@ fun PackDetailScreen(
     instanceId: String,
     appState: AppState,
     onBack: () -> Unit,
-    onOpenVersions: () -> Unit = {},
+    initialShowSettings: Boolean = false,
+    onOpenVersions: (fromSettings: Boolean) -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
@@ -155,7 +156,7 @@ fun PackDetailScreen(
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
 
-    var showSettings by remember(pack.id) { mutableStateOf(false) }
+    var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
     val authedSession = (appState as? AppState.Authenticated)?.session
 
     Column(Modifier.fillMaxSize()) {
@@ -175,7 +176,7 @@ fun PackDetailScreen(
             onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
             versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
             updateBadge    = autoUpdateStatuses[pack.id] is PackUpdateStatus.Pending,
-            onOpenVersions = onOpenVersions,
+            onOpenVersions = { onOpenVersions(false) },
         )
 
         // Import/provenance notice (e.g. a CurseForge import whose project/file-id
@@ -219,7 +220,7 @@ fun PackDetailScreen(
             instanceDir      = instanceDir,
             onInstanceChange = { instance = it },
             onDismiss        = { showSettings = false },
-            onOpenVersions   = { showSettings = false; onOpenVersions() },
+            onOpenVersions   = { onOpenVersions(true) },
         )
     }
 }
