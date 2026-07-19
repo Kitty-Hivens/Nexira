@@ -108,6 +108,62 @@ class AuthlibRedirectAgentTest {
     }
 
     @Test
+    void tolerateJoinSwallowsTheRethrow() throws Exception {
+        byte[] original = readClassBytes(JoinSample.class);
+        byte[] patched = AuthlibRedirectAgent.tolerateJoinResponse(original);
+        assertNotSame(original, patched, "the rethrow site must be found and nop-ed");
+
+        // Patched: a post() failure no longer aborts the join. defineClass runs
+        // full verification, so this also proves the nop-ed handler satisfies
+        // the method's existing stack-map.
+        Class<?> c = new IsolatedLoader("hivens.authlib.agent.JoinSample", patched)
+                .load("hivens.authlib.agent.JoinSample");
+        Object join = c.getDeclaredConstructor().newInstance();
+        c.getField("failPost").setBoolean(null, true);
+        try {
+            c.getMethod("joinServer", java.util.UUID.class, String.class, String.class)
+                    .invoke(join, java.util.UUID.randomUUID(), "token", "server-id");
+        } finally {
+            c.getField("failPost").setBoolean(null, false);
+        }
+
+        // Control: the unpatched fixture still rethrows.
+        JoinSample.failPost = true;
+        try {
+            new JoinSample().joinServer(java.util.UUID.randomUUID(), "token", "server-id");
+            fail("unpatched joinServer must rethrow");
+        } catch (IllegalStateException expected) {
+            // the rethrow is intact without the patch
+        } finally {
+            JoinSample.failPost = false;
+        }
+    }
+
+    @Test
+    void tolerateJoinSilentNoOpWithoutModernMarker() throws Exception {
+        // No MinecraftClientException in the pool = legacy authlib, whose join
+        // parsing tolerates SC's body already: untouched AND quiet.
+        byte[] original = readClassBytes(Sample.class);
+        byte[][] out = new byte[1][];
+        String quiet = captureErr(() -> out[0] = AuthlibRedirectAgent.tolerateJoinResponse(original));
+        assertSame(original, out[0], "a legacy-shaped class must pass through unchanged");
+        assertEquals("", quiet, "a legacy-shaped class must not warn");
+    }
+
+    @Test
+    void tolerateJoinWarnsWhenModernJoinShapeMoved() throws Exception {
+        // References MinecraftClientException and has a joinServer, but not the
+        // rethrow sequence: untouched, WITH a breadcrumb -- a moved modern shape
+        // means SC joins will start dying client-side again.
+        byte[] reshaped = readClassBytes(JoinSampleNoRethrow.class);
+        byte[][] out = new byte[1][];
+        String warned = captureErr(() -> out[0] = AuthlibRedirectAgent.tolerateJoinResponse(reshaped));
+        assertSame(reshaped, out[0], "an unmatchable joinServer must be left untouched");
+        assertTrue(warned.contains("[authlib-agent]") && warned.contains("join"),
+                "a present-but-unpatchable joinServer must leave a stderr breadcrumb: " + warned);
+    }
+
+    @Test
     void rewriteReturnsSameArrayWhenNothingMatches() {
         // Empty map -> no entry can match -> the rewriter must return the input
         // array untouched (the no-op fast path).

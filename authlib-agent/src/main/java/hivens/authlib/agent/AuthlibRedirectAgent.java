@@ -22,9 +22,11 @@ import java.util.Map;
  * Deliberately ASM-free / zero-dependency so the jar is a
  * plain Java 8 agent that loads in any game JVM (legacy 1.7.10 / 1.12.2 .. 1.21).
  *
- * Modern (authlib 6.x) join is already redirected by
- * {@code -Dminecraft.api.session.host}; there only the texture whitelist (a
- * hardcoded list with no system-property override) needs this. Every failure is
+ * Modern (authlib 6.x+) join is already redirected by
+ * {@code -Dminecraft.api.session.host}; there this covers what the properties
+ * cannot: the texture whitelist (a hardcoded list with no system-property
+ * override) and the join-response parsing, which SC's non-Yggdrasil reply
+ * would otherwise abort (see {@link #tolerateJoinResponse}). Every failure is
  * swallowed -- an agent must never take the game down.
  */
 public final class AuthlibRedirectAgent {
@@ -35,6 +37,9 @@ public final class AuthlibRedirectAgent {
     private static final String LEGACY_SESSION = "com/mojang/authlib/yggdrasil/YggdrasilMinecraftSessionService";
     private static final String MODERN_TEXTURES = "com/mojang/authlib/yggdrasil/TextureUrlChecker";
     private static final String TEXTURES_METHOD = "getTextures";
+    private static final String JOIN_METHOD = "joinServer";
+    private static final String MCE_CLASS = "com/mojang/authlib/exceptions/MinecraftClientException";
+    private static final String MCE_TO_AUTH = "toAuthenticationException";
 
     private static final String DEFAULT_HOST = "www.smartycraft.ru";
 
@@ -105,7 +110,10 @@ public final class AuthlibRedirectAgent {
                 // is not signed by Mojang -- a signature SC cannot produce. Drop that
                 // gate (force requireSecure=false in getTextures) so SC's unsigned
                 // skins load. No-op on modern authlib (the pattern is absent).
-                if (session) out = acceptUnsignedTextures(out);
+                if (session) {
+                    out = acceptUnsignedTextures(out);
+                    out = tolerateJoinResponse(out);
+                }
                 return out == classfileBuffer ? null : out;
             } catch (Throwable ignored) {
                 return null; // leave the original class on any trouble
@@ -204,19 +212,139 @@ public final class AuthlibRedirectAgent {
         return copy;
     }
 
+    /**
+     * Replicates SmartyCraft's own authlib patch for the modern (6.x+) join path.
+     * SC's session endpoint answers a successful join with HTTP 200 and the profile
+     * as the body, where Yggdrasil answers 204 with none; vanilla modern
+     * {@code joinServer} posts expecting no payload, chokes parsing the unexpected
+     * body, and rethrows -- so the join dies CLIENT-side after SC has already
+     * accepted it. SC's patched jar catches that {@code MinecraftClientException}
+     * and simply returns; this rewrites vanilla to the same semantics by nop-ing
+     * the rethrow ({@code aload ; invokevirtual toAuthenticationException ;
+     * athrow}) so the handler falls through into the {@code return} that follows.
+     * SC's trade rides along: a real transport failure on join is swallowed too and
+     * surfaces later as the server kicking the unverified session.
+     *
+     * The handler bytecode is identical across authlib 6.0.54 / 7.0.63 / 9.0.75
+     * ({@code astore 5; aload 5; invokevirtual; athrow; return}). Nop-ing keeps
+     * every length, so offsets, the exception table and the stack-map stay valid;
+     * falling into the return meets its declared frame (empty stack, and the
+     * handler's extra local verifies against the frame's implicit top padding).
+     * A class with no {@code MinecraftClientException} in its pool (legacy authlib,
+     * whose Gson parsing tolerates SC's body already) is returned untouched
+     * silently; a modern {@code joinServer} whose shape moved leaves a stderr
+     * breadcrumb instead of a patch.
+     */
+    static byte[] tolerateJoinResponse(byte[] classBytes) {
+        int cpCount = u2(classBytes, 8);
+        String[] utf8 = new String[cpCount];
+        int[] tags = new int[cpCount];
+        int[] refA = new int[cpCount];
+        int[] refB = new int[cpCount];
+        int p = readConstantPool(classBytes, utf8, tags, refA, refB);
+        boolean modern = false;
+        for (int i = 1; i < cpCount && !modern; i++) modern = MCE_CLASS.equals(utf8[i]);
+        if (!modern) return classBytes;
+        p += 6; // access_flags + this_class + super_class
+        int ifaces = u2(classBytes, p); p += 2 + ifaces * 2;
+        int fields = u2(classBytes, p); p += 2;
+        for (int f = 0; f < fields; f++) p = skipMember(classBytes, p, utf8, null);
+        int methods = u2(classBytes, p); p += 2;
+        boolean joinSeen = false;
+        for (int m = 0; m < methods; m++) {
+            p += 2; // access_flags
+            int nameIdx = u2(classBytes, p); p += 2;
+            int descIdx = u2(classBytes, p); p += 2;
+            int attrs = u2(classBytes, p); p += 2;
+            boolean target = JOIN_METHOD.equals(utf8[nameIdx]) && utf8[descIdx].endsWith(")V");
+            if (target) joinSeen = true;
+            for (int a = 0; a < attrs; a++) {
+                int anIdx = u2(classBytes, p); p += 2;
+                int alen = u4(classBytes, p); p += 4;
+                if (target && "Code".equals(utf8[anIdx])) {
+                    int at = findRethrowSite(classBytes, p + 8, u4(classBytes, p + 4), utf8, tags, refA, refB);
+                    if (at >= 0) {
+                        byte[] copy = classBytes.clone();
+                        int aloadLen = (copy[at] & 0xFF) == 0x19 ? 2 : 1;
+                        for (int i = at; i < at + aloadLen + 4; i++) copy[i] = 0x00; // nop over aload + invokevirtual + athrow
+                        return copy;
+                    }
+                }
+                p += alen;
+            }
+        }
+        if (joinSeen) {
+            System.err.println("[authlib-agent] modern joinServer present but its rethrow was not found; "
+                + "a non-Yggdrasil join response will still abort the join");
+        }
+        return classBytes;
+    }
+
+    /**
+     * Absolute offset of the {@code aload} that starts the
+     * {@code aload ; invokevirtual MinecraftClientException.toAuthenticationException ;
+     * athrow ; return} sequence within the code, or -1. The trailing {@code return}
+     * is part of the match: it is what the nop-ed handler falls into, so its
+     * presence (with its existing stack-map frame) is what makes the patch safe.
+     */
+    private static int findRethrowSite(byte[] b, int codeStart, int codeLen,
+                                       String[] utf8, int[] tags, int[] refA, int[] refB) {
+        int pc = 0, prevPc = -1;
+        while (pc < codeLen) {
+            int op = b[codeStart + pc] & 0xFF;
+            if (op == 0xB6 && prevPc >= 0 && pc + 4 < codeLen
+                    && (b[codeStart + pc + 3] & 0xFF) == 0xBF   // athrow
+                    && (b[codeStart + pc + 4] & 0xFF) == 0xB1) { // return it falls into
+                int prevOp = b[codeStart + prevPc] & 0xFF;
+                boolean prevIsAload = prevOp == 0x19 || (prevOp >= 0x2A && prevOp <= 0x2D);
+                if (prevIsAload && isMceToAuthRef(u2(b, codeStart + pc + 1), utf8, tags, refA, refB)) {
+                    return codeStart + prevPc;
+                }
+            }
+            prevPc = pc;
+            pc += insnLen(b, codeStart, pc);
+        }
+        return -1;
+    }
+
+    /** Whether pool entry [idx] is a Methodref to {@code MinecraftClientException.toAuthenticationException}. */
+    private static boolean isMceToAuthRef(int idx, String[] utf8, int[] tags, int[] refA, int[] refB) {
+        if (idx <= 0 || idx >= tags.length || tags[idx] != 10) return false;
+        int classIdx = refA[idx];
+        int natIdx = refB[idx];
+        if (classIdx <= 0 || classIdx >= tags.length || tags[classIdx] != 7) return false;
+        if (natIdx <= 0 || natIdx >= tags.length || tags[natIdx] != 12) return false;
+        return MCE_CLASS.equals(utf8[refA[classIdx]]) && MCE_TO_AUTH.equals(utf8[refA[natIdx]]);
+    }
+
     /** Fills [utf8] (indexed by pool entry) and returns the offset just past the constant pool. */
     private static int readConstantPool(byte[] b, String[] utf8) {
+        int n = utf8.length;
+        return readConstantPool(b, utf8, new int[n], new int[n], new int[n]);
+    }
+
+    /**
+     * As {@link #readConstantPool(byte[], String[])}, additionally recording each
+     * entry's tag and its two u2 operands ([refA]/[refB]: class + name-and-type for
+     * a Methodref, name + descriptor for a NameAndType, name for a Class), which is
+     * what {@link #tolerateJoinResponse} needs to resolve an invokevirtual operand
+     * back to a class/method name pair.
+     */
+    private static int readConstantPool(byte[] b, String[] utf8, int[] tags, int[] refA, int[] refB) {
         int cpCount = u2(b, 8);
         int p = 10; // 4 magic + 2 minor + 2 major + 2 cpCount
         int i = 1;
         while (i < cpCount) {
             int tag = b[p] & 0xFF; p += 1;
+            tags[i] = tag;
             switch (tag) {
                 case 1: { int len = u2(b, p); p += 2; utf8[i] = new String(b, p, len, StandardCharsets.UTF_8); p += len; i += 1; break; }
                 case 5: case 6: p += 8; i += 2; break;
-                case 7: case 8: case 16: case 19: case 20: p += 2; i += 1; break;
+                case 7: case 8: case 16: case 19: case 20: refA[i] = u2(b, p); p += 2; i += 1; break;
                 case 15: p += 3; i += 1; break;
-                case 3: case 4: case 9: case 10: case 11: case 12: case 17: case 18: p += 4; i += 1; break;
+                case 9: case 10: case 11: case 12: case 17: case 18:
+                    refA[i] = u2(b, p); refB[i] = u2(b, p + 2); p += 4; i += 1; break;
+                case 3: case 4: p += 4; i += 1; break;
                 default: throw new IllegalStateException("unknown constant-pool tag " + tag);
             }
         }
