@@ -46,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.mikepenz.markdown.m3.Markdown
+import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.api.dto.smrt.SmrtManifestBuild
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -523,6 +525,13 @@ private fun BuildDetailPane(
             Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
         }
 
+        // The curator's "why" next to the structural diff's "what".
+        build.changelog?.takeIf { it.isNotBlank() }?.let { notes ->
+            NxSection(s.packVersionsNotes) {
+                Markdown(content = notes)
+            }
+        }
+
         when {
             isInstalled -> Unit
             preview == null -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -599,20 +608,27 @@ private fun DiffSection(
         baseVersion == build.versionNumber ->
             Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
         else -> {
-            val diff by produceState<Result<PackVersionDiff>?>(null, build.versionNumber, baseVersion) {
+            val diff by produceState<Result<Pair<PackVersionDiff, SmrtBuildDiff?>>?>(null, build.versionNumber, baseVersion) {
                 value = null
                 value = runCatching {
                     withContext(Dispatchers.IO) {
                         val fromManifest = mirror.fetchManifestVersion(pack.packRef.id, baseVersion)
                         val toManifest = mirror.fetchManifestVersion(pack.packRef.id, build.versionNumber)
-                        PackVersionDiff.compute(fromManifest, toManifest)
+                        val computed = PackVersionDiff.compute(fromManifest, toManifest)
+                        // Registry-enriched labels are display sugar: the mirror's diff
+                        // endpoint knows real mod versions the manifests do not carry.
+                        // Its absence (older mirror, offline race) costs only the labels.
+                        val enriched = runCatching {
+                            mirror.fetchDiff(pack.packRef.id, baseVersion, build.versionNumber)
+                        }.getOrNull()
+                        computed to enriched
                     }
                 }
             }
             when (val result = diff) {
                 null -> CircularProgressIndicator(color = colors.primary.copy(alpha = 0.5f), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                 else -> result.fold(
-                    onSuccess = { DiffBody(it, icons) },
+                    onSuccess = { (computed, enriched) -> DiffBody(computed, enriched, icons) },
                     onFailure = {
                         NxCalloutBanner(body = s.packVersionsFailed(it.message ?: it.toString()), tone = NxCalloutTone.Error)
                     },
@@ -623,9 +639,10 @@ private fun DiffSection(
 }
 
 @Composable
-private fun DiffBody(diff: PackVersionDiff, icons: ModIconResolver) {
+private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: ModIconResolver) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
+    val labels = remember(enriched) { DiffLabels.from(enriched) }
 
     if (diff.identicalContent && diff.minecraft == null && diff.loader == null && diff.java == null) {
         Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
@@ -652,7 +669,7 @@ private fun DiffBody(diff: PackVersionDiff, icons: ModIconResolver) {
 
     if (diff.mods.isNotEmpty()) {
         NxSection(s.packVersionsSectionMods) {
-            DiffGroup(diff.mods, icons)
+            DiffGroup(diff.mods, labels, icons)
         }
     }
     if (diff.assets.isNotEmpty()) {
@@ -670,7 +687,7 @@ private fun DiffBody(diff: PackVersionDiff, icons: ModIconResolver) {
 }
 
 @Composable
-private fun DiffGroup(entries: List<DiffEntry<SmrtModEntry>>, icons: ModIconResolver) {
+private fun DiffGroup(entries: List<DiffEntry<SmrtModEntry>>, labels: DiffLabels, icons: ModIconResolver) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     val added = entries.filter { it.kind == DiffKind.Added }
@@ -683,27 +700,31 @@ private fun DiffGroup(entries: List<DiffEntry<SmrtModEntry>>, icons: ModIconReso
 
     if (added.isNotEmpty()) {
         header(s.packVersionsAdded(added.size))
-        added.forEach { ModDiffRow(it, icons) }
+        added.forEach { ModDiffRow(it, labels, icons) }
     }
     if (updated.isNotEmpty()) {
         header(s.packVersionsUpdated(updated.size))
-        updated.forEach { ModDiffRow(it, icons) }
+        updated.forEach { ModDiffRow(it, labels, icons) }
     }
     if (removed.isNotEmpty()) {
         header(s.packVersionsRemoved(removed.size))
-        removed.forEach { ModDiffRow(it, icons) }
+        removed.forEach { ModDiffRow(it, labels, icons) }
     }
 }
 
 @Composable
-private fun ModDiffRow(entry: DiffEntry<SmrtModEntry>, icons: ModIconResolver) {
+private fun ModDiffRow(entry: DiffEntry<SmrtModEntry>, labels: DiffLabels, icons: ModIconResolver) {
     val subject = entry.to ?: entry.from ?: return
     val title = subject.display?.name?.takeIf { it.isNotBlank() } ?: subject.filename
-    val subtitle = when (entry.kind) {
-        DiffKind.Updated -> entry.from?.filename?.takeIf { it != entry.to?.filename }?.let { "$it → ${entry.to?.filename}" }
-            ?: subject.filename.takeIf { it != title }
-        else -> subject.filename.takeIf { it != title }
-    }
+    // The mirror's registry labels beat anything derivable from the manifests:
+    // real mod versions for updates, a version tag for adds/removes. Filename
+    // details stay the fallback when the diff endpoint had nothing.
+    val subtitle = labels.subtitleFor(entry)
+        ?: when (entry.kind) {
+            DiffKind.Updated -> entry.from?.filename?.takeIf { it != entry.to?.filename }?.let { "$it → ${entry.to?.filename}" }
+                ?: subject.filename.takeIf { it != title }
+            else -> subject.filename.takeIf { it != title }
+        }
     NxDiffRow(
         kind     = entry.kind.toRowKind(),
         title    = title,
@@ -711,6 +732,34 @@ private fun ModDiffRow(entry: DiffEntry<SmrtModEntry>, icons: ModIconResolver) {
         trailing = sizeLabel(entry.from?.sizeBytes, entry.to?.sizeBytes),
         leading  = { ModDiffIcon(subject, icons) },
     )
+}
+
+/** Filename-keyed version labels lifted from the mirror's diff endpoint; empty when it was unavailable. */
+private class DiffLabels(
+    private val updated: Map<String, Pair<String?, String?>>,
+    private val singleSided: Map<String, String>,
+) {
+    fun subtitleFor(entry: DiffEntry<SmrtModEntry>): String? {
+        val filename = (entry.to ?: entry.from)?.filename ?: return null
+        return when (entry.kind) {
+            DiffKind.Updated -> updated[filename]?.let { (from, to) ->
+                if (from != null && to != null) "$from → $to" else from ?: to
+            }
+            DiffKind.Added, DiffKind.Removed -> singleSided[filename]
+        }
+    }
+
+    companion object {
+        fun from(diff: SmrtBuildDiff?): DiffLabels {
+            if (diff == null) return DiffLabels(emptyMap(), emptyMap())
+            val updated = diff.modsUpdated.associate { it.filename to (it.versionFrom to it.versionTo) }
+            val single = buildMap {
+                diff.modsAdded.forEach { entry -> entry.version?.let { put(entry.filename, it) } }
+                diff.modsRemoved.forEach { entry -> entry.version?.let { put(entry.filename, it) } }
+            }
+            return DiffLabels(updated, single)
+        }
+    }
 }
 
 @Composable

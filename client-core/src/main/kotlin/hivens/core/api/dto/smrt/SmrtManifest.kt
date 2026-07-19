@@ -33,6 +33,8 @@ data class SmrtPackManifest(
     @SerialName("pack_version") val packVersion: String,
     /** Release channel of this build; absent on builds predating the field (see [versionChannel]). */
     val channel: String? = null,
+    /** Curator-authored release notes for this build (CommonMark); absent when none were given. */
+    val changelog: String? = null,
     @SerialName("generated_at") val generatedAt: String,
     /**
      * Hash of the shipped content set. Two builds with equal non-null

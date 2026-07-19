@@ -896,6 +896,7 @@ interface AppStrings {
     val packVersionsSectionMods: String
     val packVersionsSectionAssets: String
     val packVersionsSectionPack: String
+    val packVersionsNotes: String
     val packVersionsSwitchTo: String
     val packVersionsConfirmTitle: String
     fun packVersionsConfirmBody(from: String, to: String): String

@@ -858,6 +858,7 @@ object EnglishStrings : AppStrings {
     override val packVersionsSectionMods        = "Mods"
     override val packVersionsSectionAssets      = "Pack files"
     override val packVersionsSectionPack        = "Properties"
+    override val packVersionsNotes              = "Release notes"
     override val packVersionsSwitchTo           = "Switch to this build"
     override val packVersionsConfirmTitle       = "Switch version?"
     override fun packVersionsConfirmBody(from: String, to: String) =

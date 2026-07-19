@@ -1,5 +1,6 @@
 package hivens.core.api.interfaces
 
+import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 
@@ -13,4 +14,7 @@ interface IMirrorPackClient {
     suspend fun fetchManifest(packId: String): SmrtPackManifest
     suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest
     suspend fun fetchSummary(packId: String): SmrtPackSummary
+
+    /** The mirror's structured change summary between two builds (registry-enriched version labels). */
+    suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff
 }

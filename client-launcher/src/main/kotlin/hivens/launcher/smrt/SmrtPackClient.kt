@@ -1,6 +1,7 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -12,6 +13,7 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.json.Json
@@ -84,6 +86,16 @@ class SmrtPackClient(
     suspend fun listBuilds(packId: String): SmrtManifestVersions {
         val url = "$mirrorBase/v1/packs/$packId/manifest/versions"
         return caches.versions.get(url) { getJson(url) }
+    }
+
+    /**
+     * Structured change summary between two retained builds. Display data for
+     * the versions screen (registry-enriched version labels); uncached -- a
+     * (from, to) pair is immutable but the pair space is wide and reads are rare.
+     */
+    override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff {
+        val url = "$mirrorBase/v1/packs/$packId/diff?from=${from.encodeURLParameter()}&to=${to.encodeURLParameter()}"
+        return getJson(url)
     }
 
     /**

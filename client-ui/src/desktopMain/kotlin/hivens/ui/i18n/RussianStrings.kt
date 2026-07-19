@@ -860,6 +860,7 @@ object RussianStrings : AppStrings {
     override val packVersionsSectionMods        = "Моды"
     override val packVersionsSectionAssets      = "Файлы пака"
     override val packVersionsSectionPack        = "Параметры"
+    override val packVersionsNotes              = "Заметки к билду"
     override val packVersionsSwitchTo           = "Переключиться на этот билд"
     override val packVersionsConfirmTitle       = "Переключить версию?"
     override fun packVersionsConfirmBody(from: String, to: String) =
