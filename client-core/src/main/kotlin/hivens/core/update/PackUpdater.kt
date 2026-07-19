@@ -1,5 +1,6 @@
 package hivens.core.update
 
+import hivens.core.api.dto.smrt.SmrtManifestBuild
 import hivens.core.data.PackInstance
 
 /**
@@ -13,6 +14,13 @@ interface PackUpdater {
     suspend fun checkForUpdate(instance: PackInstance): UpdateCheck
 
     /**
+     * Read-only: what switching [instance] to the specific [targetVersion] would
+     * change (forward or backward), with its compat grade. [UpdateCheck.UpToDate]
+     * when the instance is already on that build.
+     */
+    suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck
+
+    /**
      * Apply an update. [targetVersion] null updates to the latest build; a specific
      * version switches or rolls back to it.
      */
@@ -21,4 +29,17 @@ interface PackUpdater {
         targetVersion: String? = null,
         progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
     ): UpdateOutcome
+
+    /** The mirror's retained builds for [instance], newest first (server order is canonical). */
+    suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild>
+
+    /** Snapshots [instance] can be rolled back to, newest first. */
+    fun listSnapshots(instance: PackInstance): List<PackSnapshot>
+
+    /**
+     * Roll [instance] back to snapshot [snapshotId]: restore the captured files
+     * and the pre-update instance record. Returns the restored instance, pinned
+     * (no longer following latest).
+     */
+    suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance
 }

@@ -7,7 +7,6 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.data.PackOrigin
-import hivens.core.update.comparePackVersions
 import hivens.launcher.smrt.SmrtPackClient
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -64,13 +63,13 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
     }
 
     override suspend fun versions(packId: String): List<CataloguePackVersion> = coroutineScope {
-        // Summary (for the MC hint) + the retained version list in parallel. A mirror
-        // that has no versions endpoint (or errors) degrades to the single latest.
+        // Summary (for the MC hint) + the retained build listing in parallel. Server
+        // order is canonical (publish date ranks across channels; tuples do not). A
+        // mirror that has no versions endpoint (or errors) degrades to the single latest.
         val summaryD = async { client.fetchSummary(packId) }
-        val versionsD = async { runCatching { client.listVersions(packId) }.getOrDefault(emptyList()) }
+        val buildsD = async { runCatching { client.listBuilds(packId).builds }.getOrDefault(emptyList()) }
         val s = summaryD.await()
-        versionsD.await().ifEmpty { listOf(s.latestPackVersion) }
-            .sortedWith { a, b -> comparePackVersions(b, a) }
+        buildsD.await().map { it.versionNumber }.ifEmpty { listOf(s.latestPackVersion) }
             .map { v ->
                 CataloguePackVersion(
                     id = v,

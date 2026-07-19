@@ -1,14 +1,14 @@
 package hivens.core.update
 
 /**
- * Pack version comparison. Mirrors the mirror's `domain/version.rs` byte for
- * byte so client and server agree on "is there a newer build?": numeric-tuple
- * comparison with missing trailing segments treated as 0. Plain string sort is
- * wrong (`.10` would sort before `.2`), so both sides must use this.
+ * Numeric-tuple pack version comparison, same arithmetic as the mirror's
+ * `domain/version.rs` (missing trailing segments are 0, `.10` sorts after `.2`,
+ * a non-integer segment degrades to 0 like `parse::<u64>().unwrap_or(0)`).
  *
- * A segment that is not a plain integer degrades to 0 (same as the mirror's
- * `parse::<u64>().unwrap_or(0)`), so the canonical `YYYY.MM.DD[.N]` form orders
- * correctly and a malformed version still compares rather than throwing.
+ * Valid ONLY within one channel's numeric versions. A channel build's
+ * `SNAPSHOT-` prefix parses to 0, so tuples misrank it against any release --
+ * update detection compares labels for inequality instead, and build ordering
+ * comes from the server listing (publish date), never from this comparator.
  */
 fun packVersionTuple(version: String): List<Long> =
     version.split('.').map { it.toLongOrNull() ?: 0L }

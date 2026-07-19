@@ -1,6 +1,7 @@
 package hivens.core.api.dto.smrt
 
 import hivens.core.data.PackAuthRequirement
+import hivens.core.update.VersionChannel
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -30,7 +31,14 @@ data class SmrtPackManifest(
     @SerialName("schema_version") val schemaVersion: Int,
     @SerialName("pack_id") val packId: String,
     @SerialName("pack_version") val packVersion: String,
+    /** Release channel of this build; absent on builds predating the field (see [versionChannel]). */
+    val channel: String? = null,
     @SerialName("generated_at") val generatedAt: String,
+    /**
+     * Hash of the shipped content set. Two builds with equal non-null
+     * fingerprints carry identical files -- a label-only rebuild.
+     */
+    val fingerprint: String? = null,
     val minecraft: SmrtMinecraft,
     val loader: SmrtLoader,
     val java: SmrtJava,
@@ -50,7 +58,10 @@ data class SmrtPackManifest(
     val auth: SmrtAuth? = null,
     val mods: List<SmrtModEntry> = emptyList(),
     val assets: List<SmrtAssetEntry> = emptyList(),
-)
+) {
+    /** Channel of this build, derived from the version string when [channel] is absent or unknown. */
+    val versionChannel: VersionChannel get() = VersionChannel.of(channel, packVersion)
+}
 
 /**
  * Wire shape of the optional `auth` block on a pack manifest.
@@ -279,7 +290,31 @@ data class SmrtDisplay(
      * surface as broken-manifest warnings at install time.
      */
     val requires: List<SmrtRequirement> = emptyList(),
-)
+    /**
+     * Advisory side classification (`required` / `optional_client` /
+     * `optional_server` / `optional_both` / `coremod`). Display only --
+     * [SmrtModEntry.required] stays the enforcing flag. See [presenceClass]
+     * for the typed view.
+     */
+    val presence: String? = null,
+) {
+    /** Typed [presence]; null when the field is absent or carries an unknown value. */
+    val presenceClass: SmrtPresence? get() = SmrtPresence.fromWire(presence)
+}
+
+/** Advisory side classification of a manifest entry, mirroring the mirror's `domain/side.rs`. */
+enum class SmrtPresence(val wire: String) {
+    Required("required"),
+    OptionalClient("optional_client"),
+    OptionalServer("optional_server"),
+    OptionalBoth("optional_both"),
+    Coremod("coremod");
+
+    companion object {
+        fun fromWire(wire: String?): SmrtPresence? =
+            wire?.let { w -> entries.firstOrNull { it.wire.equals(w, ignoreCase = true) } }
+    }
+}
 
 /**
  * Single edge in a mod's dependency DAG. [filename] points at another
@@ -321,6 +356,12 @@ data class SmrtPackSummary(
     @SerialName("gallery_urls") val galleryUrls: List<String> = emptyList(),
     /** Long-form CommonMark description for the BrowsePackDetail About section. HTML is not parsed. */
     @SerialName("description_md") val descriptionMd: String? = null,
+    /** When the latest build was published (RFC 3339); read-time derived by the mirror. */
+    @SerialName("latest_built_at") val latestBuiltAt: String? = null,
+    /** Channel of the latest build (`release` / `beta` / `alpha`); derived by the mirror. */
+    @SerialName("latest_channel") val latestChannel: String? = null,
+    /** Curation tier (`official` / `community`). */
+    val tier: String? = null,
 )
 
 @Serializable

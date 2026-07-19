@@ -12,6 +12,7 @@ import hivens.core.data.flatten
 import hivens.core.update.CompatChange
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
+import hivens.core.update.VersionChannel
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
@@ -96,7 +97,10 @@ class PackUpdateServiceTest {
             listOf(asset("config/x.cfg", CFG, CFG_URL)),
         )
         var summaryBody = summary(V1)
-        var versionsBody = """{"schema_version":2,"versions":["2026.02.02","2026.01.01"]}"""
+        var versionsBody = """{"schema_version":2,"pack_id":"test","latest":"$V2","builds":[
+            {"version_number":"$V2","version_type":"release","date_published":"2026-02-02T00:00:00Z","fingerprint":"bb","mods_count":2,"assets_count":2},
+            {"version_number":"$V1","version_type":"release","date_published":"2026-01-01T00:00:00Z","fingerprint":"aa","mods_count":3,"assets_count":1}
+        ]}"""
 
         private val v2Body = manifest(
             V2,
@@ -252,10 +256,46 @@ class PackUpdateServiceTest {
     }
 
     @Test
-    fun `availableVersions lists builds newest first`() = runTest {
+    fun `availableBuilds keeps the server's newest-first order and channel data`() = runTest {
         val h = Harness()
         val instance = h.installV1()
-        assertEquals(listOf("2026.02.02", "2026.01.01"), h.service.availableVersions(instance))
+        val builds = h.service.availableBuilds(instance)
+        assertEquals(listOf(V2, V1), builds.map { it.versionNumber })
+        assertEquals(VersionChannel.Release, builds.first().channel)
+        assertEquals(2, builds.first().modsCount)
+        assertEquals("bb", builds.first().fingerprint)
+    }
+
+    @Test
+    fun `a channel build with an older-looking tuple still reports available`() = runTest {
+        // SNAPSHOT-... tuples to [0,0,0,...] which the old ordering read as older
+        // than any release, silently reporting UpToDate for the whole snapshot
+        // chain. Detection is label inequality now.
+        val h = Harness()
+        val instance = h.installV1()
+        val snap = "SNAPSHOT-0.0.0-2026.07.18.7"
+        h.summaryBody = summary(snap)
+        h.manifestBody = manifest(
+            snap,
+            listOf(mod("req.jar", REQ_V2, REQ_V2_URL, required = true, defaultEnabled = true)),
+            emptyList(),
+        )
+        val check = h.service.checkForUpdate(instance)
+        assertTrue(check is UpdateCheck.Available)
+        assertEquals(snap, check.toVersion)
+    }
+
+    @Test
+    fun `previewSwitch plans against the chosen build and is quiet on the current one`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        assertTrue(h.service.previewSwitch(instance, V1) is UpdateCheck.UpToDate)
+
+        val check = h.service.previewSwitch(instance, V2)
+        assertTrue(check is UpdateCheck.Available)
+        assertEquals(V2, check.toVersion)
+        assertTrue(check.plan.toUpdate.contains("mods/req.jar"))
+        assertTrue(check.plan.toDelete.contains("mods/drop.jar"))
     }
 
     @Test

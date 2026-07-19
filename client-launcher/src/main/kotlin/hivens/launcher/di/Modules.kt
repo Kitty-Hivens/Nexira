@@ -70,6 +70,7 @@ import hivens.launcher.imports.ModrinthAppSource
 import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
 import hivens.launcher.instance.ContentScanCache
@@ -847,6 +848,7 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
         listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
+        versions = f.create("pack-versions", SmrtManifestVersions.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
     )
 }
 
