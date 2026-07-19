@@ -48,9 +48,9 @@ import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
-import hivens.launcher.update.PackAutoUpdateService
 import dev.hivens.skinema.compose.VideoScale
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
@@ -127,8 +127,8 @@ fun PackDetailScreen(
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
-    val packAutoUpdate: PackAutoUpdateService = koinInject()
-    val autoUpdateStatuses by packAutoUpdate.statuses.collectAsState()
+    val updateHub: PackUpdateStatusHub = koinInject()
+    val autoUpdateStatuses by updateHub.statuses.collectAsState()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
     var resolved by remember { mutableStateOf(false) }
     LaunchedEffect(instanceId) {

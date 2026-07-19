@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
@@ -61,6 +63,7 @@ internal fun PackVersionSection(
     val updater: PackUpdater = koinInject()
     val repo: IPackRepository = koinInject()
     val mirror: IMirrorPackClient = koinInject()
+    val hub: PackUpdateStatusHub = koinInject()
     val scope = rememberCoroutineScope()
 
     var busy by remember(pack.id) { mutableStateOf(false) }
@@ -88,6 +91,13 @@ internal fun PackVersionSection(
             check = runCatching { updater.checkForUpdate(pack) }
                 .onFailure { onOpState(PackSettingsOp.Failed(it.message ?: s.packVersionCheckFailed)) }
                 .getOrNull()
+            // Feed the shared hub so the ambient badges (card, hero) reflect what
+            // this manual check just learned.
+            when (val c = check) {
+                is UpdateCheck.Available -> hub.report(pack.id, PackUpdateStatus.Pending(c.toVersion, c.compat))
+                UpdateCheck.UpToDate -> hub.report(pack.id, PackUpdateStatus.UpToDate)
+                null -> Unit
+            }
             busy = false
         }
     }
@@ -104,6 +114,7 @@ internal fun PackVersionSection(
             }.onSuccess { outcome ->
                 repo.get(pack.id)?.let(onInstanceChange)
                 check = null
+                hub.report(pack.id, PackUpdateStatus.UpToDate)
                 onOpState(PackSettingsOp.Done((outcome as? UpdateOutcome.Applied)?.toVersion ?: current))
             }.onFailure {
                 onOpState(PackSettingsOp.Failed(it.message ?: s.packVersionCheckFailed))

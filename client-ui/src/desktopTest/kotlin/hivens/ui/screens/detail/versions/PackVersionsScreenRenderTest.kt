@@ -23,6 +23,8 @@ import hivens.core.data.PackReference
 import hivens.core.smrt.ModIconResolver
 import hivens.core.update.CompatChange
 import hivens.core.update.PackSnapshot
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
@@ -114,12 +116,18 @@ class PackVersionsScreenRenderTest {
         )
     }
 
+    private object FakeHub : PackUpdateStatusHub {
+        override val statuses = MutableStateFlow<Map<String, PackUpdateStatus>>(emptyMap())
+        override fun report(id: String, status: PackUpdateStatus) {}
+    }
+
     private fun render(width: Int, height: Int, style: StyleSpec, name: String) {
         startKoin {
             modules(module {
                 single<IPackRepository> { FakeRepo(pack) }
                 single<PackUpdater> { FakeUpdater }
                 single<IMirrorPackClient> { FakeMirror }
+                single<PackUpdateStatusHub> { FakeHub }
                 single { ModIconResolver(resolveProjectIcon = { null }) }
             })
         }

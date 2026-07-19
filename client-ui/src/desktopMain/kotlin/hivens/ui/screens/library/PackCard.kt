@@ -33,8 +33,12 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
+import hivens.ui.Screen
 import hivens.ui.components.InitialsAvatar
 import hivens.ui.components.SourceBadge
+import hivens.ui.navigation.NavRequests
 import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMetaChip
@@ -167,6 +171,44 @@ fun PackCard(
         indication?.let {
             LaunchStatusPill(it, Modifier.align(Alignment.TopEnd).padding(10.dp))
         }
+        // Update-available badge from the status hub. The launch pill owns the
+        // corner while a launch is in flight; clicking routes straight to the
+        // versions screen through the nav mediator.
+        if (indication == null) {
+            val hub: PackUpdateStatusHub = koinInject()
+            val nav: NavRequests = koinInject()
+            val statuses by hub.statuses.collectAsState()
+            if (statuses[instance.id] is PackUpdateStatus.Pending) {
+                UpdateBadgePill(
+                    onClick  = { nav.open(Screen.PackVersions(instance.id)) },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Compact update-available pill; the card-corner sibling of [LaunchStatusPill]. */
+@Composable
+private fun UpdateBadgePill(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(NxTheme.colors.primary))
+        Text(
+            text       = s.packVersionUpdateBadge,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = Color.White,
+            fontWeight = FontWeight.Medium,
+            maxLines   = 1,
+        )
     }
 }
 

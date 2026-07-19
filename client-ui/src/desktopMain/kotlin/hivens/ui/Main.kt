@@ -24,12 +24,14 @@ import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.SkinManager
+import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.notifications.drivers.PackUpdateDriver
 import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
@@ -254,6 +256,23 @@ val uiModule = module {
         InstallDriver(
             service         = get(),
             notifications   = get(),
+            appScope        = get(),
+            stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
+        ).also { it.start() }
+    }
+    // Navigation requests from outside the composition (notification actions,
+    // drivers). AppRoot collects and feeds them into the back stack.
+    single { NavRequests() }
+    // Surfaces pack-update outcomes (background auto-updater + manual flows via
+    // the status hub) into the notification center. Same lifecycle rationale as
+    // InstallDriver.
+    single(createdAtStart = true) {
+        val settingsService: ISettingsService = get()
+        PackUpdateDriver(
+            hub             = get(),
+            repository      = get(),
+            notifications   = get(),
+            nav             = get(),
             appScope        = get(),
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         ).also { it.start() }

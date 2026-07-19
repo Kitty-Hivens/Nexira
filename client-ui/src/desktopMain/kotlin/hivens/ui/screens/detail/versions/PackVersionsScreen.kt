@@ -59,6 +59,8 @@ import hivens.core.smrt.PackVersionDiff
 import hivens.core.smrt.groupRebuildRuns
 import hivens.core.update.CompatChange
 import hivens.core.update.PackSnapshot
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.VersionChannel
@@ -124,6 +126,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     val updater: PackUpdater = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val icons: ModIconResolver = koinInject()
+    val hub: PackUpdateStatusHub = koinInject()
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
 
@@ -201,7 +204,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                             busy             = applyState is ApplyState.Running,
                             onSwitch         = { preview ->
                                 if (preview.compat.isSafe) {
-                                    runSwitch(scope, updater, repo, pack, sel.versionNumber,
+                                    runSwitch(scope, updater, repo, hub, pack, sel.versionNumber,
                                         onState = { applyState = it }, onDone = {
                                             refreshInstance()
                                             snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
@@ -216,7 +219,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                                 snapshots = snapshots,
                                 busy      = applyState is ApplyState.Running,
                                 onRestore = { snap ->
-                                    runRestore(scope, updater, repo, pack, snap.id,
+                                    runRestore(scope, updater, repo, hub, pack, snap.id,
                                         onState = { applyState = it }, onDone = {
                                             refreshInstance()
                                             snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
@@ -244,7 +247,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
             onConfirm    = {
                 val target = preview.toVersion
                 confirmTarget = null
-                runSwitch(scope, updater, repo, pack, target,
+                runSwitch(scope, updater, repo, hub, pack, target,
                     onState = { applyState = it }, onDone = {
                         refreshInstance()
                         snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
@@ -261,6 +264,7 @@ private fun runSwitch(
     scope: kotlinx.coroutines.CoroutineScope,
     updater: PackUpdater,
     repo: IPackRepository,
+    hub: PackUpdateStatusHub,
     pack: PackInstance,
     targetVersion: String,
     onState: (ApplyState) -> Unit,
@@ -274,6 +278,10 @@ private fun runSwitch(
                 onState(ApplyState.Running(current, total, path.substringAfterLast('/')))
             }
         }.onSuccess {
+            // The user just handled this instance's version by hand: clear any
+            // stale Pending so the ambient badges agree with reality. Quiet on
+            // purpose -- the result already shows in this screen's status row.
+            hub.report(pack.id, PackUpdateStatus.UpToDate)
             onState(ApplyState.Done(targetVersion))
             onDone()
         }.onFailure {
@@ -286,6 +294,7 @@ private fun runRestore(
     scope: kotlinx.coroutines.CoroutineScope,
     updater: PackUpdater,
     repo: IPackRepository,
+    hub: PackUpdateStatusHub,
     pack: PackInstance,
     snapshotId: String,
     onState: (ApplyState) -> Unit,
@@ -297,6 +306,7 @@ private fun runRestore(
             val fresh = repo.get(pack.id) ?: pack
             updater.rollback(fresh, snapshotId)
         }.onSuccess {
+            hub.report(pack.id, PackUpdateStatus.UpToDate)
             onState(ApplyState.Done(it.pinnedPackVersion ?: ""))
             onDone()
         }.onFailure {
