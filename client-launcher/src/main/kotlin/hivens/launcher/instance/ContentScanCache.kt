@@ -34,13 +34,18 @@ class ContentScanCache(
 ) {
     private val log = LoggerFactory.getLogger(ContentScanCache::class.java)
 
-    /** Cached scan for [canonicalPath] if present AND still matching [size]+[mtime], else null. */
+    /**
+     * Cached scan for [canonicalPath] if present, written by the current parser
+     * format AND still matching [size]+[mtime], else null. The format gate makes
+     * a parser fix (a truncated-name regex, a changed metadata priority) refresh
+     * entries whose files never changed on disk.
+     */
     fun lookup(canonicalPath: String, size: Long, mtime: Long): CachedScan? {
         val bytes = runCatching {
             env.computeInTransaction { txn -> store(txn).get(txn, key(canonicalPath))?.toByteArray() }
         }.getOrNull() ?: return null
         val scan = runCatching { json.decodeFromString(CachedScan.serializer(), bytes.decodeToString()) }.getOrNull() ?: return null
-        return scan.takeIf { it.sizeBytes == size && it.mtimeMillis == mtime }
+        return scan.takeIf { it.format == FORMAT && it.sizeBytes == size && it.mtimeMillis == mtime }
     }
 
     fun put(canonicalPath: String, size: Long, mtime: Long, meta: CachedMeta?) {
@@ -60,13 +65,13 @@ class ContentScanCache(
      * the parsed metadata caches anyway, and only skip when even that is huge.
      */
     private fun encodeBounded(canonicalPath: String, size: Long, mtime: Long, meta: CachedMeta?): ByteArray? {
-        var bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, meta)).encodeToByteArray()
+        var bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, meta, FORMAT)).encodeToByteArray()
         if (bytes.size > MAX_ENTRY_BYTES && meta?.icon != null) {
             val slim = CachedMeta(
                 meta.name, meta.version, meta.description, null,
                 meta.homepageUrl, meta.license, meta.authors, meta.dependencies,
             )
-            bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, slim)).encodeToByteArray()
+            bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, slim, FORMAT)).encodeToByteArray()
         }
         if (bytes.size > MAX_ENTRY_BYTES) {
             log.warn("scan cache entry for {} is {} bytes even without an icon; not cached", canonicalPath, bytes.size)
@@ -108,6 +113,12 @@ class ContentScanCache(
 
     private companion object {
         const val MAX_ENTRY_BYTES = 1 shl 20
+
+        // Parser-format stamp. Bump when the scanner's PARSING changes (regex
+        // fixes, metadata priority) so unchanged files re-parse; entries written
+        // before the field existed default to 1 and read as misses.
+        // 2: quote-aware TOML values, TOML-over-stub priority, jarVersion resolve.
+        const val FORMAT = 2
     }
 }
 
@@ -129,6 +140,8 @@ class CachedScan(
     @SerialName("size") val sizeBytes: Long,
     @SerialName("mtime") val mtimeMillis: Long,
     val meta: CachedMeta? = null,
+    /** Parser-format stamp; entries from another format read as misses. */
+    @SerialName("v") val format: Int = 1,
 )
 
 /** Serializable mirror of the scanner's parsed archive metadata. */

@@ -108,6 +108,18 @@ class ContentScanCacheTest {
     }
 
     @Test
+    fun `an entry from an older parser format reads as a miss`() {
+        // A parser fix must refresh entries whose files never changed on disk;
+        // pre-format entries default to v=1 and fail the format gate.
+        val stale = """{"size":1,"mtime":2,"meta":{"name":"Truncated"}}"""
+        env.executeInTransaction { txn ->
+            env.openStore("content-scan", StoreConfig.WITHOUT_DUPLICATES, txn)
+                .put(txn, StringBinding.stringToEntry("/i/mods/stale.jar"), ArrayByteIterable(stale.encodeToByteArray()))
+        }
+        assertNull(cache().lookup("/i/mods/stale.jar", 1L, 2L))
+    }
+
+    @Test
     fun `a legacy number-array icon entry reads as a miss`() {
         // Entries written before the Base64 icon field encode the icon as a JSON
         // number array. They must decode-fail into a plain miss (re-scan and
