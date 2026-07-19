@@ -864,7 +864,6 @@ interface AppStrings {
     val packVersionSection: String
     val packVersionInstalled: String
     val packVersionCheck: String
-    val packVersionWorking: String
     val packVersionUpToDate: String
     fun packVersionAvailable(version: String): String
     val packVersionSafe: String
@@ -872,7 +871,7 @@ interface AppStrings {
     val packVersionUpdateNow: String
     val packVersionFollowLatest: String
     val packVersionFollowLatestDesc: String
-    val packVersionOtherBuilds: String
+    fun packVersionLatestBuilt(version: String, publishedAt: String): String
     val packVersionSwitch: String
     val packVersionCurrentTag: String
     val packVersionUpdateBadge: String
@@ -945,6 +944,10 @@ interface AppStrings {
     // Content
     val packSettingsOptional: String
     val packSettingsOptionalNone: String
+    val packContentPresenceClient: String
+    val packContentPresenceServer: String
+    val packContentPresenceBoth: String
+    val packContentPresenceCoremod: String
     val packSettingsDependencies: String
     val packSettingsDependenciesNone: String
     fun packSettingsMissing(name: String): String

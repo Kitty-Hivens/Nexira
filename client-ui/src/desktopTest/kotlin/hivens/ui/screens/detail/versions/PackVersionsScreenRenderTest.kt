@@ -13,6 +13,7 @@ import hivens.core.api.dto.smrt.SmrtManifestBuild
 import hivens.core.api.dto.smrt.SmrtMinecraft
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.api.interfaces.IPackRepository
@@ -107,6 +108,10 @@ class PackVersionsScreenRenderTest {
             "SNAPSHOT-0.0.0-2026.07.17" -> manifest(version, "aa", listOf(mod("Architectury", "a1"), mod("Sodium", "s1")))
             else -> manifest(version, "ff", listOf(mod("Architectury", "a1"), mod("Sodium", "s2"), mod("Iris", "i1")))
         }
+        override suspend fun fetchSummary(packId: String): SmrtPackSummary = SmrtPackSummary(
+            packId = packId, displayName = "Create", tagline = "t", minecraftVersion = "1.21.1",
+            latestPackVersion = "0.1.2", latestBuiltAt = "2026-07-19T02:14:01Z", latestChannel = "beta",
+        )
     }
 
     private fun render(width: Int, height: Int, style: StyleSpec, name: String) {

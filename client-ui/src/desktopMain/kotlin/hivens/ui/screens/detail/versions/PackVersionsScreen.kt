@@ -62,8 +62,9 @@ import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.VersionChannel
+import hivens.ui.components.ChannelChip
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.i18n.AppStrings
+import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -425,13 +426,13 @@ private fun BuildRow(
                 overflow   = TextOverflow.Ellipsis,
                 modifier   = Modifier.weight(1f, fill = false),
             )
-            ChannelChip(build.channel, s)
+            ChannelChip(build.channel)
             if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
             else if (isLatest) NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text  = listOfNotNull(formatBuildDate(build.datePublished), s.packVersionsCounts(build.modsCount, build.assetsCount)).joinToString("   "),
+                text  = listOfNotNull(formatBuildTimestamp(build.datePublished), s.packVersionsCounts(build.modsCount, build.assetsCount)).joinToString("   "),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textSecondary,
             )
@@ -448,16 +449,6 @@ private fun BuildRow(
             )
         }
     }
-}
-
-@Composable
-private fun ChannelChip(channel: VersionChannel, s: AppStrings) {
-    val (label, tone) = when (channel) {
-        VersionChannel.Release -> s.packVersionsChannelRelease to NxMetaChipTone.Surface
-        VersionChannel.Beta    -> s.packVersionsChannelBeta to NxMetaChipTone.Warning
-        VersionChannel.Alpha   -> s.packVersionsChannelAlpha to NxMetaChipTone.Error
-    }
-    NxMetaChip(label, tone = tone)
 }
 
 // ─── Right pane: build detail / changelog ────────────────────────────────────
@@ -498,10 +489,10 @@ private fun BuildDetailPane(
                 overflow   = TextOverflow.Ellipsis,
                 modifier   = Modifier.weight(1f, fill = false),
             )
-            ChannelChip(build.channel, s)
+            ChannelChip(build.channel)
             if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
         }
-        formatBuildDate(build.datePublished)?.let {
+        formatBuildTimestamp(build.datePublished)?.let {
             Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
         }
 
@@ -797,10 +788,6 @@ private fun DiffKind.toRowKind(): NxDiffRowKind = when (this) {
     DiffKind.Added   -> NxDiffRowKind.Added
     DiffKind.Removed -> NxDiffRowKind.Removed
     DiffKind.Updated -> NxDiffRowKind.Updated
-}
-
-private fun formatBuildDate(raw: String?): String? = raw?.let {
-    runCatching { Instant.parse(it).atZone(ZoneId.systemDefault()).format(BUILD_TIME) }.getOrDefault(it)
 }
 
 private fun sizeLabel(fromBytes: Long?, toBytes: Long?): String? = when {
