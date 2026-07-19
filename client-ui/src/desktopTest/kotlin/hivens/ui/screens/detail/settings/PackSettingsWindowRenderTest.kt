@@ -7,6 +7,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
+import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IMirrorPackClient
@@ -56,6 +57,7 @@ class PackSettingsWindowRenderTest {
         override suspend fun fetchManifest(packId: String): SmrtPackManifest = throw IOException("offline")
         override suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest = throw IOException("offline")
         override suspend fun fetchSummary(packId: String): SmrtPackSummary = throw IOException("offline")
+        override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff = throw IOException("offline")
     }
 
     private val pack = PackInstance(

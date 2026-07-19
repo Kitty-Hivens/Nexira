@@ -30,6 +30,8 @@ data class SmrtManifestBuild(
     @SerialName("version_type") val versionType: String? = null,
     @SerialName("date_published") val datePublished: String? = null,
     val fingerprint: String? = null,
+    /** Curator-authored release notes for this build (CommonMark); absent when none were given. */
+    val changelog: String? = null,
     @SerialName("mods_count") val modsCount: Int = 0,
     @SerialName("assets_count") val assetsCount: Int = 0,
 ) {

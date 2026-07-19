@@ -9,6 +9,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.core.api.dto.smrt.SmrtJava
 import hivens.core.api.dto.smrt.SmrtLoader
+import hivens.core.api.dto.smrt.SmrtBuildDiff
+import hivens.core.api.dto.smrt.SmrtDiffEntry
+import hivens.core.api.dto.smrt.SmrtDiffUpdate
 import hivens.core.api.dto.smrt.SmrtManifestBuild
 import hivens.core.api.dto.smrt.SmrtMinecraft
 import hivens.core.api.dto.smrt.SmrtModEntry
@@ -75,9 +78,13 @@ class PackVersionsScreenRenderTest {
 
     private object FakeUpdater : PackUpdater {
         val builds = listOf(
-            SmrtManifestBuild("0.1.2", "beta", "2026-07-19T02:14:01Z", "ff", 3, 1),
-            SmrtManifestBuild("0.1.1", "beta", "2026-07-19T02:12:58Z", "ff", 3, 1),
-            SmrtManifestBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", "aa", 2, 0),
+            SmrtManifestBuild("0.1.2", "beta", "2026-07-19T02:14:01Z", fingerprint = "ff", modsCount = 3, assetsCount = 1),
+            SmrtManifestBuild(
+                "0.1.1", "beta", "2026-07-19T02:12:58Z", fingerprint = "ff",
+                changelog = "Куратор объясняет: обновлены рендер-моды, добавлен Iris.",
+                modsCount = 3, assetsCount = 1,
+            ),
+            SmrtManifestBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", fingerprint = "aa", modsCount = 2, assetsCount = 0),
         )
         override suspend fun checkForUpdate(instance: PackInstance): UpdateCheck = UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
@@ -113,6 +120,11 @@ class PackVersionsScreenRenderTest {
         override suspend fun fetchSummary(packId: String): SmrtPackSummary = SmrtPackSummary(
             packId = packId, displayName = "Create", tagline = "t", minecraftVersion = "1.21.1",
             latestPackVersion = "0.1.2", latestBuiltAt = "2026-07-19T02:14:01Z", latestChannel = "beta",
+        )
+        override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff = SmrtBuildDiff(
+            schemaVersion = 2, packId = packId, from = from, to = to, contentChanged = true,
+            modsUpdated = listOf(SmrtDiffUpdate("Sodium.jar", versionFrom = "0.6.0", versionTo = "0.6.13", sha1From = "s1", sha1To = "s2")),
+            modsAdded = listOf(SmrtDiffEntry("Iris.jar", version = "1.8.12")),
         )
     }
 
