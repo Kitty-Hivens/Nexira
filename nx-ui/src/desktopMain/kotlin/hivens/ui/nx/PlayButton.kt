@@ -1,8 +1,13 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,29 +29,36 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 
 /**
- * The Play call-to-action, shared by the Library card and the pack-detail hero
- * so the launch affordance reads the same everywhere. A decisive flat accent
- * plate on the style's button corner: state renders through the FILL itself
- * (hover lifts its luminance, press sinks it and compresses the plate a
- * touch), the glyph nudges forward on hover, and a top-lit hairline gives the
- * plate a bevel instead of a flat sticker. Disabled is a ghost outline -- a
- * visible capability that is not available right now, not a washed-out fill.
- * Colour tracks the theme accent; geometry and motion track
- * [hivens.ui.theme.StyleSpec]. [iconOnly] drops the label for tight layouts;
- * [compact] is the smaller card sizing vs. the larger hero sizing.
+ * The launch call-to-action on the pack-detail hero. A low pill in static
+ * monochrome ink -- black plate in a dark theme, white in a light one --
+ * deliberately NOT the palette accent: the hero ground is arbitrary art behind
+ * a dark scrim, and a stable ink reads on all of it while an accent fill
+ * fought both the art and the neighbouring chips. The pill follows the style
+ * axis the way NxSwitch does: a full capsule under a rounded style, the
+ * style's own hard edge under a square one.
+ *
+ * One button, three moments, zero launch-state knowledge of its own: the
+ * caller swaps [label] / [icon] / [onClick] per state, and [busy] renders the
+ * non-interactive wait moment (dimmed plate, gently pulsing content -- static
+ * dim when the style disables motion). Disabled is a ghost outline -- a
+ * visible capability that is not available right now; its ink stays white
+ * because the ghost reads against the hero's scrim, not against the theme.
+ * [iconOnly] drops the label for tight layouts; [compact] is the smaller
+ * sizing.
  */
 @Composable
 fun PlayButton(
@@ -54,57 +66,74 @@ fun PlayButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    busy: Boolean = false,
+    icon: IconKey = NxIcon.PlayArrow,
     iconOnly: Boolean = false,
     compact: Boolean = false,
 ) {
-    val accent = NxTheme.colors.primary
     val style = LocalStyle.current
-    val shape = RoundedCornerShape(style.buttonCorner)
+    val shape =
+        if (style.buttonCorner > 0.dp) RoundedCornerShape(percent = 50)
+        else RoundedCornerShape(style.buttonCorner)
+    val darkTheme = NxTheme.colors.background.luminance() < 0.5f
+    val ink = if (darkTheme) Color.Black else Color.White
+    val inkContent = if (darkTheme) Color.White else Color.Black
+
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
+    val interactive = enabled && !busy
 
     val fillTarget = when {
-        !enabled -> Color.Transparent
-        pressed  -> lerp(accent, Color.Black, 0.16f)
-        hovered  -> lerp(accent, Color.White, 0.10f)
-        else     -> accent
+        !enabled               -> Color.Transparent
+        busy                   -> ink.copy(alpha = 0.75f)
+        pressed && interactive -> lerp(ink, inkContent, 0.05f)
+        hovered && interactive -> lerp(ink, inkContent, 0.10f)
+        else                   -> ink
     }
     val fill by animateColorAsState(fillTarget, tween(style.animationDurationMs(110)), label = "playFill")
     val plateScale by animateFloatAsState(
-        targetValue   = if (pressed && enabled) 0.97f else 1f,
+        targetValue   = if (pressed && interactive) 0.97f else 1f,
         animationSpec = tween(style.animationDurationMs(90)),
         label         = "playScale",
     )
     val glyphNudge by animateDpAsState(
-        targetValue   = if (hovered && enabled) 2.dp else 0.dp,
+        targetValue   = if (hovered && interactive) 2.dp else 0.dp,
         animationSpec = tween(style.animationDurationMs(110)),
         label         = "playNudge",
     )
 
-    // Bevel: a top-lit hairline fading out downward, derived from the plate's
-    // own accent. Disabled swaps it for a full ghost outline -- the plate's
-    // shape stays, only its fill is gone.
-    val bevel = Brush.verticalGradient(
-        listOf(
-            lerp(accent, Color.White, 0.45f).copy(alpha = 0.55f),
-            Color.Transparent,
-        ),
-    )
+    val contentPulse: Float = if (busy && style.animationMultiplier > 0f) {
+        val transition = rememberInfiniteTransition(label = "playBusy")
+        val a by transition.animateFloat(
+            initialValue  = 0.55f,
+            targetValue   = 0.95f,
+            animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+            label         = "playBusyAlpha",
+        )
+        a
+    } else if (busy) 0.75f else 1f
+
     val ghost = Color.White.copy(alpha = 0.38f)
-    val content = if (enabled) Color.White else Color.White.copy(alpha = 0.55f)
+    // A faint ring in the opposite ink holds the pill's edge when the ground
+    // behind it drifts toward the fill's own tone (dark art under a black
+    // pill, pale art under a white one).
+    val ring = inkContent.copy(alpha = 0.18f)
+    val content = when {
+        !enabled -> Color.White.copy(alpha = 0.55f)
+        else     -> inkContent.copy(alpha = contentPulse)
+    }
 
     val iconSize = when {
-        iconOnly && compact -> 22.dp
-        iconOnly            -> 24.dp
-        compact             -> 18.dp
-        else                -> 22.dp
+        iconOnly -> if (compact) 18.dp else 20.dp
+        compact  -> 16.dp
+        else     -> 18.dp
     }
     val pad = when {
-        iconOnly && compact -> PaddingValues(10.dp)
-        iconOnly            -> PaddingValues(12.dp)
-        compact             -> PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-        else                -> PaddingValues(horizontal = 24.dp, vertical = 13.dp)
+        iconOnly && compact -> PaddingValues(7.dp)
+        iconOnly            -> PaddingValues(9.dp)
+        compact             -> PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+        else                -> PaddingValues(horizontal = 20.dp, vertical = 9.dp)
     }
 
     Row(
@@ -115,19 +144,19 @@ fun PlayButton(
             }
             .clip(shape)
             .background(fill)
-            .let { if (enabled) it.border(1.dp, bevel, shape) else it.border(1.5.dp, ghost, shape) }
+            .let { if (enabled) it.border(1.dp, ring, shape) else it.border(1.5.dp, ghost, shape) }
             .clickable(
                 interactionSource = interaction,
                 indication        = null,
-                enabled           = enabled,
+                enabled           = interactive,
                 onClick           = onClick,
             )
             .padding(pad),
         verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 7.dp),
     ) {
         Symbol(
-            NxIcon.PlayArrow,
+            icon,
             contentDescription = if (iconOnly) label else null,
             tint               = content,
             size               = iconSize,

@@ -70,6 +70,8 @@ import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.PlayButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.platform.SystemActions
@@ -128,6 +130,7 @@ fun PackDetailScreen(
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
+    val indications: IndicationCenter = koinInject()
     val updateHub: PackUpdateStatusHub = koinInject()
     val autoUpdateStatuses by updateHub.statuses.collectAsState()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
@@ -158,11 +161,13 @@ fun PackDetailScreen(
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
     val authedSession = (appState as? AppState.Authenticated)?.session
+    val launchIndication by indications.launchIndication(pack.id).collectAsState()
 
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
             playEnabled    = authedSession != null,
+            indication     = launchIndication,
             onBack         = onBack,
             onPlay         = {
                 authedSession?.let { session ->
@@ -172,6 +177,7 @@ fun PackDetailScreen(
                     controller.launchPackInstance(session, pack)
                 }
             },
+            onAbort        = { controller.abort() },
             onOpenSettings = { showSettings = true },
             onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
             versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
@@ -393,8 +399,10 @@ private fun LogSessionPicker(
 private fun Hero(
     pack: PackInstance,
     playEnabled: Boolean,
+    indication: LaunchIndication?,
     onBack: () -> Unit,
     onPlay: () -> Unit,
+    onAbort: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenFolder: () -> Unit,
     versionLabel: String?,
@@ -486,10 +494,17 @@ private fun Hero(
                         HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
                     }
                 }
+                // The pill walks the launch: Play -> wait (prepare/sync, inert)
+                // -> Exit (stop the running game) -> Play again. Failed falls
+                // back to Play -- the error toast carries the diagnosis.
+                val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
+                val running = indication is LaunchIndication.Running
                 PlayButton(
-                    label    = s.packDetailPlay,
-                    onClick  = onPlay,
-                    enabled  = playEnabled,
+                    label    = when { running -> s.packPlayExit; busy -> s.packPlayWait; else -> s.packDetailPlay },
+                    icon     = if (running) NxIcon.Stop else NxIcon.PlayArrow,
+                    busy     = busy,
+                    onClick  = if (running) onAbort else onPlay,
+                    enabled  = if (running) true else playEnabled,
                     iconOnly = playIconOnly,
                 )
             }
