@@ -9,13 +9,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.SmrtPresence
 import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.launcher.launch.LauncherController
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
 import hivens.ui.theme.NxTheme
@@ -64,10 +68,12 @@ internal fun PackContentSection(pack: PackInstance, onInstanceChange: (PackInsta
             manifest == null -> Muted(s.packSettingsContentUnavailable, colors.textSecondary)
             optional.isEmpty() -> Muted(s.packSettingsOptionalNone, colors.textSecondary)
             else -> optional.forEach { mod ->
+                val presence = mod.display?.presenceClass
                 NxToggle(
                     mod.display?.name ?: mod.filename,
                     state[mod.filename] ?: mod.defaultEnabled,
                     icon = NxIcon.Widgets,
+                    trailing = presenceLabel(presence, s)?.let { label -> { NxMetaChip(label, tone = NxMetaChipTone.Surface) } },
                 ) { enable ->
                     val m = manifest ?: return@NxToggle
                     val next = OptionalContentRules.applyToggle(m.mods, state, mod.filename, enable)
@@ -82,4 +88,13 @@ internal fun PackContentSection(pack: PackInstance, onInstanceChange: (PackInsta
 @Composable
 private fun Muted(text: String, color: androidx.compose.ui.graphics.Color) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = color)
+}
+
+/** Side badge for an optional entry; `required` and unknown values render none. */
+private fun presenceLabel(presence: SmrtPresence?, s: AppStrings): String? = when (presence) {
+    SmrtPresence.OptionalClient -> s.packContentPresenceClient
+    SmrtPresence.OptionalServer -> s.packContentPresenceServer
+    SmrtPresence.OptionalBoth   -> s.packContentPresenceBoth
+    SmrtPresence.Coremod        -> s.packContentPresenceCoremod
+    SmrtPresence.Required, null -> null
 }

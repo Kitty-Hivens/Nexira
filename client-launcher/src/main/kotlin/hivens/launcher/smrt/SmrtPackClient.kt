@@ -66,7 +66,7 @@ class SmrtPackClient(
         return caches.manifest.get(url) { getJson(url) }
     }
 
-    suspend fun fetchSummary(packId: String): SmrtPackSummary {
+    override suspend fun fetchSummary(packId: String): SmrtPackSummary {
         val url = "$mirrorBase/v1/packs/$packId"
         return caches.summary.get(url) { getJson(url) }
     }
