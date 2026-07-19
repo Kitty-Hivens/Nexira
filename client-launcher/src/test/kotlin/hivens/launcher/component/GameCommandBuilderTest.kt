@@ -165,6 +165,8 @@ class GameCommandBuilderTest {
         val cmd = build("1.7.10")
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+        // Modern authlib ignores the redirect wholesale without services.host.
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=") })
     }
 
     @Test
@@ -582,6 +584,7 @@ class GameCommandBuilderTest {
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=") })
     }
 
     @Test
@@ -592,6 +595,7 @@ class GameCommandBuilderTest {
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+        assertFalse(cmd.any { it.startsWith("-Dminecraft.api.services.host=") })
     }
 
     @Test
