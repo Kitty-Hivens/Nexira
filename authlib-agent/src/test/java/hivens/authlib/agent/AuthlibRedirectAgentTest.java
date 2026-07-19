@@ -164,6 +164,49 @@ class AuthlibRedirectAgentTest {
     }
 
     @Test
+    void forceSignedTexturesFlipsTheVerdictToSigned() throws Exception {
+        byte[] original = readClassBytes(TextureSignatureSample.class);
+        byte[] patched = AuthlibRedirectAgent.forceSignedTextures(original);
+        assertNotSame(original, patched, "the getPropertySignatureState call must be found and rewritten");
+
+        // Patched: unpackTextures reports SIGNED instead of INVALID. defineClass
+        // runs full verification, so this also proves the rewritten sequence
+        // still satisfies the method's stack-map.
+        Class<?> c = new IsolatedLoader("hivens.authlib.agent.TextureSignatureSample", patched)
+                .load("hivens.authlib.agent.TextureSignatureSample");
+        Object sample = c.getDeclaredConstructor().newInstance();
+        Object state = c.getMethod("unpackTextures", Object.class).invoke(sample, new Object());
+        assertEquals("SIGNED", state.toString(),
+                "with the call rewritten to a constant, unpackTextures reports SIGNED");
+
+        // Control: the unpatched fixture still reports INVALID.
+        assertEquals(com.mojang.authlib.SignatureState.INVALID,
+                new TextureSignatureSample().unpackTextures(new Object()));
+    }
+
+    @Test
+    void forceSignedTexturesSilentNoOpWithoutSignatureState() throws Exception {
+        // No SignatureState.SIGNED in the pool = legacy authlib: untouched AND quiet.
+        byte[] original = readClassBytes(Sample.class);
+        byte[][] out = new byte[1][];
+        String quiet = captureErr(() -> out[0] = AuthlibRedirectAgent.forceSignedTextures(original));
+        assertSame(original, out[0], "a legacy-shaped class must pass through unchanged");
+        assertEquals("", quiet, "a legacy-shaped class must not warn");
+    }
+
+    @Test
+    void forceSignedTexturesWarnsWhenUnpackShapeMoved() throws Exception {
+        // References SignatureState and has unpackTextures, but not the
+        // getPropertySignatureState call sequence: untouched, WITH a breadcrumb.
+        byte[] reshaped = readClassBytes(TextureSignatureSampleNoCall.class);
+        byte[][] out = new byte[1][];
+        String warned = captureErr(() -> out[0] = AuthlibRedirectAgent.forceSignedTextures(reshaped));
+        assertSame(reshaped, out[0], "an unmatchable unpackTextures must be left untouched");
+        assertTrue(warned.contains("[authlib-agent]") && warned.contains("skins"),
+                "a present-but-unpatchable unpackTextures must leave a stderr breadcrumb: " + warned);
+    }
+
+    @Test
     void rewriteReturnsSameArrayWhenNothingMatches() {
         // Empty map -> no entry can match -> the rewriter must return the input
         // array untouched (the no-op fast path).
