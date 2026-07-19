@@ -45,7 +45,11 @@ private val SNAPSHOT_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy
  * flows back through [onInstanceChange].
  */
 @Composable
-internal fun PackVersionSection(pack: PackInstance, onInstanceChange: (PackInstance) -> Unit) {
+internal fun PackVersionSection(
+    pack: PackInstance,
+    onInstanceChange: (PackInstance) -> Unit,
+    onOpenVersions: () -> Unit = {},
+) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     val updater: PackUpdateService = koinInject()
@@ -108,13 +112,21 @@ internal fun PackVersionSection(pack: PackInstance, onInstanceChange: (PackInsta
 
     NxSection(s.packVersionSection) {
         NxRow(title = s.packVersionInstalled, subtitle = current) {
-            NxButton(
-                label = if (busy) s.packVersionWorking else s.packVersionCheck,
-                onClick = { runCheck() },
-                style = NxButtonStyle.Secondary,
-                enabled = !busy,
-                compact = true,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxButton(
+                    label = if (busy) s.packVersionWorking else s.packVersionCheck,
+                    onClick = { runCheck() },
+                    style = NxButtonStyle.Secondary,
+                    enabled = !busy,
+                    compact = true,
+                )
+                NxButton(
+                    label = s.packVersionsAllVersions,
+                    onClick = onOpenVersions,
+                    style = NxButtonStyle.Tertiary,
+                    compact = true,
+                )
+            }
         }
         NxToggle(
             s.packVersionFollowLatest,

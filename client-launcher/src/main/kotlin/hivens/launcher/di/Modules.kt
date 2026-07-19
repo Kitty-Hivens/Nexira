@@ -73,6 +73,7 @@ import hivens.launcher.cache.ModrinthCaches
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
+import hivens.core.update.PackUpdater
 import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.PackInstanceService
@@ -108,6 +109,7 @@ import okhttp3.OkHttpClient
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
+import org.koin.dsl.bind
 import org.koin.dsl.module
 import java.net.InetSocketAddress
 import java.net.PasswordAuthentication
@@ -568,6 +570,8 @@ val mirrorModule = module {
     single { ApplyJournal(dataDir = get(), json = get()) }
     // Startup rollback for updates a hard crash interrupted (journal + snapshot).
     single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get()) }
+    // Also bound as the PackUpdater contract: the UI injects the interface so
+    // render tests can substitute a fake; the auto-updater keeps the concrete type.
     single {
         PackUpdateService(
             client = get<SmrtPackClient>(),
@@ -578,7 +582,7 @@ val mirrorModule = module {
             journal = get(),
             dataDir = get(),
         )
-    }
+    } bind PackUpdater::class
     // Background auto-updater over installed mirror instances. Reads the current
     // auto-update policy each pass via the settings service.
     single {

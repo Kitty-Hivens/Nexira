@@ -14,9 +14,11 @@ import hivens.ui.theme.NxTheme
  * - [OnMedia] / [OnMediaAccent] read white over banner art (a translucent
  *   black fill, or the accent fill for the emphasized one).
  * - [Surface] is the muted on-glass chip that leans on theme tokens.
+ * - [Success] marks a good/safe state (installed build, green compat).
+ * - [Warning] marks a needs-care state (structural change, prerelease channel).
  * - [Error] flags a problem (a missing dependency, etc).
  */
-enum class NxMetaChipTone { OnMedia, OnMediaAccent, Surface, Error }
+enum class NxMetaChipTone { OnMedia, OnMediaAccent, Surface, Success, Warning, Error }
 
 /**
  * Small read-only metadata pill (version, tag, license, "fork"). A disabled
@@ -34,6 +36,8 @@ fun NxMetaChip(
         NxMetaChipTone.OnMedia       -> Color.Black.copy(alpha = 0.35f) to Color.White
         NxMetaChipTone.OnMediaAccent -> colors.primary.copy(alpha = 0.85f) to Color.White
         NxMetaChipTone.Surface       -> colors.outline.copy(alpha = 0.2f) to colors.textSecondary
+        NxMetaChipTone.Success       -> colors.success.copy(alpha = 0.15f) to colors.success
+        NxMetaChipTone.Warning       -> colors.warnAccent.copy(alpha = 0.15f) to colors.warnAccent
         NxMetaChipTone.Error         -> colors.error.copy(alpha = 0.15f) to colors.error
     }
     AssistChip(

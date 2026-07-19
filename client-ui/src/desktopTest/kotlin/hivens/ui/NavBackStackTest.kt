@@ -30,6 +30,18 @@ class NavBackStackTest {
     }
 
     @Test
+    fun versionsScreenPushesOverDetailAndBacksOut() {
+        val nav = NavBackStack(Screen.Library)
+        nav.navigate(Screen.PackDetail("abc"))
+        nav.navigate(Screen.PackVersions("abc"))
+        assertEquals(Screen.PackVersions("abc"), nav.current)
+        assertTrue(nav.back())
+        assertEquals(Screen.PackDetail("abc"), nav.current)
+        assertTrue(nav.back())
+        assertEquals(Screen.Library, nav.current)
+    }
+
+    @Test
     fun backUnwindsDeepFlowToOrigin() {
         // The exact scenario the issue calls out: Browse -> pack detail ->
         // install -> installed detail should back out the way it came in, not

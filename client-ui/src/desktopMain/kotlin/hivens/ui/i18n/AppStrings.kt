@@ -878,6 +878,36 @@ interface AppStrings {
     val packVersionUpdateBadge: String
     val packVersionCheckFailed: String
 
+    // Pack versions screen (build list + per-build changelog)
+    val packVersionsTitle: String
+    val packVersionsAllVersions: String
+    val packVersionsLatestTag: String
+    fun packVersionsRebuilds(n: Int): String
+    val packVersionsChannelRelease: String
+    val packVersionsChannelBeta: String
+    val packVersionsChannelAlpha: String
+    fun packVersionsCounts(mods: Int, assets: Int): String
+    val packVersionsDiffVsPrevious: String
+    val packVersionsDiffVsInstalled: String
+    val packVersionsIdentical: String
+    val packVersionsFirstBuild: String
+    fun packVersionsAdded(n: Int): String
+    fun packVersionsUpdated(n: Int): String
+    fun packVersionsRemoved(n: Int): String
+    val packVersionsSectionMods: String
+    val packVersionsSectionAssets: String
+    val packVersionsSectionPack: String
+    val packVersionsSwitchTo: String
+    val packVersionsConfirmTitle: String
+    fun packVersionsConfirmBody(from: String, to: String): String
+    fun packVersionsPlanCounts(add: Int, update: Int, remove: Int): String
+    fun packVersionsConflicts(n: Int): String
+    fun packVersionsApplying(current: Int, total: Int, name: String): String
+    fun packVersionsApplied(version: String): String
+    fun packVersionsFailed(reason: String): String
+    val packVersionsRetry: String
+    val packVersionsLoadError: String
+
     // Pack settings window (floating, section rail)
     val packSettingsTitle: String
     val packSettingsClose: String
