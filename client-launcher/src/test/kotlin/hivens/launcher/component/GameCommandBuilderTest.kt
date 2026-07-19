@@ -164,9 +164,11 @@ class GameCommandBuilderTest {
     fun `build includes auth host overrides`() {
         val cmd = build("1.7.10")
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
-        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+        // The session pair lives at the BARE host over plain http -- SC's own
+        // patched authlib hardcodes that environment; /launcher/ and https 404.
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=http://") && !it.contains("/launcher") })
         // Modern authlib ignores the redirect wholesale without services.host.
-        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=http://") && !it.contains("/launcher") })
     }
 
     @Test
@@ -583,8 +585,8 @@ class GameCommandBuilderTest {
         val cmd = packCommand(redirectAuthHost = true)
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
-        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
-        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=http://") && !it.contains("/launcher") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=http://") && !it.contains("/launcher") })
     }
 
     @Test

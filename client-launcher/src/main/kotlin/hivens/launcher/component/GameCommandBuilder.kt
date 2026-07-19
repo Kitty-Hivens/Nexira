@@ -146,14 +146,16 @@ internal class GameCommandBuilder(
         addMacOsStartupFlags(args)
 
         // 3. System Properties (Launcher Identity & Custom Authlib)
-        // Legacy authlib (1.7-1.12) reads auth/account/session; modern authlib
-        // (1.16.4+) reads session+services and IGNORES the whole redirect unless
-        // BOTH are set ("Ignoring hosts properties. All need to be set: ...").
-        // Emit the union so every era aims at the SC backend.
+        // Two eras, two bases. Legacy auth/account flows live under the SC
+        // launcher API (/launcher/). The SESSION service -- the join -- lives at
+        // the BARE host over plain http: SC's own patched authlib hardcodes
+        // http://<host>, and both https and /launcher/ variants 404. Modern
+        // authlib (1.16.4+) additionally IGNORES the redirect unless session AND
+        // services are both set, so the pair is emitted together.
         args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
         args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
-        args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
-        args.add("-Dminecraft.api.services.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.session.host=http://${protocolConfig.sslBypassHost}")
+        args.add("-Dminecraft.api.services.host=http://${protocolConfig.sslBypassHost}")
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
 
@@ -314,19 +316,22 @@ internal class GameCommandBuilder(
         if (javaMajor <= 8) args.add("-noverify")
         addMacOsStartupFlags(args)
 
-        // authlib redirect: point every era's host set at the configured host so
+        // authlib redirect: point every era's host set at the SC backend so
         // joining an SC/mirror-derived server authenticates there (same as the SC
-        // path). Legacy authlib (1.7-1.12) reads auth/account/session; modern
-        // authlib (1.16.4+) reads session+services and IGNORES the redirect
-        // entirely unless BOTH are set -- it then joins against PROD Mojang and
-        // the SC server kicks the session as invalid. Mirror-derived packs ONLY --
-        // a Modrinth / local / own pack keeps the default Mojang hosts so its own
-        // auth provider (e.g. real Yggdrasil) is never redirected to the mirror.
+        // path). Legacy auth/account flows live under /launcher/; the SESSION
+        // service -- the join -- lives at the BARE host over plain http (SC's own
+        // patched authlib hardcodes http://<host>; https and /launcher/ both
+        // 404). Modern authlib (1.16.4+) additionally IGNORES the redirect
+        // unless session AND services are both set -- it then joins against PROD
+        // Mojang and the SC server kicks the session as invalid. Mirror-derived
+        // packs ONLY -- a Modrinth / local / own pack keeps the default Mojang
+        // hosts so its own auth provider (e.g. real Yggdrasil) is never
+        // redirected to the mirror.
         if (redirectAuthHost) {
             args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
             args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
-            args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
-            args.add("-Dminecraft.api.services.host=${protocolConfig.baseUrl}/launcher/")
+            args.add("-Dminecraft.api.session.host=http://${protocolConfig.sslBypassHost}")
+            args.add("-Dminecraft.api.services.host=http://${protocolConfig.sslBypassHost}")
         }
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
