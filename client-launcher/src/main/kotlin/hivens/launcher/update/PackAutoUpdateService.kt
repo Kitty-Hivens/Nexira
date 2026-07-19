@@ -5,6 +5,7 @@ import hivens.core.data.AmberUpdatePolicy
 import hivens.core.data.PackOrigin
 import hivens.core.data.SettingsData
 import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
@@ -30,10 +31,12 @@ class PackAutoUpdateService(
     private val repository: IPackRepository,
     private val updater: PackUpdater,
     private val settingsProvider: () -> SettingsData,
-) {
+) : PackUpdateStatusHub {
     private val log = LoggerFactory.getLogger(PackAutoUpdateService::class.java)
     private val state = MutableStateFlow<Map<String, PackUpdateStatus>>(emptyMap())
-    val statuses: StateFlow<Map<String, PackUpdateStatus>> = state.asStateFlow()
+    override val statuses: StateFlow<Map<String, PackUpdateStatus>> = state.asStateFlow()
+
+    override fun report(id: String, status: PackUpdateStatus) = setStatus(id, status)
 
     /** Run one pass over eligible instances. No-op when auto-update is off in settings. */
     suspend fun runOnce() {

@@ -138,6 +138,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
+import hivens.ui.navigation.NavRequests
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
@@ -1100,6 +1101,13 @@ fun AppRoot(
         }
         toolkit.addAWTEventListener(listener, AWTEvent.MOUSE_EVENT_MASK)
         onDispose { toolkit.removeAWTEventListener(listener) }
+    }
+
+    // Out-of-composition navigation requests (notification actions, drivers)
+    // land in the same back stack the buttons above drive.
+    val navRequests: NavRequests = koinInject()
+    LaunchedEffect(navRequests) {
+        navRequests.requests.collect { backStack.navigate(it) }
     }
 
     // ── Background settings ───────────────────────────────────────────────

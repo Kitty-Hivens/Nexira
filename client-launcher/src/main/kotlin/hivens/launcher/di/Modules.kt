@@ -74,6 +74,7 @@ import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
 import hivens.core.update.PackUpdater
+import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.PackInstanceService
@@ -584,7 +585,8 @@ val mirrorModule = module {
         )
     } bind PackUpdater::class
     // Background auto-updater over installed mirror instances. Reads the current
-    // auto-update policy each pass via the settings service.
+    // auto-update policy each pass via the settings service. Also bound as the
+    // status hub so UI badges and manual flows share one state.
     single {
         val settings = get<ISettingsService>()
         PackAutoUpdateService(
@@ -592,7 +594,7 @@ val mirrorModule = module {
             updater = get<PackUpdateService>(),
             settingsProvider = { settings.getSettings() },
         )
-    }
+    } bind PackUpdateStatusHub::class
     single {
         MrpackInstaller(
             clientProvider = get(named("direct")),
