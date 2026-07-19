@@ -71,6 +71,7 @@ import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
+import hivens.core.io.IconProcessor
 import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.PackInstanceService
@@ -470,7 +471,9 @@ val cacheModule = module {
     // pack's Content tab reads parsed mod metadata from the DB instead of re-cracking
     // every jar. Keyed by canonical path, validated by size+mtime.
     single { ContentScanCache(get<CacheFactory>().environment(), "content-scan", get()) }
-    single { InstanceContentScanner(get()) }
+    // Icon processor is bound by the UI module (ImageIO lives outside the
+    // headless engine); a GUI-less assembly scans without one.
+    single { InstanceContentScanner(get(), getOrNull<IconProcessor>()) }
     single { smrtPackCaches() }
     single { modrinthCaches() }
 }

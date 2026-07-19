@@ -1,6 +1,8 @@
 package hivens.launcher.instance
 
+import jetbrains.exodus.env.Environments
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -74,5 +76,42 @@ class InstanceContentScannerTest {
         assertEquals(ContentKind.ResourcePack, item.kind)
         assertEquals("Faithful 32x", item.description)
         assertNotNull(item.iconBytes)
+    }
+
+    @Test
+    fun `bound icon processor rewrites both the returned item and the cached entry`() = runBlocking {
+        val mods = dir.resolve("mods")
+        val jar = mods.resolve("big-icon.jar")
+        zip(jar, mapOf(
+            "fabric.mod.json" to """{"id":"big","name":"Big","version":"1.0","icon":"icon.png"}""".toByteArray(),
+            "icon.png" to ByteArray(512) { it.toByte() },
+        ))
+        val marker = byteArrayOf(7, 7, 7)
+        val env = Environments.newInstance(Files.createTempDirectory("scanenv").toFile())
+        try {
+            val cache = ContentScanCache(env, "content-scan", Json { ignoreUnknownKeys = true })
+            val items = InstanceContentScanner(cache, icons = { marker }).scan(dir)
+            assertTrue(marker.contentEquals(items.single().iconBytes), "returned item carries the processed icon")
+
+            val size = Files.size(jar)
+            val mtime = Files.getLastModifiedTime(jar).toMillis()
+            val hit = cache.lookup(jar.normalize().toString(), size, mtime)
+            assertTrue(marker.contentEquals(hit?.meta?.icon), "cache stores the processed icon, not the original")
+        } finally {
+            env.close()
+        }
+    }
+
+    @Test
+    fun `processor dropping the icon leaves the rest of the metadata intact`() = runBlocking {
+        zip(dir.resolve("mods").resolve("dropped.jar"), mapOf(
+            "fabric.mod.json" to """{"id":"d","name":"Dropped","version":"2.0","icon":"icon.png"}""".toByteArray(),
+            "icon.png" to ByteArray(64),
+        ))
+
+        val item = InstanceContentScanner(icons = { null }).scan(dir).single()
+        assertEquals("Dropped", item.displayName)
+        assertEquals("2.0", item.version)
+        assertNull(item.iconBytes)
     }
 }

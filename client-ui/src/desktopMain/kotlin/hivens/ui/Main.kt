@@ -8,6 +8,7 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.io.IconProcessor
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.bootstrap.RecoveryEntry
 import hivens.ui.threshold.BootOutcome
@@ -29,6 +30,7 @@ import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
@@ -84,6 +86,9 @@ val uiModule = module {
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
     single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
     single { GameConsoleService(get()) }
+    // AWT-backed icon downscaler for the content scanner (the engine module
+    // stays free of java.desktop; the seam interface lives in core).
+    single<IconProcessor> { ImageIoIconProcessor() }
     // Dev UI-debug overlay switchboard. Process-lifetime so the toggle survives
     // shell recomposition + the crash-restart loop; inert on release builds.
     single { DebugOverlayState() }

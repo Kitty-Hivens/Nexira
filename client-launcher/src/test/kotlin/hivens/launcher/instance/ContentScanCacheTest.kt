@@ -1,7 +1,10 @@
 package hivens.launcher.instance
 
+import jetbrains.exodus.ArrayByteIterable
+import jetbrains.exodus.bindings.StringBinding
 import jetbrains.exodus.env.Environment
 import jetbrains.exodus.env.Environments
+import jetbrains.exodus.env.StoreConfig
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -74,6 +77,47 @@ class ContentScanCacheTest {
         assertEquals("Keep", c.lookup("/inst/A/mods/keep.jar", 1L, 1L)?.meta?.name)
         assertNull(c.lookup("/inst/A/mods/gone.jar", 1L, 1L))
         assertEquals("Other", c.lookup("/inst/A2/mods/other.jar", 1L, 1L)?.meta?.name) // sibling untouched
+    }
+
+    @Test
+    fun `icon bytes round-trip through the Base64 field`() {
+        val icon = ByteArray(1000) { (it * 31).toByte() }
+        cache().put("/i/mods/icon.jar", 1L, 2L, CachedMeta(name = "Icon", icon = icon))
+        val hit = cache().lookup("/i/mods/icon.jar", 1L, 2L)
+        assertEquals(true, icon.contentEquals(hit?.meta?.icon))
+    }
+
+    @Test
+    fun `an entry over the size floor caches without its icon instead of failing`() {
+        // 2 MB icon -> ~2.7 MB as Base64 text, over the 1 MB entry floor. The
+        // pre-guard behavior was a TooBigLoggableException from Xodus on every
+        // scan; now the metadata must land minus the icon.
+        val icon = ByteArray(2 * 1024 * 1024)
+        cache().put("/i/mods/huge.jar", 1L, 2L, CachedMeta(name = "Huge", version = "3.0", icon = icon))
+        val hit = cache().lookup("/i/mods/huge.jar", 1L, 2L)
+        assertEquals("Huge", hit?.meta?.name)
+        assertEquals("3.0", hit?.meta?.version)
+        assertNull(hit?.meta?.icon)
+    }
+
+    @Test
+    fun `an entry oversized even without an icon is skipped, not thrown`() {
+        val monster = "x".repeat(2 * 1024 * 1024)
+        cache().put("/i/mods/monster.jar", 1L, 2L, CachedMeta(name = "Monster", description = monster))
+        assertNull(cache().lookup("/i/mods/monster.jar", 1L, 2L))
+    }
+
+    @Test
+    fun `a legacy number-array icon entry reads as a miss`() {
+        // Entries written before the Base64 icon field encode the icon as a JSON
+        // number array. They must decode-fail into a plain miss (re-scan and
+        // overwrite), never throw out of lookup.
+        val legacy = """{"size":1,"mtime":2,"meta":{"name":"Old","icon":[1,2,3]}}"""
+        env.executeInTransaction { txn ->
+            env.openStore("content-scan", StoreConfig.WITHOUT_DUPLICATES, txn)
+                .put(txn, StringBinding.stringToEntry("/i/mods/old.jar"), ArrayByteIterable(legacy.encodeToByteArray()))
+        }
+        assertNull(cache().lookup("/i/mods/old.jar", 1L, 2L))
     }
 
     @Test
