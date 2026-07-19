@@ -82,7 +82,7 @@ fun NavEntry(instance: WidgetInstance) {
             icon         = NxIcon.Star,
             outlineSwap  = true,
             phase        = 0.55f,
-            active       = screen is Screen.Library || screen is Screen.PackDetail,
+            active       = screen is Screen.Library || screen is Screen.PackDetail || screen is Screen.PackVersions,
             onClick      = { ctx.onScreenChange(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(

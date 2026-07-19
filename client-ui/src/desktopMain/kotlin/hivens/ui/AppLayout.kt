@@ -34,6 +34,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.NxTheme
@@ -245,8 +246,15 @@ fun AppLayout(
 
                     is Screen.PackDetail ->
                         PackDetailScreen(
+                            instanceId     = screen.instanceId,
+                            appState       = appState,
+                            onBack         = onBack,
+                            onOpenVersions = { onScreenChange(Screen.PackVersions(screen.instanceId)) },
+                        )
+
+                    is Screen.PackVersions ->
+                        PackVersionsScreen(
                             instanceId = screen.instanceId,
-                            appState   = appState,
                             onBack     = onBack,
                         )
                 }

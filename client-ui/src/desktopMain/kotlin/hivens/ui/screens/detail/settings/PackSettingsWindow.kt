@@ -62,6 +62,7 @@ fun PackSettingsWindow(
     instanceDir: Path,
     onInstanceChange: (PackInstance) -> Unit,
     onDismiss: () -> Unit,
+    onOpenVersions: () -> Unit = {},
 ) {
     val s = LocalStrings.current
     val style = LocalStyle.current
@@ -180,7 +181,7 @@ fun PackSettingsWindow(
                             PackSettingsCategory.Runtime ->
                                 PackRuntimeSection(pack, instanceDir, onInstanceChange)
                             PackSettingsCategory.Version ->
-                                PackVersionSection(pack, onInstanceChange)
+                                PackVersionSection(pack, onInstanceChange, onOpenVersions)
                             PackSettingsCategory.Content ->
                                 PackContentSection(pack, onInstanceChange)
                             PackSettingsCategory.Data ->

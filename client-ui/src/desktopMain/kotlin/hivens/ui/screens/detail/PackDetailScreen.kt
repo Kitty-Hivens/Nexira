@@ -118,6 +118,7 @@ fun PackDetailScreen(
     instanceId: String,
     appState: AppState,
     onBack: () -> Unit,
+    onOpenVersions: () -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
@@ -174,6 +175,7 @@ fun PackDetailScreen(
             onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
             versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
             updateBadge    = autoUpdateStatuses[pack.id] is PackUpdateStatus.Pending,
+            onOpenVersions = onOpenVersions,
         )
 
         // Import/provenance notice (e.g. a CurseForge import whose project/file-id
@@ -217,6 +219,7 @@ fun PackDetailScreen(
             instanceDir      = instanceDir,
             onInstanceChange = { instance = it },
             onDismiss        = { showSettings = false },
+            onOpenVersions   = { showSettings = false; onOpenVersions() },
         )
     }
 }
@@ -395,6 +398,7 @@ private fun Hero(
     onOpenFolder: () -> Unit,
     versionLabel: String?,
     updateBadge: Boolean,
+    onOpenVersions: () -> Unit,
 ) {
     val s = LocalStrings.current
     val art = rememberPackArt(pack)
@@ -476,7 +480,7 @@ private fun Hero(
                         if (showSource) SourceChip(pack.packRef.origin)
                         pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
                         versionLabel?.let { HeroChip("v$it") }
-                        if (updateBadge) HeroUpdateBadge(s.packVersionUpdateBadge)
+                        if (updateBadge) HeroUpdateBadge(s.packVersionUpdateBadge, onClick = onOpenVersions)
                         if (showPlaytime && pack.playtimeSeconds > 0L) HeroChip(playtimeLabel(pack.playtimeSeconds))
                         HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
                     }
@@ -580,11 +584,12 @@ private fun HeroChip(text: String) {
 }
 
 @Composable
-private fun HeroUpdateBadge(text: String) {
+private fun HeroUpdateBadge(text: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
             .background(NxTheme.colors.primary)
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)

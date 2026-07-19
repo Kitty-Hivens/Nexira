@@ -196,6 +196,13 @@ sealed class Screen {
     data class PackDetail    (val instanceId: String) : Screen()
 
     /**
+     * Version manager for an installed mirror pack: the retained build list,
+     * per-build changelog (client-side manifest diff), switch/rollback and
+     * restore points. Same UUID-only payload rationale as [PackDetail].
+     */
+    data class PackVersions  (val instanceId: String) : Screen()
+
+    /**
      * Catalogue-side detail target, source-neutral: carries the [origin] + that
      * source's local pack id. The one [hivens.ui.screens.browse.CataloguePackDetailScreen]
      * resolves both through [hivens.launcher.catalogue.PackCatalogueRegistry] +
