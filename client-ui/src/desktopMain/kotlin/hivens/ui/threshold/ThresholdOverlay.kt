@@ -1,8 +1,8 @@
 package hivens.ui.threshold
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,15 +42,17 @@ import androidx.compose.ui.unit.sp
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.press_start_2p
 import hivens.ui.i18n.AppStrings
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.Font
 import java.awt.Desktop
 import java.nio.file.Path
 import kotlin.concurrent.thread
 import kotlin.math.floor
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 // Pixel-game boot readout: thick block frame with stepped corners, the fill
 // made of discrete segments -- the reference is the classic 8/16-bit loading
@@ -68,28 +71,39 @@ internal data class ThresholdPalette(
     }
 }
 
-// The pixel quantum. Frame thickness, corner steps, segment gaps and the
-// flood's chunky growth are all multiples of this -- one knob keeps every
-// element on the same virtual pixel grid.
+// The pixel quantum. Frame thickness, corner steps, segment gaps, the wave's
+// dither cell and its jitter band are all multiples of this -- one knob keeps
+// every element on the same virtual pixel grid.
 private val UNIT = 6.dp
 
 // The bar group sits at the golden fraction of the surface -- low enough to
 // read staged, without the lower-third hole a 27" fullscreen would open.
 private const val BAR_CENTER_Y = 0.62f
 
-// Anti-flash: a warm boot must not flicker a one-frame bar. Content appears
-// only if boot is still running after the grace; a boot that beats it hands
-// off black-to-shell without ever showing the readout.
-private const val GRACE_MS = 250L
-private const val HOLD_MS  = 180L
+// The beat budget, all frame-clock driven (no wall-clock delay anywhere, so an
+// off-screen scene addresses any frame of the beat deterministically). The
+// readout ALWAYS shows: a warm boot plays the condensed column instead of
+// skipping -- the launch gets a signature beat, never a flicker or a bare veil.
+private const val FLOOR_MS = 350f         // minimum readout screen time before the beat
+private const val WARM_BOOT_MS = 400f     // Ready earlier than this = condensed timings
+private const val HOLD_WARM_MS = 120f
+private const val HOLD_COLD_MS = 180f
+private const val TEXT_FADE_WARM_MS = 100
+private const val TEXT_FADE_COLD_MS = 160
+private const val DECAY_WARM_MS = 150
+private const val DECAY_COLD_MS = 200
+private const val WAVE_WARM_MS = 350
+private const val WAVE_COLD_MS = 550
 
 /**
  * The boot-threshold screen, composed OVER the (not-yet or just-mounted)
  * shell inside the same window. Opaque while boot runs -- which also masks
  * the shell's expensive first composition -- then plays the exit beat:
- * bar completes, one breath, the bar's white floods the canvas (growing on
- * the pixel grid), the flood fades to reveal the live shell beneath. Calls
- * [onDone] when nothing is left to draw; the host removes it.
+ * the bar completes, one breath, the stage/percent text dims, the bar
+ * disassembles cell by cell, and the darkness dissolves as a radial dither
+ * wave from the bar outward, revealing the live shell beneath. A luminance
+ * transition throughout: only darkness is removed, nothing flashes.
+ * Calls [onDone] when nothing is left to draw; the host removes it.
  *
  * Tier-0 by construction: no Koin, no NxTheme, no widget kernel. Strings
  * arrive pre-resolved from the settings peek.
@@ -111,24 +125,32 @@ fun ThresholdOverlay(
     val failed = outcome as? BootOutcome.Failed
     val pixelFont = FontFamily(Font(Res.font.press_start_2p))
 
-    var contentShown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(GRACE_MS)
-        if (currentOutcome == null || currentOutcome is BootOutcome.Failed) contentShown = true
-    }
-    val contentAlpha by animateFloatAsState(if (contentShown) 1f else 0f, tween(120))
+    // Entry is a short fade, not a grace-gated appearance: the old grace window
+    // skipped the readout entirely on a warm boot, which is exactly the
+    // "boot animation sometimes missing" complaint.
+    val entryAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { entryAlpha.animateTo(1f, tween(120)) }
 
     val motion = remember { BarMotion() }
     var bar by remember { mutableStateOf(0f) }
-    LaunchedEffect(contentShown) {
-        if (!contentShown) return@LaunchedEffect
+    var overlayClockMs by remember { mutableStateOf(0f) }
+    var readyAtMs by remember { mutableStateOf(-1f) }
+    LaunchedEffect(Unit) {
+        var first = -1L
         var last = -1L
         while (true) {
+            // A failed boot is a static screen; keep pumping frames for it and
+            // the whole error panel repaints at refresh rate forever.
+            if (currentOutcome is BootOutcome.Failed) break
             withFrameNanos { now ->
+                if (first < 0) first = now
+                overlayClockMs = (now - first) / 1e6f
+                if (readyAtMs < 0 && currentOutcome is BootOutcome.Ready) readyAtMs = overlayClockMs
                 if (last >= 0) {
                     val dt = (now - last) / 1e6f
                     bar = if (currentOutcome is BootOutcome.Ready) {
-                        // Boot finished: sweep to full fast, then the beat fires.
+                        // Boot finished: sweep to full fast; the beat gates on a
+                        // truly full bar (BarMotion snaps the tail).
                         motion.tick(dt, target = 1f, ceiling = 1f, tauMs = 70f)
                     } else {
                         motion.tick(dt, target = stage.floor, ceiling = stage.ceiling)
@@ -139,30 +161,39 @@ fun ThresholdOverlay(
         }
     }
 
-    // Exit is a LUMINANCE transition, not a color one: the readout fades
-    // first, then the dark veil lifts off the already-live shell -- lights
-    // coming up, no white flash on a night-black screen.
-    val readoutFade = remember { Animatable(1f) }
-    val veil        = remember { Animatable(1f) }
+    // Exit drivers, deliberately split: the text dims first, the bar (frame +
+    // segments) disassembles second, the veil wave runs third, overlapping the
+    // tail of the disassembly -- one shared fade would smear the beats together.
+    val textFade = remember { Animatable(1f) }
+    val decay = remember { Animatable(0f) }
+    val wave = remember { Animatable(0f) }
     LaunchedEffect(ready) {
         if (!ready) return@LaunchedEffect
-        if (!contentShown) {
-            // Fast path: the readout never appeared. Give the shell two frames
-            // to land its first composition behind the black, then lift the
-            // veil quickly instead of popping it.
-            withFrameNanos {}
-            withFrameNanos {}
-            veil.animateTo(0f, tween(140, easing = LinearOutSlowInEasing))
-            onDone()
-            return@LaunchedEffect
+        // Gate: a truly full bar AND the readout's floor of screen time -- a
+        // warm boot still shows a complete (condensed) fill, never a flicker.
+        snapshotFlow { bar >= 1f && overlayClockMs >= FLOOR_MS }.first { it }
+        val condensed = readyAtMs >= 0f && readyAtMs <= WARM_BOOT_MS
+        // The breath, accumulated on the frame clock (delay() would break
+        // deterministic frame addressing in off-screen tests).
+        val holdMs = if (condensed) HOLD_WARM_MS else HOLD_COLD_MS
+        var holdStart = -1L
+        while (true) {
+            val done = withFrameNanos { now ->
+                if (holdStart < 0) holdStart = now
+                (now - holdStart) / 1e6f >= holdMs
+            }
+            if (done) break
         }
-        // Exit beat: full bar, one breath, readout dims, darkness lifts.
-        snapshotFlow { bar }.first { it >= 0.995f }
-        delay(HOLD_MS)
-        readoutFade.animateTo(0f, tween(160))
-        veil.animateTo(0f, tween(420, easing = LinearOutSlowInEasing))
+        textFade.animateTo(0f, tween(if (condensed) TEXT_FADE_WARM_MS else TEXT_FADE_COLD_MS))
+        launch { decay.animateTo(1f, tween(if (condensed) DECAY_WARM_MS else DECAY_COLD_MS, easing = LinearEasing)) }
+        // The wave starts at the disassembly's midpoint so the bar's last cells
+        // vanish INTO the advancing front instead of after it.
+        snapshotFlow { decay.value }.first { it >= 0.5f }
+        wave.animateTo(1f, tween(if (condensed) WAVE_WARM_MS else WAVE_COLD_MS, easing = LinearOutSlowInEasing))
         onDone()
     }
+
+    val percent by remember { derivedStateOf { (bar * 100).toInt() } }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Bar geometry on the pixel grid: everything derives from UNIT.
@@ -170,29 +201,53 @@ fun ThresholdOverlay(
         val barHeight = UNIT * 9
         val barTop    = maxHeight * BAR_CENTER_Y - barHeight / 2
 
+        // Monotonic front clamp across draws: a mid-wave window shrink would
+        // otherwise pull the front radius back and re-darken revealed shell.
+        // A plain holder, not State -- written and read during draw only.
+        val frontClamp = remember { FloatArray(1) }
+
         Canvas(Modifier.fillMaxSize()) {
             val u = UNIT.toPx()
             val frameRect = Rect(
                 Offset((size.width - barWidth.toPx()) / 2f, barTop.toPx()),
                 Size(barWidth.toPx(), barHeight.toPx()),
             )
+            val origin = Offset(size.width / 2f, size.height * BAR_CENTER_Y)
 
             // The dark veil: fully opaque while boot runs (masking the shell's
-            // first composition), lifted by the exit beat. The lift is a
-            // Bayer-dither dissolve (the project's first shader) -- darkness
-            // leaves cell by cell on the pixel grid; if the effect failed to
-            // compile, a plain alpha ramp does the same job less prettily.
-            val lift = 1f - veil.value
-            val ditherBrush = if (lift > 0f) DitherVeil.brush(lift, u, pal.field) else null
-            when {
-                lift <= 0f          -> drawRect(pal.field)
-                ditherBrush != null -> drawRect(brush = ditherBrush)
-                else                -> drawRect(pal.field.copy(alpha = veil.value))
+            // first composition), then dissolved by the exit beat as a radial
+            // dither wave from the bar outward -- darkness leaves cell by cell
+            // on the pixel grid. Shader unavailable -> plain alpha ramp.
+            val lift = wave.value
+            if (lift < 1f) {
+                if (lift <= 0f) {
+                    drawRect(pal.field)
+                } else {
+                    val band = 6 * u
+                    val maxDist = sqrt(
+                        max(origin.x, size.width - origin.x).let { it * it } +
+                            max(origin.y, size.height - origin.y).let { it * it },
+                    )
+                    // front = 1 must clear every jittered cell (maxDist + the
+                    // jitter band + one cell), or the unmount pops residue.
+                    val target = lift * (maxDist + band + u)
+                    val frontPx = max(target, frontClamp[0])
+                    frontClamp[0] = frontPx
+                    // Per-frame brush creation is LOAD-BEARING: the framework
+                    // caches a ShaderBrush's shader keyed only by size, so a
+                    // remembered brush with mutated uniforms would freeze the
+                    // wave on its first frame.
+                    val brush = DitherVeil.waveBrush(origin, frontPx, band, u, pal.field)
+                    if (brush != null) drawRect(brush = brush) else drawRect(pal.field.copy(alpha = 1f - lift))
+                }
             }
 
-            val readout = contentAlpha * readoutFade.value
-            if (readout > 0f) {
-                drawPixelFrame(frameRect, u, pal.frame.copy(alpha = 0.92f * readout))
+            // Readout: frame + segments disassemble on [decay] in quantized
+            // steps (the frame dims through four discrete levels, segments
+            // unlight from the right), texts follow their own fade.
+            val frameAlpha = entryAlpha.value * (floor((1f - decay.value) * 4f) / 4f)
+            if (frameAlpha > 0f) {
+                drawPixelFrame(frameRect, u, pal.frame.copy(alpha = 0.92f * frameAlpha))
                 // Fill: discrete segments on the pixel grid, each 3 units wide
                 // with a unit gap -- the bar loads chunk by chunk, never as a
                 // smooth smear. Segment count derives from the inner width.
@@ -203,8 +258,10 @@ fun ThresholdOverlay(
                 val segStride = 4 * u
                 val segCount = floor((inner.width + u) / segStride).toInt().coerceAtLeast(1)
                 val fillFraction = if (failed != null) 0f else bar
-                val lit = floor(fillFraction * segCount).toInt().coerceIn(0, segCount)
-                val alpha = if (failed != null) 0.25f * readout else readout
+                val litFromBar = floor(fillFraction * segCount).toInt()
+                val litFromDecay = floor((1f - decay.value) * segCount).toInt()
+                val lit = min(litFromBar, litFromDecay).coerceIn(0, segCount)
+                val alpha = if (failed != null) 0.25f * entryAlpha.value else entryAlpha.value
                 for (i in 0 until lit) {
                     drawPixelSegment(
                         Rect(
@@ -223,6 +280,7 @@ fun ThresholdOverlay(
             // Stage readout left + honest percent right, both on the bar's own
             // edges, pixel font. Percent shows the displayed (smoothed) value --
             // the same thing the segments show.
+            val textAlpha = entryAlpha.value * textFade.value
             Box(
                 modifier = Modifier.fillMaxWidth().height(labelRowSpace),
                 contentAlignment = Alignment.BottomCenter,
@@ -235,13 +293,13 @@ fun ThresholdOverlay(
                         text       = stageLabel(strings, stage).lowercase(),
                         fontFamily = pixelFont,
                         fontSize   = 16.sp,
-                        color      = pal.frame.copy(alpha = contentAlpha * readoutFade.value),
+                        color      = pal.frame.copy(alpha = textAlpha),
                     )
                     Text(
-                        text       = "${(bar * 100).toInt()}%",
+                        text       = "$percent%",
                         fontFamily = pixelFont,
                         fontSize   = 16.sp,
-                        color      = pal.frame.copy(alpha = contentAlpha * readoutFade.value),
+                        color      = pal.frame.copy(alpha = textAlpha),
                     )
                 }
             }
