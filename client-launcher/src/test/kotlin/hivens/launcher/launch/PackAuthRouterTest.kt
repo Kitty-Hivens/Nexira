@@ -25,6 +25,24 @@ class PackAuthRouterTest {
     }
 
     @Test
+    fun `smartycraft origin binds to its pack id`() {
+        assertEquals(
+            PackAuthRequirement.SmartyCraft("Industrial"),
+            PackAuthRouter.requirementFor(instance(PackOrigin.Smartycraft, id = "Industrial"), null),
+        )
+    }
+
+    @Test
+    fun `mirror origin without an explicit block derives Microsoft`() {
+        // The SC binding for mirror packs comes exclusively from the manifest's
+        // auth block now; a name is not an identity.
+        assertEquals(
+            PackAuthRequirement.Microsoft,
+            PackAuthRouter.requirementFor(instance(PackOrigin.Mirror, name = "Create", id = "Create"), null),
+        )
+    }
+
+    @Test
     fun `non-SC origins derive Microsoft`() {
         for (origin in listOf(PackOrigin.Modrinth, PackOrigin.Local, PackOrigin.Unknown)) {
             assertEquals(
@@ -33,44 +51,5 @@ class PackAuthRouterTest {
                 "origin $origin should derive Microsoft",
             )
         }
-    }
-
-    @Test
-    fun `smartycraft origin without a known name has no requirement`() {
-        assertEquals(null, PackAuthRouter.requirementFor(instance(PackOrigin.Smartycraft, name = "Random"), null))
-    }
-
-    @Test
-    fun `industrial name falls back to SC for SC and mirror origins`() {
-        assertEquals(
-            PackAuthRequirement.SmartyCraft("Industrial"),
-            PackAuthRouter.requirementFor(instance(PackOrigin.Smartycraft, name = "Industrial"), null),
-        )
-        assertEquals(
-            PackAuthRequirement.SmartyCraft("Industrial"),
-            PackAuthRouter.requirementFor(instance(PackOrigin.Mirror, id = "industrial"), null),
-        )
-    }
-
-    @Test
-    fun `create name falls back to SC for the mirror origin`() {
-        // The Create pack joins an SC server; without the mirror auth block the
-        // name table is what keeps the join session valid.
-        assertEquals(
-            PackAuthRequirement.SmartyCraft("Create"),
-            PackAuthRouter.requirementFor(instance(PackOrigin.Mirror, id = "Create", name = "Create"), null),
-        )
-        assertEquals(
-            PackAuthRequirement.SmartyCraft("Create"),
-            PackAuthRouter.requirementFor(instance(PackOrigin.Mirror, id = "create", name = "Renamed By User"), null),
-        )
-    }
-
-    @Test
-    fun `mirror origin without an SC name derives Microsoft`() {
-        assertEquals(
-            PackAuthRequirement.Microsoft,
-            PackAuthRouter.requirementFor(instance(PackOrigin.Mirror, name = "Cool", id = "cool"), null),
-        )
     }
 }
