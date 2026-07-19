@@ -375,7 +375,10 @@ private fun runShellWithRecovery(
     bootStage: MutableStateFlow<BootStage>,
 ) {
     val log = LoggerFactory.getLogger("ShellRecovery")
+    var restarts = 0
     while (true) {
+        val isRestart = restarts > 0
+        restarts++
         // Safe mode runs a standalone window that does NOT build the shell
         // scaffolding (Koin inject, tray init, theme, widget kernel) -- a crash
         // anywhere in that scaffolding is what latched safe mode, so re-running
@@ -420,10 +423,11 @@ private fun runShellWithRecovery(
                             onExit = { exitApplication() },
                         )
                     } else {
-                        // Boot already done on a restart iteration: ShellHost
-                        // sees Ready at first composition and skips the
-                        // threshold, so a recovered shell reappears directly.
-                        ShellHost(pre, bootOutcome, bootStage)
+                        // The restart flag lets ShellHost skip the threshold only
+                        // on a genuine recovery re-entry with boot done -- a first
+                        // boot that finished before the window composed still
+                        // plays it.
+                        ShellHost(pre, bootOutcome, bootStage, isRestart = isRestart)
                     }
                 }
             }
