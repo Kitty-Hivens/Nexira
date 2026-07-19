@@ -53,6 +53,20 @@ class PackAuthRouterTest {
     }
 
     @Test
+    fun `create name falls back to SC for the mirror origin`() {
+        // The Create pack joins an SC server; without the mirror auth block the
+        // name table is what keeps the join session valid.
+        assertEquals(
+            PackAuthRequirement.SmartyCraft("Create"),
+            PackAuthRouter.requirementFor(instance(PackOrigin.Mirror, id = "Create", name = "Create"), null),
+        )
+        assertEquals(
+            PackAuthRequirement.SmartyCraft("Create"),
+            PackAuthRouter.requirementFor(instance(PackOrigin.Mirror, id = "create", name = "Renamed By User"), null),
+        )
+    }
+
+    @Test
     fun `mirror origin without an SC name derives Microsoft`() {
         assertEquals(
             PackAuthRequirement.Microsoft,

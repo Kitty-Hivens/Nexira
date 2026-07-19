@@ -37,11 +37,22 @@ object PackAuthRouter {
      * SC requirement for an SC-bound pack whose mirror manifest carries no
      * explicit `auth` block yet. Recognises the shipping SC pack identities by
      * name; drains as the mirror authors fill in
-     * `auth: { kind: smartycraft, server_id: ... }`.
+     * `auth: { kind: smartycraft, server_id: ... }`. A pack missing from this
+     * table launches with a Microsoft/vanilla session and the SC server kicks
+     * it with an invalid-session error, so a newly mirrored SC pack must land
+     * here (or, properly, in the mirror's auth block) before it is playable.
      */
     private fun scFallback(instance: PackInstance): PackAuthRequirement? {
-        val matchesIndustrial = listOf(instance.displayName, instance.packRef.id)
-            .any { it.equals("Industrial", ignoreCase = true) }
-        return if (matchesIndustrial) PackAuthRequirement.SmartyCraft("Industrial") else null
+        val serverId = SC_BOUND_PACKS.entries.firstOrNull { (packName, _) ->
+            instance.displayName.equals(packName, ignoreCase = true) ||
+                instance.packRef.id.equals(packName, ignoreCase = true)
+        }?.value
+        return serverId?.let { PackAuthRequirement.SmartyCraft(it) }
     }
+
+    // Pack identity (display name or pack id) -> SC server id the join binds to.
+    private val SC_BOUND_PACKS = mapOf(
+        "Industrial" to "Industrial",
+        "Create" to "Create",
+    )
 }
