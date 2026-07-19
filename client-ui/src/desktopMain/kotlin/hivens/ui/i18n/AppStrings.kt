@@ -983,6 +983,10 @@ interface AppStrings {
     val packDetailPlay: String
     /** Shown above the Play button when the user is not authenticated. */
     val packDetailPlayLoginRequired: String
+    /** Wait state on the hero Play pill while the launch prepares or syncs. */
+    val packPlayWait: String
+    /** Run state on the hero Play pill; activating it stops the game. */
+    val packPlayExit: String
     val packDetailNotFoundTitle: String
     val packDetailNotFoundHint: String
     val packDetailNotFoundBack: String

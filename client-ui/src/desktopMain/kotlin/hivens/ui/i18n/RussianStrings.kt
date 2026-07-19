@@ -940,6 +940,8 @@ object RussianStrings : AppStrings {
     override fun packDetailInstanceDirHint(dirName: String) = "Папка экземпляра: instances/$dirName"
     override val packDetailPlay                 = "Играть"
     override val packDetailPlayLoginRequired    = "Войдите, чтобы играть"
+    override val packPlayWait                   = "Подождите"
+    override val packPlayExit                   = "Выход"
     override val packDetailNotFoundTitle        = "Экземпляр не найден"
     override val packDetailNotFoundHint         = "Возможно, удалён в другом окне."
     override val packDetailNotFoundBack         = "Назад в Library"
