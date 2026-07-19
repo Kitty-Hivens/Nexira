@@ -72,9 +72,11 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
+import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxDiffRow
 import hivens.ui.nx.NxDiffRowKind
+import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxRow
@@ -234,6 +236,16 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
             }
             StatusRow(applyState)
         }
+        // Corner close mirrors the settings window: the screen is a route (back
+        // works too), but a transient-feeling surface earns an explicit exit.
+        // Declared after the panes so it stays on top of the detail header.
+        PuppetClick("packVersions.close") { onBack() }
+        NxIconButton(
+            icon               = NxIcon.Close,
+            contentDescription = s.packSettingsClose,
+            onClick            = onBack,
+            modifier           = Modifier.align(Alignment.TopEnd).padding(10.dp),
+        )
     }
 
     confirmTarget?.let { preview ->
@@ -489,7 +501,12 @@ private fun BuildDetailPane(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // End inset keeps the title row clear of the card's corner close button.
+        Row(
+            modifier              = Modifier.fillMaxWidth().padding(end = 40.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             Text(
                 text       = build.versionNumber,
                 style      = MaterialTheme.typography.headlineSmall,
