@@ -13,9 +13,10 @@ import kotlinx.coroutines.coroutineScope
 
 /**
  * The Hivens mirror as a [IPackCatalogueService]. The mirror has no query
- * endpoint, so [search] lists everything and filters client-side. A mirror pack
- * exposes a single current version (`latest_pack_version`); the install flow
- * re-syncs to it rather than downloading a single artifact.
+ * endpoint, so [search] lists everything and filters client-side. [details]
+ * carries the full retained build list so the Browse install picker can offer
+ * any version -- the coordinator installs the picked build's own manifest --
+ * degrading to the single latest when the listing is unavailable.
  */
 class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueService {
     override val origin = PackOrigin.Mirror
@@ -41,12 +42,25 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
             }
 
     override suspend fun details(packId: String): CataloguePackDetails = coroutineScope {
-        // Summary + manifest in parallel: the manifest carries loader + Java that the
-        // detail metadata block shows but the summary alone doesn't.
+        // Summary + manifest + build listing in parallel: the manifest carries
+        // loader + Java for the metadata block, the listing feeds the version
+        // picker (server order, newest first).
         val summaryD = async { client.fetchSummary(packId) }
         val manifestD = async { client.fetchManifest(packId) }
+        val buildsD = async { runCatching { client.listBuilds(packId).builds }.getOrDefault(emptyList()) }
         val s = summaryD.await()
         val m = manifestD.await()
+        val versions = buildsD.await()
+            .map { b ->
+                CataloguePackVersion(
+                    id = b.versionNumber,
+                    name = b.versionNumber,
+                    versionNumber = b.versionNumber,
+                    mcVersions = listOf(m.minecraft.version),
+                    loaders = listOf(m.loader.name),
+                )
+            }
+            .ifEmpty { listOf(versionOf(s, m)) }
         CataloguePackDetails(
             origin = origin,
             id = s.packId,
@@ -58,7 +72,7 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
             bodyMarkdown = s.descriptionMd,
             tags = s.tags,
             runtimeLabel = "Java ${m.java.major}",
-            versions = listOf(versionOf(s, m)),
+            versions = versions,
         )
     }
 
