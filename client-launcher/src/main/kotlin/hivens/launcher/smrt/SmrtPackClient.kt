@@ -76,10 +76,14 @@ class SmrtPackClient(
         return caches.listing.get(url) { getJson(url) }
     }
 
-    /** The build versions the mirror retains for a pack; ordering is the caller's. */
-    suspend fun listVersions(packId: String): List<String> {
+    /**
+     * The per-build listing the mirror retains for a pack, newest first. The
+     * server order is canonical (publish-date across channels); callers must
+     * not re-sort by version tuples.
+     */
+    suspend fun listBuilds(packId: String): SmrtManifestVersions {
         val url = "$mirrorBase/v1/packs/$packId/manifest/versions"
-        return getJson<SmrtManifestVersions>(url).versions
+        return caches.versions.get(url) { getJson(url) }
     }
 
     /**

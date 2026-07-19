@@ -1,5 +1,6 @@
 package hivens.launcher.update
 
+import hivens.core.api.dto.smrt.SmrtManifestBuild
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.dto.smrt.toDomain
@@ -17,8 +18,6 @@ import hivens.core.update.UpdateOutcome
 import hivens.core.update.CompatChange
 import hivens.core.update.UpdateReconciler
 import hivens.core.update.classifyCompat
-import hivens.core.update.comparePackVersions
-import hivens.core.update.isNewerPackVersion
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
@@ -63,18 +62,32 @@ class PackUpdateService(
         instance.pinnedPackVersion ?: instance.packRef.version
 
     /**
-     * Read-only preview: is a newer build available, and what would applying it
-     * do? Advisory -- it scans disk without the mutation lock; the authoritative
-     * plan is recomputed under the lock in [applyUpdate].
+     * Read-only preview: is a different build current on the mirror, and what
+     * would applying it do? Detection is label INEQUALITY, not tuple ordering:
+     * versions are canonical strings, channel builds (`SNAPSHOT-...`) do not
+     * tuple-compare against releases, and a mirror-side rollback of latest is
+     * also a change to surface. Advisory -- it scans disk without the mutation
+     * lock; the authoritative plan is recomputed under the lock in [applyUpdate].
      */
     override suspend fun checkForUpdate(instance: PackInstance): UpdateCheck = withContext(Dispatchers.IO) {
         val packId = instance.packRef.id
         val latest = client.fetchSummary(packId).latestPackVersion
         val current = currentVersionOf(instance)
-        if (current != null && !isNewerPackVersion(latest, current)) {
+        if (current != null && latest == current) {
             return@withContext UpdateCheck.UpToDate
         }
         previewFor(instance, client.fetchManifest(packId))
+    }
+
+    /**
+     * Read-only preview of a switch to the specific [targetVersion], forward or
+     * backward. Same advisory caveat as [checkForUpdate].
+     */
+    override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck = withContext(Dispatchers.IO) {
+        if (currentVersionOf(instance) == targetVersion) {
+            return@withContext UpdateCheck.UpToDate
+        }
+        previewFor(instance, client.fetchManifestVersion(instance.packRef.id, targetVersion))
     }
 
     /**
@@ -222,13 +235,17 @@ class PackUpdateService(
         )
     }
 
-    /** The mirror's available builds for [instance], newest first, for a version switch or rollback. */
-    suspend fun availableVersions(instance: PackInstance): List<String> = withContext(Dispatchers.IO) {
-        client.listVersions(instance.packRef.id).sortedWith { a, b -> comparePackVersions(b, a) }
+    /**
+     * The mirror's retained builds for [instance], newest first. Server order is
+     * kept as-is: publish date is the only ranking that holds across channels,
+     * and the listing already arrives sorted by it.
+     */
+    override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = withContext(Dispatchers.IO) {
+        client.listBuilds(instance.packRef.id).builds
     }
 
     /** Snapshots [instance] can be rolled back to, newest first. */
-    fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
+    override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
         snapshotService.list(instance.instanceDirName)
 
     /**
@@ -236,7 +253,7 @@ class PackUpdateService(
      * and the pre-update instance record under the mutation lock. Returns the
      * restored instance.
      */
-    suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance {
+    override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance {
         val clientDir = clientDirOf(instance)
         return InstanceMutationLock.withLock(clientDir) {
             withContext(Dispatchers.IO) {

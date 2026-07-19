@@ -1,5 +1,6 @@
 package hivens.launcher.update
 
+import hivens.core.api.dto.smrt.SmrtManifestBuild
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.AmberUpdatePolicy
 import hivens.core.data.PackInstance
@@ -7,6 +8,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.SettingsData
 import hivens.core.update.CompatChange
+import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
@@ -37,6 +39,8 @@ class PackAutoUpdateServiceTest {
         val applied = mutableListOf<String>()
         override suspend fun checkForUpdate(instance: PackInstance): UpdateCheck =
             checks[instance.id] ?: UpdateCheck.UpToDate
+        override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
+            checks[instance.id] ?: UpdateCheck.UpToDate
         override suspend fun applyUpdate(
             instance: PackInstance,
             targetVersion: String?,
@@ -45,6 +49,9 @@ class PackAutoUpdateServiceTest {
             applied += instance.id
             return UpdateOutcome.Applied("2026.02.02", CompatChange.Same, UpdatePlan())
         }
+        override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = emptyList()
+        override fun listSnapshots(instance: PackInstance): List<PackSnapshot> = emptyList()
+        override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance
     }
 
     private fun instance(id: String, origin: PackOrigin = PackOrigin.Mirror, followLatest: Boolean = true) =

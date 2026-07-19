@@ -62,13 +62,13 @@ internal fun PackVersionSection(pack: PackInstance, onInstanceChange: (PackInsta
 
     fun refresh() {
         scope.launch {
-            versions = runCatching { updater.availableVersions(pack) }.getOrDefault(versions)
+            versions = runCatching { updater.availableBuilds(pack).map { it.versionNumber } }.getOrDefault(versions)
             snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
         }
     }
 
     LaunchedEffect(pack.id) {
-        versions = runCatching { updater.availableVersions(pack) }.getOrDefault(emptyList())
+        versions = runCatching { updater.availableBuilds(pack).map { it.versionNumber } }.getOrDefault(emptyList())
         snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(emptyList())
     }
 

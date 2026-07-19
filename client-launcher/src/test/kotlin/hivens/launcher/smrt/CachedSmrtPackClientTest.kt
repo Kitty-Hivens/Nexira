@@ -97,6 +97,7 @@ class CachedSmrtPackClientTest {
             listing = f.create("pack-listing", SmrtPackListing.serializer(), listingConfig),
             summary = PassthroughCache(),
             manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), manifestConfig),
+            versions = PassthroughCache(),
         )
     }
 
