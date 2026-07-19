@@ -53,6 +53,16 @@ class NavBackStack(root: Screen) {
         entries.add(screen)
     }
 
+    /**
+     * Swap the top entry in place, keeping history and the forward path intact.
+     * For a screen re-describing itself before a push -- e.g. PackDetail marking
+     * that its settings overlay must restore when Back returns to it -- not for
+     * navigation; use [navigate] to actually go somewhere.
+     */
+    fun replaceCurrent(screen: Screen) {
+        entries[entries.lastIndex] = screen
+    }
+
     /** Pop one entry onto the forward stack. No-op at the root; returns whether
      *  anything was popped. */
     fun back(): Boolean {

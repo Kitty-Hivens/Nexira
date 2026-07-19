@@ -64,6 +64,7 @@ fun AppLayout(
     onCloseApp: () -> Unit,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
+    onReplaceScreen: (Screen) -> Unit = {},
     onBack: () -> Unit,
     canGoBack: Boolean,
     canGoForward: Boolean,
@@ -246,10 +247,17 @@ fun AppLayout(
 
                     is Screen.PackDetail ->
                         PackDetailScreen(
-                            instanceId     = screen.instanceId,
-                            appState       = appState,
-                            onBack         = onBack,
-                            onOpenVersions = { onScreenChange(Screen.PackVersions(screen.instanceId)) },
+                            instanceId          = screen.instanceId,
+                            appState            = appState,
+                            onBack              = onBack,
+                            initialShowSettings = screen.openSettings,
+                            onOpenVersions      = { fromSettings ->
+                                // Coming from the settings overlay: stamp the current
+                                // stack entry so Back restores the overlay, not the
+                                // bare pack page.
+                                if (fromSettings) onReplaceScreen(Screen.PackDetail(screen.instanceId, openSettings = true))
+                                onScreenChange(Screen.PackVersions(screen.instanceId))
+                            },
                         )
 
                     is Screen.PackVersions ->
