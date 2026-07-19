@@ -7,10 +7,17 @@ import jetbrains.exodus.env.Environment
 import jetbrains.exodus.env.Store
 import jetbrains.exodus.env.StoreConfig
 import jetbrains.exodus.env.Transaction
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import java.util.Base64
 
 /**
  * Persistent cache of parsed archive metadata over Xodus, so re-opening a pack's
@@ -38,9 +45,34 @@ class ContentScanCache(
 
     fun put(canonicalPath: String, size: Long, mtime: Long, meta: CachedMeta?) {
         runCatching {
-            val bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, meta)).encodeToByteArray()
+            val bytes = encodeBounded(canonicalPath, size, mtime, meta) ?: return
             env.executeInTransaction { txn -> store(txn).put(txn, key(canonicalPath), ArrayByteIterable(bytes)) }
         }.onFailure { log.warn("scan cache write failed for {}", canonicalPath, it) }
+    }
+
+    /**
+     * Encodes an entry, keeping it under [MAX_ENTRY_BYTES]. A single Xodus
+     * loggable must fit the environment's log file; an oversized write throws
+     * TooBigLoggableException and rolls the transaction back, so the cache would
+     * never populate and every Content-tab open would re-parse and re-fail.
+     * Icons are downscaled upstream, but a build without the processor (or an
+     * icon that survived it) still needs this floor: retry without the icon so
+     * the parsed metadata caches anyway, and only skip when even that is huge.
+     */
+    private fun encodeBounded(canonicalPath: String, size: Long, mtime: Long, meta: CachedMeta?): ByteArray? {
+        var bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, meta)).encodeToByteArray()
+        if (bytes.size > MAX_ENTRY_BYTES && meta?.icon != null) {
+            val slim = CachedMeta(
+                meta.name, meta.version, meta.description, null,
+                meta.homepageUrl, meta.license, meta.authors, meta.dependencies,
+            )
+            bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, slim)).encodeToByteArray()
+        }
+        if (bytes.size > MAX_ENTRY_BYTES) {
+            log.warn("scan cache entry for {} is {} bytes even without an icon; not cached", canonicalPath, bytes.size)
+            return null
+        }
+        return bytes
     }
 
     /**
@@ -73,6 +105,22 @@ class ContentScanCache(
     private fun store(txn: Transaction): Store = env.openStore(storeName, StoreConfig.WITHOUT_DUPLICATES, txn)
     private fun key(s: String): ByteIterable = StringBinding.stringToEntry(s)
     private fun ByteIterable.toByteArray(): ByteArray = bytesUnsafe.copyOf(length)
+
+    private companion object {
+        const val MAX_ENTRY_BYTES = 1 shl 20
+    }
+}
+
+/**
+ * Icon bytes as Base64 text instead of kotlinx's default number-per-byte JSON
+ * array, which inflates a PNG 3-4x and is what pushed real entries past the
+ * Xodus loggable limit. Pre-Base64 entries fail to decode, which reads as a
+ * cache miss: the archive re-parses and the entry is rewritten in this format.
+ */
+private object Base64Bytes : KSerializer<ByteArray> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("hivens.Base64Bytes", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ByteArray) = encoder.encodeString(Base64.getEncoder().encodeToString(value))
+    override fun deserialize(decoder: Decoder): ByteArray = Base64.getDecoder().decode(decoder.decodeString())
 }
 
 /** A file's identity (size + mtime) plus its parsed [meta] (null for a shader / unparsed archive). */
@@ -89,6 +137,7 @@ class CachedMeta(
     val name: String? = null,
     val version: String? = null,
     val description: String? = null,
+    @Serializable(with = Base64Bytes::class)
     val icon: ByteArray? = null,
     val homepageUrl: String? = null,
     val license: String? = null,

@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import hivens.core.io.IconProcessor
 import hivens.core.io.SharedZip
 import hivens.core.io.openSharedZip
 import kotlin.io.path.isDirectory
@@ -61,7 +62,15 @@ class InstalledContent(
  * and from-scratch instances all read the same way -- the Content tab no longer
  * depends on a server manifest. One corrupt archive is logged and skipped.
  */
-class InstanceContentScanner(private val cache: ContentScanCache? = null) {
+class InstanceContentScanner(
+    private val cache: ContentScanCache? = null,
+    /**
+     * Bounds extracted icons (a declared logo can be a multi-MB PNG rendered at
+     * list-row size). Null in headless assemblies; the cache then falls back on
+     * its own entry-size floor and oversized icons simply are not cached.
+     */
+    private val icons: IconProcessor? = null,
+) {
 
     private val log = LoggerFactory.getLogger(InstanceContentScanner::class.java)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -124,7 +133,7 @@ class InstanceContentScanner(private val cache: ContentScanCache? = null) {
                 ContentKind.Mod -> readModMeta(file)
                 ContentKind.ResourcePack -> readPackMeta(file)
                 ContentKind.ShaderPack -> null
-            }.also { cache?.put(cacheKey, size, mtime, it?.toCached()) }
+            }?.normalizeIcon().also { cache?.put(cacheKey, size, mtime, it?.toCached()) }
             else -> hit.meta?.toMeta()
         }
         return InstalledContent(
@@ -264,7 +273,7 @@ class InstanceContentScanner(private val cache: ContentScanCache? = null) {
             val nested = zip.entryNames().firstOrNull { it.startsWith("assets/") && it.endsWith("/icon.png") }
             nested?.let { zip.readEntry(it) }
         }
-    }.getOrNull()
+    }.getOrNull()?.let { bytes -> icons?.process(bytes) ?: bytes }
 
     /** Drop the extension and trailing version/loader tokens so a bare filename reads cleaner. */
     private fun prettyName(fileName: String): String =
@@ -285,6 +294,15 @@ class InstanceContentScanner(private val cache: ContentScanCache? = null) {
         val authors: List<String> = emptyList(),
         val dependencies: List<String> = emptyList(),
     )
+
+    /** Runs the icon through the bound [icons] processor; identity when none is bound or there is no icon. */
+    private fun Meta.normalizeIcon(): Meta {
+        val processor = icons ?: return this
+        val original = icon ?: return this
+        val processed = processor.process(original)
+        return if (processed === original) this
+        else Meta(name, version, description, processed, homepageUrl, license, authors, dependencies)
+    }
 
     private fun Meta.toCached() =
         CachedMeta(name, version, description, icon, homepageUrl, license, authors, dependencies)
