@@ -111,7 +111,7 @@ import org.koin.compose.koinInject
  * Tabs are scoped to a single per-instance dir (`<dataDir>/instances/
  * <instance.instanceDirName>`) for Files / Worlds; the Content tab
  * uses [PackInstance.packRef] to fetch the mirror manifest on each
- * open. Logs tab deferred per [[project_logs_tab_open_question]].
+ * open.
  */
 @Composable
 fun PackDetailScreen(
