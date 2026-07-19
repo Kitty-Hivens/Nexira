@@ -174,18 +174,17 @@ class LaunchDriver(
                 log.warn("Failed to send command to game process for ${target.id}", e)
             }
         }
+        // Informational only, and it auto-dismisses: the game just appeared on
+        // screen, the toast has nothing to ask. Control (console, abort) lives
+        // on the session surfaces, not as buttons racing the game for attention.
         notifications.push(
             sourceKey = target.sourceKey,
             sender    = target.displayName,
             iconUrl   = target.iconUrl,
             severity  = Severity.Success,
-            kind      = Kind.ActionRequired,
+            kind      = Kind.OneShot,
             title     = s.notifPackRunning(target.displayName),
             body      = null,
-            actions   = listOf(
-                NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() },
-                NotifAction("abort",        s.notifActionStop)        { controller.abort() },
-            ),
         )
     }
 
