@@ -3,6 +3,7 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import java.io.File
+import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -143,9 +144,10 @@ kotlin {
         }
 
         // The agent jars ship as OPAQUE resources under /runtime/, NOT compile
-        // dependencies: they land in the ProGuard'd uber jar where -repackageclasses
-        // would rename their Premain-Class and break -javaagent. AgentExtractor reads
-        // /runtime/profiler-agent.jar (heap sampling) and /runtime/authlib-agent.jar
+        // dependencies: an agent jar carries its own Premain-Class manifest and must
+        // stay a self-contained jar, not be merged into the app classpath.
+        // AgentExtractor reads /runtime/profiler-agent.jar (heap sampling) and
+        // /runtime/authlib-agent.jar
         // (SC-bound auth redirect) at runtime. The bundle* tasks (below) fill these
         // generated dirs; every *ProcessResources task depends on them.
         desktopMain.resources.srcDir(layout.buildDirectory.dir("generated/profilerAgent"))
@@ -214,18 +216,15 @@ compose.desktop {
                 TargetFormat.Dmg
             )
 
-            // Shrinker: ProGuard 7.8.2, configured via compose-desktop.pro.
-            // optimize=true enables the optimization passes declared in the
-            // .pro file; obfuscate=false keeps stack traces / class names
-            // readable in crash reports (Nexira is GPL, hiding names earns nothing).
-            // The `version.set(...)` pin ties ProGuard to the libs catalog
-            // entry so a Compose-MP bump cannot silently drift the shrinker.
+            // No shrinker. ProGuard is gone: its reflection tax was a string of
+            // release-only crashes (JMX MBeans, ServiceLoader providers, Panama
+            // upcall stubs), each bought off with a per-lib keep rule, for ~4 MB
+            // off the final AppImage -- measured. We do not obfuscate (GPL, and
+            // readable stack traces beat hidden names), so shrinking bought only
+            // size, and that size is better spent by storing the uber jar
+            // uncompressed for the outer compressor (see the post-process below).
             buildTypes.release.proguard {
-                isEnabled.set(true)
-                optimize.set(true)
-                obfuscate.set(false)
-                configurationFiles.from(project.file("compose-desktop.pro"))
-                version.set(libs.versions.proguard.get())
+                isEnabled.set(false)
             }
 
             packageName = "Nexira"
@@ -598,9 +597,8 @@ tasks.withType<Jar>().configureEach {
     // kotlinx.coroutines debug-mode instrumentation. Only consulted when
     // launched with -Dkotlinx.coroutines.debug=on; production never does.
     exclude("DebugProbesKt.bin")
-    // ProGuard config shipped inside third-party jars (so consumers can
-    // apply recommended keep rules). Not needed at runtime; we have our
-    // own compose-desktop.pro and shrink ourselves.
+    // ProGuard config shipped inside third-party jars (so consumers who shrink
+    // can apply recommended keep rules). We do not shrink; never loaded at runtime.
     exclude("META-INF/proguard/**")
     // Android tooling artifacts (lint baselines, mocked-resources hints).
     // JVM-only desktop; never loaded.
@@ -613,44 +611,58 @@ tasks.withType<Jar>().configureEach {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-// Strip stale JAR signatures from the ProGuard release output. bcprov-jdk18on
-// (transitive via dev.hivens:libvault) ships signed by BouncyCastle; ProGuard
-// repackages its classes but keeps the original META-INF/*.SF/*.RSA, so the JVM
-// rejects the jar at load with "Invalid signature file digest" and the launcher
-// crashes before main. The `tasks.withType<Jar>` exclude above cannot reach
-// ProGuard's own output, so drop the signature entries once ProGuard has written
-// the jars. We ship unsigned; jpackage / Inno Setup own the outer envelope.
-tasks.matching { it.name == "proguardReleaseJars" }.configureEach {
-    // Resolve to a plain File in this task-config lambda so the doLast captures only
-    // that File (a local), not the Project or the build script object -- either would
-    // break configuration-cache serialization.
-    val outDir = layout.buildDirectory.dir("compose/tmp/main-release/proguard").get().asFile
+// Post-process the release uber jar (fed to the Linux AppImage). Two passes in one
+// rewrite:
+//
+//   1. Drop stale JAR signatures. bcprov-jdk18on (transitive via dev.hivens:libvault)
+//      ships signed by BouncyCastle. Merged into the uber jar under a different
+//      manifest, its META-INF/*.SF/*.RSA no longer verify and the JVM aborts at load
+//      with "Invalid signature file digest", before main. (Windows / macOS ship the
+//      distribution's separate jars, where bcprov stays its own valid signed jar, so
+//      only the merged uber jar needs this.) The `tasks.withType<Jar>` exclude above
+//      does not reach the Compose uber-jar task's own output.
+//
+//   2. Store every entry uncompressed. A DEFLATE'd jar is opaque to the outer AppImage
+//      squashfs pass -- it cannot re-compress already-compressed bytes -- so the ~100 MB
+//      of class data rides at DEFLATE ratio. Stored, the single squashfs-zstd pass
+//      compresses the classes and dedups thousands of near-identical Compose classes:
+//      ~22 MB off the AppImage, measured. Same reasoning as the jlink `compress unset`
+//      note above, applied to the app jar.
+//
+// We ship unsigned; jpackage / Inno Setup own the outer envelope.
+tasks.matching { it.name == "packageReleaseUberJarForCurrentOS" }.configureEach {
+    // Resolve to a plain File at config time so the doLast captures only Files (locals),
+    // not the Project or the build script object -- either breaks configuration-cache
+    // serialization.
+    val jarsDir = layout.buildDirectory.dir("compose/jars").get().asFile
     doLast {
-        if (!outDir.isDirectory) return@doLast
+        if (!jarsDir.isDirectory) return@doLast
         val sig = Regex("META-INF/[^/]+\\.(SF|RSA|DSA|EC)", RegexOption.IGNORE_CASE)
-        outDir.listFiles { f -> f.extension == "jar" }?.forEach { jar ->
-            var signed = false
-            ZipFile(jar).use { z ->
-                val en = z.entries()
-                while (en.hasMoreElements()) { if (sig.matches(en.nextElement().name)) { signed = true; break } }
-            }
-            if (!signed) return@forEach
-            val tmp = File(jar.parentFile, "${jar.name}.unsigned")
+        jarsDir.listFiles { f -> f.extension == "jar" }?.forEach { jar ->
+            val tmp = File(jar.parentFile, "${jar.name}.stored")
             ZipFile(jar).use { z ->
                 ZipOutputStream(tmp.outputStream().buffered()).use { out ->
+                    out.setMethod(ZipOutputStream.STORED)
                     val en = z.entries()
                     while (en.hasMoreElements()) {
                         val e = en.nextElement()
                         if (sig.matches(e.name)) continue
-                        out.putNextEntry(ZipEntry(e.name))
-                        if (!e.isDirectory) z.getInputStream(e).use { it.copyTo(out) }
+                        val data = if (e.isDirectory) ByteArray(0) else z.getInputStream(e).use { it.readBytes() }
+                        val checksum = CRC32().apply { update(data) }.value
+                        out.putNextEntry(ZipEntry(e.name).apply {
+                            method = ZipEntry.STORED
+                            size = data.size.toLong()
+                            compressedSize = data.size.toLong()
+                            crc = checksum
+                        })
+                        out.write(data)
                         out.closeEntry()
                     }
                 }
             }
             jar.delete()
             tmp.renameTo(jar)
-            println("stripSignatures: removed signature entries from ${jar.name}")
+            println("uber-jar post-process: stored + unsigned ${jar.name}")
         }
     }
 }

@@ -51,9 +51,10 @@ class XodusPackRepository(
         Files.createDirectories(dbDir)
         // Durable (fsync'd) commits: the registry is the user's installed-pack library,
         // so an install must survive a power loss -- unlike the disposable caches.
-        // Management disabled: the obfuscated distributable renames Xodus's MBean
-        // interface, so its Standard-MBean registration throws NotCompliantMBeanException
-        // on startup. Nothing here consumes those JMX beans, so skip them.
+        // Management off: Xodus registers a reflection-only Standard MBean we never
+        // consume, and a classpath shrinker that strips its by-name MBean interface
+        // (as the old release ProGuard pass did) makes registration throw
+        // NotCompliantMBeanException before the shell starts. Disabling it sidesteps both.
         Environments.newInstance(dbDir.toFile(), EnvironmentConfig().setLogDurableWrite(true).setManagementEnabled(false))
     }
     private val mutex = Mutex()

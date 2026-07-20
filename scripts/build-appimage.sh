@@ -18,7 +18,8 @@
 #                         packaging-profile.sh, produced by the
 #                         `:client-ui:emitAppImageProfile` gradle task)
 #
-# Requires on PATH: jlink (from JDK), appimagetool (continuous build).
+# Requires on PATH: jlink (from JDK), appimagetool (continuous build),
+# zip + unzip (Info-ZIP -- the foreign-JNA strip below).
 #
 # Why this lives in a script: the inline yaml in build_release.yml grew to
 # ~50 lines with a heredoc, three mkdir trees, four cp blocks and an
@@ -100,6 +101,24 @@ chmod +x "$APPDIR/AppRun"
 
 # ── 4. Copy assets ──────────────────────────────────────────────────────────
 cp "$JAR" "$APPDIR/usr/lib/nexira.jar"
+
+# Strip foreign JNA dispatchers. This is a linux-x86-64 AppImage, and JNA (pulled
+# by FileKit for native file dialogs) only ever loads com/sun/jna/linux-x86-64/.
+# The jar bundles ~30 platforms of libjnidispatch (~5 MB of incompressible .so);
+# drop every one but the host. `zip -d` rewrites the central directory and copies
+# the remaining entries' bytes verbatim, so the STORED method the gradle uber-jar
+# post-process applied is preserved (no re-compression).
+# Match only the native dispatcher blobs (libjnidispatch.so / .jnilib / .a,
+# jnidispatch.dll), NOT the com/sun/jna/{platform,internal,win32,...} Java
+# packages that also live one level under com/sun/jna/.
+mapfile -t _jna_foreign < <(
+    unzip -Z1 "$APPDIR/usr/lib/nexira.jar" 'com/sun/jna/*' 2>/dev/null \
+        | grep -E '/(libjnidispatch\.(so|jnilib|a)|jnidispatch\.dll)$' \
+        | grep -v '^com/sun/jna/linux-x86-64/' || true
+)
+if [ "${#_jna_foreign[@]}" -gt 0 ]; then
+    zip -q -d "$APPDIR/usr/lib/nexira.jar" "${_jna_foreign[@]}"
+fi
 cp "$ROOT/resources/nexira.desktop" "$APPDIR/usr/share/applications/"
 cp "$ROOT/resources/nexira.desktop" "$APPDIR/"
 cp "$ROOT/resources/icons/256x256.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/nexira.png"
@@ -113,6 +132,16 @@ cp "$ROOT/resources/dev.hivens.nexira.metainfo.xml" \
    "$APPDIR/usr/share/metainfo/dev.hivens.nexira.appdata.xml"
 
 # ── 5. Build AppImage ───────────────────────────────────────────────────────
-ARCH="$ARCH" appimagetool "$APPDIR" "$OUTPUT"
+# Squashfs compression: zstd at max level, 1 MB blocks (the mksquashfs ceiling).
+# appimagetool already defaults to zstd, but at the mksquashfs default level (15)
+# with 128 KB blocks; pinning level 22 + 1 MB blocks lets the single squashfs pass
+# get the most out of the now-STORED uber jar (see the release-uber-jar post-process
+# in client-ui/build.gradle.kts). The `=` form keeps the leading-dash mksquashfs
+# flags from being mis-parsed as appimagetool options.
+ARCH="$ARCH" appimagetool \
+    --comp zstd \
+    --mksquashfs-opt=-Xcompression-level --mksquashfs-opt=22 \
+    --mksquashfs-opt=-b --mksquashfs-opt=1M \
+    "$APPDIR" "$OUTPUT"
 
 echo "AppImage written to $OUTPUT"
