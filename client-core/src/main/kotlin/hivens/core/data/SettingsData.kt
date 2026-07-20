@@ -4,20 +4,18 @@ import kotlinx.serialization.Serializable
 
 /**
  * Which Home surface the user is currently running. Set in Settings.
- * Lets the user A/B between the legacy Dashboard (SC server grid +
- * launch panel + always-on right panel) and the new Library-first IA
- * (Library + Browse + sliding login panel + unified card). Until the
- * Library surface lands properly, [LibraryFirst] routes to the
- * "not yet implemented" placeholder -- intentional: the toggle is
- * how the user explores the direction before it's finished.
+ * [New] (labelled "Modern") is the default widget-composed home; the
+ * toggle also reaches the legacy [Classic] Dashboard (SC server grid +
+ * launch panel + always-on right panel) and the [LibraryFirst] IA
+ * (Library + Browse + sliding login panel + unified card).
  */
 @Serializable
 enum class HomeView {
     Classic,
     LibraryFirst,
-    // [New] -- widget-composed prototype home (Phase 1 / kernel-3). Carries
-    // the minimal welcome / recent-packs / quick-launch widgets; the
-    // expressive build-out happens as user customization in later phases.
+    // [New] -- widget-composed home (Phase 1 / kernel-3), the default surface.
+    // Carries the welcome / recent-packs / quick-launch widgets; the expressive
+    // build-out happens as user customization in later phases.
     New,
 }
 
@@ -232,13 +230,13 @@ data class SettingsData(
     val mimicVersionOverride: String? = null,
 
     /**
-     * Which Home surface to render after login. Lets the user explore
-     * the new Library-first IA without committing the whole launcher
-     * to it -- the toggle flips back at any time. See [HomeView] for
-     * the option set and [[project_home_library_ia]] for the IA spec
+     * Which Home surface to render. Defaults to the modern widget-composed
+     * home ([HomeView.New]); the classic Dashboard and the Library-first IA
+     * stay reachable from the Home-view toggle at any time. See [HomeView]
+     * for the option set and [[project_home_library_ia]] for the IA spec
      * the LibraryFirst variant is reaching toward.
      */
-    val homeView: HomeView = HomeView.Classic,
+    val homeView: HomeView = HomeView.New,
 
     /**
      * Visual style variant. Independent from palette / color preset.
