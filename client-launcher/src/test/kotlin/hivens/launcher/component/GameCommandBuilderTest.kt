@@ -646,6 +646,42 @@ class GameCommandBuilderTest {
         assertTrue(parts.none { it.contains("${File.separator}mods${File.separator}") }, "mods stay off the classpath")
     }
 
+    // A modern (BootstrapLauncher) runtime -- drives modernClasspath, unlike the
+    // legacy launchwrapper forgeRuntime.
+    private fun modernRuntime(clientResources: Path? = null) = forgeRuntime().copy(
+        libraries = forgeRuntime().libraries + ResolvedLibrary(
+            MavenCoord.parse("cpw.mods:bootstraplauncher:1.1.2"),
+            Path.of("/libs/cpw/mods/bootstraplauncher/1.1.2/bootstraplauncher-1.1.2.jar"),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.21.1/minecraft-1.21.1.jar"),
+        mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher",
+        clientResourcesJar = clientResources,
+    )
+
+    @Test
+    fun `modern -cp carries the resources-only client jar for its version json but never the class-bearing client`() {
+        val extra = Path.of("/libs/net/minecraft/client/1.21.1-20240808.144430/client-1.21.1-20240808.144430-extra.jar")
+        val cmd = packCommand(modernRuntime(clientResources = extra), javaMajor = 21)
+        val cp = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        assertTrue(
+            cp.contains(extra.toAbsolutePath().toString()),
+            "the -extra (version.json, no classes) jar must be on -cp so CustomSkinLoader reads the real MC version; got: $cp",
+        )
+        // The class-bearing client stays OFF -cp -- a second `minecraft` module
+        // would break BootstrapLauncher ("reads more than one module named minecraft").
+        assertFalse(
+            cp.contains(modernRuntime().clientJar.toAbsolutePath().toString()),
+            "the class-bearing client jar must NOT be on -cp; got: $cp",
+        )
+    }
+
+    @Test
+    fun `modern -cp omits the resources jar when the runtime has none`() {
+        val cmd = packCommand(modernRuntime(clientResources = null), javaMajor = 21)
+        val cp = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        assertFalse(cp.any { it.endsWith("-extra.jar") }, "no resources jar expected on -cp; got: $cp")
+    }
+
     @Test
     fun `buildPackCommand omits -noverify on Java 17+ even though it adds it on Java 8`() {
         // -noverify is legitimate on Java 8 (broken legacy bytecode) but warns

@@ -121,6 +121,17 @@ data class ResolvedRuntime(
      * 1.12.2 wants 25, legacy-Forge-1.12.2 wants 8).
      */
     val javaMajor: Int? = null,
+    /**
+     * A resources-only client jar (no classes) to place on `-cp` purely so its
+     * `version.json` is a classpath resource. Modern Forge/NeoForge load the
+     * class-bearing client off the module path, so the flat `-cp` carries no
+     * `version.json` -- and mods that detect the MC version by reading it as a
+     * resource (CustomSkinLoader) otherwise fall back to "version 0". This is the
+     * installer's `client-<neoform>-extra.jar` (version.json + assets, zero
+     * classes), so it exposes the resource without adding a second `minecraft`
+     * module. Null for legacy/vanilla, which already carry the full client on `-cp`.
+     */
+    val clientResourcesJar: Path? = null,
 )
 
 /**

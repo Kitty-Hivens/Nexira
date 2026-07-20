@@ -409,16 +409,24 @@ internal class GameCommandBuilder(
 
     /**
      * Full `-cp` for a modern (templated) launch: the resolved libraries only,
-     * NOT the vanilla client jar. Modern Forge/NeoForge load minecraft from the
-     * installer's processor output (the slim/srg client) through FML's own path
-     * locator; putting the vanilla client on `-cp` too yields a second module
+     * NOT the class-bearing client jar. Modern Forge/NeoForge load minecraft from
+     * the installer's processor output (the slim/srg client) through FML's own path
+     * locator; putting the class-bearing client on `-cp` too yields a second module
      * named `minecraft` and "reads more than one module named minecraft". Boot
      * modules stay on `-cp` -- the version json's `-DignoreList` tells
      * BootstrapLauncher which entries to keep flat versus promote to modules,
      * mirroring the official launcher.
+     *
+     * The resources-only client jar ([ResolvedRuntime.clientResourcesJar], the
+     * installer's `-extra` output) IS appended: it carries `version.json` but no
+     * classes, so it restores that resource on `-cp` (the official launcher ships
+     * it there) without creating a second `minecraft` module. Without it, mods that
+     * read the MC version from `version.json` as a resource -- CustomSkinLoader --
+     * detect "version 0" and mis-patch.
      */
     private fun modernClasspath(runtime: ResolvedRuntime): String =
-        runtime.libraries.joinToString(File.pathSeparator) { it.path.toAbsolutePath().toString() }
+        (runtime.libraries.map { it.path } + listOfNotNull(runtime.clientResourcesJar))
+            .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
 
     /**
      * Resolves the modern `arguments.jvm` template to concrete tokens. The
