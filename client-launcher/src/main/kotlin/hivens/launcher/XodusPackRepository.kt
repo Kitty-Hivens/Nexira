@@ -51,7 +51,10 @@ class XodusPackRepository(
         Files.createDirectories(dbDir)
         // Durable (fsync'd) commits: the registry is the user's installed-pack library,
         // so an install must survive a power loss -- unlike the disposable caches.
-        Environments.newInstance(dbDir.toFile(), EnvironmentConfig().setLogDurableWrite(true))
+        // Management disabled: the obfuscated distributable renames Xodus's MBean
+        // interface, so its Standard-MBean registration throws NotCompliantMBeanException
+        // on startup. Nothing here consumes those JMX beans, so skip them.
+        Environments.newInstance(dbDir.toFile(), EnvironmentConfig().setLogDurableWrite(true).setManagementEnabled(false))
     }
     private val mutex = Mutex()
     private val shutdownHook = Thread { close() }

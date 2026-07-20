@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import jetbrains.exodus.env.Environment
+import jetbrains.exodus.env.EnvironmentConfig
 import jetbrains.exodus.env.Environments
 import java.nio.file.Files
 import java.nio.file.Path
@@ -38,7 +39,11 @@ class CacheFactory(
     private val env: Environment by lazy {
         val dir = rootDir.resolve("xodus")
         Files.createDirectories(dir)
-        Environments.newInstance(dir.toFile()).also { e ->
+        // Management disabled: the obfuscated distributable renames Xodus's MBean
+        // interface, so its Standard-MBean registration throws NotCompliantMBeanException
+        // on startup. Nothing here consumes those JMX beans, so skip them.
+        val config = EnvironmentConfig().setManagementEnabled(false)
+        Environments.newInstance(dir.toFile(), config).also { e ->
             val hook = Thread { runCatching { e.close() } }
             shutdownHook = hook
             Runtime.getRuntime().addShutdownHook(hook)
