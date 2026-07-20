@@ -575,7 +575,7 @@ object GermanStrings : AppStrings {
     override val navBrowse  = "Durchsuchen"
 
     override val settingsHomeViewTitle   = "Startansicht"
-    override val settingsHomeViewSub     = "Probiere die neue Library-first-Ansicht neben dem klassischen Dashboard. Jederzeit umschaltbar."
+    override val settingsHomeViewSub     = "Der moderne Startbildschirm ist die Vorgabe. Klassisches Dashboard und Library-first-Ansicht bleiben jederzeit umschaltbar."
     override val settingsHomeViewClassic = "Klassisch"
     override val settingsHomeViewLibrary = "Library (Alpha)"
     override val settingsHomeViewNew     = "Modern"

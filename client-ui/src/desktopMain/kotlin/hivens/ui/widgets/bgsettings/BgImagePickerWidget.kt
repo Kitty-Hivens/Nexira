@@ -18,7 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import hivens.ui.background.BackgroundMediaKind
 import hivens.ui.background.BackgroundOptimizer
+import hivens.ui.background.backgroundMediaKind
 import hivens.ui.background.physicalScreenHeight
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -34,8 +36,11 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import java.io.File
 import java.nio.file.Path
 
 @Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
@@ -75,10 +80,14 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                             )),
                             dialogSettings = FileKitDialogSettings(title = s.backgroundPickFile),
                         )?.path ?: return@launch
-                        // A video taller than the screen is transcoded down once;
-                        // optimize() returns the source untouched in every other case.
-                        val isVideo = picked.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
-                        val resolved = if (isVideo && targetHeight > 0) {
+                        // Time-based media (video, GIF, animated PNG/WebP) taller than
+                        // the screen is transcoded down once and cached; optimize()
+                        // returns the source untouched in every other case. Stills fall
+                        // through to the load-time image cache instead.
+                        val timeBased = withContext(Dispatchers.IO) {
+                            backgroundMediaKind(File(picked)) == BackgroundMediaKind.TimeBased
+                        }
+                        val resolved = if (timeBased && targetHeight > 0) {
                             optimizing = true
                             try {
                                 optimizer.optimize(Path.of(picked), targetHeight).toString()
@@ -113,7 +122,3 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
         }
     }
 }
-
-// Real video containers (not the animated-image formats, which stay as-is): only
-// these route through the downscale-on-ingest.
-private val VIDEO_EXTENSIONS = setOf("mp4", "m4v", "mov", "webm", "mkv", "ogv")
