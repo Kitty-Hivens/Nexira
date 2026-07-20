@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.background.BackgroundOptimizer
+import hivens.ui.background.physicalScreenHeight
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
@@ -35,7 +36,6 @@ import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-import java.awt.Toolkit
 import java.nio.file.Path
 
 @Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
@@ -48,9 +48,9 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
     val dataDir = koinInject<Path>()
     val appScope = koinInject<CoroutineScope>()
     val optimizer = remember(dataDir) { BackgroundOptimizer(dataDir.resolve("background-cache"), appScope) }
-    // Downscale target: the monitor height, so a 4K source becomes a display-res
-    // wallpaper once and stays crisp at any window size up to the screen.
-    val targetHeight = remember { runCatching { Toolkit.getDefaultToolkit().screenSize.height }.getOrDefault(0) }
+    // Downscale target: the monitor's physical pixel height, so a 4K source becomes a
+    // display-res wallpaper once and stays crisp at any window size up to the screen.
+    val targetHeight = remember { physicalScreenHeight() }
     var optimizing by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

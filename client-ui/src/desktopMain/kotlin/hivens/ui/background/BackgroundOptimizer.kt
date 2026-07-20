@@ -6,6 +6,7 @@ import dev.hivens.skinema.libav.LibavException
 import hivens.ui.diag.SkinemaGate
 import dev.hivens.skinema.libav.VideoDecoder
 import kotlinx.coroutines.CoroutineScope
+import java.awt.GraphicsEnvironment
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.ColorAlphaType
@@ -146,6 +147,21 @@ class BackgroundOptimizer(
  * is the slow half of a 4K transcode. Video frames are opaque, so the
  * straight/premultiplied alpha distinction does not bite here.
  */
+/**
+ * The tallest physical-pixel height across all monitors. AWT's `screenSize` is
+ * logical points, so on a HiDPI / scaled display (mac Retina, Windows display
+ * scaling, fractional XWayland) it under-reports and a wallpaper downscaled to it
+ * renders soft once the framebuffer upscales it back; the display transform's scale
+ * factor recovers the true pixel height. 0 when headless -- callers then skip the
+ * downscale and decode the source directly.
+ */
+internal fun physicalScreenHeight(): Int = runCatching {
+    GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.maxOf { dev ->
+        val gc = dev.defaultConfiguration
+        (gc.bounds.height * gc.defaultTransform.scaleY).toInt()
+    }
+}.getOrDefault(0)
+
 internal fun scaleRgba(src: ByteArray, sw: Int, sh: Int, dw: Int, dh: Int): ByteArray {
     if (sw == dw && sh == dh) return src
     val srcImage = Image.makeRaster(ImageInfo(sw, sh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL), src, sw * 4)
