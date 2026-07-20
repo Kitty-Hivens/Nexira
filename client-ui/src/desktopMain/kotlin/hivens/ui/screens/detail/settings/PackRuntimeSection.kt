@@ -23,6 +23,7 @@ import hivens.core.data.PackInstance
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.JvmArgsPresets
+import hivens.core.jvm.JvmConfig
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
 import hivens.ui.components.JvmArgsBuilderDialog
@@ -185,7 +186,12 @@ internal fun PackRuntimeSection(
 
     if (showJvmBuilder) {
         JvmArgsBuilderDialog(
-            initial = JvmArgsPresets.default.config,
+            // Seed from the instance's stored args (round-tripped back into the
+            // structured model, unknown flags kept in the Custom tab) so reopening
+            // the editor no longer discards them; falls back to the default preset
+            // only when the instance has none yet.
+            initial = runtime.jvmArgs?.takeIf { it.isNotBlank() }?.let { JvmConfig.fromArgs(it) }
+                ?: JvmArgsPresets.default.config,
             onDismiss = { showJvmBuilder = false },
             onApply = { newArgs ->
                 commit(runtime.copy(jvmArgs = newArgs.ifBlank { null }))
