@@ -50,6 +50,149 @@ data class JvmConfig(
     }
 
     fun toArgString(): String = toArgs().joinToString(" ")
+
+    companion object {
+        // Flags the builder emits regardless of GC -- recognized under any choice.
+        private val GENERAL_BOOLEANS = setOf(
+            "-XX:+UseG1GC", "-XX:+UseParallelGC", "-XX:+UseZGC", "-XX:+UseShenandoahGC", "-XX:+UseSerialGC",
+            "-XX:+AutoSharedArchiveAtExit", "-XX:-TieredCompilation",
+            "-XX:+AlwaysPreTouch", "-XX:+DisableExplicitGC", "-XX:+UseLargePages",
+            "-XX:+UnlockDiagnosticVMOptions", "-XX:+UseTransparentHugePages", "-XX:+UseNUMA",
+            "-XX:+HeapDumpOnOutOfMemoryError", "-XX:+ExitOnOutOfMemoryError",
+        )
+        private val GENERAL_PREFIXES = listOf(
+            "-XX:ArchiveClassesAtExit=", "-XX:SharedArchiveFile=",
+            "-XX:ReservedCodeCacheSize=", "-XX:InitialCodeCacheSize=", "-XX:CompileThreshold=",
+            "-XX:StartFlightRecording=",
+        )
+        private val G1_BOOLEANS = setOf("-XX:+ParallelRefProcEnabled", "-XX:+PerfDisableSharedMem")
+        private val G1_PREFIXES = listOf(
+            "-XX:MaxGCPauseMillis=", "-XX:G1HeapRegionSize=", "-XX:G1NewSizePercent=", "-XX:G1MaxNewSizePercent=",
+            "-XX:G1ReservePercent=", "-XX:G1HeapWastePercent=", "-XX:G1MixedGCCountTarget=",
+            "-XX:InitiatingHeapOccupancyPercent=", "-XX:G1MixedGCLiveThresholdPercent=",
+            "-XX:G1RSetUpdatingPauseTimePercent=", "-XX:SurvivorRatio=", "-XX:MaxTenuringThreshold=",
+        )
+        private const val UNLOCK_EXPERIMENTAL = "-XX:+UnlockExperimentalVMOptions"
+
+        /**
+         * Reconstruct a [JvmConfig] from a space-joined args string so the visual
+         * builder can be seeded with an instance's STORED jvmArgs rather than
+         * always the default preset. Without this the editor discards whatever the
+         * user typed on every open, and Apply overwrites their args with the
+         * preset -- which is how a passthrough flag like
+         * `-Dcustomskinloader.ignorePatchFailure=true` kept vanishing.
+         *
+         * Recognized `-XX` flags map back onto the structured fields; every token
+         * the builder does NOT model (a `-D...`, `-X...`, a `-javaagent`, any JVM
+         * option outside this catalog) is preserved verbatim in [custom], in its
+         * original order. A GC-specific flag under the wrong GC (e.g. a `G1*` knob
+         * with ZGC selected) is also treated as passthrough so it round-trips
+         * rather than being silently dropped by the non-matching GC.
+         *
+         * A preset plus a few passthrough flags -- the realistic stored value --
+         * round-trips exactly ([toArgs] reproduces every original token). A sparse
+         * hand-written set with no recognized GC tuning is normalized UP to the
+         * matched GC's baseline: the builder composes a full flag set, it does not
+         * diff, so opening it fills in the defaults. The passthrough flags survive
+         * regardless, which is the property that matters.
+         */
+        fun fromArgs(raw: String): JvmConfig {
+            val toks = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (toks.isEmpty()) return JvmConfig()
+
+            fun has(f: String) = f in toks
+            fun value(prefix: String): String? = toks.firstOrNull { it.startsWith(prefix) }?.substring(prefix.length)
+            fun intv(prefix: String, def: Int): Int = value(prefix)?.toIntOrNull() ?: def
+            fun mb(prefix: String): Int? = value(prefix)?.removeSuffix("M")?.toIntOrNull()
+
+            val gc = when {
+                has("-XX:+UseParallelGC") -> GcChoice.Parallel
+                has("-XX:+UseZGC") -> GcChoice.Z
+                has("-XX:+UseShenandoahGC") -> GcChoice.Shenandoah
+                has("-XX:+UseSerialGC") -> GcChoice.Serial
+                else -> GcChoice.G1
+            }
+            val unlock = has(UNLOCK_EXPERIMENTAL)
+            val d = G1Tuning.AikarDefaults
+            val g1 = G1Tuning(
+                maxPauseMs = intv("-XX:MaxGCPauseMillis=", d.maxPauseMs),
+                regionSizeMb = mb("-XX:G1HeapRegionSize=") ?: d.regionSizeMb,
+                newSizePercent = intv("-XX:G1NewSizePercent=", d.newSizePercent),
+                maxNewSizePercent = intv("-XX:G1MaxNewSizePercent=", d.maxNewSizePercent),
+                reservePercent = intv("-XX:G1ReservePercent=", d.reservePercent),
+                heapWastePercent = intv("-XX:G1HeapWastePercent=", d.heapWastePercent),
+                mixedGCCountTarget = intv("-XX:G1MixedGCCountTarget=", d.mixedGCCountTarget),
+                initiatingHeapOccupancyPercent = intv("-XX:InitiatingHeapOccupancyPercent=", d.initiatingHeapOccupancyPercent),
+                mixedGCLiveThresholdPercent = intv("-XX:G1MixedGCLiveThresholdPercent=", d.mixedGCLiveThresholdPercent),
+                rsetUpdatingPauseTimePercent = intv("-XX:G1RSetUpdatingPauseTimePercent=", d.rsetUpdatingPauseTimePercent),
+                survivorRatio = intv("-XX:SurvivorRatio=", d.survivorRatio),
+                maxTenuringThreshold = intv("-XX:MaxTenuringThreshold=", d.maxTenuringThreshold),
+                unlockExperimentalVMOptions = gc == GcChoice.G1 && unlock,
+                parallelRefProcEnabled = has("-XX:+ParallelRefProcEnabled"),
+                perfDisableSharedMem = has("-XX:+PerfDisableSharedMem"),
+            )
+            val zgc = ZgcTuning(
+                unlockExperimentalVMOptions = gc == GcChoice.Z && unlock,
+                generational = has("-XX:+ZGenerational"),
+            )
+            val shenandoah = ShenandoahTuning(
+                unlockExperimentalVMOptions = gc == GcChoice.Shenandoah && unlock,
+                mode = value("-XX:ShenandoahGCHeuristics=")
+                    ?.let { h -> ShenandoahTuning.Heuristic.entries.firstOrNull { it.name.equals(h, ignoreCase = true) } }
+                    ?: ShenandoahTuning.Heuristic.Adaptive,
+            )
+            val cds = when {
+                value("-XX:SharedArchiveFile=") != null -> CdsConfig(CdsConfig.Mode.UseArchive, value("-XX:SharedArchiveFile="))
+                value("-XX:ArchiveClassesAtExit=") != null -> CdsConfig(CdsConfig.Mode.ArchiveAtExit, value("-XX:ArchiveClassesAtExit="))
+                has("-XX:+AutoSharedArchiveAtExit") -> CdsConfig(CdsConfig.Mode.AutoArchive)
+                else -> CdsConfig.Disabled
+            }
+            val jit = JitConfig(
+                tieredCompilation = !has("-XX:-TieredCompilation"),
+                codeCacheMb = mb("-XX:ReservedCodeCacheSize="),
+                initialCodeCacheMb = mb("-XX:InitialCodeCacheSize="),
+                compileThreshold = value("-XX:CompileThreshold=")?.toIntOrNull(),
+            )
+            val perf = PerfFlags(
+                alwaysPreTouch = has("-XX:+AlwaysPreTouch"),
+                disableExplicitGc = has("-XX:+DisableExplicitGC"),
+                useLargePages = has("-XX:+UseLargePages"),
+                useTransparentHugePages = has("-XX:+UseTransparentHugePages"),
+                numa = has("-XX:+UseNUMA"),
+                heapDumpOnOom = has("-XX:+HeapDumpOnOutOfMemoryError"),
+                exitOnOom = has("-XX:+ExitOnOutOfMemoryError"),
+            )
+            val jfr = value("-XX:StartFlightRecording=")?.let { spec ->
+                val parts = spec.split(",")
+                    .mapNotNull { p -> p.split("=", limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+                    .toMap()
+                JfrConfig(
+                    enabled = true,
+                    durationMinutes = parts["duration"]?.removeSuffix("m")?.toIntOrNull() ?: 60,
+                    settings = parts["settings"]
+                        ?.let { s -> JfrConfig.SettingsPreset.entries.firstOrNull { it.name.equals(s, ignoreCase = true) } }
+                        ?: JfrConfig.SettingsPreset.Default,
+                    outputPath = parts["filename"],
+                )
+            } ?: JfrConfig.Disabled
+
+            val custom = toks.filterNot { isModelled(it, gc) }
+            return JvmConfig(gc, g1, zgc, shenandoah, cds, jit, perf, jfr, custom)
+        }
+
+        /** Whether the builder emits [tok] for [gc] -- if so it round-trips through a
+         *  structured field and must NOT be duplicated into [custom]. */
+        private fun isModelled(tok: String, gc: GcChoice): Boolean {
+            if (tok in GENERAL_BOOLEANS || GENERAL_PREFIXES.any { tok.startsWith(it) }) return true
+            if (tok == UNLOCK_EXPERIMENTAL) return gc == GcChoice.G1 || gc == GcChoice.Z || gc == GcChoice.Shenandoah
+            return when (gc) {
+                GcChoice.G1 -> tok in G1_BOOLEANS || G1_PREFIXES.any { tok.startsWith(it) }
+                GcChoice.Z -> tok == "-XX:+ZGenerational"
+                GcChoice.Shenandoah -> tok.startsWith("-XX:ShenandoahGCHeuristics=")
+                GcChoice.Parallel, GcChoice.Serial -> false
+            }
+        }
+    }
 }
 
 // ─── GC algorithm choice ─────────────────────────────────────────────────
