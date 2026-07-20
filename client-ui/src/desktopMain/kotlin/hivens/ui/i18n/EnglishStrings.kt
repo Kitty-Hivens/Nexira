@@ -577,7 +577,7 @@ object EnglishStrings : AppStrings {
     override val navBrowse  = "Browse"
 
     override val settingsHomeViewTitle   = "Home view"
-    override val settingsHomeViewSub     = "Try the new Library-first surface alongside the classic Dashboard. Switch any time."
+    override val settingsHomeViewSub     = "The modern home is the default. The classic Dashboard and the Library-first surface stay one switch away."
     override val settingsHomeViewClassic = "Classic"
     override val settingsHomeViewLibrary = "Library (alpha)"
     override val settingsHomeViewNew     = "Modern"
