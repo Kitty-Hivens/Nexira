@@ -143,16 +143,17 @@ internal fun AppearanceSection(
             themeSwitchState = isChecked; onToggleTheme()
         }
 
-        // Home view variant. Lets the user A/B between the legacy Dashboard and the
-        // Library-first surface; the parent updates routing on change.
+        // Home view variant. The modern widget-composed home is the default and
+        // leads; the legacy Dashboard and the Library-first surface follow. The
+        // parent updates routing on change.
         PickerBlock(s.settingsHomeViewTitle, s.settingsHomeViewSub) {
+            NxChoiceChip(s.settingsHomeViewNew,     homeView == HomeView.New)          { onHomeViewChanged(HomeView.New) }
             NxChoiceChip(s.settingsHomeViewClassic, homeView == HomeView.Classic)      { onHomeViewChanged(HomeView.Classic) }
             NxChoiceChip(s.settingsHomeViewLibrary, homeView == HomeView.LibraryFirst) { onHomeViewChanged(HomeView.LibraryFirst) }
-            NxChoiceChip(s.settingsHomeViewNew,     homeView == HomeView.New)          { onHomeViewChanged(HomeView.New) }
         }
+        PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
         PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
         PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
-        PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
 
         // UI style variant. Independent axis from palette -- governs form, surface
         // treatment, motion. Celestia (current) and Brut (sharp / flat).
