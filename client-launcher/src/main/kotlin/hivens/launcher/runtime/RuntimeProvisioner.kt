@@ -151,9 +151,17 @@ class RuntimeProvisioner(
         profile.placeOnlyFiles.forEach { pf ->
             placeLocal(librariesDir.resolve(pf.relPath), pf.source, null)
         }
+        // The installer's resources-only client output (client-<neoform>-extra.jar:
+        // version.json + assets, no classes). Placed above like every other output;
+        // singled out here so the command builder can add it to -cp for its
+        // version.json (see [ResolvedRuntime.clientResourcesJar]).
+        val clientResources = profile.placeOnlyFiles
+            .firstOrNull { it.relPath.startsWith("net/minecraft/client/") && it.relPath.endsWith("-extra.jar") }
+            ?.let { librariesDir.resolve(it.relPath) }
         ResolvedRuntime(
             libraries = mergeLibraries(vanilla.libraries, overlay),
             clientJar = vanilla.clientJar,
+            clientResourcesJar = clientResources,
             mainClass = profile.mainClass,
             assetIndexId = vanilla.assetIndexId,
             // Modern (BootstrapLauncher) overlays need vanilla's jvm args (the
