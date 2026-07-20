@@ -1207,6 +1207,11 @@ fun AppRoot(
     Box(
         Modifier
             .fillMaxSize()
+            // Base fill behind the wallpaper: while a custom background decodes (or its
+            // first video frame arrives) CustomBackground paints nothing, and without
+            // this the bare window default -- a flat grey -- shows through. The theme
+            // surface is covered edge-to-edge once the image is ready.
+            .background(NxTheme.colors.background)
             .onSizeChanged { windowSize = it }
             .pointerInput(Unit) {
                 awaitPointerEventScope {

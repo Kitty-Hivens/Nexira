@@ -25,12 +25,23 @@ import kotlinx.coroutines.withContext
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.theme.luminanceOfArgb
 import hivens.ui.theme.wallpaperToneFromImage
+import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.Codec
 import org.jetbrains.skia.Data
+import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Rect
+import org.jetbrains.skia.SamplingMode
 import org.jetbrains.skia.makeFromFileName
+import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 
 private val log = LoggerFactory.getLogger("CustomBackground")
 
@@ -230,12 +241,41 @@ private fun AnimatedParallaxImage(
 
 @Composable
 private fun rememberStaticImage(file: File): ImageBitmap? {
+    // A wallpaper re-decodes on every launch; a full-resolution source pays tens of
+    // MB of Skia decode each time. Cache a display-height copy under the shared
+    // background-cache dir and decode that on later launches instead.
+    val dataDir = koinInject<Path>()
+    val cacheDir = remember(dataDir) { dataDir.resolve("background-cache").toFile() }
+    val maxHeight = remember { physicalScreenHeight() }
     var bitmap by remember(file) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(file) {
+    LaunchedEffect(file, maxHeight) {
         if (!file.exists()) return@LaunchedEffect
-        withContext(Dispatchers.IO) { bitmap = decodeStaticBackground(file) }
+        withContext(Dispatchers.IO) { bitmap = loadStaticBackground(file, cacheDir, maxHeight) }
     }
     return bitmap
+}
+
+/**
+ * Decode a still wallpaper, downscaling an oversized source to [maxHeight] once and
+ * caching the shrunk copy keyed on (path, mtime, height). Later launches decode that
+ * small file; a source already within the display height decodes directly, uncached.
+ * The path is hashed into a stable prefix so a re-edit or a display change evicts the
+ * source's earlier cached copy rather than accumulating orphans.
+ */
+internal fun loadStaticBackground(file: File, cacheDir: File, maxHeight: Int): ImageBitmap? {
+    if (maxHeight <= 0) return decodeStaticBackground(file)
+    val prefix = "img-${sha(file.absolutePath).take(16)}-"
+    val cached = File(cacheDir, "$prefix${sha("${file.lastModified()}:h$maxHeight").take(16)}.png")
+    if (cached.length() > 0L) {
+        decodeStaticBackground(cached)?.let { return it }
+    }
+    return decodeAndCacheDownscaled(file, cached, prefix, maxHeight)
+}
+
+private fun sha(s: String): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    md.update(s.toByteArray())
+    return md.digest().joinToString("") { "%02x".format(it) }
 }
 
 private fun decodeStaticBackground(file: File): ImageBitmap? {
@@ -254,11 +294,73 @@ private fun decodeStaticBackground(file: File): ImageBitmap? {
     }
 }
 
+/**
+ * Decode [file] at full resolution, box-downscale it to [maxHeight], write the result
+ * to [cached] as PNG (best-effort, atomic via a unique temp + move), and return the
+ * shrunk bitmap. A source no taller than [maxHeight] is returned as-is and left
+ * uncached. [prefix] identifies the source so older cached copies of it are evicted.
+ */
+private fun decodeAndCacheDownscaled(file: File, cached: File, prefix: String, maxHeight: Int): ImageBitmap? {
+    var data:  Data?  = null
+    var codec: Codec? = null
+    return try {
+        data  = Data.makeFromFileName(file.absolutePath)
+        codec = Codec.makeFromData(data)
+        val info = codec.imageInfo
+        if (info.height <= maxHeight) return decodeFrame(codec, info, frame = 0)
+
+        val dh  = maxHeight
+        val dw  = (info.width.toLong() * dh / info.height).toInt().coerceAtLeast(1)
+        val src = Bitmap().apply { allocPixels(info) }
+        src.use {
+            codec.readPixels(src, 0)
+            val dst = Bitmap().apply { allocPixels(ImageInfo.makeN32Premul(dw, dh)) }
+            dst.use {
+                Image.makeFromBitmap(src).use { srcImg ->
+                    Canvas(dst).drawImageRect(
+                        srcImg,
+                        Rect.makeWH(info.width.toFloat(), info.height.toFloat()),
+                        Rect.makeWH(dw.toFloat(), dh.toFloat()),
+                        SamplingMode.LINEAR, null, true,
+                    )
+                }
+                Image.makeFromBitmap(dst).use { dstImg ->
+                    writePngCache(dstImg, cached, prefix)
+                    dstImg.toComposeImageBitmap()
+                }
+            }
+        }
+    } catch (e: Exception) {
+        log.error("Failed to decode static background at {}", file.absolutePath, e)
+        null
+    } finally {
+        codec?.close()
+        data?.close()
+    }
+}
+
+private fun writePngCache(image: Image, dst: File, prefix: String) {
+    runCatching {
+        val encoded = image.encodeToData(EncodedImageFormat.PNG) ?: return
+        encoded.use { enc ->
+            val dir = dst.parentFile ?: return
+            dir.mkdirs()
+            // Unique temp per writer so two live instances of the same wallpaper never
+            // tear a shared .part; atomic move publishes it.
+            val part = Files.createTempFile(dir.toPath(), "${dst.name}.", ".part")
+            Files.write(part, enc.bytes)
+            Files.move(part, dst.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            // Evict the source's older display-height copies (one live file per source).
+            dir.listFiles { f -> f.name.startsWith(prefix) && f.name.endsWith(".png") && f.name != dst.name }
+                ?.forEach { it.delete() }
+        }
+    }
+}
+
 private fun decodeFrame(codec: Codec, info: ImageInfo, frame: Int): ImageBitmap {
-    val bmp = org.jetbrains.skia.Bitmap().apply { allocPixels(info) }
+    val bmp = Bitmap().apply { allocPixels(info) }
     return bmp.use { bmp ->
         codec.readPixels(bmp, frame)
-        val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-        img.use { it.toComposeImageBitmap() }
+        Image.makeFromBitmap(bmp).use { it.toComposeImageBitmap() }
     }
 }
