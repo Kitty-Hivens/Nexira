@@ -52,6 +52,9 @@ object LayoutManifest {
         Files.writeString(file, json.encodeToString(manifest))
     }
 
+    /** SHA-256 of [file], for the post-download / post-patch integrity gate. */
+    fun sha256Of(file: Path): String = hash(file).second
+
     /** SHA-1 and SHA-256 of [file] in one read pass. */
     private fun hash(file: Path): Pair<String, String> {
         val sha1 = MessageDigest.getInstance("SHA-1")
