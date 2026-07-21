@@ -130,7 +130,7 @@ import org.koin.compose.koinInject
 // Severity-only highlight + the exception markers that survive Slice A.
 // Class-name / number / null highlights were noisy and lied when log
 // formats shifted; cut. User-extensible rule list arrives with Slice C.
-private val ERROR_MARKERS = Regex("(Exception|Error|FATAL|SEVERE|Caused by:|\\bat )")
+internal val ERROR_MARKERS = Regex("(Exception|Error|FATAL|SEVERE|Caused by:|\\bat )")
 private val FONT_SIZES = listOf(11, 12, 14)
 
 // Upper bound on search-highlight spans / match offsets kept per render. A broad
@@ -138,7 +138,7 @@ private val FONT_SIZES = listOf(11, 12, 14)
 // DocSpans + IntRanges + AnnotatedString entries -- a memory spike out of all
 // proportion to a highlight aid. Past this, scanning stops: F3 navigates the first
 // MAX_SEARCH_MATCHES hits, which is far more than anyone steps through by hand.
-private const val MAX_SEARCH_MATCHES = 5000
+internal const val MAX_SEARCH_MATCHES = 5000
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 // Theme-derived colors flow through NxTheme.colors at every composable
@@ -2033,7 +2033,7 @@ private fun computeGutterRects(
     return rects
 }
 
-private fun findAllSubstring(text: String, query: String): List<IntRange> {
+internal fun findAllSubstring(text: String, query: String): List<IntRange> {
     if (query.isEmpty()) return emptyList()
     val out = mutableListOf<IntRange>()
     var i = text.indexOf(query, ignoreCase = true)
