@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.v2.ScrollbarAdapter
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -165,6 +168,20 @@ internal fun LogCanvas(
         0
     }
 
+    // Continuous edge auto-scroll: while a drag-select parks the pointer at the top
+    // or bottom edge, keep scrolling and extending the selection to the pointer even
+    // though no new pointer events fire.
+    var autoScroll by remember { mutableStateOf(0) } // -1 up, 0 off, +1 down
+    var dragPos by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(autoScroll) {
+        if (autoScroll == 0) return@LaunchedEffect
+        while (true) {
+            state.scroll.scrollBy(autoScroll * lineHeightPx * AUTO_SCROLL_STEP_FACTOR)
+            selection.extendTo(state.hitTest(dragPos.x, dragPos.y, lines, effStyle, topPadPx, startPadPx))
+            delay(AUTO_SCROLL_TICK_MS)
+        }
+    }
+
     val idx = state.heightIndex
 
     Box(
@@ -194,15 +211,23 @@ internal fun LogCanvas(
                 detectDragGestures(
                     onDragStart = { pos ->
                         onInteract()
+                        dragPos = pos
                         selection.beginAt(state.hitTest(pos.x, pos.y, lines, effStyle, topPadPx, startPadPx))
                     },
                     onDrag = { change, _ ->
                         val p = change.position
-                        // Edge auto-scroll so a drag can extend past the viewport.
-                        if (p.y < AUTO_SCROLL_EDGE_PX) state.scroll.scrollBy(-lineHeightPx.toFloat())
-                        else if (p.y > size.height - AUTO_SCROLL_EDGE_PX) state.scroll.scrollBy(lineHeightPx.toFloat())
+                        dragPos = p
+                        // Arm / disarm continuous auto-scroll from the pointer's edge
+                        // proximity; the LaunchedEffect drives it while held.
+                        autoScroll = when {
+                            p.y < AUTO_SCROLL_EDGE_PX               -> -1
+                            p.y > size.height - AUTO_SCROLL_EDGE_PX -> 1
+                            else                                    -> 0
+                        }
                         selection.extendTo(state.hitTest(p.x, p.y, lines, effStyle, topPadPx, startPadPx))
                     },
+                    onDragEnd = { autoScroll = 0 },
+                    onDragCancel = { autoScroll = 0 },
                 )
             }
             .drawBehind {
@@ -264,3 +289,5 @@ internal fun LogCanvas(
 
 private const val SCROLL_LINES_PER_NOTCH = 3f
 private const val AUTO_SCROLL_EDGE_PX = 24f
+private const val AUTO_SCROLL_STEP_FACTOR = 0.6f
+private const val AUTO_SCROLL_TICK_MS = 16L
