@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":client-auth-microsoft"))
 
     implementation(libs.commons.compress)
+    implementation(libs.jbsdiff)
     // Xodus (JetBrains): pure-JVM embedded KV, backs the disk cache. No JNA/JNI --
     // fits the no-native-in-launcher policy below.
     implementation(libs.xodus.environment)
