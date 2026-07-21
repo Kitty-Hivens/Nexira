@@ -84,6 +84,7 @@ fun SurfacePropertiesPanel(
         modifier = modifier,
     ) {
         val s = LocalStrings.current
+        val style = LocalStyle.current
         // Draggable dock: the header drags this offset (session-scoped), like the
         // widget palette, so the panel can be pulled off the right edge.
         var offset by remember { mutableStateOf(Offset.Zero) }
@@ -93,8 +94,8 @@ fun SurfacePropertiesPanel(
                 .width(320.dp)
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-                .shadow(elevation = 18.dp, shape = RoundedCornerShape(14.dp))
-                .clip(RoundedCornerShape(14.dp))
+                .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
+                .clip(RoundedCornerShape(style.panelCorner))
                 // Solid surface, no glass: a settings panel must stay readable and
                 // not composite with the layers it floats over.
                 .background(NxTheme.colors.surface),

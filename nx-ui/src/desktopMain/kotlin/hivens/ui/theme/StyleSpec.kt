@@ -33,6 +33,13 @@ data class StyleSpec(
     val animationMultiplier: Float,
     /** Whether decorative effects (pulsating glow, soft shadow) render at all. */
     val softGlowEnabled: Boolean,
+    /** Drop-shadow depth on floating panels (editor palette, prop and preset
+     *  panels). Celestia lifts them off the canvas; Brut keeps everything flat
+     *  at 0.dp, so the whole surface stack reads as one plane. */
+    val panelElevation: Dp,
+    /** Corner rounding on those floating panels. Tracks the card look:
+     *  soft on Celestia, near-square on Brut. */
+    val panelCorner: Dp,
     /** Form of the toggle/switch primitive (NxSwitch). Colours stay on the palette
      *  axis; this carries only the skinnable geometry. */
     val switchStyle: SwitchStyleSpec = SwitchStyleSpec.Pill,
@@ -97,6 +104,8 @@ val CelestiaStyle = StyleSpec(
     buttonCorner        = 8.dp,
     animationMultiplier = 1.0f,
     softGlowEnabled     = true,
+    panelElevation      = 18.dp,
+    panelCorner         = 14.dp,
 )
 
 /**
@@ -111,6 +120,8 @@ val BrutStyle = StyleSpec(
     buttonCorner        = 0.dp,
     animationMultiplier = 0.0f,
     softGlowEnabled     = false,
+    panelElevation      = 0.dp,
+    panelCorner         = 2.dp,
     switchStyle         = SwitchStyleSpec.Square,
 )
 

@@ -39,6 +39,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
@@ -133,6 +134,7 @@ private fun PropPanelBody(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
+    val style = LocalStyle.current
     val sd = serializer?.descriptor
     // Effective values: the encoded default baseline overlaid with the
     // instance's stored overrides. Every key is present, so each field's
@@ -146,8 +148,8 @@ private fun PropPanelBody(
             .width(320.dp)
             .fillMaxHeight()
             .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-            .shadow(elevation = 18.dp, shape = RoundedCornerShape(14.dp))
-            .clip(RoundedCornerShape(14.dp))
+            .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
+            .clip(RoundedCornerShape(style.panelCorner))
             // Solid surface, no glass: a settings panel must stay readable and
             // not composite with the layers it floats over.
             .background(NxTheme.colors.surface),
