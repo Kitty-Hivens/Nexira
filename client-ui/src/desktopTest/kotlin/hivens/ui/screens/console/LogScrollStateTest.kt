@@ -24,18 +24,41 @@ class LogScrollStateTest {
     @Test
     fun scrollByReportsConsumedPixels() {
         val s = state(1000, 300)
+        s.scrollTo(0f)
         assertEquals(700f, s.scrollBy(700f)) // full
         assertEquals(0f, s.scrollBy(200f))   // already at bottom, nothing consumed
         assertEquals(-700f, s.scrollBy(-9999f))
     }
 
     @Test
-    fun atBottomTracksTheEnd() {
+    fun followArmsAtBottomAndDisengagesOnScrollUp() {
         val s = state(1000, 300)
+        assertTrue(s.follow) // a fresh view follows the tail
+        s.scrollToBottom(); assertTrue(s.follow); assertEquals(700f, s.offsetPx)
+        s.scrollBy(-50f); assertFalse(s.follow) // scrolled up -> paused
         assertFalse(s.atBottom)
-        s.scrollToBottom()
+        s.scrollBy(50f); assertTrue(s.follow)   // back to the bottom -> re-armed
         assertTrue(s.atBottom)
-        assertEquals(700f, s.offsetPx)
+    }
+
+    @Test
+    fun stickIfFollowingRepinsOnlyWhenFollowing() {
+        val s = state(1000, 300)
+        s.scrollToBottom() // follow, offset 700
+        s.contentHeightPx = 1200 // content grew; maxOffset now 900
+        s.stickIfFollowing(); assertEquals(900f, s.offsetPx) // re-pinned to new bottom
+
+        s.scrollTo(0f) // user scrolls up -> paused
+        s.contentHeightPx = 1500
+        s.stickIfFollowing(); assertEquals(0f, s.offsetPx) // stays put
+    }
+
+    @Test
+    fun reclampPreservesFollow() {
+        val s = state(1000, 300)
+        s.scrollToBottom()
+        s.viewportPx = 500 // viewport grew; maxOffset now 500
+        s.reclamp(); assertEquals(500f, s.offsetPx) // still pinned to bottom
     }
 
     @Test
@@ -47,13 +70,13 @@ class LogScrollStateTest {
     }
 
     @Test
-    fun shiftByKeepsVisiblePositionAndClamps() {
+    fun shiftByKeepsVisiblePositionAndDoesNotArmFollow() {
         val s = state(1000, 300)
         s.scrollTo(400f)
+        assertFalse(s.follow)
         s.shiftBy(120f) // content above grew by 120px
         assertEquals(520f, s.offsetPx)
-        s.shiftBy(10_000f)
-        assertEquals(700f, s.offsetPx) // clamped to range
+        assertFalse(s.follow) // history paging is not tail-following
     }
 
     @Test

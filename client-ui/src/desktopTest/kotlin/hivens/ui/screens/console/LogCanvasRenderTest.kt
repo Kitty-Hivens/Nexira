@@ -60,6 +60,7 @@ class LogCanvasRenderTest {
                     startPadPx = 10f,
                     topPadPx = 4f,
                     gutterWidthPx = 3f,
+                    contentKey = "static",
                 )
             }
         }

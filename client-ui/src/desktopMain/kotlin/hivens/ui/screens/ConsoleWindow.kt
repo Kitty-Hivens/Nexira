@@ -15,7 +15,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,14 +27,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.LocalTextContextMenu
-import androidx.compose.foundation.text.TextContextMenu
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -49,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -66,8 +58,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -86,13 +76,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -195,7 +182,6 @@ internal data class ConsoleRender(
     val searchCapped:   Boolean = false,
 )
 
-private val EMPTY_RENDER = ConsoleRender(AnnotatedString(""), emptyList(), emptyList(), 0, 0, 0, 0)
 
 internal data class LineSeverity(
     val startOffset: Int,
@@ -237,7 +223,6 @@ internal data class ConsoleDoc(
     val searchCapped:   Boolean = false,
 )
 
-private val EMPTY_DOC = ConsoleDoc("", emptyList(), emptyList(), emptyList(), 0, 0, 0, 0)
 
 /**
  * Where [ConsoleContent] reads its entries from.
@@ -529,7 +514,9 @@ internal fun ConsoleContent(
     // Copy the logical line under the caret (last click / F3 target). One entry is
     // one line in the model, so this reads the line text straight from it.
     fun copyLine() {
-        val lineIdx = selection.focus?.line ?: selection.anchor?.line ?: return
+        // No caret yet (e.g. right-click before any left-click) -> first line, matching
+        // the old field-copy behaviour so the menu action always does something.
+        val lineIdx = selection.focus?.line ?: selection.anchor?.line ?: 0
         val lineText = models.lines.getOrNull(lineIdx)?.text ?: return
         if (lineText.isBlank()) return
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(lineText))) }
@@ -641,7 +628,9 @@ internal fun ConsoleContent(
                     onNextMatch  = ::jumpNext,
                     onPrevMatch  = ::jumpPrev,
                     onSelectAll  = { selection.selectAll(models) },
-                    onCopy       = { if (selection.active) copySelection() else copyLine() },
+                    // Ctrl+C copies the active selection (no-op when collapsed), as the
+                    // old field-native copy did; Copy line stays a context-menu action.
+                    onCopy       = { copySelection() },
                     onScrollTop  = { scope.launch { canvasState.scroll.scrollTo(0f) } },
                     onScrollBottom = { scope.launch { canvasState.scroll.animateScrollTo(canvasState.scroll.maxOffset) } },
                     onPageUp     = { scope.launch { canvasState.scroll.animateScrollBy(-canvasState.scroll.viewportPx.toFloat() * 0.9f) } },
@@ -733,6 +722,15 @@ internal fun ConsoleContent(
                         startPadPx      = startPadPx,
                         topPadPx        = topPadPx,
                         gutterWidthPx   = gutterWidthPx,
+                        // Every render-affecting input except the entries: a change drops
+                        // the layout cache + rebuilds the height index, while a pure
+                        // append leaves them intact.
+                        contentKey      = listOf(
+                            showTimestamps, effectiveQuery, regexMode,
+                            filterInfo, filterWarn, filterError, searchAsFilter,
+                            settings.highlightRules, settings.filterRules,
+                        ),
+                        onInteract      = { runCatching { logFocus.requestFocus() } },
                         onViewportWidth = { hostWidthPx = it },
                         modifier        = Modifier.focusRequester(logFocus).focusable(),
                     )
@@ -802,7 +800,7 @@ internal fun ConsoleContent(
             SearchPrompt(
                 query          = searchQuery,
                 // Position preserved across query refinements; the
-                // LaunchedEffect(render.ranges.size) clamp resets
+                // LaunchedEffect(models.matches.size) clamp resets
                 // currentMatch only when the new match set has fewer
                 // entries than the cursor position. Refining 'NullPoint'
                 // to 'NullPointer' keeps the user at hit 5 of 12 instead

@@ -47,26 +47,33 @@ internal class LogCanvasState internal constructor(val measurer: TextMeasurer) {
     var hOffsetPx by mutableFloatStateOf(0f)
     var maxLineWidthPx by mutableIntStateOf(0)
 
-    private var lastWrap: Boolean? = null
-    private var lastLineHeight: Int = -1
     private var lastCount: Int = -1
 
     fun sampleLineHeightPx(base: TextStyle): Int =
         measurer.measure(text = "Ag", style = base).size.height.coerceAtLeast(1)
 
-    fun syncGeometry(wrap: Boolean, lineHeightPx: Int, count: Int) {
-        val shapeChanged = wrap != lastWrap || lineHeightPx != lastLineHeight
-        if (shapeChanged) {
-            heightIndex = if (wrap) FenwickHeightIndex(count, lineHeightPx)
-                          else ConstantHeightIndex(lineHeightPx).also { it.reset(count, lineHeightPx) }
-        } else if (count != lastCount) {
-            // Same shape, line count moved. Constant re-seeds in O(1); Fenwick re-seeds
-            // to estimates and re-measures visible lines on the next draw (a wrap append
-            // briefly softens the scrollbar -- preserving measured heights across appends
-            // is a later refinement).
-            heightIndex.reset(count, lineHeightPx)
+    /** Fresh index (every line at the estimate) and reset the accumulated max line
+     *  width. Called when shape / width / rendering changes -- all measured heights
+     *  are stale then anyway. */
+    fun rebuildIndex(wrap: Boolean, lineHeightPx: Int, count: Int) {
+        heightIndex = if (wrap) FenwickHeightIndex(count, lineHeightPx)
+                      else ConstantHeightIndex(lineHeightPx).also { it.reset(count, lineHeightPx) }
+        lastCount = count
+        maxLineWidthPx = 0
+    }
+
+    /** React to a line-count change WITHOUT dropping measured heights on a pure
+     *  append: Fenwick grows (keeps every measured height), constant re-seeds in
+     *  O(1); a shrink renumbers indices, so rebuild. */
+    fun syncCount(wrap: Boolean, lineHeightPx: Int, count: Int) {
+        if (count == lastCount) return
+        val hi = heightIndex
+        when {
+            hi is FenwickHeightIndex && count > lastCount -> hi.grow(count, lineHeightPx)
+            hi is FenwickHeightIndex                      -> rebuildIndex(wrap, lineHeightPx, count)
+            else                                          -> hi.reset(count, lineHeightPx)
         }
-        lastWrap = wrap; lastLineHeight = lineHeightPx; lastCount = count
+        lastCount = count
     }
 
     fun scrollToLine(index: Int, viewportFraction: Float = 0.33f) {
@@ -123,6 +130,11 @@ internal fun LogCanvas(
     startPadPx: Float,
     topPadPx: Float,
     gutterWidthPx: Float,
+    // Value-equal key over every render-affecting input EXCEPT the entries (timestamps,
+    // query, regex, filters, rules). A change drops the layout cache and rebuilds the
+    // height index; a pure entries append leaves it untouched (append stays O(1)).
+    contentKey: Any?,
+    onInteract: () -> Unit = {},
     onViewportWidth: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -135,15 +147,21 @@ internal fun LogCanvas(
         wrap = wrap,
         widthPx = (viewportWidthPx - startPadPx.toInt()).coerceAtLeast(0),
     )
-    // A style / width change makes every cached layout stale.
-    remember(palette, baseStyle, wrap, effStyle.widthPx) { state.cache.invalidate(); 0 }
-    remember(wrap, lineHeightPx, lines) { state.syncGeometry(wrap, lineHeightPx, lines.lines.size); 0 }
-
-    // Sticky-bottom: keep following the tail as content grows, if already at bottom.
-    val wasAtBottom = state.scroll.atBottom
+    // Rendering or geometry inputs changed (theme / font / wrap / width / timestamps /
+    // query / rules) -> every cached layout and measured height is stale: drop the
+    // cache and rebuild the index to estimates.
+    remember(palette, baseStyle, wrap, effStyle.widthPx, contentKey) {
+        state.cache.invalidate()
+        state.rebuildIndex(wrap, lineHeightPx, lines.lines.size)
+        0
+    }
+    // Line count moved (append / clear): grow or re-seed the index without dropping
+    // measured heights on a pure append, refresh the content height, and -- if we are
+    // following the tail -- pin to the (estimate) bottom; the draw pass firms it up.
     remember(lines) {
+        state.syncCount(wrap, lineHeightPx, lines.lines.size)
         state.scroll.contentHeightPx = state.heightIndex.totalHeight
-        if (wasAtBottom) state.scroll.scrollToBottom()
+        if (state.scroll.follow) state.scroll.scrollToBottom()
         0
     }
 
@@ -157,9 +175,10 @@ internal fun LogCanvas(
                 viewportWidthPx = it.width
                 onViewportWidth(it.width)
                 state.scroll.viewportPx = it.height
-                // Re-clamp: the offset may have been set (sticky-bottom) before the
-                // viewport was known, which would over-scroll past the true maximum.
-                state.scroll.scrollTo(state.scroll.offsetPx)
+                // Re-clamp to the new range, preserving follow: if following, stay
+                // pinned to the (new) bottom; the offset may have been set before the
+                // viewport was known.
+                state.scroll.reclamp()
             }
             .onPointerEvent(PointerEventType.Scroll) { ev ->
                 val dy = ev.changes.firstOrNull()?.scrollDelta?.y ?: 0f
@@ -167,12 +186,14 @@ internal fun LogCanvas(
             }
             .pointerInput(lines, effStyle, startPadPx, topPadPx) {
                 detectTapGestures(onTap = { pos ->
+                    onInteract()
                     selection.setCaret(state.hitTest(pos.x, pos.y, lines, effStyle, topPadPx, startPadPx))
                 })
             }
             .pointerInput(lines, effStyle, startPadPx, topPadPx) {
                 detectDragGestures(
                     onDragStart = { pos ->
+                        onInteract()
                         selection.beginAt(state.hitTest(pos.x, pos.y, lines, effStyle, topPadPx, startPadPx))
                     },
                     onDrag = { change, _ ->
@@ -233,6 +254,9 @@ internal fun LogCanvas(
                 val total = idx.totalHeight
                 if (geometryFirmedUp && state.scroll.contentHeightPx != total) {
                     state.scroll.contentHeightPx = total
+                    // The followed tail just firmed up to its real height -> re-pin to
+                    // the true bottom so the newest lines stay in view.
+                    state.scroll.stickIfFollowing()
                 }
             },
     )
