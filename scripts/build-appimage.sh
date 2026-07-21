@@ -87,13 +87,28 @@ mkdir -p \
 # reflection the launcher would show up as "java" in the taskbar. The fat
 # jar bypasses the Compose-generated launcher script, so the jvmArgs in
 # client-ui/build.gradle.kts do not flow through here -- the AppRun is the
-# only place where flags actually reach the AppImage runtime.
+# only place where flags reach the AppImage runtime, so the ones that matter
+# are mirrored here: the Linux AWT/X11 rendering + tiling-WM hints
+# (_JAVA_AWT_WM_NONREPARENTING fixes AWT window sizing under tiling WMs like
+# Hyprland/sway), the sun.nio.ch open some deps reflect through, and G1 +
+# string dedup. Heap caps are deliberately NOT mirrored: the default (1/4 RAM)
+# suits a GUI that spikes on skins / 3D / backgrounds better than a hard
+# -Xmx512m. (Windows/macOS still cap via jpackage --java-options; reconcile
+# separately.)
 cat > "$APPDIR/AppRun" << EOF
 #!/bin/sh
 HERE="\$(dirname "\$(readlink -f "\$0")")"
+export MALLOC_ARENA_MAX=2
 exec "\$HERE/usr/bin/java" \\
      --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
+     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \\
      --enable-native-access=ALL-UNNAMED \\
+     -Dawt.useSystemAAFontSettings=on \\
+     -Djdk.gtk.version=3 \\
+     -D_JAVA_AWT_WM_NONREPARENTING=1 \\
+     -Drobot.need_x11=false \\
+     -XX:+UseG1GC \\
+     -XX:+UseStringDeduplication \\
      -jar "\$HERE/usr/lib/nexira.jar" \\
      "\$@"
 EOF
