@@ -49,6 +49,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.theme.Dimens
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import java.time.Duration
@@ -90,7 +91,7 @@ fun PackCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(132.dp)
+            .height(Dimens.packCardHeight)
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onOpenDetail),
     ) {
@@ -250,7 +251,7 @@ private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
         model              = iconUrl,
         contentDescription = null,
         contentScale       = ContentScale.Crop,
-        modifier           = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+        modifier           = Modifier.size(Dimens.packAvatar).clip(RoundedCornerShape(Dimens.packAvatarCorner)),
         loading            = { Box(Modifier.fillMaxSize().background(hue)) },
         error              = { InitialsAvatar(displayName, hue) },
     )
