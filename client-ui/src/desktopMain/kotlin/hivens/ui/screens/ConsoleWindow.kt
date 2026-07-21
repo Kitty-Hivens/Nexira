@@ -1948,7 +1948,7 @@ internal fun styleDoc(doc: ConsoleDoc, palette: ConsolePalette): ConsoleRender {
     )
 }
 
-private fun spanStyleFor(role: SpanRole, p: ConsolePalette): SpanStyle = when (role) {
+internal fun spanStyleFor(role: SpanRole, p: ConsolePalette): SpanStyle = when (role) {
     SpanRole.Divider -> SpanStyle(color = p.divider, fontWeight = FontWeight.Light)
     SpanRole.Info    -> SpanStyle(color = p.severityInfo)
     SpanRole.Warn    -> SpanStyle(color = p.severityWarn)
