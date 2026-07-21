@@ -22,5 +22,14 @@ data class FileData(
      * diff target vs on-disk without re-hashing. Empty when not captured.
      */
     @SerialName("sha1")
-    val sha1: String = ""
+    val sha1: String = "",
+
+    /**
+     * SHA-256, used by the launcher self-update as the integrity gate on a downloaded
+     * or patched file (change detection can lean on the cheaper [sha1]; the tamper
+     * gate wants the stronger hash). Empty when not captured (pack manifests do not
+     * set it).
+     */
+    @SerialName("sha256")
+    val sha256: String = ""
 )
