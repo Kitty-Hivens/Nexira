@@ -80,13 +80,7 @@ class FenwickHeightIndex(initialCount: Int = 0, estimatePerLine: Int = 0) : Heig
         val est = estimatePerLine.coerceAtLeast(0)
         this.count = n
         heights = IntArray(n) { est }
-        // O(n) tree build: seed each node with its own value, then push into parent.
-        tree = LongArray(n + 1)
-        for (i in 1..n) {
-            tree[i] += est
-            val parent = i + (i and -i)
-            if (parent <= n) tree[parent] += tree[i]
-        }
+        rebuildTree()
     }
 
     override fun setHeight(index: Int, heightPx: Int) {
@@ -99,6 +93,34 @@ class FenwickHeightIndex(initialCount: Int = 0, estimatePerLine: Int = 0) : Heig
         while (x <= count) {
             tree[x] += delta
             x += x and -x
+        }
+    }
+
+    /**
+     * Extend to [newCount] lines, appending the new tail at [estimatePerLine] while
+     * KEEPING every existing measured height (they live in [heights]). The tree is
+     * rebuilt in O(newCount) -- cheap integer work, unlike a layout pass -- which is
+     * what a live append needs: a reset that dropped measured heights made the
+     * followed tail's scroll position drift (the flood case). Shrink is not supported
+     * (indices renumber); the caller rebuilds instead.
+     */
+    fun grow(newCount: Int, estimatePerLine: Int) {
+        if (newCount <= count) return
+        val est = estimatePerLine.coerceAtLeast(0)
+        val old = count
+        heights = heights.copyOf(newCount)
+        for (i in old until newCount) heights[i] = est
+        count = newCount
+        rebuildTree()
+    }
+
+    // Build the Fenwick tree from `heights` in O(count).
+    private fun rebuildTree() {
+        tree = LongArray(count + 1)
+        for (i in 1..count) {
+            tree[i] += heights[i - 1]
+            val parent = i + (i and -i)
+            if (parent <= count) tree[parent] += tree[i]
         }
     }
 

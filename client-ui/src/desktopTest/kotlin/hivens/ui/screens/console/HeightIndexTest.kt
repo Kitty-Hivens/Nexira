@@ -73,6 +73,33 @@ class HeightIndexTest {
     }
 
     @Test
+    fun fenwickGrowPreservesMeasuredHeights() {
+        val idx = FenwickHeightIndex(initialCount = 3, estimatePerLine = 10)
+        idx.setHeight(0, 25); idx.setHeight(1, 40); idx.setHeight(2, 15) // [25,40,15], total 80
+        idx.grow(newCount = 5, estimatePerLine = 12) // append 2 lines at estimate 12
+        assertEquals(104, idx.totalHeight) // 80 + 24
+        // existing heights survived the grow
+        assertEquals(25, idx.topOfLine(1))
+        assertEquals(65, idx.topOfLine(2))
+        assertEquals(80, idx.topOfLine(3)) // top of first appended line
+        assertEquals(92, idx.topOfLine(4))
+        assertEquals(3, idx.lineAtOffset(80))
+        assertEquals(4, idx.lineAtOffset(92))
+        // appended lines are still correctable afterwards
+        idx.setHeight(4, 30)
+        assertEquals(122, idx.totalHeight)
+        assertEquals(4, idx.lineAtOffset(92))
+    }
+
+    @Test
+    fun fenwickGrowIsNoOpWhenNotGrowing() {
+        val idx = FenwickHeightIndex(initialCount = 4, estimatePerLine = 10)
+        idx.setHeight(2, 33)
+        idx.grow(newCount = 4, estimatePerLine = 10) // same count
+        assertEquals(63, idx.totalHeight) // unchanged (30 + 33)
+    }
+
+    @Test
     fun emptyIsSafe() {
         val c = ConstantHeightIndex(20); c.reset(0, 0)
         assertEquals(0, c.totalHeight)
