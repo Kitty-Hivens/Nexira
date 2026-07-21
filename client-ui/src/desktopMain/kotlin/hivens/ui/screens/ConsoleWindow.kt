@@ -107,6 +107,12 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.generated.resources.Res
+import hivens.ui.screens.console.DocPos
+import hivens.ui.screens.console.LineModels
+import hivens.ui.screens.console.LogCanvas
+import hivens.ui.screens.console.LogSelection
+import hivens.ui.screens.console.buildLineModels
+import hivens.ui.screens.console.rememberLogCanvasState
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
@@ -356,10 +362,9 @@ internal fun ConsoleContent(
     var cmdHistoryIdx   by remember { mutableIntStateOf(-1) }
     var currentMatch    by remember { mutableIntStateOf(0) }
     var copiedFlash     by remember { mutableStateOf(false) }
-    var selection       by remember { mutableStateOf(TextRange.Zero) }
-    var layoutResult    by remember { mutableStateOf<TextLayoutResult?>(null) }
 
-    val scrollState     = rememberScrollState()
+    val canvasState     = rememberLogCanvasState()
+    val selection       = remember { LogSelection() }
     val searchFocus     = remember { FocusRequester() }
     val logFocus        = remember { FocusRequester() }
     val density         = LocalDensity.current
@@ -411,14 +416,14 @@ internal fun ConsoleContent(
     // O(n) cost (severity/query filter, regex, warn/error counts, span layout)
     // runs only when content, filters, search, or timestamps change. A theme
     // tick does NOT re-run this: palette is deliberately not a key here.
-    val doc by produceState(
-        initialValue = remember { EMPTY_DOC },
+    val models by produceState(
+        initialValue = remember { LineModels.EMPTY },
         entries, filterInfo, filterWarn, filterError,
         searchAsFilter, effectiveQuery, regexMode, searchRegex, showTimestamps,
         settings.highlightRules, settings.filterRules,
     ) {
         value = withContext(Dispatchers.Default) {
-            buildConsoleDoc(
+            buildLineModels(
                 all            = entries,
                 filterInfo     = filterInfo,
                 filterWarn     = filterWarn,
@@ -434,21 +439,13 @@ internal fun ConsoleContent(
         }
     }
 
-    // Stage 2 -- styling pass: apply palette colours to the precomputed spans.
-    // Keyed on the doc instance (stable across a pure palette tick) plus the
-    // palette, so a theme change re-runs only this cheap span-colour pass, never
-    // the filter/regex above. Still off-thread so a content flood never styles a
-    // 5000-line buffer on Main.
-    val render by produceState(
-        initialValue = remember { EMPTY_RENDER },
-        doc, palette,
-    ) {
-        value = withContext(Dispatchers.Default) { styleDoc(doc, palette) }
-    }
+    // Styling is per-line and lazy now: the canvas's LineLayoutCache colours each
+    // visible line via the palette when it measures, so a theme tick only
+    // re-measures the viewport (cache invalidate), never the whole buffer.
 
     // Clamp current match index when the match set shrinks past it.
-    LaunchedEffect(render.ranges.size) {
-        if (currentMatch >= render.ranges.size) currentMatch = 0
+    LaunchedEffect(models.matches.size) {
+        if (currentMatch >= models.matches.size) currentMatch = 0
     }
 
     // Initial focus on the log area: BasicTextField is read-only but still
@@ -476,17 +473,9 @@ internal fun ConsoleContent(
     }
 
     // ── Sticky-bottom follow ───────────────────────────────────────────────
-    // User scrolling up naturally pauses follow because isAtBottom flips
-    // false. Scrolling back to the bottom (or pressing G) flips it true
-    // again. No explicit follow flag needed.
-    val isAtBottom by remember {
-        derivedStateOf {
-            scrollState.maxValue == 0 || scrollState.value >= scrollState.maxValue - 16
-        }
-    }
-    LaunchedEffect(render.annotated) {
-        if (isAtBottom) scrollState.scrollTo(scrollState.maxValue)
-    }
+    // The canvas keeps following the tail as content grows; this just surfaces
+    // the state for the footer's follow / paused chip.
+    val isAtBottom = canvasState.scroll.atBottom
 
     // ── Lazy history page-in (sliding window upper edge) ───────────────────
     // When the user scrolls within 80 px of the top AND the service has
@@ -501,35 +490,28 @@ internal fun ConsoleContent(
     // views load the whole tail-bounded file up front, so there is nothing to
     // page. loadHistoryBefore prepends to the buffer on the drainer and the next
     // snapshot carries the older entries; we only do the scroll-anchor shift.
-    LaunchedEffect(scrollState.value, historyOffset, isLive) {
+    LaunchedEffect(canvasState.scroll.offsetPx, historyOffset, isLive) {
         if (!isLive) return@LaunchedEffect
         if (historyLoading) return@LaunchedEffect
         if (historyOffset <= 0) return@LaunchedEffect
-        if (scrollState.value > 80) return@LaunchedEffect
+        if (canvasState.scroll.offsetPx > 80f) return@LaunchedEffect
         historyLoading = true
         try {
             val loaded = gameConsole.loadHistoryBefore(count = 500)
             if (loaded.isNotEmpty()) {
-                // ScrollState shifts by an approximate line height per loaded
-                // entry so the user's visual line stays put; not exact (wrap
-                // line height depends on glyph metrics) but the miss is sub-100 px.
+                // Shift by an approximate line height per prepended entry so the
+                // user's visual line stays put; exact for no-wrap, off by wrap
+                // reflow (sub-100 px) until those lines re-measure.
                 val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
-                val shift = (loaded.size * approxLineHeightPx).toInt()
-                scrollState.scrollTo((scrollState.value + shift).coerceAtMost(scrollState.maxValue))
+                canvasState.scroll.shiftBy(loaded.size * approxLineHeightPx)
             }
         } finally {
             historyLoading = false
         }
     }
 
-    // ── TextFieldValue source of truth ─────────────────────────────────────
-    // Text comes from `render.annotated` (system-controlled). Selection
-    // is user-controlled and persists across rebuilds; the read-only field
-    // only routes selection changes (drag-select, Ctrl+A, click-position)
-    // through onValueChange.
-    val textFieldValue = remember(render.annotated, selection) {
-        TextFieldValue(annotatedString = render.annotated, selection = selection)
-    }
+    // Selection lives in `selection` (LogSelection); the canvas renders and
+    // hit-tests it, and copy assembles from the model.
 
     // ── Copy actions ───────────────────────────────────────────────────────
     fun copyAll() {
@@ -544,24 +526,11 @@ internal fun ConsoleContent(
         }
     }
 
-    // Copy the LOGICAL line under the current caret. Works off the
-    // annotated text's '\n' boundaries directly, not the field's
-    // TextLayoutResult -- the context-menu callback can fire before
-    // layoutResult is populated (or after a buffer-rebuild swaps it
-    // out), and the prior "layout ?: return" guard silently swallowed
-    // the click + the toast that goes with it. One entry equals one
-    // logical line in our builder, so '\n' bounds are authoritative.
+    // Copy the logical line under the caret (last click / F3 target). One entry is
+    // one line in the model, so this reads the line text straight from it.
     fun copyLine() {
-        val annotated = render.annotated
-        if (annotated.isEmpty()) return
-        val text = annotated.text
-        val pos = selection.start.coerceIn(0, text.length)
-        val lineStart = if (pos == 0) 0
-                        else text.lastIndexOf('\n', startIndex = pos - 1) + 1
-        val rawEnd = text.indexOf('\n', pos)
-        val lineEnd = if (rawEnd < 0) text.length else rawEnd
-        if (lineStart > lineEnd) return
-        val lineText = text.substring(lineStart, lineEnd)
+        val lineIdx = selection.focus?.line ?: selection.anchor?.line ?: return
+        val lineText = models.lines.getOrNull(lineIdx)?.text ?: return
         if (lineText.isBlank()) return
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(lineText))) }
         copiedFlash = true
@@ -571,15 +540,11 @@ internal fun ConsoleContent(
         }
     }
 
-    // Copy the active selection. Collapsed selection (no drag) -> no-op;
-    // the user can switch to copy-line for that case via the same menu.
+    // Copy the active selection, assembled from the model across lines. No active
+    // selection -> no-op (copy-line covers the caret case via the same menu).
     fun copySelection() {
-        if (selection.collapsed) return
-        val annotated = render.annotated
-        val start = selection.start.coerceIn(0, annotated.length)
-        val end   = selection.end.coerceIn(0, annotated.length)
-        if (start >= end) return
-        val text = annotated.substring(start, end)
+        val text = selection.copyText(models)
+        if (text.isEmpty()) return
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
         copiedFlash = true
         scope.launch {
@@ -589,39 +554,25 @@ internal fun ConsoleContent(
     }
 
     // ── Match jumping ──────────────────────────────────────────────────────
-    // The layout result may be from the PREVIOUS frame's BasicTextField measure
-    // while render.ranges references char positions in the JUST-rebuilt
-    // annotated string. Under flood, an offset can exceed the old layout's
-    // text length -- MultiParagraph.getLineForOffset would throw. Guard on
-    // text length first, then runCatching the layout call so a transient
-    // out-of-range only loses one F3 press instead of crashing.
+    // Matches carry their filtered-line index, so a jump scrolls that line into
+    // view via the height index and selects the matched span -- no dependency on a
+    // text-layout snapshot, so a jump can't race the buffer rebuild.
     fun scrollToMatch(idx: Int) {
-        val layout = layoutResult ?: return
-        if (idx !in render.ranges.indices) return
-        val range = render.ranges[idx]
-        val start = range.first
-        val end   = range.last + 1
-        if (start >= layout.layoutInput.text.length) return
-        val line = runCatching { layout.getLineForOffset(start) }.getOrNull() ?: return
-        val top = runCatching { layout.getLineTop(line).toInt() }.getOrNull() ?: return
-        val target = (top - scrollState.viewportSize / 3).coerceAtLeast(0)
-        scope.launch { scrollState.animateScrollTo(target) }
-        // Selection mirrors the match span exactly -- in regex mode this
-        // visualises the full matched text rather than collapsing to a
-        // zero-width caret as the prior queryLength-based form did.
-        val safeEnd = end.coerceAtMost(render.annotated.length)
-        selection = TextRange(start, safeEnd)
+        if (idx !in models.matches.indices) return
+        val m = models.matches[idx]
+        canvasState.scrollToLine(m.line)
+        selection.select(DocPos(m.line, m.start), DocPos(m.line, m.end))
     }
 
     fun jumpNext() {
-        if (render.ranges.isEmpty()) return
-        currentMatch = (currentMatch + 1) % render.ranges.size
+        if (models.matches.isEmpty()) return
+        currentMatch = (currentMatch + 1) % models.matches.size
         scrollToMatch(currentMatch)
     }
 
     fun jumpPrev() {
-        if (render.ranges.isEmpty()) return
-        currentMatch = if (currentMatch == 0) render.ranges.lastIndex
+        if (models.matches.isEmpty()) return
+        currentMatch = if (currentMatch == 0) models.matches.lastIndex
                        else currentMatch - 1
         scrollToMatch(currentMatch)
     }
@@ -660,11 +611,11 @@ internal fun ConsoleContent(
     PuppetClick ("console.saveToFile")   { gameConsole.exportEntries(entries) }
     PuppetClick ("console.copyAll")      { copyAll() }
     PuppetClick ("console.clear", enabled = isLive) { if (isLive) gameConsole.clear() }
-    PuppetClick ("console.jumpToBottom", enabled = render.filteredCount > 0) {
-        scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
+    PuppetClick ("console.jumpToBottom", enabled = models.filteredCount > 0) {
+        scope.launch { canvasState.scroll.animateScrollTo(canvasState.scroll.maxOffset) }
     }
-    PuppetClick ("console.matchNext",    enabled = render.ranges.isNotEmpty()) { jumpNext() }
-    PuppetClick ("console.matchPrev",    enabled = render.ranges.isNotEmpty()) { jumpPrev() }
+    PuppetClick ("console.matchNext",    enabled = models.matches.isNotEmpty()) { jumpNext() }
+    PuppetClick ("console.matchPrev",    enabled = models.matches.isNotEmpty()) { jumpPrev() }
     FONT_SIZES.forEach { sz ->
         PuppetClick("console.fontSize.$sz") { onSettingsChange(settings.copy(fontSize = sz)) }
     }
@@ -682,29 +633,31 @@ internal fun ConsoleContent(
                 handleKey(
                     ev          = ev,
                     searchFocus = searchHasFocus,
-                    matchCount  = render.ranges.size,
+                    matchCount  = models.matches.size,
                     onOpenSearch = { openSearch() },
                     onCloseSearch = {
                         if (searchQuery.isNotEmpty()) searchQuery = "" else closeSearch()
                     },
                     onNextMatch  = ::jumpNext,
                     onPrevMatch  = ::jumpPrev,
-                    onScrollTop  = { scope.launch { scrollState.scrollTo(0) } },
-                    onScrollBottom = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
-                    onPageUp     = { scope.launch { scrollState.animateScrollBy(-scrollState.viewportSize.toFloat() * 0.9f) } },
-                    onPageDown   = { scope.launch { scrollState.animateScrollBy( scrollState.viewportSize.toFloat() * 0.9f) } },
-                    onLineUp     = { scope.launch { scrollState.animateScrollBy(-fontSize.toFloat() * 1.6f) } },
-                    onLineDown   = { scope.launch { scrollState.animateScrollBy( fontSize.toFloat() * 1.6f) } },
+                    onSelectAll  = { selection.selectAll(models) },
+                    onCopy       = { if (selection.active) copySelection() else copyLine() },
+                    onScrollTop  = { scope.launch { canvasState.scroll.scrollTo(0f) } },
+                    onScrollBottom = { scope.launch { canvasState.scroll.animateScrollTo(canvasState.scroll.maxOffset) } },
+                    onPageUp     = { scope.launch { canvasState.scroll.animateScrollBy(-canvasState.scroll.viewportPx.toFloat() * 0.9f) } },
+                    onPageDown   = { scope.launch { canvasState.scroll.animateScrollBy( canvasState.scroll.viewportPx.toFloat() * 0.9f) } },
+                    onLineUp     = { scope.launch { canvasState.scroll.animateScrollBy(-fontSize.toFloat() * 1.6f) } },
+                    onLineDown   = { scope.launch { canvasState.scroll.animateScrollBy( fontSize.toFloat() * 1.6f) } },
                 )
             },
     ) {
         // ── Toolbar ─────────────────────────────────────────────────────────
         Toolbar(
             strings       = s,
-            filtered      = render.filteredCount,
+            filtered      = models.filteredCount,
             total         = entries.size,
-            warnCount     = render.warnCount,
-            errorCount    = render.errorCount,
+            warnCount     = models.warnCount,
+            errorCount    = models.errorCount,
             filterInfo    = filterInfo,
             filterWarn    = filterWarn,
             filterError   = filterError,
@@ -736,70 +689,19 @@ internal fun ConsoleContent(
         // ── Log area ────────────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxWidth()) {
             // Nothing has been logged yet -> idle easter-egg instead of a blank void.
-            if (render.totalCount == 0) ConsoleEmptyState(settings.customArt)
-            val hScroll = rememberScrollState()
+            if (models.totalCount == 0) ConsoleEmptyState(settings.customArt)
+
             val baseStyle = TextStyle(
                 fontFamily = LocalMonoFamily.current,
                 fontSize   = fontSize.sp,
                 color      = themeColors.textPrimary,
             )
-
-            // Gutter strip pixel width is independent of font size; 3 dp
-            // reads as a clear severity tag without competing with the
-            // text column for horizontal space. drawBehind sits BEFORE
-            // padding in the modifier chain so its canvas covers the
-            // field's outer box -- the bar lands flush with the window's
-            // left edge while the text starts after the start padding,
-            // leaving a clean gap. yOffsetPx folds the field's top
-            // padding into each line's getLineTop so the bar aligns with
-            // the actual rendered baseline rather than the canvas top.
+            val startPadPx    = with(density) { 10.dp.toPx() }
+            val topPadPx      = with(density) { 4.dp.toPx() }
             val gutterWidthPx = with(density) { 3.dp.toPx() }
-            val verticalPaddingPx = with(density) { 4.dp.toPx() }
-            // Precompute the WARN/ERROR strip rects once per (layout, severities,
-            // palette) change rather than walking every entry + querying the
-            // layout on every draw frame -- a 5000-line buffer would otherwise
-            // re-measure the gutter on each scroll tick.
-            val gutterRects = remember(
-                layoutResult, render.lineSeverities,
-                themeColors.warnAccent, themeColors.criticalAccent, verticalPaddingPx,
-            ) {
-                computeGutterRects(
-                    layout     = layoutResult,
-                    severities = render.lineSeverities,
-                    warnColor  = themeColors.warnAccent,
-                    errorColor = themeColors.criticalAccent,
-                    yOffsetPx  = verticalPaddingPx,
-                )
-            }
-            val gutterModifier = if (showGutter && gutterRects.isNotEmpty()) {
-                Modifier.drawBehind {
-                    for (r in gutterRects) {
-                        drawRect(color = r.color, topLeft = Offset(0f, r.top), size = Size(gutterWidthPx, r.height))
-                    }
-                }
-            } else {
-                Modifier
-            }
+            var hostWidthPx by remember { mutableIntStateOf(0) }
 
-            // Override BasicTextField's built-in LocalTextContextMenu so
-            // the right-click popup drops Cut / Paste (we are read-only)
-            // and picks up our Copy line + Copy all entries. Keeps the
-            // field's native Copy / Select-all so OS shortcuts and the
-            // menu agree on behaviour.
-            val customContextMenu = remember(s) {
-                ConsoleTextContextMenu(
-                    strings        = s,
-                    onCopyLine     = ::copyLine,
-                    onCopyAll      = ::copyAll,
-                )
-            }
-            // Replace Compose Desktop's native-JPopupMenu representation
-            // with a Compose-rendered one painted from NxTheme.
-            // Default on Linux pulls a Swing popup (dated, ignores theme,
-            // user reported as ugly); the DefaultContextMenuRepresentation
-            // constructor draws via Compose primitives and lets us pick
-            // surface / text / hover colours straight from the active
-            // palette. Atelier accent overrides flow through naturally.
+            // Themed right-click popup (Compose-drawn, not the dated Swing default).
             val menuRepresentation = remember(themeColors) {
                 DefaultContextMenuRepresentation(
                     backgroundColor = themeColors.surface,
@@ -807,80 +709,38 @@ internal fun ConsoleContent(
                     itemHoverColor  = themeColors.primary.copy(alpha = 0.14f),
                 )
             }
-            CompositionLocalProvider(
-                LocalTextContextMenu          provides customContextMenu,
-                LocalContextMenuRepresentation provides menuRepresentation,
-            ) {
-            ContextMenuArea(
-                items = {
-                    listOf(
-                        ContextMenuItem(s.consoleMenuCopyLine) { copyLine() },
-                        ContextMenuItem(s.consoleMenuCopySelection) { copySelection() },
-                        ContextMenuItem(s.consoleCopyAll) { copyAll() },
-                    )
-                },
-            ) {
-            if (wrapText) {
-                // Wrap-on path: BasicTextField inherits its width from the
-                // parent verticalScroll Column at fillMaxWidth, which is
-                // exactly what enables wrap. Drag-select, Ctrl+A, Ctrl+C,
-                // and F3 visual selection band all work natively.
-                Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
-                    BasicTextField(
-                        value         = textFieldValue,
-                        onValueChange = { tfv -> selection = tfv.selection },
-                        readOnly      = true,
-                        textStyle     = baseStyle,
-                        cursorBrush   = SolidColor(themeColors.textPrimary),
-                        onTextLayout  = { layoutResult = it },
-                        modifier      = Modifier
-                            .fillMaxWidth()
-                            .then(gutterModifier)
-                            .padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
-                            .focusRequester(logFocus),
-                    )
-                }
-            } else {
-                // Wrap-off path: BasicTextField has no softWrap parameter
-                // and cannot escape its parent's fillMaxWidth constraint,
-                // so a no-wrap rendering needs a different host. Text(
-                // softWrap = false) measures at its intrinsic line width
-                // and a horizontalScroll around the column then exposes
-                // the overflow to scrolling. SelectionContainer gives
-                // drag-select; the focusable outer Column carries the
-                // kbd-chord focus the chord handler relies on. Ctrl+A
-                // and the F3 selection band are unavailable in this
-                // mode -- the yellow span highlights still mark every
-                // match so navigation remains usable.
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                        .horizontalScroll(hScroll)
-                        .focusRequester(logFocus)
-                        .focusable(),
-                ) {
-                    SelectionContainer {
-                        Text(
-                            text         = render.annotated,
-                            softWrap     = false,
-                            style        = baseStyle,
-                            onTextLayout = { layoutResult = it },
-                            modifier     = Modifier
-                                .then(gutterModifier)
-                                .padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            CompositionLocalProvider(LocalContextMenuRepresentation provides menuRepresentation) {
+                ContextMenuArea(
+                    items = {
+                        listOf(
+                            ContextMenuItem(s.consoleMenuCopyLine) { copyLine() },
+                            ContextMenuItem(s.consoleMenuCopySelection) { copySelection() },
+                            ContextMenuItem(s.consoleCopyAll) { copyAll() },
                         )
-                    }
+                    },
+                ) {
+                    LogCanvas(
+                        state           = canvasState,
+                        lines           = models,
+                        selection       = selection,
+                        palette         = palette,
+                        baseStyle       = baseStyle,
+                        wrap            = wrapText,
+                        showGutter      = showGutter,
+                        warnColor       = themeColors.warnAccent,
+                        errorColor      = themeColors.criticalAccent,
+                        selectionColor  = themeColors.primary.copy(alpha = 0.30f),
+                        startPadPx      = startPadPx,
+                        topPadPx        = topPadPx,
+                        gutterWidthPx   = gutterWidthPx,
+                        onViewportWidth = { hostWidthPx = it },
+                        modifier        = Modifier.focusRequester(logFocus).focusable(),
+                    )
                 }
             }
-            } // end ContextMenuArea
-            } // end CompositionLocalProvider(LocalTextContextMenu)
 
-            // Console-local scrollbar style: Compose Desktop's default is
-            // 4 dp thick at 12% alpha, effectively invisible against the
-            // console background. Bump to 8 dp + 40% unhover / 75% hover
-            // so the bar is parseable peripherally without dominating the
-            // text column.
+            // Console-local scrollbar style: the default is near-invisible against
+            // the console background, so bump thickness + alpha.
             val scrollbarStyle = ScrollbarStyle(
                 minimalHeight       = 24.dp,
                 thickness           = 8.dp,
@@ -890,13 +750,13 @@ internal fun ConsoleContent(
                 hoverColor          = themeColors.textSecondary.copy(alpha = 0.75f),
             )
             VerticalScrollbar(
-                adapter  = rememberScrollbarAdapter(scrollState),
+                adapter  = canvasState.scroll.scrollbarAdapter(),
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
                 style    = scrollbarStyle,
             )
             if (!wrapText) {
                 HorizontalScrollbar(
-                    adapter  = rememberScrollbarAdapter(hScroll),
+                    adapter  = canvasState.horizontalScrollbarAdapter { hostWidthPx },
                     modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
                     style    = scrollbarStyle,
                 )
@@ -1019,18 +879,18 @@ internal fun ConsoleContent(
 
         StatusFooter(
             strings        = s,
-            filtered       = render.filteredCount,
+            filtered       = models.filteredCount,
             total          = entries.size,
             historyOffset  = historyOffset,
-            warnCount      = render.warnCount,
-            errorCount     = render.errorCount,
+            warnCount      = models.warnCount,
+            errorCount     = models.errorCount,
             following      = isAtBottom,
             searchActive   = effectiveQuery.isNotBlank(),
-            matchCurrent   = if (render.ranges.isNotEmpty()) currentMatch + 1 else 0,
-            matchTotal     = render.ranges.size,
-            searchCapped   = render.searchCapped,
+            matchCurrent   = if (models.matches.isNotEmpty()) currentMatch + 1 else 0,
+            matchTotal     = models.matches.size,
+            searchCapped   = models.searchCapped,
             onResumeFollow = {
-                scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
+                scope.launch { canvasState.scroll.animateScrollTo(canvasState.scroll.maxOffset) }
             },
         )
     }
@@ -1523,6 +1383,8 @@ private fun handleKey(
     onCloseSearch:  () -> Unit,
     onNextMatch:    () -> Unit,
     onPrevMatch:    () -> Unit,
+    onSelectAll:    () -> Unit,
+    onCopy:         () -> Unit,
     onScrollTop:    () -> Unit,
     onScrollBottom: () -> Unit,
     onPageUp:       () -> Unit,
@@ -1561,9 +1423,11 @@ private fun handleKey(
         matchCount > 0 && key == Key.N && shift           -> { onPrevMatch(); true }
         matchCount > 0 && key == Key.N && !shift          -> { onNextMatch(); true }
 
-        // Scroll anchors. Ctrl+Home / Ctrl+End never conflict with
-        // selection-extension since BasicTextField only honors plain
-        // Home / End / Shift+Home / Shift+End on selection.
+        // Copy / select-all: the canvas owns text handling now (no field beneath).
+        key == Key.A && ctrl && !shift         -> { onSelectAll(); true }
+        key == Key.C && ctrl && !shift         -> { onCopy(); true }
+
+        // Scroll anchors. Ctrl+Home / Ctrl+End for top / bottom.
         key == Key.MoveHome && ctrl && !shift  -> { onScrollTop(); true }
         key == Key.MoveEnd  && ctrl && !shift  -> { onScrollBottom(); true }
         key == Key.G        && shift           -> { onScrollBottom(); true }
@@ -1955,82 +1819,6 @@ internal fun spanStyleFor(role: SpanRole, p: ConsolePalette): SpanStyle = when (
     SpanRole.Error   -> SpanStyle(color = p.severityError)
     SpanRole.Marker  -> SpanStyle(color = p.severityError, fontWeight = FontWeight.Bold)
     SpanRole.Search  -> SpanStyle(color = p.searchMatch, background = p.searchMatchBg, fontWeight = FontWeight.Bold)
-}
-
-// Replaces the default BasicTextField right-click menu (Cut / Copy /
-// Paste / Select all) with one that drops Cut + Paste (the field is
-// read-only, those are useless) and adds Copy line / Copy all + keeps
-// native Copy + Select all. The styling still flows through Compose
-// Desktop's ContextMenuRepresentation; further visual polish lives on
-// Phase 7.5.
-@OptIn(ExperimentalFoundationApi::class)
-private class ConsoleTextContextMenu(
-    private val strings: AppStrings,
-    private val onCopyLine: () -> Unit,
-    private val onCopyAll: () -> Unit,
-) : TextContextMenu {
-    @Composable
-    override fun Area(
-        textManager: TextContextMenu.TextManager,
-        state: ContextMenuState,
-        content: @Composable () -> Unit,
-    ) {
-        ContextMenuArea(
-            items = {
-                buildList {
-                    val copyAction = textManager.copy
-                    if (copyAction != null && copyAction.enabled) {
-                        add(ContextMenuItem(strings.consoleMenuCopySelection) { copyAction.execute() })
-                    }
-                    add(ContextMenuItem(strings.consoleMenuCopyLine) { onCopyLine() })
-                    add(ContextMenuItem(strings.consoleCopyAll) { onCopyAll() })
-                    val selectAllAction = textManager.selectAll
-                    if (selectAllAction != null && selectAllAction.enabled) {
-                        add(ContextMenuItem(strings.consoleSelectAll) { selectAllAction.execute() })
-                    }
-                }
-            },
-            state   = state,
-            content = content,
-        )
-    }
-}
-
-// A precomputed gutter strip rect: a thin vertical bar at the left edge of a
-// rendered WARN / ERROR line. Computed off the draw frame (see
-// [computeGutterRects]) so the paint pass is a flat list iteration.
-private class GutterRect(val top: Float, val height: Float, val color: Color)
-
-// Map every WARN/ERROR entry's char range to its visual line extent via the
-// TextLayoutResult, once per layout / severities change. runCatching guards a
-// transient stale layout while the buffer catches up. INFO / DIVIDER lines get
-// no bar.
-private fun computeGutterRects(
-    layout: TextLayoutResult?,
-    severities: List<LineSeverity>,
-    warnColor: Color,
-    errorColor: Color,
-    yOffsetPx: Float,
-): List<GutterRect> {
-    if (layout == null || severities.isEmpty()) return emptyList()
-    val textLen = layout.layoutInput.text.length
-    if (textLen == 0) return emptyList()
-    val rects = ArrayList<GutterRect>()
-    for (sev in severities) {
-        if (sev.type == LogType.INFO || sev.type == LogType.DIVIDER) continue
-        val color = if (sev.type == LogType.ERROR) errorColor else warnColor
-        val safeStart = sev.startOffset.coerceIn(0, textLen - 1)
-        val safeEnd   = (sev.endOffset - 1).coerceIn(0, textLen - 1)
-        if (safeStart > safeEnd) continue
-        val startLine = runCatching { layout.getLineForOffset(safeStart) }.getOrNull() ?: continue
-        val endLine   = runCatching { layout.getLineForOffset(safeEnd) }.getOrNull() ?: continue
-        for (line in startLine..endLine) {
-            val top    = runCatching { layout.getLineTop(line) }.getOrNull() ?: continue
-            val bottom = runCatching { layout.getLineBottom(line) }.getOrNull() ?: continue
-            rects.add(GutterRect(yOffsetPx + top, bottom - top, color))
-        }
-    }
-    return rects
 }
 
 internal fun findAllSubstring(text: String, query: String): List<IntRange> {
