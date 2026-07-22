@@ -121,5 +121,15 @@ abstract class CustomRuntimeTask : DefaultTask() {
         }
 
         execOperations.exec { commandLine(args) }
+
+        // jlink emits two archives: classes.jsa (compressed oops) and
+        // classes_nocoops.jsa for the uncompressed-oops mode. The launcher's heap
+        // is always far below the 32 GB coops threshold, so the nocoops variant is
+        // never mapped -- dead weight worth ~14 MB on disk and ~3 MB in the
+        // compressed distributable. Dropping it is safe: a run that somehow
+        // disabled compressed oops would simply fall back to no class sharing.
+        if (generateCdsArchive.get()) {
+            fileSystem.delete { delete(out.resolve("lib/server/classes_nocoops.jsa")) }
+        }
     }
 }
