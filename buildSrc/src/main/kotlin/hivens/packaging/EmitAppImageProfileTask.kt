@@ -73,6 +73,10 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
     @get:Optional
     abstract val includeLocales: Property<String>
 
+    /** `--generate-cds-archive`; see [hivens.packaging.JlinkOptionsExtension]. */
+    @get:Input
+    abstract val generateCdsArchive: Property<Boolean>
+
     // ── Output ────────────────────────────────────────────────────────────
 
     @get:OutputFile
@@ -89,6 +93,7 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
             compress.orNull?.let { add("--compress=$it") }
             vmKind.orNull?.let { add("--vm=$it") }
             includeLocales.orNull?.let { add("--include-locales=$it") }
+            if (generateCdsArchive.get()) add("--generate-cds-archive")
         }
         val moduleList = modules.get().joinToString(",")
         val file = outputFile.get().asFile

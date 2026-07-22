@@ -64,6 +64,12 @@ abstract class CustomRuntimeTask : DefaultTask() {
     @get:Optional
     abstract val includeLocales: Property<String>
 
+    /** `--generate-cds-archive`. Without the base archive in the image, app-class
+     *  sharing (`-XX:ArchiveClassesAtExit`, `-XX:+AutoCreateSharedArchive`) is
+     *  rejected by the JVM, so class loading cannot be cut off the cold start. */
+    @get:Input
+    abstract val generateCdsArchive: Property<Boolean>
+
     /**
      * Absolute path of the JDK whose jlink + jmods we invoke. Treated as
      * an `@Input` string so swapping JDK installation paths invalidates the
@@ -110,6 +116,7 @@ abstract class CustomRuntimeTask : DefaultTask() {
             compress.orNull?.let { add("--compress=$it") }
             vmKind.orNull?.let { add("--vm=$it") }
             includeLocales.orNull?.let { add("--include-locales=$it") }
+            if (generateCdsArchive.get()) add("--generate-cds-archive")
             add("--output"); add(out.absolutePath)
         }
 
