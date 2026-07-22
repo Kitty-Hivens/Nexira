@@ -32,7 +32,7 @@ class LauncherUpdater(private val layout: InstallLayout) {
         // The recorded manifest is the baseline; fall back to a live scan the first time
         // the managed layout runs without one.
         val local = LayoutManifest.read(layout.manifestFile)
-            ?: LayoutManifest.scan(layout.root, excludes = setOf(layout.stagingDir))
+            ?: LayoutManifest.scan(layout.root, excludes = layout.bookkeeping)
 
         val plan = LauncherUpdatePlanner.plan(local, remote, patches)
         if (plan.isEmpty) {
