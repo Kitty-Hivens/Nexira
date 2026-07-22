@@ -2,13 +2,15 @@ package hivens.core.update
 
 import hivens.core.data.FileManifest
 import hivens.core.data.flatten
+import kotlinx.serialization.Serializable
 
 /**
  * A binary patch offered for one file: apply it to the local file whose hash is
  * [fromSha1] to reproduce the target file [toSha1]. Produced by CI between two
  * releases, applied client-side (bspatch), so a changed file downloads as a small
- * delta instead of in full.
+ * delta instead of in full. Serialized into a delta bundle's `patches.json`.
  */
+@Serializable
 data class LauncherPatch(
     val path: String,
     val fromSha1: String,
