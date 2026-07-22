@@ -336,6 +336,20 @@ fun main(args: Array<String>) {
         }.onSuccess { result ->
             bootStage.value   = BootStage.Done
             bootOutcome.value = BootOutcome.Ready(result)
+            // Training run for the class archive: -Dnexira.trainAndExit=<ms> boots
+            // to a rendered shell, waits for the first frames so the UI path's
+            // classes are actually loaded, then exits CLEANLY. The clean exit is
+            // the point -- CDS writes the archive at VM exit, so a killed process
+            // leaves nothing behind. Opt-in only; a normal run never sets it.
+            System.getProperty("nexira.trainAndExit")?.let { raw ->
+                val settleMs = (raw.toLongOrNull() ?: 3_000L).coerceIn(0L, 60_000L)
+                thread(name = "nexira-train-exit", isDaemon = true) {
+                    Thread.sleep(settleMs)
+                    LoggerFactory.getLogger("Main")
+                        .info("trainAndExit: boot complete, exiting to flush the class archive")
+                    exitProcess(0)
+                }
+            }
         }.onFailure { e ->
             LoggerFactory.getLogger("Main").error("Boot failed before the shell could start", e)
             runCatching {
