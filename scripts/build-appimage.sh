@@ -70,6 +70,12 @@ jlink \
     --add-modules "$AURA_JLINK_MODULES" \
     "${AURA_JLINK_OPTIONS[@]}"
 
+# --generate-cds-archive emits both classes.jsa (compressed oops) and
+# classes_nocoops.jsa. The launcher's heap never approaches the 32 GB coops
+# threshold, so the nocoops archive is never mapped: ~14 MB on disk and ~3 MB
+# of squashfs for nothing. Mirrors the same drop in CustomRuntimeTask.
+rm -f "$APPDIR/usr/lib/server/classes_nocoops.jsa"
+
 # ── 2. Remaining subdirs (usr/bin already exists from jlink) ────────────────
 mkdir -p \
     "$APPDIR/usr/lib" \
@@ -99,10 +105,19 @@ cat > "$APPDIR/AppRun" << EOF
 #!/bin/sh
 HERE="\$(dirname "\$(readlink -f "\$0")")"
 export MALLOC_ARENA_MAX=2
+# Application class-data archive. The JVM writes it on the first clean exit and
+# refreshes it by itself once it goes stale (an update swapping the jar
+# invalidates it), which is why it is not shipped: zero bytes in the download,
+# and no training step in CI. It has to live in the user data dir because the
+# AppImage is mounted read-only.
+NX_DATA="\${NEXIRA_DATA_DIR:-\${XDG_DATA_HOME:-\$HOME/.local/share}/nexira}"
+mkdir -p "\$NX_DATA" 2>/dev/null || true
 exec "\$HERE/usr/bin/java" \\
      --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
      --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \\
      --enable-native-access=ALL-UNNAMED \\
+     -XX:+AutoCreateSharedArchive \\
+     -XX:SharedArchiveFile="\$NX_DATA/app.jsa" \\
      -Dawt.useSystemAAFontSettings=on \\
      -Djdk.gtk.version=3 \\
      -D_JAVA_AWT_WM_NONREPARENTING=1 \\

@@ -463,24 +463,44 @@ packaging {
     // NEXIRA_WAYLAND_TRIAL flow is gone (Liberica swap commit e573318);
     // -Dawt.appClassName is JBR-only honour, dropped in the same
     // commit; jna.nosys was a dorkbox/JBR rudiment, also dropped.
-    jvmArgs.set(listOf(
-        "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
-        // Xodus uninterruptible file channels (DB integrity under thread interrupts).
-        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
-        "--enable-native-access=ALL-UNNAMED",
-        "-Dawt.useSystemAAFontSettings=on",
-        "-Djdk.gtk.version=3",
-        "-D_JAVA_AWT_WM_NONREPARENTING=1",
-        "-Drobot.need_x11=false",
-        "-XX:+UseG1GC",
-        "-XX:+UseStringDeduplication",
-        "-XX:+OptimizeStringConcat",
-        "-XX:+UseCompressedOops",
-        "-Xms128m",
-        "-Xmx512m",
-        "-XX:MaxMetaspaceSize=256m",
-        "-XX:ReservedCodeCacheSize=128m",
-    ))
+    jvmArgs.set(buildList {
+        addAll(listOf(
+            "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+            // Xodus uninterruptible file channels (DB integrity under thread interrupts).
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            "--enable-native-access=ALL-UNNAMED",
+            "-Dawt.useSystemAAFontSettings=on",
+            "-Djdk.gtk.version=3",
+            "-D_JAVA_AWT_WM_NONREPARENTING=1",
+            "-Drobot.need_x11=false",
+            "-XX:+UseG1GC",
+            "-XX:+UseStringDeduplication",
+            "-XX:+OptimizeStringConcat",
+            "-XX:+UseCompressedOops",
+            "-Xms128m",
+            "-Xmx512m",
+            "-XX:MaxMetaspaceSize=256m",
+            "-XX:ReservedCodeCacheSize=128m",
+        ))
+        // Windows: the class-data archive lives next to the app. The Inno installer
+        // is per-user (PrivilegesRequired=lowest, {localappdata}\Nexira\Programs), so
+        // $APPDIR -- expanded by the jpackage launcher at run time -- is writable.
+        // The JVM writes the archive on the first clean exit and refreshes it once a
+        // jar update makes it stale, so nothing ships in the installer and CI gains
+        // no training step. The Linux equivalent lives in scripts/build-appimage.sh.
+        //
+        // macOS is deliberately excluded: a bundle in /Applications is not
+        // user-writable, so it needs a launcher that can point the archive at the
+        // per-user data dir. Elevating a Windows install to Program Files lands in
+        // the same spot -- the JVM then just warns and runs without sharing.
+        //
+        // Host-OS conditional is sound because CI builds each platform on its own
+        // native runner (no cross-building).
+        if (System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)) {
+            add("-XX:+AutoCreateSharedArchive")
+            add("-XX:SharedArchiveFile=\$APPDIR/app.jsa")
+        }
+    })
 
     windowsIcon.set(rootProject.file("resources/icons/icon.ico"))
     macosIcon.set(rootProject.file("resources/icons/icon.icns"))
