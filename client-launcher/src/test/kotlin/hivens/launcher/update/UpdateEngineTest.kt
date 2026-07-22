@@ -153,6 +153,47 @@ class UpdateEngineTest {
         }
     }
 
+    @Test
+    fun aotCacheIsInvalidatedWhenTheJarChanges() {
+        val (base, live, server) = setup()
+        try {
+            val layout = InstallLayout(live)
+            Files.write(layout.aotCache, "stale-cache".toByteArray())
+            val local = LayoutManifest.scan(live, excludes = layout.bookkeeping)
+            val remote = LayoutManifest.scan(server, excludes = layout.bookkeeping)
+            val plan = LauncherUpdatePlanner.plan(local, remote) // jar changed -> full download
+            val staged = UpdateStager(layout, FakeSource(server, emptyMap())).stage(plan, remote)
+            LayoutApplier(layout).apply(staged, remote, "2.0.0")
+            assertFalse(Files.exists(layout.aotCache), "stale AOT cache should be dropped after a jar update")
+        } finally {
+            deleteTree(base)
+        }
+    }
+
+    @Test
+    fun aotCacheSurvivesAnUpdateThatDoesNotTouchTheJar() {
+        val base = Files.createTempDirectory("engine")
+        try {
+            val live = base.resolve("live"); Files.createDirectories(live)
+            Files.write(live.resolve("lib/nexira.jar").also { it.createParentDirectories() }, jar(1))
+            val layout = InstallLayout(live)
+            Files.write(layout.aotCache, "keep-cache".toByteArray())
+
+            val server = base.resolve("new"); Files.createDirectories(server)
+            Files.write(server.resolve("lib/nexira.jar").also { it.createParentDirectories() }, jar(1)) // unchanged
+            write(server, "natives/added", "n")
+
+            val local = LayoutManifest.scan(live, excludes = layout.bookkeeping)
+            val remote = LayoutManifest.scan(server, excludes = layout.bookkeeping)
+            val plan = LauncherUpdatePlanner.plan(local, remote) // only the added native
+            val staged = UpdateStager(layout, FakeSource(server, emptyMap())).stage(plan, remote)
+            LayoutApplier(layout).apply(staged, remote, "2.0.0")
+            assertTrue(Files.exists(layout.aotCache), "AOT cache should be kept when the jar is unchanged")
+        } finally {
+            deleteTree(base)
+        }
+    }
+
     private fun assertContentEqualsBytes(expected: Path, actual: Path) =
         assertContentEquals(Files.readAllBytes(expected), Files.readAllBytes(actual))
 }

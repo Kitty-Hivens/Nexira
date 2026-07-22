@@ -21,10 +21,18 @@ class InstallLayout(val root: Path) {
     val launchStub: Path = root.resolve("launch")
     /** Plain semver marker of the installed version. */
     val versionFile: Path = root.resolve("version")
+    /** Leyden AOT cache for a faster cold start; loaded via -XX:AOTCache. Built against
+     *  the app jar's exact bytes, so a jar-changing update invalidates it. */
+    val aotCache: Path = root.resolve("app.aot")
     /** FileManifest of what is installed (the update baseline). */
     val manifestFile: Path = root.resolve("manifest.json")
     /** Where an in-flight update downloads + patches before the atomic swap. */
     val stagingDir: Path = root.resolve("staging")
+
+    /** Derived / update scaffolding that is NOT shipped content and must never enter
+     *  a content manifest: the recorded manifest itself, the version marker, the AOT
+     *  cache (client-generated), and the staging area. */
+    val bookkeeping: Set<Path> = setOf(stagingDir, manifestFile, versionFile, aotCache)
 
     companion object {
         /** The managed layout lives under the launcher data root, not inside the

@@ -152,6 +152,14 @@ class LayoutApplier(private val layout: InstallLayout) {
             runCatching { Files.deleteIfExists(layout.root.resolve(rel)) }
                 .onFailure { log.warn("apply: failed to delete {}", rel, it) }
         }
+        // The Leyden AOT cache is built against the app jar's exact bytes. If this apply
+        // changed the jar, the shipped cache is stale -- drop it so startup regenerates a
+        // fresh one instead of loading a mismatched (ignored or misbehaving) cache.
+        val appJarRel = layout.root.relativize(layout.appJar).joinToString("/") { it.toString() }
+        if (appJarRel in commit.moves) {
+            runCatching { Files.deleteIfExists(layout.aotCache) }
+                .onFailure { log.warn("apply: failed to invalidate AOT cache", it) }
+        }
         LayoutManifest.write(layout.manifestFile, newManifest)
         AtomicFiles.writeString(layout.versionFile, commit.version)
         Files.deleteIfExists(marker)
