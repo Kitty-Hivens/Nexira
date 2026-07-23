@@ -94,7 +94,7 @@ class CleanroomResolver(
         minecraftArguments: String?,
         specs: List<LibrarySpec>,
     ): LoaderProfile {
-        val (natives, classpath) = specs.partition { (it.coord.classifier ?: "").startsWith("natives") }
+        val (natives, classpath) = specs.partition { it.coord.nativeClassifier != null }
         return LoaderProfile(
             libraries = classpath,
             mainClass = mainClass,

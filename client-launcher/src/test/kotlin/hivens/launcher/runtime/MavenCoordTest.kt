@@ -54,6 +54,26 @@ class MavenCoordTest {
     }
 
     @Test
+    fun `nativeClassifier reads a maven classifier (Cleanroom form)`() {
+        assertEquals("natives-linux", MavenCoord.parse("org.lwjgl:lwjgl:3.4.1:natives-linux").nativeClassifier)
+        assertEquals("natives-windows-arm64", MavenCoord.parse("org.lwjgl:lwjgl-glfw:3.4.1:natives-windows-arm64").nativeClassifier)
+    }
+
+    @Test
+    fun `nativeClassifier reads a name-encoded native (lwjgl3ify form)`() {
+        assertEquals("natives-linux", MavenCoord.parse("org.lwjgl:lwjgl-opengl-natives-linux:3.4.2").nativeClassifier)
+        assertEquals("natives-macos-arm64", MavenCoord.parse("org.lwjgl:lwjgl-stb-natives-macos-arm64:3.4.2").nativeClassifier)
+    }
+
+    @Test
+    fun `nativeClassifier is null for a non-native jar in either form`() {
+        assertNull(MavenCoord.parse("org.lwjgl:lwjgl-opengl:3.4.2").nativeClassifier)
+        assertNull(MavenCoord.parse("com.google.guava:guava:33.6.0-jre").nativeClassifier)
+        // a non-natives classifier (e.g. Forge universal) is not a native either.
+        assertNull(MavenCoord.parse("net.minecraftforge:forge:1.12.2-14.23.5.2860:universal").nativeClassifier)
+    }
+
+    @Test
     fun `too few segments is rejected`() {
         assertFailsWith<IllegalArgumentException> { MavenCoord.parse("group:artifact") }
     }

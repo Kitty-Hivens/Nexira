@@ -22,6 +22,21 @@ data class MavenCoord(
 ) {
     val groupArtifact: String get() = "$group:$artifact"
 
+    /**
+     * The `natives-<platform>` token this coordinate targets, or null when it is
+     * not a native jar. Two encodings appear in the wild and both resolve here:
+     * a maven classifier (`org.lwjgl:lwjgl:3.4.1:natives-linux`, the Mojang /
+     * Cleanroom form) and the platform baked into the artifact name
+     * (`org.lwjgl:lwjgl-opengl-natives-linux:3.4.2`, the GTNH / lwjgl3ify form).
+     * Lets one host filter cover both.
+     */
+    val nativeClassifier: String?
+        get() {
+            classifier?.let { if (it.startsWith("natives")) return it }
+            val marker = artifact.indexOf("-natives-")
+            return if (marker >= 0) artifact.substring(marker + 1) else null
+        }
+
     val relativePath: String
         get() {
             val groupPath = group.replace('.', '/')
