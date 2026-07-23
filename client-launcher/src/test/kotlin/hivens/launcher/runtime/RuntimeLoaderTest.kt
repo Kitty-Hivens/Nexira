@@ -1,12 +1,16 @@
 package hivens.launcher.runtime
 
 import hivens.core.api.HttpClientProvider
+import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderProfile
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.LoaderResolver
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.mergeLibraries
+import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -155,8 +159,42 @@ class RuntimeLoaderTest {
     private val lwjgl3Bytes = "LWJGL3".toByteArray()
     private val nativeBytes = "LWJGL3-NATIVES".toByteArray()
 
+    private val crNormalBytes = "CR-NORMAL".toByteArray()
+    private val crGlfwBytes = "CR-GLFW".toByteArray()
+    private val crGlfwLinuxBytes = "CR-GLFW-LINUX".toByteArray()
+    private val crGlfwWinBytes = "CR-GLFW-WIN".toByteArray()
+    private val crCoreBytes = "CR-CORE".toByteArray()
+
+    /**
+     * A real-shaped Cleanroom installer jar: a self-contained `version.json`
+     * (Foundation main class, FML tweaker, a normal lib, the LWJGL3 glfw base
+     * plus its linux+windows natives, and the core jar with an empty url) with
+     * that core jar bundled under `maven/`. Mirrors the 0.6.x installer layout.
+     */
+    private val cleanroomInstaller: ByteArray by lazy {
+        val versionJson = """
+            {"id":"1.12.2-Cleanroom-0.6.4",
+             "mainClass":"top.outlands.foundation.boot.Foundation",
+             "minecraftArguments":"--username player --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker --versionType Forge",
+             "libraries":[
+               {"name":"com.example:normal:1.0","downloads":{"artifact":{"path":"com/example/normal/1.0/normal-1.0.jar","url":"$CR_NORMAL_URL","sha1":"${sha1(crNormalBytes)}","size":${crNormalBytes.size}}}},
+               {"name":"org.lwjgl:lwjgl-glfw:3.4.1","downloads":{"artifact":{"path":"org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1.jar","url":"$CR_GLFW_URL","sha1":"${sha1(crGlfwBytes)}","size":${crGlfwBytes.size}}}},
+               {"name":"org.lwjgl:lwjgl-glfw:3.4.1:natives-linux","downloads":{"artifact":{"path":"org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1-natives-linux.jar","url":"$CR_GLFW_LINUX_URL","sha1":"${sha1(crGlfwLinuxBytes)}","size":${crGlfwLinuxBytes.size}}}},
+               {"name":"org.lwjgl:lwjgl-glfw:3.4.1:natives-windows","downloads":{"artifact":{"path":"org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1-natives-windows.jar","url":"$CR_GLFW_WIN_URL","sha1":"${sha1(crGlfwWinBytes)}","size":${crGlfwWinBytes.size}}}},
+               {"name":"com.cleanroommc:cleanroom:0.6.4","downloads":{"artifact":{"path":"com/cleanroommc/cleanroom/0.6.4/cleanroom-0.6.4.jar","url":"","sha1":"${sha1(crCoreBytes)}","size":${crCoreBytes.size}}}}
+             ]}
+        """.trimIndent()
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            zip.putNextEntry(ZipEntry("version.json")); zip.write(versionJson.toByteArray()); zip.closeEntry()
+            zip.putNextEntry(ZipEntry("maven/com/cleanroommc/cleanroom/0.6.4/cleanroom-0.6.4.jar")); zip.write(crCoreBytes); zip.closeEntry()
+        }
+        out.toByteArray()
+    }
+
     /** Vanilla 1.12.2-shaped base that carries LWJGL2 (`org.lwjgl.lwjgl` group)
-     *  alongside patchy, so a loader can exercise the cross-group swap. */
+     *  alongside patchy, so a loader can exercise the cross-group swap. Also
+     *  serves the Cleanroom installer + its libraries for the end-to-end test. */
     private fun swapEngine(requests: MutableList<String>) = MockEngine { req ->
         val url = req.url.toString()
         requests += url
@@ -178,6 +216,11 @@ class RuntimeLoaderTest {
             LWJGL2_URL -> respond(ByteReadChannel(lwjgl2Bytes), HttpStatusCode.OK)
             LWJGL3_URL -> respond(ByteReadChannel(lwjgl3Bytes), HttpStatusCode.OK)
             NATIVE_URL -> respond(ByteReadChannel(nativeBytes), HttpStatusCode.OK)
+            CR_INSTALLER_URL -> respond(ByteReadChannel(cleanroomInstaller), HttpStatusCode.OK)
+            CR_NORMAL_URL -> respond(ByteReadChannel(crNormalBytes), HttpStatusCode.OK)
+            CR_GLFW_URL -> respond(ByteReadChannel(crGlfwBytes), HttpStatusCode.OK)
+            CR_GLFW_LINUX_URL -> respond(ByteReadChannel(crGlfwLinuxBytes), HttpStatusCode.OK)
+            CR_GLFW_WIN_URL -> respond(ByteReadChannel(crGlfwWinBytes), HttpStatusCode.OK)
             else -> respond("missing $url", HttpStatusCode.NotFound)
         }
     }
@@ -247,6 +290,36 @@ class RuntimeLoaderTest {
         assertTrue(rt.natives.isEmpty(), "no override -- inherits vanilla's native set (empty in this fixture)")
     }
 
+    @Test
+    fun `ensureRuntime via CleanroomResolver swaps LWJGL2 for LWJGL3 and host-filters natives`() = runTest {
+        val resolver = CleanroomResolver(
+            clientProvider = HttpClientProvider { HttpClient(swapEngine(mutableListOf())) },
+            json = json,
+            releaseBase = "https://cr.invalid/dl",
+        )
+        val p = swapProvisioner(LoaderRegistry(listOf(resolver)), mutableListOf())
+
+        val rt = p.ensureRuntime("1.12.2", "cleanroom", "0.6.4")
+
+        assertEquals("top.outlands.foundation.boot.Foundation", rt.mainClass)
+        assertEquals(25, rt.javaMajor)
+        assertEquals(listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"), rt.gameArgs)
+
+        // vanilla LWJGL2 dropped, LWJGL3 base + loader libs merged, no natives on -cp.
+        assertTrue(rt.libraries.none { it.coord.group == "org.lwjgl.lwjgl" }, "vanilla LWJGL2 dropped")
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "org.lwjgl:lwjgl-glfw" && it.coord.classifier == null }, "LWJGL3 base present")
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "com.cleanroommc:cleanroom" }, "bundled core provisioned onto -cp")
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "com.mojang:patchy" }, "vanilla non-LWJGL base survives")
+        assertTrue(rt.libraries.none { (it.coord.classifier ?: "").startsWith("natives") }, "no natives leaked onto -cp")
+
+        // native override host-filtered: linux kept, windows dropped (host = Linux).
+        assertEquals(1, rt.natives.size, "only the host native, got ${rt.natives}")
+        assertTrue(rt.natives.single().fileName.toString().contains("natives-linux"))
+
+        // the bundled core landed with its real bytes.
+        assertEquals("CR-CORE", librariesDir.resolve("com/cleanroommc/cleanroom/0.6.4/cleanroom-0.6.4.jar").toFile().readText())
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://t.invalid/manifest.json"
         const val VERSION_URL = "https://t.invalid/1.12.2.json"
@@ -257,6 +330,11 @@ class RuntimeLoaderTest {
         const val LWJGL2_URL = "https://t.invalid/lwjgl2.jar"
         const val LWJGL3_URL = "https://t.invalid/lwjgl3.jar"
         const val NATIVE_URL = "https://t.invalid/lwjgl3-natives-linux.jar"
+        const val CR_INSTALLER_URL = "https://cr.invalid/dl/0.6.4/cleanroom-0.6.4-installer.jar"
+        const val CR_NORMAL_URL = "https://cr.invalid/normal.jar"
+        const val CR_GLFW_URL = "https://cr.invalid/glfw.jar"
+        const val CR_GLFW_LINUX_URL = "https://cr.invalid/glfw-linux.jar"
+        const val CR_GLFW_WIN_URL = "https://cr.invalid/glfw-win.jar"
         const val RES_BASE = "https://res.invalid"
         val jsonH = headersOf("Content-Type", "application/json")
     }
