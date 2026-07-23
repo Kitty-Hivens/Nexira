@@ -99,7 +99,13 @@ class CleanroomResolver(
             libraries = classpath,
             mainClass = mainClass,
             gameArgs = extractTweakClassArgs(minecraftArguments),
-            removeFromBase = { it.group == LWJGL2_GROUP },
+            // Cleanroom's installer version.json is a complete, self-contained set
+            // (inheritsFrom null). Replacing the vanilla libraries wholesale drops
+            // the cross-coord twins vanilla would otherwise leak in (old oshi/icu/
+            // netty shadowing Cleanroom's) -- verified live: the merge left
+            // oshi-project:oshi-core:1.1 ahead of com.github.oshi and LWJGL's
+            // Display.create hit NoSuchMethodError getGraphicsCards().
+            replacesVanillaLibraries = true,
             nativesOverride = natives,
             javaMajor = CLEANROOM_JAVA_MAJOR,
         )
@@ -134,9 +140,6 @@ class CleanroomResolver(
 
     companion object {
         const val CLEANROOM_RELEASES = "https://github.com/CleanroomMC/Cleanroom/releases/download"
-        /** Vanilla's LWJGL2 maven group -- dropped from the base so LWJGL3 (group
-         *  `org.lwjgl`) is the only LWJGL on the classpath. */
-        const val LWJGL2_GROUP = "org.lwjgl.lwjgl"
         /** Required Java major, from upstream docs (not declared in any artifact). */
         const val CLEANROOM_JAVA_MAJOR = 25
     }

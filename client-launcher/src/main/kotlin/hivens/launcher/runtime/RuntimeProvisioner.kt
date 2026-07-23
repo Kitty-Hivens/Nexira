@@ -158,14 +158,24 @@ class RuntimeProvisioner(
         val clientResources = profile.placeOnlyFiles
             .firstOrNull { it.relPath.startsWith("net/minecraft/client/") && it.relPath.endsWith("-extra.jar") }
             ?.let { librariesDir.resolve(it.relPath) }
+        // A self-contained loader (Cleanroom) supplies the whole classpath, so
+        // the vanilla libraries are dropped -- keeping them leaks cross-coord
+        // twins the merge cannot dedup (old oshi/icu/netty shadowing the new).
+        // Additive loaders keep the vanilla base minus whatever they swap out.
+        val base = if (profile.replacesVanillaLibraries) {
+            emptyList()
+        } else {
+            vanilla.libraries.filterNot { profile.removeFromBase(it.coord) }
+        }
+        val baseNatives = if (profile.replacesVanillaLibraries) {
+            emptyList()
+        } else {
+            vanilla.natives.filterNot { profile.removeFromBase(it.coord) }.map { it.path }
+        }
         ResolvedRuntime(
-            // Base minus whatever the loader drops (LWJGL2 for a LWJGL3 swap),
-            // then the overlay merged on. removeFromBase is a no-op for every
-            // additive loader, so their merged set is byte-identical to before.
-            libraries = mergeLibraries(
-                vanilla.libraries.filterNot { profile.removeFromBase(it.coord) },
-                overlay,
-            ),
+            // removeFromBase is a no-op for every additive loader, so their merged
+            // set is byte-identical to before.
+            libraries = mergeLibraries(base, overlay),
             clientJar = vanilla.clientJar,
             clientResourcesJar = clientResources,
             mainClass = profile.mainClass,
@@ -178,11 +188,10 @@ class RuntimeProvisioner(
             // (--launchTarget, --fml.*) come from the profile.
             jvmArgs = if (profile.inheritsVanillaArguments) vanilla.jvmArgs + profile.jvmArgs else profile.jvmArgs,
             gameArgs = profile.gameArgs,
-            // Vanilla natives minus the ones the loader swaps out (LWJGL2), plus
-            // the loader's own (LWJGL3). Unrelated vanilla natives (jinput) that
-            // the swap does not name are kept. Additive loaders touch neither, so
-            // they inherit the full vanilla native set unchanged.
-            natives = vanilla.natives.filterNot { profile.removeFromBase(it.coord) }.map { it.path } + overrideNatives,
+            // Additive: vanilla natives minus the swapped-out ones (LWJGL2) plus
+            // the loader's own (LWJGL3), keeping unrelated vanilla natives
+            // (jinput). Self-contained: only the loader's own natives.
+            natives = baseNatives + overrideNatives,
             // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
             javaMajor = profile.javaMajor ?: vanilla.javaMajor,
         )
