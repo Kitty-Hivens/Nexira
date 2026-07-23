@@ -366,11 +366,13 @@ class RuntimeLoaderTest {
         assertEquals(25, rt.javaMajor)
         assertEquals(listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"), rt.gameArgs)
 
-        // vanilla LWJGL2 dropped, LWJGL3 base + loader libs merged, no natives on -cp.
+        // self-contained: the classpath is the overlay only. Vanilla libs
+        // (LWJGL2 and the unrelated patchy) are dropped; the loader's LWJGL3 base
+        // and bundled core are present; no natives on -cp.
         assertTrue(rt.libraries.none { it.coord.group == "org.lwjgl.lwjgl" }, "vanilla LWJGL2 dropped")
+        assertTrue(rt.libraries.none { it.coord.groupArtifact == "com.mojang:patchy" }, "vanilla libs dropped wholesale")
         assertTrue(rt.libraries.any { it.coord.groupArtifact == "org.lwjgl:lwjgl-glfw" && it.coord.classifier == null }, "LWJGL3 base present")
         assertTrue(rt.libraries.any { it.coord.groupArtifact == "com.cleanroommc:cleanroom" }, "bundled core provisioned onto -cp")
-        assertTrue(rt.libraries.any { it.coord.groupArtifact == "com.mojang:patchy" }, "vanilla non-LWJGL base survives")
         assertTrue(rt.libraries.none { (it.coord.classifier ?: "").startsWith("natives") }, "no natives leaked onto -cp")
 
         // native override host-filtered: linux kept, windows dropped (host = Linux).

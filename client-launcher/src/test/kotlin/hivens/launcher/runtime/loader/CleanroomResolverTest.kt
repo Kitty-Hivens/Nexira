@@ -62,12 +62,10 @@ class CleanroomResolverTest {
     }
 
     @Test
-    fun `removeFromBase drops vanilla LWJGL2 and nothing else`() {
-        val p = realProfile()
-        assertTrue(p.removeFromBase(MavenCoord.parse("org.lwjgl.lwjgl:lwjgl:2.9.4-nightly-20150209")))
-        assertTrue(p.removeFromBase(MavenCoord.parse("org.lwjgl.lwjgl:lwjgl_util:2.9.4-nightly-20150209")))
-        assertFalse(p.removeFromBase(MavenCoord.parse("org.lwjgl:lwjgl:3.4.1")))
-        assertFalse(p.removeFromBase(MavenCoord.parse("com.google.guava:guava:33.6.0-jre")))
+    fun `the profile replaces the vanilla library set wholesale`() {
+        // Cleanroom is self-contained; dropping the vanilla libs is what keeps the
+        // old oshi/icu/netty twins from shadowing its own.
+        assertTrue(realProfile().replacesVanillaLibraries)
     }
 
     @Test

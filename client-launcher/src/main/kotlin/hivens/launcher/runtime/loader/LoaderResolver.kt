@@ -107,6 +107,23 @@ data class LoaderProfile(
      * the provisioner keeps only this host's platform.
      */
     val nativesOverride: List<LibrarySpec>? = null,
+    /**
+     * When true the loader's [libraries] are the COMPLETE classpath and the
+     * vanilla library set is dropped entirely -- only the vanilla client jar
+     * survives (a separate field). For a self-contained profile (`inheritsFrom`
+     * null carrying its own full set, like Cleanroom), merging vanilla on top
+     * leaks libraries the loader already modernised under a different
+     * coordinate: `oshi-project:oshi-core` beside `com.github.oshi`,
+     * `icu4j-core-mojang` beside `icu4j`, `netty-all` beside the split netty --
+     * cross-coordinate twins the group:artifact merge cannot dedup, so the older
+     * vanilla copy shadows the loader's and its classes miss methods the loader
+     * calls (LWJGL's `Display.create` calling `oshi ... getGraphicsCards()`).
+     * Replacing wholesale is correct and immune to the next such twin. Additive
+     * loaders (Forge / Fabric / NeoForge / lwjgl3ify, which still needs vanilla
+     * for its empty-url entries) leave this false and merge via [removeFromBase].
+     * Natives follow: true keeps only [nativesOverride].
+     */
+    val replacesVanillaLibraries: Boolean = false,
 )
 
 /**
