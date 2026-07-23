@@ -6,10 +6,15 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -98,5 +103,27 @@ class Lwjgl3ifyResolverTest {
         assertTrue(libs.none { it.coord.groupArtifact == "tv.twitch:twitch-platform" }, "empty-url twitch-platform skipped")
         assertTrue(libs.none { it.coord.groupArtifact == "tv.twitch:twitch-external-platform" }, "empty-url twitch-external-platform skipped")
         assertTrue(libs.any { it.coord.groupArtifact == "net.java.jinput:jinput" }, "url-bearing base jinput kept")
+    }
+
+    @Test
+    fun `registry resolves the lwjgl3ify loader id case-insensitively`() {
+        val registry = LoaderRegistry(listOf(resolver))
+        assertSame(resolver, registry.resolverFor("lwjgl3ify"))
+        assertSame(resolver, registry.resolverFor("Lwjgl3ify"))
+        assertNull(registry.resolverFor("forge"))
+    }
+
+    @Test
+    fun `resolve fails with a message naming the loader and version`() = runTest {
+        val net = Lwjgl3ifyResolver(
+            clientProvider = HttpClientProvider { HttpClient(MockEngine { respond("nope", HttpStatusCode.NotFound) }) },
+            json = json,
+            osName = "Linux",
+            releaseBase = "https://l3.invalid/dl",
+        )
+        val ex = assertFailsWith<IOException> { net.resolve("1.7.10", "9.9.9") }
+        val msg = ex.message ?: ""
+        assertTrue(msg.contains("lwjgl3ify"), "names the loader: $msg")
+        assertTrue(msg.contains("9.9.9"), "names the version: $msg")
     }
 }

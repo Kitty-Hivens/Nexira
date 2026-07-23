@@ -56,6 +56,15 @@ class PackSerializationTest {
     }
 
     @Test
+    fun `lwjgl3ify loader decodes to its own value, not Unknown`() {
+        val pack = json.decodeFromString(
+            Pack.serializer(),
+            """{"id":"x","origin":"Mirror","displayName":"X","mcVersion":"1.7.10","loader":"Lwjgl3ify"}""",
+        )
+        assertEquals(PackLoader.Lwjgl3ify, pack.loader)
+    }
+
+    @Test
     fun `unknown origin in a PackReference folds to Unknown`() {
         val ref = json.decodeFromString(PackReference.serializer(), """{"origin":"Steam","id":"abc"}""")
         assertEquals(PackOrigin.Unknown, ref.origin)
