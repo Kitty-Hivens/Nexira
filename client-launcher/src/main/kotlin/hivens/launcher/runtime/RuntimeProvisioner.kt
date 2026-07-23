@@ -93,8 +93,10 @@ class RuntimeProvisioner(
         val jvmArgs: List<String> = emptyList(),
         val gameArgs: List<String> = emptyList(),
         /** Host-matching native jars (lwjgl etc.) resolved from the manifest,
-         *  on disk in the shared root after [ensureVanilla]. */
-        val natives: List<Path> = emptyList(),
+         *  on disk in the shared root after [ensureVanilla]. Carries coords so a
+         *  loader that swaps natives can drop the ones its removeFromBase matches
+         *  (LWJGL2) while keeping the rest (jinput). */
+        val natives: List<ResolvedLibrary> = emptyList(),
         /** Mojang's declared Java major (1.17+ vanilla json carries
          *  `javaVersion.majorVersion`); null on legacy / when absent. */
         val javaMajor: Int? = null,
@@ -128,22 +130,22 @@ class RuntimeProvisioner(
                 clientJar = vanilla.clientJar,
                 mainClass = VANILLA_MAIN_CLASS,
                 assetIndexId = vanilla.assetIndexId,
-                natives = vanilla.natives,
+                natives = vanilla.natives.map { it.path },
                 javaMajor = vanilla.javaMajor,
             )
 
         log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
         val profile = resolver.resolve(mcVersion, loaderVersion)
         val overlay = profile.libraries.map { ResolvedLibrary(it.coord, provision(it)) }
-        // Host natives the loader supplies in place of vanilla's -- a LWJGL swap
-        // (Cleanroom / lwjgl3ify) extracts its own LWJGL3 .so/.dll here so they
-        // match the LWJGL3 classes it puts on -cp; null leaves the vanilla native
-        // set untouched (every additive loader). The loader lists all platforms
-        // (as the MMC instance does); the same host filter as the vanilla natives
-        // keeps only this machine's set, so the resolver stays platform-agnostic.
+        // Host natives the loader adds on top of vanilla's -- a LWJGL swap
+        // (Cleanroom / lwjgl3ify) contributes its own LWJGL3 .so/.dll here. The
+        // loader lists all platforms (as the MMC instance does); the same host
+        // filter as the vanilla natives keeps only this machine's set, so the
+        // resolver stays platform-agnostic.
         val overrideNatives = profile.nativesOverride
             ?.filterNot { isForeignNative(it.coord) }
             ?.map { provision(it) }
+            .orEmpty()
         // Processor outputs FML resolves by path under libraryDirectory (the
         // patched/SRG client, neoforge universal) -- on disk, never on -cp.
         profile.placeOnlyFiles.forEach { pf ->
@@ -176,7 +178,11 @@ class RuntimeProvisioner(
             // (--launchTarget, --fml.*) come from the profile.
             jvmArgs = if (profile.inheritsVanillaArguments) vanilla.jvmArgs + profile.jvmArgs else profile.jvmArgs,
             gameArgs = profile.gameArgs,
-            natives = overrideNatives ?: vanilla.natives,
+            // Vanilla natives minus the ones the loader swaps out (LWJGL2), plus
+            // the loader's own (LWJGL3). Unrelated vanilla natives (jinput) that
+            // the swap does not name are kept. Additive loaders touch neither, so
+            // they inherit the full vanilla native set unchanged.
+            natives = vanilla.natives.filterNot { profile.removeFromBase(it.coord) }.map { it.path } + overrideNatives,
             // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
             javaMajor = profile.javaMajor ?: vanilla.javaMajor,
         )
@@ -234,7 +240,7 @@ class RuntimeProvisioner(
             libraries = vanillaLibraries(version),
             jvmArgs = version.arguments?.let { flattenArguments(it.jvm, mojangOs) } ?: emptyList(),
             gameArgs = version.arguments?.let { flattenArguments(it.game, mojangOs) } ?: emptyList(),
-            natives = nativeJarPaths(version),
+            natives = nativeLibraries(version),
             javaMajor = version.javaVersion?.majorVersion,
         )
     }
@@ -285,22 +291,23 @@ class RuntimeProvisioner(
      * match [planVanillaDownloads], so the jars are on disk by the time
      * [hivens.launcher.component.EnvironmentPreparer] extracts them.
      */
-    internal fun nativeJarPaths(version: MojangVersion): List<Path> {
-        val out = ArrayList<Path>()
+    internal fun nativeLibraries(version: MojangVersion): List<ResolvedLibrary> {
+        val out = ArrayList<ResolvedLibrary>()
         for (lib in version.libraries) {
             if (!isLibraryAllowed(lib.rules)) continue
             val downloads = lib.downloads ?: continue
+            val base = MavenCoord.parse(lib.name)
             for ((classifier, art) in downloads.classifiers) {
                 if (classifier in acceptedNativeClassifiers && art.path.isNotBlank()) {
-                    out.add(librariesDir.resolve(art.path))
+                    out.add(ResolvedLibrary(base.copy(classifier = classifier), librariesDir.resolve(art.path)))
                 }
             }
-            val coordClassifier = MavenCoord.parse(lib.name).classifier
-            if (coordClassifier != null && coordClassifier in acceptedNativeClassifiers) {
-                downloads.artifact?.takeIf { it.path.isNotBlank() }?.let { out.add(librariesDir.resolve(it.path)) }
+            if (base.classifier != null && base.classifier in acceptedNativeClassifiers) {
+                downloads.artifact?.takeIf { it.path.isNotBlank() }
+                    ?.let { out.add(ResolvedLibrary(base, librariesDir.resolve(it.path))) }
             }
         }
-        return out.distinct()
+        return out.distinctBy { it.path }
     }
 
     // -- pure planning (no IO) ------------------------------------------------
