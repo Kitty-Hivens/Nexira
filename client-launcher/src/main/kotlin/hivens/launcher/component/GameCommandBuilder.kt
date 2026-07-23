@@ -390,15 +390,18 @@ internal class GameCommandBuilder(
 
     /**
      * Ordered `-cp` for a pack: bootstrap jars (launchwrapper / asm /
-     * bootstraplauncher) first, then the client jar, then the rest -- mirrors
-     * the proven legacy Forge classpath ordering. Mods are NOT here; the loader
-     * scans the per-instance mods/ dir.
+     * bootstraplauncher / foundation) first, then the client jar, then the rest
+     * -- mirrors the proven legacy Forge classpath ordering. `foundation` is
+     * Cleanroom's launchwrapper replacement (its `Foundation` bootstrap starts
+     * FMLTweaker), so it takes launchwrapper's boot-first slot. Mods are NOT
+     * here; the loader scans the per-instance mods/ dir.
      */
     private fun packClasspath(runtime: ResolvedRuntime): String {
         val libPaths = runtime.libraries.map { it.path }
         val (boot, rest) = libPaths.partition { p ->
             val n = p.fileName.toString().lowercase()
-            n.contains("launchwrapper") || n.contains("asm") || n.contains("bootstraplauncher")
+            n.contains("launchwrapper") || n.contains("asm") ||
+                n.contains("bootstraplauncher") || n.contains("foundation")
         }
         // listOf(clientJar), NOT `+ clientJar`: a Path is Iterable<Path> over its
         // name segments, so `List<Path> + Path` would spread the client jar into

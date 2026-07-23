@@ -646,6 +646,37 @@ class GameCommandBuilderTest {
         assertTrue(parts.none { it.contains("${File.separator}mods${File.separator}") }, "mods stay off the classpath")
     }
 
+    // A Cleanroom runtime -- launchwrapper-family like forgeRuntime, but the
+    // bootstrap is top.outlands.foundation.boot.Foundation (launchwrapper's
+    // replacement) rather than launchwrapper itself.
+    private fun cleanroomRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("com.google.guava:guava:33.6.0-jre"), Path.of("/libs/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.ow2.asm:asm:9.10.1"), Path.of("/libs/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar")),
+            ResolvedLibrary(MavenCoord.parse("top.outlands:foundation:0.19.8"), Path.of("/libs/top/outlands/foundation/0.19.8/foundation-0.19.8.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.lwjgl:lwjgl-glfw:3.4.1"), Path.of("/libs/org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1.jar")),
+            ResolvedLibrary(MavenCoord.parse("com.cleanroommc:cleanroom:0.6.4-alpha"), Path.of("/libs/com/cleanroommc/cleanroom/0.6.4-alpha/cleanroom-0.6.4-alpha.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar"),
+        mainClass = "top.outlands.foundation.boot.Foundation",
+        assetIndexId = "1.12",
+        gameArgs = listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"),
+        javaMajor = 25,
+    )
+
+    @Test
+    fun `buildPackCommand puts the Cleanroom Foundation bootstrap ahead of the client jar`() {
+        val rt = cleanroomRuntime()
+        val cmd = packCommand(rt, javaMajor = 25)
+        val parts = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        val foundationIdx = parts.indexOfFirst { it.contains("foundation") }
+        val clientIdx = parts.indexOf(rt.clientJar.toAbsolutePath().toString())
+        assertTrue(foundationIdx >= 0, "foundation jar present, got: $parts")
+        assertTrue(clientIdx >= 0, "client jar is one entry, got: $parts")
+        assertTrue(foundationIdx < clientIdx, "Foundation must precede the client jar; got: $parts")
+        assertTrue(parts[0].contains("foundation") || parts[0].contains("asm"), "bootstrap jar first, got ${parts[0]}")
+    }
+
     // A modern (BootstrapLauncher) runtime -- drives modernClasspath, unlike the
     // legacy launchwrapper forgeRuntime.
     private fun modernRuntime(clientResources: Path? = null) = forgeRuntime().copy(
