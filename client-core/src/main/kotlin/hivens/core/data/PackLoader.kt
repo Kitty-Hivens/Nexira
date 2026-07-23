@@ -20,6 +20,13 @@ enum class PackLoader {
     NeoForge,
     Fabric,
     Quilt,
+
+    /**
+     * Cleanroom: a Forge 1.12.2 fork on LWJGL3 + Java 25. Distinct from [Forge]
+     * because it needs a different Java and swaps LWJGL, which drives a
+     * different classpath / native set than plain 1.12.2 Forge.
+     */
+    Cleanroom,
     Vanilla,
 
     /**
