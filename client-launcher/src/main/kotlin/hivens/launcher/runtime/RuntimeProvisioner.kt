@@ -270,8 +270,8 @@ class RuntimeProvisioner(
      * the gate is on the classifier, not on Mojang's inconsistent arch rules.
      */
     private fun isForeignNative(coord: MavenCoord): Boolean {
-        val classifier = coord.classifier ?: return false
-        return classifier.startsWith("natives") && classifier !in acceptedNativeClassifiers
+        val classifier = coord.nativeClassifier ?: return false
+        return classifier !in acceptedNativeClassifiers
     }
 
     /**
