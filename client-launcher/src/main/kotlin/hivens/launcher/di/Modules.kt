@@ -42,6 +42,7 @@ import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.FabricLikeResolver
 import hivens.launcher.runtime.loader.ForgeLegacyResolver
+import hivens.launcher.runtime.loader.Lwjgl3ifyResolver
 import hivens.launcher.runtime.loader.ForgeResolver
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ModernInstallerResolver
@@ -907,6 +908,7 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
             FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
             FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
             CleanroomResolver(get(named("direct")), get()),
+            Lwjgl3ifyResolver(get(named("direct")), get()),
         ),
     )
 }
