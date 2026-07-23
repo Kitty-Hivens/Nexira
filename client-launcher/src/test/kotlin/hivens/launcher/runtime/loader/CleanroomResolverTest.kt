@@ -6,10 +6,19 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
+import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -86,5 +95,42 @@ class CleanroomResolverTest {
         // no natives leaked into the classpath, and no LWJGL2.
         assertTrue(libs.none { (it.coord.classifier ?: "").startsWith("natives") })
         assertTrue(libs.none { it.coord.group == "org.lwjgl.lwjgl" })
+    }
+
+    @Test
+    fun `registry resolves the cleanroom loader id case-insensitively`() {
+        val registry = LoaderRegistry(listOf(resolver))
+        assertSame(resolver, registry.resolverFor("cleanroom"))
+        assertSame(resolver, registry.resolverFor("Cleanroom"))
+        assertNull(registry.resolverFor("forge"), "an unrelated loader must not match")
+        assertNull(registry.resolverFor("vanilla"), "vanilla means no overlay")
+    }
+
+    @Test
+    fun `resolve fails with a message naming the loader, version and missing artifact`() = runTest {
+        // A tester forwarding this line must be able to see what broke without a
+        // stacktrace: loader, version, and the artifact that was absent.
+        val badInstaller = ByteArrayOutputStream().also { bos ->
+            ZipOutputStream(bos).use {
+                it.putNextEntry(ZipEntry("readme.txt")); it.write("no version json here".toByteArray()); it.closeEntry()
+            }
+        }.toByteArray()
+        val installerUrl = "https://cr.invalid/dl/9.9.9-alpha/cleanroom-9.9.9-alpha-installer.jar"
+        val net = CleanroomResolver(
+            clientProvider = HttpClientProvider {
+                HttpClient(MockEngine { req ->
+                    if (req.url.toString() == installerUrl) respond(ByteReadChannel(badInstaller), HttpStatusCode.OK)
+                    else respond("missing", HttpStatusCode.NotFound)
+                })
+            },
+            json = json,
+            releaseBase = "https://cr.invalid/dl",
+        )
+
+        val ex = assertFailsWith<IOException> { net.resolve("1.12.2", "9.9.9-alpha") }
+        val msg = ex.message ?: ""
+        assertTrue(msg.contains("cleanroom"), "names the loader: $msg")
+        assertTrue(msg.contains("9.9.9-alpha"), "names the version: $msg")
+        assertTrue(msg.contains("version.json"), "names what is missing: $msg")
     }
 }
