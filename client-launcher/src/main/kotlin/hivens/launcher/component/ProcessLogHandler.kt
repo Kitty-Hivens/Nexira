@@ -42,7 +42,16 @@ internal class ProcessLogHandler {
             // it the reader stayed referenced until GC.
             BufferedReader(InputStreamReader(stream)).use { reader ->
                 try {
-                    reader.lineSequence().forEach { text ->
+                    reader.lineSequence().forEach { raw ->
+                        // Strip terminal colour codes before anything sees the line.
+                        // Some games colour stdout with ANSI even when it is a pipe,
+                        // not a tty (Cleanroom's TerminalConsole appender emits
+                        // `%style`/`%highlight` SGR sequences); left raw they show up
+                        // as escape litter in the console pane and in game.log, and
+                        // the level regexes below would match against the escapes.
+                        // The console does its own colouring by level, so the game's
+                        // is dropped, not rendered.
+                        val text = stripAnsi(raw)
                         val finalType = classify(text, type)
                         onLog(text, finalType)
 
@@ -60,6 +69,20 @@ internal class ProcessLogHandler {
     }
 
     companion object {
+        /**
+         * ANSI control sequences a child may write to stdout/stderr: the CSI
+         * form `ESC [ <params> <intermediates> <final>` (SGR colour `...m`,
+         * cursor moves, erases) and the OSC form `ESC ] ... (BEL | ESC \)`
+         * (window titles). Stripped so terminal-oriented game log output stays
+         * readable in a non-terminal console pane.
+         */
+        internal val ANSI_ESCAPE_RE: Regex =
+            Regex("\u001B(?:\\[[0-?]*[ -/]*[@-~]|\\][^\u0007]*(?:\u0007|\u001B\\\\))")
+
+        /** Removes ANSI escape sequences, leaving the plain text. */
+        internal fun stripAnsi(text: String): String =
+            if (text.indexOf('\u001B') < 0) text else ANSI_ESCAPE_RE.replace(text, "")
+
         /**
          * Matches a log4j/logback-style level marker that some logging
          * framework -- Forge/NeoForge's log4j config, vanilla MC's slf4j

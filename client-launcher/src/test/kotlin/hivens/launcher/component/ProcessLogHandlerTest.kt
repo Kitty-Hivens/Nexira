@@ -86,4 +86,34 @@ class ProcessLogHandlerTest {
     @Test fun `empty line is INFO`() {
         assertEquals(LauncherLogType.INFO, classify(""))
     }
+
+    // ── ANSI stripping ──────────────────────────────────────────────────────
+
+    private val esc = '\u001B'
+
+    @Test fun `strips SGR colour codes, keeps the text`() {
+        // A Cleanroom-style coloured console line (TerminalConsole %style/%highlight).
+        val raw = "$esc[93m[01:14:00]$esc[m $esc[36m[main|Foundation]$esc[m 1304"
+        assertEquals("[01:14:00] [main|Foundation] 1304", ProcessLogHandler.stripAnsi(raw))
+    }
+
+    @Test fun `strips a bare reset and multi-param SGR`() {
+        assertEquals("bold then normal", ProcessLogHandler.stripAnsi("$esc[1;31mbold$esc[0m then normal"))
+    }
+
+    @Test fun `strips an OSC window-title sequence terminated by BEL`() {
+        assertEquals("after", ProcessLogHandler.stripAnsi("$esc]0;some title\u0007after"))
+    }
+
+    @Test fun `plain text without escapes is returned unchanged`() {
+        val line = "[19:42:13] [main/INFO]: nothing to strip"
+        assertEquals(line, ProcessLogHandler.stripAnsi(line))
+    }
+
+    @Test fun `classification runs on the stripped line, not the raw escapes`() {
+        // The WARN level sits inside a coloured prefix; stripping first lets the
+        // level regex see it.
+        val raw = "$esc[33m[Server thread/WARN]$esc[m: deprecated"
+        assertEquals(LauncherLogType.WARN, classify(ProcessLogHandler.stripAnsi(raw)))
+    }
 }
