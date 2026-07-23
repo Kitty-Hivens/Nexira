@@ -138,8 +138,12 @@ class RuntimeProvisioner(
         // Host natives the loader supplies in place of vanilla's -- a LWJGL swap
         // (Cleanroom / lwjgl3ify) extracts its own LWJGL3 .so/.dll here so they
         // match the LWJGL3 classes it puts on -cp; null leaves the vanilla native
-        // set untouched (every additive loader).
-        val overrideNatives = profile.nativesOverride?.map { provision(it) }
+        // set untouched (every additive loader). The loader lists all platforms
+        // (as the MMC instance does); the same host filter as the vanilla natives
+        // keeps only this machine's set, so the resolver stays platform-agnostic.
+        val overrideNatives = profile.nativesOverride
+            ?.filterNot { isForeignNative(it.coord) }
+            ?.map { provision(it) }
         // Processor outputs FML resolves by path under libraryDirectory (the
         // patched/SRG client, neoforge universal) -- on disk, never on -cp.
         profile.placeOnlyFiles.forEach { pf ->

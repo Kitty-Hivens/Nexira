@@ -95,21 +95,8 @@ class ForgeLegacyResolver(
      * `minecraftArguments`; the vanilla game args (username, gameDir, ...) are
      * produced by the command builder. Falls back to the canonical FML tweaker.
      */
-    internal fun extractTweakArgs(minecraftArguments: String?): List<String> {
-        val tokens = minecraftArguments?.trim()?.split(Regex("\\s+")).orEmpty()
-        val out = ArrayList<String>()
-        var i = 0
-        while (i < tokens.size) {
-            if (tokens[i] == "--tweakClass" && i + 1 < tokens.size) {
-                out += "--tweakClass"
-                out += tokens[i + 1]
-                i += 2
-            } else {
-                i++
-            }
-        }
-        return out.ifEmpty { DEFAULT_TWEAK_ARGS }
-    }
+    internal fun extractTweakArgs(minecraftArguments: String?): List<String> =
+        extractTweakClassArgs(minecraftArguments).ifEmpty { DEFAULT_TWEAK_ARGS }
 
     /**
      * The Forge build to actually install. Returns [requested] when it is

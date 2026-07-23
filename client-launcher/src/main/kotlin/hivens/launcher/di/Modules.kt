@@ -39,6 +39,7 @@ import hivens.launcher.AgentExtractor
 import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.FabricLikeResolver
 import hivens.launcher.runtime.loader.ForgeLegacyResolver
 import hivens.launcher.runtime.loader.ForgeResolver
@@ -905,6 +906,7 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
             ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), loaderCacheDir),
             FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
             FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
+            CleanroomResolver(get(named("direct")), get()),
         ),
     )
 }
