@@ -290,6 +290,67 @@ class RuntimeLoaderTest {
         assertTrue(rt.natives.isEmpty(), "no override -- inherits vanilla's native set (empty in this fixture)")
     }
 
+    private val lwjgl2NatBytes = "LWJGL2-NATIVES".toByteArray()
+    private val jinputNatBytes = "JINPUT-NATIVES".toByteArray()
+    private val glfwOvrBytes = "GLFW-OVR-NATIVES".toByteArray()
+
+    /** Vanilla 1.12.2 base carrying a host LWJGL2 native AND an unrelated jinput
+     *  native (both pre-1.19 classifier shape), so a swap can be observed to drop
+     *  the LWJGL2 native, keep jinput, and add its own. */
+    private fun nativesEngine() = MockEngine { req ->
+        val url = req.url.toString()
+        val emptyIndex = """{"objects":{}}"""
+        val versionJson = """
+            {"assetIndex":{"id":"1.12","sha1":"${sha1(emptyIndex.toByteArray())}","size":${emptyIndex.length},"url":"$INDEX_URL"},
+             "downloads":{"client":{"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+             "libraries":[
+               {"name":"org.lwjgl.lwjgl:lwjgl:2.9.4","downloads":{
+                 "artifact":{"path":"org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar","sha1":"${sha1(lwjgl2Bytes)}","size":${lwjgl2Bytes.size},"url":"$LWJGL2_URL"},
+                 "classifiers":{"natives-linux":{"path":"org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar","sha1":"${sha1(lwjgl2NatBytes)}","size":${lwjgl2NatBytes.size},"url":"$LWJGL2_NAT_URL"}}}},
+               {"name":"net.java.jinput:jinput-platform:2.0.5","downloads":{
+                 "classifiers":{"natives-linux":{"path":"net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-linux.jar","sha1":"${sha1(jinputNatBytes)}","size":${jinputNatBytes.size},"url":"$JINPUT_NAT_URL"}}}}
+             ]}
+        """.trimIndent()
+        when (url) {
+            MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonH)
+            VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonH)
+            INDEX_URL -> respond(emptyIndex, HttpStatusCode.OK, jsonH)
+            CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+            LWJGL2_URL -> respond(ByteReadChannel(lwjgl2Bytes), HttpStatusCode.OK)
+            LWJGL2_NAT_URL -> respond(ByteReadChannel(lwjgl2NatBytes), HttpStatusCode.OK)
+            JINPUT_NAT_URL -> respond(ByteReadChannel(jinputNatBytes), HttpStatusCode.OK)
+            GLFW_OVR_URL -> respond(ByteReadChannel(glfwOvrBytes), HttpStatusCode.OK)
+            else -> respond("missing $url", HttpStatusCode.NotFound)
+        }
+    }
+
+    @Test
+    fun `a LWJGL swap drops the LWJGL2 native, keeps jinput, adds the loader native`() = runTest {
+        val resolver = object : LoaderResolver {
+            override val loaderId = "swap"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
+                libraries = emptyList(),
+                mainClass = "x.Main",
+                removeFromBase = { it.group == "org.lwjgl.lwjgl" },
+                nativesOverride = listOf(
+                    LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl-glfw:3.4.1:natives-linux"), GLFW_OVR_URL, sha1(glfwOvrBytes), glfwOvrBytes.size.toLong()),
+                ),
+            )
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir, assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(nativesEngine()) },
+            json = json, loaderRegistry = LoaderRegistry(listOf(resolver)), osName = "Linux",
+            versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+        )
+
+        val natives = p.ensureRuntime("1.12.2", "swap", "1").natives.map { it.toString() }
+
+        assertTrue(natives.none { it.contains("org/lwjgl/lwjgl/lwjgl/2.9.4") }, "vanilla LWJGL2 native dropped: $natives")
+        assertTrue(natives.any { it.contains("jinput-platform") }, "unrelated jinput native kept: $natives")
+        assertTrue(natives.any { it.contains("lwjgl-glfw") && it.contains("natives-linux") }, "loader LWJGL3 native added: $natives")
+    }
+
     @Test
     fun `ensureRuntime via CleanroomResolver swaps LWJGL2 for LWJGL3 and host-filters natives`() = runTest {
         val resolver = CleanroomResolver(
@@ -335,6 +396,9 @@ class RuntimeLoaderTest {
         const val CR_GLFW_URL = "https://cr.invalid/glfw.jar"
         const val CR_GLFW_LINUX_URL = "https://cr.invalid/glfw-linux.jar"
         const val CR_GLFW_WIN_URL = "https://cr.invalid/glfw-win.jar"
+        const val LWJGL2_NAT_URL = "https://t.invalid/lwjgl2-natives-linux.jar"
+        const val JINPUT_NAT_URL = "https://t.invalid/jinput-natives-linux.jar"
+        const val GLFW_OVR_URL = "https://t.invalid/glfw-override-natives-linux.jar"
         const val RES_BASE = "https://res.invalid"
         val jsonH = headersOf("Content-Type", "application/json")
     }

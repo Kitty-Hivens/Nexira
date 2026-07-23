@@ -168,7 +168,7 @@ class RuntimeProvisionerTest {
             ),
         )
 
-        val natives = p.nativeJarPaths(version)
+        val natives = p.nativeLibraries(version).map { it.path }
 
         assertEquals(2, natives.size, "exactly the two linux natives, got $natives")
         assertTrue(natives.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar")))

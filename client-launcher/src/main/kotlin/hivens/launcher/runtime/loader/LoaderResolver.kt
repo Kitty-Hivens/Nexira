@@ -98,12 +98,13 @@ data class LoaderProfile(
      */
     val removeFromBase: (MavenCoord) -> Boolean = { false },
     /**
-     * Host natives to extract into `java.library.path`, REPLACING the vanilla
-     * set wholesale. Null means inherit vanilla's natives -- every additive
-     * loader. A loader that swaps LWJGL (Cleanroom / lwjgl3ify) supplies the
-     * LWJGL3 host natives here; the vanilla base would otherwise extract LWJGL2
-     * `.so`/`.dll` under LWJGL3 classes and crash at GLFW init. Provisioned the
-     * same way as [libraries].
+     * Host natives to extract into `java.library.path`, ADDED on top of the
+     * vanilla natives that survive [removeFromBase]. Null (or empty) means the
+     * loader adds none. A loader that swaps LWJGL (Cleanroom / lwjgl3ify)
+     * supplies the LWJGL3 host natives here and names the LWJGL2 group in
+     * [removeFromBase]; the result extracts LWJGL3 in place of LWJGL2 while
+     * keeping unrelated vanilla natives (jinput). Provisioned like [libraries];
+     * the provisioner keeps only this host's platform.
      */
     val nativesOverride: List<LibrarySpec>? = null,
 )
@@ -125,8 +126,9 @@ data class ResolvedRuntime(
     /**
      * Platform-native jars (lwjgl etc.) for the host, resolved from the same
      * manifest as [libraries] -- so the natives extracted into an instance
-     * always match the LWJGL version on the classpath. A loader overlay adds
-     * none; this is the vanilla base's set.
+     * always match the LWJGL version on the classpath. Usually the vanilla
+     * base's set; a loader that swaps LWJGL drops the swapped-out natives
+     * (via removeFromBase) and adds its own, so this is the final extract set.
      */
     val natives: List<Path> = emptyList(),
     /**
