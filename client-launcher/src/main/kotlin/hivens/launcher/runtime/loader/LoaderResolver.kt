@@ -87,6 +87,25 @@ data class LoaderProfile(
      * Fabric, Quilt today) leave this null.
      */
     val javaMajor: Int? = null,
+    /**
+     * Predicate selecting vanilla-base libraries to DROP before the overlay is
+     * merged on. Additive loaders (Forge / NeoForge / Fabric / Quilt) leave the
+     * default -- remove nothing. The modern-Java + LWJGL3 loaders (Cleanroom,
+     * lwjgl3ify) use it to strip the vanilla LWJGL2 group (`org.lwjgl.lwjgl`),
+     * which the merge cannot do on its own: LWJGL3 lives under a DIFFERENT group
+     * (`org.lwjgl`), so it never collides with LWJGL2 on the group:artifact
+     * dedup key and both would otherwise land on `-cp` at once.
+     */
+    val removeFromBase: (MavenCoord) -> Boolean = { false },
+    /**
+     * Host natives to extract into `java.library.path`, REPLACING the vanilla
+     * set wholesale. Null means inherit vanilla's natives -- every additive
+     * loader. A loader that swaps LWJGL (Cleanroom / lwjgl3ify) supplies the
+     * LWJGL3 host natives here; the vanilla base would otherwise extract LWJGL2
+     * `.so`/`.dll` under LWJGL3 classes and crash at GLFW init. Provisioned the
+     * same way as [libraries].
+     */
+    val nativesOverride: List<LibrarySpec>? = null,
 )
 
 /**

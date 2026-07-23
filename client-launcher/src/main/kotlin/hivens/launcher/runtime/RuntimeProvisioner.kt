@@ -134,18 +134,12 @@ class RuntimeProvisioner(
 
         log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
         val profile = resolver.resolve(mcVersion, loaderVersion)
-        val overlay = profile.libraries.map { spec ->
-            val dest = librariesDir.resolve(spec.coord.relativePath)
-            when {
-                spec.localFile != null -> placeLocal(dest, spec.localFile, spec.sha1)
-                spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
-                else -> {
-                    val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url, bundled bytes, nor a local file")
-                    fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
-                }
-            }
-            ResolvedLibrary(spec.coord, dest)
-        }
+        val overlay = profile.libraries.map { ResolvedLibrary(it.coord, provision(it)) }
+        // Host natives the loader supplies in place of vanilla's -- a LWJGL swap
+        // (Cleanroom / lwjgl3ify) extracts its own LWJGL3 .so/.dll here so they
+        // match the LWJGL3 classes it puts on -cp; null leaves the vanilla native
+        // set untouched (every additive loader).
+        val overrideNatives = profile.nativesOverride?.map { provision(it) }
         // Processor outputs FML resolves by path under libraryDirectory (the
         // patched/SRG client, neoforge universal) -- on disk, never on -cp.
         profile.placeOnlyFiles.forEach { pf ->
@@ -159,7 +153,13 @@ class RuntimeProvisioner(
             .firstOrNull { it.relPath.startsWith("net/minecraft/client/") && it.relPath.endsWith("-extra.jar") }
             ?.let { librariesDir.resolve(it.relPath) }
         ResolvedRuntime(
-            libraries = mergeLibraries(vanilla.libraries, overlay),
+            // Base minus whatever the loader drops (LWJGL2 for a LWJGL3 swap),
+            // then the overlay merged on. removeFromBase is a no-op for every
+            // additive loader, so their merged set is byte-identical to before.
+            libraries = mergeLibraries(
+                vanilla.libraries.filterNot { profile.removeFromBase(it.coord) },
+                overlay,
+            ),
             clientJar = vanilla.clientJar,
             clientResourcesJar = clientResources,
             mainClass = profile.mainClass,
@@ -172,10 +172,29 @@ class RuntimeProvisioner(
             // (--launchTarget, --fml.*) come from the profile.
             jvmArgs = if (profile.inheritsVanillaArguments) vanilla.jvmArgs + profile.jvmArgs else profile.jvmArgs,
             gameArgs = profile.gameArgs,
-            natives = vanilla.natives,
+            natives = overrideNatives ?: vanilla.natives,
             // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
             javaMajor = profile.javaMajor ?: vanilla.javaMajor,
         )
+    }
+
+    /**
+     * Materialises one [LibrarySpec] into the shared libraries root and returns
+     * its on-disk path: a local file copy, bundled bytes, or a download, in that
+     * precedence. Shared by the loader overlay and the loader's native-override
+     * set so both go through the same verify/skip path.
+     */
+    private suspend fun provision(spec: LibrarySpec): Path {
+        val dest = librariesDir.resolve(spec.coord.relativePath)
+        when {
+            spec.localFile != null -> placeLocal(dest, spec.localFile, spec.sha1)
+            spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
+            else -> {
+                val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url, bundled bytes, nor a local file")
+                fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
+            }
+        }
+        return dest
     }
 
     /**
