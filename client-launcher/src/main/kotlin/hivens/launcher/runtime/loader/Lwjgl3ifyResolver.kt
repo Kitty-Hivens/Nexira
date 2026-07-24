@@ -87,7 +87,7 @@ class Lwjgl3ifyResolver(
             mainClass = version.mainClass,
             jvmArgs = stripCommandOwnedArgs(flattenArguments(args?.jvm.orEmpty(), mojangOs)),
             gameArgs = extractTweakClassArgs(flattenArguments(args?.game.orEmpty(), mojangOs)),
-            removeFromBase = { it.group == LWJGL2_GROUP },
+            removeFromBase = { it.group == LWJGL2_GROUP || it.groupArtifact in SUPERSEDED_BY_FORGEPATCHES },
             nativesOverride = natives,
             javaMajor = LWJGL3IFY_JAVA_MAJOR,
         )
@@ -132,6 +132,21 @@ class Lwjgl3ifyResolver(
         const val LWJGL3IFY_RELEASES = "https://github.com/GTNewHorizons/lwjgl3ify/releases/download"
         /** Vanilla's LWJGL2 maven group, dropped so LWJGL3 is the only LWJGL on -cp. */
         const val LWJGL2_GROUP = "org.lwjgl.lwjgl"
+
+        /**
+         * Vanilla 1.7.10 Apache Commons that forgePatches ships newer copies of.
+         * The RFB Pack200 unpacker (commons-compress harmony, shaded in
+         * forgePatches) calls `BoundedInputStream.builder()`, which only exists in
+         * the newer commons-io; left on -cp the vanilla `commons-io:2.4` shadows
+         * it and the binpatch step dies with NoSuchMethodError. The lwjgl3ify MMC
+         * profile drops these three for the same reason -- keep commons-logging /
+         * commons-codec, which forgePatches does not supersede.
+         */
+        val SUPERSEDED_BY_FORGEPATCHES = setOf(
+            "commons-io:commons-io",
+            "org.apache.commons:commons-compress",
+            "org.apache.commons:commons-lang3",
+        )
         /** Target Java major; the profile declares none, upstream targets 17-21. */
         const val LWJGL3IFY_JAVA_MAJOR = 21
     }
