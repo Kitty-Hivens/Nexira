@@ -41,24 +41,23 @@ internal class ProcessLogHandler {
             // when the loop exits (EOF, exception, or process kill). Without
             // it the reader stayed referenced until GC.
             BufferedReader(InputStreamReader(stream)).use { reader ->
+                val assembler = LineAssembler(MAX_LINE) { raw -> emit(raw, type, onLog) }
+                val buf = CharArray(READ_CHUNK)
                 try {
-                    reader.lineSequence().forEach { raw ->
-                        // The raw line keeps its ANSI so the console can turn the
-                        // game's `%style`/`%highlight` colours into styled spans
-                        // (Cleanroom's TerminalConsole appender colours stdout even
-                        // when it is a pipe). Classification and the on-disk game.log
-                        // use the stripped text -- the file stays plain and the level
-                        // regexes match the words, not the escapes.
-                        val clean = stripAnsi(raw)
-                        val finalType = classify(clean, type)
-                        onLog(raw, finalType)
-
-                        when (finalType) {
-                            LauncherLogType.ERROR -> gameLog.error(clean)
-                            LauncherLogType.WARN  -> gameLog.warn(clean)
-                            else                  -> gameLog.info(clean)
-                        }
+                    // Read raw chunks and split into lines ourselves rather than
+                    // BufferedReader.readLine(): a game whose stdout has no newlines
+                    // (Cleanroom's broken log config eats the trailing `%n` on the
+                    // console appender) would otherwise buffer the entire run into
+                    // one line, emitted only at EOF -- no live output, and one
+                    // monster line the console pane chokes on. The assembler also
+                    // breaks on a length cap, so such a stream still shows up live
+                    // and stays renderable.
+                    while (true) {
+                        val n = reader.read(buf)
+                        if (n < 0) break
+                        assembler.feed(buf, n)
                     }
+                    assembler.finish()
                 } catch (_: Exception) {
                     // Ignore EOF when terminating the process
                 }
@@ -66,7 +65,32 @@ internal class ProcessLogHandler {
         }
     }
 
+    private fun emit(raw: String, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
+        // The raw line keeps its ANSI so the console can turn the game's
+        // `%style`/`%highlight` colours into styled spans. Classification and the
+        // on-disk game.log use the stripped text -- the file stays plain and the
+        // level regexes match the words, not the escapes.
+        val clean = stripAnsi(raw)
+        val finalType = classify(clean, type)
+        onLog(raw, finalType)
+        when (finalType) {
+            LauncherLogType.ERROR -> gameLog.error(clean)
+            LauncherLogType.WARN  -> gameLog.warn(clean)
+            else                  -> gameLog.info(clean)
+        }
+    }
+
     companion object {
+        /** Read buffer size for draining a child stream. */
+        private const val READ_CHUNK = 8192
+
+        /**
+         * Hard cap on a single emitted line. Real game log lines are far shorter;
+         * the cap only fires on a stream with no newlines (a broken log config),
+         * chopping it into renderable pieces instead of one giant line.
+         */
+        internal const val MAX_LINE = 8192
+
         /**
          * ANSI control sequences a child may write to stdout/stderr: the CSI
          * form `ESC [ <params> <intermediates> <final>` (SGR colour `...m`,
@@ -146,5 +170,38 @@ internal class ProcessLogHandler {
                 else                                    -> LauncherLogType.INFO
             }
         }
+    }
+}
+
+/**
+ * Splits a stream of character chunks into lines: on `\n` (dropping a trailing
+ * `\r` of a `\r\n` pair) and on a [maxLen] cap so a newline-starved stream still
+ * yields bounded, live lines instead of one buffer-until-EOF monster. [onLine]
+ * fires per completed line; [finish] flushes any trailing partial line.
+ */
+internal class LineAssembler(private val maxLen: Int, private val onLine: (String) -> Unit) {
+
+    private val sb = StringBuilder()
+
+    fun feed(chunk: CharArray, len: Int) {
+        for (i in 0 until len) {
+            val c = chunk[i]
+            if (c == '\n') {
+                flush()
+            } else {
+                sb.append(c)
+                if (sb.length >= maxLen) flush()
+            }
+        }
+    }
+
+    fun finish() {
+        if (sb.isNotEmpty()) flush()
+    }
+
+    private fun flush() {
+        if (sb.isNotEmpty() && sb[sb.length - 1] == '\r') sb.setLength(sb.length - 1)
+        onLine(sb.toString())
+        sb.setLength(0)
     }
 }
