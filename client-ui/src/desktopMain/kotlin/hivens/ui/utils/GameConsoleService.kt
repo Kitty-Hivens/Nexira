@@ -143,10 +143,22 @@ class GameConsoleService(
         }
     }
 
+    /**
+     * Turns a raw game line into an entry: ANSI escapes become colour runs, the
+     * stripped text is redacted, and the runs are kept only when redaction did
+     * not move offsets (it rarely fires, so coloured lines stay coloured).
+     */
+    private fun entryOf(text: String, type: LogType): LogEntry {
+        val parsed = parseAnsi(text)
+        val redacted = Redactor.redact(parsed.text)
+        val colors = if (redacted == parsed.text) parsed.runs else emptyList()
+        return LogEntry(redacted, type, colors = colors)
+    }
+
     private fun apply(msg: Msg) {
         when (msg) {
             is Msg.Append -> {
-                val entry = LogEntry(Redactor.redact(msg.text), msg.type)
+                val entry = entryOf(msg.text, msg.type)
                 buffer.addLast(entry)
                 trim()
                 writeLine(entry)
@@ -157,7 +169,7 @@ class GameConsoleService(
                 // to one updating line. NOT mirrored to the file (launcher-
                 // internal provisioning ticks; archiving every tick would bloat
                 // the file and break the disk/line-index alignment).
-                val entry = LogEntry(Redactor.redact(msg.text), msg.type)
+                val entry = entryOf(msg.text, msg.type)
                 val prev = slotEntries[msg.slotId]
                 val idx = if (prev != null) buffer.indexOf(prev) else -1
                 if (idx >= 0) {

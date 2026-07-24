@@ -130,6 +130,16 @@ internal fun buildLineModels(
             }
             text = if (showTimestamps) "[${e.timestamp}] ${e.text}" else e.text
             spans.add(LineSpan(0, text.length, role))
+            // Colours recovered from the game's ANSI, over the message body. The
+            // timestamp prefix shifts the offsets; emitted after the base span so
+            // they win over the severity colour, before highlight/marker/search so
+            // those overlays still show.
+            if (e.colors.isNotEmpty()) {
+                val ansiOffset = text.length - e.text.length
+                for (run in e.colors) {
+                    spans.add(LineSpan(run.start + ansiOffset, run.end + ansiOffset, role, run.colorHex, run.bold))
+                }
+            }
             highlightFor(text)?.let { spans.add(LineSpan(0, text.length, role, it.colorHex, it.bold)) }
             if (e.type == LogType.ERROR || e.type == LogType.WARN) {
                 ERROR_MARKERS.findAll(text).forEach { m ->

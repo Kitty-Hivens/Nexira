@@ -43,22 +43,20 @@ internal class ProcessLogHandler {
             BufferedReader(InputStreamReader(stream)).use { reader ->
                 try {
                     reader.lineSequence().forEach { raw ->
-                        // Strip terminal colour codes before anything sees the line.
-                        // Some games colour stdout with ANSI even when it is a pipe,
-                        // not a tty (Cleanroom's TerminalConsole appender emits
-                        // `%style`/`%highlight` SGR sequences); left raw they show up
-                        // as escape litter in the console pane and in game.log, and
-                        // the level regexes below would match against the escapes.
-                        // The console does its own colouring by level, so the game's
-                        // is dropped, not rendered.
-                        val text = stripAnsi(raw)
-                        val finalType = classify(text, type)
-                        onLog(text, finalType)
+                        // The raw line keeps its ANSI so the console can turn the
+                        // game's `%style`/`%highlight` colours into styled spans
+                        // (Cleanroom's TerminalConsole appender colours stdout even
+                        // when it is a pipe). Classification and the on-disk game.log
+                        // use the stripped text -- the file stays plain and the level
+                        // regexes match the words, not the escapes.
+                        val clean = stripAnsi(raw)
+                        val finalType = classify(clean, type)
+                        onLog(raw, finalType)
 
                         when (finalType) {
-                            LauncherLogType.ERROR -> gameLog.error(text)
-                            LauncherLogType.WARN  -> gameLog.warn(text)
-                            else                  -> gameLog.info(text)
+                            LauncherLogType.ERROR -> gameLog.error(clean)
+                            LauncherLogType.WARN  -> gameLog.warn(clean)
+                            else                  -> gameLog.info(clean)
                         }
                     }
                 } catch (_: Exception) {

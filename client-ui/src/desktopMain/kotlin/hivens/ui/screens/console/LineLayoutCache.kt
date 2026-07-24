@@ -84,13 +84,14 @@ internal class LineLayoutCache(
             val start = sp.start.coerceIn(0, len)
             val end = sp.end.coerceIn(start, len)
             if (start == end) continue
-            val style = if (sp.colorHex != null) {
-                SpanStyle(
+            val style = when {
+                sp.colorHex != null -> SpanStyle(
                     color = CustomTheme.parseHexColor(sp.colorHex),
                     fontWeight = if (sp.bold) FontWeight.Bold else null,
                 )
-            } else {
-                spanStyleFor(sp.role, palette)
+                // A bold-only run (ANSI `1` with no colour) keeps the role colour.
+                sp.bold -> spanStyleFor(sp.role, palette).copy(fontWeight = FontWeight.Bold)
+                else -> spanStyleFor(sp.role, palette)
             }
             addStyle(style, start, end)
         }

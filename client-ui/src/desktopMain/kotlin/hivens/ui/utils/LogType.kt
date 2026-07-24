@@ -21,4 +21,10 @@ data class LogEntry(
     val text: String,
     val type: LogType,
     val timestamp: String = SimpleDateFormat("HH:mm:ss").format(Date()),
+    /**
+     * Foreground-colour / bold runs recovered from the line's ANSI escapes, over
+     * offsets into [text]. Empty for the common uncoloured line; the console
+     * renders these on top of the severity colour.
+     */
+    val colors: List<AnsiRun> = emptyList(),
 )
