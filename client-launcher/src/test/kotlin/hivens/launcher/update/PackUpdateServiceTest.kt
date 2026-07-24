@@ -87,7 +87,9 @@ class PackUpdateServiceTest {
         val repo = FakeRepo()
         private val protectedPaths = ProtectedPaths(tempDir("pp").resolve("pp.json"), json)
 
-        var manifestBody = manifest(
+        // The installed baseline (V1), served at its own version URL so the update
+        // path can fetch the baseline mods with identity (not just latest/target).
+        val v1Body = manifest(
             V1,
             listOf(
                 mod("req.jar", REQ_V1, REQ_V1_URL, required = true, defaultEnabled = true),
@@ -96,6 +98,7 @@ class PackUpdateServiceTest {
             ),
             listOf(asset("config/x.cfg", CFG, CFG_URL)),
         )
+        var manifestBody = v1Body
         var summaryBody = summary(V1)
         var versionsBody = """{"schema_version":2,"pack_id":"test","latest":"$V2","builds":[
             {"version_number":"$V2","version_type":"release","date_published":"2026-02-02T00:00:00Z","fingerprint":"bb","mods_count":2,"assets_count":2},
@@ -118,6 +121,7 @@ class PackUpdateServiceTest {
             when (req.url.toString()) {
                 MANIFEST_URL -> respond(manifestBody, HttpStatusCode.OK, jsonHeaders)
                 MANIFEST_V2_URL -> respond(v2Body, HttpStatusCode.OK, jsonHeaders)
+                MANIFEST_V1_URL -> respond(v1Body, HttpStatusCode.OK, jsonHeaders)
                 SUMMARY_URL -> respond(summaryBody, HttpStatusCode.OK, jsonHeaders)
                 VERSIONS_URL -> respond(versionsBody, HttpStatusCode.OK, jsonHeaders)
                 REQ_V1_URL -> respond(ByteReadChannel(REQ_V1), HttpStatusCode.OK)
@@ -391,6 +395,7 @@ class PackUpdateServiceTest {
         const val MIRROR = "https://mirror.test"
         const val MANIFEST_URL = "https://mirror.test/v1/packs/test/manifest"
         const val MANIFEST_V2_URL = "https://mirror.test/v1/packs/test/manifest/2026.02.02"
+        const val MANIFEST_V1_URL = "https://mirror.test/v1/packs/test/manifest/2026.01.01"
         const val SUMMARY_URL = "https://mirror.test/v1/packs/test"
         const val VERSIONS_URL = "https://mirror.test/v1/packs/test/manifest/versions"
         const val REQ_V1_URL = "https://mirror.test/dl/req-v1"
