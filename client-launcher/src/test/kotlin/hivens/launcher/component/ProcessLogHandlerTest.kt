@@ -116,4 +116,39 @@ class ProcessLogHandlerTest {
         val raw = "$esc[33m[Server thread/WARN]$esc[m: deprecated"
         assertEquals(LauncherLogType.WARN, classify(ProcessLogHandler.stripAnsi(raw)))
     }
+
+    // ── line assembly ───────────────────────────────────────────────────────
+
+    private fun assemble(vararg chunks: String, maxLen: Int = 8192): List<String> {
+        val out = ArrayList<String>()
+        val a = LineAssembler(maxLen) { out.add(it) }
+        for (ch in chunks) a.feed(ch.toCharArray(), ch.length)
+        a.finish()
+        return out
+    }
+
+    @Test fun `assembler splits on newline`() {
+        assertEquals(listOf("a", "b", "c"), assemble("a\nb\nc"))
+    }
+
+    @Test fun `assembler drops the trailing CR of a CRLF`() {
+        assertEquals(listOf("x", "y"), assemble("x\r\ny"))
+    }
+
+    @Test fun `assembler joins a line split across chunks`() {
+        assertEquals(listOf("hello", "world"), assemble("hel", "lo\nwor", "ld"))
+    }
+
+    @Test fun `assembler flushes a trailing partial line at finish`() {
+        assertEquals(listOf("no newline"), assemble("no newline"))
+    }
+
+    @Test fun `assembler caps a newline-starved run into bounded pieces`() {
+        // 20 chars, no newline, cap 8 -> 8 + 8 + 4.
+        assertEquals(listOf("aaaaaaaa", "aaaaaaaa", "aaaa"), assemble("a".repeat(20), maxLen = 8))
+    }
+
+    @Test fun `assembler emits a blank line for a bare newline`() {
+        assertEquals(listOf(""), assemble("\n"))
+    }
 }
