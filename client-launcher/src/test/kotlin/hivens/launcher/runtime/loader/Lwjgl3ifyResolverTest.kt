@@ -73,10 +73,20 @@ class Lwjgl3ifyResolverTest {
     }
 
     @Test
-    fun `removeFromBase drops vanilla LWJGL2 only`() {
+    fun `removeFromBase drops vanilla LWJGL2 and the commons forgePatches supersedes`() {
         val p = realProfile()
+        // LWJGL2 across the whole group -> LWJGL3 is the only LWJGL on -cp.
         assertTrue(p.removeFromBase(MavenCoord.parse("org.lwjgl.lwjgl:lwjgl:2.9.4-nightly-20130708-debug3")))
         assertFalse(p.removeFromBase(MavenCoord.parse("org.lwjgl:lwjgl-opengl:3.4.2")))
+        // The stale vanilla commons whose newer copies ship inside forgePatches;
+        // left on -cp they shadow it and the Pack200 unpacker dies on
+        // BoundedInputStream.builder().
+        assertTrue(p.removeFromBase(MavenCoord.parse("commons-io:commons-io:2.4")))
+        assertTrue(p.removeFromBase(MavenCoord.parse("org.apache.commons:commons-compress:1.8.1")))
+        assertTrue(p.removeFromBase(MavenCoord.parse("org.apache.commons:commons-lang3:3.1")))
+        // Not superseded -- these stay on the base classpath.
+        assertFalse(p.removeFromBase(MavenCoord.parse("commons-logging:commons-logging:1.1.3")))
+        assertFalse(p.removeFromBase(MavenCoord.parse("commons-codec:commons-codec:1.9")))
         assertFalse(p.removeFromBase(MavenCoord.parse("net.minecraftforge:forge:1.7.10-10.13.4.1614-1.7.10")))
     }
 
