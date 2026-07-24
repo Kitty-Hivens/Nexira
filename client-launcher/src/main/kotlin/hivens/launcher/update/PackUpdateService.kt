@@ -1,6 +1,7 @@
 package hivens.launcher.update
 
 import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.dto.smrt.toDomain
@@ -9,15 +10,19 @@ import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.FileManifest
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
+import hivens.core.data.fileManifestOf
 import hivens.core.data.flatten
 import hivens.core.io.InstanceMutationLock
 import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
+import hivens.core.update.UpdatePlan
 import hivens.core.update.CompatChange
 import hivens.core.update.UpdateReconciler
 import hivens.core.update.classifyCompat
+import hivens.core.update.mergedWith
+import hivens.core.update.reconcileMods
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
@@ -117,12 +122,7 @@ class PackUpdateService(
                 val fresh = repository.get(instance.id) ?: instance
                 val targetManifest = target.toBaselineManifest()
                 val paths = fresh.installedManifest?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys
-                val plan = UpdateReconciler.reconcile(
-                    baseline = fresh.installedManifest,
-                    target = targetManifest,
-                    current = scanInstanceState(clientDir, paths),
-                    isProtected = protectedPaths::isProtected,
-                )
+                val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths))
                 val compat = gradeCompat(fresh, target)
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
                 // Snapshot the pack-managed files before ANY change so a failed apply
@@ -181,17 +181,67 @@ class PackUpdateService(
         }
     }
 
-    private fun previewFor(instance: PackInstance, target: SmrtPackManifest): UpdateCheck {
+    private suspend fun previewFor(instance: PackInstance, target: SmrtPackManifest): UpdateCheck {
         val targetManifest = target.toBaselineManifest()
         val paths = instance.installedManifest?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys
-        val plan = UpdateReconciler.reconcile(
-            baseline = instance.installedManifest,
-            target = targetManifest,
-            current = scanInstanceState(clientDirOf(instance), paths),
-            isProtected = protectedPaths::isProtected,
-        )
+        val plan = computePlan(instance, target, targetManifest, scanInstanceState(clientDirOf(instance), paths))
         return UpdateCheck.Available(currentVersionOf(instance), target.packVersion, gradeCompat(instance, target), plan)
     }
+
+    /**
+     * The update plan: mods matched by identity, assets by path. A mod carries
+     * its version in the filename, so one that renames across a bump (JEI.jar ->
+     * jei.jar) must be tracked by [SmrtModEntry.stableKey] -- a path diff would
+     * duplicate an edited jar (see [reconcileMods]). Baseline identity lives only
+     * in the installed version's manifest, fetched via [fetchBaselineMods]; when
+     * that is unavailable the plan falls back to the path-keyed whole-manifest
+     * diff, i.e. the prior behaviour.
+     */
+    private suspend fun computePlan(
+        instance: PackInstance,
+        target: SmrtPackManifest,
+        targetManifest: FileManifest,
+        current: FileManifest,
+    ): UpdatePlan {
+        val baselineMods = fetchBaselineMods(instance)
+            ?: return UpdateReconciler.reconcile(
+                baseline = instance.installedManifest,
+                target = targetManifest,
+                current = current,
+                isProtected = protectedPaths::isProtected,
+            )
+        val modPlan = reconcileMods(baselineMods, target.mods, current, protectedPaths::isProtected)
+        val assetPlan = UpdateReconciler.reconcile(
+            baseline = instance.installedManifest?.let(::assetsOnly),
+            target = assetsOnly(targetManifest),
+            current = current,
+            isProtected = protectedPaths::isProtected,
+        )
+        return modPlan.mergedWith(assetPlan)
+    }
+
+    /**
+     * The installed version's mods, which carry the identity `installedManifest`
+     * dropped when it collapsed each mod to `mods/<filename>`. Null (caller falls
+     * back to the path reconcile) when there is no baseline, no known current
+     * version, or the mirror fetch fails (offline, or a retired build) -- so an
+     * update degrades to the prior behaviour rather than erroring.
+     */
+    private suspend fun fetchBaselineMods(instance: PackInstance): List<SmrtModEntry>? {
+        if (instance.installedManifest == null) return null
+        val version = currentVersionOf(instance) ?: return null
+        return runCatching { client.fetchManifestVersion(instance.packRef.id, version).mods }
+            .onFailure {
+                log.warn(
+                    "update: baseline fetch failed for {} {}; path-reconcile fallback: {}",
+                    instance.packRef.id, version, it.toString(),
+                )
+            }
+            .getOrNull()
+    }
+
+    private fun assetsOnly(manifest: FileManifest): FileManifest =
+        fileManifestOf(manifest.flatten().filterKeys { !it.startsWith("mods/") })
 
     /**
      * Grades how structural the change is. A null baseline (a pre-baseline or
