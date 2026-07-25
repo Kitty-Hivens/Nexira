@@ -73,6 +73,7 @@ fun NotificationCard(
     group: NotificationGroup,
     now: Instant,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     // Include count in the key so dismiss-then-re-push under the same
     // sourceKey resets the expanded affordance; otherwise a freshly-
@@ -94,7 +95,7 @@ fun NotificationCard(
     val swipeFrac = (abs(offsetX.value) / with(density) { 380.dp.toPx() }).coerceIn(0f, 1f)
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .widthIn(min = 320.dp, max = 420.dp)
             .offset { IntOffset(offsetX.value.toInt(), 0) }
             .alpha(1f - 0.55f * swipeFrac)
