@@ -35,6 +35,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
+import hivens.core.update.UpdateDirection
 import hivens.ui.Screen
 import hivens.ui.components.InitialsAvatar
 import hivens.ui.components.SourceBadge
@@ -181,19 +182,20 @@ fun PackCard(
             val hub: PackUpdateStatusHub = koinInject()
             val nav: NavRequests = koinInject()
             val statuses by hub.statuses.collectAsState()
-            if (statuses[instance.id] is PackUpdateStatus.Pending) {
+            (statuses[instance.id] as? PackUpdateStatus.Pending)?.let { pending ->
                 UpdateBadgePill(
-                    onClick  = { nav.open(Screen.PackVersions(instance.id)) },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                    isRollback = pending.direction == UpdateDirection.Older,
+                    onClick    = { nav.open(Screen.PackVersions(instance.id)) },
+                    modifier   = Modifier.align(Alignment.TopEnd).padding(10.dp),
                 )
             }
         }
     }
 }
 
-/** Compact update-available pill; the card-corner sibling of [LaunchStatusPill]. */
+/** Compact pill for a pending build move; the card-corner sibling of [LaunchStatusPill]. */
 @Composable
-private fun UpdateBadgePill(onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
     Row(
         modifier = modifier
@@ -204,9 +206,12 @@ private fun UpdateBadgePill(onClick: () -> Unit, modifier: Modifier = Modifier) 
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(NxTheme.colors.primary))
+        Box(
+            Modifier.size(7.dp).clip(RoundedCornerShape(50))
+                .background(if (isRollback) NxTheme.colors.warnAccent else NxTheme.colors.primary),
+        )
         Text(
-            text       = s.packVersionUpdateBadge,
+            text       = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
             style      = MaterialTheme.typography.labelSmall,
             color      = Color.White,
             fontWeight = FontWeight.Medium,

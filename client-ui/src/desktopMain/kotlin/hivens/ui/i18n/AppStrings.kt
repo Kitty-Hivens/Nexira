@@ -870,6 +870,12 @@ interface AppStrings {
     val packVersionSwitch: String
     val packVersionCurrentTag: String
     val packVersionUpdateBadge: String
+    /** Ambient badge when the mirror's current build is OLDER than the installed one. */
+    val packVersionRollbackBadge: String
+    /** Banner title for that case; the neutral [packVersionAvailable] would read as an update. */
+    fun packVersionRolledBack(version: String): String
+    /** Action label for a move that is not forward. */
+    val packVersionSwitchNow: String
     val packVersionCheckFailed: String
 
     // Pack versions screen (build list + per-build changelog)

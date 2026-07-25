@@ -11,6 +11,7 @@ import hivens.core.data.PackReference
 import hivens.core.data.flatten
 import hivens.core.update.CompatChange
 import hivens.core.update.UpdateCheck
+import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
 import hivens.launcher.ProtectedPaths
@@ -257,6 +258,68 @@ class PackUpdateServiceTest {
         // Still serving v1; applying "latest" (v1) must not fetch/write.
         val outcome = h.service.applyUpdate(instance, null, null)
         assertTrue(outcome is UpdateOutcome.AlreadyCurrent)
+    }
+
+    @Test
+    fun `a stale summary can no longer invent an update onto the installed build`() = runTest {
+        // The two reads used to be independent: the summary's latest pointer
+        // decided whether anything moved, the manifest endpoint decided to what.
+        // Separate cache namespaces with separate TTLs let them disagree, and a
+        // summary left over from before an apply pointed the user back at the
+        // build they just left. The manifest is the single source now, so a
+        // summary saying otherwise changes nothing.
+        val h = Harness()
+        val instance = h.installV1()
+        h.summaryBody = summary(V2)
+
+        assertEquals(UpdateCheck.UpToDate, h.service.checkForUpdate(instance))
+    }
+
+    @Test
+    fun `a mirror-side rollback of latest reports the move as backwards`() = runTest {
+        // Installed at V2, mirror serves V1 as current: a real state, since the
+        // mirror can retire a bad build. Detection is label inequality, so this
+        // arrives through the same path as a release and would otherwise be
+        // announced as an update onto an older build.
+        val h = Harness()
+        h.serveV2()
+        val installed = h.installV1().let { h.service.applyUpdate(it, null, null); h.repo.get(it.id)!! }
+        assertEquals(V2, installed.pinnedPackVersion)
+
+        h.manifestBody = h.v1Body
+
+        val check = h.service.checkForUpdate(installed)
+        assertTrue(check is UpdateCheck.Available, "a different current build is still a move")
+        assertEquals(V1, check.toVersion)
+        assertEquals(UpdateDirection.Older, check.direction)
+    }
+
+    @Test
+    fun `a forward move reports the move as newer`() = runTest {
+        val h = Harness()
+        val instance = h.installV1()
+        h.serveV2()
+
+        val check = h.service.checkForUpdate(instance)
+        assertTrue(check is UpdateCheck.Available)
+        assertEquals(UpdateDirection.Newer, check.direction)
+    }
+
+    @Test
+    fun `a build the listing no longer retains is left unranked`() = runTest {
+        // Honest over confident: with the target missing from the publish-ordered
+        // listing there is no ranking to give, and version tuples cannot supply
+        // one across channels.
+        val h = Harness()
+        val instance = h.installV1()
+        h.serveV2()
+        h.versionsBody = """{"schema_version":2,"pack_id":"test","latest":"$V2","builds":[
+            {"version_number":"$V1","version_type":"release","date_published":"2026-01-01T00:00:00Z","fingerprint":"aa","mods_count":3,"assets_count":1}
+        ]}"""
+
+        val check = h.service.checkForUpdate(instance)
+        assertTrue(check is UpdateCheck.Available)
+        assertEquals(UpdateDirection.Unknown, check.direction)
     }
 
     @Test

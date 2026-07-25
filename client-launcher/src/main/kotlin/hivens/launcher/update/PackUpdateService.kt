@@ -16,6 +16,7 @@ import hivens.core.io.InstanceMutationLock
 import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
+import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
 import hivens.core.update.CompatChange
@@ -27,6 +28,9 @@ import hivens.launcher.ProtectedPaths
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -74,14 +78,17 @@ class PackUpdateService(
      * also a change to surface. Advisory -- it scans disk without the mutation
      * lock; the authoritative plan is recomputed under the lock in [applyUpdate].
      */
-    override suspend fun checkForUpdate(instance: PackInstance): UpdateCheck = withContext(Dispatchers.IO) {
+    override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck = withContext(Dispatchers.IO) {
         val packId = instance.packRef.id
-        val latest = client.fetchSummary(packId).latestPackVersion
-        val current = currentVersionOf(instance)
-        if (current != null && latest == current) {
+        // ONE read answers both "did it move" and "to what". Asking the summary
+        // for the latest label and the manifest endpoint for the plan means two
+        // cache namespaces with two TTLs, which drift apart and let the banner
+        // name a build the decision was not made against.
+        val target = client.fetchManifest(packId, forceRefresh)
+        if (currentVersionOf(instance) == target.packVersion) {
             return@withContext UpdateCheck.UpToDate
         }
-        previewFor(instance, client.fetchManifest(packId))
+        previewFor(instance, target)
     }
 
     /**
@@ -154,6 +161,11 @@ class PackUpdateService(
                 try {
                     syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
                     commit(fresh, target, enabledState, pinExplicit = targetVersion != null)
+                    // The instance just moved, so the mirror views that describe
+                    // "where it should be" are a build out of date. Left alone,
+                    // the next check answers from a cache older than this apply
+                    // and reports an update back to the build we came from.
+                    client.invalidatePack(packId)
                     if (snapshot != null) journal.complete(fresh.instanceDirName)
                 } catch (e: Throwable) {
                     if (snapshot != null) {
@@ -185,7 +197,37 @@ class PackUpdateService(
         val targetManifest = target.toBaselineManifest()
         val paths = instance.installedManifest?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys
         val plan = computePlan(instance, target, targetManifest, scanInstanceState(clientDirOf(instance), paths))
-        return UpdateCheck.Available(currentVersionOf(instance), target.packVersion, gradeCompat(instance, target), plan)
+        val from = currentVersionOf(instance)
+        return UpdateCheck.Available(
+            fromVersion = from,
+            toVersion = target.packVersion,
+            direction = directionOf(instance.packRef.id, from, target.packVersion),
+            compat = gradeCompat(instance, target),
+            plan = plan,
+        )
+    }
+
+    /**
+     * Ranks the move by the mirror's publish order, which is the listing's own
+     * order and the only ranking that holds across channels. Degrades to
+     * [UpdateDirection.Unknown] rather than guessing: with no baseline, with a
+     * build the listing no longer retains, or offline, an unranked move is
+     * honest where a tuple comparison would be confidently wrong.
+     */
+    private suspend fun directionOf(packId: String, from: String?, to: String): UpdateDirection {
+        if (from == null) return UpdateDirection.Unknown
+        val order = runCatching { client.listBuilds(packId).builds.map { it.versionNumber } }
+            .onFailure { log.warn("update: build listing unavailable for {}; direction unranked: {}", packId, it.toString()) }
+            .getOrNull()
+            ?: return UpdateDirection.Unknown
+        val fromIndex = order.indexOf(from)
+        val toIndex = order.indexOf(to)
+        if (fromIndex < 0 || toIndex < 0) return UpdateDirection.Unknown
+        return when {
+            toIndex < fromIndex -> UpdateDirection.Newer
+            toIndex > fromIndex -> UpdateDirection.Older
+            else -> UpdateDirection.Unknown
+        }
     }
 
     /**
@@ -293,6 +335,10 @@ class PackUpdateService(
     override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = withContext(Dispatchers.IO) {
         client.listBuilds(instance.packRef.id).builds
     }
+
+    /** The same listing, stale-then-fresh, for a screen that must not miss a build the cache predates. */
+    override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> =
+        client.buildsStream(instance.packRef.id).map { it.builds }.flowOn(Dispatchers.IO)
 
     /** Snapshots [instance] can be rolled back to, newest first. */
     override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =

@@ -23,6 +23,18 @@ interface Cache<V> {
     suspend fun get(key: String, loader: suspend () -> V): V
 
     /**
+     * Ignore the TTL and reload: always runs [loader], stores the result, and
+     * returns it. Still single-flighted, so a burst of explicit refreshes for
+     * one key costs one upstream call.
+     *
+     * This is what an action the user took deliberately must use. [get] answers
+     * a four-minute-old entry without touching the network, which is right for
+     * ambient reads and wrong for a "check now" button -- there the whole point
+     * is to learn something the cache cannot know.
+     */
+    suspend fun refresh(key: String, loader: suspend () -> V): V
+
+    /**
      * Reactive view: emits the stale value first (if any, within the cap) then
      * the fresh value; a missing entry emits only the fresh value. The load is
      * single-flighted with concurrent callers.
@@ -32,3 +44,10 @@ interface Cache<V> {
     suspend fun invalidate(key: String)
     suspend fun invalidateAll()
 }
+
+/**
+ * [Cache.get] or [Cache.refresh] chosen by [forceRefresh], so a caller can carry
+ * "the user asked for this" down as a flag instead of branching at every read.
+ */
+suspend fun <V> Cache<V>.read(key: String, forceRefresh: Boolean, loader: suspend () -> V): V =
+    if (forceRefresh) refresh(key, loader) else get(key, loader)

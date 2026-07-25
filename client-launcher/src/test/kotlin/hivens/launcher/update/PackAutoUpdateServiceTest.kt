@@ -12,11 +12,13 @@ import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
+import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,7 +39,7 @@ class PackAutoUpdateServiceTest {
     /** Returns a scripted check per instance id and records which ids were applied. */
     private class FakeUpdater(private val checks: Map<String, UpdateCheck>) : PackUpdater {
         val applied = mutableListOf<String>()
-        override suspend fun checkForUpdate(instance: PackInstance): UpdateCheck =
+        override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck =
             checks[instance.id] ?: UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
             checks[instance.id] ?: UpdateCheck.UpToDate
@@ -50,6 +52,7 @@ class PackAutoUpdateServiceTest {
             return UpdateOutcome.Applied("2026.02.02", CompatChange.Same, UpdatePlan())
         }
         override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = emptyList()
+        override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> = flowOf(emptyList())
         override fun listSnapshots(instance: PackInstance): List<PackSnapshot> = emptyList()
         override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance
     }
@@ -68,8 +71,8 @@ class PackAutoUpdateServiceTest {
     private fun settings(auto: Boolean = true, amber: AmberUpdatePolicy = AmberUpdatePolicy.Ask) =
         SettingsData(autoUpdatePacks = auto, amberUpdatePolicy = amber)
 
-    private fun available(compat: CompatChange) =
-        UpdateCheck.Available("2026.01.01", "2026.02.02", compat, UpdatePlan(toUpdate = listOf("mods/x.jar")))
+    private fun available(compat: CompatChange, direction: UpdateDirection = UpdateDirection.Newer) =
+        UpdateCheck.Available("2026.01.01", "2026.02.02", direction, compat, UpdatePlan(toUpdate = listOf("mods/x.jar")))
 
     @Test
     fun `green auto-applies while amber under Ask is held`() = runTest {
