@@ -838,6 +838,18 @@ object EnglishStrings : AppStrings {
     override val packVersionSwitchNow           = "Switch"
     override val packVersionCheckFailed         = "Couldn't check for updates"
 
+    override val versionPickerInstallTitle      = "Install pack"
+    override val versionPickerChangeTitle       = "Change pack version"
+    override val versionPickerSearch            = "Find a version"
+    override fun versionPickerCount(n: Int)     = if (n == 1) "1 version" else "$n versions"
+    override val versionPickerEmpty             = "No version selected"
+    override val versionPickerNoChangelog       = "This version has no changelog"
+    override val versionPickerWarning           = "Changing the version rewrites the pack's files. A restore point is taken before it applies."
+    override fun versionPickerInstall(version: String)  = "Install $version"
+    override fun versionPickerUpgrade(version: String)  = "Update to $version"
+    override fun versionPickerRollback(version: String) = "Roll back to $version"
+    override fun versionPickerSwitch(version: String)   = "Switch to $version"
+
     override val packVersionsTitle              = "Pack versions"
     override val packVersionsAllVersions        = "All versions"
     override val packVersionsLatestTag          = "Latest"

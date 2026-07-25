@@ -58,6 +58,9 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
                     versionNumber = b.versionNumber,
                     mcVersions = listOf(m.minecraft.version),
                     loaders = listOf(m.loader.name),
+                    channel = b.channel,
+                    publishedAt = b.datePublished,
+                    changelog = b.changelog,
                 )
             }
             .ifEmpty { listOf(versionOf(s, m)) }
@@ -83,16 +86,20 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
         val summaryD = async { client.fetchSummary(packId) }
         val buildsD = async { runCatching { client.listBuilds(packId).builds }.getOrDefault(emptyList()) }
         val s = summaryD.await()
-        buildsD.await().map { it.versionNumber }.ifEmpty { listOf(s.latestPackVersion) }
-            .map { v ->
-                CataloguePackVersion(
-                    id = v,
-                    name = v,
-                    versionNumber = v,
-                    mcVersions = listOf(s.minecraftVersion),
-                    loaders = emptyList(),
-                )
-            }
+        val builds = buildsD.await()
+        if (builds.isEmpty()) listOf(versionOf(s, null))
+        else builds.map { b ->
+            CataloguePackVersion(
+                id = b.versionNumber,
+                name = b.versionNumber,
+                versionNumber = b.versionNumber,
+                mcVersions = listOf(s.minecraftVersion),
+                loaders = emptyList(),
+                channel = b.channel,
+                publishedAt = b.datePublished,
+                changelog = b.changelog,
+            )
+        }
     }
 
     private fun versionOf(s: SmrtPackSummary, m: SmrtPackManifest?) = CataloguePackVersion(

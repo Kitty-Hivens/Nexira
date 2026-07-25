@@ -878,6 +878,19 @@ interface AppStrings {
     val packVersionSwitchNow: String
     val packVersionCheckFailed: String
 
+    // Version picker (shared by the catalogue install flow and an installed instance)
+    val versionPickerInstallTitle: String
+    val versionPickerChangeTitle: String
+    val versionPickerSearch: String
+    fun versionPickerCount(n: Int): String
+    val versionPickerEmpty: String
+    val versionPickerNoChangelog: String
+    val versionPickerWarning: String
+    fun versionPickerInstall(version: String): String
+    fun versionPickerUpgrade(version: String): String
+    fun versionPickerRollback(version: String): String
+    fun versionPickerSwitch(version: String): String
+
     // Pack versions screen (build list + per-build changelog)
     val packVersionsTitle: String
     val packVersionsAllVersions: String

@@ -1,6 +1,7 @@
 package hivens.core.api.catalogue
 
 import hivens.core.data.PackOrigin
+import hivens.core.update.VersionChannel
 
 /**
  * Source-neutral pack-catalogue model. Every browsable source (the Hivens
@@ -50,7 +51,14 @@ data class CataloguePackDetails(
     val runtimeLabel: String? = null,
 )
 
-/** One installable version of a pack. */
+/**
+ * One installable version of a pack.
+ *
+ * Carries what a person needs to CHOOSE between versions, not just to fetch one:
+ * both sources date and grade their builds, and dropping that on the floor left
+ * the install picker unable to say which build is current, which is a beta, or
+ * what changed.
+ */
 data class CataloguePackVersion(
     /** Source-local version id: Modrinth `version_id`, mirror `pack_version`. */
     val id: String,
@@ -64,4 +72,10 @@ data class CataloguePackVersion(
      * files from the manifest by (packId, version).
      */
     val downloadUrl: String? = null,
+    /** Release channel; both sources spell it `version_type` on the wire. */
+    val channel: VersionChannel = VersionChannel.Release,
+    /** ISO-8601 publish instant, or null when the source does not date a version. */
+    val publishedAt: String? = null,
+    /** The curator's notes for this build; null when the source carries none. */
+    val changelog: String? = null,
 )

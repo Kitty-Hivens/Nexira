@@ -840,6 +840,18 @@ object RussianStrings : AppStrings {
     override val packVersionSwitchNow           = "Перейти"
     override val packVersionCheckFailed         = "Не удалось проверить обновления"
 
+    override val versionPickerInstallTitle      = "Установка сборки"
+    override val versionPickerChangeTitle       = "Смена версии сборки"
+    override val versionPickerSearch            = "Поиск версии"
+    override fun versionPickerCount(n: Int)     = "$n ${russianPlural(n, "версия", "версии", "версий")}"
+    override val versionPickerEmpty             = "Версия не выбрана"
+    override val versionPickerNoChangelog       = "У этой версии нет описания изменений"
+    override val versionPickerWarning           = "Смена версии перезапишет файлы сборки. Перед применением снимается точка восстановления."
+    override fun versionPickerInstall(version: String)  = "Установить $version"
+    override fun versionPickerUpgrade(version: String)  = "Обновить до $version"
+    override fun versionPickerRollback(version: String) = "Откатить до $version"
+    override fun versionPickerSwitch(version: String)   = "Перейти на $version"
+
     override val packVersionsTitle              = "Версии сборки"
     override val packVersionsAllVersions        = "Все версии"
     override val packVersionsLatestTag          = "Последняя"
