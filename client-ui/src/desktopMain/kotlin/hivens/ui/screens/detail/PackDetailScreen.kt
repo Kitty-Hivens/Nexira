@@ -29,7 +29,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,7 +98,6 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
@@ -157,7 +155,6 @@ fun PackDetailScreen(
 
     var tabIndex by remember(pack.id) { mutableIntStateOf(0) }
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
     val authedSession = (appState as? AppState.Authenticated)?.session
@@ -200,19 +197,7 @@ fun PackDetailScreen(
 
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
             when (tabIndex) {
-                0 -> ContentTabPane(
-                    instance = pack,
-                    onDetach = {
-                        // Become a Local instance the user owns; keep where it came
-                        // from in forkedFrom so provenance (and its art) survive.
-                        val detached = pack.copy(
-                            packRef    = pack.packRef.copy(origin = PackOrigin.Local),
-                            forkedFrom = pack.forkedFrom ?: pack.packRef,
-                        )
-                        instance = detached
-                        scope.launch { repo.put(detached) }
-                    },
-                )
+                0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)

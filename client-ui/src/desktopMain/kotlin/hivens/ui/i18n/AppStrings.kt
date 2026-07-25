@@ -780,11 +780,6 @@ interface AppStrings {
 
     // ── Library / PackDetail / Content tab ──────────────────────────────
     val contentTabUnsupportedOrigin: String
-    val contentDetachTitle: String
-    val contentDetachBody: String
-    /** Tracked mirror packs: optional mods already toggle; detach for the rest. */
-    val contentTrackedOptionalBody: String
-    val contentDetachButton: String
     val contentAddFiles: String
     val contentFindProjects: String
     val contentSearchPlaceholder: String

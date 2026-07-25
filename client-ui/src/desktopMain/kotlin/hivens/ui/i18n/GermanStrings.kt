@@ -735,10 +735,6 @@ object GermanStrings : AppStrings {
     override val fileBrowserEmptyFolder      = "(leer)"
 
     override val contentTabUnsupportedOrigin    = "Inhaltsansicht ist heute nur für Mirror-veröffentlichte Packs verfügbar. Andere Quellen folgen in einem Folge-PR."
-    override val contentDetachTitle             = "Verfolgtes Pack"
-    override val contentDetachBody              = "Loslösen, um Mods frei zu aktivieren, zu löschen und hinzuzufügen."
-    override val contentTrackedOptionalBody     = "Optionale Mods werden hier umgeschaltet. Loslösen, um hinzuzufügen und zu entfernen."
-    override val contentDetachButton            = "Loslösen"
     override val contentAddFiles                = "Dateien hinzufügen"
     override val contentFindProjects            = "Projekte finden"
     override val contentSearchPlaceholder       = "Inhalt durchsuchen..."

@@ -736,10 +736,6 @@ object RussianStrings : AppStrings {
     override val fileBrowserEmptyFolder      = "(пусто)"
 
     override val contentTabUnsupportedOrigin    = "Просмотр содержимого пока работает только для сборок с зеркала. Для остальных источников поддержку добавим в следующих PR."
-    override val contentDetachTitle             = "Отслеживаемая сборка"
-    override val contentDetachBody              = "Отвяжи, чтобы свободно включать, удалять и добавлять моды."
-    override val contentTrackedOptionalBody     = "Опциональные моды переключаются здесь. Отвяжи, чтобы добавлять и удалять."
-    override val contentDetachButton            = "Отвязать"
     override val contentAddFiles                = "Добавить файлы"
     override val contentFindProjects            = "Найти проекты"
     override val contentSearchPlaceholder       = "Поиск в содержимом..."

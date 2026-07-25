@@ -737,10 +737,6 @@ object EnglishStrings : AppStrings {
     override val fileBrowserEmptyFolder      = "(empty)"
 
     override val contentTabUnsupportedOrigin    = "Content view is only available for mirror-published packs today. Other sources will get parity in a follow-up."
-    override val contentDetachTitle             = "Tracked pack"
-    override val contentDetachBody              = "Detach to freely enable, delete and add mods."
-    override val contentTrackedOptionalBody     = "Optional mods toggle here. Detach to add and remove."
-    override val contentDetachButton            = "Detach"
     override val contentAddFiles                = "Add files"
     override val contentFindProjects            = "Find projects"
     override val contentSearchPlaceholder       = "Search content..."
