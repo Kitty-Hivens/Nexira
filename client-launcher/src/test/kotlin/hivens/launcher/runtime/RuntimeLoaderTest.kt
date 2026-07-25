@@ -112,7 +112,7 @@ class RuntimeLoaderTest {
     private fun provisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
         librariesDir = librariesDir, assetsDir = assetsDir,
         clientProvider = HttpClientProvider { HttpClient(engine(requests)) },
-        json = json, loaderRegistry = registry, osName = "Linux",
+        json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
         versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
     )
 
@@ -228,7 +228,7 @@ class RuntimeLoaderTest {
     private fun swapProvisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
         librariesDir = librariesDir, assetsDir = assetsDir,
         clientProvider = HttpClientProvider { HttpClient(swapEngine(requests)) },
-        json = json, loaderRegistry = registry, osName = "Linux",
+        json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
         versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
     )
 
@@ -340,7 +340,7 @@ class RuntimeLoaderTest {
         val p = RuntimeProvisioner(
             librariesDir = librariesDir, assetsDir = assetsDir,
             clientProvider = HttpClientProvider { HttpClient(nativesEngine()) },
-            json = json, loaderRegistry = LoaderRegistry(listOf(resolver)), osName = "Linux",
+            json = json, loaderRegistry = LoaderRegistry(listOf(resolver)), osName = "Linux", osArch = "amd64",
             versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
         )
 
