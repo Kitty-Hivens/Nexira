@@ -836,6 +836,18 @@ object GermanStrings : AppStrings {
     override val packVersionSwitchNow           = "Wechseln"
     override val packVersionCheckFailed         = "Updates konnten nicht geprüft werden"
 
+    override val versionPickerInstallTitle      = "Pack installieren"
+    override val versionPickerChangeTitle       = "Pack-Version wechseln"
+    override val versionPickerSearch            = "Version suchen"
+    override fun versionPickerCount(n: Int)     = if (n == 1) "1 Version" else "$n Versionen"
+    override val versionPickerEmpty             = "Keine Version ausgewählt"
+    override val versionPickerNoChangelog       = "Diese Version hat keine Änderungsliste"
+    override val versionPickerWarning           = "Ein Versionswechsel überschreibt die Dateien des Packs. Vorher wird ein Wiederherstellungspunkt angelegt."
+    override fun versionPickerInstall(version: String)  = "$version installieren"
+    override fun versionPickerUpgrade(version: String)  = "Auf $version aktualisieren"
+    override fun versionPickerRollback(version: String) = "Auf $version zurücksetzen"
+    override fun versionPickerSwitch(version: String)   = "Zu $version wechseln"
+
     override val packVersionsTitle              = "Paketversionen"
     override val packVersionsAllVersions        = "Alle Versionen"
     override val packVersionsLatestTag          = "Neueste"
