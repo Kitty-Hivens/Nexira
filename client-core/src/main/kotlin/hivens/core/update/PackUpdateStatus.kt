@@ -8,8 +8,18 @@ sealed interface PackUpdateStatus {
     data object UpToDate : PackUpdateStatus
     data class Updated(val toVersion: String) : PackUpdateStatus
 
-    /** A newer build is available but was not auto-applied (an amber change held by policy). */
-    data class Pending(val toVersion: String, val compat: CompatChange) : PackUpdateStatus
+    /**
+     * A different build is available but was not auto-applied (an amber change
+     * held by policy). [direction] rides along because every ambient consumer
+     * labels this state, and a mirror-side rollback of latest reaches here too:
+     * announcing that as "update available" points the user at a build older
+     * than the one they are running.
+     */
+    data class Pending(
+        val toVersion: String,
+        val direction: UpdateDirection,
+        val compat: CompatChange,
+    ) : PackUpdateStatus
 
     data class Failed(val reason: String) : PackUpdateStatus
 }

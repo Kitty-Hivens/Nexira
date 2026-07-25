@@ -835,6 +835,9 @@ object RussianStrings : AppStrings {
     override val packVersionSwitch              = "Переключить"
     override val packVersionCurrentTag          = "Текущая"
     override val packVersionUpdateBadge         = "Обновление"
+    override val packVersionRollbackBadge       = "Откат"
+    override fun packVersionRolledBack(version: String) = "Зеркало откатило сборку до $version"
+    override val packVersionSwitchNow           = "Перейти"
     override val packVersionCheckFailed         = "Не удалось проверить обновления"
 
     override val packVersionsTitle              = "Версии сборки"

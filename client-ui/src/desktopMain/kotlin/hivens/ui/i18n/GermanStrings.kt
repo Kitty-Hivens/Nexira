@@ -831,6 +831,9 @@ object GermanStrings : AppStrings {
     override val packVersionSwitch              = "Wechseln"
     override val packVersionCurrentTag          = "Aktuell"
     override val packVersionUpdateBadge         = "Update"
+    override val packVersionRollbackBadge       = "Rückstufung"
+    override fun packVersionRolledBack(version: String) = "Der Mirror hat das Pack auf $version zurückgestuft"
+    override val packVersionSwitchNow           = "Wechseln"
     override val packVersionCheckFailed         = "Updates konnten nicht geprüft werden"
 
     override val packVersionsTitle              = "Paketversionen"

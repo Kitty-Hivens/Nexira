@@ -1,6 +1,7 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -95,9 +96,9 @@ class CachedSmrtPackClientTest {
         factory = f
         return SmrtPackCaches(
             listing = f.create("pack-listing", SmrtPackListing.serializer(), listingConfig),
-            summary = PassthroughCache(),
+            summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10_000_000)),
             manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), manifestConfig),
-            versions = PassthroughCache(),
+            versions = f.create("pack-versions", SmrtManifestVersions.serializer(), CacheConfig(ttlMs = 10_000_000)),
         )
     }
 
@@ -144,6 +145,47 @@ class CachedSmrtPackClientTest {
         (smrtCaches.listing as Cache<SmrtPackListing>).invalidate("$mirror/v1/packs")
         client.listPacks()
         assertEquals(2, counter.get(), "post-invalidate listPacks reloads")
+    }
+
+    @Test
+    fun `forceRefresh reaches the mirror while the cached manifest is still fresh`() = runTest {
+        val counter = AtomicInteger(0)
+        val client = SmrtPackClient(provider(counter, manifestBody), mirror, json, caches(TestClock()))
+
+        client.fetchManifest("p")
+        client.fetchManifest("p")
+        assertEquals(1, counter.get(), "an ambient read stays on the warm cache")
+
+        client.fetchManifest("p", forceRefresh = true)
+        assertEquals(2, counter.get(), "an explicit check must not be answered from cache")
+    }
+
+    @Test
+    fun `invalidatePack drops the views an applied update makes stale`() = runTest {
+        val counter = AtomicInteger(0)
+        val client = SmrtPackClient(provider(counter, manifestBody), mirror, json, caches(TestClock()))
+
+        client.fetchManifest("p")
+        assertEquals(1, counter.get())
+
+        client.invalidatePack("p")
+
+        client.fetchManifest("p")
+        assertEquals(2, counter.get(), "the current manifest reloads after an apply")
+    }
+
+    @Test
+    fun `a pinned manifest survives invalidatePack because it cannot go stale`() = runTest {
+        val counter = AtomicInteger(0)
+        val client = SmrtPackClient(provider(counter, manifestBody), mirror, json, caches(TestClock()))
+
+        client.fetchManifestVersion("p", "1")
+        assertEquals(1, counter.get())
+
+        client.invalidatePack("p")
+
+        client.fetchManifestVersion("p", "1")
+        assertEquals(1, counter.get(), "a version-pinned manifest is immutable and stays cached")
     }
 
     @Test

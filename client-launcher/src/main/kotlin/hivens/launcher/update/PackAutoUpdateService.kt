@@ -60,7 +60,7 @@ class PackAutoUpdateService(
     private suspend fun applyOrHold(id: String, check: UpdateCheck.Available, amber: AmberUpdatePolicy) {
         val autoApply = check.compat.isSafe || amber == AmberUpdatePolicy.SnapshotThenApply
         if (!autoApply) {
-            setStatus(id, PackUpdateStatus.Pending(check.toVersion, check.compat))
+            setStatus(id, PackUpdateStatus.Pending(check.toVersion, check.direction, check.compat))
             return
         }
         val instance = repository.get(id) ?: return

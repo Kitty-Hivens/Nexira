@@ -30,6 +30,7 @@ import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
+import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
 import hivens.ui.theme.BrutStyle
@@ -38,6 +39,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import org.jetbrains.skia.EncodedImageFormat
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
@@ -86,15 +88,19 @@ class PackVersionsScreenRenderTest {
             ),
             SmrtManifestBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", fingerprint = "aa", modsCount = 2, assetsCount = 0),
         )
-        override suspend fun checkForUpdate(instance: PackInstance): UpdateCheck = UpdateCheck.UpToDate
+        override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck = UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
-            UpdateCheck.Available(instance.pinnedPackVersion, targetVersion, CompatChange.Same, UpdatePlan(toAdd = listOf("mods/New.jar")))
+            UpdateCheck.Available(
+                instance.pinnedPackVersion, targetVersion, UpdateDirection.Newer,
+                CompatChange.Same, UpdatePlan(toAdd = listOf("mods/New.jar")),
+            )
         override suspend fun applyUpdate(
             instance: PackInstance,
             targetVersion: String?,
             progress: ((Int, Int, String) -> Unit)?,
         ): UpdateOutcome = UpdateOutcome.AlreadyCurrent
         override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = builds
+        override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> = flowOf(builds)
         override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
             listOf(PackSnapshot("snap-1", 1_752_900_000_000L, "0.1.0"))
         override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance

@@ -48,6 +48,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
+import hivens.core.update.UpdateDirection
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import dev.hivens.skinema.compose.VideoScale
@@ -178,7 +179,7 @@ fun PackDetailScreen(
             onOpenSettings = { showSettings = true },
             onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
             versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
-            updateBadge    = autoUpdateStatuses[pack.id] is PackUpdateStatus.Pending,
+            pending        = autoUpdateStatuses[pack.id] as? PackUpdateStatus.Pending,
             onOpenVersions = { onOpenVersions(false) },
         )
 
@@ -391,7 +392,7 @@ private fun Hero(
     onOpenSettings: () -> Unit,
     onOpenFolder: () -> Unit,
     versionLabel: String?,
-    updateBadge: Boolean,
+    pending: PackUpdateStatus.Pending?,
     onOpenVersions: () -> Unit,
 ) {
     val s = LocalStrings.current
@@ -474,7 +475,14 @@ private fun Hero(
                         if (showSource) SourceChip(pack.packRef.origin)
                         pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
                         versionLabel?.let { HeroChip("v$it") }
-                        if (updateBadge) HeroUpdateBadge(s.packVersionUpdateBadge, onClick = onOpenVersions)
+                        pending?.let { p ->
+                            val rollback = p.direction == UpdateDirection.Older
+                            HeroUpdateBadge(
+                                text     = if (rollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
+                                rollback = rollback,
+                                onClick  = onOpenVersions,
+                            )
+                        }
                         if (showPlaytime && pack.playtimeSeconds > 0L) HeroChip(playtimeLabel(pack.playtimeSeconds))
                         HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
                     }
@@ -585,11 +593,11 @@ private fun HeroChip(text: String) {
 }
 
 @Composable
-private fun HeroUpdateBadge(text: String, onClick: () -> Unit) {
+private fun HeroUpdateBadge(text: String, rollback: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(NxTheme.colors.primary)
+            .background(if (rollback) NxTheme.colors.warnAccent else NxTheme.colors.primary)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {

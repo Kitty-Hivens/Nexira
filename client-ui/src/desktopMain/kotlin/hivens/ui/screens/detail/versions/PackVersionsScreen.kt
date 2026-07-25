@@ -93,6 +93,7 @@ import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -160,14 +161,25 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
         scope.launch { repo.get(pack.id)?.let { instance = it } }
     }
 
+    // Stale-then-fresh: a cached listing paints at once, the reloaded one replaces
+    // it in place. Reading it once instead left the screen showing whatever the
+    // cache held while the refresh it kicked off landed nowhere -- which is why
+    // the newest builds only appeared on the second visit.
     LaunchedEffect(pack.id, loadTick) {
         loadFailed = false
         builds = null
-        builds = runCatching { updater.availableBuilds(pack) }
-            .onFailure { loadFailed = true }
-            .getOrNull()
-        selected = builds?.let { list -> list.firstOrNull { it.versionNumber == installedVersion } ?: list.firstOrNull() }
         snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(emptyList())
+        updater.availableBuildsStream(pack)
+            .catch { loadFailed = true }
+            .collect { list ->
+                builds = list
+                // Keep the user's pick across the refresh; only seed a selection
+                // when there is none, or when the pick is gone from the listing.
+                val current = selected?.versionNumber
+                if (current == null || list.none { it.versionNumber == current }) {
+                    selected = list.firstOrNull { it.versionNumber == installedVersion } ?: list.firstOrNull()
+                }
+            }
     }
 
     val style = LocalStyle.current

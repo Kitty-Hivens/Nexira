@@ -21,11 +21,30 @@ sealed interface UpdateCheck {
     data class Available(
         val fromVersion: String?,
         val toVersion: String,
+        val direction: UpdateDirection,
         val compat: CompatChange,
         val plan: UpdatePlan,
     ) : UpdateCheck {
         val hasFileChanges: Boolean get() = !plan.isEmpty
     }
+}
+
+/**
+ * Which way a build move goes. Detection is label inequality, so "a different
+ * build is current" covers a mirror-side rollback of latest just as much as a
+ * release -- without this the UI announces both as an update and can point the
+ * user at a build older than the one they run.
+ *
+ * Ranked by the mirror's publish order (its listing is canonical, newest first),
+ * never by comparing version tuples: a channel build's `SNAPSHOT-` prefix parses
+ * to zero and would misrank against any release.
+ */
+enum class UpdateDirection {
+    Newer,
+    Older,
+
+    /** No baseline, or a build the listing does not carry (retired, or offline). */
+    Unknown,
 }
 
 /**

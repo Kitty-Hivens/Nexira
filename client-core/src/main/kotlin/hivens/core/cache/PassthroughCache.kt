@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.flow
  */
 class PassthroughCache<V> : Cache<V> {
     override suspend fun get(key: String, loader: suspend () -> V): V = loader()
+    override suspend fun refresh(key: String, loader: suspend () -> V): V = loader()
     override fun flow(key: String, loader: suspend () -> V): Flow<CacheValue<V>> =
         flow { emit(CacheValue(loader(), Freshness.FRESH)) }
     override suspend fun invalidate(key: String) {}

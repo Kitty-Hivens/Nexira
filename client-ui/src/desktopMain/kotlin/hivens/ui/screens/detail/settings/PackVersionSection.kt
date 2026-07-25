@@ -25,6 +25,7 @@ import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
+import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
@@ -88,13 +89,15 @@ internal fun PackVersionSection(
         if (busy) return
         scope.launch {
             busy = true
-            check = runCatching { updater.checkForUpdate(pack) }
+            // Explicit action: go past the cache. Answering "check now" out of a
+            // four-minute-old entry is what made this button feel like a coin flip.
+            check = runCatching { updater.checkForUpdate(pack, forceRefresh = true) }
                 .onFailure { onOpState(PackSettingsOp.Failed(it.message ?: s.packVersionCheckFailed)) }
                 .getOrNull()
             // Feed the shared hub so the ambient badges (card, hero) reflect what
             // this manual check just learned.
             when (val c = check) {
-                is UpdateCheck.Available -> hub.report(pack.id, PackUpdateStatus.Pending(c.toVersion, c.compat))
+                is UpdateCheck.Available -> hub.report(pack.id, PackUpdateStatus.Pending(c.toVersion, c.direction, c.compat))
                 UpdateCheck.UpToDate -> hub.report(pack.id, PackUpdateStatus.UpToDate)
                 null -> Unit
             }
@@ -176,10 +179,14 @@ internal fun PackVersionSection(
     // place; amber (structural) opens the versions screen where the full diff,
     // the snapshot notice and the confirm flow live.
     (check as? UpdateCheck.Available)?.let { c ->
+        val isRollback = c.direction == UpdateDirection.Older
         NxCalloutBanner(
-            title = s.packVersionAvailable(c.toVersion),
+            // A mirror-side rollback of latest arrives through the same check as
+            // a release; calling it "available build" would be true but reads as
+            // an update, and the target is older than what is installed.
+            title = if (isRollback) s.packVersionRolledBack(c.toVersion) else s.packVersionAvailable(c.toVersion),
             body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
-            tone = if (c.compat.isSafe) NxCalloutTone.Info else NxCalloutTone.Warning,
+            tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
         ) {
             if (c.hasFileChanges) {
                 Text(
@@ -191,7 +198,12 @@ internal fun PackVersionSection(
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (c.compat.isSafe) {
                     PuppetClick("packSettings.version.updateNow") { applyLatest() }
-                    NxButton(s.packVersionUpdateNow, onClick = { applyLatest() }, enabled = !busy, compact = true)
+                    NxButton(
+                        label   = if (isRollback) s.packVersionSwitchNow else s.packVersionUpdateNow,
+                        onClick = { applyLatest() },
+                        enabled = !busy,
+                        compact = true,
+                    )
                 } else {
                     NxButton(s.packVersionsAllVersions, onClick = onOpenVersions, compact = true)
                 }
