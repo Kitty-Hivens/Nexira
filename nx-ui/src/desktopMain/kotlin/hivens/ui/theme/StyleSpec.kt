@@ -1,5 +1,6 @@
 package hivens.ui.theme
 
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -43,6 +44,9 @@ data class StyleSpec(
     /** Form of the toggle/switch primitive (NxSwitch). Colours stay on the palette
      *  axis; this carries only the skinnable geometry. */
     val switchStyle: SwitchStyleSpec = SwitchStyleSpec.Pill,
+    /** Form of the badge primitive (NxMetaChip / NxSourceBadge). Same split as
+     *  [switchStyle]: the tone owns colour, this owns the shell. */
+    val badgeStyle: BadgeStyleSpec = BadgeStyleSpec.Pill,
 ) {
     /**
      * Build a Material 3 [Shapes] bundle from this style. Driven by
@@ -93,6 +97,46 @@ data class SwitchStyleSpec(
 }
 
 /**
+ * Skinnable geometry of the badge primitive ([hivens.ui.nx.NxMetaChip] and its
+ * source-badge sibling). Colour arrives from the tone, so a skin only swaps the
+ * shell: how tall the badge sits, how far the label is from the edge, and what
+ * the corner does.
+ *
+ * Height is deliberately close to the label's own line box. A badge annotates a
+ * value, so it must not out-measure the value; Material's chip metric is built
+ * for a labelLarge body and reads as a small button when it wraps labelSmall.
+ */
+data class BadgeStyleSpec(
+    val height: Dp,
+    val horizontalPadding: Dp,
+    /** Space between the state dot and the label. */
+    val gap: Dp,
+    val dotSize: Dp,
+    val corner: CornerSize,
+) {
+    fun shape(): RoundedCornerShape = RoundedCornerShape(corner)
+
+    companion object {
+        /** Full pill -- the Celestia look, and what the Library card's status badges already drew. */
+        val Pill = BadgeStyleSpec(
+            height            = 22.dp,
+            horizontalPadding = 9.dp,
+            gap               = 6.dp,
+            dotSize           = 7.dp,
+            corner            = CornerSize(50),
+        )
+        /** Hard-edged tag -- the Brut look. */
+        val Square = BadgeStyleSpec(
+            height            = 22.dp,
+            horizontalPadding = 8.dp,
+            gap               = 6.dp,
+            dotSize           = 7.dp,
+            corner            = CornerSize(0.dp),
+        )
+    }
+}
+
+/**
  * Default style -- matches the current NxTheme aesthetic: rounded
  * corners, glass cards with alpha, soft glow on focus / hover. This is
  * what existing code sees if it switches to LocalStyle.current.
@@ -123,6 +167,7 @@ val BrutStyle = StyleSpec(
     panelElevation      = 0.dp,
     panelCorner         = 2.dp,
     switchStyle         = SwitchStyleSpec.Square,
+    badgeStyle          = BadgeStyleSpec.Square,
 )
 
 val LocalStyle = staticCompositionLocalOf { CelestiaStyle }
