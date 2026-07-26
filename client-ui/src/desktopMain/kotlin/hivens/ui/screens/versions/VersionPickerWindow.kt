@@ -2,7 +2,10 @@ package hivens.ui.screens.versions
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,12 +14,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -37,13 +36,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import coil3.compose.SubcomposeAsyncImage
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.update.VersionChannel
@@ -110,7 +114,6 @@ fun VersionPickerWindow(
     busyVersionId: String? = null,
     warning: String? = null,
 ) {
-    val s = LocalStrings.current
     val style = LocalStyle.current
     val colors = NxTheme.colors
     val busy = busyVersionId != null
@@ -130,50 +133,67 @@ fun VersionPickerWindow(
     }
     val selected = versions.firstOrNull { it.id == selectedId }
 
-    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            NxSurface(
-                level = NxSurfaceLevel.Raised,
-                glass = false,
-                opaque = true,
-                modifier = Modifier
-                    .widthIn(max = 860.dp)
-                    .fillMaxWidth(0.86f)
-                    .heightIn(max = 560.dp)
-                    .clip(RoundedCornerShape(style.cardCorner))
-                    .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
-            ) {
-                Column(Modifier.fillMaxSize()) {
-                    Header(title, packName, packIconUrl, onDismiss)
-                    HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
-                    Row(Modifier.weight(1f).fillMaxWidth()) {
-                        ListPanel(
-                            versions = shown,
-                            total = versions.size,
-                            query = query,
-                            onQuery = { query = it },
-                            selectedId = selectedId,
-                            onSelect = { selectedId = it },
-                            modifier = Modifier.width(300.dp).fillMaxHeight(),
-                        )
-                        DetailPanel(selected, Modifier.weight(1f).fillMaxHeight())
-                    }
-                    Footer(
-                        warning = warning,
-                        selected = selected,
-                        intent = selected?.let(intentFor),
-                        busy = busy,
-                        busyThis = selected != null && selected.id == busyVersionId,
-                        onConfirm = { selected?.let(onConfirm) },
-                        onDismiss = onDismiss,
-                    )
+    // In-composition overlay rather than a Popup: the window belongs to the app's
+    // own surface stack, so it inherits the theme, sizes against the app window,
+    // and cannot outlive its host as a separate top-level layer. Same grammar as
+    // the pack-settings window -- scrim dismisses, Esc dismisses, the card
+    // swallows its own clicks.
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .focusRequester(focus)
+            .focusable()
+            .onPreviewKeyEvent { ev ->
+                if (ev.type == KeyEventType.KeyDown && ev.key == Key.Escape) {
+                    onDismiss(); true
+                } else {
+                    false
                 }
+            }
+            .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        NxSurface(
+            level = NxSurfaceLevel.Raised,
+            glass = false,
+            opaque = true,
+            // Fraction of the app window with no dp ceiling: a bigger screen gets a
+            // bigger window, not the same island floating in more emptiness.
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .fillMaxHeight(0.90f)
+                .clip(RoundedCornerShape(style.cardCorner))
+                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Header(title, packName, packIconUrl, onDismiss)
+                HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
+                Row(Modifier.weight(1f).fillMaxWidth()) {
+                    // Proportional, not a fixed 300dp rail: the list has to grow
+                    // with the window or it turns into a slot in a field of notes.
+                    ListPanel(
+                        versions = shown,
+                        total = versions.size,
+                        query = query,
+                        onQuery = { query = it },
+                        selectedId = selectedId,
+                        onSelect = { selectedId = it },
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                    DetailPanel(selected, Modifier.weight(2f).fillMaxHeight())
+                }
+                Footer(
+                    warning = warning,
+                    selected = selected,
+                    intent = selected?.let(intentFor),
+                    busy = busy,
+                    busyThis = selected != null && selected.id == busyVersionId,
+                    onConfirm = { selected?.let(onConfirm) },
+                    onDismiss = onDismiss,
+                )
             }
         }
     }
@@ -262,7 +282,11 @@ private fun ListPanel(
                 )
             }
             val listState = rememberLazyListState()
-            Box(Modifier.weight(1f)) {
+            // The bar is the only cue for how deep the list runs, so it has to show
+            // on hover too -- scroll-only means it appears once you already guessed.
+            val hover = remember { MutableInteractionSource() }
+            val hovered by hover.collectIsHoveredAsState()
+            Box(Modifier.weight(1f).hoverable(hover)) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
@@ -275,7 +299,7 @@ private fun ListPanel(
                 }
                 NxVerticalScrollbar(
                     adapter = rememberScrollbarAdapter(listState),
-                    revealed = listState.isScrollInProgress,
+                    revealed = hovered || listState.isScrollInProgress,
                     modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
                 )
             }
@@ -323,9 +347,11 @@ private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit)
             // next is the date at its END, and a tail ellipsis turns the whole
             // snapshot chain into identical rows.
             overflow = TextOverflow.MiddleEllipsis,
-            modifier = Modifier.weight(1f, fill = false),
+            // The single flexible child. A trailing weighted spacer would split the
+            // free space with it, so the label lost half the row to blank whenever
+            // a badge was present and ellipsised a version that fit.
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.weight(1f))
         when {
             v.installed -> NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
             v.latest -> NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
@@ -352,10 +378,11 @@ private fun DetailPanel(v: PickerVersion?, modifier: Modifier = Modifier) {
                 color = colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+                // Same anatomy as a list row: the value owns the flexible space,
+                // the badges and the date sit against the right edge.
+                modifier = Modifier.weight(1f),
             )
             ChannelChip(v.channel)
-            Spacer(Modifier.weight(1f))
             formatBuildTimestamp(v.publishedAt)?.let {
                 Text(it, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             }
@@ -365,11 +392,16 @@ private fun DetailPanel(v: PickerVersion?, modifier: Modifier = Modifier) {
             Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
         }
         HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
-        Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-            val notes = v.changelog?.takeIf { it.isNotBlank() }
-            if (notes != null) {
+        val notes = v.changelog?.takeIf { it.isNotBlank() }
+        if (notes != null) {
+            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Markdown(content = notes)
-            } else {
+            }
+        } else {
+            // Most mirror builds ship no notes, so this is the pane's ordinary
+            // state rather than an exception. Pinned to the top edge it reads as a
+            // caption for a paragraph that failed to load.
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(s.versionPickerNoChangelog, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
             }
         }
