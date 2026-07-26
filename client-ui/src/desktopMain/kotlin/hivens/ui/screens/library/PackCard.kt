@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -197,27 +196,13 @@ fun PackCard(
 @Composable
 private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(
-            Modifier.size(7.dp).clip(RoundedCornerShape(50))
-                .background(if (isRollback) NxTheme.colors.warnAccent else NxTheme.colors.primary),
-        )
-        Text(
-            text       = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
-            style      = MaterialTheme.typography.labelSmall,
-            color      = Color.White,
-            fontWeight = FontWeight.Medium,
-            maxLines   = 1,
-        )
-    }
+    NxMetaChip(
+        text     = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
+        modifier = modifier,
+        tone     = NxMetaChipTone.OnMedia,
+        dot      = if (isRollback) NxTheme.colors.warnAccent else NxTheme.colors.primary,
+        onClick  = onClick,
+    )
 }
 
 /** Compact launch-state pill overlaid on the card while a launch of this pack is in flight. */
@@ -231,23 +216,7 @@ private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modi
         IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
         IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
     }
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color.Black.copy(alpha = 0.55f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(dotColor))
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelSmall,
-            color      = Color.White,
-            fontWeight = FontWeight.Medium,
-            maxLines   = 1,
-        )
-    }
+    NxMetaChip(text = label, modifier = modifier, tone = NxMetaChipTone.OnMedia, dot = dotColor)
 }
 
 @Composable

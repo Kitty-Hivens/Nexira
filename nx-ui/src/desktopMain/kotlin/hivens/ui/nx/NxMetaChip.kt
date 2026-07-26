@@ -1,12 +1,9 @@
 package hivens.ui.nx
 
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import hivens.ui.theme.NxTheme
 
 /**
@@ -21,15 +18,21 @@ import hivens.ui.theme.NxTheme
 enum class NxMetaChipTone { OnMedia, OnMediaAccent, Surface, Success, Warning, Error }
 
 /**
- * Small read-only metadata pill (version, tag, license, "fork"). A disabled
- * [AssistChip] so it keeps Material's chip metrics; [tone] carries the only
- * thing the per-screen copies actually varied.
+ * Small read-only metadata pill (version, tag, license, "fork"), drawn on the
+ * shared [NxPill] shell; [tone] carries the only thing the per-screen copies
+ * actually varied.
+ *
+ * [dot] adds the leading state marker, and [onClick] makes the badge a target --
+ * together they cover the live-state badges that used to be hand-rolled pills on
+ * the Library card.
  */
 @Composable
 fun NxMetaChip(
     text: String,
     modifier: Modifier = Modifier,
     tone: NxMetaChipTone = NxMetaChipTone.Surface,
+    dot: Color? = null,
+    onClick: (() -> Unit)? = null,
 ) {
     val colors = NxTheme.colors
     val (container, label) = when (tone) {
@@ -40,16 +43,18 @@ fun NxMetaChip(
         NxMetaChipTone.Warning       -> colors.warnAccent.copy(alpha = 0.15f) to colors.warnAccent
         NxMetaChipTone.Error         -> colors.error.copy(alpha = 0.15f) to colors.error
     }
-    AssistChip(
-        onClick  = {},
-        enabled  = false,
-        modifier = modifier,
-        shape    = MaterialTheme.shapes.extraSmall,
-        label    = { Text(text, style = MaterialTheme.typography.labelSmall, color = label) },
-        colors   = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = container,
-            disabledLabelColor     = label,
-        ),
-        border   = null,
+    NxPill(
+        text       = text,
+        container  = container,
+        label      = label,
+        modifier   = modifier,
+        // Over art the label competes with the picture; on a flat surface it must
+        // not outweigh the value it annotates.
+        fontWeight = when (tone) {
+            NxMetaChipTone.OnMedia, NxMetaChipTone.OnMediaAccent -> FontWeight.Medium
+            else -> null
+        },
+        dot        = dot,
+        onClick    = onClick,
     )
 }
