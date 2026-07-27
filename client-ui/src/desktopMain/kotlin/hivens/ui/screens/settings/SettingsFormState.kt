@@ -31,6 +31,7 @@ import hivens.core.data.SettingsData
 @Stable
 internal class SettingsFormState(initial: SettingsData) {
     var closeAfterStart        by mutableStateOf(initial.closeAfterStart)
+    var useCustomChrome        by mutableStateOf(initial.useCustomChrome)
     var isOfflineMode          by mutableStateOf(initial.isOfflineMode)
     var experimentalEnabled    by mutableStateOf(initial.experimentalFeaturesEnabled)
     var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
@@ -65,6 +66,7 @@ internal class SettingsFormState(initial: SettingsData) {
         val normalisedMimic = if (mimicOverrideEnabled) mimicVersionText.trim().ifBlank { null } else null
         return current.copy(
             closeAfterStart             = closeAfterStart,
+            useCustomChrome             = useCustomChrome,
             isOfflineMode               = isOfflineMode,
             experimentalFeaturesEnabled = experimentalEnabled,
             mandatoryUpdatesEnabled     = mandatoryUpdates,

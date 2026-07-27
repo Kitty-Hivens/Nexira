@@ -32,6 +32,18 @@ class SettingsFormStateTest {
     }
 
     @Test
+    fun `custom chrome seeds from settings and round-trips through mergeInto`() {
+        val form = SettingsFormState(SettingsData())
+        assertTrue(form.useCustomChrome, "custom chrome seeds ON")
+
+        form.useCustomChrome = false
+        assertFalse(form.mergeInto(SettingsData()).useCustomChrome)
+
+        form.useCustomChrome = true
+        assertTrue(form.mergeInto(SettingsData(useCustomChrome = false)).useCustomChrome)
+    }
+
+    @Test
     fun `auth-mechanism toggles seed and round-trip with their distinct defaults`() {
         // Network agent defaults ON, SC authlib swap defaults OFF.
         val form = SettingsFormState(SettingsData())

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
+import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -163,6 +164,29 @@ internal fun AppearanceSection(
         }
         PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
         PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
+
+        // Window chrome. `undecorated` is fixed when the window is created, so the flip
+        // lands at the next launch and the row says so rather than looking inert. On a
+        // tiling WM nothing downstream of the flag is active -- the frame stays
+        // OS-decorated, the caption buttons and drag area stand down regardless -- so
+        // the row is disabled there instead of offering a switch that changes nothing.
+        NxToggle(
+            label       = s.settingsCustomChrome,
+            checked     = form.useCustomChrome,
+            description = s.settingsCustomChromeDesc,
+            icon        = NxIcon.Computer,
+            enabled     = !IS_TILING_WM,
+        ) { form.useCustomChrome = it; save() }
+        if (IS_TILING_WM) {
+            Text(
+                text  = s.settingsCustomChromeTiling,
+                style = MaterialTheme.typography.bodySmall,
+                color = NxTheme.colors.textSecondary,
+            )
+        }
+        PuppetToggle("settings.useCustomChrome", form.useCustomChrome, enabled = !IS_TILING_WM) {
+            form.useCustomChrome = it; save()
+        }
     }
 
     Spacer(Modifier.height(16.dp))

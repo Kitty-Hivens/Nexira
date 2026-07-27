@@ -95,6 +95,9 @@ interface AppStrings {
     val settingsThemeModeSystemUnavailable: String
     val settingsPaletteFromWallpaper: String
     val settingsPaletteFromWallpaperDesc: String
+    val settingsCustomChrome: String
+    val settingsCustomChromeDesc: String
+    val settingsCustomChromeTiling: String
     val settingsCloseAfterLaunch: String
     val settingsCloseAfterLaunchDesc: String
     val settingsSaved: String
