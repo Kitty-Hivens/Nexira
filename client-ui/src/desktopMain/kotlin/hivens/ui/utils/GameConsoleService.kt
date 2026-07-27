@@ -50,7 +50,7 @@ data class ConsoleSnapshot(
  *
  * The in-memory buffer is a sliding window: only the latest [maxLines] entries
  * are kept; older entries drop off the front but remain on disk and page back
- * via [loadHistoryBefore] (see [[project_console_sliding_window]]).
+ * via [loadHistoryBefore].
  *
  * Constructor-injected [paths] (not a static `PlatformPaths.system()`) so the
  * singleton honors a mid-session data-dir migration. One Koin singleton shared

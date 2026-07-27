@@ -23,10 +23,8 @@ import java.util.zip.ZipFile
 /**
  * Forge resolver for the launchwrapper era (<= 1.12.2). These versions need NO
  * install-time processors: the official vanilla client plus the forge libraries
- * on the classpath is enough (validated live 2026-05-29 -- the official client
- * + canonical Forge ran the full Industrial pack; see
- * [[project_industrial_mechanics]]). Modern Forge / NeoForge (1.13+) DO patch
- * the client and are a separate resolver.
+ * on the classpath is enough, validated against a full 1.12.2 modpack. Modern
+ * Forge / NeoForge (1.13+) DO patch the client and are a separate resolver.
  *
  * The official installer carries a `version.json` that is a vanilla overlay:
  * `mainClass` = launchwrapper, the forge library set, and
