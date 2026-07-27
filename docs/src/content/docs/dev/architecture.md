@@ -1,88 +1,174 @@
 ---
 title: Architecture
-description: Module structure and key design decisions in Nexira.
+description: Modules, boot pipeline, dependency graph and the seams Nexira is built on.
 ---
 
-## Module structure
+## Module map
+
+Sixteen Gradle modules. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
+
+| Module | Role |
+|---|---|
+| `client-config` | Branding, storage filenames, protocol constants and their runtime overrides. |
+| `client-core` | Domain models, wire DTOs, the `I*` service interfaces, the cache engine, launch state types. |
+| `client-auth` | Auth SPI: `AuthProvider`, `AuthCapabilities`, the account store, the credential manager. |
+| `client-auth-smartycraft` | SmartyCraft provider. |
+| `client-auth-microsoft` | Microsoft (MSA) provider. |
+| `client-launcher` | The engine: DI wiring, mirror client and sync, runtime provisioning, loader resolution, the launch flow, update apply and rollback. |
+| `client-cli` | Headless entry point over the same engine. |
+| `client-media` | Video cache and yt-dlp resolution for the media surfaces. |
+| `client-tray` | System tray behind one interface, backed by libtray (Panama bindings). |
+| `client-ui` | The Compose Desktop shell: screens, widgets, editor, console. |
+| `nx-ui` | The design system: theme, tokens, surfaces, primitives. |
+| `widget-model` | Layout graph, slot and widget identity, service and command keys. Compose-free. |
+| `widget-api` | Widget runtime: the slot renderer, the registries, the composition locals. |
+| `widget-processor` | KSP processor that generates the widget registry from `@Widget`. |
+| `authlib-agent` | Java agent that redirects authlib endpoints for a SmartyCraft-bound join. |
+| `profiler-agent` | Java agent that observes heap and GC inside the game JVM. |
+
+Two boundaries are worth stating outright, because nothing enforces them mechanically:
+
+- `client-launcher` and everything below it carry no `java.awt`, `javax.swing` or `javax.imageio` import. That is what keeps AWT out of the CLI's reachable graph and out of a native image. The only AWT-looking strings in the engine are JVM flags handed to the game process.
+- `nx-ui` depends on Compose, coroutines, serialization and a colour library, and on no module of this project. A component belongs there only if it names no domain type and resolves no string of its own. That is why a source badge maps `PackOrigin` to a colour in `client-ui` and then calls a colour-taking primitive in `nx-ui`.
+
+## Boot
+
+The pipeline is split so a window is on screen before the slow work runs.
+
+1. `LauncherBootstrap.preWindow` -- milliseconds only. Resolve the logs directory before the first logger call, stamp a session id into a system property so every log line traces back to one process, take the single-instance lock. A duplicate launch exits here without flashing a window.
+2. The window opens and renders the boot threshold.
+3. `LauncherBootstrap.completeCore` -- on a background thread. Apply a pending data-directory move, re-resolve paths after it, restore persisted SSL bypasses before any request can be made, construct the crash reporter.
+4. `LauncherBootstrap.finishBoot` -- detect a pending migration, then start Koin.
+
+Progress is reported as four phases (`Data`, `Network`, `Migration`, `Modules`) that drive the threshold's bar.
+
+The toolkit-touching edge lives in `hivens.ui.bootstrap.GuiBootstrap`: the X11 window-class override, the Skiko vsync property, a one-line display diagnostic, and a crash handler that surfaces a Swing dialog. The CLI composes the same core through `preBootHeadless` with a log-and-persist handler and no single-instance lock.
+
+## Shell recovery
+
+The Compose entry point runs inside a restart loop. `application` is invoked with `exitProcessOnExit = false`, so a composition crash unwinds and returns instead of killing the process; a crash on the render thread is caught by a window exception handler and routed to the same place. The loop escalates: retry with a fresh composition, latch safe mode on a crash loop, fall back to a terminal Swing dialog if safe mode itself fails.
+
+Koin and the data directories are created outside the loop, so a restart keeps data, session and audio playback. Only composition state is lost.
+
+A separate recovery entry (environment variable, command-line flag, or a one-shot marker file) renders a recovery surface before Koin exists at all, so a broken module cannot take the recovery path down with it.
+
+## Dependency graph
+
+Koin is the real map of this project, and static analysis cannot see it: a class asks the container for an interface and never names the implementation.
+
+The engine registers eight modules in `client-launcher/di/Modules.kt` -- `networkModule`, `authModule`, `cacheModule`, `runtimeModule`, `mirrorModule`, `launchPipelineModule`, `updateModule`, `appModule`. Membership is grouping only; all start together.
+
+The UI contributes a ninth, `uiModule` in `hivens.ui.Main`, handed to `GuiBootstrap.completeBoot` as an extra module. That is the direction guard: the engine imports no UI type, and the UI still lands in the same container.
+
+Five definitions are eager: platform paths, the data directory, the settings restore hook, the shared process-lifetime coroutine scope, and the shutdown hook that cancels it. Everything else resolves on demand.
+
+Some bindings alias one instance rather than construct a second. The credential manager is bound as both the read-only credential store and the account store; the pack update service is bound as the updater contract, and the background auto-updater as the status hub the UI reads.
+
+## Network channels
+
+Outbound traffic is split in two, and every binding picks one explicitly.
+
+- The SmartyCraft channel is SOCKS-proxied and required for everything on the upstream host. A direct attempt runs first and falls back to the proxy; a user on a censored network can force the proxy from Settings.
+- The direct channel has no proxy and strict TLS, and serves every third-party CDN: Mojang, BellSoft, Maven Central, Modrinth, the Hivens mirror, GitHub releases.
+
+The update path is pinned to the direct channel on purpose: the auto-updater has to keep working while the upstream proxy is down, or it cannot deliver the fix that restores connectivity.
+
+`HttpClientProvider` is a provider rather than an injected client, so the per-request decision (bypass, forced proxy, direct) is re-read on every call and a Settings change takes effect without rebuilding the container.
+
+## Data directory
+
+Resolved in order: the `NEXIRA_DATA_DIR` environment variable, a `data-dir` key in a bootstrap config that deliberately lives outside the data directory, then the per-OS default.
+
+| OS | Path |
+|---|---|
+| Windows | `%LOCALAPPDATA%\Nexira` |
+| macOS | `~/Library/Application Support/Nexira` |
+| Linux | `$XDG_DATA_HOME/nexira` (default `~/.local/share/nexira`) |
+
+Layout inside it:
 
 ```
-nexira/
-├── client-config      # Constants, AppConfig, BuildConfig
-├── client-core        # Domain models, API services, interfaces
-├── client-launcher    # DI wiring, file download, update, launch logic
-└── client-ui          # Compose Multiplatform desktop UI
+instances/      pack instances -- the unit of installation
+clients/        legacy SmartyCraft per-server layout
+libraries/      shared Maven-layout libraries, deduped across packs
+assets/         shared vanilla assets (indexes plus content-addressed objects)
+db/             Xodus: the pack registry and the content-scan cache
+cache/          TTL cache namespaces for pack and Modrinth metadata
+loader-cache/   headless loader-installer output
+snapshots/      pre-apply snapshots for update rollback
+presets/        layout presets
+logs/  crash-reports/  skin-cache/  video-cache/  tools/
 ```
 
-### client-config
+`libraries/` and `assets/` sit outside any instance on purpose: two packs on the same Minecraft version share one copy instead of each downloading its own. Historical data directories from earlier releases are walked once by the migration screen and copied, never deleted.
 
-App-wide constants: server URLs, timeouts, file paths, proxy config.  
-Generates `BuildConfig` with version and build time via `gmazzo/buildconfig`.
+## Runtime provisioning
 
-### client-core
+A pack declares a Minecraft version and a loader; the provisioner turns that into a launchable classpath.
 
-Pure business logic — no UI, no DI framework dependencies.
+The vanilla base comes from Mojang's own CDN into the shared roots. A loader contributes an overlay: extra libraries plus launch metadata (main class, JVM and game argument additions). The two are merged with the loader winning on a collision, keyed on `group:artifact:classifier` -- the classifier matters, because a modern version json lists a library's base jar and its natives jar under the same coordinate.
 
-- `AuthService` — login, AES token decryption, SSL error detection
-- `ServerRepository` — dashboard fetch, launcher hash update cycle
-- `SkinRepository` — skin/cloak upload
-- `HttpClientProvider` — switches between secure/insecure OkHttp client at runtime
-- Domain models: `SessionData`, `FileManifest`, `SettingsData`, etc.
+Loaders differ in kind, and the profile says which:
 
-### client-launcher
+- Additive loaders (Forge, NeoForge, Fabric, Quilt) merge onto the vanilla set.
+- A loader that swaps LWJGL names the vanilla group to drop and supplies its own natives, so LWJGL3 replaces LWJGL2 while unrelated vanilla natives survive.
+- A self-contained loader replaces the vanilla library set wholesale, because cross-coordinate twins (two spellings of the same library) cannot be deduplicated by a group-and-artifact merge.
+- Modern installers emit files that must exist on disk but stay off the classpath, because the loader's own locator finds them by path.
 
-Wires everything together with Koin DI.
+The Java major is resolved by precedence: a loader override wins over Mojang's declaration, which wins over the launcher's heuristic. The same Minecraft version on a different loader can need a different JDK.
 
-- `FileDownloadService` — manifest flattening, parallel download, MD5 verification, extra.zip unpacking
-- `LauncherService` + `GameCommandBuilder` — assembles JVM command line for 1.7.10 / 1.12.2 / 1.21.1
-- `UpdateService` — GitHub Releases API, per-OS asset detection, SHA256 verification
-- `CredentialsManager` — AES-256-GCM encryption with PBKDF2 key derivation
-- `ProfileManager` — per-server instance profiles, favorites, last server
-- `JavaManagerService` — downloads Bellsoft JDK bundles per Minecraft version
+With every artifact already present, a relaunch needs no network at all: the version json and the asset index are reused from disk.
 
-### client-ui
+## Update apply
 
-Compose Multiplatform desktop UI.
+An update is a transaction. Before the first byte is written, the pack-managed files are snapshotted (hardlinked, so it is cheap) and a journal entry records the in-flight apply. The plan is then applied, the new baseline committed, and the journal closed. A failure restores the snapshot; a hard crash is rolled back from the journal on the next start.
 
-- `AppLayout` / `AppRoot` — root composition, window management, auto-login
-- `DashboardScreen` — server grid, launch control panel
-- `RightPanel` — login/account panel, news feed
-- `TrayManager` — dorkbox/SystemTray wrapper
-- `LauncherController` — launch pipeline state machine (`Idle → Prepare → Downloading → GameRunning`)
+Every file lands atomically: written to a temporary sibling, then moved with an atomic move, with documented fallbacks for filesystems that refuse it.
 
----
+Structural mutations of an instance serialise on a per-directory lock, so a sync, a content relabel and an update apply can never interleave.
 
-## Key design decisions
+## Widget kernel
 
-### HttpClientProvider instead of direct HttpClient injection
+The shell is itself a widget surface. `AppLayout` ends in a single slot render of `appshell.root`; the left rail, the centre and the right panel are widgets in the layout graph. Navigation is not a surface yet, so the screen router is passed down through the shell context.
 
-Repositories receive a provider that resolves the correct client on every call. This allows SSL bypass to take effect immediately without recreating Koin singletons.
+Three modules, three roles:
 
-### JNA version pinning
+- `widget-model` holds the graph (`LayoutGraph`, `SurfaceLayout`, `SlotContent`, `WidgetInstance`, recursive through `children`) and the identity types. It carries no Compose dependency, so a headless consumer can read a layout.
+- `widget-api` holds the runtime: the slot renderer, the widget registry, and the service, data and command registries.
+- `widget-processor` generates the registry from `@Widget` annotations.
 
-dorkbox/SystemTray 4.4 performs a hardcoded version check against JNA. JetBrains Runtime 25 bundles JNA 7.x, which fails this check. Solution: `resolutionStrategy.eachDependency` forces JNA to `6.1.6` globally, with `5.18.1` pinned explicitly in `client-ui` for Windows.
+Extension happens through composition locals with identity defaults. The decorator that wraps every widget, the empty-slot placeholder, the unknown-widget placeholder, the slot chrome modifier and the per-instance backing renderer all default to doing nothing; the editor swaps in real ones. Production pays nothing for an editor it does not mount.
 
-### AppImage manual assembly
+A slot owns its own arrangement: column, row, grid, free canvas, or an addressed cube grid. A widget's content is wrapped in per-instance movable content, so toggling edit mode moves the subtree rather than disposing it, and the widget keeps its loaded state.
 
-Compose Multiplatform's built-in Linux packaging produces DEB/RPM. AppImage is assembled manually in CI using `jlink` for a minimal JRE and `appimagetool`, with `.desktop` and AppStream metainfo injected.
+A widget whose kind is absent from the registry keeps its stored props and children; it renders as nothing in production and as a visible placeholder in the editor. Orphans are only reaped after a schema bump.
 
-### GameCommandBuilder version configs
+## Style and palette
 
-Each supported Minecraft version has an immutable `VersionConfig` — main class, tweak class, JVM flags, natives dir. NeoForge (1.21.1) requires module path separation (`-p`) and additional `--add-opens` flags for Java 21+.
+Two independent axes, deliberately separate so a palette and a form can be chosen without a combined preset.
 
-### Platform data directories
+Palette is colour: a fixed dark or light base, optionally reseeded from the wallpaper through Material colour science, then a preset, then an accent override. Brand and semantic tokens -- source colours, severity accents, the decorative ramp -- are deliberately not derived, because a badge whose colour follows the wallpaper stops identifying its source.
 
-User data (settings, credentials, downloaded clients, skin cache, logs, crash reports) lives under a single per-OS directory, resolved by `PlatformPaths` in `client-launcher`:
+Style is form: corner radii, border weight, surface treatment, a motion multiplier, glow, panel elevation, and the switch and badge shells. Two ship today, `Celestia` (rounded, glass, glow, animated) and `Brut` (square, flat, still).
 
-| OS      | Path                                              |
-|---------|---------------------------------------------------|
-| Windows | `%LOCALAPPDATA%\Nexira\`                    |
-| macOS   | `~/Library/Application Support/Nexira/`     |
-| Linux   | `$XDG_DATA_HOME/nexira/` (default `~/.local/share/nexira/`) |
+Adoption of the style tokens is uneven. Corner radius is read widely; motion and glow by a handful of call sites; the surface-treatment token by almost nothing. Rendering the same screen under both styles currently differs by well under a tenth of a percent of pixels, and the difference is concentrated in corners.
 
-The environment variable **`AURA_DATA_DIR`** overrides the platform default on every OS — useful for moving data to another drive (e.g. `D:\Nexira` on Windows) without code changes.
+## Testing and what runs
 
-On first launch the legacy `~/.aura/` directory (used by versions ≤ 2.2.x) is copied into the resolved data directory and a `.migrated` marker is written into the legacy directory. The legacy data is **not** deleted — users can remove it manually after verifying the migration.
+Roughly 1780 test methods. The engine and the widget model are covered densely. The UI is covered thinly, and its visual output has only a few assertions: most render tests assert that a non-empty image was produced, not what is in it.
 
-### Protocol constants (`AppConfig.LEGACY_*`)
+Continuous integration on a pull request runs three suites (`client-config`, `client-core`, `client-launcher`) across Linux, macOS and Windows. The UI, the design system, the widget modules and the auth modules are not run there.
 
-The auth salt, default launcher hash, default server id and protocol JAR descriptor in `AppConfig` were recovered from the decompiled official SMARTYcraft launcher: [`Kitty-Hivens/smrt-deco`](https://github.com/Kitty-Hivens/smrt-deco). The upstream is Proguard-obfuscated (`a.java`, `b.java`, …) and archived since April 2026, so any future protocol change will need to be re-derived from a fresh dump.
+Two custom scanners do run strictly on every pull request: one fails on a user-facing string hardcoded outside the localisation layer, the other on process metadata in comments. Both scan the engine and `client-ui`; neither scans `nx-ui` or the widget modules.
+
+## Packaging
+
+Distribution is assembled by custom Gradle plugins in `buildSrc` rather than by the Compose plugin's defaults: a jlink runtime trimmed to a measured module set, a jpackage image, a macOS disk image, and an AppImage profile assembled by script with desktop-entry and AppStream metadata injected.
+
+A verification task fails the build if the trimmed module set omits a module the runtime actually reads, since the failure it prevents is silent rather than loud.
+
+## Protocol constants
+
+`hivens.config.Protocol` holds the values the SmartyCraft wire format requires: the mimicked launcher version, the default launcher hash, and the signature scheme's inputs. They were derived from the upstream launcher (see [`Kitty-Hivens/smrt-deco`](https://github.com/Kitty-Hivens/smrt-deco)). They are interop constants, not secrets, and are documented as such -- hiding them would only make the protocol harder to reason about.
+
+Both the mimicked version and the base URL have runtime overrides behind explicit opt-ins, so an upstream version pin can be answered faster than a release cycle.
