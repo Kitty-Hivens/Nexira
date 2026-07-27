@@ -101,14 +101,3 @@ fun NxCard(
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) = NxSurface(level, modifier, shape, glass, FrostTier.Frosted, hairline = true, interactionSource = interactionSource, content = content)
-
-/** Full-height structural region (rails, side panels): square, [NxSurfaceLevel.Floating],
- *  [FrostTier.Heavy] so it sits clearly above the page. */
-@Composable
-fun NxPanel(
-    modifier: Modifier = Modifier,
-    level: NxSurfaceLevel = NxSurfaceLevel.Floating,
-    shape: Shape = RectangleShape,
-    glass: Boolean = true,
-    content: @Composable BoxScope.() -> Unit,
-) = NxSurface(level, modifier, shape, glass, FrostTier.Heavy, hairline = true, content = content)
