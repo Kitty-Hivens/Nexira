@@ -60,11 +60,15 @@ class PaletteEngineTest {
     }
 
     @Test
-    fun brandAndSemanticTokensPreserved() {
+    fun brandTokensPreserved() {
         val p = seededNxColors(base, 0xFF22C55E.toInt(), dark = true)
-        // Only the M3 roles change; brand / semantic tokens stay from the base.
+        // Brand identity is not the engine's to decide -- a source badge means the
+        // same thing whatever the wallpaper is. Severity is generated (see
+        // PaletteSpecTest): it has to track the scheme's contrast, so it cannot
+        // stay a fixed literal.
         assertEquals(base.originModrinth, p.originModrinth)
+        assertEquals(base.originSmartycraft, p.originSmartycraft)
         assertEquals(base.decorativeRamp, p.decorativeRamp)
-        assertEquals(base.warnAccent, p.warnAccent)
+        assertNotEquals(base.warnAccent, p.warnAccent)
     }
 }
