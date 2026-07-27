@@ -68,10 +68,22 @@ fun LoginPanel(
 
     var login        by remember { mutableStateOf("") }
     var password     by remember { mutableStateOf("") }
-    var rememberMe   by remember { mutableStateOf(true) }
+    // Seeded from the persisted choice rather than always-on: the box gates every
+    // save path below, so a session-local default of true silently re-armed saving
+    // on the next start for a user who had turned it off.
+    var rememberMe   by remember { mutableStateOf(settingsService.getSettings().saveCredentials) }
     var isLoading    by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var sslWarning   by remember { mutableStateOf(false) }
+
+    // The choice outlives the panel, so it is persisted on the flip rather than at
+    // login: a user who unticks and then closes the window without signing in has
+    // still expressed it. Does NOT touch credentials already stored -- turning the
+    // box off stops future saves and nothing else.
+    val setRememberMe: (Boolean) -> Unit = { value ->
+        rememberMe = value
+        settingsService.saveSettings(settingsService.getSettings().copy(saveCredentials = value))
+    }
 
     // 2FA flow state. Which path a TWOAUTH demand takes is decided by the
     // provider's AuthCapabilities.supports2FA: a capable provider opens the
@@ -396,7 +408,7 @@ fun LoginPanel(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
                 checked         = rememberMe,
-                onCheckedChange = { rememberMe = it },
+                onCheckedChange = setRememberMe,
                 colors          = CheckboxDefaults.colors(
                     checkedColor   = NxTheme.colors.primary,
                     uncheckedColor = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
@@ -408,7 +420,7 @@ fun LoginPanel(
                 color = NxTheme.colors.textSecondary
             )
         }
-        PuppetToggle("login.rememberMe", rememberMe) { rememberMe = it }
+        PuppetToggle("login.rememberMe", rememberMe, onValueChange = setRememberMe)
 
         // LOG IN -- chaos target (only when not loading, loading state stays reliable)
         if (isLoading) {
