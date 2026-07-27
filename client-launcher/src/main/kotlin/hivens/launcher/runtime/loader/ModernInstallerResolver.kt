@@ -32,8 +32,7 @@ import java.util.concurrent.TimeUnit
  * loader's install processors binpatch the client jar -- a step too large and
  * version-volatile to reimplement. Instead this runs the OFFICIAL installer
  * headless via the managed JDK and consumes what it produces, so upstream
- * changes track for free and no copyrighted bits are redistributed
- * ([[feedback_no_official_runtime_redistribution]]).
+ * changes track for free and no copyrighted bits are redistributed.
  *
  * The installer runs once into a persistent per-`(loader, mc, version)` cache
  * (the `--installClient` target, shaped like a `.minecraft` dir). Re-launches

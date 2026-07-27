@@ -233,8 +233,7 @@ data class SettingsData(
      * Which Home surface to render. Defaults to the modern widget-composed
      * home ([HomeView.New]); the classic Dashboard and the Library-first IA
      * stay reachable from the Home-view toggle at any time. See [HomeView]
-     * for the option set and [[project_home_library_ia]] for the IA spec
-     * the LibraryFirst variant is reaching toward.
+     * for the option set.
      */
     val homeView: HomeView = HomeView.New,
 

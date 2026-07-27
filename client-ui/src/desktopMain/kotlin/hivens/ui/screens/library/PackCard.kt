@@ -68,8 +68,8 @@ import org.koin.compose.koinInject
  * detail hop.
  *
  * Source-badge is the small chip next to the title; it differentiates cards
- * from the four [PackOrigin] values at a glance per
- * [[project_home_library_ia]]'s unified-entity-with-source-badge rule.
+ * from the four [PackOrigin] values at a glance, so one list can hold every
+ * source instead of splitting per origin.
  */
 @Composable
 fun PackCard(

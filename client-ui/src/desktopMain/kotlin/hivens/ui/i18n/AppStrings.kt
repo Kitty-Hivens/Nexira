@@ -435,9 +435,9 @@ interface AppStrings {
     fun aprilCloseEscapeCount(current: Int, max: Int): String
 
     // --- 2FA (TOTP) ---
-    // Code-path scaffolding kept for future auth providers that DO support 2FA
-    // (see [[project_client_auth_extraction]]). For the SmartyCraft provider
-    // these strings are unused at runtime; the banner copy below is what the
+    // Code-path scaffolding kept for future auth providers that DO support 2FA.
+    // For the SmartyCraft provider these strings are unused at runtime; the
+    // banner copy below is what the
     // user actually sees when the upstream demands a 2FA code.
     val auth2faTitle: String
     val auth2faPrompt: String
