@@ -14,11 +14,17 @@ sealed interface PackUpdateStatus {
      * labels this state, and a mirror-side rollback of latest reaches here too:
      * announcing that as "update available" points the user at a build older
      * than the one they are running.
+     *
+     * [held] separates the two policies that both land here: under Ask the build
+     * waits for a deliberate apply and is worth interrupting for, under Hold the
+     * user asked to stay on the current build, so ambient surfaces still show the
+     * newer one but nothing demands action.
      */
     data class Pending(
         val toVersion: String,
         val direction: UpdateDirection,
         val compat: CompatChange,
+        val held: Boolean = false,
     ) : PackUpdateStatus
 
     data class Failed(val reason: String) : PackUpdateStatus

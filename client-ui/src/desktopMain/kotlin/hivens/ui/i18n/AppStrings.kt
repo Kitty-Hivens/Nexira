@@ -397,6 +397,11 @@ interface AppStrings {
     val settingsAutoSyncAllPacksDesc: String
     val settingsAutoUpdatePacks: String
     val settingsAutoUpdatePacksDesc: String
+    val settingsAmberPolicy: String
+    val settingsAmberPolicyDesc: String
+    val settingsAmberPolicyAsk: String
+    val settingsAmberPolicyApply: String
+    val settingsAmberPolicyHold: String
     val settingsJvmBuilder: String
     val settingsJvmBuilderDesc: String
     val settingsAdaptiveMemory: String

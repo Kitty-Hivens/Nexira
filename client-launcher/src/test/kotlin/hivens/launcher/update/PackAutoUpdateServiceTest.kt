@@ -89,6 +89,23 @@ class PackAutoUpdateServiceTest {
         assertTrue(service.statuses.value["amber"] is PackUpdateStatus.Pending)
     }
 
+    // Ask and Hold both leave the build pending; only the flag on the status tells
+    // the ambient surfaces which one asked for attention.
+    @Test
+    fun `pending under Ask asks, pending under Hold does not`() = runTest {
+        suspend fun pendingUnder(amber: AmberUpdatePolicy): PackUpdateStatus.Pending {
+            val repo = FakeRepo(listOf(instance("amber")))
+            val updater = FakeUpdater(mapOf("amber" to available(CompatChange.McBump)))
+            val service = PackAutoUpdateService(repo, updater) { settings(amber = amber) }
+            service.runOnce()
+            assertTrue(updater.applied.isEmpty(), "$amber must not apply an amber change")
+            return service.statuses.value["amber"] as PackUpdateStatus.Pending
+        }
+
+        assertEquals(false, pendingUnder(AmberUpdatePolicy.Ask).held)
+        assertEquals(true, pendingUnder(AmberUpdatePolicy.Hold).held)
+    }
+
     @Test
     fun `amber applies under snapshot-then-apply`() = runTest {
         val repo = FakeRepo(listOf(instance("amber")))

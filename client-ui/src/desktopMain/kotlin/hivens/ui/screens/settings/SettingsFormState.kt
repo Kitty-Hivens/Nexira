@@ -37,6 +37,7 @@ internal class SettingsFormState(initial: SettingsData) {
     var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
     var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
     var autoUpdatePacks        by mutableStateOf(initial.autoUpdatePacks)
+    var amberUpdatePolicy      by mutableStateOf(initial.amberUpdatePolicy)
     var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
     var adaptiveMemoryEnabled  by mutableStateOf(initial.adaptiveMemoryEnabled)
     var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
@@ -72,6 +73,7 @@ internal class SettingsFormState(initial: SettingsData) {
             mandatoryUpdatesEnabled     = mandatoryUpdates,
             autoSyncAllPacks            = autoSyncAllPacks,
             autoUpdatePacks             = autoUpdatePacks,
+            amberUpdatePolicy           = amberUpdatePolicy,
             jvmBuilderEnabled           = jvmBuilderEnabled,
             adaptiveMemoryEnabled       = adaptiveMemoryEnabled,
             forceProxyMode              = forceProxyMode,

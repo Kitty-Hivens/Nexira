@@ -21,8 +21,11 @@ import org.slf4j.LoggerFactory
  * all") it visits each mirror instance that follows latest and updates it per
  * policy: a green (safe re-sync) update applies automatically; an amber
  * (structural MC / loader) update applies only under
- * [AmberUpdatePolicy.SnapshotThenApply], otherwise it is left pending for the
- * user to apply deliberately.
+ * [AmberUpdatePolicy.SnapshotThenApply], otherwise it is left pending. The two
+ * non-applying policies differ in what the pending state asks of the user:
+ * [AmberUpdatePolicy.Ask] expects a deliberate apply, [AmberUpdatePolicy.Hold]
+ * expects nothing, and the status carries that so ambient surfaces can show the
+ * build without demanding action.
  *
  * Per-instance progress is published on [statuses] so the UI can badge a card.
  * A per-instance failure is recorded and never aborts the rest of the pass.
@@ -60,7 +63,15 @@ class PackAutoUpdateService(
     private suspend fun applyOrHold(id: String, check: UpdateCheck.Available, amber: AmberUpdatePolicy) {
         val autoApply = check.compat.isSafe || amber == AmberUpdatePolicy.SnapshotThenApply
         if (!autoApply) {
-            setStatus(id, PackUpdateStatus.Pending(check.toVersion, check.direction, check.compat))
+            setStatus(
+                id,
+                PackUpdateStatus.Pending(
+                    check.toVersion,
+                    check.direction,
+                    check.compat,
+                    held = amber == AmberUpdatePolicy.Hold,
+                ),
+            )
             return
         }
         val instance = repository.get(id) ?: return
