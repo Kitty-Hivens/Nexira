@@ -51,7 +51,7 @@ if [ ! -f "$PACKAGING_PROFILE" ]; then
     echo "       or set PACKAGING_PROFILE=<path> to override." >&2
     exit 1
 fi
-# Populates AURA_JLINK_MODULES (comma-joined string) and AURA_JLINK_OPTIONS
+# Populates NEXIRA_JLINK_MODULES (comma-joined string) and NEXIRA_JLINK_OPTIONS
 # (bash array). See buildSrc/.../EmitAppImageProfileTask.kt for the writer.
 source "$PACKAGING_PROFILE"
 
@@ -67,8 +67,8 @@ source "$PACKAGING_PROFILE"
 # squeezes a non-zip-9 runtime image harder than it can a pre-compressed one.
 jlink \
     --output "$APPDIR/usr" \
-    --add-modules "$AURA_JLINK_MODULES" \
-    "${AURA_JLINK_OPTIONS[@]}"
+    --add-modules "$NEXIRA_JLINK_MODULES" \
+    "${NEXIRA_JLINK_OPTIONS[@]}"
 
 # --generate-cds-archive emits both classes.jsa (compressed oops) and
 # classes_nocoops.jsa. The launcher's heap never approaches the 32 GB coops
