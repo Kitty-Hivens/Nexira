@@ -20,7 +20,7 @@ import java.util.zip.ZipOutputStream
  *
  * Bundle layout:
  * ```
- * aura-diagnostic-<sessionId>-<timestamp>.zip
+ * nexira-diagnostic-<sessionId>-<timestamp>.zip
  *   ├── system-info.txt    OS/JVM/RAM/CPU/heap/property snapshot
  *   ├── action-ring.txt    last N ActionRing entries with timestamps
  *   ├── logs/
@@ -55,7 +55,7 @@ object DiagnosticBundle {
     fun create(paths: PlatformPaths): Path {
         val sessionId = System.getProperty("nexira.sessionId", "unknown")
         val timestamp = tsFmt.format(Instant.now())
-        val output = paths.dataDir.resolve("aura-diagnostic-$sessionId-$timestamp.zip")
+        val output = paths.dataDir.resolve("nexira-diagnostic-$sessionId-$timestamp.zip")
 
         Files.createDirectories(paths.dataDir)
 
