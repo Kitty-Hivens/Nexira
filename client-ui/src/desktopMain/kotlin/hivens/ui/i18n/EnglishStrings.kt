@@ -97,6 +97,8 @@ object EnglishStrings : AppStrings {
     override val settingsThemeModeSystem            = "System"
     override val settingsThemeModeWallpaper         = "Wallpaper"
     override val settingsThemeModeSystemUnavailable = "System scheme is not available in this environment"
+    override val settingsPaletteFromWallpaper       = "Colors from wallpaper"
+    override val settingsPaletteFromWallpaperDesc   = "Off: a theme keeps its own colors"
     override val settingsCloseAfterLaunch   = "Hide launcher to tray after the game starts"
     override val settingsCloseAfterLaunchDesc = "Hides the launcher to the system tray once the game starts."
     override val settingsSaved              = "Settings saved"

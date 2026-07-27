@@ -36,6 +36,29 @@ class PaletteEngineTest {
         assertNotEquals(warm.surfaceContainerHigh, cool.surfaceContainerHigh)
     }
 
+    // --- the wallpaper-seeding switch ---
+
+    private val seed = 0xFF3B82F6.toInt()
+
+    @Test
+    fun seedingOffKeepsTheFixedPalette() {
+        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = seed, fromWallpaper = false))
+        assertEquals(LightColorPalette, resolveBasePalette(dark = false, seed = seed, fromWallpaper = false))
+    }
+
+    @Test
+    fun seedingOnDerivesFromTheSeed() {
+        assertEquals(
+            seededNxColors(DarkColorPalette, seed, dark = true),
+            resolveBasePalette(dark = true, seed = seed, fromWallpaper = true),
+        )
+    }
+
+    @Test
+    fun seedingOnWithoutASeedKeepsTheFixedPalette() {
+        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = null, fromWallpaper = true))
+    }
+
     @Test
     fun brandAndSemanticTokensPreserved() {
         val p = seededNxColors(base, 0xFF22C55E.toInt(), dark = true)

@@ -22,16 +22,17 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxRow
+import hivens.ui.nx.NxToggle
 import hivens.ui.screens.settings.DayNightRow
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 
 // Right island of the Appearance studio: the theme axis (dark/light, its source,
-// UI style, and a jump to the full theme picker) beside the wallpaper controls, over the
-// live preview. The palette itself is already seeded from the wallpaper by default
-// (Monet), so editing the wallpaper re-tints everything here; this island owns the
-// dark/light + style choices that Monet does not.
+// whether the palette is seeded from the wallpaper, UI style, and a jump to the full
+// theme picker) beside the wallpaper controls, over the live preview. Editing the
+// wallpaper re-tints everything here while the seeding switch is on; this island owns
+// the choices Monet does not make.
 @Composable
 internal fun AppearanceThemeIsland(
     isDarkTheme: Boolean,
@@ -39,6 +40,8 @@ internal fun AppearanceThemeIsland(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
+    paletteFromWallpaper: Boolean,
+    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
@@ -80,6 +83,19 @@ internal fun AppearanceThemeIsland(
                     )
                 }
             }
+
+            // Palette source, the axis under the theme source: on, the wallpaper seeds
+            // the base palette and a preset lands tinted on top of it; off, the preset
+            // is the palette. Sits above the picker row so the choice is made before
+            // walking into it.
+            NxToggle(
+                label           = s.settingsPaletteFromWallpaper,
+                checked         = paletteFromWallpaper,
+                description     = s.settingsPaletteFromWallpaperDesc,
+                icon            = NxIcon.Palette,
+                accent          = NxTheme.colors.primary,
+                onCheckedChange = onPaletteFromWallpaperChanged,
+            )
 
             BgPicker(s.settingsUiStyleTitle) {
                 NxChoiceChip(s.settingsUiStyleCelestia, uiStyle == UiStyle.Celestia) { onUiStyleChanged(UiStyle.Celestia) }
