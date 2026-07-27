@@ -20,7 +20,8 @@ import kotlinx.coroutines.launch
  * toasts instead of dying in the log. `Updated` and `Failed` announce on each
  * transition; a `Pending` build announces once per version (the hub re-emits
  * the whole map on any instance's change, and an auto-update pass re-deriving
- * the same Pending must not re-toast it); `Checking` is noise and stays quiet.
+ * the same Pending must not re-toast it) and not at all while it is held by
+ * policy; `Checking` is noise and stays quiet.
  * Actions navigate through [NavRequests] -- a toast has no place in the
  * composition to reach the back stack directly.
  */
@@ -73,6 +74,10 @@ class PackUpdateDriver(
                 )
             }
             is PackUpdateStatus.Pending -> {
+                // Hold means the user chose to stay on the current build. The card and
+                // the versions screen still show the newer one; interrupting for it
+                // would be nagging about a decision already made.
+                if (status.held) return
                 if (announcedPending[id] == status.toVersion) return
                 announcedPending[id] = status.toVersion
                 notifications.push(

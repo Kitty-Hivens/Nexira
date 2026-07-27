@@ -257,10 +257,11 @@ internal fun DayNightRow(
 /**
  * A labelled single-select chip group (title + sub + wrapping [NxChoiceChip]s). The
  * chips wrap to a second line on a narrow pane instead of the longest label shrinking
- * per character.
+ * per character. Shared across the settings sections so every enum choice reads the
+ * same.
  */
 @Composable
-private fun PickerBlock(
+internal fun PickerBlock(
     title: String,
     sub: String,
     chips: @Composable FlowRowScope.() -> Unit,
