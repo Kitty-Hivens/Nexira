@@ -160,6 +160,18 @@ val LocalNxColors = staticCompositionLocalOf<NxColors> {
 
 // --- THEME WITH ANIMATION AND SUPPORT FOR CUSTOM THEMES ---
 
+/**
+ * The palette a theme starts from, before presets, accent overrides and the tonal
+ * expansion land on top. Wallpaper seeding (Monet) applies only when it is switched
+ * on AND a seed was extracted; either half missing falls back to the fixed palette,
+ * which is what the off state of the switch has to mean -- a preset then reads as it
+ * was designed instead of tinted by whatever is behind the window.
+ */
+internal fun resolveBasePalette(dark: Boolean, seed: Int?, fromWallpaper: Boolean): NxColors {
+    val fixed = if (dark) DarkColorPalette else LightColorPalette
+    return if (fromWallpaper && seed != null) seededNxColors(fixed, seed, dark) else fixed
+}
+
 @Composable
 fun NxTheme(
     useDarkTheme: Boolean = true,
@@ -176,9 +188,7 @@ fun NxTheme(
     val customization = LocalCustomization.current
 
     // Base palette: fixed Celestia, or wallpaper-seeded (Monet) when enabled.
-    val rawBase = if (useDarkTheme) DarkColorPalette else LightColorPalette
-    val baseColors = if (paletteFromWallpaper && paletteSeed != null)
-        seededNxColors(rawBase, paletteSeed, useDarkTheme) else rawBase
+    val baseColors = resolveBasePalette(useDarkTheme, paletteSeed, paletteFromWallpaper)
 
     val themedColors = if (customTheme != null) {
         baseColors.copy(

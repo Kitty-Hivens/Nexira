@@ -94,6 +94,8 @@ object RussianStrings : AppStrings {
     override val settingsThemeModeSystem            = "Система"
     override val settingsThemeModeWallpaper         = "Обои"
     override val settingsThemeModeSystemUnavailable = "Системная схема недоступна в этой среде"
+    override val settingsPaletteFromWallpaper       = "Цвета из обоев"
+    override val settingsPaletteFromWallpaperDesc   = "Выключено: тема сохраняет свои цвета"
     override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска игры"
     override val settingsCloseAfterLaunchDesc = "Прячет лаунчер в системный трей, как только запускается игра."
     override val settingsSaved              = "Настройки сохранены"

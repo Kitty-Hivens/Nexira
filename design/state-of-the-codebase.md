@@ -78,7 +78,6 @@ Built, correct, and impossible to get to from the UI.
 - **The whole layout editor.** 4489 lines, the widget palette, the prop panel, presets, drag and drop. Entered only by pressing Ctrl+E. `requestEditToggle()` has exactly one production caller. No button, no menu item, nothing in the UI mentions the chord. Eleven of 57 widget kinds -- clock, music player, video, notes, checklist, quick launch, progress, launch button, mini playback, and both containers -- exist only in that palette and never appear on a fresh install.
 - **`glassIntensity` and `densityScale`.** Both are read (`glassIntensity` by the surface layers, `densityScale` as a global `Density` override at the shell root) and neither is written anywhere. The only way to change them is editing `customization.json` by hand.
 - **`useCustomChrome`.** Documented as the escape hatch for a window manager that misbehaves with the custom title bar. Four reads, zero writes.
-- **`paletteFromWallpaper`.** Default on, documented as switchable off. No switch.
 - **`SettingsData.memoryMB`.** The global fallback heap. The RAM selector writes per-instance values instead; this field appears in the UI module only inside a test.
 - **`amberUpdatePolicy`.** The policy for risky auto-updates (ask, snapshot and apply, hold). Read by the engine, absent from the UI entirely.
 - **`preferredFaceProvider`.** Which signed-in account fronts the shell. Read once, written never, so it is permanently null and the fallback always wins.

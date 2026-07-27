@@ -306,7 +306,9 @@ fun FrameWindowScope.AppShellContent(
     // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
     // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
     // the palette from it. Default-on; the seed is null until a bitmap is decoded.
-    val paletteFromWallpaper = settings.paletteFromWallpaper
+    // Switching seeding off is how a theme preset is seen in its own colours, so the
+    // flag is state here rather than a read of the startup snapshot.
+    var paletteFromWallpaper by remember { mutableStateOf(settings.paletteFromWallpaper) }
     var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
     // Which source drives dark/light: the manual toggle, the OS scheme, or the
     // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
@@ -953,6 +955,13 @@ fun FrameWindowScope.AppShellContent(
                             ))
                         },
                         systemThemeAvailable = systemThemeAvailable,
+                        paletteFromWallpaper = paletteFromWallpaper,
+                        onPaletteFromWallpaperChanged = { seeded ->
+                            paletteFromWallpaper = seeded
+                            settingsService.saveSettings(
+                                settingsService.getSettings().copy(paletteFromWallpaper = seeded),
+                            )
+                        },
                         customTheme          = customTheme,
                         onCustomThemeChanged = { newTheme ->
                             customTheme = newTheme
@@ -1029,6 +1038,8 @@ fun AppRoot(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
+    paletteFromWallpaper: Boolean,
+    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -1263,6 +1274,8 @@ fun AppRoot(
                 themeMode = themeMode,
                 onThemeModeChanged = onThemeModeChanged,
                 systemThemeAvailable = systemThemeAvailable,
+                paletteFromWallpaper = paletteFromWallpaper,
+                onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
                 customTheme = customTheme,
                 onCustomThemeChanged = onCustomThemeChanged,
                 currentLocale = currentLocale,

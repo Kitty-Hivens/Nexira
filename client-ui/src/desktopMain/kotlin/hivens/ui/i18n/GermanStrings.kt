@@ -94,6 +94,8 @@ object GermanStrings : AppStrings {
     override val settingsThemeModeSystem            = "System"
     override val settingsThemeModeWallpaper         = "Hintergrund"
     override val settingsThemeModeSystemUnavailable = "Systemschema ist in dieser Umgebung nicht verfügbar"
+    override val settingsPaletteFromWallpaper       = "Farben aus dem Bild"
+    override val settingsPaletteFromWallpaperDesc   = "Aus: Design behält eigene Farben"
     override val settingsCloseAfterLaunch   = "Launcher nach Spielstart in Tray minimieren"
     override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet."
     override val settingsSaved              = "Einstellungen gespeichert"
