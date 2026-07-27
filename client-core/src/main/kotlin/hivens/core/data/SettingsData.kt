@@ -116,8 +116,9 @@ data class SettingsData(
      * open console). Opt-in for users who want out-of-sight behavior.
      */
     val closeAfterStart: Boolean = false,
+    /** Whether a successful sign-in stores the account. Seeds the login panel's
+     *  remember-me box and is written back when it is flipped. */
     val saveCredentials: Boolean = true,
-    val savedFileManifest: FileManifest? = null,
     /** BCP-47 language tag: "ru", "en", "de". */
     val locale: String = "en",
     /** Offline mode: skip authentication, play with an offline identity. */

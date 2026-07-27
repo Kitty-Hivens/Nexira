@@ -45,11 +45,4 @@ data class InstanceRuntime(
      * stale 925x530.
      */
     val windowSizeOverride: Boolean = false,
-    /**
-     * Server identity (in whatever shape the pack's origin uses --
-     * SC server id, mirror server id, or `host:port` for a manual
-     * entry) to connect to immediately after launch. Null = stay on
-     * the in-game multiplayer screen for the user to pick.
-     */
-    val autoConnectServerId: String? = null,
 )
