@@ -542,6 +542,14 @@ val verifyRuntimeModules = tasks.register("verifyRuntimeModules") {
 
 tasks.named("check") { dependsOn(verifyRuntimeModules) }
 
+// `check` alone left the guard unreached: no workflow runs it for this module, and
+// the release path invokes the packaging tasks directly. Both producers that read
+// `packaging.modules` -- the jlink task and the profile the AppImage script sources
+// -- now run the guard first, so no path can build a runtime image from a module
+// list the guard would reject. customJpackageImage inherits it through customRuntime.
+tasks.matching { it.name == "customRuntime" || it.name == "emitAppImageProfile" }
+    .configureEach { dependsOn(verifyRuntimeModules) }
+
 // Kotlin compiler options for every JVM compile task in client-ui.
 // freeCompilerArgs split into "always on" and "opt-in" groups.
 //
