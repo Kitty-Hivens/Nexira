@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * 1. Config file at `<dataDir>/server-config.json` -- the full data
  *    class serialized; loader merges with defaults so partial files
  *    are fine.
- * 2. System property `aura.conduit.baseurl` -- overrides just the
+ * 2. System property `nexira.conduit.baseurl` -- overrides just the
  *    base URL, leaves everything else at config-file or default.
  *    Useful for one-off "test against mirror right now" CLI workflows.
  *
@@ -86,7 +86,7 @@ data class ServerProtocolConfig(
         const val DEFAULT_READ_TIMEOUT_MS    = 300_000L
 
         /** System-property name for the runtime base-URL override. */
-        const val SYSTEM_PROP_BASE_URL = "aura.conduit.baseurl"
+        const val SYSTEM_PROP_BASE_URL = "nexira.conduit.baseurl"
 
         /**
          * Resolve the effective config given a parsed-from-file value. Applies

@@ -348,7 +348,7 @@ val networkModule = module {
 
     // ServerProtocolConfig -- Conduit Phase 3. Loads from
     // <dataDir>/server-config.json with smartycraft.ru defaults if absent.
-    // Optional system-property override aura.conduit.baseurl gates a runtime
+    // Optional system-property override nexira.conduit.baseurl gates a runtime
     // base URL change for Mirror development / test environments (gated by
     // ExperimentalConduitOverride opt-in inside the loader).
     single<ServerProtocolConfig> {
