@@ -6,7 +6,7 @@ package hivens.config
  * properties or config file. Bypasses build-time defaults; misconfigured
  * overrides fail fast at the first network call.
  *
- * Legitimate uses: Mirror development (`-Daura.conduit.baseurl=...`),
+ * Legitimate uses: Mirror development (`-Dnexira.conduit.baseurl=...`),
  * censored-region operator workarounds, test / staging environments.
  *
  * @see ExperimentalProtocolOverride for the parallel knob over wire-protocol values.
