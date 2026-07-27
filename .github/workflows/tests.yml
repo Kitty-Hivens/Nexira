@@ -2,7 +2,7 @@ name: Tests
 
 # Unit-test matrix on every code PR.
 #
-# build_release.yml runs these same three suites, but only on a release tag --
+# build_release.yml runs the same suites minus widget-processor, but only on a release tag --
 # so OS-specific regressions stayed invisible until a tag was cut (that is how
 # a macOS native-classifier assumption and Windows path-separator asserts once
 # reached a release and blocked it). This workflow runs them at PR time instead.
@@ -60,7 +60,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test --continue
+        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :widget-processor:test --continue
 
       # The runtime-module guard is a config-time read with no compilation behind
       # it, so it costs nothing here and fails a bad module list at PR time rather
