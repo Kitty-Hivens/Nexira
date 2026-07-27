@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [stable, Project-Void]
     paths:
-      - "client-ui/**/*.kt"
+      - "**/*.kt"
       - "scripts/check-i18n.py"
       - ".github/workflows/i18n-lint.yml"
   push:

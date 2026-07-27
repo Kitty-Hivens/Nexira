@@ -27,8 +27,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
- * The one button. Four emphasis roles (the taxonomy from #182) -- a call site
- * picks a role, not colours. The per-widget freedom the old de-facto base button
+ * The one button. Four emphasis roles -- a call site picks a role, not colours. The per-widget freedom the old de-facto base button
  * had (an arbitrary Material ButtonColors) moves up to the Flexible event layer.
  *
  *  - [Primary]     -- filled accent; the one obvious next action (Play, Login). One per screen.
@@ -37,8 +36,8 @@ import hivens.ui.theme.LocalStyle
  *  - [Destructive] -- filled error; a destructive or critical action (Delete, Force re-download).
  *
  * Sizing stays provisional ([compact] / [minHeight]) until the dimens token scale
- * (#350) lands; decorative glow lives at the call site or the effects layer (#352),
- * not in the button -- both are the separate styling track, not a button role.
+ * lands; decorative glow lives at the call site or the effects layer, not in the
+ * button -- both are the separate styling track, not a button role.
  */
 enum class NxButtonStyle { Primary, Secondary, Tertiary, Destructive }
 
