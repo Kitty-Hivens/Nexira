@@ -600,7 +600,10 @@ class FileDownloadService(
 
         try {
             messageUI?.invoke("Setting up the client...")
-            val newPaths = ZipUtils.unzip(localZip.toFile(), baseDir.toFile())
+            // The index lives in the directory the archive unpacks into, so
+            // without this an entry of that name would let the archive choose
+            // what the next sync prunes.
+            val newPaths = ZipUtils.unzip(localZip.toFile(), baseDir.toFile(), reserved = setOf(INDEX_FILENAME))
             pruneOrphans(baseDir, previousIndex.paths, newPaths)
             writeIndex(indexFile, ExtraZipIndex(hash = localHash, paths = newPaths))
         } catch (e: Exception) {

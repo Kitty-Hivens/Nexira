@@ -1,6 +1,7 @@
 package hivens.launcher.runtime
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.io.resolveWithinRoot
 import hivens.core.platform.Platform
 import hivens.launcher.runtime.loader.DownloadProgress
 import hivens.launcher.runtime.loader.LibrarySpec
@@ -272,7 +273,7 @@ class RuntimeProvisioner(
             if (artifact.path.isBlank()) return@mapNotNull null
             val coord = MavenCoord.parse(lib.name)
             if (isForeignNative(coord)) return@mapNotNull null
-            ResolvedLibrary(coord, librariesDir.resolve(artifact.path))
+            ResolvedLibrary(coord, resolveWithinRoot(librariesDir, artifact.path, lib.name))
         }
 
     /**
@@ -308,12 +309,12 @@ class RuntimeProvisioner(
             val base = MavenCoord.parse(lib.name)
             for ((classifier, art) in downloads.classifiers) {
                 if (classifier in acceptedNativeClassifiers && art.path.isNotBlank()) {
-                    out.add(ResolvedLibrary(base.copy(classifier = classifier), librariesDir.resolve(art.path)))
+                    out.add(ResolvedLibrary(base.copy(classifier = classifier), resolveWithinRoot(librariesDir, art.path, lib.name)))
                 }
             }
             if (base.classifier != null && base.classifier in acceptedNativeClassifiers) {
                 downloads.artifact?.takeIf { it.path.isNotBlank() }
-                    ?.let { out.add(ResolvedLibrary(base, librariesDir.resolve(it.path))) }
+                    ?.let { out.add(ResolvedLibrary(base, resolveWithinRoot(librariesDir, it.path, lib.name))) }
             }
         }
         return out.distinctBy { it.path }
@@ -341,7 +342,7 @@ class RuntimeProvisioner(
             downloads.artifact?.takeIf { it.path.isNotBlank() && !isForeignNative(coord) }?.let { artifact ->
                 out += DownloadTask(
                     url = artifact.url,
-                    dest = librariesDir.resolve(artifact.path),
+                    dest = resolveWithinRoot(librariesDir, artifact.path, lib.name),
                     sha1 = artifact.sha1,
                     size = artifact.size,
                 )
@@ -353,7 +354,7 @@ class RuntimeProvisioner(
                 if (classifier in acceptedNativeClassifiers && nativeArt.path.isNotBlank()) {
                     out += DownloadTask(
                         url = nativeArt.url,
-                        dest = librariesDir.resolve(nativeArt.path),
+                        dest = resolveWithinRoot(librariesDir, nativeArt.path, lib.name),
                         sha1 = nativeArt.sha1,
                         size = nativeArt.size,
                     )
@@ -373,7 +374,7 @@ class RuntimeProvisioner(
         for ((_, obj) in assetIndex.objects) {
             out += DownloadTask(
                 url = assetObjectUrl(obj.hash),
-                dest = assetsDir.resolve(assetObjectRelPath(obj.hash)),
+                dest = resolveWithinRoot(assetsDir, assetObjectRelPath(obj.hash), obj.hash),
                 sha1 = obj.hash,
                 size = obj.size,
             )
