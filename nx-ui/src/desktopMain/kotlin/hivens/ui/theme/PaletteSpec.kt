@@ -16,6 +16,13 @@ import com.materialkolor.scheme.SchemeVibrant
 import com.materialkolor.scheme.Variant
 
 /**
+ * The seed a scheme falls back to when there is neither a wallpaper nor a chosen
+ * colour. Generation is unconditional, so this is what a fresh install renders
+ * from -- the brand accent, carrying the identity the fixed palette used to.
+ */
+const val BRAND_SEED_ARGB: Int = 0xFFBB86FC.toInt()
+
+/**
  * How a seed colour is turned into a scheme. Each entry is one of the tonal
  * strategies the colour science ships: they differ in how far the accents travel
  * from the seed hue and how much chroma reaches the surfaces, from [Monochrome]
