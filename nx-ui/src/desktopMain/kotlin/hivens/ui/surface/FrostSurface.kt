@@ -120,10 +120,11 @@ data class StateOverlay(val role: FrostRole = FrostRole.Primary, val hoverAlpha:
 
 /** Theme color roles a layer can pull from -- maps to live palette fields for
  *  rendering. */
-enum class FrostRole { Surface, SurfaceContainerLow, SurfaceContainer, SurfaceContainerHigh, Background, Primary, Secondary, Tertiary, Outline }
+enum class FrostRole { Surface, SurfaceContainerLowest, SurfaceContainerLow, SurfaceContainer, SurfaceContainerHigh, Background, Primary, Secondary, Tertiary, Outline }
 
 private fun NxColors.frost(role: FrostRole): Color = when (role) {
     FrostRole.Surface              -> surface
+    FrostRole.SurfaceContainerLowest -> surfaceContainerLowest
     FrostRole.SurfaceContainerLow  -> surfaceContainerLow
     FrostRole.SurfaceContainer     -> surfaceContainer
     FrostRole.SurfaceContainerHigh -> surfaceContainerHigh

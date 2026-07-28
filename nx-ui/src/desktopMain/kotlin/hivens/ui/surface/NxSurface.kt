@@ -18,10 +18,19 @@ import hivens.ui.theme.bevelHairline
  */
 enum class NxSurfaceLevel { Sunken, Base, Raised, Floating }
 
-/** Tonal-ladder role per level. Monotonic, so adjacent levels carry a tone step; the
- *  bevel hairline supplies the second separation signal regardless of the step size. */
+/**
+ * Tonal-ladder role per level, in the colour science's own order rather than the one
+ * the hand-written palettes happened to have. `surface` is the DIMMEST plane there
+ * and the containers climb away from it, so mapping the lowest level onto a
+ * container put a sunken plane above a base one -- invisible while the palette was
+ * hand-picked to our ordering, and inverted the moment it was generated.
+ *
+ * Monotonic by construction now: adjacent levels carry a tone step in the right
+ * direction, and the bevel hairline supplies the second separation signal regardless
+ * of the step size.
+ */
 fun NxSurfaceLevel.role(): FrostRole = when (this) {
-    NxSurfaceLevel.Sunken   -> FrostRole.SurfaceContainerLow
+    NxSurfaceLevel.Sunken   -> FrostRole.SurfaceContainerLowest
     NxSurfaceLevel.Base     -> FrostRole.Surface
     NxSurfaceLevel.Raised   -> FrostRole.SurfaceContainer
     NxSurfaceLevel.Floating -> FrostRole.SurfaceContainerHigh

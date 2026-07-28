@@ -57,6 +57,7 @@ data class NxColors(
     val onSecondaryContainer: Color,
     val tertiaryContainer: Color,
     val onTertiaryContainer: Color,
+    val surfaceContainerLowest: Color,
     val surfaceContainerLow: Color,
     val surfaceContainer: Color,
     val surfaceContainerHigh: Color,
@@ -102,6 +103,7 @@ internal val DarkColorPalette = NxColors(
     onSecondaryContainer = Color(0xFFB9F5EA),
     tertiaryContainer = Color(0xFF3A2E20),
     onTertiaryContainer = Color(0xFFFFE2C7),
+    surfaceContainerLowest = Color(0xFF131313),
     surfaceContainerLow  = Color(0xFF181818),
     surfaceContainer     = Color(0xFF222222),
     surfaceContainerHigh = Color(0xFF2A2A2A),
@@ -116,7 +118,9 @@ internal val LightColorPalette = NxColors(
     primaryVariant = Color(0xFF3F51B5),
     secondary = Color(0xFF26A69A),     // Calm teal
     background = Color(0xFFF5F7FA),    // Very light gray (not white!)
-    surface = Color(0xFFFFFFFF),       // White cards
+    // Just under the lowest plane, which is the white one: in a light theme the
+    // ladder descends as it rises, so a flush surface cannot also be the brightest.
+    surface = Color(0xFFFAFBFD),
     surfaceVariant = Color(0xFFE8EAF0),
     error = Color(0xFFD32F2F),
     onPrimary = Color.White,
@@ -145,6 +149,7 @@ internal val LightColorPalette = NxColors(
     onSecondaryContainer = Color(0xFF0A3B33),
     tertiaryContainer = Color(0xFFF6E2CE),
     onTertiaryContainer = Color(0xFF4A2A09),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
     surfaceContainerLow  = Color(0xFFF0F2F6),
     surfaceContainer     = Color(0xFFEAECF2),
     surfaceContainerHigh = Color(0xFFE2E5EC),
