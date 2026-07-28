@@ -74,19 +74,35 @@ jobs:
     steps:
       - name: Verify HEAD originates from a reviewed PR
         # Nightlies are unreviewed bleeding-dev builds (tagged off dev HEAD, no
-        # PR of their own), so the check is skipped for -nightly tags while the
-        # job itself still passes. The condition sits on the STEP, not the job:
-        # a skipped JOB is inherited by everything downstream through the
-        # implicit success() over the whole needs chain, so gating the job
+        # PR of their own), so the gate does not apply to them. The exemption is
+        # decided inside the script rather than by an `if:` on the step, because
+        # the expression language has no substring operator and the tag must be
+        # read the same way ReleaseChannel.classify reads it. It stays off the
+        # JOB either way: a skipped job is inherited by everything downstream
+        # through the implicit success() over the needs chain, so gating the job
         # silently skipped changelog and every build under it -- a green run
         # that shipped nothing. The gate still guards every real release.
-        if: ${{ !contains(github.ref_name, 'nightly') }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_SHA:   ${{ github.sha }}
-          GH_REPO:  ${{ github.repository }}
+          GH_TOKEN:     ${{ secrets.GITHUB_TOKEN }}
+          GH_SHA:       ${{ github.sha }}
+          GH_REPO:      ${{ github.repository }}
+          GH_REF_NAME:  ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          # The prerelease suffix must START with "nightly", matching
+          # ReleaseChannel.classify. The former `contains(ref_name, 'nightly')`
+          # accepted the substring anywhere, so a tag like v9.9.9-rc1nightly
+          # walked past this gate while classify still sorted it as Beta and
+          # shipped it to everyone on a pre-release channel.
+          SUFFIX="${GH_REF_NAME#*-}"
+          if [ "$SUFFIX" != "$GH_REF_NAME" ]; then
+            case "$SUFFIX" in
+              nightly*)
+                echo "Nightly tag $GH_REF_NAME -- the review gate does not apply."
+                exit 0
+                ;;
+            esac
+          fi
           echo "Resolving PR for HEAD $GH_SHA on $GH_REPO..."
           PR=$(gh pr list --repo "$GH_REPO" --state merged --search "sha:$GH_SHA" --json number --jq '.[0].number // empty')
           if [ -z "$PR" ]; then
@@ -183,7 +199,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test --continue
+        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-ui:desktopTest --continue
 
       - name: Upload test reports
         if: always()   # we publish it even if it falls, so we can see what's broken
@@ -194,6 +210,7 @@ jobs:
             client-config/build/reports/tests/
             client-core/build/reports/tests/
             client-launcher/build/reports/tests/
+            client-ui/build/reports/tests/
 
   # ─────────────────────────────────────────────────────────────────────────
   # Extract changelog section for this version from CHANGELOG.md
