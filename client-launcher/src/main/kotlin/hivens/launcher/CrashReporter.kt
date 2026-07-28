@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.config.Branding
+import hivens.core.logging.Redactor
 import hivens.core.diag.ActionRing
 import hivens.launcher.platform.PlatformPaths
 import java.io.File
@@ -66,7 +67,13 @@ class CrashReporter(
         val ts = FILENAME_FMT.format(Instant.parse(report.timestamp))
         val file = File(crashDir, "crash-$ts.txt")
 
-        file.writeText(buildString {
+        // Redacted on the way to disk, not only on the way out of it. The
+        // dialog this file feeds tells the user to send it to the developers,
+        // and a stack trace echoes what the failing call was given -- exception
+        // messages carry URL parameters, and an accessToken rides in one. The
+        // bundle and the issue prefill redact too; that is now defence in
+        // depth rather than the only pass.
+        file.writeText(Redactor.redact(buildString {
             appendLine("===================================")
             appendLine(" Nexira Crash Report")
             appendLine("===================================")
@@ -89,7 +96,7 @@ class CrashReporter(
             appendLine(" Stack Trace:")
             appendLine(report.stackTrace)
             appendLine("===================================")
-        })
+        }))
 
         return file
     }
