@@ -11,10 +11,9 @@ private val log = LoggerFactory.getLogger("RetryWithBackoff")
  * backoff, retrying only when [shouldRetry] matches. Last exception
  * bubbles up unmodified.
  *
- * Designed narrowly for transient HTTP/2 reset over SOCKS on the
- * smartycraft channel (auth + chunk downloads periodically die
- * mid-stream; one retry almost always succeeds). Not a general-purpose
- * retry utility -- resist growing it.
+ * Designed narrowly for transfers that die mid-stream on a flaky route
+ * (auth calls and file downloads both do; one retry almost always
+ * succeeds). Not a general-purpose retry utility -- resist growing it.
  *
  * [operation] is for logs only; appears in retry warnings so a user
  * log paste shows which call is flapping.

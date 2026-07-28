@@ -405,8 +405,8 @@ class FileDownloadService(
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
 
-            // Retry the whole transfer on transient network errors. The
-            // SMARTYcraft channel periodically drops mid-stream over SOCKS;
+            // Retry the whole transfer on transient network errors. Long
+            // bodies from the SMARTYcraft host periodically drop mid-stream;
             // without retry-with-resume a flaky network turns 100MB asset sync
             // into a Sisyphean restart-from-zero loop.
             retryWithBackoff(

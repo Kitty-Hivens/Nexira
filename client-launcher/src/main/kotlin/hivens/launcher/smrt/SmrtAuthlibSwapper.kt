@@ -85,7 +85,7 @@ class SmrtAuthlibSwapper(
             val url = "${config.clientFilesBase}/" +
                 rawPath.split("/").joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
             log.info("authlib swap: downloading {} <- {}", fileName, url)
-            // The SC SOCKS channel drops mid-stream periodically; this jar is
+            // The SC channel drops mid-stream periodically; this jar is
             // mandatory (a miss blocks the launch), so retry transient failures.
             retryWithBackoff(
                 operation = "authlib $fileName",

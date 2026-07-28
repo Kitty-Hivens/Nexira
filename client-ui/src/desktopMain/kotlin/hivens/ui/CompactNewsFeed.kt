@@ -26,7 +26,6 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
-import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
@@ -55,14 +54,10 @@ fun CompactNewsFeed(
     var loading by remember { mutableStateOf(true) }
     var query   by remember { mutableStateOf("") }
     // Bumped by the retry button to re-trigger the fetch effect. The effect
-    // re-runs on (a) initial composition, (b) force-proxy toggle change,
-    // (c) SSL bypass grant for the host, (d) explicit retry click. Each is
-    // keyed via this counter, so a first-call failure doesn't strand the
-    // strip at "no news" forever -- the user can recover by toggling the
-    // proxy or clicking Retry.
+    // re-runs on (a) initial composition, (b) an SSL bypass grant for the
+    // host, (c) an explicit retry click, so a first-call failure doesn't
+    // strand the strip at "no news" forever.
     var retryTick by remember { mutableStateOf(0) }
-
-    val forceProxy by NetworkState.forceProxyState.collectAsState()
 
     suspend fun fetch(forceRefresh: Boolean) {
         loading = true
@@ -78,10 +73,10 @@ fun CompactNewsFeed(
         loading = false
     }
 
-    LaunchedEffect(retryTick, forceProxy, sslBypass) {
-        // Initial composition + toggle/bypass changes: use the cache-aware
-        // path, since the first call has nothing cached and toggle-driven
-        // retries only make sense when news is empty anyway (working strips
+    LaunchedEffect(retryTick, sslBypass) {
+        // Initial composition + bypass changes: use the cache-aware path,
+        // since the first call has nothing cached and bypass-driven retries
+        // only make sense when news is empty anyway (working strips
         // shouldn't flicker on Settings flips). Explicit retry skips the
         // cache so a user clicking Retry after network recovery actually
         // hits upstream, even if a successful fetch had already cached an
@@ -138,8 +133,8 @@ fun CompactNewsFeed(
                             color = NxTheme.colors.textSecondary,
                         )
                         // Explicit retry covers the "network came back but no
-                        // toggle was touched" path -- the LaunchedEffect above
-                        // only re-runs on toggle / bypass changes.
+                        // setting was touched" path -- the LaunchedEffect above
+                        // only re-runs on bypass changes.
                         TextButton(onClick = { retryTick++ }) {
                             Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
                         }

@@ -96,7 +96,7 @@ The experimental **JVM Args Builder** (Settings → Experimental → JVM Args) l
 
 **News feed empty / can't fetch server list**
 
-Nexira routes SMARTYcraft traffic directly by default and falls back to the SOCKS proxy at `proxy.smartycraft.ru:58613` on connection failure. If both are blocked, **Settings → Network → Force proxy mode** sticks to the proxy from the start.
+Nexira reaches SMARTYcraft over a direct HTTPS connection. If that host is unreachable from your network, the feed and the server list stay empty -- there is no alternate route. A VPN or a system-level proxy is the workaround.
 
 **Stale data dir warnings**
 

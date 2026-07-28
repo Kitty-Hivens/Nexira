@@ -470,10 +470,6 @@ interface AppStrings {
     /** Receives a pre-formatted local date/time string. */
     fun sslBypassExpiresAt(formatted: String): String
 
-    // --- Force proxy mode (Settings → Network) — Conduit Phase 2 ---
-    val settingsForceProxyTitle: String
-    val settingsForceProxyDesc: String
-
     // --- Smarty server controls (Settings → Smarty) ---
     val settingsSectionSmarty: String
     val settingsOpenSmrtHelperTitle: String

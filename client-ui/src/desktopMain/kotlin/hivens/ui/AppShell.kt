@@ -1065,10 +1065,10 @@ fun AppRoot(
     val msaProvider: RefreshableAuthProvider?  =
         authRegistry.all.filterIsInstance<RefreshableAuthProvider>().firstOrNull()
     // Smartycraft-routed Call.Factory for Coil's image fetcher. The
-    // bypass / forceProxy / direct routing rule lives in Modules.kt
-    // alongside the same rule for the Ktor HttpClientProvider; both
-    // must agree or news / skin images would diverge from auth and
-    // protocol traffic on the same host.
+    // bypass / direct routing rule lives in Modules.kt alongside the
+    // same rule for the Ktor HttpClientProvider; both must agree or
+    // news / skin images would diverge from auth and protocol traffic
+    // on the same host.
     val routingCallFactory: Call.Factory       = koinInject()
     val af = LocalAprilFools.current
 
@@ -1147,12 +1147,11 @@ fun AppRoot(
     // retry on a capped backoff for the app's lifetime (a launcher left open
     // signs itself in when the network returns); rejections and missing
     // credentials stop -- looping on those hammers the upstream for nothing.
-    // A proxy/bypass policy flip restarts the effect for an immediate fresh
-    // attempt with a reset ladder (the flip is a user action). A manual login
-    // racing the loop wins: the loop re-reads the state each pass.
-    val autoLoginForceProxy by NetworkState.forceProxyState.collectAsState()
+    // A bypass policy flip restarts the effect for an immediate fresh attempt
+    // with a reset ladder (the flip is a user action). A manual login racing
+    // the loop wins: the loop re-reads the state each pass.
     val autoLoginBypasses by NetworkState.bypassesState.collectAsState()
-    LaunchedEffect(autoLoginForceProxy, autoLoginBypasses) {
+    LaunchedEffect(autoLoginBypasses) {
         var attempt = 0
         while (appState !is AppState.Authenticated) {
             val settings = withContext(Dispatchers.IO) { settingsService.getSettings() }

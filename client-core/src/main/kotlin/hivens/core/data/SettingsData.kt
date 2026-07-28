@@ -211,16 +211,6 @@ data class SettingsData(
     val adaptiveMemoryEnabled: Boolean = true,
 
     /**
-     * Skip the direct-channel attempt; route every SmartyCraft request
-     * through SOCKS5 from the first call. Off by default -- direct works
-     * for ~99% of users. Enable when `smartycraft.ru:443` is blocked
-     * (censored regions, corporate firewalls) but
-     * `proxy.smartycraft.ru:58613` gets through. Persisted so users in
-     * those networks set this once and forget.
-     */
-    val forceProxyMode: Boolean = false,
-
-    /**
      * Override for the version string sent in the dashboard handshake,
      * the User-Agent header, and `-Dminecraft.launcher.version`. Null /
      * blank uses `Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION`. Persisted

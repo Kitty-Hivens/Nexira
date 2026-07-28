@@ -26,7 +26,7 @@ import java.nio.file.Path
  * HTTP client for Modrinth's public, key-less `/v2` API. Split out of
  * [hivens.launcher.smrt.SmrtPackClient] so the mirror client stays mirror-only
  * and Modrinth can grow into a first-class catalogue source. Uses the "direct"
- * HttpClient (strict TLS, no SOCKS proxy) -- api.modrinth.com is a public
+ * HttpClient (strict TLS, no per-host bypass) -- api.modrinth.com is a public
  * CDN-fronted endpoint that needs none of the SmartyCraft channel's handling.
  */
 class ModrinthClient(

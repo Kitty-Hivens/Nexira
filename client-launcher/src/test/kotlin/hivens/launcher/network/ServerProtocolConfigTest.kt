@@ -59,7 +59,7 @@ class ServerProtocolConfigTest {
         val resolved = ServerProtocolConfig.resolve(ServerProtocolConfig(baseUrl = "https://www.smartycraft.ru"))
         assertEquals("https://override.example.com", resolved.baseUrl)
         // Non-overridden fields survive the copy.
-        assertEquals(ServerProtocolConfig.DEFAULT_PROXY_PORT, resolved.proxyPort)
+        assertEquals(ServerProtocolConfig.DEFAULT_READ_TIMEOUT_MS, resolved.readTimeoutMs)
     }
 
     @Test

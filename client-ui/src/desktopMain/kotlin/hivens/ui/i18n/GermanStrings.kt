@@ -451,8 +451,6 @@ object GermanStrings : AppStrings {
     override val sslBypassRevoke        = "Widerrufen"
     override fun sslBypassExpiresAt(formatted: String) = "Läuft ab: $formatted"
 
-    override val settingsForceProxyTitle = "Nur Proxy verwenden"
-    override val settingsForceProxyDesc  = "Direktverbindung überspringen und alle Anfragen über den SmartyCraft-SOCKS-Proxy leiten. Aktivieren Sie dies, wenn in Ihrem Netzwerk Direktverbindungen blockiert werden."
 
     override val settingsSectionSmarty           = "Smarty-Server"
     override val settingsOpenSmrtHelperTitle      = "Alternativen smrt-Netzwerk-Helfer verwenden"

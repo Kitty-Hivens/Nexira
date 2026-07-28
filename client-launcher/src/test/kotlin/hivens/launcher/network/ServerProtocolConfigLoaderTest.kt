@@ -34,20 +34,19 @@ class ServerProtocolConfigLoaderTest {
     fun `load returns defaults when file is absent`() {
         val cfg = loader.load(dataDir)
         assertEquals(ServerProtocolConfig.DEFAULT_BASE_URL, cfg.baseUrl)
-        assertEquals(ServerProtocolConfig.DEFAULT_PROXY_HOST, cfg.proxyHost)
-        assertEquals(ServerProtocolConfig.DEFAULT_PROXY_PORT, cfg.proxyPort)
+        assertEquals(ServerProtocolConfig.DEFAULT_CONNECT_TIMEOUT_MS, cfg.connectTimeoutMs)
     }
 
     @Test
     fun `load reads custom baseUrl from server-config json`() {
         Files.writeString(
             dataDir.resolve(ServerProtocolConfigLoader.CONFIG_FILE_NAME),
-            """{"baseUrl": "https://mirror.example.com", "proxyHost": "proxy.mirror.example.com"}""",
+            """{"baseUrl": "https://mirror.example.com", "connectTimeoutMs": 5000}""",
         )
         val cfg = loader.load(dataDir)
         assertEquals("https://mirror.example.com", cfg.baseUrl)
-        assertEquals("proxy.mirror.example.com", cfg.proxyHost)
-        assertEquals(ServerProtocolConfig.DEFAULT_PROXY_PORT, cfg.proxyPort)
+        assertEquals(5_000L, cfg.connectTimeoutMs)
+        assertEquals(ServerProtocolConfig.DEFAULT_READ_TIMEOUT_MS, cfg.readTimeoutMs)
     }
 
     @Test

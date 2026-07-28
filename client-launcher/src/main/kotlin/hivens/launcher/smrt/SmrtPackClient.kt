@@ -26,7 +26,7 @@ import java.io.IOException
 
 /**
  * Thin HTTP wrapper for the smrt mirror's `/v1/...` endpoints. Uses the
- * "direct" HttpClient (strict TLS, no SOCKS proxy) since the mirror is public
+ * "direct" HttpClient (strict TLS, no per-host bypass) since the mirror is public
  * CDN-fronted and needs none of the SC channel's special handling. Modrinth
  * reads live in [hivens.launcher.modrinth.ModrinthClient].
  */
