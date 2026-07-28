@@ -452,8 +452,6 @@ object RussianStrings : AppStrings {
     override val sslBypassRevoke        = "Отозвать"
     override fun sslBypassExpiresAt(formatted: String) = "Истекает: $formatted"
 
-    override val settingsForceProxyTitle = "Только через прокси"
-    override val settingsForceProxyDesc  = "Не пытаться подключаться напрямую — все запросы пойдут через SOCKS-прокси SmartyCraft. Включи если в твоей сети прямое соединение блокируется."
 
     override val settingsSectionSmarty           = "Серверы Smarty"
     override val settingsOpenSmrtHelperTitle      = "Использовать альтернативный хелпер для сети smrt"

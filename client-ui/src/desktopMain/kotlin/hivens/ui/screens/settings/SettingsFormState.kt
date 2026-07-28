@@ -40,7 +40,6 @@ internal class SettingsFormState(initial: SettingsData) {
     var amberUpdatePolicy      by mutableStateOf(initial.amberUpdatePolicy)
     var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
     var adaptiveMemoryEnabled  by mutableStateOf(initial.adaptiveMemoryEnabled)
-    var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
     var mimicOverrideEnabled   by mutableStateOf(!initial.mimicVersionOverride.isNullOrBlank())
     var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
     var useOpenSmrtHelper      by mutableStateOf(initial.useOpenSmrtHelper)
@@ -76,7 +75,6 @@ internal class SettingsFormState(initial: SettingsData) {
             amberUpdatePolicy           = amberUpdatePolicy,
             jvmBuilderEnabled           = jvmBuilderEnabled,
             adaptiveMemoryEnabled       = adaptiveMemoryEnabled,
-            forceProxyMode              = forceProxyMode,
             mimicVersionOverride        = normalisedMimic,
             useOpenSmrtHelper           = useOpenSmrtHelper,
             strictModVerification       = strictModVerification,
