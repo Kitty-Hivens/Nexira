@@ -25,13 +25,14 @@ enum class NxSurfaceLevel { Sunken, Base, Raised, Floating }
  * container put a sunken plane above a base one -- invisible while the palette was
  * hand-picked to our ordering, and inverted the moment it was generated.
  *
- * Monotonic by construction now: adjacent levels carry a tone step in the right
- * direction, and the bevel hairline supplies the second separation signal regardless
- * of the step size.
+ * Monotonic by construction now, and every level except the sunken one sits ABOVE
+ * the ground: `surface` is what the background aliases, so a base plane mapped onto
+ * it would be flush and therefore invisible -- correct by the specification and
+ * useless for cards, which is what our base level actually carries.
  */
 fun NxSurfaceLevel.role(): FrostRole = when (this) {
     NxSurfaceLevel.Sunken   -> FrostRole.SurfaceContainerLowest
-    NxSurfaceLevel.Base     -> FrostRole.Surface
+    NxSurfaceLevel.Base     -> FrostRole.SurfaceContainerLow
     NxSurfaceLevel.Raised   -> FrostRole.SurfaceContainer
     NxSurfaceLevel.Floating -> FrostRole.SurfaceContainerHigh
 }
