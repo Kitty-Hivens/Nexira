@@ -41,7 +41,9 @@ The palette is a function of four inputs: a seed, its source, a tonal variant, a
 
 That last one is what makes generation unconditional. A fresh install with no wallpaper generates from the brand seed instead of falling back to a hand-written palette, so the engine is never bypassed and there is no second code path to keep in sync.
 
-**Severity accents are derived, not fixed.** Success, warning and progress are built from fixed hues at the tone the scheme gave `error`. Borrowing that tone is what makes them follow dark and light and the contrast level without a second solver. Fixing the hue and chroma is what keeps them a code rather than decoration: a monochrome scheme greys its own accents, and a grey success beside a grey error says nothing.
+**Severity accents are derived, not fixed.** Success, warning and progress are built from fixed hues, borrowing both the tone and the chroma the scheme gave `error`. The tone is what makes them follow dark and light and the contrast level without a second solver. The chroma is borrowed rather than fixed because the 2025 spec scales the error role with how expressive the scheme is, so a fixed value would leave a success louder than the error beside it wherever the scheme is quiet. Only the hues stay constant, because severity is a learned code and not a decorative choice.
+
+Worth recording, since it is not obvious: the monochrome variant is not a desaturation filter. It greys its own accents and leaves the error palette alone, measured at chroma 29 against 0.7 on its surfaces. Anything reasoning about "the palette with colour removed" has to account for that.
 
 **The two fixed palettes stop being palettes.** What survives of them is the brand record the generator preserves: source colours, the decorative ramp, glass. The forty-odd generated fields go.
 
