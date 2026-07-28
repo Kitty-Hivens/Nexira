@@ -5,6 +5,7 @@ import hivens.config.Protocol
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import hivens.core.logging.Redactor
 import hivens.core.platform.OS
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.loader.ResolvedRuntime
@@ -525,6 +526,12 @@ internal class GameCommandBuilder(
     }
 
     private fun addSessionAuthArgs(args: MutableList<String>, session: SessionData) {
+        // The game process echoes this token back in ways no log pattern
+        // predicts -- authlib logs it verbatim when it fails to read it as a
+        // JWT. Registering the value here, at the one point where a token
+        // crosses into the process, masks every such echo.
+        Redactor.registerSecret(session.accessToken)
+
         // Never emit a blank uuid/token. An offline relaunch of a server whose
         // per-server SmartyCraft token was never cached leaves accessToken empty,
         // which puts an empty element in argv ("--accessToken" then "") -- the
