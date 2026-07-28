@@ -45,6 +45,10 @@ That last one is what makes generation unconditional. A fresh install with no wa
 
 **The two fixed palettes stop being palettes.** What survives of them is the brand record the generator preserves: source colours, the decorative ramp, glass. The forty-odd generated fields go.
 
+**Contrast sits behind a disclosure.** It is a real parameter and some people want it, so it ships -- but behind a switch that reveals the advanced rendering controls, rather than in the first row a new user meets. The default is standard.
+
+**The second seed ships in the first version.** It works in the engine, and a control held back for later is a control that never arrives.
+
 ### Form
 
 The style axis (`StyleSpec`) is what a theme means from here: corners, borders, surface treatment, elevation, motion, and the shape of switches and badges. It is currently two variants where the second is defined almost entirely by subtraction, which is the real work this ADR does not do. Naming it is the point: the colour half is a library call, the form half is design.
@@ -75,11 +79,19 @@ These change the implementation and are not settled here.
 
 2. **The default variant.** Measured on the current brand hue, the conservative variant leaves surfaces near-neutral and only the accent carries colour, which is the state this ADR calls grey. The most colourful variant tints the surfaces themselves; without a wallpaper the whole window becomes a coloured field, which may be more than wanted. A middle variant keeps the accent faithful at roughly half the surface tint.
 
-3. **Contrast as a user control or an accessibility setting.** The level is a real parameter of the science and raising it widens the plane ladder and lightens accents. Whether it belongs beside the variant chips or in an accessibility section is a product decision.
+3. **Whether a variant change plays the reveal.** The dark/light flip carries a circular reveal because the palette swaps in one recomposition and per-token animation froze the interface. A variant change is the same kind of swap. An alternative worth weighing is animating colour inside the surface primitive instead, where each surface tweens its own resolved colour and no composition-local invalidation occurs.
 
-4. **The second seed in the first version.** Two-tone theming works in the engine today. Exposing it doubles the seed controls for a feature most users will not touch.
+## Open questions raised while writing this
 
-5. **Whether a variant change plays the reveal.** The dark/light flip carries a circular reveal because the palette swaps in one recomposition and per-token animation froze the interface. A variant change is the same kind of swap. An alternative worth weighing is animating colour inside the surface primitive instead, where each surface tweens its own resolved colour and no composition-local invalidation occurs.
+Recorded rather than answered. They are design work, not configuration.
+
+**What "two-tone" means.** The second seed currently feeds the secondary and tertiary palettes, so it splits the accents among themselves and leaves the surfaces alone. A different and arguably more striking reading is that it should feed the neutrals, so the surfaces come from one hue and every accent from another -- a warm background under cool components. The library's explicit-palette constructor supports either. Deciding which one the control means has to happen before it is exposed, or the knob will mean one thing and be wanted for the other.
+
+**What the second and third accents are for.** Measured: `primary` has 198 call sites, `secondary` and `tertiary` have zero. Three accent families are generated, carried in the type, and never spent. Picking a more colourful variant does not fix this -- it produces more colour that nothing renders. Each family needs a rule that includes its negation ("this and nowhere else"), or a second colour only doubles the noise.
+
+**How often the accent is allowed to appear.** 198 uses of one accent is not a palette, it is a wash: when everything is emphasised nothing is. The first move on colour is probably subtraction, not addition, and that is a design pass rather than a code change.
+
+**How planes are allowed to separate.** The surface test asserts a perceptual step in lightness between adjacent planes. A palette whose planes are identical in hue and one step apart in lightness passes it. If planes are meant to differ by colour, the rule has to say so.
 
 ## Consequences
 
