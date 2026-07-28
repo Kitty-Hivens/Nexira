@@ -14,6 +14,8 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
@@ -151,14 +153,31 @@ class SmrtPackClient(
      * resident memory bounded regardless of file size.
      */
     suspend fun downloadStreaming(url: String, consume: suspend (ByteReadChannel) -> Unit) {
+        downloadStreaming(url, resumeFrom = 0L) { _, channel -> consume(channel) }
+    }
+
+    /**
+     * Resuming variant. With [resumeFrom] above zero the request carries a range
+     * header, and [consume] is told whether the server honoured it: `true` means the
+     * channel continues from that offset and the caller appends, `false` means the
+     * response is the whole resource from the start and whatever was kept must be
+     * discarded. A server that ignores ranges is normal, so this is a fact to act on
+     * rather than an error.
+     */
+    suspend fun downloadStreaming(
+        url: String,
+        resumeFrom: Long,
+        consume: suspend (resumed: Boolean, ByteReadChannel) -> Unit,
+    ) {
         httpProvider.current.prepareGet(url) {
             headers.append("User-Agent", USER_AGENT)
+            if (resumeFrom > 0L) headers.append(HttpHeaders.Range, "bytes=$resumeFrom-")
         }.execute { resp ->
             if (!resp.status.isSuccess()) {
                 val body = runCatching { resp.bodyAsText() }.getOrDefault("")
                 throw IOException("GET $url failed: ${resp.status} body=$body")
             }
-            consume(resp.bodyAsChannel())
+            consume(resp.status == HttpStatusCode.PartialContent, resp.bodyAsChannel())
         }
     }
 

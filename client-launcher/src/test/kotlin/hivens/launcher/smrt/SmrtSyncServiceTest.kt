@@ -12,6 +12,7 @@ import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -44,12 +45,25 @@ class SmrtSyncServiceTest {
          ],"assets":[]}
     """.trimIndent()
 
-    private fun syncService(): SmrtSyncService {
+    /**
+     * [failDownloads] cuts the first N mod-file responses the way a middlebox cuts a
+     * transfer: the request is answered and the body then fails to arrive. The
+     * manifest is always served, since a pack that cannot be described never gets as
+     * far as touching the directory.
+     */
+    private fun syncService(failDownloads: Int = 0): SmrtSyncService {
+        var cuts = failDownloads
         val engine = MockEngine { req ->
             when (req.url.toString()) {
                 MANIFEST_URL -> respond(manifest(), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
-                REQ_URL -> respond(ByteReadChannel(reqBytes), HttpStatusCode.OK)
-                OPT_URL -> respond(ByteReadChannel(optBytes), HttpStatusCode.OK)
+                REQ_URL, OPT_URL -> {
+                    if (cuts > 0) {
+                        cuts--
+                        throw IOException("stream was reset: PROTOCOL_ERROR")
+                    }
+                    val bytes = if (req.url.toString() == REQ_URL) reqBytes else optBytes
+                    respond(ByteReadChannel(bytes), HttpStatusCode.OK)
+                }
                 else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
             }
         }
@@ -74,6 +88,46 @@ class SmrtSyncServiceTest {
         syncService().sync("test", dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
         assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "user-enabled optional is active")
         assertFalse(Files.exists(dir.resolve("mods/opt.jar.disabled")), "no leftover .disabled variant")
+    }
+
+    // --- a broken transfer must not cost the instance its contents ---
+
+    @Test
+    fun `a cut transfer is retried rather than failing the pack`() = runTest {
+        val dir = tempDir("sync-retry")
+        syncService(failDownloads = 2).sync("test", dir)
+        assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the retry completed the transfer")
+    }
+
+    @Test
+    fun `a failed sync leaves what was already installed`() = runTest {
+        val dir = tempDir("sync-keep")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.writeString(mods.resolve("foreign.jar"), "from another source")
+
+        // Every attempt is cut, so the sync gives up.
+        val failed = runCatching { syncService(failDownloads = Int.MAX_VALUE).sync("test", dir) }
+        assertTrue(failed.isFailure, "the sync was expected to fail")
+        assertTrue(
+            Files.exists(mods.resolve("foreign.jar")),
+            "a failed install destroyed content it had not replaced",
+        )
+    }
+
+    @Test
+    fun `a completed sync drops the foreign content it replaced`() = runTest {
+        val dir = tempDir("sync-drop")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.writeString(mods.resolve("foreign.jar"), "from another source")
+        Files.createDirectories(mods.resolve("nested")).also {
+            Files.writeString(it.resolve("buried.jar"), "nested payload")
+        }
+
+        syncService().sync("test", dir)
+
+        assertFalse(Files.exists(mods.resolve("foreign.jar")), "foreign jar survived a completed sync")
+        assertFalse(Files.exists(mods.resolve("nested/buried.jar")), "nested payload survived a completed sync")
+        assertTrue(Files.exists(mods.resolve("req.jar")), "the pack's own mod is in place")
     }
 
     private companion object {

@@ -7,6 +7,7 @@ import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
+import hivens.core.util.retryWithBackoff
 import hivens.core.update.UpdatePlan
 import hivens.launcher.FileDownloadService
 import hivens.launcher.ProtectedPaths
@@ -84,12 +85,16 @@ class SmrtSyncService(
             // source independently.
             val marker = clientDir.resolve(SOURCE_MARKER_FILE)
             val previousSource = readSourceMarker(marker)
-            if (previousSource != SOURCE_MIRROR) {
+            val sourceChanged = previousSource != SOURCE_MIRROR
+            if (sourceChanged) {
+                // Noted here, acted on after the downloads succeed. Clearing the
+                // directory up front meant any failure past this point -- one reset
+                // connection out of a hundred files -- left the instance with less
+                // than it started with and nothing to roll back to.
                 log.info(
-                    "smrt sync: source change ({} -> {}), wiping mods/",
+                    "smrt sync: source change ({} -> {}), foreign content will be dropped once the new set is in place",
                     previousSource ?: "<none>", SOURCE_MIRROR,
                 )
-                wipeModsDir(clientDir)
             }
 
             val total = manifest.mods.size + manifest.assets.size
@@ -112,7 +117,8 @@ class SmrtSyncService(
             // without touching the marker, so the wipe gate saw a stale
             // "mirror" value). Only top-level mods/{expected_filename}
             // entries survive.
-            pruneOrphanMods(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+            val expected = manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
+            if (sourceChanged) pruneForeignEntries(clientDir, expected) else pruneOrphanMods(clientDir, expected)
 
             writeSourceMarker(marker, SOURCE_MIRROR)
         }
@@ -256,21 +262,33 @@ class SmrtSyncService(
         if (removed > 0) log.info("smrt sync: pruned {} orphan jar(s) from mods/", removed)
     }
 
-    private fun wipeModsDir(clientDir: Path) {
+    /**
+     * Removes everything under `mods/` that the manifest does not name, keeping the
+     * files just downloaded. Replaces the old wipe-then-download order: the same end
+     * state, reached without a window in which the instance holds neither the old
+     * content nor the new one.
+     *
+     * Walked deepest-first so a directory is considered after its children; one that
+     * still holds a kept file refuses to delete and is left alone.
+     */
+    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>) {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return
         var removed = 0
         Files.walk(modsDir).use { stream ->
-            stream.sorted(Comparator.reverseOrder())
-                .forEach { p ->
-                    if (p == modsDir) return@forEach
-                    runCatching {
-                        fileOpRetry("smrt wipe $p") { Files.delete(p) }
-                        removed++
-                    }.onFailure { log.warn("smrt sync: failed to wipe {}", p, it) }
+            stream.sorted(Comparator.reverseOrder()).forEach { p ->
+                if (p == modsDir) return@forEach
+                val keep = Files.isRegularFile(p) &&
+                    p.parent == modsDir &&
+                    p.fileName.toString() in expected
+                if (keep) return@forEach
+                runCatching {
+                    fileOpRetry("smrt drop foreign $p") { Files.delete(p) }
+                    removed++
                 }
+            }
         }
-        if (removed > 0) log.info("smrt sync: wiped {} entries from mods/", removed)
+        if (removed > 0) log.info("smrt sync: dropped {} foreign entr(ies) from mods/", removed)
     }
 
     private fun readSourceMarker(marker: Path): String? =
@@ -432,16 +450,41 @@ class SmrtSyncService(
     private fun fileIsPresentAndNonEmpty(p: Path): Boolean =
         Files.exists(p) && Files.isRegularFile(p) && Files.size(p) > 0L
 
+    /**
+     * Fetches [url] into [dest], retrying a broken transfer and continuing from
+     * where it stopped rather than starting over.
+     *
+     * Both halves matter on a route that breaks mid-body -- the failure this was
+     * written for is a middlebox resetting the connection partway through a large
+     * file. Without the retry one reset file fails the whole pack; without the
+     * resume the retry re-fetches everything already on disk and is just as likely
+     * to be cut at the same point, so a big file on a bad line never completes.
+     *
+     * The partial lives in the same `.tmp` the commit moves from, so a resumed
+     * attempt appends to real bytes. A server that ignores the range answers with
+     * the whole resource, and then the partial is dropped and the write starts at
+     * zero -- correct either way, just slower.
+     */
     private suspend fun downloadToFile(url: String, dest: Path) {
         val tmp = dest.resolveSibling("${dest.fileName}.tmp")
-        runCatching { Files.deleteIfExists(tmp) }
-        client.downloadStreaming(url) { channel ->
-            FileOutputStream(tmp.toFile()).use { out ->
-                val buf = ByteArray(64 * 1024)
-                while (!channel.isClosedForRead) {
-                    val n = channel.readAvailable(buf, 0, buf.size)
-                    if (n <= 0) break
-                    out.write(buf, 0, n)
+        retryWithBackoff(
+            operation = "smrt download ${dest.fileName}",
+            shouldRetry = { it is IOException },
+        ) {
+            val have = if (Files.exists(tmp)) runCatching { Files.size(tmp) }.getOrDefault(0L) else 0L
+            client.downloadStreaming(url, resumeFrom = have) { resumed, channel ->
+                if (!resumed && have > 0L) {
+                    log.debug("smrt sync: range ignored for {}, restarting the transfer", dest.fileName)
+                }
+                val append = resumed && have > 0L
+                if (!append) runCatching { Files.deleteIfExists(tmp) }
+                FileOutputStream(tmp.toFile(), append).use { out ->
+                    val buf = ByteArray(64 * 1024)
+                    while (!channel.isClosedForRead) {
+                        val n = channel.readAvailable(buf, 0, buf.size)
+                        if (n <= 0) break
+                        out.write(buf, 0, n)
+                    }
                 }
             }
         }
