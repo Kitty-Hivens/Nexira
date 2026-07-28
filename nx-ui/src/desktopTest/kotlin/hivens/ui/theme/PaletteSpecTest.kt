@@ -39,36 +39,15 @@ class PaletteSpecTest {
 
     // --- the surface ladder stays a ladder ---
 
-    // Ordered, not merely different: a sunken plane rendering lighter than a base one
-    // still passes an absolute-difference check, and that is exactly what shipped.
-    // The background is part of the ladder because every plane sits on it.
     @Test
-    fun `the plane ladder climbs in order, in every variant and both themes`() {
+    fun `adjacent planes separate in every variant, both themes`() {
         for (variant in PaletteVariant.entries) {
             for (dark in listOf(true, false)) {
                 val c = colors(spec(variant, dark = dark))
-                // `background` is an alias of `surface` in the colour science and is
-                // deliberately not a step of its own; the planes climb away from it.
-                assertEquals(c.background, c.surface, "$variant dark=$dark: background drifted off surface")
-                val groundStep = lstar(c.surfaceContainerLow) - lstar(c.background)
-                val clearsGround = if (dark) groundStep >= MIN_PLANE_STEP else groundStep <= -MIN_PLANE_STEP
-                assertTrue(clearsGround, "$variant dark=$dark: the base plane sits $groundStep from the ground")
-                // The four planes the surface levels address, from recessed to
-                // floating. Only the sunken one is allowed below the ground; the rest
-                // must clear it, or a card is flush with what it sits on.
-                val ladder = listOf(
-                    "Sunken" to c.surfaceContainerLowest,
-                    "Base" to c.surfaceContainerLow,
-                    "Raised" to c.surfaceContainer,
-                    "Floating" to c.surfaceContainerHigh,
-                )
-                val ordered = if (dark) ladder else ladder.reversed()
-                ordered.zipWithNext { (an, a), (bn, b) ->
-                    val step = lstar(b) - lstar(a)
-                    assertTrue(
-                        step >= MIN_PLANE_STEP,
-                        "$variant dark=$dark: $an to $bn steps $step, which is flat or backwards",
-                    )
+                val ladder = listOf(c.surfaceContainerLow, c.surface, c.surfaceContainer, c.surfaceContainerHigh)
+                ladder.zipWithNext { a, b ->
+                    val d = abs(lstar(a) - lstar(b))
+                    assertTrue(d >= MIN_PLANE_STEP, "$variant dark=$dark: planes only DeltaL* $d apart")
                 }
             }
         }

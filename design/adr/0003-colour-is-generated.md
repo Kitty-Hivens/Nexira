@@ -5,7 +5,26 @@ description: The launcher stops shipping palettes and starts generating them. Co
 
 ## Status
 
-Proposed -- 2026-07-28. Supersedes the preset system introduced with the theme picker; extends nothing.
+**On hold -- 2026-07-28.** Proposed and then pulled back the same day. The engine
+stays; wiring it into the running app does not, because doing so broke the interface
+in two ways worth recording before anyone tries again:
+
+- Raising the surfaces' chroma turned the glass coat into a colour filter. A frosted
+  surface is a translucent layer over a blurred copy of the wallpaper, so it already
+  carries the wallpaper's colour; tinting the surface role applies that colour a
+  second time, and because surfaces nest, each nested one applies it again.
+- The science's own surface ladder is tighter than this interface carries. It spans
+  about 8 L* from the ground to the topmost plane where the hand-written palettes
+  spanned 12, and every plane is then covered by a coat that compresses the
+  difference further, so neighbouring levels stopped reading as separate. The
+  contrast level does not help: it moves on-colours and accents and leaves the
+  ladder identical at every setting.
+
+Both were addressed and the result still read worse than what it replaced, so the
+feature is unstable rather than incremental. What ships is the generator and its
+tests; what does not is any of it deciding what the running app looks like.
+
+Supersedes the preset system introduced with the theme picker; extends nothing.
 
 Depends on nothing outstanding. The generating half landed already: `PaletteSpec` and `generatedNxColors` resolve a seed, a variant, a contrast level and an optional second seed against the 2025 colour spec, with eleven property tests across all nine variants and both themes.
 
