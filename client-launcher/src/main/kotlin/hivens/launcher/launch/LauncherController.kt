@@ -25,6 +25,7 @@ import hivens.core.launch.LaunchState
 import hivens.core.launch.PrepareStage
 import hivens.core.launch.SpawnResult
 import hivens.launcher.di.AppCoroutineScopeHook
+import hivens.launcher.platform.ServerNameValidator
 import hivens.launcher.smrt.ClientSyncCoordinator
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
@@ -397,7 +398,7 @@ class LauncherController(
 
         // 3. Download -- skip in offline mode if client exists
         setStage(PrepareStage.SYNC, 0.2f)
-        val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
+        val clientDir = dataDirectory.resolve("clients").resolve(ServerNameValidator.require(targetServerId))
         if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
 
         if (isOffline) {

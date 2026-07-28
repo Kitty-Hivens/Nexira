@@ -120,4 +120,31 @@ class SmartyCraftServerListServiceTest {
             .fetchDashboardData().await()
         assertEquals(0, store2.saved.size, "an empty/failed fetch must not overwrite the tray seed")
     }
+
+    @Test
+    fun `a server whose assetDir is not a usable directory name never enters the roster`() = runBlocking {
+        // assetDir arrives from the server and becomes a directory under
+        // clients/ that gets written into and, from the pack settings screen,
+        // deleted recursively. Screened here, where the list enters, so no
+        // downstream caller has to remember to.
+        val protocol = FakeServerProtocol().apply {
+            loaderResult = {
+                LoaderResponse(
+                    status = "OK",
+                    servers = listOf(
+                        SmartyServer(id = "Industrial", ip = "127.0.0.1"),
+                        SmartyServer(id = "evil", ip = "127.0.0.1", _assetDir = "../../../.config/autostart"),
+                    ),
+                )
+            }
+        }
+        val store = RecordingStore()
+        val data = SmartyCraftServerListService(
+            ServerRepository(protocol), cache = store, dashboardCache = memCache(),
+        ).fetchDashboardData().await()
+
+        assertEquals(listOf("Industrial"), data.servers.map { it.assetDir })
+        assertEquals(listOf("Industrial"), store.saved.single().map { it.assetDir },
+            "the rejected entry must not reach the tray seed either")
+    }
 }
