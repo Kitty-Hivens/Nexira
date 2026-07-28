@@ -89,8 +89,16 @@ data class SettingsData(
     val paletteFromWallpaper: Boolean = true,
     /** Where the seed comes from -- see [PaletteSource]. The palette is always generated. */
     val paletteSource: PaletteSource = PaletteSource.Wallpaper,
-    /** Which tonal strategy turns the seed into a scheme -- see [PaletteVariant]. */
-    val paletteVariant: PaletteVariant = PaletteVariant.Vibrant,
+    /**
+     * Which tonal strategy turns the seed into a scheme -- see [PaletteVariant].
+     *
+     * The conservative one is the default on purpose. The surface system draws a
+     * translucent coat over a blurred copy of the wallpaper, which is where a
+     * surface gets its colour from; a variant that also tints the surface role
+     * applies that colour a second time, and nested surfaces multiply it. Colour in
+     * the accent is free, colour in the surfaces is not.
+     */
+    val paletteVariant: PaletteVariant = PaletteVariant.TonalSpot,
     /**
      * Contrast level handed to the colour science: -1 reduced, 0 standard, 1 maximum.
      * Solved into the scheme rather than applied afterwards, so on-colours are
