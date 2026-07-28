@@ -304,7 +304,8 @@ object NxTheme {
         get() = LocalNxColors.current
 }
 
-private fun parseHexColorOrNull(hex: String): Color? = try {
+/** Parses `#RRGGBB` / `#AARRGGBB` (with or without the hash), or null if it will not parse. */
+fun parseHexColorOrNull(hex: String): Color? = try {
     val clean = hex.trim().removePrefix("#")
     val full = if (clean.length == 6) "FF$clean" else clean
     Color(full.toLong(16))

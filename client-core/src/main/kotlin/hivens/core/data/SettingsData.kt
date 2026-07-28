@@ -81,12 +81,29 @@ data class SettingsData(
     val memoryMB: Int = 6144,
     val isDarkTheme: Boolean = true,
     /**
-     * Derive the colour palette from the wallpaper (Material You / Monet): the
-     * dominant colour of the background seeds tinted tonal surfaces, so planes
-     * differ by colour, not just lightness. On by default. Off -> the fixed
-     * Celestia palette (and manual theme overrides) apply as before.
+     * Legacy mirror of `paletteSource == Wallpaper`, kept so a downgrade to a build
+     * that predates [paletteSource] still honours the opt-out. New code reads
+     * [paletteSource] through [resolveInitialPaletteSource] and only writes this
+     * field in step with it.
      */
     val paletteFromWallpaper: Boolean = true,
+    /** Where the seed comes from -- see [PaletteSource]. The palette is always generated. */
+    val paletteSource: PaletteSource = PaletteSource.Wallpaper,
+    /** Which tonal strategy turns the seed into a scheme -- see [PaletteVariant]. */
+    val paletteVariant: PaletteVariant = PaletteVariant.Vibrant,
+    /**
+     * Contrast level handed to the colour science: -1 reduced, 0 standard, 1 maximum.
+     * Solved into the scheme rather than applied afterwards, so on-colours are
+     * re-resolved against their backgrounds instead of being lightened blindly.
+     */
+    val paletteContrast: Float = 0f,
+    /** Seed chosen by the user, `#RRGGBB`. Read when [paletteSource] is Custom. */
+    val paletteCustomSeed: String? = null,
+    /**
+     * Optional second seed for two-tone schemes, `#RRGGBB`. Null means every palette
+     * comes from the one seed.
+     */
+    val paletteSecondarySeed: String? = null,
     /**
      * Legacy mirror of `themeMode == Wallpaper`, kept so a downgrade to a build
      * that predates [themeMode] still honours the wallpaper opt-in. New code
