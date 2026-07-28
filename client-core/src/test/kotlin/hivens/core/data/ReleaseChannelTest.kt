@@ -23,6 +23,17 @@ class ReleaseChannelTest {
     }
 
     @Test
+    fun `only a suffix starting with nightly is a nightly`() {
+        // The release workflow exempts nightlies from its review gate and must
+        // read a tag the same way this does. It used to test the whole tag for
+        // the substring, so these three walked past the gate while classify
+        // still sorted them onto a pre-release channel and shipped them.
+        assertEquals(ReleaseChannel.Beta,    ReleaseChannel.classify("9.9.9-rc1nightly"))
+        assertEquals(ReleaseChannel.Beta,    ReleaseChannel.classify("9.9.9-rc1-nightly5"))
+        assertEquals(ReleaseChannel.Release, ReleaseChannel.classify("nightly"))
+    }
+
+    @Test
     fun `a dirty or commits-ahead git-describe is a source build (Dev)`() {
         assertEquals(ReleaseChannel.Dev, ReleaseChannel.classify("2.3.4-beta4-17-g5c1a7ee-dirty"))
         assertEquals(ReleaseChannel.Dev, ReleaseChannel.classify("2.3.4-beta4-17-g5c1a7ee"))
