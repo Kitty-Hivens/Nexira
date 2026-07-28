@@ -52,6 +52,7 @@ fun generatedNxColors(base: NxColors, spec: PaletteSpec): NxColors {
         background           = role(m.background()),
         surface              = role(m.surface()),
         surfaceVariant       = role(m.surfaceVariant()),
+        surfaceContainerLowest = role(m.surfaceContainerLowest()),
         surfaceContainerLow  = role(m.surfaceContainerLow()),
         surfaceContainer     = role(m.surfaceContainer()),
         surfaceContainerHigh = role(m.surfaceContainerHigh()),

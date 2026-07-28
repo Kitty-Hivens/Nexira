@@ -39,15 +39,33 @@ class PaletteSpecTest {
 
     // --- the surface ladder stays a ladder ---
 
+    // Ordered, not merely different: a sunken plane rendering lighter than a base one
+    // still passes an absolute-difference check, and that is exactly what shipped.
+    // The background is part of the ladder because every plane sits on it.
     @Test
-    fun `adjacent planes separate in every variant, both themes`() {
+    fun `the plane ladder climbs in order, in every variant and both themes`() {
         for (variant in PaletteVariant.entries) {
             for (dark in listOf(true, false)) {
                 val c = colors(spec(variant, dark = dark))
-                val ladder = listOf(c.surfaceContainerLow, c.surface, c.surfaceContainer, c.surfaceContainerHigh)
-                ladder.zipWithNext { a, b ->
-                    val d = abs(lstar(a) - lstar(b))
-                    assertTrue(d >= MIN_PLANE_STEP, "$variant dark=$dark: planes only DeltaL* $d apart")
+                // `background` is an alias of `surface` in the colour science and is
+                // deliberately not a step of its own; the planes climb away from it.
+                assertEquals(c.background, c.surface, "$variant dark=$dark: background drifted off surface")
+                // The four planes the surface levels actually address, from recessed
+                // to floating. `surfaceContainerLowest` sits BELOW `surface` in a dark
+                // theme, which is what makes a sunken plane read as sunken.
+                val ladder = listOf(
+                    "Sunken" to c.surfaceContainerLowest,
+                    "Base" to c.surface,
+                    "Raised" to c.surfaceContainer,
+                    "Floating" to c.surfaceContainerHigh,
+                )
+                val ordered = if (dark) ladder else ladder.reversed()
+                ordered.zipWithNext { (an, a), (bn, b) ->
+                    val step = lstar(b) - lstar(a)
+                    assertTrue(
+                        step >= MIN_PLANE_STEP,
+                        "$variant dark=$dark: $an to $bn steps $step, which is flat or backwards",
+                    )
                 }
             }
         }
