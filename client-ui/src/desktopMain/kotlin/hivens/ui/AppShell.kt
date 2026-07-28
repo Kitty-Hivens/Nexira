@@ -1160,13 +1160,11 @@ fun AppRoot(
             }
             val resolution = withContext(Dispatchers.IO) {
                 AutoLoginCoordinator.resolveSession(
-                    settings            = settings,
-                    saved               = saved,
-                    lastServerId        = profileManager.lastServerId,
-                    authService         = authService,
-                    insecureAuthService = insecureAuthService,
-                    protocolConfig      = protocolConfig,
-                    msaProvider         = msaProvider,
+                    settings     = settings,
+                    saved        = saved,
+                    lastServerId = profileManager.lastServerId,
+                    authService  = authService,
+                    msaProvider  = msaProvider,
                 )
             }
             when (resolution) {
@@ -1184,7 +1182,12 @@ fun AppRoot(
                     return@LaunchedEffect
                 }
                 AutoLoginCoordinator.Resolution.NoCredentials,
-                AutoLoginCoordinator.Resolution.Rejected -> {
+                AutoLoginCoordinator.Resolution.Rejected,
+                // The certificate decision belongs to the user. Dropping to the
+                // login form routes them to the prompt that asks for it, which
+                // also grants the bypass and restores silent auto-login from the
+                // next start.
+                AutoLoginCoordinator.Resolution.CertificateUntrusted -> {
                     appState = AppState.Unauthenticated
                     return@LaunchedEffect
                 }

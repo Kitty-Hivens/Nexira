@@ -113,12 +113,21 @@ import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import java.net.Socket
 import java.nio.file.Path
+import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLEngine
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManager
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -151,30 +160,25 @@ val networkModule = module {
     // [HttpClientProvider]'s KDoc.
 
     /**
-     * Smartycraft insecure client (SSL verification disabled).
-     * Registered only for the explicit "connect anyway" user flow.
-     * Never injected by default -- must be requested by `named("insecure")`.
+     * Smartycraft bypass client. Backs the explicit "connect anyway" user
+     * flow; requested by `named("insecure")` or handed out by the default
+     * [HttpClientProvider] once a grant exists, so a caller that has just
+     * granted a bypass can stay on the regular `authService` and reach the
+     * same transport.
      *
-     * The default `HttpClientProvider` already returns this insecure
-     * client when `NetworkState.bypassFor()` is true (see
-     * `single<HttpClientProvider>` below), so a caller that has just
-     * granted bypass via `NetworkState.grantBypass()` can switch back
-     * to the regular `authService` and reach the same transport. The
-     * `named("insecure")` chain (this client + dependent IServerProtocol
-     * / AuthProvider) is therefore redundant for the standard "Connect
-     * anyway" flow and is slated for removal once the UI call sites are
-     * migrated. Until then it stays -- still useful as a one-shot
-     * insecure transport that doesn't require touching `NetworkState`.
+     * It is NOT a trust-nothing client: see [buildBypassScopedSsl]. Skipping
+     * verification is scoped to a host the user granted, so this client
+     * validates every other host exactly as the direct one does.
      */
     single<OkHttpClient>(named("insecure")) {
         val cfg: ServerProtocolConfig = get()
-        val (socketFactory, trustManager) = buildTrustAllSsl()
+        val (socketFactory, trustManager) = buildBypassScopedSsl()
 
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
-            .hostnameVerifier { _, _ -> true }
+            .hostnameVerifier(bypassScopedHostnameVerifier())
             .build()
     }
 
@@ -206,12 +210,15 @@ val networkModule = module {
     }
 
     /**
-     * Default (smartycraft) [HttpClientProvider] -- thin wrapper that picks
-     * the cert mode on every request: the insecure client while the user
-     * holds a live bypass for the smartycraft host, the direct client
+     * Default (smartycraft) [HttpClientProvider] -- hands out the bypass
+     * client while a grant for the smartycraft host is live, the direct one
      * otherwise. Reading [NetworkState] per request rather than at
-     * construction is what lets a bypass granted mid-session take effect on
-     * the next call instead of after a relaunch.
+     * construction is what lets a grant made mid-session take effect on the
+     * next call instead of after a relaunch.
+     *
+     * This choice is routing, not enforcement: the bypass client scopes its
+     * own relaxation to granted hosts, so picking it for a request to some
+     * other host still validates that host normally.
      */
     single {
         val cfg: ServerProtocolConfig = get()
@@ -246,11 +253,14 @@ val networkModule = module {
      * adjacent registrations under one diff.
      */
     single<Call.Factory> {
-        val cfg: ServerProtocolConfig = get()
         val direct   = get<OkHttpClient>(named("direct"))
         val insecure = get<OkHttpClient>(named("insecure"))
         Call.Factory { request ->
-            val client = if (NetworkState.bypassFor(cfg.sslBypassHost)) insecure else direct
+            // The request's own host, not the configured smartycraft one. This
+            // factory backs the process-wide Coil loader, so keying on a fixed
+            // host meant a grant for smartycraft also relaxed pack art from the
+            // mirror and Modrinth.
+            val client = if (NetworkState.bypassFor(request.url.host)) insecure else direct
             client.newCall(request)
         }
     }
@@ -860,17 +870,82 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
  * Allows connecting to servers with expired certificates
  * when the user explicitly accepts the risk.
  */
-private fun buildTrustAllSsl(): Pair<SSLSocketFactory, X509TrustManager> {
-    val trustManager = object : X509TrustManager {
-        override fun checkClientTrusted(
-            chain: Array<X509Certificate>, authType: String
-        ) = Unit
-        override fun checkServerTrusted(
-            chain: Array<X509Certificate>, authType: String
-        ) = Unit
-        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+/**
+ * TLS for the bypass channel, scoped to the host the connection is actually
+ * being made to.
+ *
+ * A bypass is a grant for one host. Building a client that trusts everything
+ * and then choosing that client by a rule elsewhere makes the choosing rule
+ * the security boundary, and a rule in a DI lambda is a poor place for one:
+ * the process-wide Coil loader shares this client, so a grant for the
+ * SmartyCraft host used to turn certificate checking off for pack art from
+ * the mirror and from Modrinth too.
+ *
+ * Here the peer's own name decides. Verification is skipped only while
+ * [NetworkState] holds a live grant for that exact host; every other host on
+ * the same client gets full platform validation. Which client a call site
+ * picks is then a routing detail, not a security decision.
+ */
+private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
+    val platform = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+        .apply { init(null as KeyStore?) }
+        .trustManagers
+        .filterIsInstance<X509ExtendedTrustManager>()
+        .first()
+
+    val trustManager = object : X509ExtendedTrustManager() {
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) {
+            if (granted(peerHostOf(socket))) return
+            platform.checkServerTrusted(chain, authType, socket)
+        }
+
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) {
+            if (granted(engine?.peerHost)) return
+            platform.checkServerTrusted(chain, authType, engine)
+        }
+
+        /**
+         * The socket-less overload carries no peer identity, so there is no
+         * host to match a grant against. Validate for real rather than guess.
+         * OkHttp always takes one of the overloads above.
+         */
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) =
+            platform.checkServerTrusted(chain, authType)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) =
+            platform.checkClientTrusted(chain, authType, socket)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) =
+            platform.checkClientTrusted(chain, authType, engine)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) =
+            platform.checkClientTrusted(chain, authType)
+
+        override fun getAcceptedIssuers(): Array<X509Certificate> = platform.acceptedIssuers
     }
+
     val ctx = SSLContext.getInstance("TLS")
-    ctx.init(null, arrayOf(trustManager), SecureRandom())
+    ctx.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
     return ctx.socketFactory to trustManager
+}
+
+/** True when the user currently holds a bypass for [host]. Null host never matches. */
+private fun granted(host: String?): Boolean = host != null && NetworkState.bypassFor(host)
+
+/**
+ * Peer name for an in-progress handshake. `handshakeSession` is the JSSE hook
+ * meant for exactly this window; `socket.inetAddress` is deliberately not used,
+ * since it would resolve a name by reverse DNS and match a grant against
+ * something the user never agreed to.
+ */
+private fun peerHostOf(socket: Socket?): String? =
+    (socket as? SSLSocket)?.handshakeSession?.peerHost
+
+/**
+ * Hostname verification for the bypass channel: skipped for a host under a
+ * live grant, the platform check for everything else.
+ */
+private fun bypassScopedHostnameVerifier(): HostnameVerifier {
+    val platform = HttpsURLConnection.getDefaultHostnameVerifier()
+    return HostnameVerifier { host, session -> granted(host) || platform.verify(host, session) }
 }
