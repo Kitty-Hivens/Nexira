@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.core.api.HttpClientProvider
+import hivens.core.io.resolveWithinRoot
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.launch.SyncProgress
 import hivens.core.data.FileData
@@ -159,7 +160,7 @@ class FileDownloadService(
         // user can't map back to a launcher-side cause.
         val cacheValid = manifestCache.isClean(serverId, manifestHash) {
             filesMap.entries.all { (rawPath, fileData) ->
-                val path = targetDir.resolve(normalizePath(rawPath))
+                val path = resolveWithinRoot(targetDir, normalizePath(rawPath), rawPath)
                 runCatching {
                     val attrs = Files.readAttributes(path, BasicFileAttributes::class.java)
                     attrs.isRegularFile && attrs.size() == fileData.size
@@ -288,7 +289,7 @@ class FileDownloadService(
         var checked = 0
         for ((rawPath, data) in files) {
             val cleanPath = normalizePath(rawPath)
-            if (isFileMissingOrChanged(baseDir.resolve(cleanPath), data.md5, cleanPath)) {
+            if (isFileMissingOrChanged(resolveWithinRoot(baseDir, cleanPath, rawPath), data.md5, cleanPath)) {
                 filesToDownload[rawPath] = data
             }
             checked++
@@ -360,7 +361,7 @@ class FileDownloadService(
                         if (!isActive) throw CancellationException()
 
                         val cleanPath = normalizePath(rawPath)
-                        val targetFile = baseDir.resolve(cleanPath)
+                        val targetFile = resolveWithinRoot(baseDir, cleanPath, rawPath)
 
                         downloadFileInternal(rawPath, targetFile) { bytesRead ->
                             // We just increase the counter. We don't touch the UI.
@@ -578,7 +579,7 @@ class FileDownloadService(
         messageUI: ((String) -> Unit)?
     ) {
         val extraKey = files.keys.firstOrNull { normalizePath(it).endsWith("extra.zip") } ?: return
-        val localZip = baseDir.resolve(normalizePath(extraKey))
+        val localZip = resolveWithinRoot(baseDir, normalizePath(extraKey), extraKey)
         if (!Files.exists(localZip)) return
 
         val localHash = try { calculateMD5(localZip) } catch (_: Exception) { "" }
@@ -626,7 +627,13 @@ class FileDownloadService(
                 logger.debug("orphan {} kept -- protected path", rel)
                 continue
             }
-            val target = baseDir.resolve(rel)
+            // The index this list came from lives inside the directory
+            // extra.zip unpacks into, so the archive can rewrite it and choose
+            // what the next sync deletes.
+            val target = runCatching { resolveWithinRoot(baseDir, rel) }.getOrElse {
+                logger.warn("orphan {} skipped -- {}", rel, it.message)
+                continue
+            }
             try {
                 if (Files.deleteIfExists(target)) pruned++
             } catch (e: Exception) {
@@ -655,6 +662,11 @@ class FileDownloadService(
 
     /**
      * Removes prefixes like "Industrial/mods/..." -> "mods/..."
+     *
+     * Naming only. Whether the result may be written is decided by
+     * [resolveWithinRoot] at each resolve site, not here: this function has no
+     * root to compare against, and a caller that trusted it to sanitise would
+     * be trusting a string transform to make a filesystem decision.
      */
     internal fun normalizePath(rawPath: String): String {
         val parts = rawPath.split("/")

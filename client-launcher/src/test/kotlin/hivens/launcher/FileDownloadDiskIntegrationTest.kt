@@ -578,6 +578,59 @@ class FileDownloadDiskIntegrationTest {
             "failed sync must NOT mark manifest as cleanly-synced")
     }
 
+    // ── Hostile manifest ───────────────────────────────────────────────────
+
+    @Test
+    fun `a manifest entry climbing out of the instance writes nothing outside it`() = runBlocking {
+        // The manifest is a document the server sends, so its paths are the
+        // server's to choose. Nested `..` keys flatten to `mods/../../..`,
+        // whose first segment still reads as a known root directory, and
+        // Path.resolve does not normalise -- the write used to land wherever
+        // the entry pointed. The realistic target is a startup file.
+        val payload = "#!/bin/sh\necho pwned".toByteArray()
+        val escaping = "mods/../../../pwned.sh"
+        val (svc, _) = newService(mapOf(escaping to payload))
+
+        assertFails {
+            svc.processSession(
+                session = sessionWith(manifestOf(mapOf(escaping to payload))),
+                serverId = "Industrial",
+                targetDir = clientDir,
+                extraCheckSum = null,
+                ignoredFiles = null,
+                messageUI = null,
+                progressUI = null,
+            )
+        }
+
+        // clientDir is <workDir>/clients/Industrial, so three levels up is
+        // workDir's parent -- outside the sandbox entirely. Assert against the
+        // resolved location rather than trusting the exception alone.
+        val escaped = clientDir.resolve(escaping).normalize()
+        assertTrue(!Files.exists(escaped), "a manifest entry wrote outside the instance: $escaped")
+    }
+
+    @Test
+    fun `an absolute manifest entry lands inside the instance, not at its own path`() = runBlocking {
+        // Not a traversal on this platform, and worth pinning as such: the
+        // leading empty segment is not a known root directory, so normalizePath
+        // strips it as a server-name prefix and what remains is relative. The
+        // boundary check still stands behind that for the shapes it does not
+        // neutralise -- a Windows drive-qualified path splits into one segment
+        // and stays absolute. Refusal itself is covered in PathBoundaryTest.
+        val marker = workDir / "absolute-escape.txt"
+        val payload = "x".toByteArray()
+        val entry = marker.toString()
+        val manifest = FileManifest(files = mapOf(entry to FileData(md5 = md5Hex(payload), size = payload.size.toLong())))
+        val (svc, _) = newService(mapOf(entry to payload))
+
+        runCatching {
+            svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+        }
+
+        assertTrue(!Files.exists(marker), "an absolute entry wrote to its own path")
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /**
