@@ -587,9 +587,19 @@ class FileDownloadDiskIntegrationTest {
         // whose first segment still reads as a known root directory, and
         // Path.resolve does not normalise -- the write used to land wherever
         // the entry pointed. The realistic target is a startup file.
+        //
+        // Served by a mock that answers every URL, deliberately: matching by
+        // path made the test vacuous, because ktor normalises the dot segments
+        // out of the request and the unmatched-URL branch failed the sync
+        // before anything was written. The transport must not be what stops
+        // this -- the boundary check must.
         val payload = "#!/bin/sh\necho pwned".toByteArray()
         val escaping = "mods/../../../pwned.sh"
-        val (svc, _) = newService(mapOf(escaping to payload))
+        // The climb goes through mods/, and the OS only resolves `..` through a
+        // directory that exists -- without this the write fails on its own and
+        // the test proves nothing. Every synced instance has one.
+        Files.createDirectories(clientDir.resolve("mods"))
+        val svc = service(HttpClientProvider(alwaysRespondingClient(payload)))
 
         assertFails {
             svc.processSession(
@@ -676,6 +686,25 @@ class FileDownloadDiskIntegrationTest {
             }
         }
         return service(HttpClientProvider { client })
+    }
+
+    /**
+     * Serves [payload] for any URL. Used where the point of the test is what
+     * the service does with a path, so a mock that 404s an unexpected URL
+     * would hide the behaviour under test.
+     */
+    private fun alwaysRespondingClient(payload: ByteArray): () -> HttpClient = {
+        HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    respond(
+                        content = ByteReadChannel(payload),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf("Content-Type", "application/octet-stream"),
+                    )
+                }
+            }
+        }
     }
 
     private fun service(provider: HttpClientProvider): FileDownloadService {
