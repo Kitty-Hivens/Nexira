@@ -2,8 +2,8 @@
 """Regenerate the bundled Material Symbols icon set for Nexira.
 
 Reads tools/icons/icons.txt and writes:
-  - client-ui/src/desktopMain/kotlin/hivens/ui/icons/NxIcon.kt   (typed codepoint catalog)
-  - client-ui/src/commonMain/composeResources/font/material_symbols.ttf   (subset)
+  - nx-ui/src/desktopMain/kotlin/hivens/ui/icons/NxIcon.kt   (typed codepoint catalog)
+  - nx-ui/src/commonMain/composeResources/font/material_symbols.ttf   (subset)
 
 Icons are rendered by codepoint (not ligature), so the font is subset with
 --unicodes to exactly the listed glyphs -- it carries only what the app uses.
@@ -24,8 +24,8 @@ from fontTools.ttLib import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MANIFEST = os.path.join(ROOT, "tools", "icons", "icons.txt")
-KT_OUT = os.path.join(ROOT, "client-ui", "src", "desktopMain", "kotlin", "hivens", "ui", "icons", "NxIcon.kt")
-FONT_OUT = os.path.join(ROOT, "client-ui", "src", "commonMain", "composeResources", "font", "material_symbols.ttf")
+KT_OUT = os.path.join(ROOT, "nx-ui", "src", "desktopMain", "kotlin", "hivens", "ui", "icons", "NxIcon.kt")
+FONT_OUT = os.path.join(ROOT, "nx-ui", "src", "commonMain", "composeResources", "font", "material_symbols.ttf")
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/ttf-material-symbols-variable/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf",
