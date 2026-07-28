@@ -8,6 +8,7 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
+import hivens.launcher.platform.ServerNameValidator
 import hivens.launcher.smrt.ClientSyncCoordinator
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
@@ -199,7 +200,9 @@ class AutoSyncService(
             val settings = settingsProvider()
             val userState = optionalModsStateProvider(server.assetDir)
             val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
-            val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
+            // Second gate behind the server-list screening: this name came from
+            // a server response and is about to become a directory we write into.
+            val clientDir = dataDirectory.resolve("clients").resolve(ServerNameValidator.require(server.assetDir))
             val smartyPlan = runCatching { smartyPlanner.plan(server, session.fileManifest, settings) }
                 .getOrElse {
                     log.warn("Auto-sync: Smarty planning failed for {}: {}", server.assetDir, it.message)

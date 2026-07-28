@@ -148,6 +148,28 @@ class JsonServerListCacheStoreTest {
         assertEquals(emptyList(), noop.load())
     }
 
+    @Test
+    fun `a cached server whose assetDir is not a usable directory name is dropped`() {
+        // The file holds whatever an earlier build accepted, and assetDir
+        // becomes a directory the launcher writes into and the reset button
+        // deletes recursively. A hostile entry must not re-enter through it.
+        Files.writeString(
+            file,
+            """
+            {"schema_version":1,"servers":[
+              {"name":"good","title":"Good","version":"1.12.2","ip":"127.0.0.1","port":25566,
+               "assetDir":"Industrial","source":"Smartycraft"},
+              {"name":"evil","title":"Evil","version":"1.12.2","ip":"127.0.0.1","port":25566,
+               "assetDir":"../../../.config/autostart","source":"Smartycraft"}
+            ]}
+            """.trimIndent(),
+        )
+
+        val loaded = JsonServerListCacheStore(file, json).load()
+
+        assertEquals(listOf("Industrial"), loaded.map { it.assetDir })
+    }
+
     private fun sampleServer(id: String, title: String) = ServerProfile(
         name      = id,
         title     = title,
