@@ -51,7 +51,14 @@ class PathBoundaryTest {
     fun `an absolute entry is refused`() {
         // Path.resolve replaces the root outright when handed an absolute path,
         // which is the quietest escape of the lot.
-        assertFailsWith<IOException> { resolveWithinRoot(root, "/etc/passwd") }
+        //
+        // Built from the filesystem's own root rather than written as
+        // "/etc/passwd": on Windows that string is rooted but has no drive, so
+        // it is not absolute and resolve() would append it -- landing back
+        // inside the root and passing for the wrong reason. This yields /evil
+        // on POSIX and C:\evil on Windows, absolute on both.
+        val absolute = root.toAbsolutePath().root!!.resolve("evil").toString()
+        assertFailsWith<IOException> { resolveWithinRoot(root, absolute) }
     }
 
     @Test
