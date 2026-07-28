@@ -27,17 +27,21 @@ fun generatedNxColors(base: NxColors, spec: PaletteSpec): NxColors {
     fun role(dc: DynamicColor): Color = Color(dc.getArgb(scheme))
 
     // Severity accents are not Material roles -- the spec has `error` and nothing
-    // for success, warning or progress -- so they are built here from fixed hues at
-    // the tone the scheme chose for error. Borrowing that tone is what makes them
-    // follow dark/light and the contrast level without a second contrast solver:
-    // whatever legibility treatment error received, they receive. The hues stay
-    // fixed because severity is a learned code, not a decorative choice, and the
-    // chroma is fixed for the same reason -- a Monochrome scheme greys its own
-    // accents, but a grey "success" next to a grey "error" says nothing.
+    // for success, warning or progress -- so they are built here from fixed hues,
+    // borrowing BOTH the tone and the chroma the scheme gave error. The tone is what
+    // makes them follow dark/light and the contrast level without a second contrast
+    // solver: whatever legibility treatment error received, they receive. The chroma
+    // is borrowed rather than fixed because the 2025 spec scales error with how
+    // expressive the scheme is -- roughly 29 on a monochrome scheme against 60 on a
+    // colourful one -- and a fixed value would leave a success louder than the error
+    // beside it wherever the scheme is quiet. Only the hues stay constant, because
+    // severity is a learned code and not a decorative choice.
     val errorArgb = m.error().getArgb(scheme)
-    val severityTone = Hct.fromInt(errorArgb).tone.roundToInt()
+    val errorHct = Hct.fromInt(errorArgb)
+    val severityTone = errorHct.tone.roundToInt()
+    val severityChroma = errorHct.chroma
     fun severity(hue: Double): Color =
-        Color(TonalPalette.fromHueAndChroma(hue, SEVERITY_CHROMA).tone(severityTone))
+        Color(TonalPalette.fromHueAndChroma(hue, severityChroma).tone(severityTone))
 
     return base.copy(
         primary              = role(m.primary()),
@@ -75,7 +79,3 @@ fun seededNxColors(base: NxColors, seedArgb: Int, dark: Boolean): NxColors =
 private const val SUCCESS_HUE = 145.0
 private const val WARN_HUE = 75.0
 private const val PROGRESS_HUE = 255.0
-
-// Enough chroma to read as a colour rather than a tint at any tone the error role
-// reaches, without competing with the accent for attention.
-private const val SEVERITY_CHROMA = 48.0

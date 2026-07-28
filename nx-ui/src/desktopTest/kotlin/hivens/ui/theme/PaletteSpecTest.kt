@@ -107,12 +107,30 @@ class PaletteSpecTest {
         }
     }
 
+    // Monochrome is not a desaturation filter: it greys its own accents and leaves the
+    // error palette alone, so severity must stay visible there -- but never louder
+    // than the error it sits beside.
     @Test
-    fun `monochrome greys the accent but not the severities`() {
+    fun `monochrome greys the accent while severity tracks the error role`() {
         val c = colors(spec(PaletteVariant.Monochrome))
         assertTrue(chroma(c.primary) < 8.0, "Monochrome kept chroma ${chroma(c.primary)} on the accent")
-        listOf(c.success, c.warnAccent, c.criticalAccent).forEach {
+        listOf(c.success, c.warnAccent).forEach {
             assertTrue(chroma(it) > 20.0, "a severity was greyed out to chroma ${chroma(it)}")
+        }
+    }
+
+    @Test
+    fun `no severity outshouts the error it sits beside, in any variant`() {
+        for (variant in PaletteVariant.entries) {
+            val c = colors(spec(variant))
+            val errorChroma = chroma(c.criticalAccent)
+            listOf("success" to c.success, "warn" to c.warnAccent, "progress" to c.progressAccent)
+                .forEach { (name, colour) ->
+                    assertTrue(
+                        chroma(colour) <= errorChroma + 1.0,
+                        "$variant: $name at chroma ${chroma(colour)} against error at $errorChroma",
+                    )
+                }
         }
     }
 
