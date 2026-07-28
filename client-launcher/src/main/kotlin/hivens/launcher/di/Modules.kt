@@ -109,6 +109,7 @@ import java.net.Authenticator
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import okhttp3.OkHttpClient
+import okhttp3.Protocol as HttpProtocol
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
@@ -234,6 +235,12 @@ val networkModule = module {
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
+            // HTTP/1.1 only. This channel carries the pack downloads, which are
+            // fetched one file at a time, so multiplexing buys nothing while h2's
+            // framing adds a failure mode we have seen in the wild: a middlebox on
+            // a filtered route resets the stream mid-body with PROTOCOL_ERROR and
+            // the transfer dies. One request per connection has no stream to reset.
+            .protocols(listOf(HttpProtocol.HTTP_1_1))
             .build()
     }
 
