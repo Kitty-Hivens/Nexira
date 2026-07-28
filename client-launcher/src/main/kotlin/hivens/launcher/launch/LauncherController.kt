@@ -14,7 +14,6 @@ import hivens.core.data.OfflineIdentity
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.core.io.InstanceMutationLock
@@ -603,11 +602,14 @@ class LauncherController(
                     javaPathOverride     = javaOverride,
                     allocatedMemoryMB    = settings.memoryMB,
                     adaptiveEnabled      = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
-                    // Redirect authlib to the mirror auth host only for
-                    // mirror-derived packs. A Modrinth / local / own pack keeps
-                    // the default Mojang hosts so its own auth provider stands.
-                    redirectAuthHost     = refreshedInstance.packRef.origin
-                        .let { it == PackOrigin.Smartycraft || it == PackOrigin.Mirror },
+                    // Redirect authlib away from the Mojang hosts only when the
+                    // session being carried is an SC one. Keying this on the
+                    // pack's ORIGIN instead put a mirror pack with no auth block
+                    // behind the redirect while PackAuthRouter had already
+                    // resolved it to Microsoft -- the launch would hand a
+                    // Microsoft token to the SC host. Same test the service uses
+                    // for its SC binding, so the two cannot disagree.
+                    redirectAuthHost     = authRequirement?.scServerId != null,
                     // Auth mechanism for an SC-bound join: the redirect agent
                     // (default on) and/or SC's patched authlib jar (default off,
                     // fallback). Both no-op on non-SC packs.

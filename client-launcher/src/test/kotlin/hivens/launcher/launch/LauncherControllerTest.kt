@@ -335,6 +335,7 @@ class LauncherControllerTest {
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
                 displayName        = any(),
                 onLog              = any(),
             )
@@ -465,6 +466,7 @@ class LauncherControllerTest {
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
                 displayName        = any(),
                 onLog              = any(),
             )
@@ -596,7 +598,7 @@ class LauncherControllerTest {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
                 clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
-                adaptiveEnabled = any(), displayName = any(), onLog = any(),
+                adaptiveEnabled = any(), redirectAuthHost = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -657,6 +659,72 @@ class LauncherControllerTest {
 
         assertEquals(false, agentFlag.captured, "useNetworkAgent must be forwarded as set")
         assertEquals(true, swapFlag.captured, "useSmartycraftAuthLib must be forwarded as set")
+    }
+
+    @Test
+    fun `a mirror pack with no SC binding does not get the auth host redirected`() = runTest {
+        // PackAuthRouter resolves a mirror pack with no auth block to Microsoft.
+        // The redirect used to key on the pack ORIGIN, so that pack launched with
+        // -Dminecraft.api.session.host pointed at the SC host while carrying a
+        // Microsoft token -- the token would have gone to SC as soon as the
+        // provider is registered.
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val redirect = slot<Boolean>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                redirectAuthHost = capture(redirect), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "ms-token"),
+            packInstance   = scBoundPackInstance(authRequirement = null, origin = PackOrigin.Mirror),
+        )
+        advanceUntilIdle()
+
+        assertEquals(false, redirect.captured, "a Microsoft-resolved pack must keep the Mojang auth hosts")
+    }
+
+    @Test
+    fun `an SC-bound pack still gets the auth host redirected`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val redirect = slot<Boolean>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                redirectAuthHost = capture(redirect), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(true, redirect.captured, "an SC join still needs the redirect")
     }
 
     @Test
