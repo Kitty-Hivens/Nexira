@@ -160,35 +160,21 @@ val LocalNxColors = staticCompositionLocalOf<NxColors> {
 
 // --- THEME WITH ANIMATION AND SUPPORT FOR CUSTOM THEMES ---
 
-/**
- * The palette a theme starts from, before presets, accent overrides and the tonal
- * expansion land on top. Wallpaper seeding (Monet) applies only when it is switched
- * on AND a seed was extracted; either half missing falls back to the fixed palette,
- * which is what the off state of the switch has to mean -- a preset then reads as it
- * was designed instead of tinted by whatever is behind the window.
- */
-internal fun resolveBasePalette(dark: Boolean, seed: Int?, fromWallpaper: Boolean): NxColors {
-    val fixed = if (dark) DarkColorPalette else LightColorPalette
-    return if (fromWallpaper && seed != null) seededNxColors(fixed, seed, dark) else fixed
-}
-
 @Composable
 fun NxTheme(
     useDarkTheme: Boolean = true,
     customTheme: CustomTheme? = null,
     style: StyleSpec = CelestiaStyle,
-    // Material You: when [paletteFromWallpaper] is on and a [paletteSeed] (ARGB,
-    // extracted from the wallpaper) is available, the base palette is generated from
-    // it -- tinted tonal surfaces seeded by the background. Otherwise the fixed
-    // Celestia palette. Defaulted so other call sites (the console window) are unaffected.
-    paletteSeed: Int? = null,
-    paletteFromWallpaper: Boolean = false,
+    // The palette to generate. Null keeps the fixed brand record, which is what a
+    // preview outside the shell (the console window) wants -- the running app always
+    // passes a spec, because generation is unconditional there.
+    palette: PaletteSpec? = null,
     content: @Composable () -> Unit
 ) {
     val customization = LocalCustomization.current
 
-    // Base palette: fixed Celestia, or wallpaper-seeded (Monet) when enabled.
-    val baseColors = resolveBasePalette(useDarkTheme, paletteSeed, paletteFromWallpaper)
+    val fixed = if (useDarkTheme) DarkColorPalette else LightColorPalette
+    val baseColors = palette?.let { generatedNxColors(fixed, it) } ?: fixed
 
     val themedColors = if (customTheme != null) {
         baseColors.copy(
