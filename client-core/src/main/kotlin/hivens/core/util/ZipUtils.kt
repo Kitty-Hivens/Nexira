@@ -15,6 +15,10 @@ object ZipUtils {
      * orphan-pruning in `FileDownloadService` -- snapshot the previous
      * unpack, diff the next, remove what the upstream modpack dropped.
      *
+     * [reserved] names the caller will not let the archive write -- entry
+     * names matching are skipped. Used where the destination holds a file the
+     * caller depends on being its own.
+     *
      * Security: plain Zip Slip (`startsWith(destDir)`) catches `../`
      * traversal in entry names but not symbolic-link entries. A symlink
      * entry named `safe.txt` whose payload points to `~/.ssh/id_rsa`
@@ -26,7 +30,7 @@ object ZipUtils {
      * external-attributes field that holds the unix file-type bits
      * needed to detect and refuse the symlink.
      */
-    fun unzip(zipFile: File, destDir: File): List<String> {
+    fun unzip(zipFile: File, destDir: File, reserved: Set<String> = emptySet()): List<String> {
         if (!destDir.exists()) destDir.mkdirs()
         val buffer = ByteArray(8192)
         val extracted = mutableListOf<String>()
@@ -40,6 +44,14 @@ object ZipUtils {
                 val destFilePath = newFile.canonicalPath
                 if (!destFilePath.startsWith(destDirPath + File.separator)) {
                     logger.warn("Missed attempt to go outside the folder when unpacking: {}", zipEntry.name)
+                    continue
+                }
+
+                // Names the caller keeps for itself. An archive that unpacks
+                // into a directory holding the caller's own bookkeeping could
+                // otherwise overwrite it and dictate what that bookkeeping says.
+                if (zipEntry.name.trimStart('/') in reserved) {
+                    logger.warn("Refusing reserved entry from archive {}: {}", zipFile.name, zipEntry.name)
                     continue
                 }
 

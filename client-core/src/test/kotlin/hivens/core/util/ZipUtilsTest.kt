@@ -97,4 +97,28 @@ class ZipUtilsTest {
         assertTrue(extracted.isEmpty(), "Zip Slip entry must be excluded")
         assertFalse(File(workDir, "escape.txt").exists(), "no file must appear in the parent dir")
     }
+
+    @Test
+    fun `unzip refuses an entry whose name the caller reserved`() {
+        // The extra.zip unpack keeps its prune index in the same directory it
+        // unpacks into. An archive shipping that name would otherwise choose
+        // what the next sync deletes.
+        val zip = File(workDir, "reserved.zip")
+        ZipArchiveOutputStream(FileOutputStream(zip)).use { zos ->
+            zos.putArchiveEntry(ZipArchiveEntry(".extra_unpacked_index.json"))
+            zos.write("""{"hash":"","paths":["mods/victim.jar"]}""".toByteArray())
+            zos.closeArchiveEntry()
+            zos.putArchiveEntry(ZipArchiveEntry("mods/real.jar"))
+            zos.write("jar".toByteArray())
+            zos.closeArchiveEntry()
+        }
+
+        val dest = File(workDir, "reserved-dest").also { it.mkdirs() }
+        val ours = File(dest, ".extra_unpacked_index.json").also { it.writeText("ours") }
+
+        val extracted = ZipUtils.unzip(zip, dest, reserved = setOf(".extra_unpacked_index.json"))
+
+        assertEquals(listOf("mods/real.jar"), extracted, "the reserved entry must not be reported as extracted")
+        assertEquals("ours", ours.readText(), "the reserved file must not be overwritten")
+    }
 }
