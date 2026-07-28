@@ -15,8 +15,8 @@ class NxSurfaceTest {
 
     @Test
     fun `each level maps to its ladder role`() {
-        assertEquals(FrostRole.SurfaceContainerLowest, NxSurfaceLevel.Sunken.role())
-        assertEquals(FrostRole.SurfaceContainerLow, NxSurfaceLevel.Base.role())
+        assertEquals(FrostRole.SurfaceContainerLow, NxSurfaceLevel.Sunken.role())
+        assertEquals(FrostRole.Surface, NxSurfaceLevel.Base.role())
         assertEquals(FrostRole.SurfaceContainer, NxSurfaceLevel.Raised.role())
         assertEquals(FrostRole.SurfaceContainerHigh, NxSurfaceLevel.Floating.role())
     }
@@ -91,7 +91,6 @@ class NxSurfaceTest {
 
         fun NxColors.ladderColor(role: FrostRole): Color = when (role) {
             FrostRole.Surface              -> surface
-            FrostRole.SurfaceContainerLowest -> surfaceContainerLowest
             FrostRole.SurfaceContainerLow  -> surfaceContainerLow
             FrostRole.SurfaceContainer     -> surfaceContainer
             FrostRole.SurfaceContainerHigh -> surfaceContainerHigh

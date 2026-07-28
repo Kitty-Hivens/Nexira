@@ -34,7 +34,6 @@ import hivens.core.data.HomeView
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackOrigin
-import hivens.core.data.PaletteSource
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
@@ -100,7 +99,6 @@ import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.paletteSpecFor
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
@@ -308,9 +306,9 @@ fun FrameWindowScope.AppShellContent(
     // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
     // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
     // the palette from it. Default-on; the seed is null until a bitmap is decoded.
-    // The palette settings are state here so a change in the appearance surface
-    // repaints without a restart. Everything else about the palette is derived.
-    var paletteSettings by remember { mutableStateOf(settings) }
+    // Switching seeding off is how a theme preset is seen in its own colours, so the
+    // flag is state here rather than a read of the startup snapshot.
+    var paletteFromWallpaper by remember { mutableStateOf(settings.paletteFromWallpaper) }
     var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
     // Which source drives dark/light: the manual toggle, the OS scheme, or the
     // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
@@ -895,7 +893,8 @@ fun FrameWindowScope.AppShellContent(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
                 style        = effectiveStyle,
-                palette      = paletteSpecFor(paletteSettings, isDarkTheme, wallpaperSeed),
+                paletteSeed  = wallpaperSeed,
+                paletteFromWallpaper = paletteFromWallpaper,
             ) {
                 ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
@@ -956,13 +955,12 @@ fun FrameWindowScope.AppShellContent(
                             ))
                         },
                         systemThemeAvailable = systemThemeAvailable,
-                        paletteFromWallpaper = paletteSettings.paletteSource == PaletteSource.Wallpaper,
+                        paletteFromWallpaper = paletteFromWallpaper,
                         onPaletteFromWallpaperChanged = { seeded ->
-                            val source = if (seeded) PaletteSource.Wallpaper else PaletteSource.Brand
-                            val updated = settingsService.getSettings()
-                                .copy(paletteSource = source, paletteFromWallpaper = seeded)
-                            settingsService.saveSettings(updated)
-                            paletteSettings = updated
+                            paletteFromWallpaper = seeded
+                            settingsService.saveSettings(
+                                settingsService.getSettings().copy(paletteFromWallpaper = seeded),
+                            )
                         },
                         customTheme          = customTheme,
                         onCustomThemeChanged = { newTheme ->
@@ -1004,7 +1002,8 @@ fun FrameWindowScope.AppShellContent(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
                 style        = effectiveStyle,
-                palette      = paletteSpecFor(paletteSettings, isDarkTheme, wallpaperSeed),
+                paletteSeed  = wallpaperSeed,
+                paletteFromWallpaper = paletteFromWallpaper,
             ) {
                 DebugOverlay(debugOverlay)
             }

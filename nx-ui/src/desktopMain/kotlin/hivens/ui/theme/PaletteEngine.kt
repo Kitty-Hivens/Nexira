@@ -30,33 +30,17 @@ fun generatedNxColors(base: NxColors, spec: PaletteSpec): NxColors {
     // for success, warning or progress -- so they are built here from fixed hues,
     // borrowing BOTH the tone and the chroma the scheme gave error. The tone is what
     // makes them follow dark/light and the contrast level without a second contrast
-    // solver: whatever legibility treatment error received, they receive. The chroma
-    // is borrowed rather than fixed because the 2025 spec scales error with how
-    // expressive the scheme is -- roughly 29 on a monochrome scheme against 60 on a
-    // colourful one -- and a fixed value would leave a success louder than the error
-    // beside it wherever the scheme is quiet. Only the hues stay constant, because
-    // severity is a learned code and not a decorative choice.
+    // solver. The chroma is borrowed rather than fixed because the 2025 spec scales
+    // error with how expressive the scheme is -- roughly 29 on a monochrome scheme
+    // against 60 on a colourful one -- and a fixed value would leave a success
+    // louder than the error beside it wherever the scheme is quiet. Only the hues
+    // stay constant, because severity is a learned code and not a decorative choice.
     val errorArgb = m.error().getArgb(scheme)
     val errorHct = Hct.fromInt(errorArgb)
     val severityTone = errorHct.tone.roundToInt()
     val severityChroma = errorHct.chroma
     fun severity(hue: Double): Color =
         Color(TonalPalette.fromHueAndChroma(hue, severityChroma).tone(severityTone))
-
-    // The science's own ladder is tighter than this interface can carry. It spans
-    // roughly 8 L* from the ground to the topmost plane where the hand-written
-    // palettes spanned 12, and every plane here is then covered by a translucent
-    // coat that compresses the difference again -- so cards at neighbouring levels
-    // stop reading as separate. The planes are therefore respaced against the
-    // ground at a fixed step, keeping the hue and chroma the scheme chose and
-    // moving only the tone. Same idea as the body floor in the surface system: the
-    // science decides the colour, the design system guarantees the separation.
-    val groundTone = Hct.fromInt(m.surface().getArgb(scheme)).tone
-    val up = if (spec.dark) 1.0 else -1.0
-    fun plane(dc: DynamicColor, steps: Double): Color {
-        val h = Hct.fromInt(dc.getArgb(scheme))
-        return Color(Hct.from(h.hue, h.chroma, (groundTone + up * PLANE_STEP * steps).coerceIn(0.0, 100.0)).toInt())
-    }
 
     return base.copy(
         primary              = role(m.primary()),
@@ -67,10 +51,9 @@ fun generatedNxColors(base: NxColors, spec: PaletteSpec): NxColors {
         background           = role(m.background()),
         surface              = role(m.surface()),
         surfaceVariant       = role(m.surfaceVariant()),
-        surfaceContainerLowest = plane(m.surfaceContainerLowest(), -1.0),
-        surfaceContainerLow  = plane(m.surfaceContainerLow(), 1.0),
-        surfaceContainer     = plane(m.surfaceContainer(), 2.1),
-        surfaceContainerHigh = plane(m.surfaceContainerHigh(), 3.2),
+        surfaceContainerLow  = role(m.surfaceContainerLow()),
+        surfaceContainer     = role(m.surfaceContainer()),
+        surfaceContainerHigh = role(m.surfaceContainerHigh()),
         outline              = role(m.outline()),
         onPrimary            = role(m.onPrimary()),
         onSecondary          = role(m.onSecondary()),
@@ -89,11 +72,6 @@ fun generatedNxColors(base: NxColors, spec: PaletteSpec): NxColors {
 /** Single-seed shorthand: the default variant at standard contrast. */
 fun seededNxColors(base: NxColors, seedArgb: Int, dark: Boolean): NxColors =
     generatedNxColors(base, PaletteSpec(seedArgb = seedArgb, dark = dark))
-
-// One plane step in HCT tone. Chosen so the topmost plane lands where the
-// hand-written palettes put it, which is the separation this interface was drawn
-// against and the point at which a coated card still reads as a card.
-private const val PLANE_STEP = 4.1
 
 // Severity hues in HCT degrees: green, amber, blue. Far enough apart that the three
 // stay separable at one tone, and none of them lands on the red the error role owns.
