@@ -7,6 +7,7 @@ import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
+import hivens.core.io.resolveWithinRoot
 import hivens.core.util.retryWithBackoff
 import hivens.core.update.UpdatePlan
 import hivens.launcher.FileDownloadService
@@ -369,17 +370,8 @@ class SmrtSyncService(
      * to `toRealPath(NOFOLLOW_LINKS)` per parent component before
      * the startsWith comparison.
      */
-    private fun resolveSafe(root: Path, relative: String, label: String): Path {
-        val resolved = root.resolve(relative).normalize()
-        val rootNormalized = root.normalize()
-        if (!resolved.startsWith(rootNormalized)) {
-            throw IOException(
-                "smrt manifest entry $label resolves outside the instance " +
-                    "directory ($resolved); refusing to write."
-            )
-        }
-        return resolved
-    }
+    private fun resolveSafe(root: Path, relative: String, label: String): Path =
+        resolveWithinRoot(root, relative, label)
 
     private suspend fun downloadIfNeeded(
         dest: Path,
