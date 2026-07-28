@@ -10,11 +10,7 @@ import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
-import hivens.launcher.network.NetworkState
-import hivens.launcher.network.ServerProtocolConfig
 import org.slf4j.LoggerFactory
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 /**
  * Resolves the launcher's initial auth state from cached credentials.
@@ -33,9 +29,8 @@ import java.time.temporal.ChronoUnit
  *   [TwoFactorRequiredException], trust the cached accessToken in `saved`
  *   (2FA accounts already paid the 2FA cost when they got that token --
  *   re-validating on every startup defeats the point). On
- *   [AuthException] with `isSslError`, auto-grant the SSL bypass for 30
- *   days (the user implicitly consented by previously saving credentials
- *   through a cert outage) and retry through the SSL-bypass auth service.
+ *   [AuthException] with `isSslError`, stop at [Resolution.CertificateUntrusted]
+ *   and leave the decision to the user.
  *   On any other failure, return null and let the user re-enter manually.
  * - **No cached password.** Return [Resolution.NoCredentials].
  *
@@ -66,6 +61,15 @@ object AutoLoginCoordinator {
 
         /** Network-shaped failure: the server was never reached. Retryable. */
         data object NetworkDown : Resolution
+
+        /**
+         * The host presented a certificate we do not trust. Terminal here on
+         * purpose: disabling certificate verification is the user's call, taken
+         * at the explicit prompt in the login panel, and an attacker who can
+         * present a bad certificate is exactly who benefits from the launcher
+         * making that call on its own.
+         */
+        data object CertificateUntrusted : Resolution
     }
 
     suspend fun resolveSession(
@@ -73,8 +77,6 @@ object AutoLoginCoordinator {
         saved: SessionData?,
         lastServerId: String?,
         authService: AuthProvider,
-        insecureAuthService: AuthProvider,
-        protocolConfig: ServerProtocolConfig,
         msaProvider: RefreshableAuthProvider? = null,
     ): Resolution {
         if (settings.isOfflineMode) {
@@ -131,13 +133,11 @@ object AutoLoginCoordinator {
             Resolution.Success(saved.copy(serverId = lastServerId))
         } catch (e: AuthException) {
             when {
-                e.isSslError -> recoverWithSslBypass(
-                    saved = saved,
-                    cachedPass = cachedPass,
-                    server = server,
-                    insecureAuthService = insecureAuthService,
-                    protocolConfig = protocolConfig,
-                )
+                e.isSslError -> {
+                    log.warn("Cached-credential auto-login hit a certificate error -- the bypass is the user's to grant")
+                    ActionRing.record("Auto-login stopped: certificate not trusted, awaiting an explicit decision")
+                    Resolution.CertificateUntrusted
+                }
                 e.isNetworkError -> {
                     log.warn("Cached-credential auto-login failed (network down): {}", e.message)
                     Resolution.NetworkDown
@@ -172,32 +172,4 @@ object AutoLoginCoordinator {
         return ladder.getOrNull(attempt) ?: 300_000L
     }
 
-    /**
-     * Auto-grant on cached-credential cert error gets the same 30-day
-     * expiry as user-initiated accept (RightPanel). The user accepted
-     * the SSL bypass implicitly by saving credentials through a prior
-     * cert outage; we extend that consent until the cert issue resolves
-     * or 30 days, whichever comes first.
-     */
-    private suspend fun recoverWithSslBypass(
-        saved: SessionData,
-        cachedPass: String,
-        server: String,
-        insecureAuthService: AuthProvider,
-        protocolConfig: ServerProtocolConfig,
-    ): Resolution {
-        val until = Instant.now().plus(30, ChronoUnit.DAYS)
-        ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) -- 30 days")
-        NetworkState.grantBypass(protocolConfig.sslBypassHost, until)
-        return try {
-            Resolution.Success(insecureAuthService.login(saved.playerName, cachedPass, server))
-        } catch (e: Exception) {
-            log.warn("Auto-login with cached credentials failed after SSL bypass", e)
-            if (e is AuthException && e.isNetworkError || e is java.io.IOException) {
-                Resolution.NetworkDown
-            } else {
-                Resolution.Rejected
-            }
-        }
-    }
 }

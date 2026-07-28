@@ -17,6 +17,9 @@ ksp               = "2.3.10"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
 ktor              = "3.5.1"
+# Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
+# certificate helper matches the TLS stack under test.
+okhttp            = "5.3.2"
 koin              = "4.2.2"
 xodus             = "2.0.1"
 serialization     = "1.11.0"
@@ -120,6 +123,8 @@ ktor-client-okhttp              = { group = "io.ktor", name = "ktor-client-okhtt
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation",  version.ref = "ktor" }
 ktor-serialization-json         = { group = "io.ktor", name = "ktor-serialization-kotlinx-json",  version.ref = "ktor" }
 ktor-client-mock                = { group = "io.ktor", name = "ktor-client-mock",                 version.ref = "ktor" }
+# Self-signed certificates for the TLS-scoping test. Test scope only.
+okhttp-tls                      = { group = "com.squareup.okhttp3", name = "okhttp-tls",          version.ref = "okhttp" }
 
 # Ktor server (puppet HTTP control surface in client-ui — see hivens.ui.puppet)
 ktor-server-core                = { group = "io.ktor", name = "ktor-server-core",                 version.ref = "ktor" }

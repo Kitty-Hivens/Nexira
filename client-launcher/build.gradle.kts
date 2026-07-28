@@ -41,6 +41,7 @@ dependencies {
     // ─── TEST ────────────────────────────────────────────────────────────────
     testImplementation(kotlin("test"))
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.okhttp.tls)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.slf4j.simple)
