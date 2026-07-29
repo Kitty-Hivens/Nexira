@@ -10,6 +10,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -124,6 +125,7 @@ class GameConsoleService(
         data class StartSession(val packId: String?) : Msg
         data object Clear : Msg
         data class LoadHistory(val count: Int, val result: CompletableDeferred<List<LogEntry>>) : Msg
+        data class Close(val done: CompletableDeferred<Unit>) : Msg
     }
 
     /**
@@ -188,6 +190,10 @@ class GameConsoleService(
                 historyOffset = 0
             }
             is Msg.LoadHistory -> msg.result.complete(pageHistory(msg.count))
+            is Msg.Close -> {
+                closeWriter()
+                msg.done.complete(Unit)
+            }
         }
     }
 
@@ -235,6 +241,24 @@ class GameConsoleService(
         val result = CompletableDeferred<List<LogEntry>>()
         channel.trySend(Msg.LoadHistory(count, result))
         return result.await()
+    }
+
+    /**
+     * Stop the drainer and let go of the session file. Routed through the channel
+     * so the writer is closed by its owner thread, after every already-queued line
+     * has been mirrored.
+     *
+     * The Koin singleton lives as long as the process, so nothing in the shell
+     * calls this; it exists for callers that must release the handle while the
+     * process keeps running -- a test tearing down its temp dir, or a data-dir
+     * migration. Windows refuses to delete or move a file that is still open.
+     * Idempotent: a second call finds the channel closed and returns.
+     */
+    suspend fun close() {
+        val done = CompletableDeferred<Unit>()
+        if (channel.trySend(Msg.Close(done)).isSuccess) done.await()
+        channel.close()
+        scope.cancel()
     }
 
     // ── Drainer-thread implementation ────────────────────────────────────────
