@@ -1,6 +1,7 @@
 package hivens.ui.screens
 
 import androidx.compose.runtime.Composable
+import hivens.core.io.deleteTree
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -226,7 +227,8 @@ internal class ServerSettingsState(
     /** Wipe clients/<assetDir> irrecoverably, persist, then notify [onDone]. */
     fun resetClient(onDone: () -> Unit) {
         val dir = clientDirOrNull() ?: return
-        dir.toFile().deleteRecursively()
+        runCatching { deleteTree(dir) }
+            .onFailure { log.warn("Reset of {} did not finish", dir, it) }
         save()
         onDone()
     }

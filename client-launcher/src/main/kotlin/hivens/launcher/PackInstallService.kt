@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.core.api.catalogue.CataloguePack
+import hivens.core.io.deleteTree
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -170,7 +171,7 @@ class PackInstallService(
     private fun cleanupReserved(dirs: Set<Path>) {
         for (dir in dirs) {
             runCatching {
-                if (Files.isDirectory(dir)) dir.toFile().deleteRecursively()
+                if (Files.isDirectory(dir)) deleteTree(dir)
             }.onFailure { log.warn("failed to remove partial install dir {}", dir, it) }
         }
     }
