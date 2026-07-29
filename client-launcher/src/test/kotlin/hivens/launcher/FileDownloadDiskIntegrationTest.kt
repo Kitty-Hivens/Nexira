@@ -649,6 +649,30 @@ class FileDownloadDiskIntegrationTest {
         assertTrue(!Files.exists(target), "bytes that failed the hash check were installed anyway")
     }
 
+    @Test
+    fun `strict mod check deletes a foreign zip, which a 1_7_10 loader would have run`() = runBlocking {
+        // Forge 1.7.10 discovers mods matching `(.+).(zip|jar)$`; the pattern is
+        // gone by 1.12.2. The launcher does not get to assume the newer loader,
+        // since a SmartyCraft server with no version in the list defaults to
+        // 1.7.10, so a prune that only knew about .jar left a loadable file.
+        val files = mapOf("mods/keeper.jar" to "keep me".toByteArray())
+        val (svc, _) = newService(files)
+
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.write(clientDir.resolve("mods/cheat.zip"), "loadable on 1.7.10".toByteArray())
+
+        svc.processSession(
+            sessionWith(manifestOf(files)), "Industrial", clientDir,
+            null, null, null, null,
+            strictModCheck = true,
+        )
+
+        assertTrue(!Files.exists(clientDir.resolve("mods/cheat.zip")),
+            "a foreign .zip in mods/ survived the strict check")
+        assertTrue(Files.exists(clientDir.resolve("mods/keeper.jar")),
+            "the manifest jar must still survive")
+    }
+
     // ── Hostile manifest ───────────────────────────────────────────────────
 
     @Test

@@ -13,6 +13,7 @@ import hivens.core.util.ZipUtils
 import hivens.core.util.retryWithBackoff
 import hivens.launcher.smrt.ModInjector
 import hivens.launcher.util.ClientRootDirs
+import hivens.launcher.util.ModArchives
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -246,7 +247,7 @@ class FileDownloadService(
         try {
             Files.walk(modsDir).use { stream ->
                 stream
-                    .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
+                    .filter { Files.isRegularFile(it) && ModArchives.isLoadable(it.fileName.toString()) }
                     .forEach { jar ->
                         val name = jar.fileName.toString()
                         val rel = baseNorm.relativize(jar.normalize()).toString().replace('\\', '/')

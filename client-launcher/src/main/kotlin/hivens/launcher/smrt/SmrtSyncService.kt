@@ -11,6 +11,7 @@ import hivens.core.io.resolveWithinRoot
 import hivens.core.util.retryWithBackoff
 import hivens.core.update.UpdatePlan
 import hivens.launcher.FileDownloadService
+import hivens.launcher.util.ModArchives
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.util.sha1Of
@@ -247,7 +248,7 @@ class SmrtSyncService(
         if (!Files.isDirectory(modsDir)) return
         var removed = 0
         Files.walk(modsDir).use { stream ->
-            stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
+            stream.filter { Files.isRegularFile(it) && ModArchives.isLoadable(it.fileName.toString()) }
                 .forEach { jar ->
                     val isCanonical = jar.parent == modsDir &&
                         jar.fileName.toString() in expected
