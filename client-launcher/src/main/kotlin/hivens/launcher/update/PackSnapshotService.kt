@@ -1,6 +1,7 @@
 package hivens.launcher.update
 
 import hivens.core.data.PackInstance
+import hivens.core.io.deleteTree
 import hivens.core.io.AtomicFiles
 import hivens.core.update.PackSnapshot
 import kotlinx.serialization.Serializable
@@ -132,7 +133,7 @@ class PackSnapshotService(
 
     fun delete(instanceDirName: String, id: String) {
         val dir = rootFor(instanceDirName).resolve(id)
-        runCatching { dir.toFile().deleteRecursively() }
+        runCatching { deleteTree(dir) }
             .onFailure { log.warn("snapshot: failed to delete {} for {}", id, instanceDirName, it) }
     }
 

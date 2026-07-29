@@ -1,6 +1,7 @@
 package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.io.deleteTree
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
@@ -125,7 +126,7 @@ class ModernInstallerResolver(
         }
         // A leftover dir with no marker is a failed prior run -- start clean so
         // the installer never appends to half-written state.
-        deleteRecursively(dotMinecraft)
+        deleteTree(dotMinecraft)
         Files.createDirectories(dotMinecraft)
         // The installer's --installClient mode requires a launcher_profiles.json
         // in the target; it adds a profile entry there.
@@ -236,21 +237,6 @@ class ModernInstallerResolver(
             if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
             FileOutputStream(dest.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
         }
-    }
-
-    private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
-            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                Files.delete(file)
-                return FileVisitResult.CONTINUE
-            }
-
-            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-                Files.delete(dir)
-                return FileVisitResult.CONTINUE
-            }
-        })
     }
 
     companion object {
