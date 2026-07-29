@@ -140,6 +140,14 @@ subprojects {
             "--enable-native-access=ALL-UNNAMED"
         )
 
+        // Per-test bound, so a deadlock names the method instead of only the
+        // module. SEPARATE_THREAD is the load-bearing half: the default mode
+        // measures a test that already returned, which never fires on a hang.
+        // Two minutes is an order of magnitude past the slowest suite here, so
+        // reaching it means stuck, not slow.
+        systemProperty("junit.jupiter.execution.timeout.default", "2m")
+        systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
+
         // A deadlocked test worker is worse than a failing one: GitHub withholds
         // a job's log until the job ends, so a hang yields no test report and no
         // stack -- just a job sitting on the 6-hour limit while the release
