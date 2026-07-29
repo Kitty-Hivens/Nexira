@@ -17,6 +17,7 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
 import org.junit.jupiter.api.condition.EnabledOnOs
+import hivens.core.platform.OS as PlatformOS
 import org.junit.jupiter.api.condition.OS
 import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
@@ -796,5 +797,28 @@ class JavaManagerServiceTest {
 
         assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.incoming")))
         assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.previous")))
+    }
+
+    @Test
+    fun `a bad download through the real path leaves the previous runtime installed`() {
+        // The three cases above drive installUnpacked directly, which pins its
+        // contract but not that the download path still uses it. This one goes
+        // through getJavaPath, so it fails if that wiring is ever undone.
+        val target = workDir.resolve("java-21-${PlatformOS.platform.bellsoft}-${PlatformOS.arch.bellsoft}")
+        val exe = target.resolve("bin/java")
+        Files.createDirectories(exe.parent)
+        // Present and executable so it is FOUND, but not a real program, so the
+        // -version probe fails and the service proceeds to re-download. A stub
+        // that exits cleanly would short-circuit before any download happens.
+        Files.writeString(exe, "definitely not an ELF header")
+        exe.toFile().setExecutable(true)
+
+        val garbage = synthesiseJdkTarGz("garbage/bin/not-java")
+        val svc = JavaManagerService(workDir, mockClientWithBytes(garbage))
+
+        assertFails { runBlocking { svc.getJavaPathForMajor(21) } }
+
+        assertTrue(Files.exists(exe), "a failed re-download destroyed the runtime it was replacing")
+        assertEquals("definitely not an ELF header", Files.readString(exe))
     }
 }
