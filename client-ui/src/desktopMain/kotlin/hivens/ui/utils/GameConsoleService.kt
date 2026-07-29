@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
 import java.io.File
@@ -256,9 +257,19 @@ class GameConsoleService(
      */
     suspend fun close() {
         val done = CompletableDeferred<Unit>()
-        if (channel.trySend(Msg.Close(done)).isSuccess) done.await()
+        val queued = channel.trySend(Msg.Close(done)).isSuccess
+        // Bounded on purpose. The drainer owns the writer, so the handshake is
+        // what keeps queued lines ordered ahead of the close -- but a drainer
+        // that died on an unexpected throw would otherwise strand the caller
+        // forever, and a console mirror is never worth hanging a shutdown over.
+        val acked = queued && withTimeoutOrNull(CLOSE_ACK_TIMEOUT_MS) { done.await() } != null
         channel.close()
         scope.cancel()
+        if (queued && !acked) {
+            // Nothing is draining any more, so there is no writer to race with.
+            log.warn("Console drainer did not acknowledge close; releasing the session file directly")
+            closeWriter()
+        }
     }
 
     // ── Drainer-thread implementation ────────────────────────────────────────
@@ -485,6 +496,9 @@ class GameConsoleService(
     companion object {
         private const val MARKER_WARN  = "[WARN]"
         private const val MARKER_ERROR = "[ERROR]"
+
+        /** How long [close] waits for the drainer to hand the writer back. */
+        private const val CLOSE_ACK_TIMEOUT_MS = 5_000L
 
         /** Filesystem-safe form of a pack/server id for log file names. */
         private fun sanitizeId(id: String): String =
