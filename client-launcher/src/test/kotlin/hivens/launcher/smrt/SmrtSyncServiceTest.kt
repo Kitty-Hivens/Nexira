@@ -137,7 +137,13 @@ class SmrtSyncServiceTest {
         // `(.+).(zip|jar)$` out of mods/. Pruning only .jar left a loadable
         // file behind on exactly those packs.
         val dir = tempDir("sync-drop-zip")
-        val mods = Files.createDirectories(dir.resolve("mods"))
+        // Synced once first, so the instance is already marked mirror-sourced.
+        // Without that the next sync counts as a source change and takes the
+        // drop-everything branch, which removes the file whatever its
+        // extension -- the test would pass without exercising the orphan prune
+        // at all.
+        syncService().sync("test", dir)
+        val mods = dir.resolve("mods")
         Files.writeString(mods.resolve("foreign.zip"), "loadable on 1.7.10")
 
         syncService().sync("test", dir)
