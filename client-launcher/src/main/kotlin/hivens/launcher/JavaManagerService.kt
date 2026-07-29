@@ -113,14 +113,7 @@ class JavaManagerService(
 
                 onProgress("Unpacking Java $version archive...")
                 log.info("Unpacking to {}", targetDir)
-                deleteDirectoryRecursively(targetDir)
-                Files.createDirectories(targetDir)
-
-                if (isZip) {
-                    unzip(archive.toFile(), targetDir)
-                } else {
-                    untargz(archive.toFile(), targetDir)
-                }
+                installUnpacked(archive, targetDir, isZip)
                 Files.deleteIfExists(archive)
                 return
             } catch (e: Exception) {
@@ -183,6 +176,58 @@ class JavaManagerService(
             process.exitValue() == 0
         } catch (_: Exception) {
             false
+        }
+    }
+
+    /**
+     * Unpacks [archive] into [targetDir], keeping whatever is already installed
+     * there until the new copy is complete and usable.
+     *
+     * The previous order emptied [targetDir] first and unpacked into it, so a
+     * truncated archive, a full disk, or an interrupted unpack left the user
+     * with no JVM where a working one had been -- and the retry loop then moved
+     * on to the next mirror having already destroyed the fallback. A JVM is not
+     * cheap to re-fetch on a metered or blocked connection.
+     *
+     * Unpacking to a sibling first also gives a real integrity gate: an archive
+     * that arrives truncated produces a tree with no `java` in it, and that is
+     * checked before anything installed is touched. That check is worth more
+     * than comparing a checksum fetched from the same host over the same
+     * connection as the archive, which an attacker able to serve one can serve
+     * the other.
+     */
+    internal fun installUnpacked(archive: Path, targetDir: Path, isZip: Boolean) {
+        val incoming = targetDir.resolveSibling("${targetDir.fileName}.incoming")
+        val previous = targetDir.resolveSibling("${targetDir.fileName}.previous")
+        deleteDirectoryRecursively(incoming)
+        deleteDirectoryRecursively(previous)
+        Files.createDirectories(incoming)
+
+        try {
+            if (isZip) unzip(archive.toFile(), incoming) else untargz(archive.toFile(), incoming)
+            if (findJavaExecutable(incoming) == null) {
+                // Worded to match the post-install check below: this is the same
+                // condition found earlier, and the all-mirrors-failed error
+                // quotes this message, so the reason reaches the user either way.
+                throw IOException("Java was downloaded, but the executable file was not found in the unpacked archive")
+            }
+
+            // Two renames with the swap between them, rather than a delete and
+            // a full unpack: the window where neither copy is in place is as
+            // short as the filesystem allows.
+            if (Files.exists(targetDir)) Files.move(targetDir, previous)
+            Files.move(incoming, targetDir)
+            deleteDirectoryRecursively(previous)
+        } catch (e: Exception) {
+            runCatching { deleteDirectoryRecursively(incoming) }
+            // A swap that failed between the two renames leaves the install
+            // under `.previous`; put it back rather than leaving the user with
+            // nothing.
+            if (!Files.exists(targetDir) && Files.exists(previous)) {
+                runCatching { Files.move(previous, targetDir) }
+            }
+            runCatching { deleteDirectoryRecursively(previous) }
+            throw e
         }
     }
 

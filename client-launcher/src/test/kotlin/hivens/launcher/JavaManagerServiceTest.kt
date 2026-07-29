@@ -724,4 +724,77 @@ class JavaManagerServiceTest {
             else System.setProperty(key, original)
         }
     }
+
+    // ── installUnpacked: the previous JVM survives a bad archive ──────────
+
+    /**
+     * A tar.gz rather than a zip: the executable bit rides in the tar entry
+     * mode, and findJavaExecutable only counts a `java` that carries it -- the
+     * same predicate production uses on a real BellSoft tarball.
+     */
+    private fun tarGzOnDisk(name: String, entries: Map<String, String>): Path {
+        val out = ByteArrayOutputStream()
+        GzipCompressorOutputStream(out).use { gz ->
+            TarArchiveOutputStream(gz).use { tar ->
+                entries.forEach { (path, content) ->
+                    val payload = content.toByteArray()
+                    val entry = TarArchiveEntry(path)
+                    entry.mode = 0b111_101_101
+                    entry.size = payload.size.toLong()
+                    tar.putArchiveEntry(entry)
+                    tar.write(payload)
+                    tar.closeArchiveEntry()
+                }
+            }
+        }
+        return Files.write(workDir.resolve(name), out.toByteArray())
+    }
+
+    private fun installedJava(dir: Path): Path {
+        val exe = dir.resolve("bin/java")
+        Files.createDirectories(exe.parent)
+        Files.writeString(exe, "#!/bin/sh\n")
+        exe.toFile().setExecutable(true)
+        return exe
+    }
+
+    @Test
+    fun `a good archive replaces the installed runtime`() {
+        val target = workDir.resolve("java-21-linux-amd64")
+        installedJava(target)
+        Files.writeString(target.resolve("marker.txt"), "OLD")
+
+        val archive = tarGzOnDisk("good.tar.gz", mapOf("jdk/bin/java" to "#!/bin/sh\n", "jdk/marker.txt" to "NEW"))
+        svc.installUnpacked(archive, target, isZip = false)
+
+        assertEquals("NEW", Files.readString(target.resolve("jdk/marker.txt")))
+        assertFalse(Files.exists(target.resolve("marker.txt")), "the old tree must be replaced, not merged")
+    }
+
+    @Test
+    fun `an archive with no java executable leaves the installed runtime alone`() {
+        // What a truncated or wrong-arch download looks like on disk. The old
+        // order emptied the target first, so the working JVM was already gone
+        // by the time the unpack turned out to be useless -- and the retry loop
+        // moved to the next mirror with no fallback left.
+        val target = workDir.resolve("java-21-linux-amd64")
+        val exe = installedJava(target)
+
+        val archive = tarGzOnDisk("truncated.tar.gz", mapOf("jdk/README" to "not a jvm"))
+        assertFailsWith<IOException> { svc.installUnpacked(archive, target, isZip = false) }
+
+        assertTrue(Files.exists(exe), "the working runtime was destroyed by a bad download")
+    }
+
+    @Test
+    fun `a failed install leaves no staging directories behind`() {
+        val target = workDir.resolve("java-21-linux-amd64")
+        installedJava(target)
+
+        val archive = tarGzOnDisk("truncated2.tar.gz", mapOf("jdk/README" to "not a jvm"))
+        runCatching { svc.installUnpacked(archive, target, isZip = false) }
+
+        assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.incoming")))
+        assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.previous")))
+    }
 }
