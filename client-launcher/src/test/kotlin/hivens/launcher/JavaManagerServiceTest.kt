@@ -804,7 +804,11 @@ class JavaManagerServiceTest {
         // The three cases above drive installUnpacked directly, which pins its
         // contract but not that the download path still uses it. This one goes
         // through getJavaPath, so it fails if that wiring is ever undone.
-        val target = workDir.resolve("java-21-${PlatformOS.platform.bellsoft}-${PlatformOS.arch.bellsoft}")
+        // Under runtimes/, which is where the service derives its target from
+        // baseDir -- putting the stub anywhere else makes the whole test pass
+        // for the wrong reason, because nothing ever touches that path.
+        val target = workDir.resolve("runtimes")
+            .resolve("java-21-${PlatformOS.platform.bellsoft}-${PlatformOS.arch.bellsoft}")
         val exe = target.resolve("bin/java")
         Files.createDirectories(exe.parent)
         // Present and executable so it is FOUND, but not a real program, so the
