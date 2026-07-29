@@ -1,6 +1,7 @@
 package hivens.auth
 
 import dev.hivens.libvault.SecretVault
+import hivens.core.io.writeStringOwnerOnly
 import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.data.SessionData
 import kotlinx.serialization.Serializable
@@ -239,8 +240,11 @@ class CredentialsManager(
         vault.retrieve(compositeKey(account.providerId, account.accountId, field))?.decodeToString()
 
     private fun writeAccountsFile(file: SavedAccountsFile) {
-        credentialsFile.parent?.let { Files.createDirectories(it) }
-        Files.writeString(credentialsFile, json.encodeToString(SavedAccountsFile.serializer(), file))
+        // Owner-only: the file names every account on the machine and, on the
+        // pre-vault format, carries the encrypted material and its IV. The
+        // process umask leaves it world-readable by default on a typical Linux
+        // desktop.
+        writeStringOwnerOnly(credentialsFile, json.encodeToString(SavedAccountsFile.serializer(), file))
     }
 
     private fun deleteFile() {
