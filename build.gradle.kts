@@ -46,6 +46,15 @@ allprojects {
 subprojects {
     afterEvaluate {
         if (plugins.hasPlugin("java")) {
+            // kotlin("test") carries its own junit-bom, so a module that never
+            // names JUnit still pins one -- an older line than the catalog, and
+            // one that moves on its own whenever Kotlin is bumped. The platform
+            // dependency puts every test classpath on the declared version, which
+            // is what lets a JUnit configuration parameter be set build-wide and
+            // actually hold. KMP modules have no `java` plugin and declare it in
+            // their own test source set instead.
+            dependencies.add("testImplementation", dependencies.platform(rootProject.libs.junit.bom))
+
             configure<JavaPluginExtension> {
                 sourceCompatibility = JavaVersion.VERSION_26
                 targetCompatibility = JavaVersion.VERSION_26

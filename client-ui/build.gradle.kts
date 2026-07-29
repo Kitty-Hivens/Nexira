@@ -165,6 +165,11 @@ kotlin {
         // in fakes from sibling modules.
         getByName("desktopTest") {
             dependencies {
+                // The root applies this to every `java` module; a KMP module has
+                // no such plugin, so it pins the same JUnit here -- otherwise the
+                // one kotlin("test") brings along wins and this module drifts off
+                // the version the rest of the build declares.
+                implementation(project.dependencies.platform(libs.junit.bom))
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
             }
