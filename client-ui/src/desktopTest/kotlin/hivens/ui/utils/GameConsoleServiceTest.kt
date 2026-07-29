@@ -23,15 +23,22 @@ import kotlin.time.Duration.Companion.seconds
 class GameConsoleServiceTest {
 
     private lateinit var dir: Path
+    private val services = mutableListOf<GameConsoleService>()
 
     @BeforeTest
     fun setUp() {
         dir = Files.createTempDirectory("console-svc-")
     }
 
+    /**
+     * Close every service before deleting the tree: a started session leaves the
+     * log file open, and Windows will not delete a file that still has a handle.
+     */
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
     @AfterTest
     fun tearDown() {
+        runBlocking { services.forEach { it.close() } }
+        services.clear()
         dir.deleteRecursively()
     }
 
@@ -42,7 +49,10 @@ class GameConsoleServiceTest {
             bootstrapDataDir = { null },
             env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
         )
-        return GameConsoleService(paths).also { it.maxLines = maxLines }
+        return GameConsoleService(paths).also {
+            it.maxLines = maxLines
+            services += it
+        }
     }
 
     private suspend fun GameConsoleService.awaitSnapshot(
@@ -93,6 +103,31 @@ class GameConsoleServiceTest {
         val lines = file.readLines()
         assertTrue(lines.any { it.contains("Session started") }, "divider is mirrored")
         assertTrue(lines.any { it.endsWith("l0") } && lines.any { it.endsWith("l2") }, "all lines flushed")
+    }
+
+    @Test
+    fun `close flushes the queue then releases the session file`() = runBlocking {
+        val svc = service()
+        svc.startSession("Test")
+        repeat(3) { svc.append("l$it") }
+        svc.close()
+
+        val file = assertNotNull(svc.capturedSessionFiles("Test").firstOrNull())
+        val afterClose = file.readLines()
+        assertTrue(afterClose.any { it.endsWith("l2") }, "lines queued before close still reach disk")
+
+        // The writer is gone, so a later append cannot grow the file -- which is
+        // what lets the caller delete the tree underneath it.
+        svc.append("after-close")
+        assertEquals(afterClose, file.readLines(), "nothing is written once closed")
+    }
+
+    @Test
+    fun `close is idempotent`() = runBlocking {
+        val svc = service()
+        svc.startSession("Test")
+        svc.close()
+        svc.close()
     }
 
     @Test
