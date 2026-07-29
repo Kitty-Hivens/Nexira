@@ -18,6 +18,7 @@ import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -53,20 +54,67 @@ class SmrtSyncServiceTest {
      */
     private fun syncService(failDownloads: Int = 0): SmrtSyncService {
         var cuts = failDownloads
-        val engine = MockEngine { req ->
-            when (req.url.toString()) {
-                MANIFEST_URL -> respond(manifest(), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
-                REQ_URL, OPT_URL -> {
-                    if (cuts > 0) {
-                        cuts--
-                        throw IOException("stream was reset: PROTOCOL_ERROR")
+        return serviceWith(
+            MockEngine { req ->
+                when (req.url.toString()) {
+                    MANIFEST_URL -> respond(manifest(), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                    REQ_URL, OPT_URL -> {
+                        if (cuts > 0) {
+                            cuts--
+                            throw IOException("stream was reset: PROTOCOL_ERROR")
+                        }
+                        val bytes = if (req.url.toString() == REQ_URL) reqBytes else optBytes
+                        respond(ByteReadChannel(bytes), HttpStatusCode.OK)
                     }
-                    val bytes = if (req.url.toString() == REQ_URL) reqBytes else optBytes
-                    respond(ByteReadChannel(bytes), HttpStatusCode.OK)
+                    else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
                 }
-                else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+            }
+        )
+    }
+
+    /**
+     * Serves the mod bodies with the range semantics a static host has: no range
+     * gets the whole object, an offset inside it gets a 206 with the remainder, and
+     * an offset at or past the end gets a 416, since there is nothing left to send.
+     * [seenRanges] collects the offsets asked for, which is how a test tells a
+     * resumed transfer from one that quietly started over.
+     *
+     * [ignoreRanges] answers every request with the whole object instead, the way a
+     * host with no range support does.
+     */
+    private fun rangeAwareService(
+        seenRanges: MutableList<Long> = mutableListOf(),
+        ignoreRanges: Boolean = false,
+    ): SmrtSyncService = serviceWith(
+        MockEngine { req ->
+            val url = req.url.toString()
+            val bytes = when (url) {
+                REQ_URL -> reqBytes
+                OPT_URL -> optBytes
+                else -> null
+            }
+            when {
+                url == MANIFEST_URL ->
+                    respond(manifest(), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                bytes == null -> respond("missing $url", HttpStatusCode.NotFound)
+                else -> {
+                    val from = req.headers[HttpHeaders.Range]
+                        ?.removePrefix("bytes=")?.substringBefore('-')?.toLongOrNull() ?: 0L
+                    if (from > 0L) seenRanges += from
+                    when {
+                        ignoreRanges || from == 0L -> respond(ByteReadChannel(bytes), HttpStatusCode.OK)
+                        from >= bytes.size -> respond("", HttpStatusCode.RequestedRangeNotSatisfiable)
+                        else -> respond(
+                            ByteReadChannel(bytes.copyOfRange(from.toInt(), bytes.size)),
+                            HttpStatusCode.PartialContent,
+                        )
+                    }
+                }
             }
         }
+    )
+
+    private fun serviceWith(engine: MockEngine): SmrtSyncService {
         val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR_BASE, json)
         val modrinth = ModrinthClient(provider, json)
@@ -97,6 +145,49 @@ class SmrtSyncServiceTest {
         val dir = tempDir("sync-retry")
         syncService(failDownloads = 2).sync("test", dir)
         assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the retry completed the transfer")
+    }
+
+    @Test
+    fun `a partial left behind is continued rather than refetched`() = runTest {
+        val dir = tempDir("sync-resume")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        // What a transfer cut mid-body leaves: the head of the object in the temp
+        // file the commit moves from.
+        Files.write(mods.resolve("req.jar.tmp"), reqBytes.copyOfRange(0, 4))
+
+        val ranges = mutableListOf<Long>()
+        rangeAwareService(ranges).sync("test", dir)
+
+        assertContentEquals(reqBytes, Files.readAllBytes(mods.resolve("req.jar")), "resumed file")
+        assertTrue(4L in ranges, "the transfer did not ask to continue from the partial")
+    }
+
+    @Test
+    fun `a partial the host will not continue is dropped instead of failing every attempt`() = runTest {
+        val dir = tempDir("sync-416")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        // A transfer that reached the last byte but never got committed -- killed
+        // launcher, crash, a commit that could not take the lock. The offset is at
+        // the end of the object, so the host answers 416 and keeps answering it for
+        // as long as the partial decides the offset.
+        Files.write(mods.resolve("req.jar.tmp"), reqBytes + "TRAILING".toByteArray())
+
+        rangeAwareService().sync("test", dir)
+
+        assertContentEquals(reqBytes, Files.readAllBytes(mods.resolve("req.jar")), "refetched file")
+    }
+
+    @Test
+    fun `a host that ignores the range restarts the transfer instead of appending`() = runTest {
+        val dir = tempDir("sync-no-range")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.write(mods.resolve("req.jar.tmp"), reqBytes.copyOfRange(0, 4))
+
+        rangeAwareService(ignoreRanges = true).sync("test", dir)
+
+        // Appending to a partial the response already contains would land 12 bytes
+        // and fail the sha1; the partial has to be thrown away instead.
+        assertContentEquals(reqBytes, Files.readAllBytes(mods.resolve("req.jar")), "file written from zero")
     }
 
     @Test
