@@ -7,7 +7,7 @@
 kotlin            = "2.4.10"
 compose           = "1.11.1"
 buildconfigPlugin = "6.0.10"
-versionsPlugin    = "0.54.0"
+versionsPlugin    = "0.56.0"
 # ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
 # the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
 # against the Kotlin 2.4.10 toolchain here (:widget-processor / :client-ui
@@ -34,7 +34,7 @@ coroutines        = "1.11.0"
 composeMaterial3  = "1.11.0-alpha07"
 markdownRenderer  = "0.43.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
-markdown          = "0.7.7"
+markdown          = "0.7.8"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
 jsoup             = "1.22.2"
 # Coil 3 -- async image loading (pack + mod icons, Browse cards). Deliberately no
@@ -49,7 +49,7 @@ filekit           = "0.14.2"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.0.18"
-logback           = "1.5.38"
+logback           = "1.6.1"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
