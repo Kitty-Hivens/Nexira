@@ -36,7 +36,13 @@ kotlin {
     // (java-plugin modules only) skips them; set it here so org.gradle.jvm.version
     // matches the JDK 26 leaf modules instead of falling back to the daemon JVM.
     jvmToolchain(26)
-    jvm("desktop")
+    jvm("desktop") {
+        // Every other module already runs on the platform; this one was still on
+        // JUnit 4 purely by KMP default, which left it out of the build-wide
+        // per-test timeout (a JUnit 5 configuration parameter). The tests use
+        // kotlin.test only, so kotlin("test") just resolves to the junit5 variant.
+        testRuns["test"].executionTask.configure { useJUnitPlatform() }
+    }
 
     sourceSets {
         getByName("commonMain") {
