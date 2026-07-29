@@ -18,8 +18,11 @@ tasks.test {
 // this block runs after it and pins the agent back to 8 (`options.release` makes
 // javac ignore the inherited source/target=26). Deliberately zero-dependency
 // (raw constant-pool rewrite, no ASM) so the agent jar stays self-contained.
+// Scoped to the shipped classes. The tests run in the Gradle test JVM, never in
+// the game's, so holding them at 8 only kept the whole build's JUnit on a line
+// old enough to still support Java 8.
 afterEvaluate {
-    tasks.withType<JavaCompile>().configureEach {
+    tasks.named<JavaCompile>("compileJava") {
         options.release.set(8)
     }
 }

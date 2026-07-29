@@ -100,16 +100,13 @@ skinema           = "0.7.0"
 skinemaNatives    = "8.1.1-1"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
-# junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
-# which authlib-agent / profiler-agent can't honour -- those modules compile to
-# Java 8 bytecode (injected into the legacy 1.12.2 game JVM, which is Java 8).
-# Gradle's variant resolution rejects junit-jupiter 6 on their testCompileClasspath
-# ("compatible with JVM runtime 8, but 6.x needs 17+"). Track latest 5.x instead.
-# junit (Jupiter) and junitPlatform version independently: Jupiter 5.x pairs with
-# Platform 1.x.
+# One version for the whole platform: JUnit 6 merged the Jupiter 5.x and Platform
+# 1.x lines that used to be tracked apart. The agents held the build on 5.x while
+# their test compilation inherited release 8 from the shipped-agent pin; only the
+# agent classes need Java 8 bytecode, so that pin is now scoped to compileJava and
+# 6.x resolves on every test classpath.
 mockk             = "1.14.11"
-junit             = "5.14.4"
-junitPlatform     = "1.14.4"
+junit             = "6.1.2"
 
 [libraries]
 # Logging
@@ -176,8 +173,9 @@ skinema-skiko                   = { group = "dev.hivens", name = "skinema-skiko"
 
 # Test
 mockk                           = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+junit-bom                       = { group = "org.junit",          name = "junit-bom",               version.ref = "junit" }
 junit-jupiter                   = { group = "org.junit.jupiter",  name = "junit-jupiter",           version.ref = "junit" }
-junit-platform-launcher         = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
+junit-platform-launcher         = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit" }
 
 # KSP processor API (used by :widget-processor to scan @Widget composables
 # and emit GeneratedWidgetRegistry at compile time).

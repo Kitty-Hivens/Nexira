@@ -7,9 +7,9 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
-// JUnit 5 for the agent's own tests (the GC-classification table). Test compile
-// is still pinned to release 8 by the block below -- fine, JUnit 5 is Java 8
-// compatible; only the JVM that RUNS the tests is JDK 26.
+// JUnit for the agent's own tests (the GC-classification table). Only the shipped
+// agent classes are pinned to release 8 below; the tests compile and run on the
+// same JDK as the rest of the build.
 tasks.test {
     useJUnitPlatform()
 }
@@ -25,7 +25,7 @@ tasks.test {
 //   javap -v build/classes/java/main/hivens/profiler/agent/ProfilerAgent.class | grep major
 // -> must read "major version: 52".
 afterEvaluate {
-    tasks.withType<JavaCompile>().configureEach {
+    tasks.named<JavaCompile>("compileJava") {
         options.release.set(8)
     }
 }

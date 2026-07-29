@@ -32,14 +32,6 @@ updates:
           - "org.junit*"
           - "io.mockk*"
     ignore:
-      # JUnit 6.x drops Java 8 and needs a JVM 17+ runtime; authlib-agent and
-      # profiler-agent compile to Java 8 bytecode for the legacy 1.12.2 game JVM,
-      # and Gradle's variant resolution rejects junit 6 on their test classpath.
-      # Stay on the 5.x (Jupiter) / 1.x (Platform) lines -- minors/patches only.
-      - dependency-name: "org.junit.jupiter:*"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "org.junit.platform:*"
-        update-types: ["version-update:semver-major"]
       # compose material3 is a JetBrains pre-release (1.11.0-alpha07) paired to
       # the compose 1.11 core. Because it is already a pre-release, Dependabot
       # would otherwise jump it to the 1.12 alpha line, which needs compose 1.12.
