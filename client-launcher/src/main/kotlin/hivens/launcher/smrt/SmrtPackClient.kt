@@ -25,6 +25,18 @@ import kotlinx.serialization.json.Json
 import java.io.IOException
 
 /**
+ * The host refused a resume offset: what is already on disk is at least as long
+ * as the object being fetched, so there is no remainder to send.
+ *
+ * Separate from the generic transport failure because the caller has to drop its
+ * partial before trying again. A retry that keeps the offset asks the same
+ * unanswerable question and gets the same refusal, for as many attempts as it is
+ * given and on every later run too.
+ */
+class RangeNotSatisfiableException(url: String) :
+    IOException("GET $url: resume offset is past the end of the resource")
+
+/**
  * Thin HTTP wrapper for the smrt mirror's `/v1/...` endpoints. Uses the
  * "direct" HttpClient (strict TLS, no per-host bypass) since the mirror is public
  * CDN-fronted and needs none of the SC channel's special handling. Modrinth
@@ -163,6 +175,10 @@ class SmrtPackClient(
      * response is the whole resource from the start and whatever was kept must be
      * discarded. A server that ignores ranges is normal, so this is a fact to act on
      * rather than an error.
+     *
+     * An offset the host refuses outright raises [RangeNotSatisfiableException] --
+     * distinct from a transport failure, since only the caller can drop the partial
+     * that made the offset unusable.
      */
     suspend fun downloadStreaming(
         url: String,
@@ -173,6 +189,9 @@ class SmrtPackClient(
             headers.append("User-Agent", USER_AGENT)
             if (resumeFrom > 0L) headers.append(HttpHeaders.Range, "bytes=$resumeFrom-")
         }.execute { resp ->
+            if (resumeFrom > 0L && resp.status == HttpStatusCode.RequestedRangeNotSatisfiable) {
+                throw RangeNotSatisfiableException(url)
+            }
             if (!resp.status.isSuccess()) {
                 val body = runCatching { resp.bodyAsText() }.getOrDefault("")
                 throw IOException("GET $url failed: ${resp.status} body=$body")

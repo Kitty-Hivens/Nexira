@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory
 import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -457,6 +458,12 @@ class SmrtSyncService(
      * attempt appends to real bytes. A server that ignores the range answers with
      * the whole resource, and then the partial is dropped and the write starts at
      * zero -- correct either way, just slower.
+     *
+     * A partial the host refuses to continue is dropped so the next attempt starts
+     * from zero. Keeping it would make the offset permanent: a transfer cut after
+     * its last byte, or a file the mirror republished shorter, leaves a `.tmp` no
+     * shorter than the object, and every attempt from then on -- this run and every
+     * later one -- asks for a range the host has nothing to answer with.
      */
     private suspend fun downloadToFile(url: String, dest: Path) {
         val tmp = dest.resolveSibling("${dest.fileName}.tmp")
@@ -465,20 +472,26 @@ class SmrtSyncService(
             shouldRetry = { it is IOException },
         ) {
             val have = if (Files.exists(tmp)) runCatching { Files.size(tmp) }.getOrDefault(0L) else 0L
-            client.downloadStreaming(url, resumeFrom = have) { resumed, channel ->
-                if (!resumed && have > 0L) {
-                    log.debug("smrt sync: range ignored for {}, restarting the transfer", dest.fileName)
-                }
-                val append = resumed && have > 0L
-                if (!append) runCatching { Files.deleteIfExists(tmp) }
-                FileOutputStream(tmp.toFile(), append).use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    while (!channel.isClosedForRead) {
-                        val n = channel.readAvailable(buf, 0, buf.size)
-                        if (n <= 0) break
-                        out.write(buf, 0, n)
+            try {
+                client.downloadStreaming(url, resumeFrom = have) { resumed, channel ->
+                    if (!resumed && have > 0L) {
+                        log.debug("smrt sync: range ignored for {}, restarting the transfer", dest.fileName)
+                    }
+                    val append = resumed && have > 0L
+                    if (!append) runCatching { Files.deleteIfExists(tmp) }
+                    FileOutputStream(tmp.toFile(), append).use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        while (!channel.isClosedForRead) {
+                            val n = channel.readAvailable(buf, 0, buf.size)
+                            if (n <= 0) break
+                            out.write(buf, 0, n)
+                        }
                     }
                 }
+            } catch (e: RangeNotSatisfiableException) {
+                log.warn("smrt sync: partial for {} is unusable ({} bytes), restarting from zero", dest.fileName, have)
+                runCatching { Files.deleteIfExists(tmp) }
+                throw e
             }
         }
         // Non-atomic REPLACE_EXISTING on FAT32/SMB can leave a 0-byte
