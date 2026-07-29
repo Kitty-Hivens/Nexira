@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.multiplatform) apply false
@@ -137,6 +139,13 @@ subprojects {
             // this). A harmless no-op for the pure-JVM module tests.
             "--enable-native-access=ALL-UNNAMED"
         )
+
+        // A deadlocked test worker is worse than a failing one: GitHub withholds
+        // a job's log until the job ends, so a hang yields no test report and no
+        // stack -- just a job sitting on the 6-hour limit while the release
+        // behind it waits. Failing here converts that silence into a report.
+        // The slowest module stays under 8 minutes even on one starved core.
+        timeout.set(Duration.ofMinutes(20))
     }
 }
 
