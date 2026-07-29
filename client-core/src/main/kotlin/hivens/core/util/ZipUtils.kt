@@ -1,5 +1,7 @@
 package hivens.core.util
 
+import hivens.core.io.UnpackBudget
+import hivens.core.io.UnpackLimits
 import org.apache.commons.compress.archivers.zip.ZipFile
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -14,6 +16,10 @@ object ZipUtils {
      * ignore the return value are unaffected; the list powers extra.zip
      * orphan-pruning in `FileDownloadService` -- snapshot the previous
      * unpack, diff the next, remove what the upstream modpack dropped.
+     *
+     * [limits] caps what the archive may become on disk; the default suits
+     * pack content. Overridable so a test can drive the cap without producing
+     * gigabytes to hit the real one.
      *
      * [reserved] names the caller will not let the archive write -- entry
      * names matching are skipped. Used where the destination holds a file the
@@ -30,9 +36,14 @@ object ZipUtils {
      * external-attributes field that holds the unix file-type bits
      * needed to detect and refuse the symlink.
      */
-    fun unzip(zipFile: File, destDir: File, reserved: Set<String> = emptySet()): List<String> {
+    fun unzip(
+        zipFile: File,
+        destDir: File,
+        reserved: Set<String> = emptySet(),
+        limits: UnpackLimits = UnpackLimits.PACK_CONTENT,
+    ): List<String> {
         if (!destDir.exists()) destDir.mkdirs()
-        val buffer = ByteArray(8192)
+        val budget = UnpackBudget(limits, zipFile.name)
         val extracted = mutableListOf<String>()
         val destDirPath = destDir.canonicalPath
 
@@ -66,13 +77,9 @@ object ZipUtils {
                     newFile.mkdirs()
                 } else {
                     newFile.parentFile?.mkdirs()
+                    budget.entry()
                     zf.getInputStream(zipEntry).use { zis ->
-                        FileOutputStream(newFile).use { fos ->
-                            var len: Int
-                            while (zis.read(buffer).also { len = it } > 0) {
-                                fos.write(buffer, 0, len)
-                            }
-                        }
+                        FileOutputStream(newFile).use { fos -> budget.copyStream(zis, fos) }
                     }
                     extracted += zipEntry.name.replace('\\', '/')
                 }

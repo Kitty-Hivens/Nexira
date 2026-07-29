@@ -1,6 +1,8 @@
 package hivens.launcher
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.io.UnpackBudget
+import hivens.core.io.UnpackLimits
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.platform.OS
 import io.ktor.client.request.*
@@ -275,6 +277,7 @@ class JavaManagerService(
         // misses a symlink entry whose linked target sits outside
         // [dest]; the next extraction would write attacker bytes to
         // that target.
+        val budget = UnpackBudget(UnpackLimits.RUNTIME, zip.name)
         ZipFile.builder().setFile(zip).get().use { zf ->
             for (entry in zf.entries) {
                 // Protection against Zip Slip vulnerabilities
@@ -305,15 +308,15 @@ class JavaManagerService(
                     Files.createDirectories(resolvedPath)
                 } else {
                     Files.createDirectories(resolvedPath.parent)
-                    zf.getInputStream(entry).use { input ->
-                        Files.copy(input, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
-                    }
+                    budget.entry()
+                    zf.getInputStream(entry).use { input -> budget.copyTo(input, resolvedPath) }
                 }
             }
         }
     }
 
     internal fun untargz(tar: File, dest: Path) {
+        val budget = UnpackBudget(UnpackLimits.RUNTIME, tar.name)
         FileInputStream(tar).use { fi ->
             BufferedInputStream(fi).use { bi ->
                 GzipCompressorInputStream(bi).use { gzi ->
@@ -360,7 +363,8 @@ class JavaManagerService(
                                 Files.createDirectories(resolvedPath)
                             } else {
                                 Files.createDirectories(resolvedPath.parent)
-                                Files.copy(tai, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
+                                budget.entry()
+                                budget.copyTo(tai, resolvedPath)
                                 // Restore execute bits on Linux / mac:
                                 // 0o111 mask = any of owner / group /
                                 // other execute. Stricter masks miss
