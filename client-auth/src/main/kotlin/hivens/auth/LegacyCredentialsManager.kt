@@ -1,6 +1,7 @@
 package hivens.auth
 
 import hivens.core.data.SessionData
+import hivens.core.io.writeStringOwnerOnly
 import hivens.core.security.IKeyringStorage
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -187,7 +188,7 @@ class LegacyCredentialsManager(
             if (credentialsFile.parent != null) Files.createDirectories(credentialsFile.parent)
 
             val text = json.encodeToString(data)
-            Files.writeString(credentialsFile, text)
+            writeStringOwnerOnly(credentialsFile, text)
             log.info(
                 "Credentials saved (password: {}, accessToken: {})",
                 if (passwordInKeyring) "keyring" else "AES-256-GCM file",
