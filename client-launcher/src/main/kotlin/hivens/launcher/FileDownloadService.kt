@@ -30,6 +30,7 @@ import java.net.SocketTimeoutException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
@@ -353,7 +354,7 @@ class FileDownloadService(
             }
 
             // Downloading
-            val tasks = filesToDownload.map { (rawPath, _) ->
+            val tasks = filesToDownload.map { (rawPath, fileData) ->
                 async(Dispatchers.IO) {
                     if (!isActive) throw CancellationException()
 
@@ -363,7 +364,7 @@ class FileDownloadService(
                         val cleanPath = normalizePath(rawPath)
                         val targetFile = resolveWithinRoot(baseDir, cleanPath, rawPath)
 
-                        downloadFileInternal(rawPath, targetFile) { bytesRead ->
+                        downloadFileInternal(rawPath, targetFile, fileData.md5) { bytesRead ->
                             // We just increase the counter. We don't touch the UI.
                             downloadedBytesGlobal.addAndGet(bytesRead.toLong())
                             if (!isActive) throw CancellationException()
@@ -396,15 +397,36 @@ class FileDownloadService(
         }
     }
 
+    /**
+     * Fetches [serverPath] into [localPath], staged through a `.part` sibling.
+     *
+     * The staging is what makes resuming safe. A file reaches this function
+     * precisely because its hash did NOT match, so the stale copy is still on
+     * disk with the old content -- reading its length as a resume offset and
+     * appending produced old-bytes-plus-new-tail, at exactly the length the
+     * manifest expects, which the cheap size check then accepted on every later
+     * sync. Resume now applies only to bytes this download wrote.
+     *
+     * [expectedMd5] closes the other half: a `.part` left by an earlier attempt
+     * may predate a manifest change, so an offset into it is only trustworthy
+     * once the finished file is checked. A mismatch drops the partial and
+     * refetches from zero. The `any` sentinel means the upstream published no
+     * hash, and without one a resume cannot be validated -- so those transfers
+     * start from zero rather than resume on faith.
+     */
     private suspend fun downloadFileInternal(
         serverPath: String,
         localPath: Path,
+        expectedMd5: String,
         onBytesRead: ((Int) -> Unit)? = null
     ) {
         val url = "${config.clientFilesBase}/" +
                 serverPath.split("/").joinToString("/") { segment -> URLEncoder.encode(segment, "UTF-8").replace("+", "%20") }
+        val verifiable = expectedMd5.isNotBlank() && !expectedMd5.equals("any", ignoreCase = true)
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
+            val part = localPath.resolveSibling("${localPath.fileName}.part")
+            if (!verifiable) runCatching { Files.deleteIfExists(part) }
 
             // Retry the whole transfer on transient network errors. Long
             // bodies from the SMARTYcraft host periodically drop mid-stream;
@@ -414,7 +436,7 @@ class FileDownloadService(
                 operation = "download $serverPath",
                 shouldRetry = ::isTransientDownloadError,
             ) {
-                val existing = if (Files.exists(localPath)) Files.size(localPath) else 0L
+                val existing = if (verifiable && Files.exists(part)) Files.size(part) else 0L
 
                 client.prepareGet(url) {
                     if (existing > 0) header(HttpHeaders.Range, "bytes=$existing-")
@@ -426,12 +448,12 @@ class FileDownloadService(
                             // total-bytes progress hits 100% on completion. (Long-to-Int
                             // narrowing is fine here -- modpack assets are well under 2GB.)
                             if (existing > 0) onBytesRead?.invoke(existing.toInt())
-                            writeBody(response, localPath, append = true, onBytesRead)
+                            writeBody(response, part, append = true, onBytesRead)
                         }
                         HttpStatusCode.OK -> {
                             // 200: server ignored Range (or we sent none) -- overwrite.
                             // Don't report existing bytes; we're throwing them away.
-                            writeBody(response, localPath, append = false, onBytesRead)
+                            writeBody(response, part, append = false, onBytesRead)
                         }
                         HttpStatusCode.RequestedRangeNotSatisfiable -> {
                             // 416: partial on disk is bigger than the upstream file
@@ -441,12 +463,26 @@ class FileDownloadService(
                             // -- a plain IOException with this message would NOT
                             // match the predicate's substring checks and would
                             // hard-fail instead of recovering.
-                            Files.deleteIfExists(localPath)
+                            Files.deleteIfExists(part)
                             throw RetryableHttpException("HTTP 416 for $url; cleared bad partial, will refetch")
                         }
                         else -> throw IOException("HTTP ${response.status} for $url")
                     }
                 }
+
+                if (verifiable) {
+                    val got = calculateMD5(part)
+                    if (!got.equals(expectedMd5, ignoreCase = true)) {
+                        Files.deleteIfExists(part)
+                        throw RetryableHttpException(
+                            "checksum mismatch for $serverPath (expected $expectedMd5, got $got); refetching"
+                        )
+                    }
+                }
+                // Into place only once the bytes are what the manifest named, so
+                // a failed transfer leaves the previous copy intact instead of a
+                // half-written one the next sync would have to notice.
+                Files.move(part, localPath, StandardCopyOption.REPLACE_EXISTING)
             }
         }
     }

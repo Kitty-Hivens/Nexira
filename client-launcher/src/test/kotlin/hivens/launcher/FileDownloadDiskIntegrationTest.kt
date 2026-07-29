@@ -578,6 +578,71 @@ class FileDownloadDiskIntegrationTest {
             "failed sync must NOT mark manifest as cleanly-synced")
     }
 
+    // ── Resume correctness ─────────────────────────────────────────────────
+
+    @Test
+    fun `an updated file is replaced, not appended to`() = runBlocking {
+        // The ordinary case: a mod changed upstream. The stale copy is on disk
+        // and its hash no longer matches, which is exactly why it is being
+        // downloaded -- so its length must not be read as a resume offset. A
+        // range-honouring server used to turn that into old-bytes plus new-tail,
+        // at the length the manifest expects, which the cheap size check then
+        // accepted forever after.
+        val oldBytes = "OLD-VERSION-OF-THE-MOD".toByteArray()
+        val newBytes = "NEW-VERSION-OF-THE-MOD-WITH-MORE".toByteArray()
+        val stale = clientDir.resolve("mods/foo.jar")
+        Files.createDirectories(stale.parent)
+        Files.write(stale, oldBytes)
+
+        val svc = service(HttpClientProvider(rangeHonouringClient(newBytes)))
+        svc.processSession(
+            sessionWith(manifestOf(mapOf("mods/foo.jar" to newBytes))),
+            "Industrial", clientDir, null, null, null, null,
+        )
+
+        assertEquals(newBytes.toList(), Files.readAllBytes(stale).toList(),
+            "the updated file must be the upstream bytes, not a splice of both versions")
+    }
+
+    @Test
+    fun `a failed download leaves the previous copy in place`() = runBlocking {
+        val oldBytes = "THE-WORKING-MOD".toByteArray()
+        val stale = clientDir.resolve("mods/foo.jar")
+        Files.createDirectories(stale.parent)
+        Files.write(stale, oldBytes)
+
+        val svc = newServiceFailing()
+        runCatching {
+            svc.processSession(
+                sessionWith(manifestOf(mapOf("mods/foo.jar" to "NEW".toByteArray()))),
+                "Industrial", clientDir, null, null, null, null,
+            )
+        }
+
+        assertEquals(oldBytes.toList(), Files.readAllBytes(stale).toList(),
+            "a failed sync must not damage what already worked")
+    }
+
+    @Test
+    fun `bytes that do not match the manifest hash never reach the file`() = runBlocking {
+        // The manifest names one thing and the host serves another -- a stale
+        // CDN edge, or a middlebox. Nothing downstream re-hashes, so without a
+        // check here the wrong bytes simply become the installed file.
+        val declared = "WHAT-THE-MANIFEST-PROMISES".toByteArray()
+        val served = "SOMETHING-ELSE-ENTIRELY-XX".toByteArray()
+        val target = clientDir.resolve("mods/foo.jar")
+
+        val svc = service(HttpClientProvider(alwaysRespondingClient(served)))
+        runCatching {
+            svc.processSession(
+                sessionWith(manifestOf(mapOf("mods/foo.jar" to declared))),
+                "Industrial", clientDir, null, null, null, null,
+            )
+        }
+
+        assertTrue(!Files.exists(target), "bytes that failed the hash check were installed anyway")
+    }
+
     // ── Hostile manifest ───────────────────────────────────────────────────
 
     @Test
@@ -702,6 +767,35 @@ class FileDownloadDiskIntegrationTest {
                         status = HttpStatusCode.OK,
                         headers = headersOf("Content-Type", "application/octet-stream"),
                     )
+                }
+            }
+        }
+    }
+
+    /**
+     * Serves [payload] and honours a Range header with a 206, which is what
+     * makes the resume path run at all. A server that ignores Range hides the
+     * behaviour these tests are about.
+     */
+    private fun rangeHonouringClient(payload: ByteArray): () -> HttpClient = {
+        HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val range = request.headers[io.ktor.http.HttpHeaders.Range]
+                    val from = range?.removePrefix("bytes=")?.substringBefore('-')?.toIntOrNull() ?: 0
+                    if (from > 0 && from <= payload.size) {
+                        respond(
+                            content = ByteReadChannel(payload.copyOfRange(from, payload.size)),
+                            status = HttpStatusCode.PartialContent,
+                            headers = headersOf("Content-Type", "application/octet-stream"),
+                        )
+                    } else {
+                        respond(
+                            content = ByteReadChannel(payload),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf("Content-Type", "application/octet-stream"),
+                        )
+                    }
                 }
             }
         }
