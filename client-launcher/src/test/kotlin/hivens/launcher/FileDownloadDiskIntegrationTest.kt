@@ -605,22 +605,28 @@ class FileDownloadDiskIntegrationTest {
     }
 
     @Test
-    fun `a failed download leaves the previous copy in place`() = runBlocking {
+    fun `a download that completes with the wrong bytes leaves the previous copy in place`() = runBlocking {
+        // Deliberately a transfer that SUCCEEDS and then fails verification, not
+        // one that 500s. A server that never sends a body leaves the file alone
+        // whatever the staging does, so testing against that proves nothing --
+        // the damage came from bytes reaching the live path before anything
+        // checked them.
         val oldBytes = "THE-WORKING-MOD".toByteArray()
         val stale = clientDir.resolve("mods/foo.jar")
         Files.createDirectories(stale.parent)
         Files.write(stale, oldBytes)
 
-        val svc = newServiceFailing()
+        val declared = "WHAT-THE-MANIFEST-PROMISES".toByteArray()
+        val svc = service(HttpClientProvider(alwaysRespondingClient("WRONG-BYTES-FROM-THE-HOST".toByteArray())))
         runCatching {
             svc.processSession(
-                sessionWith(manifestOf(mapOf("mods/foo.jar" to "NEW".toByteArray()))),
+                sessionWith(manifestOf(mapOf("mods/foo.jar" to declared))),
                 "Industrial", clientDir, null, null, null, null,
             )
         }
 
         assertEquals(oldBytes.toList(), Files.readAllBytes(stale).toList(),
-            "a failed sync must not damage what already worked")
+            "a sync that could not deliver the declared bytes must not damage what already worked")
     }
 
     @Test
