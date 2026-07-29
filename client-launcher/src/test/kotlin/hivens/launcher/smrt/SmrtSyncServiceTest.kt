@@ -130,6 +130,22 @@ class SmrtSyncServiceTest {
         assertTrue(Files.exists(mods.resolve("req.jar")), "the pack's own mod is in place")
     }
 
+    @Test
+    fun `a completed sync drops a foreign zip too`() = runTest {
+        // A pack may target 1.7.10 -- the legacy Forge resolver takes whatever
+        // Minecraft version it is asked for -- and that loader discovers
+        // `(.+).(zip|jar)$` out of mods/. Pruning only .jar left a loadable
+        // file behind on exactly those packs.
+        val dir = tempDir("sync-drop-zip")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.writeString(mods.resolve("foreign.zip"), "loadable on 1.7.10")
+
+        syncService().sync("test", dir)
+
+        assertFalse(Files.exists(mods.resolve("foreign.zip")), "foreign zip survived a completed sync")
+        assertTrue(Files.exists(mods.resolve("req.jar")), "the pack's own mod is in place")
+    }
+
     private companion object {
         const val MIRROR_BASE = "https://mirror.test"
         const val MANIFEST_URL = "https://mirror.test/v1/packs/test/manifest"
