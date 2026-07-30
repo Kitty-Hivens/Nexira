@@ -153,11 +153,12 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     }
 }
 
+/** Internal so a render sheet can exercise the presentation without Koin. */
 @Composable
-private fun Pill(
+internal fun Pill(
     activity: Activity,
     props: PillProps,
-    commands: ActivityCommands,
+    commands: ActivityCommands?,
     s: AppStrings,
 ) {
     val style = LocalStyle.current
@@ -170,72 +171,75 @@ private fun Pill(
     val failed = activity.phase as? ActivityPhase.Failed
     val accent = if (failed != null) colors.criticalAccent else colors.progressAccent
 
-    Box {
-        NxSurface(
-            level = NxSurfaceLevel.Floating,
-            modifier = Modifier.height(height).clip(shape),
-            shape = shape,
-            tier = props.frostTier,
-            // Opaque body: the object floats over arbitrary content, so the
-            // legibility floor cannot depend on what happens to be behind it.
-            opaque = true,
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 7.dp, end = 8.dp).height(height),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(11.dp),
-            ) {
-                Subject(activity, fraction, accent, props.progress)
-                Text(
-                    text = activity.title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                activity.measure(s)?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.textSecondary,
-                        maxLines = 1,
-                    )
-                }
-                if (props.progress == PillProgress.Bar) {
-                    Box(Modifier.width(120.dp)) {
-                        NxProgressBar(progress = fraction, color = accent)
-                    }
-                }
-                Spacer(Modifier.width(2.dp))
-                if (props.showActions) {
-                    activity.actions.forEach { action ->
-                        NxIconButton(
-                            icon = action.icon(),
-                            contentDescription = action.label(s),
-                            onClick = { commands.perform(activity, action) },
-                        )
-                    }
-                }
-            }
-        }
-
+    NxSurface(
+        level = NxSurfaceLevel.Floating,
+        modifier = Modifier.height(height).clip(shape),
+        shape = shape,
+        tier = props.frostTier,
+        // Opaque body: the object floats over arbitrary content, so the
+        // legibility floor cannot depend on what happens to be behind it.
+        opaque = true,
+    ) {
         // Rule 5: the measure is a property of the object, not a widget parked
-        // inside it. Drawn last so it sits over the body's own edge.
-        if (props.progress == PillProgress.Edge) {
-            EdgeMeasure(fraction, accent, shape, Modifier.matchParentSize())
-        }
+        // inside it. Both overlays measure against the surface's OWN bounds via
+        // this BoxScope -- matching a wrapping Box put the stroke outside the
+        // body, which the render probe caught.
         if (props.progress == PillProgress.Fill) {
             Box(
                 Modifier.matchParentSize().clip(shape),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                Box(
-                    Modifier
-                        .fillMaxSize(fraction ?: 0f)
-                        .background(accent.copy(alpha = 0.22f)),
+                Box(Modifier.fillMaxSize(fraction ?: 0f).background(accent.copy(alpha = 0.22f)))
+            }
+        }
+        Row(
+            modifier = Modifier
+                .padding(horizontal = if (props.collapsed) 8.dp else 7.dp)
+                .height(height),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            Subject(activity, fraction, accent, props.progress)
+            // Collapsed keeps the ball and nothing else: the object is still
+            // present and still measures, it just stops narrating. The same
+            // shape the unfurl starts from, so there is one drawing rather
+            // than a separate compact variant.
+            if (props.collapsed) return@Row
+            Text(
+                text = activity.title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            activity.measure(s)?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textSecondary,
+                    maxLines = 1,
                 )
             }
+            if (props.progress == PillProgress.Bar) {
+                Box(Modifier.width(120.dp)) {
+                    NxProgressBar(progress = fraction, color = accent)
+                }
+            }
+            Spacer(Modifier.width(2.dp))
+            if (props.showActions) {
+                activity.actions.forEach { action ->
+                    NxIconButton(
+                        icon = action.icon(),
+                        contentDescription = action.label(s),
+                        onClick = { commands?.perform(activity, action) },
+                    )
+                }
+            }
+        }
+        // Drawn last so it sits over the body's own bevel.
+        if (props.progress == PillProgress.Edge) {
+            EdgeMeasure(fraction, accent, shape, Modifier.matchParentSize())
         }
     }
 }
@@ -255,23 +259,27 @@ private fun EdgeMeasure(
 ) {
     val trackColor = NxTheme.colors.textSecondary.copy(alpha = 0.22f)
     Canvas(modifier) {
+        // Density-derived, not a raw pixel count: a 2px stroke is a hairline on a
+        // 2x display and a heavy band on a 1x one. The render probe found this by
+        // failing to see the measure at all at 2x.
+        val strokeWidth = MEASURE_STROKE.toPx()
         val radius = shape.topStart.toPx(size, this)
         val outline = Path().apply {
             addRoundRect(
                 RoundRect(
-                    rect = Rect(Offset.Zero, size).deflate(1f),
+                    rect = Rect(Offset.Zero, size).deflate(strokeWidth / 2f),
                     radiusX = radius,
                     radiusY = radius,
                 ),
             )
         }
-        drawPath(outline, trackColor, style = Stroke(width = 2f))
+        drawPath(outline, trackColor, style = Stroke(width = strokeWidth))
         if (fraction == null || fraction <= 0f) return@Canvas
 
         val measure = PathMeasure().apply { setPath(outline, false) }
         val done = Path()
         measure.getSegment(0f, measure.length * fraction.coerceIn(0f, 1f), done, true)
-        drawPath(done, color, style = Stroke(width = 2f))
+        drawPath(done, color, style = Stroke(width = strokeWidth))
     }
 }
 
@@ -336,3 +344,6 @@ private fun ActivityAction.label(s: AppStrings): String = when (this) {
     ActivityAction.Stop -> s.activityPillStop
     ActivityAction.Pause -> s.activityPillPause
 }
+
+/** Weight of the perimeter measure. Reads at any density; see [EdgeMeasure]. */
+private val MEASURE_STROKE = 2.dp
