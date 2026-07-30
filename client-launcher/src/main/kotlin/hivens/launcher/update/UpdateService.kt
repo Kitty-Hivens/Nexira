@@ -2,6 +2,11 @@ package hivens.launcher.update
 
 import hivens.config.Branding
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.LauncherUpdate
 import hivens.core.data.ReleaseChannel
@@ -12,15 +17,12 @@ import hivens.core.platform.OS
 import hivens.core.platform.Platform
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.contentLength
-import io.ktor.utils.io.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -29,6 +31,7 @@ import java.time.temporal.ChronoUnit
 
 class UpdateService(
     private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     dataDirectory: Path,
     private val settingsService: ISettingsService,
@@ -91,6 +94,9 @@ class UpdateService(
         // GitHub returns 30 per page by default; we never need that many to
         // find the most recently published non-draft entry.
         private const val PRERELEASE_PAGE_SIZE = 20
+
+        /** How often the download speed is recomputed for the UI. */
+        private const val PROGRESS_SAMPLE_MS = 500L
     }
 
     init {
@@ -292,63 +298,43 @@ class UpdateService(
         val fileName = update.downloadUrl.substringAfterLast("/")
         val targetFile = updateDir.resolve(fileName)
 
-        if (Files.exists(targetFile) && verifyChecksum(targetFile, update.checksum)) {
-            logger.info("Update file already downloaded and verified")
-            return@withContext targetFile
+        // Same gate as [verifyChecksum], applied before a byte moves: an update with
+        // no pinned hash is a verification failure and not a reason to skip the
+        // check. [checkForUpdate] refuses to build one, so reaching here without a
+        // checksum means a bug elsewhere -- fail closed rather than hand the
+        // installer bytes nothing vouched for.
+        if (update.checksum.isBlank()) {
+            logger.error("Refusing to download {}: the release pins no SHA-256", fileName)
+            throw SecurityException("Refusing to install an update with no pinned checksum")
         }
 
-        Files.deleteIfExists(targetFile)
         logger.info("Downloading update from ${update.downloadUrl}")
+        var lastSampleAt = System.currentTimeMillis()
+        var lastSampleBytes = 0L
+        var speed = 0.0
 
-        var lastUpdateTime = System.currentTimeMillis()
-        var lastDownloadedBytes = 0L
-
-        try {
-            httpClient.prepareGet(update.downloadUrl).execute { response ->
-                val channel = response.bodyAsChannel()
-                val totalBytes = response.contentLength() ?: 0L
-                var downloadedBytes = 0L
-
-                FileOutputStream(targetFile.toFile()).use { output ->
-                    val buffer = ByteArray(8192)
-
-                    while (!channel.isClosedForRead) {
-                        val read = channel.readAvailable(buffer)
-                        if (read <= 0) break
-
-                        output.write(buffer, 0, read)
-                        downloadedBytes += read
-
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastUpdateTime >= 500) {
-                            val deltaBytes = downloadedBytes - lastDownloadedBytes
-                            val deltaTime = (currentTime - lastUpdateTime) / 1000.0
-                            val speed = if (deltaTime > 0) deltaBytes / deltaTime else 0.0
-
-                            onProgress(downloadedBytes, totalBytes, speed)
-
-                            lastUpdateTime = currentTime
-                            lastDownloadedBytes = downloadedBytes
-                        }
-                    }
-                }
-
-                onProgress(downloadedBytes, totalBytes, 0.0)
-                logger.info("Download completed: ${downloadedBytes / 1024 / 1024} MB")
+        transfers.fetch(
+            Transfer(
+                url = update.downloadUrl,
+                dest = targetFile,
+                expect = Digest(DigestAlgorithm.SHA256, update.checksum),
+                // An installer already on disk and hashing to the pinned value is the
+                // one we would download, so it is used as-is.
+                skip = SkipIfPresent.ByDigest,
+            )
+        ) { done, total ->
+            val now = System.currentTimeMillis()
+            if (now - lastSampleAt >= PROGRESS_SAMPLE_MS) {
+                val seconds = (now - lastSampleAt) / 1000.0
+                if (seconds > 0) speed = (done - lastSampleBytes) / seconds
+                lastSampleAt = now
+                lastSampleBytes = done
             }
-
-            if (!verifyChecksum(targetFile, update.checksum)) {
-                Files.delete(targetFile)
-                throw SecurityException("Checksum verification failed!")
-            }
-
-            logger.info("Checksum verified successfully")
-            targetFile
-
-        } catch (e: Exception) {
-            Files.deleteIfExists(targetFile)
-            throw e
+            onProgress(done, total, speed)
         }
+
+        logger.info("Update ready and checksum verified: {}", fileName)
+        targetFile
     }
 
     fun cleanupOldUpdates() {
