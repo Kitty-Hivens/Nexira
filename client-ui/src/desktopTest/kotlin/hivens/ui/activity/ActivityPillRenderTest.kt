@@ -114,9 +114,9 @@ class ActivityPillRenderTest {
     @Composable
     private fun Sheet(props: PillProps) {
         val commands: ActivityCommands? = null // static sheet: nothing to click
-        Box(Modifier.height(44.dp)) { Pill(running, props, commands, EnglishStrings) }
-        Box(Modifier.height(44.dp)) { Pill(game, props, commands, EnglishStrings) }
-        Box(Modifier.height(44.dp)) { Pill(failed, props, commands, EnglishStrings) }
+        Box(Modifier.height(44.dp)) { Pill(running, props, commands, EnglishStrings, 520.dp) }
+        Box(Modifier.height(44.dp)) { Pill(game, props, commands, EnglishStrings, 520.dp) }
+        Box(Modifier.height(44.dp)) { Pill(failed, props, commands, EnglishStrings, 520.dp) }
     }
 
     @Test
@@ -150,7 +150,7 @@ class ActivityPillRenderTest {
                 "install:A", ActivityKind.Install, "A", ActivityPhase.Running(done, 100),
             )
             val bmp = render(CelestiaStyle, true, Color(0xFF121212), "measure-$done") {
-                Box(Modifier.height(44.dp)) { Pill(one, PillProps(), null, EnglishStrings) }
+                Box(Modifier.height(44.dp)) { Pill(one, PillProps(), null, EnglishStrings, 520.dp) }
             }
             var hits = 0
             // Whole frame: at a low value the arc sits on the pill's lower edge,

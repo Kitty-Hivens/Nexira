@@ -1,6 +1,11 @@
 package hivens.ui.activity
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -53,7 +58,8 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.nx.NxIconButton
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.FrostTier
 import hivens.ui.surface.NxSurface
@@ -167,7 +173,7 @@ internal fun Pill(
     props: PillProps,
     commands: ActivityCommands?,
     s: AppStrings,
-    maxWidth: Dp = Dp.Unspecified,
+    maxWidth: Dp,
 ) {
     val style = LocalStyle.current
     val colors = NxTheme.colors
@@ -181,10 +187,10 @@ internal fun Pill(
 
     NxSurface(
         level = NxSurfaceLevel.Floating,
-        modifier = Modifier
-            .height(height)
-            .then(if (maxWidth != Dp.Unspecified) Modifier.widthIn(max = maxWidth) else Modifier)
-            .clip(shape),
+        // The bound is required, not optional: the title takes a weight, and a
+        // weight in a Row with unbounded width is undefined -- which is how the
+        // controls ended up drawn outside the body.
+        modifier = Modifier.height(height).widthIn(max = maxWidth).clip(shape),
         shape = shape,
         tier = props.frostTier,
         // Opaque body: the object floats over arbitrary content, so the
@@ -233,6 +239,7 @@ internal fun Pill(
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textSecondary,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (props.progress == PillProgress.Bar) {
@@ -243,10 +250,16 @@ internal fun Pill(
             Spacer(Modifier.width(2.dp))
             if (props.showActions) {
                 activity.actions.forEach { action ->
-                    NxIconButton(
-                        icon = action.icon(),
-                        contentDescription = action.label(s),
+                    NxButton(
+                        label = action.label(s),
                         onClick = { commands?.perform(activity, action) },
+                        style = if (action == ActivityAction.Stop) {
+                            NxButtonStyle.Destructive
+                        } else {
+                            NxButtonStyle.Tertiary
+                        },
+                        icon = action.icon(),
+                        compact = true,
                     )
                 }
             }
@@ -272,6 +285,23 @@ private fun EdgeMeasure(
     modifier: Modifier,
 ) {
     val trackColor = NxTheme.colors.textSecondary.copy(alpha = 0.22f)
+    val style = LocalStyle.current
+    // A job whose size is not known yet still has to look alive. A static track
+    // reads as stalled, which is what a launcher does for the first seconds of
+    // every install -- exactly when the user is watching hardest.
+    val sweep = if (fraction == null && style.animationMultiplier > 0f) {
+        rememberInfiniteTransition(label = "pillSweep").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(style.animationDurationMs(1_600), easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "pillSweepValue",
+        ).value
+    } else {
+        null
+    }
     Canvas(modifier) {
         // Density-derived, not a raw pixel count: a 2px stroke is a hairline on a
         // 2x display and a heavy band on a 1x one. The render probe found this by
@@ -288,12 +318,31 @@ private fun EdgeMeasure(
             )
         }
         drawPath(outline, trackColor, style = Stroke(width = strokeWidth))
-        if (fraction == null || fraction <= 0f) return@Canvas
-
         val measure = PathMeasure().apply { setPath(outline, false) }
-        val done = Path()
-        measure.getSegment(0f, measure.length * fraction.coerceIn(0f, 1f), done, true)
-        drawPath(done, color, style = Stroke(width = strokeWidth))
+        val total = measure.length
+        val arc = Path()
+
+        when {
+            // Unknown size: a short arc travelling the perimeter.
+            fraction == null && sweep != null -> {
+                val span = total * INDETERMINATE_SPAN
+                val head = total * sweep
+                measure.getSegment(head, (head + span).coerceAtMost(total), arc, true)
+                // Wrap the tail back to the start so the arc never vanishes at the seam.
+                if (head + span > total) {
+                    measure.getSegment(0f, head + span - total, arc, true)
+                }
+            }
+            // Unknown size with motion off: a still, dimmed full perimeter. Busy,
+            // not a percentage.
+            fraction == null -> {
+                drawPath(outline, color.copy(alpha = 0.35f), style = Stroke(width = strokeWidth))
+                return@Canvas
+            }
+            fraction <= 0f -> return@Canvas
+            else -> measure.getSegment(0f, total * fraction.coerceIn(0f, 1f), arc, true)
+        }
+        drawPath(arc, color, style = Stroke(width = strokeWidth))
     }
 }
 
@@ -342,8 +391,13 @@ private fun Activity.fraction(): Float? {
  */
 private fun Activity.measure(s: AppStrings): String? {
     if (kind == ActivityKind.Game) return null // elapsed time is composed by the caller's clock
+    val failed = phase as? ActivityPhase.Failed
+    if (failed != null) return failed.reason
     val running = phase as? ActivityPhase.Running ?: return null
-    if (running.total <= 0) return null
+    // A job whose size is not known yet still has something to say -- the stage
+    // it is in, or the file it is on. Leaving the zone empty is what made the
+    // first seconds of an install read as a bare name and nothing else.
+    if (running.total <= 0) return running.detail
     return s.activityPillMeasure(running.done, running.total)
 }
 
@@ -364,3 +418,6 @@ private val MEASURE_STROKE = 2.dp
 
 /** Share of the content column the pill may occupy before the title elides. */
 private const val MAX_WIDTH_SHARE = 0.72f
+
+/** Share of the perimeter the indeterminate arc covers. */
+private const val INDETERMINATE_SPAN = 0.22f

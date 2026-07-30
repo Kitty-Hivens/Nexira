@@ -52,24 +52,11 @@ class InstallDriver(
         val s = stringsProvider()
         val sourceKey = "install:${snapshot.key}"
         when (val phase = snapshot.phase) {
-            is InstallPhase.Running -> {
-                val fraction = if (phase.total > 0) phase.current.toFloat() / phase.total else Float.NaN
-                notifications.push(
-                    sourceKey = sourceKey,
-                    sender    = snapshot.title,
-                    iconUrl   = snapshot.iconUrl,
-                    severity  = Severity.Info,
-                    kind      = Kind.Progress,
-                    title     = s.notifInstallSyncing(snapshot.title),
-                    body      = if (phase.total > 0)
-                        s.browseDetailInstallProgress(phase.filename, phase.current, phase.total)
-                    else s.browseDetailInstallStarting,
-                    progress  = fraction,
-                    actions   = listOf(
-                        NotifAction("cancel", s.notifActionCancel) { service.cancel(snapshot.key) },
-                    ),
-                )
-            }
+            // Live progress belongs to the activity surface. A toast that
+            // sits there for the length of a multi-gigabyte download is the
+            // thing that surface exists to replace, and two of them narrating
+            // one install is worse than either alone.
+            is InstallPhase.Running -> Unit
             is InstallPhase.Succeeded -> notifications.push(
                 sourceKey = sourceKey,
                 sender    = snapshot.title,
