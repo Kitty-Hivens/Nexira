@@ -999,6 +999,9 @@ object EnglishStrings : AppStrings {
     override val editorSurfOverlay                      = "Floating layer"
     override val editorSurfShortOverlay                 = "Floating"
 
+    override val activityPillExpand                     = "Show all"
+    override fun activityPillMore(count: Int)           = "+$count"
+
     override val activityPillCancel                     = "Cancel"
     override val activityPillPause                      = "Pause"
     override fun activityPillMeasure(done: Long, total: Long) = "$done of $total"

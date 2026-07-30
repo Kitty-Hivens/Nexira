@@ -73,6 +73,12 @@ class ActivityPillRenderTest {
         "install:Industrial", ActivityKind.Install, "Industrial",
         ActivityPhase.Running(34, 97, "AmbientSounds.jar"), setOf(ActivityAction.Cancel),
     )
+    private val sync = activity(
+        "sync:Industrial", ActivityKind.Sync, "Industrial", ActivityPhase.Running(0, 0),
+    )
+    private val repair = activity(
+        "repair:SkyBlock", ActivityKind.Repair, "SkyBlock", ActivityPhase.Running(2, 9),
+    )
     private val failed = activity(
         "install:Create", ActivityKind.Install, "Create", ActivityPhase.Failed("timeout"),
     )
@@ -115,8 +121,8 @@ class ActivityPillRenderTest {
     @Composable
     private fun Sheet(props: PillProps) {
         val commands: ActivityCommands? = null // static sheet: nothing to click
-        Box(Modifier.height(44.dp)) { Pill(running, props, commands, EnglishStrings, 520.dp) }
-        Box(Modifier.height(44.dp)) { Pill(failed, props, commands, EnglishStrings, 520.dp) }
+        Box(Modifier.height(44.dp)) { Pill(running, listOf(running, failed, sync, repair), false, {}, props, commands, EnglishStrings, 520.dp) }
+        Box(Modifier.height(44.dp)) { Pill(failed, listOf(failed), false, {}, props, commands, EnglishStrings, 520.dp) }
     }
 
     @Test
@@ -150,7 +156,7 @@ class ActivityPillRenderTest {
                 "install:A", ActivityKind.Install, "A", ActivityPhase.Running(done, 100),
             )
             val bmp = render(CelestiaStyle, true, Color(0xFF121212), "measure-$done") {
-                Box(Modifier.height(44.dp)) { Pill(one, PillProps(), null, EnglishStrings, 520.dp) }
+                Box(Modifier.height(44.dp)) { Pill(one, listOf(one), false, {}, PillProps(), null, EnglishStrings, 520.dp) }
             }
             var hits = 0
             // Whole frame: at a low value the arc sits on the pill's lower edge,

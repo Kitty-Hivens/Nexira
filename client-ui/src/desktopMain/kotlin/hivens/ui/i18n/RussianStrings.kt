@@ -1014,6 +1014,9 @@ object RussianStrings : AppStrings {
     override val editorSurfOverlay                      = "Плавающий слой"
     override val editorSurfShortOverlay                 = "Плавающий"
 
+    override val activityPillExpand                     = "Показать все"
+    override fun activityPillMore(count: Int)           = "+$count"
+
     override val activityPillCancel                     = "Отменить"
     override val activityPillPause                      = "Пауза"
     override fun activityPillMeasure(done: Long, total: Long) = "$done из $total"
