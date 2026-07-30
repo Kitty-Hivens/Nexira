@@ -40,6 +40,7 @@ import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -65,7 +66,10 @@ internal fun PackVersionSection(
     val repo: IPackRepository = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
+    // Two scopes on purpose: a check is cheap and belongs to the window, an apply
+    // outlives it. See applyLatest.
     val scope = rememberCoroutineScope()
+    val appScope: CoroutineScope = koinInject()
 
     var busy by remember(pack.id) { mutableStateOf(false) }
     var check by remember(pack.id) { mutableStateOf<UpdateCheck?>(null) }
@@ -107,12 +111,19 @@ internal fun PackVersionSection(
 
     fun applyLatest() {
         if (busy) return
-        scope.launch {
+        // The app scope, not the composition's: this window is dismissed by Esc, by
+        // the scrim and by its own close button, and on the composition scope every
+        // one of those cancels the apply mid-flight. The rollback does run (it is
+        // blocking, so cancellation cannot stop it) and the files come back, but the
+        // user is left with an update that silently did not happen and a snapshot
+        // nobody cleans up. The same lesson is already written down on
+        // LauncherController.setOptionalModsAsync.
+        appScope.launch {
             busy = true
-            onOpState(PackSettingsOp.Running(0, 0, ""))
+            onOpState(PackSettingsOp.Running(PackSettingsOpKind.Update, 0, 0, ""))
             runCatching {
                 updater.applyUpdate(pack, null) { c, t, p ->
-                    onOpState(PackSettingsOp.Running(c, t, p.substringAfterLast('/')))
+                    onOpState(PackSettingsOp.Running(PackSettingsOpKind.Update, c, t, p.substringAfterLast('/')))
                 }
             }.onSuccess { outcome ->
                 repo.get(pack.id)?.let(onInstanceChange)

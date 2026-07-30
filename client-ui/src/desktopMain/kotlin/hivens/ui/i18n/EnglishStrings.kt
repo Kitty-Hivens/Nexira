@@ -941,9 +941,11 @@ object EnglishStrings : AppStrings {
     override val packSettingsDetachDesc         = "Become your own copy; provenance is kept"
     override val packSettingsDetachAction       = "Detach"
     override val packSettingsRepair             = "Verify and repair files"
-    override val packSettingsRepairDesc         = "Re-sync the pack against the mirror"
+    override val packSettingsRepairDesc         = "Check every file and restore only what is damaged"
     override val packSettingsRepairAction       = "Repair"
-    override val packSettingsRepairDone         = "Files re-synced"
+    override fun packSettingsRepairDone(checked: Int, repaired: Int) =
+        if (repaired == 0) "Checked $checked files, all intact" else "Checked $checked files, restored $repaired"
+    override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "Checking $current/$total: $name"
     override val packSettingsDangerZone         = "Danger zone"
     override val packSettingsDelete             = "Delete pack"
     override val packSettingsDeleteDesc         = "The instance files are erased for good"

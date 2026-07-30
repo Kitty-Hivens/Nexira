@@ -939,9 +939,11 @@ object GermanStrings : AppStrings {
     override val packSettingsDetachDesc         = "Werde deine eigene Kopie; Herkunft bleibt erhalten"
     override val packSettingsDetachAction       = "Lösen"
     override val packSettingsRepair             = "Dateien prüfen und reparieren"
-    override val packSettingsRepairDesc         = "Das Pack erneut mit dem Mirror abgleichen"
+    override val packSettingsRepairDesc         = "Alle Dateien prüfen und nur die beschädigten wiederherstellen"
     override val packSettingsRepairAction       = "Reparieren"
-    override val packSettingsRepairDone         = "Dateien neu abgeglichen"
+    override fun packSettingsRepairDone(checked: Int, repaired: Int) =
+        if (repaired == 0) "$checked Dateien geprüft, alle in Ordnung" else "$checked Dateien geprüft, $repaired wiederhergestellt"
+    override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "Prüfung $current/$total: $name"
     override val packSettingsDangerZone         = "Gefahrenzone"
     override val packSettingsDelete             = "Pack löschen"
     override val packSettingsDeleteDesc         = "Die Instanzdateien werden endgültig gelöscht"
