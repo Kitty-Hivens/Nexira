@@ -65,11 +65,18 @@ import hivens.ui.theme.decorativeColor
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
+/** Which long operation the footer is narrating. The two read differently: one
+ *  installs a different build, the other puts the current one back. */
+internal enum class PackSettingsOpKind { Update, Repair }
+
 /** Lifecycle of the window's current async operation, rendered in the footer strip. */
 internal sealed interface PackSettingsOp {
     data object Idle : PackSettingsOp
-    data class Running(val current: Int, val total: Int, val path: String) : PackSettingsOp
+    data class Running(val kind: PackSettingsOpKind, val current: Int, val total: Int, val path: String) : PackSettingsOp
     data class Done(val version: String) : PackSettingsOp
+
+    /** A finished repair. Says what it looked at, not just that it ran. */
+    data class Repaired(val checked: Int, val repaired: Int) : PackSettingsOp
     data class Failed(val reason: String) : PackSettingsOp
 }
 
@@ -199,7 +206,7 @@ fun PackSettingsWindow(
                             PackSettingsCategory.Content ->
                                 PackContentSection(pack, onInstanceChange)
                             PackSettingsCategory.Data ->
-                                PackDataSection(pack, instanceDir, onInstanceChange, onDismiss)
+                                PackDataSection(pack, instanceDir, onInstanceChange, onDismiss, onOpState = { opState = it })
                         }
                     }
                 }
@@ -307,7 +314,10 @@ private fun FooterStatus(state: PackSettingsOp) {
                         color    = colors.primary,
                     )
                     Text(
-                        text     = s.packVersionsApplying(state.current, state.total, state.path),
+                        text     = when (state.kind) {
+                            PackSettingsOpKind.Update -> s.packVersionsApplying(state.current, state.total, state.path)
+                            PackSettingsOpKind.Repair -> s.packSettingsRepairProgress(state.current, state.total, state.path)
+                        },
                         style    = MaterialTheme.typography.labelSmall,
                         color    = colors.textSecondary,
                         maxLines = 1,
@@ -319,6 +329,11 @@ private fun FooterStatus(state: PackSettingsOp) {
             }
             is PackSettingsOp.Done -> Text(
                 text  = s.packVersionsApplied(state.version),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.success,
+            )
+            is PackSettingsOp.Repaired -> Text(
+                text  = s.packSettingsRepairDone(state.checked, state.repaired),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.success,
             )

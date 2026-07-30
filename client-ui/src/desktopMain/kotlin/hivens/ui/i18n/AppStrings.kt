@@ -985,7 +985,9 @@ interface AppStrings {
     val packSettingsRepair: String
     val packSettingsRepairDesc: String
     val packSettingsRepairAction: String
-    val packSettingsRepairDone: String
+    /** Outcome line: how much was looked at, and how much had to be put back. */
+    fun packSettingsRepairDone(checked: Int, repaired: Int): String
+    fun packSettingsRepairProgress(current: Int, total: Int, name: String): String
     val packSettingsDangerZone: String
     val packSettingsDelete: String
     val packSettingsDeleteDesc: String

@@ -943,9 +943,11 @@ object RussianStrings : AppStrings {
     override val packSettingsDetachDesc         = "Стать своей копией; провенанс сохранится"
     override val packSettingsDetachAction       = "Отсоединить"
     override val packSettingsRepair             = "Проверить и восстановить файлы"
-    override val packSettingsRepairDesc         = "Заново синхронизировать сборку с зеркалом"
+    override val packSettingsRepairDesc         = "Проверить все файлы и восстановить только повреждённые"
     override val packSettingsRepairAction       = "Восстановить"
-    override val packSettingsRepairDone         = "Файлы пересинхронизированы"
+    override fun packSettingsRepairDone(checked: Int, repaired: Int) =
+        if (repaired == 0) "Проверено файлов: $checked, все целы" else "Проверено файлов: $checked, восстановлено: $repaired"
+    override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "Проверка $current/$total: $name"
     override val packSettingsDangerZone         = "Опасная зона"
     override val packSettingsDelete             = "Удалить сборку"
     override val packSettingsDeleteDesc         = "Файлы инстанса будут стёрты безвозвратно"
