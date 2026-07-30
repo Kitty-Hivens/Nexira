@@ -307,10 +307,11 @@ jobs:
         shell: pwsh
         run: |
           # B-3 follow-up: source dir moves with the packaging swap.
-          # customJpackageImage produces Nexira\ directly (no
-          # intermediate app\ layer like Compose Desktop did), so the
-          # Nexira\bin\..., Nexira\lib\runtime\... shape
-          # inside the zip stays identical from the user's perspective.
+          # customJpackageImage produces Nexira\ directly, without the
+          # intermediate app\ directory Compose Desktop put above it, so
+          # what the user sees inside the zip is unchanged: Nexira.exe
+          # beside its app\ and runtime\ folders, which is the layout
+          # portable-readme.txt describes.
           $src = "client-ui\build\customJpackageImage"
           # Drop the bilingual README inside Nexira\ before zipping so
           # users see it immediately on extraction. Without it, the
