@@ -996,6 +996,9 @@ object EnglishStrings : AppStrings {
     override val notifActionOpenVersions                = "Open versions"
     override fun notifInstallFailed(packName: String)   = "$packName failed to install"
     override fun notifInstallCancelled(packName: String) = "$packName install cancelled"
+    override val editorSurfOverlay                      = "Floating layer"
+    override val editorSurfShortOverlay                 = "Floating"
+
     override val activityPillCancel                     = "Cancel"
     override val activityPillStop                       = "Stop"
     override val activityPillPause                      = "Pause"

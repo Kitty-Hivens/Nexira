@@ -1053,6 +1053,9 @@ interface AppStrings {
     fun notifInstallFailed(packName: String): String
     fun notifInstallCancelled(packName: String): String
     // Activity pill -- the floating account of what the launcher is doing.
+    val editorSurfOverlay: String
+    val editorSurfShortOverlay: String
+
     val activityPillCancel: String
     val activityPillStop: String
     val activityPillPause: String

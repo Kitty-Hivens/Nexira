@@ -1011,6 +1011,9 @@ object RussianStrings : AppStrings {
     override val notifActionOpenVersions                = "Открыть версии"
     override fun notifInstallFailed(packName: String)   = "$packName не удалось установить"
     override fun notifInstallCancelled(packName: String) = "Установка $packName отменена"
+    override val editorSurfOverlay                      = "Плавающий слой"
+    override val editorSurfShortOverlay                 = "Плавающий"
+
     override val activityPillCancel                     = "Отменить"
     override val activityPillStop                       = "Остановить"
     override val activityPillPause                      = "Пауза"

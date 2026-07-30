@@ -10,6 +10,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +40,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.activity.Activity
@@ -124,7 +127,11 @@ fun ActivityPillWidget(instance: WidgetInstance) {
         activities.lastOrNull { it.phase is ActivityPhase.Failed } ?: activities.lastOrNull()
     }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+    // The object must not outgrow the column it floats in: a long pack name on a
+    // narrow window would otherwise push it past the edge, since the pill sizes to
+    // its content. The cap turns that into an ellipsis instead.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val cap = maxWidth * MAX_WIDTH_SHARE
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalArrangement =
@@ -147,7 +154,7 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                     targetWidth = { ballPx },
                 ) + fadeOut(tween(style.animationDurationMs(140))),
             ) {
-                subject?.let { Pill(it, props, commands, s) }
+                subject?.let { Pill(it, props, commands, s, cap) }
             }
         }
     }
@@ -160,6 +167,7 @@ internal fun Pill(
     props: PillProps,
     commands: ActivityCommands?,
     s: AppStrings,
+    maxWidth: Dp = Dp.Unspecified,
 ) {
     val style = LocalStyle.current
     val colors = NxTheme.colors
@@ -173,7 +181,10 @@ internal fun Pill(
 
     NxSurface(
         level = NxSurfaceLevel.Floating,
-        modifier = Modifier.height(height).clip(shape),
+        modifier = Modifier
+            .height(height)
+            .then(if (maxWidth != Dp.Unspecified) Modifier.widthIn(max = maxWidth) else Modifier)
+            .clip(shape),
         shape = shape,
         tier = props.frostTier,
         // Opaque body: the object floats over arbitrary content, so the
@@ -212,6 +223,9 @@ internal fun Pill(
                 color = colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                // The title yields first: the measure and the controls are the
+                // parts a truncation would make useless.
+                modifier = Modifier.weight(1f, fill = false),
             )
             activity.measure(s)?.let {
                 Text(
@@ -347,3 +361,6 @@ private fun ActivityAction.label(s: AppStrings): String = when (this) {
 
 /** Weight of the perimeter measure. Reads at any density; see [EdgeMeasure]. */
 private val MEASURE_STROKE = 2.dp
+
+/** Share of the content column the pill may occupy before the title elides. */
+private const val MAX_WIDTH_SHARE = 0.72f
