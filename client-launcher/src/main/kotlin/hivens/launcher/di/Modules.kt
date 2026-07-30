@@ -18,6 +18,7 @@ import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
 import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.TransferEngine
 import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
@@ -239,6 +240,17 @@ val networkModule = module {
         val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
         HttpClientProvider { direct }
     }
+
+    /**
+     * The one downloader. Every path that writes network bytes to disk goes
+     * through it, so retry, resume, block-parallel transfer, verification and the
+     * concurrency decision are the same wherever the bytes came from.
+     *
+     * Bound to the direct channel: the runtime CDNs, the mirror, the JDK hosts and
+     * GitHub all keep strict TLS, and none of them has any business inheriting an
+     * SSL bypass the user granted for the smartycraft host.
+     */
+    single { TransferEngine(get<HttpClientProvider>(named("direct"))) }
 
     /**
      * Smartycraft-routed `okhttp3.Call.Factory` for callers that consume the
@@ -560,7 +572,7 @@ val mirrorModule = module {
  */
 val runtimeModule = module {
     // Direct channel -- the BellSoft JDK CDN keeps strict TLS.
-    single<IJavaManager> { JavaManagerService(get(), get(named("direct"))) }
+    single<IJavaManager> { JavaManagerService(get(), get()) }
 
     // Direct channel -- Maven Central LWJGL/JInput natives keep strict TLS.
     single { EnvironmentPreparer(get(named("direct"))) }
@@ -578,6 +590,7 @@ val runtimeModule = module {
             librariesDir = get<PlatformPaths>().librariesDir,
             assetsDir = get<PlatformPaths>().assetsDir,
             clientProvider = get(named("direct")),
+            transfers = get(),
             json = get(),
             loaderRegistry = get(),
         )

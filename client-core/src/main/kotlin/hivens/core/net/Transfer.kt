@@ -57,6 +57,14 @@ enum class SkipIfPresent {
     /** Present at the declared size. Cheap, one stat. */
     BySize,
 
+    /**
+     * Present at all. For a destination whose path already carries its identity
+     * and whose upstream declares no size -- a maven artifact at its coordinate,
+     * an object addressed by its own hash. Refetching those on every launch
+     * because a manifest omitted a length would be minutes of network for nothing.
+     */
+    Presence,
+
     /** Present and hashing to the pinned digest. Falls back to [BySize] with no digest. */
     ByDigest,
 }

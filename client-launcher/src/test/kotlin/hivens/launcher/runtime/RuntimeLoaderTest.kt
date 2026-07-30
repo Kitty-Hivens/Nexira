@@ -1,5 +1,6 @@
 package hivens.launcher.runtime
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.LibrarySpec
@@ -112,6 +113,7 @@ class RuntimeLoaderTest {
     private fun provisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
         librariesDir = librariesDir, assetsDir = assetsDir,
         clientProvider = HttpClientProvider { HttpClient(engine(requests)) },
+        transfers = testTransferEngine(HttpClientProvider { HttpClient(engine(requests)) }),
         json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
         versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
     )
@@ -228,6 +230,7 @@ class RuntimeLoaderTest {
     private fun swapProvisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
         librariesDir = librariesDir, assetsDir = assetsDir,
         clientProvider = HttpClientProvider { HttpClient(swapEngine(requests)) },
+        transfers = testTransferEngine(HttpClientProvider { HttpClient(swapEngine(requests)) }),
         json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
         versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
     )
@@ -340,6 +343,7 @@ class RuntimeLoaderTest {
         val p = RuntimeProvisioner(
             librariesDir = librariesDir, assetsDir = assetsDir,
             clientProvider = HttpClientProvider { HttpClient(nativesEngine()) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(nativesEngine()) }),
             json = json, loaderRegistry = LoaderRegistry(listOf(resolver)), osName = "Linux", osArch = "amd64",
             versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
         )

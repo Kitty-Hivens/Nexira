@@ -1,14 +1,12 @@
 package hivens.launcher
 
-import hivens.core.api.HttpClientProvider
 import hivens.core.io.UnpackBudget
 import hivens.core.io.UnpackLimits
 import hivens.core.api.interfaces.IJavaManager
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.platform.OS
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
@@ -23,11 +21,18 @@ import java.util.concurrent.TimeUnit
 
 class JavaManagerService(
     baseDir: Path,
-    private val clientProvider: HttpClientProvider
+    private val transfers: TransferEngine,
 ) : IJavaManager {
     private val log = LoggerFactory.getLogger(JavaManagerService::class.java)
-    private val httpClient get() = clientProvider.current
     private val runtimesDir: Path = baseDir.resolve("runtimes")
+
+    /**
+     * Where an archive is downloaded to. Inside the data dir and named after what
+     * it is, rather than a fresh system temp file per attempt: a two hundred
+     * megabyte download that a relaunch cannot continue is a download that a bad
+     * line never completes.
+     */
+    private val downloadsDir: Path = runtimesDir.resolve(".downloads")
 
     override suspend fun getJavaPath(version: String): Path =
         getJavaPathForMajor(detectJavaVersion(version))
@@ -79,37 +84,46 @@ class JavaManagerService(
         // despite valid URL, while curl from elsewhere returned 200).
         // Adoptium is hosted on GitHub releases which has wider regional
         // reachability and less aggressive bot detection.
+        //
+        // The loop stays even though the engine can walk mirrors itself: here the
+        // next host is also worth trying when the archive downloads fine and then
+        // will not unpack, which is a failure the engine cannot see.
         var lastError: Exception? = null
         for ((index, url) in urls.withIndex()) {
             val isZip = url.endsWith(".zip")
-            val archive = Files.createTempFile("java_pkg", if (isZip) ".zip" else ".tar.gz")
+            val archive = downloadsDir.resolve("java-$version-${OS.platform.bellsoft}-${OS.arch.bellsoft}" + if (isZip) ".zip" else ".tar.gz")
             try {
                 log.info("Download Java attempt {}/{}: {}", index + 1, urls.size, url)
-
-                // Browser-shaped User-Agent. Default ktor UA ("Ktor
-                // client/...") is on CloudFlare's bot signature list and
-                // gets blanket-403'd from regions CloudFlare flags as
-                // bot-heavy. Sending a real-Chrome UA passes the cheap
-                // bot heuristic; sophisticated TLS-fingerprint detection
-                // would still catch us, but BellSoft / GitHub don't
-                // appear to use that tier.
-                httpClient.prepareGet(url) {
-                    header(HttpHeaders.UserAgent, DOWNLOAD_UA)
-                }.execute { httpResponse ->
-                    if (!httpResponse.status.isSuccess()) {
-                        throw IOException("Loading error: ${httpResponse.status}")
-                    }
-                    val total = httpResponse.contentLength() ?: -1L
-                    val channel = httpResponse.bodyAsChannel()
-                    FileOutputStream(archive.toFile()).use { fileStream ->
-                        // Wrap to count bytes and emit progress every 5% -- a fresh
-                        // Java 25 download is ~200 MB and the UI sits on PrepareStage.JVM
-                        // otherwise.
-                        val counting = ProgressOutputStream(fileStream, total) { pct ->
+                var lastPct = -1
+                transfers.fetch(
+                    Transfer(
+                        url = url,
+                        dest = archive,
+                        // Verified by unpacking it and running `java -version` rather
+                        // than by hash: a checksum fetched from the same host over the
+                        // same connection as the archive is worth little, and a tree
+                        // with no working java in it is caught before anything
+                        // installed is touched. See [installUnpacked].
+                        expect = null,
+                        // Browser-shaped User-Agent. The default ktor identifier is on
+                        // CloudFlare's bot signature list and gets blanket-403'd from
+                        // regions it flags as bot-heavy. A real-Chrome UA passes the
+                        // cheap heuristic; TLS-fingerprint detection would still catch
+                        // us, but neither BellSoft nor GitHub appears to use that tier.
+                        userAgent = DOWNLOAD_UA,
+                        // Nothing addresses this path but the version in its name, and
+                        // a half-downloaded archive is a partial, not a file.
+                        skip = SkipIfPresent.Never,
+                    )
+                ) { done, total ->
+                    // A fresh Java 25 download is ~200 MB, and without this the UI sits
+                    // on PrepareStage.JVM saying nothing for minutes.
+                    if (total > 0) {
+                        val pct = ((done * 100) / total).toInt().coerceIn(0, 100)
+                        if (pct >= lastPct + 5 || pct == 100) {
+                            lastPct = pct
                             onProgress("Downloading Java $version: $pct%")
                         }
-                        channel.copyTo(counting)
-                        counting.flush()
                     }
                 }
 
@@ -119,7 +133,10 @@ class JavaManagerService(
                 Files.deleteIfExists(archive)
                 return
             } catch (e: Exception) {
-                Files.deleteIfExists(archive)
+                // Whatever arrived is left where it is. The partial beside this
+                // archive is what the next attempt continues from, and on the route
+                // this fallback exists for, continuing rather than starting over is the
+                // difference between finishing and never finishing.
                 log.warn("Download from {} failed: {}", url, e.message)
                 lastError = e
                 // Continue to next mirror.
@@ -499,42 +516,6 @@ class JavaManagerService(
         val tagPrefix = if (major == 8) "jdk" else "jdk-"
         return "https://github.com/adoptium/temurin${major}-binaries/releases/download/" +
             "$tagPrefix$tagEncoded/OpenJDK${major}U-jdk_${arch}_${os}_hotspot_$fileVersion.$ext"
-    }
-
-    /**
-     * Counting [java.io.OutputStream] wrapper that emits a percent-progress
-     * callback every 5 percentage points (and once at 100). Used for the JDK
-     * download so the launch UI can show meaningful status during the ~200 MB
-     * first-run download instead of sitting silent on PrepareStage.JVM. The
-     * close() is a no-op -- the wrapped stream is owned by an outer `use` block.
-     */
-    private class ProgressOutputStream(
-        private val delegate: java.io.OutputStream,
-        private val totalBytes: Long,
-        private val onPct: (Int) -> Unit,
-    ) : java.io.OutputStream() {
-        private var written = 0L
-        private var lastPct = -1
-        override fun write(b: Int) {
-            delegate.write(b)
-            written++
-            emitMaybe()
-        }
-        override fun write(b: ByteArray, off: Int, len: Int) {
-            delegate.write(b, off, len)
-            written += len
-            emitMaybe()
-        }
-        override fun flush() { delegate.flush() }
-        override fun close() { /* delegate is owned by an outer `use` */ }
-        private fun emitMaybe() {
-            if (totalBytes <= 0) return
-            val pct = ((written * 100) / totalBytes).toInt().coerceIn(0, 100)
-            if (pct >= lastPct + 5 || pct == 100) {
-                lastPct = pct
-                onPct(pct)
-            }
-        }
     }
 
     companion object {

@@ -1,5 +1,6 @@
 package hivens.launcher.mrpack
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.IPackRepository
@@ -63,7 +64,7 @@ class MrpackInstallerTest {
 
     private fun bareInstaller(): MrpackInstaller {
         val dead = HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.NotFound) }) }
-        val provisioner = RuntimeProvisioner(tempDir("libs"), tempDir("assets"), dead, json)
+        val provisioner = RuntimeProvisioner(tempDir("libs"), tempDir("assets"), dead, testTransferEngine(dead), json)
         return MrpackInstaller(dead, json, fakeJava, provisioner, FakeRepository(), tempDir("data"))
     }
 
@@ -135,7 +136,8 @@ class MrpackInstallerTest {
         val assets = tempDir("assets")
         val dataDir = tempDir("data")
         val provisioner = RuntimeProvisioner(
-            librariesDir = libs, assetsDir = assets, clientProvider = provider, json = json,
+            librariesDir = libs, assetsDir = assets, clientProvider = provider,
+            transfers = testTransferEngine(provider), json = json,
             loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
             versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
         )
@@ -163,7 +165,8 @@ class MrpackInstallerTest {
     fun `install stamps Modrinth origin, project id and version from the source`() = runTest {
         val provider = HttpClientProvider { HttpClient(engine()) }
         val provisioner = RuntimeProvisioner(
-            librariesDir = tempDir("libs"), assetsDir = tempDir("assets"), clientProvider = provider, json = json,
+            librariesDir = tempDir("libs"), assetsDir = tempDir("assets"), clientProvider = provider,
+            transfers = testTransferEngine(provider), json = json,
             loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
             versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
         )

@@ -1,5 +1,6 @@
 package hivens.launcher.runtime
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.loader.LoaderProfile
 import hivens.launcher.runtime.loader.LoaderRegistry
@@ -56,6 +57,7 @@ class RuntimeProvisionerTest {
         librariesDir = librariesDir,
         assetsDir = assetsDir,
         clientProvider = HttpClientProvider { client },
+        transfers = testTransferEngine(HttpClientProvider { client }),
         json = json,
         osName = osName,
         osArch = osArch,
@@ -443,6 +445,7 @@ class RuntimeProvisionerTest {
             librariesDir = librariesDir,
             assetsDir = assetsDir,
             clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
             json = json,
             loaderRegistry = LoaderRegistry(listOf(stub)),
             osName = "Linux",

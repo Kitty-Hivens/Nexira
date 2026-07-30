@@ -46,7 +46,7 @@ class JavaManagerServiceTest {
     @BeforeTest
     fun setup() {
         workDir = Files.createTempDirectory("aura-jm-test-")
-        svc = JavaManagerService(workDir, buildMockClient(""))
+        svc = JavaManagerService(workDir, testTransferEngine(buildMockClient("")))
     }
 
     @AfterTest
@@ -497,7 +497,7 @@ class JavaManagerServiceTest {
                 binDir.resolve("java").toFile().setExecutable(true)
 
                 val resolved = runBlocking {
-                    JavaManagerService(runtimesRoot, deadHttpClientProvider())
+                    JavaManagerService(runtimesRoot, testTransferEngine(deadHttpClientProvider()))
                         .getJavaPath("1.21.1")
                 }
                 assertEquals("java", resolved.fileName.toString())
@@ -524,7 +524,7 @@ class JavaManagerServiceTest {
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
                 val resolved = runBlocking {
-                    JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                    JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                 }
                 assertEquals("java", resolved.fileName.toString())
                 assertTrue(Files.isExecutable(resolved),
@@ -544,7 +544,7 @@ class JavaManagerServiceTest {
             withSystemProp("os.arch", "i386") {
                 val ex = assertFails {
                     runBlocking {
-                        JavaManagerService(runtimesRoot, buildMockClient(""))
+                        JavaManagerService(runtimesRoot, testTransferEngine(buildMockClient("")))
                             .getJavaPath("1.21.1")
                     }
                 }
@@ -573,7 +573,7 @@ class JavaManagerServiceTest {
             withSystemProp("os.arch", "amd64") {
                 val ex = assertFails {
                     runBlocking {
-                        JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                        JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                     }
                 }
                 assertTrue(
@@ -605,7 +605,7 @@ class JavaManagerServiceTest {
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
                 val resolved = runBlocking {
-                    JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                    JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                 }
                 assertEquals("java", resolved.fileName.toString())
                 assertTrue(
@@ -635,7 +635,7 @@ class JavaManagerServiceTest {
             withSystemProp("os.arch", "amd64") {
                 val ex = assertFails {
                     runBlocking {
-                        JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                        JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                     }
                 }
                 assertTrue(
@@ -818,7 +818,7 @@ class JavaManagerServiceTest {
         exe.toFile().setExecutable(true)
 
         val garbage = synthesiseJdkTarGz("garbage/bin/not-java")
-        val svc = JavaManagerService(workDir, mockClientWithBytes(garbage))
+        val svc = JavaManagerService(workDir, testTransferEngine(mockClientWithBytes(garbage)))
 
         assertFails { runBlocking { svc.getJavaPathForMajor(21) } }
 
