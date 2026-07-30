@@ -1,6 +1,7 @@
 package hivens.ui.notifications.drivers
 
 import hivens.auth.OfflineAuthProvider
+import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
 import hivens.core.activity.ActivityRegistry
@@ -121,7 +122,12 @@ class LaunchDriver(
     private fun onPrepare(target: LaunchTarget, state: LaunchState.Prepare) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Preparing)
-        reportActivity(target, ActivityKind.Launch, ActivityPhase.Running(0, 0, state.stage.name.lowercase()))
+        reportActivity(
+            target,
+            ActivityKind.Launch,
+            ActivityPhase.Running(0, 0, state.stage.name.lowercase()),
+            actions = setOf(ActivityAction.Cancel),
+        )
         notifications.push(
             sourceKey = target.sourceKey,
             sender    = target.displayName,
@@ -148,6 +154,7 @@ class LaunchDriver(
             target,
             ActivityKind.Launch,
             ActivityPhase.Running(state.downloadedBytes, state.totalBytes),
+            actions = setOf(ActivityAction.Cancel),
         )
 
         val s = stringsProvider()
@@ -172,11 +179,17 @@ class LaunchDriver(
         indications.setLaunchIndication(target.id, LaunchIndication.Running)
         // Preparation is done and the game is up: the launch entry settles and
         // a game entry takes over, narrated by elapsed time rather than a
-        // fraction. No Stop control is offered yet -- terminating the process
-        // tree is not implemented, and a control that looks live and does
-        // nothing is worse than no control.
+        // fraction. Stop is offered because the pack hero already offers it and
+        // it is wired to the same controller abort; whether that abort should
+        // escalate past SIGTERM is a question about the abort, not about
+        // whether this surface may expose it.
         activities.dismiss(launchKey(target))
-        reportActivity(target, ActivityKind.Game, ActivityPhase.Running(0, 0))
+        reportActivity(
+            target,
+            ActivityKind.Game,
+            ActivityPhase.Running(0, 0),
+            actions = setOf(ActivityAction.Stop),
+        )
         sessions.register(
             packInstanceId  = target.id,
             packDisplayName = target.displayName,
@@ -289,13 +302,19 @@ class LaunchDriver(
     private fun launchKey(target: LaunchTarget) = "launch:${target.id}"
     private fun gameKey(target: LaunchTarget) = "game:${target.id}"
 
-    private fun reportActivity(target: LaunchTarget, kind: ActivityKind, phase: ActivityPhase) {
+    private fun reportActivity(
+        target: LaunchTarget,
+        kind: ActivityKind,
+        phase: ActivityPhase,
+        actions: Set<ActivityAction> = emptySet(),
+    ) {
         activities.report(
             key     = if (kind == ActivityKind.Game) gameKey(target) else launchKey(target),
             kind    = kind,
             title   = target.displayName,
             iconUrl = target.iconUrl,
             phase   = phase,
+            actions = actions,
         )
     }
 
