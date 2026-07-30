@@ -168,9 +168,9 @@ class ActivityRegistryTest {
     fun `re-reporting a key keeps its start time so elapsed survives a tick`() = runTest {
         val clock = TestClock(1_000)
         val reg = ActivityRegistry(scope = this, clock = clock)
-        reg.report("g", ActivityKind.Game, "SkyBlock", running(0, 0)); runCurrent()
+        reg.report("g", ActivityKind.Sync, "SkyBlock", running(0, 0)); runCurrent()
         clock.advance(30_000)
-        reg.report("g", ActivityKind.Game, "SkyBlock", running(0, 0)); runCurrent()
+        reg.report("g", ActivityKind.Sync, "SkyBlock", running(0, 0)); runCurrent()
         advanceTimeBy(300); runCurrent()
 
         val a = reg.activities.value.single()

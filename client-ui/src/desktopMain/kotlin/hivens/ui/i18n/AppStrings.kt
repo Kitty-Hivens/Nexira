@@ -1057,7 +1057,6 @@ interface AppStrings {
     val editorSurfShortOverlay: String
 
     val activityPillCancel: String
-    val activityPillStop: String
     val activityPillPause: String
     fun activityPillMeasure(done: Long, total: Long): String
 

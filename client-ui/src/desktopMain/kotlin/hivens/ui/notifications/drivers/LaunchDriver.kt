@@ -113,7 +113,6 @@ class LaunchDriver(
                 // narrating for this target is no longer being updated, so
                 // drop it rather than leave a frozen measure on screen.
                 activities.dismiss(launchKey(target))
-                activities.dismiss(gameKey(target))
             }
         }
         observerJobs.put(target.id, job)?.cancel()
@@ -161,19 +160,11 @@ class LaunchDriver(
     private fun onRunning(target: LaunchTarget, state: LaunchState.GameRunning) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Running)
-        // Preparation is done and the game is up: the launch entry settles and
-        // a game entry takes over, narrated by elapsed time rather than a
-        // fraction. Stop is offered because the pack hero already offers it and
-        // it is wired to the same controller abort; whether that abort should
-        // escalate past SIGTERM is a question about the abort, not about
-        // whether this surface may expose it.
+        // The launch is over, so its entry goes. A running game is not this
+        // surface's business: it is a state the user can see out of the window,
+        // and it already has its places -- the pack hero's control, the session
+        // list, the console. The activity surface narrates work in progress.
         activities.dismiss(launchKey(target))
-        reportActivity(
-            target,
-            ActivityKind.Game,
-            ActivityPhase.Running(0, 0),
-            actions = setOf(ActivityAction.Stop),
-        )
         sessions.register(
             packInstanceId  = target.id,
             packDisplayName = target.displayName,
@@ -213,7 +204,6 @@ class LaunchDriver(
     private fun onError(target: LaunchTarget, reason: LaunchError) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Failed)
-        activities.dismiss(gameKey(target))
         reportActivity(target, ActivityKind.Launch, ActivityPhase.Failed(humanReason(reason, stringsProvider())))
         sessions.unregister(target.id)
         gameConsole.detachCommandSink()
@@ -269,7 +259,6 @@ class LaunchDriver(
         // so the user can scroll back through the run.
         indications.setLaunchIndication(target.id, null)
         activities.dismiss(launchKey(target))
-        reportActivity(target, ActivityKind.Game, ActivityPhase.Succeeded)
         sessions.unregister(target.id)
         gameConsole.detachCommandSink()
         notifications.push(
@@ -284,7 +273,6 @@ class LaunchDriver(
     }
 
     private fun launchKey(target: LaunchTarget) = "launch:${target.id}"
-    private fun gameKey(target: LaunchTarget) = "game:${target.id}"
 
     private fun reportActivity(
         target: LaunchTarget,
@@ -293,7 +281,7 @@ class LaunchDriver(
         actions: Set<ActivityAction> = emptySet(),
     ) {
         activities.report(
-            key     = if (kind == ActivityKind.Game) gameKey(target) else launchKey(target),
+            key     = launchKey(target),
             kind    = kind,
             title   = target.displayName,
             iconUrl = target.iconUrl,
