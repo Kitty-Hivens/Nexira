@@ -1,6 +1,7 @@
 package hivens.ui.screens
 
 import androidx.compose.runtime.Composable
+import hivens.core.io.deleteTree
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -20,6 +21,7 @@ import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.SystemMemory
 import hivens.auth.AccountStore
 import hivens.launcher.ProfileManager
+import hivens.launcher.platform.ServerNameValidator
 import hivens.launcher.ProfilerProfileStore
 import hivens.ui.platform.SystemActions
 import io.github.vinceglb.filekit.FileKit
@@ -33,6 +35,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -60,6 +63,8 @@ internal sealed interface SpawnResetState {
  * (a `rememberCoroutineScope`), not in click lambdas.
  */
 @Stable
+private val log = LoggerFactory.getLogger("ServerSettingsState")
+
 internal class ServerSettingsState(
     val server: ServerProfile,
     private val profileManager: ProfileManager,
@@ -119,8 +124,8 @@ internal class ServerSettingsState(
         isAutoMode = !p.fixedMemory
         val settings = settingsService.getSettings()
         val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
-        val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
-        val derivedMb = if (adaptiveOn) {
+        val clientDir = clientDirOrNull()
+        val derivedMb = if (adaptiveOn && clientDir != null) {
             withContext(Dispatchers.IO) { profilerStore.readProfile(clientDir)?.derivedHeapMb }
         } else {
             null
@@ -198,15 +203,32 @@ internal class ServerSettingsState(
         }
     }
 
+    /**
+     * `clients/<assetDir>` for this server, or null when [ServerProfile.assetDir]
+     * is not a name we will turn into a path.
+     *
+     * The field arrives in a server response and lands here as a directory name
+     * that [resetClient] deletes recursively. The list is screened where it
+     * enters the launcher; this is the second gate, at the point where the name
+     * actually becomes a path, so a profile reaching this screen by some other
+     * route cannot aim a recursive delete.
+     */
+    private fun clientDirOrNull(): Path? =
+        runCatching { dataDirectory.resolve("clients").resolve(ServerNameValidator.require(server.assetDir)) }
+            .onFailure { log.warn("Server '{}' has an unusable assetDir -- refusing to touch a directory for it", server.name) }
+            .getOrNull()
+
     fun openClientFolder() {
-        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
+        val path = clientDirOrNull() ?: return
         if (!path.toFile().exists()) path.toFile().mkdirs()
         SystemActions.openFile(path.toFile())
     }
 
     /** Wipe clients/<assetDir> irrecoverably, persist, then notify [onDone]. */
     fun resetClient(onDone: () -> Unit) {
-        dataDirectory.resolve("clients").resolve(server.assetDir).toFile().deleteRecursively()
+        val dir = clientDirOrNull() ?: return
+        runCatching { deleteTree(dir) }
+            .onFailure { log.warn("Reset of {} did not finish", dir, it) }
         save()
         onDone()
     }

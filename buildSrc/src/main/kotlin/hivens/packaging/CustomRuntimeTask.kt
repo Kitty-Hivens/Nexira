@@ -64,6 +64,12 @@ abstract class CustomRuntimeTask : DefaultTask() {
     @get:Optional
     abstract val includeLocales: Property<String>
 
+    /** `--generate-cds-archive`. Without the base archive in the image, app-class
+     *  sharing (`-XX:ArchiveClassesAtExit`, `-XX:+AutoCreateSharedArchive`) is
+     *  rejected by the JVM, so class loading cannot be cut off the cold start. */
+    @get:Input
+    abstract val generateCdsArchive: Property<Boolean>
+
     /**
      * Absolute path of the JDK whose jlink + jmods we invoke. Treated as
      * an `@Input` string so swapping JDK installation paths invalidates the
@@ -110,9 +116,20 @@ abstract class CustomRuntimeTask : DefaultTask() {
             compress.orNull?.let { add("--compress=$it") }
             vmKind.orNull?.let { add("--vm=$it") }
             includeLocales.orNull?.let { add("--include-locales=$it") }
+            if (generateCdsArchive.get()) add("--generate-cds-archive")
             add("--output"); add(out.absolutePath)
         }
 
         execOperations.exec { commandLine(args) }
+
+        // jlink emits two archives: classes.jsa (compressed oops) and
+        // classes_nocoops.jsa for the uncompressed-oops mode. The launcher's heap
+        // is always far below the 32 GB coops threshold, so the nocoops variant is
+        // never mapped -- dead weight worth ~14 MB on disk and ~3 MB in the
+        // compressed distributable. Dropping it is safe: a run that somehow
+        // disabled compressed oops would simply fall back to no class sharing.
+        if (generateCdsArchive.get()) {
+            fileSystem.delete { delete(out.resolve("lib/server/classes_nocoops.jsa")) }
+        }
     }
 }

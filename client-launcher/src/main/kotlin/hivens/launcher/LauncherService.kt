@@ -232,6 +232,9 @@ internal class LauncherService(
             agentJarPath = adaptive.agentJar,
             metricsOutPath = adaptive.metricsOut,
             authlibAgentJarPath = authlibAgent,
+            windowWidth = runtime.windowWidth.takeIf { runtime.windowSizeOverride },
+            windowHeight = runtime.windowHeight.takeIf { runtime.windowSizeOverride },
+            fullScreen = runtime.fullScreen,
         )
 
         SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, onLog)))

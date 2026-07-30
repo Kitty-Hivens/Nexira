@@ -25,8 +25,8 @@ enum class PackOrigin {
 
     /**
      * Hivens mirror at `smrt.hivens.dev`. Pack identity is the
-     * mirror's `pack_id`. Manifest is the v2 spec in
-     * `docs/src/content/docs/dev/smrt-api-spec.md`. Public read,
+     * mirror's `pack_id`. Manifest is the v2 spec in the smrt
+     * repo (`Kitty-Hivens/smrt`, `docs/api.md`). Public read,
      * no auth required to browse / install.
      */
     Mirror,

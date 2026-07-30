@@ -1,5 +1,6 @@
 package hivens.launcher.runtime.loader
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IJavaManager
 import hivens.launcher.runtime.MojangArtifact
@@ -24,6 +25,7 @@ class ModernInstallerResolverTest {
 
     private fun resolver() = ModernInstallerResolver(
         clientProvider = HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.NotFound) }) },
+        transfers = testTransferEngine(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.NotFound) }) }),
         json = Json { ignoreUnknownKeys = true },
         javaManager = object : IJavaManager {
             override suspend fun getJavaPath(version: String): Path = Path.of("/bin/java")

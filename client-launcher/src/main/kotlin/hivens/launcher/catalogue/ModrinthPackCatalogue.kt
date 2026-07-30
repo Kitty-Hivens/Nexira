@@ -5,6 +5,7 @@ import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.api.interfaces.IPackCatalogueService
 import hivens.core.data.PackOrigin
+import hivens.core.update.VersionChannel
 import hivens.launcher.modrinth.ModrinthClient
 
 /**
@@ -57,6 +58,9 @@ class ModrinthPackCatalogue(private val client: ModrinthClient) : IPackCatalogue
                 loaders = v.loaders,
                 // A modpack version's primary file is its .mrpack.
                 downloadUrl = v.files.firstOrNull { it.primary }?.url ?: v.files.firstOrNull()?.url,
+                channel = VersionChannel.of(v.versionType, v.versionNumber),
+                publishedAt = v.datePublished.ifBlank { null },
+                changelog = v.changelog?.takeIf { it.isNotBlank() },
             )
         }
 

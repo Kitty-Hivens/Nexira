@@ -36,6 +36,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.theme.Dimens
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 
@@ -63,7 +64,7 @@ fun BrowsePackCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(132.dp)
+            .height(Dimens.packCardHeight)
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick),
     ) {
@@ -146,7 +147,7 @@ private fun BrowseAvatar(pack: CataloguePack, hue: Color) {
         model              = pack.iconUrl,
         contentDescription = null,
         contentScale       = ContentScale.Crop,
-        modifier           = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+        modifier           = Modifier.size(Dimens.packAvatar).clip(RoundedCornerShape(Dimens.packAvatarCorner)),
         // While the icon resolves, a flat hue avoids a letters-then-icon flash;
         // a missing or broken icon (incl. a null url) lands in error -> initials.
         loading            = { Box(Modifier.fillMaxSize().background(hue)) },

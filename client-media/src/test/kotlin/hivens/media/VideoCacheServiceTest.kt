@@ -1,6 +1,7 @@
 package hivens.media
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.TransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -22,6 +23,13 @@ import kotlin.test.assertTrue
 
 class VideoCacheServiceTest {
 
+    /**
+     * An engine over a host that answers with [body]. Zero backoff so a retry in a
+     * test costs no wall clock; the engine's own behaviour is covered in client-core.
+     */
+    private fun engine(counter: AtomicInteger, body: String, delayMs: Long = 0L): TransferEngine =
+        TransferEngine(http = provider(counter, body, delayMs), backoffMs = listOf(0L, 0L, 0L))
+
     private fun provider(counter: AtomicInteger, body: String, delayMs: Long = 0L): HttpClientProvider =
         HttpClientProvider {
             HttpClient(MockEngine {
@@ -40,7 +48,7 @@ class VideoCacheServiceTest {
         val scope = CoroutineScope(Dispatchers.IO)
         val counter = AtomicInteger(0)
         try {
-            val svc = VideoCacheService(dir, provider(counter, "VIDEOBYTES"), scope)
+            val svc = VideoCacheService(dir, engine(counter, "VIDEOBYTES"), scope)
             val first = svc.resolve("https://cdn.example.com/clip.mp4")
             assertTrue(Files.isRegularFile(first))
             assertEquals("VIDEOBYTES", Files.readString(first))
@@ -61,7 +69,7 @@ class VideoCacheServiceTest {
         val counter = AtomicInteger(0)
         try {
             // The handler holds the response so both resolves are in flight together.
-            val svc = VideoCacheService(dir, provider(counter, "X", delayMs = 150L), scope)
+            val svc = VideoCacheService(dir, engine(counter, "X", delayMs = 150L), scope)
             val url = "https://cdn.example.com/same.mp4"
             val both = listOf(async { svc.resolve(url) }, async { svc.resolve(url) }).awaitAll()
             assertEquals(both[0], both[1])
@@ -78,7 +86,7 @@ class VideoCacheServiceTest {
         val counter = AtomicInteger(0)
         try {
             // Cap below two payloads, so caching the second evicts down to one file.
-            val svc = VideoCacheService(dir, provider(counter, "AAAAAA"), scope, maxBytes = 10L)
+            val svc = VideoCacheService(dir, engine(counter, "AAAAAA"), scope, maxBytes = 10L)
             svc.resolve("https://cdn.example.com/a.mp4")
             svc.resolve("https://cdn.example.com/b.mp4")
             val files = cachedFiles(dir)

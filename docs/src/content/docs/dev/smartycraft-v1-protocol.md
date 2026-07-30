@@ -4,9 +4,9 @@ description: Empirically captured wire spec of the SmartyCraft launcher protocol
 ---
 
 Empirically captured 2026-05-14 against live `https://www.smartycraft.ru`
-using user account NoLikeHumans + analysis of smrt-deco source.
-Direct connection (no SOCKS5 proxy). All requests POST to
-`/launcher2/index.php` with `Content-Type: application/x-www-form-urlencoded`.
+using a test account + analysis of smrt-deco source.
+Direct HTTPS connection. All requests POST to `/launcher2/index.php` with
+`Content-Type: application/x-www-form-urlencoded`.
 
 ## Common request envelope
 
@@ -219,8 +219,8 @@ signatures use uid + raw login + time bucket + per-action payload.
 
 **No `Authorization` header.** All auth via form-data + signature.
 
-**Direct connection works.** SOCKS5 proxy through proxy.smartycraft.ru:58613
-is FALLBACK only (per official launcher). Direct adds 100-300ms saving.
+**Direct connection works**, and is the only channel Nexira has. The
+upstream SOCKS5 proxy the official launcher falls back to is not used.
 
 **Wire format = old PHP-era.** Form-encoded (not JSON body), errors via
 status enum (not HTTP codes), file manifest deeply nested. A modern REST
@@ -253,18 +253,8 @@ Empirical RTT for `action=loader` from German residential IP (~470ms baseline RT
 
 ### Implications
 
-- **Switch default channel to direct** saves ~500 ms per request (~10-20 calls per session = 5-10 s lifetime savings).
-- **`FORCE_HTTP1_FOR_SMARTYCRAFT` workaround in `Network.kt` is obsolete as of 2026-05-14** — HTTP/2 negotiation works on both direct and proxied paths. Remove and rely on okhttp's ALPN default. Document removal in Conduit Phase 4 cleanup. (If issue resurfaces in future upstream server reconfig, add back with concrete reproduction case.)
-- **No need for the no-SSL fallback** that smrt-deco has (`ck.q = false`) — direct HTTPS works for typical user. Skip that intermediate state in Nexira's retry chain. Just direct → proxy on IOException, two states not three.
-- **Proxy is functionally fine** when our creds are correct. Initial assumption "creds rotated" was a transcription error on my side — Nexira's hardcoded `Network.Proxy.PASS = "ngyxvpFfiUz4FB2OPx1nqEa4TEKigbKc"` matches the URL-safe-Base64-decoded value from smrt-deco line 83. Don't propose rotating these unless the actual proxy stops accepting them.
+- **Direct is the channel.** It saves ~500 ms per request against the proxied path (~10-20 calls per session), and it does not depend on infrastructure the upstream operator has taken down before.
+- **The proxy path is gone.** Nexira no longer carries a fallback route, proxy credentials, or a force-proxy setting. A user who cannot reach the host directly needs a VPN or a system-level proxy; that is outside what the launcher can solve.
+- **HTTP/2 negotiates fine on this host** — the RTT is identical to HTTP/1.1, so nothing here forces a protocol pin. (The download channel pins HTTP/1.1 for an unrelated reason: a middlebox on some routes resets the stream mid-body.)
+- **No need for the no-SSL fallback** that the upstream launcher has — direct HTTPS works. The explicit SSL-bypass flow covers the one real case, an expired certificate, and only after the user confirms it.
 - **Server validation surface is permissive**: User-Agent not checked, HTTP version not pinned, even `Host:` header doesn't have to be precise. So we don't need to obsess about mimicry headers — only the form-data shape matters.
-
-### What ABOUT bypassing censorship for specific users
-
-If a user is in a region where direct access is blocked but proxy works:
-- IOException retry chain (Conduit Phase 2) handles it transparently
-- Settings → Network → "Force proxy mode" toggle for users who know they need it day-1
-
-If a user is in a region where BOTH direct and proxy are blocked:
-- Outside of what we can reasonably solve from launcher side
-- Workaround for them: VPN or system-level SOCKS proxy (their problem, not ours)

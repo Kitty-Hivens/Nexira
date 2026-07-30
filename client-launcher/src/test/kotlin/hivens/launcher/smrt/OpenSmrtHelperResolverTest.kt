@@ -1,5 +1,6 @@
 package hivens.launcher.smrt
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -63,7 +64,7 @@ class OpenSmrtHelperResolverTest {
                 }
             }
         }
-        val resolver = OpenSmrtHelperResolver(HttpClientProvider { client }, json, dir)
+        val resolver = OpenSmrtHelperResolver(HttpClientProvider { client }, testTransferEngine(HttpClientProvider { client }), json, dir)
 
         val first = resolver.fetchDescriptor()
         assertEquals("v0.1.0", first?.variantFor("1.12.2")?.tag, "live fetch parses + caches")

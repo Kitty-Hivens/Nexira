@@ -87,6 +87,43 @@ data class LoaderProfile(
      * Fabric, Quilt today) leave this null.
      */
     val javaMajor: Int? = null,
+    /**
+     * Predicate selecting vanilla-base libraries to DROP before the overlay is
+     * merged on. Additive loaders (Forge / NeoForge / Fabric / Quilt) leave the
+     * default -- remove nothing. The modern-Java + LWJGL3 loaders (Cleanroom,
+     * lwjgl3ify) use it to strip the vanilla LWJGL2 group (`org.lwjgl.lwjgl`),
+     * which the merge cannot do on its own: LWJGL3 lives under a DIFFERENT group
+     * (`org.lwjgl`), so it never collides with LWJGL2 on the group:artifact
+     * dedup key and both would otherwise land on `-cp` at once.
+     */
+    val removeFromBase: (MavenCoord) -> Boolean = { false },
+    /**
+     * Host natives to extract into `java.library.path`, ADDED on top of the
+     * vanilla natives that survive [removeFromBase]. Null (or empty) means the
+     * loader adds none. A loader that swaps LWJGL (Cleanroom / lwjgl3ify)
+     * supplies the LWJGL3 host natives here and names the LWJGL2 group in
+     * [removeFromBase]; the result extracts LWJGL3 in place of LWJGL2 while
+     * keeping unrelated vanilla natives (jinput). Provisioned like [libraries];
+     * the provisioner keeps only this host's platform.
+     */
+    val nativesOverride: List<LibrarySpec>? = null,
+    /**
+     * When true the loader's [libraries] are the COMPLETE classpath and the
+     * vanilla library set is dropped entirely -- only the vanilla client jar
+     * survives (a separate field). For a self-contained profile (`inheritsFrom`
+     * null carrying its own full set, like Cleanroom), merging vanilla on top
+     * leaks libraries the loader already modernised under a different
+     * coordinate: `oshi-project:oshi-core` beside `com.github.oshi`,
+     * `icu4j-core-mojang` beside `icu4j`, `netty-all` beside the split netty --
+     * cross-coordinate twins the group:artifact merge cannot dedup, so the older
+     * vanilla copy shadows the loader's and its classes miss methods the loader
+     * calls (LWJGL's `Display.create` calling `oshi ... getGraphicsCards()`).
+     * Replacing wholesale is correct and immune to the next such twin. Additive
+     * loaders (Forge / Fabric / NeoForge / lwjgl3ify, which still needs vanilla
+     * for its empty-url entries) leave this false and merge via [removeFromBase].
+     * Natives follow: true keeps only [nativesOverride].
+     */
+    val replacesVanillaLibraries: Boolean = false,
 )
 
 /**
@@ -106,8 +143,9 @@ data class ResolvedRuntime(
     /**
      * Platform-native jars (lwjgl etc.) for the host, resolved from the same
      * manifest as [libraries] -- so the natives extracted into an instance
-     * always match the LWJGL version on the classpath. A loader overlay adds
-     * none; this is the vanilla base's set.
+     * always match the LWJGL version on the classpath. Usually the vanilla
+     * base's set; a loader that swaps LWJGL drops the swapped-out natives
+     * (via removeFromBase) and adds its own, so this is the final extract set.
      */
     val natives: List<Path> = emptyList(),
     /**
@@ -121,6 +159,17 @@ data class ResolvedRuntime(
      * 1.12.2 wants 25, legacy-Forge-1.12.2 wants 8).
      */
     val javaMajor: Int? = null,
+    /**
+     * A resources-only client jar (no classes) to place on `-cp` purely so its
+     * `version.json` is a classpath resource. Modern Forge/NeoForge load the
+     * class-bearing client off the module path, so the flat `-cp` carries no
+     * `version.json` -- and mods that detect the MC version by reading it as a
+     * resource (CustomSkinLoader) otherwise fall back to "version 0". This is the
+     * installer's `client-<neoform>-extra.jar` (version.json + assets, zero
+     * classes), so it exposes the resource without adding a second `minecraft`
+     * module. Null for legacy/vanilla, which already carry the full client on `-cp`.
+     */
+    val clientResourcesJar: Path? = null,
 )
 
 /**

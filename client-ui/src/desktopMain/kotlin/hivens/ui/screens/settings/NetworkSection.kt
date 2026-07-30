@@ -20,9 +20,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSection
-import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
@@ -30,15 +28,12 @@ import java.time.format.FormatStyle
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Network controls -- the SSL-bypass entries (live list with revoke) and the
- * force-proxy toggle. One section for "things that affect how Nexira talks to the
- * network" so users have one place to look when networking misbehaves.
+ * Network controls -- the SSL-bypass entries, as a live list with revoke. One
+ * section for "things that affect how Nexira talks to the network" so users have
+ * one place to look when networking misbehaves.
  */
 @Composable
-internal fun NetworkSection(
-    form: SettingsFormState,
-    save: () -> Unit,
-) {
+internal fun NetworkSection() {
     val s = LocalStrings.current
 
     // Live snapshot -- re-reads every 1s. Sufficient for a settings screen; avoids
@@ -88,10 +83,5 @@ internal fun NetworkSection(
                 }
             }
         }
-
-        NxToggle(s.settingsForceProxyTitle, form.forceProxyMode, description = s.settingsForceProxyDesc) {
-            form.forceProxyMode = it; save()
-        }
-        PuppetToggle("settings.forceProxyMode", form.forceProxyMode) { form.forceProxyMode = it; save() }
     }
 }

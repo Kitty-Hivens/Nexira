@@ -58,6 +58,7 @@ fun ApplicationScope.ShellHost(
     pre: GuiBootstrap.PreBoot,
     outcomeFlow: StateFlow<BootOutcome?>,
     stageFlow: StateFlow<BootStage>,
+    isRestart: Boolean = false,
 ) {
     val outcome by outcomeFlow.collectAsState()
 
@@ -80,9 +81,14 @@ fun ApplicationScope.ShellHost(
     val windowIcon = painterResource(Res.drawable.icon)
     val thresholdStrings = remember { stringsFor(AppLocale.fromTag(pre.peek.locale)) }
 
-    // A recovery restart re-enters with boot already done: skip the
-    // threshold entirely, no black frame.
-    var thresholdDone by remember { mutableStateOf(outcomeFlow.value is BootOutcome.Ready) }
+    // A recovery restart with boot already done skips the threshold entirely
+    // (no black frame). The restart flag is EXPLICIT, not inferred from the
+    // outcome: a first boot that finishes before this first composition must
+    // still play the threshold -- the readout always shows -- and must keep
+    // masking the shell's expensive first composition. A restart that crashed
+    // MID-boot (outcome still null) also keeps the threshold, or the window
+    // would sit empty until boot lands.
+    var thresholdDone by remember { mutableStateOf(isRestart && outcomeFlow.value is BootOutcome.Ready) }
 
     Window(
         onCloseRequest = { chrome.onCloseRequest() },

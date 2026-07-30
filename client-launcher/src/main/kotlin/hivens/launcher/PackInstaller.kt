@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.dto.smrt.toDomain
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
@@ -110,6 +111,7 @@ class PackInstaller(
                 javaMajor        = manifest.java.major,
                 authRequirement  = manifest.auth?.toDomain(),
             ),
+            installedManifest     = manifest.toBaselineManifest(),
         )
         repository.put(instance)
         log.info("install: registered instance {} in repository", instanceId)

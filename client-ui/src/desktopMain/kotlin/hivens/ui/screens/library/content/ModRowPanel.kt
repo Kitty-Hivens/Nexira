@@ -1,6 +1,7 @@
 package hivens.ui.screens.library.content
 
 import androidx.compose.foundation.background
+import hivens.ui.render.openInBrowser
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -294,7 +295,9 @@ private fun LinkChip(text: String, url: String) {
         modifier              = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
             .background(NxTheme.colors.primary.copy(alpha = 0.2f))
-            .clickable { runCatching { Desktop.getDesktop().browse(URI(url)) } }
+            // Through the shared opener so a mod's own metadata cannot name a
+            // scheme the platform handler would act on.
+            .clickable { openInBrowser(url) }
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),

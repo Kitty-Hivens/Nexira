@@ -22,26 +22,6 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
- * Shape-correct hover/press feedback for buttons, kept with the base
- * components rather than inside the April Fools layer. The canonical button
- * ([NxButton]) and the easter-egg button both draw their state layer through
- * here, so a button's interaction correctness does not depend on the seasonal
- * prank being on the classpath.
- *
- * M3 1.11-alpha07's default ripple paints its state-layer with a shape that
- * doesn't match the button container, so the layer is drawn here as a rounded
- * rect with the host's own corner radius -- it can't mismatch.
- */
-object NoOpIndication : IndicationNodeFactory {
-    private class EmptyNode : Modifier.Node()
-
-    override fun create(interactionSource: InteractionSource): DelegatableNode = EmptyNode()
-
-    override fun equals(other: Any?): Boolean = other === this
-    override fun hashCode(): Int = System.identityHashCode(this)
-}
-
-/**
  * The M3 state-layer alpha for the current interaction: press over focus over
  * hover over idle. Pulled out as a pure function so the contract (press 12% /
  * focus 10% / hover 8% / idle 0) is unit-testable without a renderer.

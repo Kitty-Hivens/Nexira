@@ -11,7 +11,6 @@ import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
-import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
@@ -25,10 +24,9 @@ import org.koin.compose.koinInject
  * and the [SettingsCategory] routing of the right pane. Sections live
  * in their per-domain files in this package.
  *
- * save() mirrors [NetworkState.forceProxyMode] and
- * [Protocol.setMimicLauncherVersion] inline -- those reads are
- * per-protocol-call, so without the mirror the user would need a
- * restart for those two knobs to take effect.
+ * save() mirrors [Protocol.setMimicLauncherVersion] inline -- that read is
+ * per-protocol-call, so without the mirror the user would need a restart
+ * for the knob to take effect.
  */
 @Composable
 fun SettingsScreen(
@@ -57,9 +55,6 @@ fun SettingsScreen(
     fun save() {
         val toPersist = form.mergeInto(settingsService.getSettings())
         settingsService.saveSettings(toPersist)
-        // Mirror to NetworkState so ChannelRouter sees it on the very next
-        // request without waiting for launcher restart.
-        NetworkState.setForceProxyMode(form.forceProxyMode)
         // Apply the mimic-version override immediately so the next protocol
         // handshake picks it up. Without this the user would have to restart
         // for the change to take effect, even though the system property
@@ -105,10 +100,7 @@ fun SettingsScreen(
                             onUiStyleChanged             = onUiStyleChanged,
                         )
                         SettingsCategory.Console -> ConsoleSection(paths = paths)
-                        SettingsCategory.Network -> NetworkSection(
-                            form = form,
-                            save = ::save,
-                        )
+                        SettingsCategory.Network -> NetworkSection()
                         SettingsCategory.Smarty -> SmartySection(
                             form = form,
                             save = ::save,

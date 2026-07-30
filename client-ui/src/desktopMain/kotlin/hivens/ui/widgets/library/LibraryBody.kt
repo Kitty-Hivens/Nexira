@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
+import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.Screen
 import hivens.ui.nx.NxButton
@@ -36,17 +37,10 @@ import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import java.nio.file.Files
 import java.nio.file.Path
-import java.util.Comparator
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
-
-private val log = LoggerFactory.getLogger("LibraryBody")
 
 @Serializable
 data class LibraryBodyProps(
@@ -67,6 +61,7 @@ fun LibraryBody(instance: WidgetInstance) {
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
+    val packInstanceService: PackInstanceService = koinInject()
     val scope = rememberCoroutineScope()
     var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
@@ -92,14 +87,9 @@ fun LibraryBody(instance: WidgetInstance) {
             body         = s.packCardDeleteBody,
             confirmLabel = s.editorDelete,
             onConfirm    = {
-                scope.launch {
-                    val removed = withContext(Dispatchers.IO) { deleteInstanceDir(instanceDirOf(paths, target)) }
-                    // Drop the Library entry only when the files are actually gone.
-                    // A locked file (a running game holding a jar) would otherwise
-                    // leave orphaned data on disk with the pack vanished from the
-                    // list and no way to retry.
-                    if (removed) repo.delete(target.id)
-                }
+                // Files first, registry second (locked jar -> keep the entry, no
+                // orphaned data); ordering lives in PackInstanceService now.
+                scope.launch { packInstanceService.deleteCompletely(target) }
             },
             onDismiss    = { pendingDelete = null },
         )
@@ -108,26 +98,6 @@ fun LibraryBody(instance: WidgetInstance) {
 
 private fun instanceDirOf(paths: PlatformPaths, instance: PackInstance): Path =
     paths.dataDir.resolve("instances").resolve(instance.instanceDirName)
-
-/**
- * Recursive delete, deepest-first so directories are empty before removal.
- * Returns true only when every entry was removed; a failed entry is logged and
- * leaves the tree partial so the caller keeps the Library entry rather than
- * orphaning files on disk with the pack gone from the list.
- */
-private fun deleteInstanceDir(dir: Path): Boolean {
-    if (!Files.exists(dir)) return true
-    var ok = true
-    Files.walk(dir).use { stream ->
-        stream.sorted(Comparator.reverseOrder()).forEach { path ->
-            runCatching { Files.delete(path) }.onFailure { e ->
-                ok = false
-                log.warn("delete instance dir: could not remove {} -- {}", path, e.toString())
-            }
-        }
-    }
-    return ok
-}
 
 @Composable
 private fun LibraryList(

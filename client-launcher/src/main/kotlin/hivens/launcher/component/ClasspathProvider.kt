@@ -2,6 +2,7 @@ package hivens.launcher.component
 
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.data.FileManifest
+import hivens.core.io.resolveWithinRoot
 import hivens.core.platform.Platform
 import hivens.launcher.util.ClientRootDirs
 import org.slf4j.LoggerFactory
@@ -66,7 +67,14 @@ class ClasspathProvider(
         // 1. Take paths from the manifest (Main source)
         val flatManifest = manifestProcessor.flattenManifest(manifest)
         flatManifest.keys.forEach { rawPath ->
-            val resolved = resolveSanitizedPath(clientRoot, rawPath)
+            // Defence in depth: the download side refuses to write an escaping
+            // entry, so one reaching here means a manifest changed under us.
+            // Dropping the entry is enough -- an unreferenced file cannot join
+            // the classpath -- and beats failing a launch over a stray line.
+            val resolved = runCatching { resolveSanitizedPath(clientRoot, rawPath) }.getOrElse {
+                logger.warn("classpath entry {} skipped -- {}", rawPath, it.message)
+                return@forEach
+            }
             allJars.add(resolved)
         }
 
@@ -175,16 +183,19 @@ class ClasspathProvider(
      * `FileDownloadService.normalizePath`'s decision for the same
      * path, so the two sides agree on whether `config/foo.jar` is a
      * top-level dir or a server-prefixed entry.
+     *
+     * The result is bounded to [root] for the same reason the download side
+     * is: an entry that resolves elsewhere would put an attacker-chosen jar
+     * on the classpath of a JVM we are about to start.
      */
     private fun resolveSanitizedPath(root: Path, rawPath: String): Path {
         val pathPart = Paths.get(rawPath)
-        if (pathPart.nameCount > 1) {
-            val first = pathPart.getName(0).toString()
-            if (!ClientRootDirs.isKnown(first)) {
-                return root.resolve(pathPart.subpath(1, pathPart.nameCount))
-            }
+        val relative = if (pathPart.nameCount > 1 && !ClientRootDirs.isKnown(pathPart.getName(0).toString())) {
+            pathPart.subpath(1, pathPart.nameCount)
+        } else {
+            pathPart
         }
-        return root.resolve(pathPart)
+        return resolveWithinRoot(root, relative.toString(), rawPath)
     }
 
     /**

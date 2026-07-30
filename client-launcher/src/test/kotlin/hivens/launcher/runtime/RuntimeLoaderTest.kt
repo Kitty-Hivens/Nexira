@@ -1,12 +1,17 @@
 package hivens.launcher.runtime
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
+import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderProfile
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.LoaderResolver
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.mergeLibraries
+import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -108,7 +113,8 @@ class RuntimeLoaderTest {
     private fun provisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
         librariesDir = librariesDir, assetsDir = assetsDir,
         clientProvider = HttpClientProvider { HttpClient(engine(requests)) },
-        json = json, loaderRegistry = registry, osName = "Linux",
+        transfers = testTransferEngine(HttpClientProvider { HttpClient(engine(requests)) }),
+        json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
         versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
     )
 
@@ -149,6 +155,239 @@ class RuntimeLoaderTest {
         assertTrue(requests.none { it == LOADER_LIB_URL }, "no loader libs fetched for vanilla")
     }
 
+    // -- removeFromBase + nativesOverride (the Cleanroom / lwjgl3ify capability) --
+
+    private val lwjgl2Bytes = "LWJGL2".toByteArray()
+    private val lwjgl3Bytes = "LWJGL3".toByteArray()
+    private val nativeBytes = "LWJGL3-NATIVES".toByteArray()
+
+    private val crNormalBytes = "CR-NORMAL".toByteArray()
+    private val crGlfwBytes = "CR-GLFW".toByteArray()
+    private val crGlfwLinuxBytes = "CR-GLFW-LINUX".toByteArray()
+    private val crGlfwWinBytes = "CR-GLFW-WIN".toByteArray()
+    private val crCoreBytes = "CR-CORE".toByteArray()
+
+    /**
+     * A real-shaped Cleanroom installer jar: a self-contained `version.json`
+     * (Foundation main class, FML tweaker, a normal lib, the LWJGL3 glfw base
+     * plus its linux+windows natives, and the core jar with an empty url) with
+     * that core jar bundled under `maven/`. Mirrors the 0.6.x installer layout.
+     */
+    private val cleanroomInstaller: ByteArray by lazy {
+        val versionJson = """
+            {"id":"1.12.2-Cleanroom-0.6.4",
+             "mainClass":"top.outlands.foundation.boot.Foundation",
+             "minecraftArguments":"--username player --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker --versionType Forge",
+             "libraries":[
+               {"name":"com.example:normal:1.0","downloads":{"artifact":{"path":"com/example/normal/1.0/normal-1.0.jar","url":"$CR_NORMAL_URL","sha1":"${sha1(crNormalBytes)}","size":${crNormalBytes.size}}}},
+               {"name":"org.lwjgl:lwjgl-glfw:3.4.1","downloads":{"artifact":{"path":"org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1.jar","url":"$CR_GLFW_URL","sha1":"${sha1(crGlfwBytes)}","size":${crGlfwBytes.size}}}},
+               {"name":"org.lwjgl:lwjgl-glfw:3.4.1:natives-linux","downloads":{"artifact":{"path":"org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1-natives-linux.jar","url":"$CR_GLFW_LINUX_URL","sha1":"${sha1(crGlfwLinuxBytes)}","size":${crGlfwLinuxBytes.size}}}},
+               {"name":"org.lwjgl:lwjgl-glfw:3.4.1:natives-windows","downloads":{"artifact":{"path":"org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1-natives-windows.jar","url":"$CR_GLFW_WIN_URL","sha1":"${sha1(crGlfwWinBytes)}","size":${crGlfwWinBytes.size}}}},
+               {"name":"com.cleanroommc:cleanroom:0.6.4","downloads":{"artifact":{"path":"com/cleanroommc/cleanroom/0.6.4/cleanroom-0.6.4.jar","url":"","sha1":"${sha1(crCoreBytes)}","size":${crCoreBytes.size}}}}
+             ]}
+        """.trimIndent()
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            zip.putNextEntry(ZipEntry("version.json")); zip.write(versionJson.toByteArray()); zip.closeEntry()
+            zip.putNextEntry(ZipEntry("maven/com/cleanroommc/cleanroom/0.6.4/cleanroom-0.6.4.jar")); zip.write(crCoreBytes); zip.closeEntry()
+        }
+        out.toByteArray()
+    }
+
+    /** Vanilla 1.12.2-shaped base that carries LWJGL2 (`org.lwjgl.lwjgl` group)
+     *  alongside patchy, so a loader can exercise the cross-group swap. Also
+     *  serves the Cleanroom installer + its libraries for the end-to-end test. */
+    private fun swapEngine(requests: MutableList<String>) = MockEngine { req ->
+        val url = req.url.toString()
+        requests += url
+        val emptyIndex = """{"objects":{}}"""
+        val versionJson = """
+            {"assetIndex":{"id":"1.12","sha1":"${sha1(emptyIndex.toByteArray())}","size":${emptyIndex.length},"url":"$INDEX_URL"},
+             "downloads":{"client":{"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+             "libraries":[
+               {"name":"com.mojang:patchy:1.1","downloads":{"artifact":{"path":"com/mojang/patchy/1.1/patchy-1.1.jar","sha1":"${sha1(patchyBytes)}","size":${patchyBytes.size},"url":"$LIB_URL"}}},
+               {"name":"org.lwjgl.lwjgl:lwjgl:2.9.4","downloads":{"artifact":{"path":"org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar","sha1":"${sha1(lwjgl2Bytes)}","size":${lwjgl2Bytes.size},"url":"$LWJGL2_URL"}}}
+             ]}
+        """.trimIndent()
+        when (url) {
+            MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonH)
+            VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonH)
+            INDEX_URL -> respond(emptyIndex, HttpStatusCode.OK, jsonH)
+            LIB_URL -> respond(ByteReadChannel(patchyBytes), HttpStatusCode.OK)
+            CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+            LWJGL2_URL -> respond(ByteReadChannel(lwjgl2Bytes), HttpStatusCode.OK)
+            LWJGL3_URL -> respond(ByteReadChannel(lwjgl3Bytes), HttpStatusCode.OK)
+            NATIVE_URL -> respond(ByteReadChannel(nativeBytes), HttpStatusCode.OK)
+            CR_INSTALLER_URL -> respond(ByteReadChannel(cleanroomInstaller), HttpStatusCode.OK)
+            CR_NORMAL_URL -> respond(ByteReadChannel(crNormalBytes), HttpStatusCode.OK)
+            CR_GLFW_URL -> respond(ByteReadChannel(crGlfwBytes), HttpStatusCode.OK)
+            CR_GLFW_LINUX_URL -> respond(ByteReadChannel(crGlfwLinuxBytes), HttpStatusCode.OK)
+            CR_GLFW_WIN_URL -> respond(ByteReadChannel(crGlfwWinBytes), HttpStatusCode.OK)
+            else -> respond("missing $url", HttpStatusCode.NotFound)
+        }
+    }
+
+    private fun swapProvisioner(registry: LoaderRegistry, requests: MutableList<String>) = RuntimeProvisioner(
+        librariesDir = librariesDir, assetsDir = assetsDir,
+        clientProvider = HttpClientProvider { HttpClient(swapEngine(requests)) },
+        transfers = testTransferEngine(HttpClientProvider { HttpClient(swapEngine(requests)) }),
+        json = json, loaderRegistry = registry, osName = "Linux", osArch = "amd64",
+        versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+    )
+
+    private fun swapResolver(profile: LoaderProfile) = object : LoaderResolver {
+        override val loaderId = "cleanroom"
+        override suspend fun resolve(mcVersion: String, loaderVersion: String) = profile
+    }
+
+    @Test
+    fun `removeFromBase strips vanilla LWJGL2 across group while the overlay adds LWJGL3`() = runTest {
+        val profile = LoaderProfile(
+            libraries = listOf(LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), LWJGL3_URL, sha1(lwjgl3Bytes), lwjgl3Bytes.size.toLong())),
+            mainClass = "cleanroom.Foundation",
+            removeFromBase = { it.group == "org.lwjgl.lwjgl" },
+        )
+        val p = swapProvisioner(LoaderRegistry(listOf(swapResolver(profile))), mutableListOf())
+
+        val rt = p.ensureRuntime("1.12.2", "cleanroom", "0.3.0")
+
+        assertTrue(rt.libraries.none { it.coord.group == "org.lwjgl.lwjgl" }, "vanilla LWJGL2 must be dropped")
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "org.lwjgl:lwjgl" }, "LWJGL3 (different group) must be present")
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "com.mojang:patchy" }, "an unrelated base lib survives the removal")
+    }
+
+    @Test
+    fun `nativesOverride becomes the runtime native set`() = runTest {
+        val nativeSpec = LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3:natives-linux"), NATIVE_URL, sha1(nativeBytes), nativeBytes.size.toLong())
+        val profile = LoaderProfile(
+            libraries = emptyList(),
+            mainClass = "cleanroom.Foundation",
+            nativesOverride = listOf(nativeSpec),
+        )
+        val p = swapProvisioner(LoaderRegistry(listOf(swapResolver(profile))), mutableListOf())
+
+        val rt = p.ensureRuntime("1.12.2", "cleanroom", "0.3.0")
+
+        assertEquals(
+            listOf(librariesDir.resolve("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar")),
+            rt.natives,
+        )
+        assertEquals("LWJGL3-NATIVES", rt.natives.single().toFile().readText())
+    }
+
+    @Test
+    fun `default profile removes nothing and inherits vanilla natives`() = runTest {
+        // The additive shape every existing loader uses: removeFromBase and
+        // nativesOverride left at their defaults must change neither the merged
+        // library set nor the native set.
+        val profile = LoaderProfile(
+            libraries = listOf(LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), LWJGL3_URL, sha1(lwjgl3Bytes), lwjgl3Bytes.size.toLong())),
+            mainClass = "cleanroom.Foundation",
+        )
+        val p = swapProvisioner(LoaderRegistry(listOf(swapResolver(profile))), mutableListOf())
+
+        val rt = p.ensureRuntime("1.12.2", "cleanroom", "0.3.0")
+
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "com.mojang:patchy" })
+        assertTrue(rt.libraries.any { it.coord.group == "org.lwjgl.lwjgl" }, "no removal by default -- vanilla LWJGL2 stays")
+        assertTrue(rt.natives.isEmpty(), "no override -- inherits vanilla's native set (empty in this fixture)")
+    }
+
+    private val lwjgl2NatBytes = "LWJGL2-NATIVES".toByteArray()
+    private val jinputNatBytes = "JINPUT-NATIVES".toByteArray()
+    private val glfwOvrBytes = "GLFW-OVR-NATIVES".toByteArray()
+
+    /** Vanilla 1.12.2 base carrying a host LWJGL2 native AND an unrelated jinput
+     *  native (both pre-1.19 classifier shape), so a swap can be observed to drop
+     *  the LWJGL2 native, keep jinput, and add its own. */
+    private fun nativesEngine() = MockEngine { req ->
+        val url = req.url.toString()
+        val emptyIndex = """{"objects":{}}"""
+        val versionJson = """
+            {"assetIndex":{"id":"1.12","sha1":"${sha1(emptyIndex.toByteArray())}","size":${emptyIndex.length},"url":"$INDEX_URL"},
+             "downloads":{"client":{"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+             "libraries":[
+               {"name":"org.lwjgl.lwjgl:lwjgl:2.9.4","downloads":{
+                 "artifact":{"path":"org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar","sha1":"${sha1(lwjgl2Bytes)}","size":${lwjgl2Bytes.size},"url":"$LWJGL2_URL"},
+                 "classifiers":{"natives-linux":{"path":"org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar","sha1":"${sha1(lwjgl2NatBytes)}","size":${lwjgl2NatBytes.size},"url":"$LWJGL2_NAT_URL"}}}},
+               {"name":"net.java.jinput:jinput-platform:2.0.5","downloads":{
+                 "classifiers":{"natives-linux":{"path":"net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-linux.jar","sha1":"${sha1(jinputNatBytes)}","size":${jinputNatBytes.size},"url":"$JINPUT_NAT_URL"}}}}
+             ]}
+        """.trimIndent()
+        when (url) {
+            MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonH)
+            VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonH)
+            INDEX_URL -> respond(emptyIndex, HttpStatusCode.OK, jsonH)
+            CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+            LWJGL2_URL -> respond(ByteReadChannel(lwjgl2Bytes), HttpStatusCode.OK)
+            LWJGL2_NAT_URL -> respond(ByteReadChannel(lwjgl2NatBytes), HttpStatusCode.OK)
+            JINPUT_NAT_URL -> respond(ByteReadChannel(jinputNatBytes), HttpStatusCode.OK)
+            GLFW_OVR_URL -> respond(ByteReadChannel(glfwOvrBytes), HttpStatusCode.OK)
+            else -> respond("missing $url", HttpStatusCode.NotFound)
+        }
+    }
+
+    @Test
+    fun `a LWJGL swap drops the LWJGL2 native, keeps jinput, adds the loader native`() = runTest {
+        val resolver = object : LoaderResolver {
+            override val loaderId = "swap"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
+                libraries = emptyList(),
+                mainClass = "x.Main",
+                removeFromBase = { it.group == "org.lwjgl.lwjgl" },
+                nativesOverride = listOf(
+                    LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl-glfw:3.4.1:natives-linux"), GLFW_OVR_URL, sha1(glfwOvrBytes), glfwOvrBytes.size.toLong()),
+                ),
+            )
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir, assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(nativesEngine()) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(nativesEngine()) }),
+            json = json, loaderRegistry = LoaderRegistry(listOf(resolver)), osName = "Linux", osArch = "amd64",
+            versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+        )
+
+        val natives = p.ensureRuntime("1.12.2", "swap", "1").natives.map { it.toString() }
+
+        assertTrue(natives.none { it.contains("org/lwjgl/lwjgl/lwjgl/2.9.4") }, "vanilla LWJGL2 native dropped: $natives")
+        assertTrue(natives.any { it.contains("jinput-platform") }, "unrelated jinput native kept: $natives")
+        assertTrue(natives.any { it.contains("lwjgl-glfw") && it.contains("natives-linux") }, "loader LWJGL3 native added: $natives")
+    }
+
+    @Test
+    fun `ensureRuntime via CleanroomResolver swaps LWJGL2 for LWJGL3 and host-filters natives`() = runTest {
+        val resolver = CleanroomResolver(
+            clientProvider = HttpClientProvider { HttpClient(swapEngine(mutableListOf())) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(swapEngine(mutableListOf())) }),
+            json = json,
+            releaseBase = "https://cr.invalid/dl",
+        )
+        val p = swapProvisioner(LoaderRegistry(listOf(resolver)), mutableListOf())
+
+        val rt = p.ensureRuntime("1.12.2", "cleanroom", "0.6.4")
+
+        assertEquals("top.outlands.foundation.boot.Foundation", rt.mainClass)
+        assertEquals(25, rt.javaMajor)
+        assertEquals(listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"), rt.gameArgs)
+
+        // self-contained: the classpath is the overlay only. Vanilla libs
+        // (LWJGL2 and the unrelated patchy) are dropped; the loader's LWJGL3 base
+        // and bundled core are present; no natives on -cp.
+        assertTrue(rt.libraries.none { it.coord.group == "org.lwjgl.lwjgl" }, "vanilla LWJGL2 dropped")
+        assertTrue(rt.libraries.none { it.coord.groupArtifact == "com.mojang:patchy" }, "vanilla libs dropped wholesale")
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "org.lwjgl:lwjgl-glfw" && it.coord.classifier == null }, "LWJGL3 base present")
+        assertTrue(rt.libraries.any { it.coord.groupArtifact == "com.cleanroommc:cleanroom" }, "bundled core provisioned onto -cp")
+        assertTrue(rt.libraries.none { (it.coord.classifier ?: "").startsWith("natives") }, "no natives leaked onto -cp")
+
+        // native override host-filtered: linux kept, windows dropped (host = Linux).
+        assertEquals(1, rt.natives.size, "only the host native, got ${rt.natives}")
+        assertTrue(rt.natives.single().fileName.toString().contains("natives-linux"))
+
+        // the bundled core landed with its real bytes.
+        assertEquals("CR-CORE", librariesDir.resolve("com/cleanroommc/cleanroom/0.6.4/cleanroom-0.6.4.jar").toFile().readText())
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://t.invalid/manifest.json"
         const val VERSION_URL = "https://t.invalid/1.12.2.json"
@@ -156,6 +395,17 @@ class RuntimeLoaderTest {
         const val LIB_URL = "https://t.invalid/patchy.jar"
         const val CLIENT_URL = "https://t.invalid/client.jar"
         const val LOADER_LIB_URL = "https://t.invalid/fabric-loader.jar"
+        const val LWJGL2_URL = "https://t.invalid/lwjgl2.jar"
+        const val LWJGL3_URL = "https://t.invalid/lwjgl3.jar"
+        const val NATIVE_URL = "https://t.invalid/lwjgl3-natives-linux.jar"
+        const val CR_INSTALLER_URL = "https://cr.invalid/dl/0.6.4/cleanroom-0.6.4-installer.jar"
+        const val CR_NORMAL_URL = "https://cr.invalid/normal.jar"
+        const val CR_GLFW_URL = "https://cr.invalid/glfw.jar"
+        const val CR_GLFW_LINUX_URL = "https://cr.invalid/glfw-linux.jar"
+        const val CR_GLFW_WIN_URL = "https://cr.invalid/glfw-win.jar"
+        const val LWJGL2_NAT_URL = "https://t.invalid/lwjgl2-natives-linux.jar"
+        const val JINPUT_NAT_URL = "https://t.invalid/jinput-natives-linux.jar"
+        const val GLFW_OVR_URL = "https://t.invalid/glfw-override-natives-linux.jar"
         const val RES_BASE = "https://res.invalid"
         val jsonH = headersOf("Content-Type", "application/json")
     }

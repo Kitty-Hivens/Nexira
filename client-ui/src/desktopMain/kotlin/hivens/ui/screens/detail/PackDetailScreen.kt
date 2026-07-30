@@ -2,7 +2,6 @@ package hivens.ui.screens.detail
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,12 +23,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,20 +43,17 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.interfaces.IPackRepository
-import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.CachedManifestSnapshot
-import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
-import hivens.core.jvm.AutomaticHeap
-import hivens.core.jvm.SystemMemory
-import hivens.launcher.ProfilerProfileStore
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
+import hivens.core.update.UpdateDirection
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import dev.hivens.skinema.compose.VideoScale
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
-import hivens.ui.components.RamSelector
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isVideoUrl
 import hivens.ui.customization.glassSurfaceAlpha
@@ -65,13 +61,17 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
+import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxCalloutTone
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.PlayButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.platform.SystemActions
@@ -79,6 +79,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.ConsoleContent
+import hivens.ui.screens.detail.settings.PackSettingsWindow
 import hivens.ui.screens.ConsoleSource
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.screens.library.FileBrowserPane
@@ -98,7 +99,6 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
@@ -112,13 +112,15 @@ import org.koin.compose.koinInject
  * Tabs are scoped to a single per-instance dir (`<dataDir>/instances/
  * <instance.instanceDirName>`) for Files / Worlds; the Content tab
  * uses [PackInstance.packRef] to fetch the mirror manifest on each
- * open. Logs tab deferred per [[project_logs_tab_open_question]].
+ * open.
  */
 @Composable
 fun PackDetailScreen(
     instanceId: String,
     appState: AppState,
     onBack: () -> Unit,
+    initialShowSettings: Boolean = false,
+    onOpenVersions: (fromSettings: Boolean) -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
@@ -127,6 +129,9 @@ fun PackDetailScreen(
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
+    val indications: IndicationCenter = koinInject()
+    val updateHub: PackUpdateStatusHub = koinInject()
+    val autoUpdateStatuses by updateHub.statuses.collectAsState()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
     var resolved by remember { mutableStateOf(false) }
     LaunchedEffect(instanceId) {
@@ -151,15 +156,16 @@ fun PackDetailScreen(
 
     var tabIndex by remember(pack.id) { mutableIntStateOf(0) }
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
 
-    var showSettings by remember(pack.id) { mutableStateOf(false) }
+    var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
     val authedSession = (appState as? AppState.Authenticated)?.session
+    val launchIndication by indications.launchIndication(pack.id).collectAsState()
 
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
             playEnabled    = authedSession != null,
+            indication     = launchIndication,
             onBack         = onBack,
             onPlay         = {
                 authedSession?.let { session ->
@@ -169,8 +175,12 @@ fun PackDetailScreen(
                     controller.launchPackInstance(session, pack)
                 }
             },
+            onAbort        = { controller.abort() },
             onOpenSettings = { showSettings = true },
             onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
+            versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
+            pending        = autoUpdateStatuses[pack.id] as? PackUpdateStatus.Pending,
+            onOpenVersions = { onOpenVersions(false) },
         )
 
         // Import/provenance notice (e.g. a CurseForge import whose project/file-id
@@ -188,19 +198,7 @@ fun PackDetailScreen(
 
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
             when (tabIndex) {
-                0 -> ContentTabPane(
-                    instance = pack,
-                    onDetach = {
-                        // Become a Local instance the user owns; keep where it came
-                        // from in forkedFrom so provenance (and its art) survive.
-                        val detached = pack.copy(
-                            packRef    = pack.packRef.copy(origin = PackOrigin.Local),
-                            forkedFrom = pack.forkedFrom ?: pack.packRef,
-                        )
-                        instance = detached
-                        scope.launch { repo.put(detached) }
-                    },
-                )
+                0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)
@@ -209,16 +207,12 @@ fun PackDetailScreen(
     }
 
     if (showSettings) {
-        PackSettingsModal(
-            title           = s.packDetailTabSettings,
-            runtime         = pack.runtime,
-            instanceDir     = instanceDir,
-            onRuntimeChange = { rt ->
-                val updated = pack.copy(runtime = rt)
-                instance = updated
-                scope.launch { repo.put(updated) }
-            },
-            onDismiss       = { showSettings = false },
+        PackSettingsWindow(
+            pack             = pack,
+            instanceDir      = instanceDir,
+            onInstanceChange = { instance = it },
+            onDismiss        = { showSettings = false },
+            onOpenVersions   = { onOpenVersions(true) },
         )
     }
 }
@@ -310,51 +304,6 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
     }
 }
 
-/**
- * Settings tab: per-instance runtime. RAM only for now -- Auto (the machine-aware
- * Automatic baseline, refined by the adaptive sizer) vs a pinned value. Persists each
- * change through [onRuntimeChange]; the Auto chip shows what the next launch will use.
- */
-@Composable
-private fun PackSettingsTab(
-    runtime: InstanceRuntime,
-    instanceDir: Path,
-    onRuntimeChange: (InstanceRuntime) -> Unit,
-) {
-    val profilerStore: ProfilerProfileStore = koinInject()
-    val settingsService: ISettingsService = koinInject()
-
-    // Keyed on the stable instanceDir, not runtime: the tab's own edits mutate runtime,
-    // and re-seeding on those would fight an in-progress edit. Reset only when the
-    // displayed instance changes (which also remounts the screen via the nav Crossfade).
-    var isAutoMode by remember(instanceDir) { mutableStateOf(!runtime.fixedMemory) }
-    var memory by remember(instanceDir) { mutableStateOf(if (runtime.memoryMb > 0) runtime.memoryMb else 4096) }
-    var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
-
-    LaunchedEffect(instanceDir) {
-        val settings = settingsService.getSettings()
-        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
-        val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(instanceDir)?.derivedHeapMb } else null
-        resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
-    }
-
-    RamSelector(
-        isAuto = isAutoMode,
-        resolvedAutoMb = resolvedAutoMb,
-        currentMb = memory,
-        onAutoSelected = {
-            isAutoMode = true
-            onRuntimeChange(runtime.copy(fixedMemory = false))
-        },
-        onValueChanged = {
-            memory = it
-            isAutoMode = false
-            onRuntimeChange(runtime.copy(memoryMb = it, fixedMemory = true))
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
 // List the instance's own log files, latest.log pinned first, then by
 // recency: the logs dir's .log files plus crash-reports .txt / .log.
 // These are the logs the game itself wrote -- the ones a user expects
@@ -436,10 +385,15 @@ private fun LogSessionPicker(
 private fun Hero(
     pack: PackInstance,
     playEnabled: Boolean,
+    indication: LaunchIndication?,
     onBack: () -> Unit,
     onPlay: () -> Unit,
+    onAbort: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenFolder: () -> Unit,
+    versionLabel: String?,
+    pending: PackUpdateStatus.Pending?,
+    onOpenVersions: () -> Unit,
 ) {
     val s = LocalStrings.current
     val art = rememberPackArt(pack)
@@ -520,14 +474,30 @@ private fun Hero(
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (showSource) SourceChip(pack.packRef.origin)
                         pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
+                        versionLabel?.let { HeroChip("v$it") }
+                        pending?.let { p ->
+                            val rollback = p.direction == UpdateDirection.Older
+                            HeroUpdateBadge(
+                                text     = if (rollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
+                                rollback = rollback,
+                                onClick  = onOpenVersions,
+                            )
+                        }
                         if (showPlaytime && pack.playtimeSeconds > 0L) HeroChip(playtimeLabel(pack.playtimeSeconds))
                         HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
                     }
                 }
+                // The pill walks the launch: Play -> wait (prepare/sync, inert)
+                // -> Exit (stop the running game) -> Play again. Failed falls
+                // back to Play -- the error toast carries the diagnosis.
+                val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
+                val running = indication is LaunchIndication.Running
                 PlayButton(
-                    label    = s.packDetailPlay,
-                    onClick  = onPlay,
-                    enabled  = playEnabled,
+                    label    = when { running -> s.packPlayExit; busy -> s.packPlayWait; else -> s.packDetailPlay },
+                    icon     = if (running) NxIcon.Stop else NxIcon.PlayArrow,
+                    busy     = busy,
+                    onClick  = if (running) onAbort else onPlay,
+                    enabled  = if (running) true else playEnabled,
                     iconOnly = playIconOnly,
                 )
             }
@@ -622,6 +592,19 @@ private fun HeroChip(text: String) {
     }
 }
 
+@Composable
+private fun HeroUpdateBadge(text: String, rollback: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(if (rollback) NxTheme.colors.warnAccent else NxTheme.colors.primary)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
 private fun loaderMcLabel(m: CachedManifestSnapshot): String {
     val loader = m.loaderName
         .takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
@@ -644,46 +627,6 @@ private fun lastPlayedShort(epoch: Long, s: AppStrings): String {
         dur.toDays()    < 1  -> s.packCardPlayedHoursAgo(dur.toHours())
         dur.toDays()    < 14 -> s.packCardPlayedDaysAgo(dur.toDays())
         else                 -> s.packCardPlayedLongAgo
-    }
-}
-
-@Composable
-private fun PackSettingsModal(
-    title: String,
-    runtime: InstanceRuntime,
-    instanceDir: Path,
-    onRuntimeChange: (InstanceRuntime) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val scrim = remember { MutableInteractionSource() }
-    val card = remember { MutableInteractionSource() }
-    Box(
-        modifier         = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(interactionSource = scrim, indication = null, onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier
-                .widthIn(max = 620.dp)
-                .fillMaxWidth(0.7f)
-                .clickable(interactionSource = card, indication = null, onClick = {}),
-            shape    = MaterialTheme.shapes.medium,
-            color    = NxTheme.colors.surface,
-        ) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically,
-                ) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss) { Symbol(NxIcon.Close, contentDescription = null, tint = NxTheme.colors.textSecondary) }
-                }
-                PackSettingsTab(runtime = runtime, instanceDir = instanceDir, onRuntimeChange = onRuntimeChange)
-            }
-        }
     }
 }
 

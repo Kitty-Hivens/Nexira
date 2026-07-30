@@ -2,7 +2,7 @@ name: Tests
 
 # Unit-test matrix on every code PR.
 #
-# build_release.yml runs these same three suites, but only on a release tag --
+# build_release.yml runs the same suites minus widget-processor, but only on a release tag --
 # so OS-specific regressions stayed invisible until a tag was cut (that is how
 # a macOS native-classifier assumption and Windows path-separator asserts once
 # reached a release and blocked it). This workflow runs them at PR time instead.
@@ -49,9 +49,9 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -59,15 +59,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # client-ui carries the UI suites, including the off-screen render tests
+      # that draw through Skiko. They need no display -- verified with DISPLAY
+      # and WAYLAND_DISPLAY unset -- and its one wall-clock assertion holds on a
+      # single starved core. The video-transcode test opts in through
+      # NEXIRA_TEST_VIDEO and no-ops without it, so no media natives are needed.
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test --continue
+        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-ui:desktopTest :widget-processor:test --continue
+
+      # The runtime-module guard is a config-time read with no compilation behind
+      # it, so it costs nothing here and fails a bad module list at PR time rather
+      # than when a tag is cut and the packaging tasks finally run it.
+      - name: Verify runtime modules
+        run: ./gradlew :client-ui:verifyRuntimeModules
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
           path: |
             client-config/build/reports/tests/
             client-core/build/reports/tests/
             client-launcher/build/reports/tests/
+            client-ui/build/reports/tests/

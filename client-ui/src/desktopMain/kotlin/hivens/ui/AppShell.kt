@@ -39,6 +39,8 @@ import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
 import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.AutoSyncService
+import hivens.launcher.update.ApplyRecovery
+import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.ServerListCacheStore
 import hivens.core.diag.ActionRing
 import hivens.launcher.bootstrap.AutoLoginCoordinator
@@ -136,6 +138,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
+import hivens.ui.navigation.NavRequests
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
@@ -189,9 +192,19 @@ sealed class Screen {
      * detail screen resolves it via [hivens.core.api.interfaces.IPackRepository]
      * so the Screen sealed class stays free of domain types and the
      * back-stack item stays small (a UUID string, not a PackInstance
-     * graph).
+     * graph). [openSettings] restores the settings overlay on arrival --
+     * stamped onto the back-stack entry when the user drills from the
+     * settings window into the versions screen, so Back lands them in
+     * the settings they left, not on the bare pack page.
      */
-    data class PackDetail    (val instanceId: String) : Screen()
+    data class PackDetail    (val instanceId: String, val openSettings: Boolean = false) : Screen()
+
+    /**
+     * Version manager for an installed mirror pack: the retained build list,
+     * per-build changelog (client-side manifest diff), switch/rollback and
+     * restore points. Same UUID-only payload rationale as [PackDetail].
+     */
+    data class PackVersions  (val instanceId: String) : Screen()
 
     /**
      * Catalogue-side detail target, source-neutral: carries the [origin] + that
@@ -293,7 +306,9 @@ fun FrameWindowScope.AppShellContent(
     // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
     // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
     // the palette from it. Default-on; the seed is null until a bitmap is decoded.
-    val paletteFromWallpaper = settings.paletteFromWallpaper
+    // Switching seeding off is how a theme preset is seen in its own colours, so the
+    // flag is state here rather than a read of the startup snapshot.
+    var paletteFromWallpaper by remember { mutableStateOf(settings.paletteFromWallpaper) }
     var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
     // Which source drives dark/light: the manual toggle, the OS scheme, or the
     // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
@@ -457,6 +472,8 @@ fun FrameWindowScope.AppShellContent(
 
         val dataDirectory: java.nio.file.Path = koinInject()
         val autoSyncService: AutoSyncService = koinInject()
+        val packAutoUpdateService: PackAutoUpdateService = koinInject()
+        val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory) }
         var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
@@ -578,6 +595,20 @@ fun FrameWindowScope.AppShellContent(
             ) {
                 applicationScope.launch {
                     autoSyncService.syncAll(dashboardServers)
+                }
+            }
+
+            // Roll back any update a hard crash (kill / power loss / OOM) interrupted
+            // before anything else touches instances -- runs regardless of the
+            // auto-update setting, since a half-applied instance must be repaired.
+            applicationScope.launch { applyRecovery.recoverInterrupted() }
+
+            // Background auto-update of installed mirror packs -- same experimental
+            // gating as auto-sync, a separate axis (packs, not SC servers). The
+            // service is a singleton and reads the current policy each pass.
+            if (settings.experimentalFeaturesEnabled && settings.autoUpdatePacks) {
+                applicationScope.launch {
+                    packAutoUpdateService.runOnce()
                 }
             }
         }
@@ -924,6 +955,13 @@ fun FrameWindowScope.AppShellContent(
                             ))
                         },
                         systemThemeAvailable = systemThemeAvailable,
+                        paletteFromWallpaper = paletteFromWallpaper,
+                        onPaletteFromWallpaperChanged = { seeded ->
+                            paletteFromWallpaper = seeded
+                            settingsService.saveSettings(
+                                settingsService.getSettings().copy(paletteFromWallpaper = seeded),
+                            )
+                        },
                         customTheme          = customTheme,
                         onCustomThemeChanged = { newTheme ->
                             customTheme = newTheme
@@ -1000,6 +1038,8 @@ fun AppRoot(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
+    paletteFromWallpaper: Boolean,
+    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -1025,10 +1065,10 @@ fun AppRoot(
     val msaProvider: RefreshableAuthProvider?  =
         authRegistry.all.filterIsInstance<RefreshableAuthProvider>().firstOrNull()
     // Smartycraft-routed Call.Factory for Coil's image fetcher. The
-    // bypass / forceProxy / direct routing rule lives in Modules.kt
-    // alongside the same rule for the Ktor HttpClientProvider; both
-    // must agree or news / skin images would diverge from auth and
-    // protocol traffic on the same host.
+    // bypass / direct routing rule lives in Modules.kt alongside the
+    // same rule for the Ktor HttpClientProvider; both must agree or
+    // news / skin images would diverge from auth and protocol traffic
+    // on the same host.
     val routingCallFactory: Call.Factory       = koinInject()
     val af = LocalAprilFools.current
 
@@ -1077,6 +1117,13 @@ fun AppRoot(
         onDispose { toolkit.removeAWTEventListener(listener) }
     }
 
+    // Out-of-composition navigation requests (notification actions, drivers)
+    // land in the same back stack the buttons above drive.
+    val navRequests: NavRequests = koinInject()
+    LaunchedEffect(navRequests) {
+        navRequests.requests.collect { backStack.navigate(it) }
+    }
+
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
@@ -1100,12 +1147,11 @@ fun AppRoot(
     // retry on a capped backoff for the app's lifetime (a launcher left open
     // signs itself in when the network returns); rejections and missing
     // credentials stop -- looping on those hammers the upstream for nothing.
-    // A proxy/bypass policy flip restarts the effect for an immediate fresh
-    // attempt with a reset ladder (the flip is a user action). A manual login
-    // racing the loop wins: the loop re-reads the state each pass.
-    val autoLoginForceProxy by NetworkState.forceProxyState.collectAsState()
+    // A bypass policy flip restarts the effect for an immediate fresh attempt
+    // with a reset ladder (the flip is a user action). A manual login racing
+    // the loop wins: the loop re-reads the state each pass.
     val autoLoginBypasses by NetworkState.bypassesState.collectAsState()
-    LaunchedEffect(autoLoginForceProxy, autoLoginBypasses) {
+    LaunchedEffect(autoLoginBypasses) {
         var attempt = 0
         while (appState !is AppState.Authenticated) {
             val settings = withContext(Dispatchers.IO) { settingsService.getSettings() }
@@ -1114,13 +1160,11 @@ fun AppRoot(
             }
             val resolution = withContext(Dispatchers.IO) {
                 AutoLoginCoordinator.resolveSession(
-                    settings            = settings,
-                    saved               = saved,
-                    lastServerId        = profileManager.lastServerId,
-                    authService         = authService,
-                    insecureAuthService = insecureAuthService,
-                    protocolConfig      = protocolConfig,
-                    msaProvider         = msaProvider,
+                    settings     = settings,
+                    saved        = saved,
+                    lastServerId = profileManager.lastServerId,
+                    authService  = authService,
+                    msaProvider  = msaProvider,
                 )
             }
             when (resolution) {
@@ -1138,7 +1182,12 @@ fun AppRoot(
                     return@LaunchedEffect
                 }
                 AutoLoginCoordinator.Resolution.NoCredentials,
-                AutoLoginCoordinator.Resolution.Rejected -> {
+                AutoLoginCoordinator.Resolution.Rejected,
+                // The certificate decision belongs to the user. Dropping to the
+                // login form routes them to the prompt that asks for it, which
+                // also grants the bypass and restores silent auto-login from the
+                // next start.
+                AutoLoginCoordinator.Resolution.CertificateUntrusted -> {
                     appState = AppState.Unauthenticated
                     return@LaunchedEffect
                 }
@@ -1171,6 +1220,11 @@ fun AppRoot(
     Box(
         Modifier
             .fillMaxSize()
+            // Base fill behind the wallpaper: while a custom background decodes (or its
+            // first video frame arrives) CustomBackground paints nothing, and without
+            // this the bare window default -- a flat grey -- shows through. The theme
+            // surface is covered edge-to-edge once the image is ready.
+            .background(NxTheme.colors.background)
             .onSizeChanged { windowSize = it }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -1208,6 +1262,7 @@ fun AppRoot(
                 onCloseApp = onCloseApp,
                 currentScreen = backStack.current,
                 onScreenChange = backStack::navigate,
+                onReplaceScreen = backStack::replaceCurrent,
                 onBack = { backStack.back() },
                 canGoBack = backStack.canGoBack,
                 canGoForward = backStack.canGoForward,
@@ -1221,6 +1276,8 @@ fun AppRoot(
                 themeMode = themeMode,
                 onThemeModeChanged = onThemeModeChanged,
                 systemThemeAvailable = systemThemeAvailable,
+                paletteFromWallpaper = paletteFromWallpaper,
+                onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
                 customTheme = customTheme,
                 onCustomThemeChanged = onCustomThemeChanged,
                 currentLocale = currentLocale,

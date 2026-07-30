@@ -17,6 +17,7 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
 import org.junit.jupiter.api.condition.EnabledOnOs
+import hivens.core.platform.OS as PlatformOS
 import org.junit.jupiter.api.condition.OS
 import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
@@ -45,7 +46,7 @@ class JavaManagerServiceTest {
     @BeforeTest
     fun setup() {
         workDir = Files.createTempDirectory("aura-jm-test-")
-        svc = JavaManagerService(workDir, buildMockClient(""))
+        svc = JavaManagerService(workDir, testTransferEngine(buildMockClient("")))
     }
 
     @AfterTest
@@ -496,7 +497,7 @@ class JavaManagerServiceTest {
                 binDir.resolve("java").toFile().setExecutable(true)
 
                 val resolved = runBlocking {
-                    JavaManagerService(runtimesRoot, deadHttpClientProvider())
+                    JavaManagerService(runtimesRoot, testTransferEngine(deadHttpClientProvider()))
                         .getJavaPath("1.21.1")
                 }
                 assertEquals("java", resolved.fileName.toString())
@@ -523,7 +524,7 @@ class JavaManagerServiceTest {
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
                 val resolved = runBlocking {
-                    JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                    JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                 }
                 assertEquals("java", resolved.fileName.toString())
                 assertTrue(Files.isExecutable(resolved),
@@ -543,7 +544,7 @@ class JavaManagerServiceTest {
             withSystemProp("os.arch", "i386") {
                 val ex = assertFails {
                     runBlocking {
-                        JavaManagerService(runtimesRoot, buildMockClient(""))
+                        JavaManagerService(runtimesRoot, testTransferEngine(buildMockClient("")))
                             .getJavaPath("1.21.1")
                     }
                 }
@@ -572,7 +573,7 @@ class JavaManagerServiceTest {
             withSystemProp("os.arch", "amd64") {
                 val ex = assertFails {
                     runBlocking {
-                        JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                        JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                     }
                 }
                 assertTrue(
@@ -604,7 +605,7 @@ class JavaManagerServiceTest {
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
                 val resolved = runBlocking {
-                    JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                    JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                 }
                 assertEquals("java", resolved.fileName.toString())
                 assertTrue(
@@ -634,7 +635,7 @@ class JavaManagerServiceTest {
             withSystemProp("os.arch", "amd64") {
                 val ex = assertFails {
                     runBlocking {
-                        JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                        JavaManagerService(runtimesRoot, testTransferEngine(provider)).getJavaPath("1.21.1")
                     }
                 }
                 assertTrue(
@@ -723,5 +724,105 @@ class JavaManagerServiceTest {
             if (original == null) System.clearProperty(key)
             else System.setProperty(key, original)
         }
+    }
+
+    // ── installUnpacked: the previous JVM survives a bad archive ──────────
+
+    /**
+     * A tar.gz rather than a zip: the executable bit rides in the tar entry
+     * mode, and findJavaExecutable only counts a `java` that carries it -- the
+     * same predicate production uses on a real BellSoft tarball.
+     */
+    private fun tarGzOnDisk(name: String, entries: Map<String, String>): Path {
+        val out = ByteArrayOutputStream()
+        GzipCompressorOutputStream(out).use { gz ->
+            TarArchiveOutputStream(gz).use { tar ->
+                entries.forEach { (path, content) ->
+                    val payload = content.toByteArray()
+                    val entry = TarArchiveEntry(path)
+                    entry.mode = 0b111_101_101
+                    entry.size = payload.size.toLong()
+                    tar.putArchiveEntry(entry)
+                    tar.write(payload)
+                    tar.closeArchiveEntry()
+                }
+            }
+        }
+        return Files.write(workDir.resolve(name), out.toByteArray())
+    }
+
+    private fun installedJava(dir: Path): Path {
+        val exe = dir.resolve("bin/java")
+        Files.createDirectories(exe.parent)
+        Files.writeString(exe, "#!/bin/sh\n")
+        exe.toFile().setExecutable(true)
+        return exe
+    }
+
+    @Test
+    fun `a good archive replaces the installed runtime`() {
+        val target = workDir.resolve("java-21-linux-amd64")
+        installedJava(target)
+        Files.writeString(target.resolve("marker.txt"), "OLD")
+
+        val archive = tarGzOnDisk("good.tar.gz", mapOf("jdk/bin/java" to "#!/bin/sh\n", "jdk/marker.txt" to "NEW"))
+        svc.installUnpacked(archive, target, isZip = false)
+
+        assertEquals("NEW", Files.readString(target.resolve("jdk/marker.txt")))
+        assertFalse(Files.exists(target.resolve("marker.txt")), "the old tree must be replaced, not merged")
+    }
+
+    @Test
+    fun `an archive with no java executable leaves the installed runtime alone`() {
+        // What a truncated or wrong-arch download looks like on disk. The old
+        // order emptied the target first, so the working JVM was already gone
+        // by the time the unpack turned out to be useless -- and the retry loop
+        // moved to the next mirror with no fallback left.
+        val target = workDir.resolve("java-21-linux-amd64")
+        val exe = installedJava(target)
+
+        val archive = tarGzOnDisk("truncated.tar.gz", mapOf("jdk/README" to "not a jvm"))
+        assertFailsWith<IOException> { svc.installUnpacked(archive, target, isZip = false) }
+
+        assertTrue(Files.exists(exe), "the working runtime was destroyed by a bad download")
+    }
+
+    @Test
+    fun `a failed install leaves no staging directories behind`() {
+        val target = workDir.resolve("java-21-linux-amd64")
+        installedJava(target)
+
+        val archive = tarGzOnDisk("truncated2.tar.gz", mapOf("jdk/README" to "not a jvm"))
+        runCatching { svc.installUnpacked(archive, target, isZip = false) }
+
+        assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.incoming")))
+        assertFalse(Files.exists(workDir.resolve("java-21-linux-amd64.previous")))
+    }
+
+    @Test
+    fun `a bad download through the real path leaves the previous runtime installed`() {
+        // The three cases above drive installUnpacked directly, which pins its
+        // contract but not that the download path still uses it. This one goes
+        // through getJavaPath, so it fails if that wiring is ever undone.
+        // Under runtimes/, which is where the service derives its target from
+        // baseDir -- putting the stub anywhere else makes the whole test pass
+        // for the wrong reason, because nothing ever touches that path.
+        val target = workDir.resolve("runtimes")
+            .resolve("java-21-${PlatformOS.platform.bellsoft}-${PlatformOS.arch.bellsoft}")
+        val exe = target.resolve("bin/java")
+        Files.createDirectories(exe.parent)
+        // Present and executable so it is FOUND, but not a real program, so the
+        // -version probe fails and the service proceeds to re-download. A stub
+        // that exits cleanly would short-circuit before any download happens.
+        Files.writeString(exe, "definitely not an ELF header")
+        exe.toFile().setExecutable(true)
+
+        val garbage = synthesiseJdkTarGz("garbage/bin/not-java")
+        val svc = JavaManagerService(workDir, testTransferEngine(mockClientWithBytes(garbage)))
+
+        assertFails { runBlocking { svc.getJavaPathForMajor(21) } }
+
+        assertTrue(Files.exists(exe), "a failed re-download destroyed the runtime it was replacing")
+        assertEquals("definitely not an ELF header", Files.readString(exe))
     }
 }

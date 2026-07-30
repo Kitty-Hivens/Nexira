@@ -129,6 +129,7 @@ fun SquareServerCard(
 
     val showActions = isHovered || isFocused
     val scale by animateFloatAsState(if (showActions) 1.02f else 1.0f)
+    val style = LocalStyle.current
     val palette = NxTheme.colors
     val (colorA, colorB) = remember(profile.name, palette) { palette.decorativePair(profile.name) }
 
@@ -176,13 +177,19 @@ fun SquareServerCard(
             .clip(MaterialTheme.shapes.medium)
             .let { m ->
                 when {
-                    isSelected -> m.neonBorder(NxTheme.colors.primary, cornerRadius = LocalStyle.current.cardCorner, strokeWidth = 2.dp)
+                    // Under a no-glow style (Brut) the selection frame is a static
+                    // border, not an animated pulse -- decorative motion gates on
+                    // softGlowEnabled everywhere it appears.
+                    isSelected && style.softGlowEnabled ->
+                        m.neonBorder(NxTheme.colors.primary, cornerRadius = style.cardCorner, strokeWidth = 2.dp)
+                    isSelected -> m.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
                     isFocused  -> m.border(2.dp, NxTheme.colors.textPrimary, MaterialTheme.shapes.medium)
                     else       -> m.border(1.dp, NxTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
                 }
             }
-            // Shimmer on hover (not when already glowing with neon)
-            .shimmerOverlay(enabled = isHovered && !isSelected)
+            // Shimmer on hover (not when already glowing with neon), and only
+            // where the active style renders decorative motion at all.
+            .shimmerOverlay(enabled = isHovered && !isSelected && style.softGlowEnabled)
             // Track position for chaos engine. Tracker setter is a no-op
             // in production builds (NoOp impl), so no `if active` guard.
             .onGloballyPositioned { coords ->

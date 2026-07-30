@@ -8,6 +8,9 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
+import kotlin.test.assertFailsWith
+import java.io.IOException
+import hivens.core.io.UnpackLimits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -96,5 +99,69 @@ class ZipUtilsTest {
 
         assertTrue(extracted.isEmpty(), "Zip Slip entry must be excluded")
         assertFalse(File(workDir, "escape.txt").exists(), "no file must appear in the parent dir")
+    }
+
+    @Test
+    fun `unzip refuses an entry whose name the caller reserved`() {
+        // The extra.zip unpack keeps its prune index in the same directory it
+        // unpacks into. An archive shipping that name would otherwise choose
+        // what the next sync deletes.
+        val zip = File(workDir, "reserved.zip")
+        ZipArchiveOutputStream(FileOutputStream(zip)).use { zos ->
+            zos.putArchiveEntry(ZipArchiveEntry(".extra_unpacked_index.json"))
+            zos.write("""{"hash":"","paths":["mods/victim.jar"]}""".toByteArray())
+            zos.closeArchiveEntry()
+            zos.putArchiveEntry(ZipArchiveEntry("mods/real.jar"))
+            zos.write("jar".toByteArray())
+            zos.closeArchiveEntry()
+        }
+
+        val dest = File(workDir, "reserved-dest").also { it.mkdirs() }
+        val ours = File(dest, ".extra_unpacked_index.json").also { it.writeText("ours") }
+
+        val extracted = ZipUtils.unzip(zip, dest, reserved = setOf(".extra_unpacked_index.json"))
+
+        assertEquals(listOf("mods/real.jar"), extracted, "the reserved entry must not be reported as extracted")
+        assertEquals("ours", ours.readText(), "the reserved file must not be overwritten")
+    }
+
+    @Test
+    fun `an archive that unpacks past the budget is stopped`() {
+        // Driven through a small limit rather than a real bomb: producing four
+        // gigabytes to trip the shipped cap would cost a CI runner four
+        // gigabytes of writes to prove a counter works.
+        val zip = File(workDir, "bomb.zip")
+        ZipArchiveOutputStream(FileOutputStream(zip)).use { zos ->
+            repeat(4) { i ->
+                zos.putArchiveEntry(ZipArchiveEntry("filler-$i.bin"))
+                zos.write(ByteArray(32 * 1024))
+                zos.closeArchiveEntry()
+            }
+        }
+
+        val dest = File(workDir, "bomb-dest").also { it.mkdirs() }
+        assertFailsWith<IOException> {
+            ZipUtils.unzip(zip, dest, limits = UnpackLimits(maxEntries = 100, maxBytes = 40 * 1024))
+        }
+
+        val written = dest.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
+        assertTrue(written < 64 * 1024, "unpack ran past the limit and wrote $written bytes")
+    }
+
+    @Test
+    fun `an archive with too many entries is stopped`() {
+        val zip = File(workDir, "many.zip")
+        ZipArchiveOutputStream(FileOutputStream(zip)).use { zos ->
+            repeat(10) { i ->
+                zos.putArchiveEntry(ZipArchiveEntry("f-$i.txt"))
+                zos.write("x".toByteArray())
+                zos.closeArchiveEntry()
+            }
+        }
+
+        val dest = File(workDir, "many-dest").also { it.mkdirs() }
+        assertFailsWith<IOException> {
+            ZipUtils.unzip(zip, dest, limits = UnpackLimits(maxEntries = 3, maxBytes = 1024 * 1024))
+        }
     }
 }

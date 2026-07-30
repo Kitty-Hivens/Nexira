@@ -14,9 +14,9 @@ import hivens.core.data.OfflineIdentity
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
-import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
+import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -24,6 +24,7 @@ import hivens.core.launch.LaunchState
 import hivens.core.launch.PrepareStage
 import hivens.core.launch.SpawnResult
 import hivens.launcher.di.AppCoroutineScopeHook
+import hivens.launcher.platform.ServerNameValidator
 import hivens.launcher.smrt.ClientSyncCoordinator
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
@@ -91,14 +92,23 @@ class LauncherController(
         val updated = instance.copy(optionalContent = toggles)
         packRepository.put(updated)
         val clientDir = dataDirectory.resolve("instances").resolve(instance.instanceDirName)
-        withContext(Dispatchers.IO) {
-            smrtSyncService.relabel(
-                clientDir,
-                manifest.mods,
-                OptionalContentRules.enabledState(manifest.mods, toggles),
-            )
+        val deferred = withContext(Dispatchers.IO) {
+            InstanceMutationLock.withLock(clientDir) {
+                smrtSyncService.relabel(
+                    clientDir,
+                    manifest.mods,
+                    OptionalContentRules.enabledState(manifest.mods, toggles),
+                )
+            }
         }
-        ActionRing.record("Optional content updated: ${instance.displayName}")
+        if (deferred.isEmpty()) {
+            ActionRing.record("Optional content updated: ${instance.displayName}")
+        } else {
+            // The selection is saved; only the on-disk flip could not land now (a
+            // live holder keeps the jar -- the running game on Windows). It applies
+            // on the next launch's sync, so tell the user rather than imply it took.
+            ActionRing.record("${instance.displayName}: ${deferred.size} content change(s) apply after the game restarts")
+        }
         return updated
     }
 
@@ -387,7 +397,7 @@ class LauncherController(
 
         // 3. Download -- skip in offline mode if client exists
         setStage(PrepareStage.SYNC, 0.2f)
-        val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
+        val clientDir = dataDirectory.resolve("clients").resolve(ServerNameValidator.require(targetServerId))
         if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
 
         if (isOffline) {
@@ -592,11 +602,14 @@ class LauncherController(
                     javaPathOverride     = javaOverride,
                     allocatedMemoryMB    = settings.memoryMB,
                     adaptiveEnabled      = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
-                    // Redirect authlib to the mirror auth host only for
-                    // mirror-derived packs. A Modrinth / local / own pack keeps
-                    // the default Mojang hosts so its own auth provider stands.
-                    redirectAuthHost     = refreshedInstance.packRef.origin
-                        .let { it == PackOrigin.Smartycraft || it == PackOrigin.Mirror },
+                    // Redirect authlib away from the Mojang hosts only when the
+                    // session being carried is an SC one. Keying this on the
+                    // pack's ORIGIN instead put a mirror pack with no auth block
+                    // behind the redirect while PackAuthRouter had already
+                    // resolved it to Microsoft -- the launch would hand a
+                    // Microsoft token to the SC host. Same test the service uses
+                    // for its SC binding, so the two cannot disagree.
+                    redirectAuthHost     = authRequirement?.scServerId != null,
                     // Auth mechanism for an SC-bound join: the redirect agent
                     // (default on) and/or SC's patched authlib jar (default off,
                     // fallback). Both no-op on non-SC packs.

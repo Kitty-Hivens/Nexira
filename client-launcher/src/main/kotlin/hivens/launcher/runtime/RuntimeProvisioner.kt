@@ -1,6 +1,12 @@
 package hivens.launcher.runtime
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.io.resolveWithinRoot
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.platform.Platform
 import hivens.launcher.runtime.loader.DownloadProgress
 import hivens.launcher.runtime.loader.LibrarySpec
@@ -51,6 +57,7 @@ class RuntimeProvisioner(
     private val librariesDir: Path,
     private val assetsDir: Path,
     private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     private val loaderRegistry: LoaderRegistry = LoaderRegistry(emptyList()),
     osName: String = System.getProperty("os.name", ""),
@@ -93,8 +100,10 @@ class RuntimeProvisioner(
         val jvmArgs: List<String> = emptyList(),
         val gameArgs: List<String> = emptyList(),
         /** Host-matching native jars (lwjgl etc.) resolved from the manifest,
-         *  on disk in the shared root after [ensureVanilla]. */
-        val natives: List<Path> = emptyList(),
+         *  on disk in the shared root after [ensureVanilla]. Carries coords so a
+         *  loader that swaps natives can drop the ones its removeFromBase matches
+         *  (LWJGL2) while keeping the rest (jinput). */
+        val natives: List<ResolvedLibrary> = emptyList(),
         /** Mojang's declared Java major (1.17+ vanilla json carries
          *  `javaVersion.majorVersion`); null on legacy / when absent. */
         val javaMajor: Int? = null,
@@ -128,32 +137,54 @@ class RuntimeProvisioner(
                 clientJar = vanilla.clientJar,
                 mainClass = VANILLA_MAIN_CLASS,
                 assetIndexId = vanilla.assetIndexId,
-                natives = vanilla.natives,
+                natives = vanilla.natives.map { it.path },
                 javaMajor = vanilla.javaMajor,
             )
 
         log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
         val profile = resolver.resolve(mcVersion, loaderVersion)
-        val overlay = profile.libraries.map { spec ->
-            val dest = librariesDir.resolve(spec.coord.relativePath)
-            when {
-                spec.localFile != null -> placeLocal(dest, spec.localFile, spec.sha1)
-                spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
-                else -> {
-                    val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url, bundled bytes, nor a local file")
-                    fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
-                }
-            }
-            ResolvedLibrary(spec.coord, dest)
-        }
+        val overlay = profile.libraries.map { ResolvedLibrary(it.coord, provision(it)) }
+        // Host natives the loader adds on top of vanilla's -- a LWJGL swap
+        // (Cleanroom / lwjgl3ify) contributes its own LWJGL3 .so/.dll here. The
+        // loader lists all platforms (as the MMC instance does); the same host
+        // filter as the vanilla natives keeps only this machine's set, so the
+        // resolver stays platform-agnostic.
+        val overrideNatives = profile.nativesOverride
+            ?.filterNot { isForeignNative(it.coord) }
+            ?.map { provision(it) }
+            .orEmpty()
         // Processor outputs FML resolves by path under libraryDirectory (the
         // patched/SRG client, neoforge universal) -- on disk, never on -cp.
         profile.placeOnlyFiles.forEach { pf ->
             placeLocal(librariesDir.resolve(pf.relPath), pf.source, null)
         }
+        // The installer's resources-only client output (client-<neoform>-extra.jar:
+        // version.json + assets, no classes). Placed above like every other output;
+        // singled out here so the command builder can add it to -cp for its
+        // version.json (see [ResolvedRuntime.clientResourcesJar]).
+        val clientResources = profile.placeOnlyFiles
+            .firstOrNull { it.relPath.startsWith("net/minecraft/client/") && it.relPath.endsWith("-extra.jar") }
+            ?.let { librariesDir.resolve(it.relPath) }
+        // A self-contained loader (Cleanroom) supplies the whole classpath, so
+        // the vanilla libraries are dropped -- keeping them leaks cross-coord
+        // twins the merge cannot dedup (old oshi/icu/netty shadowing the new).
+        // Additive loaders keep the vanilla base minus whatever they swap out.
+        val base = if (profile.replacesVanillaLibraries) {
+            emptyList()
+        } else {
+            vanilla.libraries.filterNot { profile.removeFromBase(it.coord) }
+        }
+        val baseNatives = if (profile.replacesVanillaLibraries) {
+            emptyList()
+        } else {
+            vanilla.natives.filterNot { profile.removeFromBase(it.coord) }.map { it.path }
+        }
         ResolvedRuntime(
-            libraries = mergeLibraries(vanilla.libraries, overlay),
+            // removeFromBase is a no-op for every additive loader, so their merged
+            // set is byte-identical to before.
+            libraries = mergeLibraries(base, overlay),
             clientJar = vanilla.clientJar,
+            clientResourcesJar = clientResources,
             mainClass = profile.mainClass,
             assetIndexId = vanilla.assetIndexId,
             // Modern (BootstrapLauncher) overlays need vanilla's jvm args (the
@@ -164,10 +195,32 @@ class RuntimeProvisioner(
             // (--launchTarget, --fml.*) come from the profile.
             jvmArgs = if (profile.inheritsVanillaArguments) vanilla.jvmArgs + profile.jvmArgs else profile.jvmArgs,
             gameArgs = profile.gameArgs,
-            natives = vanilla.natives,
+            // Additive: vanilla natives minus the swapped-out ones (LWJGL2) plus
+            // the loader's own (LWJGL3), keeping unrelated vanilla natives
+            // (jinput). Self-contained: only the loader's own natives.
+            natives = baseNatives + overrideNatives,
             // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
             javaMajor = profile.javaMajor ?: vanilla.javaMajor,
         )
+    }
+
+    /**
+     * Materialises one [LibrarySpec] into the shared libraries root and returns
+     * its on-disk path: a local file copy, bundled bytes, or a download, in that
+     * precedence. Shared by the loader overlay and the loader's native-override
+     * set so both go through the same verify/skip path.
+     */
+    private suspend fun provision(spec: LibrarySpec): Path {
+        val dest = librariesDir.resolve(spec.coord.relativePath)
+        when {
+            spec.localFile != null -> placeLocal(dest, spec.localFile, spec.sha1)
+            spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
+            else -> {
+                val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url, bundled bytes, nor a local file")
+                fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
+            }
+        }
+        return dest
     }
 
     /**
@@ -192,9 +245,11 @@ class RuntimeProvisioner(
 
         val tasks = planVanillaDownloads(mcVersion, version, assetIndex)
         log.info("vanilla runtime {}: {} files to verify/fetch (assetIndex={})", mcVersion, tasks.size, assetIndexId)
-        tasks.forEachIndexed { i, task ->
-            progress(i + 1, tasks.size, task.dest.fileName.toString())
-            fetchIfNeeded(task)
+        // One request at a time over a few thousand asset objects was the slowest
+        // part of a first launch, and a single reset anywhere in it failed the whole
+        // provisioning run with nothing retried.
+        transfers.fetchAll(tasks.map { it.toTransfer() }) { p ->
+            progress(p.filesDone, p.filesTotal, p.current)
         }
 
         VanillaRuntime(
@@ -203,7 +258,7 @@ class RuntimeProvisioner(
             libraries = vanillaLibraries(version),
             jvmArgs = version.arguments?.let { flattenArguments(it.jvm, mojangOs) } ?: emptyList(),
             gameArgs = version.arguments?.let { flattenArguments(it.game, mojangOs) } ?: emptyList(),
-            natives = nativeJarPaths(version),
+            natives = nativeLibraries(version),
             javaMajor = version.javaVersion?.majorVersion,
         )
     }
@@ -226,7 +281,7 @@ class RuntimeProvisioner(
             if (artifact.path.isBlank()) return@mapNotNull null
             val coord = MavenCoord.parse(lib.name)
             if (isForeignNative(coord)) return@mapNotNull null
-            ResolvedLibrary(coord, librariesDir.resolve(artifact.path))
+            ResolvedLibrary(coord, resolveWithinRoot(librariesDir, artifact.path, lib.name))
         }
 
     /**
@@ -239,8 +294,8 @@ class RuntimeProvisioner(
      * the gate is on the classifier, not on Mojang's inconsistent arch rules.
      */
     private fun isForeignNative(coord: MavenCoord): Boolean {
-        val classifier = coord.classifier ?: return false
-        return classifier.startsWith("natives") && classifier !in acceptedNativeClassifiers
+        val classifier = coord.nativeClassifier ?: return false
+        return classifier !in acceptedNativeClassifiers
     }
 
     /**
@@ -254,22 +309,23 @@ class RuntimeProvisioner(
      * match [planVanillaDownloads], so the jars are on disk by the time
      * [hivens.launcher.component.EnvironmentPreparer] extracts them.
      */
-    internal fun nativeJarPaths(version: MojangVersion): List<Path> {
-        val out = ArrayList<Path>()
+    internal fun nativeLibraries(version: MojangVersion): List<ResolvedLibrary> {
+        val out = ArrayList<ResolvedLibrary>()
         for (lib in version.libraries) {
             if (!isLibraryAllowed(lib.rules)) continue
             val downloads = lib.downloads ?: continue
+            val base = MavenCoord.parse(lib.name)
             for ((classifier, art) in downloads.classifiers) {
                 if (classifier in acceptedNativeClassifiers && art.path.isNotBlank()) {
-                    out.add(librariesDir.resolve(art.path))
+                    out.add(ResolvedLibrary(base.copy(classifier = classifier), resolveWithinRoot(librariesDir, art.path, lib.name)))
                 }
             }
-            val coordClassifier = MavenCoord.parse(lib.name).classifier
-            if (coordClassifier != null && coordClassifier in acceptedNativeClassifiers) {
-                downloads.artifact?.takeIf { it.path.isNotBlank() }?.let { out.add(librariesDir.resolve(it.path)) }
+            if (base.classifier != null && base.classifier in acceptedNativeClassifiers) {
+                downloads.artifact?.takeIf { it.path.isNotBlank() }
+                    ?.let { out.add(ResolvedLibrary(base, resolveWithinRoot(librariesDir, it.path, lib.name))) }
             }
         }
-        return out.distinct()
+        return out.distinctBy { it.path }
     }
 
     // -- pure planning (no IO) ------------------------------------------------
@@ -294,7 +350,7 @@ class RuntimeProvisioner(
             downloads.artifact?.takeIf { it.path.isNotBlank() && !isForeignNative(coord) }?.let { artifact ->
                 out += DownloadTask(
                     url = artifact.url,
-                    dest = librariesDir.resolve(artifact.path),
+                    dest = resolveWithinRoot(librariesDir, artifact.path, lib.name),
                     sha1 = artifact.sha1,
                     size = artifact.size,
                 )
@@ -306,7 +362,7 @@ class RuntimeProvisioner(
                 if (classifier in acceptedNativeClassifiers && nativeArt.path.isNotBlank()) {
                     out += DownloadTask(
                         url = nativeArt.url,
-                        dest = librariesDir.resolve(nativeArt.path),
+                        dest = resolveWithinRoot(librariesDir, nativeArt.path, lib.name),
                         sha1 = nativeArt.sha1,
                         size = nativeArt.size,
                     )
@@ -326,7 +382,7 @@ class RuntimeProvisioner(
         for ((_, obj) in assetIndex.objects) {
             out += DownloadTask(
                 url = assetObjectUrl(obj.hash),
-                dest = assetsDir.resolve(assetObjectRelPath(obj.hash)),
+                dest = resolveWithinRoot(assetsDir, assetObjectRelPath(obj.hash), obj.hash),
                 sha1 = obj.hash,
                 size = obj.size,
             )
@@ -427,39 +483,29 @@ class RuntimeProvisioner(
             buf.toByteArray()
         }
 
-    /**
-     * Skip when the file is already present at the right size (content is
-     * addressed by hash in its path for objects, and pinned by the manifest
-     * sha1 for libraries -- a same-size collision is not a realistic threat,
-     * and re-hashing thousands of objects on every launch is not worth it).
-     * Freshly downloaded bytes are always sha1-verified.
-     */
     private suspend fun fetchIfNeeded(task: DownloadTask) {
-        if (Files.isRegularFile(task.dest) && (task.size <= 0 || Files.size(task.dest) == task.size)) {
-            return
-        }
-        Files.createDirectories(task.dest.parent)
-        // Unique temp per writer: the shared libraries root can be provisioned
-        // concurrently (a launch and an import fetching the same lib), so a fixed
-        // "<dest>.tmp" sibling would let two downloads clobber each other's bytes.
-        // The finally drops a partial temp on any failure.
-        val tmp = Files.createTempFile(task.dest.parent, "${task.dest.fileName}.", ".tmp")
-        try {
-            httpClient.prepareGet(task.url).execute { resp ->
-                if (!resp.status.isSuccess()) throw IOException("GET ${task.url} -> HTTP ${resp.status}")
-                FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-            }
-            if (task.sha1.isNotBlank()) {
-                val actual = sha1Of(tmp)
-                if (!actual.equals(task.sha1, ignoreCase = true)) {
-                    throw IOException("sha1 mismatch for ${task.url}: expected ${task.sha1}, got $actual")
-                }
-            }
-            moveAtomic(tmp, task.dest)
-        } finally {
-            runCatching { Files.deleteIfExists(tmp) }
-        }
+        transfers.fetch(task.toTransfer())
     }
+
+    /**
+     * Skip when the file is already present at the right size: content here is
+     * addressed by hash in its own path (asset objects) or pinned by the manifest
+     * sha1 at a maven coordinate (libraries), a same-size collision is not a
+     * realistic threat, and re-hashing thousands of objects on every launch is
+     * minutes of disk for an answer the paths already gave. An entry whose upstream
+     * declares no size falls back to presence for the same reason -- refetching it
+     * every launch would cost the network instead.
+     *
+     * Freshly downloaded bytes are always verified against the sha1 when there is
+     * one, by the engine, before anything is published.
+     */
+    private fun DownloadTask.toTransfer(): Transfer = Transfer(
+        url = url,
+        dest = dest,
+        expect = sha1.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.SHA1, it) },
+        size = size,
+        skip = if (size > 0L) SkipIfPresent.BySize else SkipIfPresent.Presence,
+    )
 
     private fun writeBytes(dest: Path, bytes: ByteArray) {
         Files.createDirectories(dest.parent)

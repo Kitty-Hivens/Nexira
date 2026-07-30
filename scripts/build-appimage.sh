@@ -18,7 +18,8 @@
 #                         packaging-profile.sh, produced by the
 #                         `:client-ui:emitAppImageProfile` gradle task)
 #
-# Requires on PATH: jlink (from JDK), appimagetool (continuous build).
+# Requires on PATH: jlink (from JDK), appimagetool (continuous build),
+# zip + unzip (Info-ZIP -- the foreign-JNA strip below).
 #
 # Why this lives in a script: the inline yaml in build_release.yml grew to
 # ~50 lines with a heredoc, three mkdir trees, four cp blocks and an
@@ -50,7 +51,7 @@ if [ ! -f "$PACKAGING_PROFILE" ]; then
     echo "       or set PACKAGING_PROFILE=<path> to override." >&2
     exit 1
 fi
-# Populates AURA_JLINK_MODULES (comma-joined string) and AURA_JLINK_OPTIONS
+# Populates NEXIRA_JLINK_MODULES (comma-joined string) and NEXIRA_JLINK_OPTIONS
 # (bash array). See buildSrc/.../EmitAppImageProfileTask.kt for the writer.
 source "$PACKAGING_PROFILE"
 
@@ -66,8 +67,14 @@ source "$PACKAGING_PROFILE"
 # squeezes a non-zip-9 runtime image harder than it can a pre-compressed one.
 jlink \
     --output "$APPDIR/usr" \
-    --add-modules "$AURA_JLINK_MODULES" \
-    "${AURA_JLINK_OPTIONS[@]}"
+    --add-modules "$NEXIRA_JLINK_MODULES" \
+    "${NEXIRA_JLINK_OPTIONS[@]}"
+
+# --generate-cds-archive emits both classes.jsa (compressed oops) and
+# classes_nocoops.jsa. The launcher's heap never approaches the 32 GB coops
+# threshold, so the nocoops archive is never mapped: ~14 MB on disk and ~3 MB
+# of squashfs for nothing. Mirrors the same drop in CustomRuntimeTask.
+rm -f "$APPDIR/usr/lib/server/classes_nocoops.jsa"
 
 # ── 2. Remaining subdirs (usr/bin already exists from jlink) ────────────────
 mkdir -p \
@@ -86,13 +93,37 @@ mkdir -p \
 # reflection the launcher would show up as "java" in the taskbar. The fat
 # jar bypasses the Compose-generated launcher script, so the jvmArgs in
 # client-ui/build.gradle.kts do not flow through here -- the AppRun is the
-# only place where flags actually reach the AppImage runtime.
+# only place where flags reach the AppImage runtime, so the ones that matter
+# are mirrored here: the Linux AWT/X11 rendering + tiling-WM hints
+# (_JAVA_AWT_WM_NONREPARENTING fixes AWT window sizing under tiling WMs like
+# Hyprland/sway), the sun.nio.ch open some deps reflect through, and G1 +
+# string dedup. Heap caps are deliberately NOT mirrored: the default (1/4 RAM)
+# suits a GUI that spikes on skins / 3D / backgrounds better than a hard
+# -Xmx512m. (Windows/macOS still cap via jpackage --java-options; reconcile
+# separately.)
 cat > "$APPDIR/AppRun" << EOF
 #!/bin/sh
 HERE="\$(dirname "\$(readlink -f "\$0")")"
+export MALLOC_ARENA_MAX=2
+# Application class-data archive. The JVM writes it on the first clean exit and
+# refreshes it by itself once it goes stale (an update swapping the jar
+# invalidates it), which is why it is not shipped: zero bytes in the download,
+# and no training step in CI. It has to live in the user data dir because the
+# AppImage is mounted read-only.
+NX_DATA="\${NEXIRA_DATA_DIR:-\${XDG_DATA_HOME:-\$HOME/.local/share}/nexira}"
+mkdir -p "\$NX_DATA" 2>/dev/null || true
 exec "\$HERE/usr/bin/java" \\
      --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
+     --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \\
      --enable-native-access=ALL-UNNAMED \\
+     -XX:+AutoCreateSharedArchive \\
+     -XX:SharedArchiveFile="\$NX_DATA/app.jsa" \\
+     -Dawt.useSystemAAFontSettings=on \\
+     -Djdk.gtk.version=3 \\
+     -D_JAVA_AWT_WM_NONREPARENTING=1 \\
+     -Drobot.need_x11=false \\
+     -XX:+UseG1GC \\
+     -XX:+UseStringDeduplication \\
      -jar "\$HERE/usr/lib/nexira.jar" \\
      "\$@"
 EOF
@@ -100,6 +131,24 @@ chmod +x "$APPDIR/AppRun"
 
 # ── 4. Copy assets ──────────────────────────────────────────────────────────
 cp "$JAR" "$APPDIR/usr/lib/nexira.jar"
+
+# Strip foreign JNA dispatchers. This is a linux-x86-64 AppImage, and JNA (pulled
+# by FileKit for native file dialogs) only ever loads com/sun/jna/linux-x86-64/.
+# The jar bundles ~30 platforms of libjnidispatch (~5 MB of incompressible .so);
+# drop every one but the host. `zip -d` rewrites the central directory and copies
+# the remaining entries' bytes verbatim, so the STORED method the gradle uber-jar
+# post-process applied is preserved (no re-compression).
+# Match only the native dispatcher blobs (libjnidispatch.so / .jnilib / .a,
+# jnidispatch.dll), NOT the com/sun/jna/{platform,internal,win32,...} Java
+# packages that also live one level under com/sun/jna/.
+mapfile -t _jna_foreign < <(
+    unzip -Z1 "$APPDIR/usr/lib/nexira.jar" 'com/sun/jna/*' 2>/dev/null \
+        | grep -E '/(libjnidispatch\.(so|jnilib|a)|jnidispatch\.dll)$' \
+        | grep -v '^com/sun/jna/linux-x86-64/' || true
+)
+if [ "${#_jna_foreign[@]}" -gt 0 ]; then
+    zip -q -d "$APPDIR/usr/lib/nexira.jar" "${_jna_foreign[@]}"
+fi
 cp "$ROOT/resources/nexira.desktop" "$APPDIR/usr/share/applications/"
 cp "$ROOT/resources/nexira.desktop" "$APPDIR/"
 cp "$ROOT/resources/icons/256x256.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/nexira.png"
@@ -113,6 +162,16 @@ cp "$ROOT/resources/dev.hivens.nexira.metainfo.xml" \
    "$APPDIR/usr/share/metainfo/dev.hivens.nexira.appdata.xml"
 
 # ── 5. Build AppImage ───────────────────────────────────────────────────────
-ARCH="$ARCH" appimagetool "$APPDIR" "$OUTPUT"
+# Squashfs compression: zstd at max level, 1 MB blocks (the mksquashfs ceiling).
+# appimagetool already defaults to zstd, but at the mksquashfs default level (15)
+# with 128 KB blocks; pinning level 22 + 1 MB blocks lets the single squashfs pass
+# get the most out of the now-STORED uber jar (see the release-uber-jar post-process
+# in client-ui/build.gradle.kts). The `=` form keeps the leading-dash mksquashfs
+# flags from being mis-parsed as appimagetool options.
+ARCH="$ARCH" appimagetool \
+    --comp zstd \
+    --mksquashfs-opt=-Xcompression-level --mksquashfs-opt=22 \
+    --mksquashfs-opt=-b --mksquashfs-opt=1M \
+    "$APPDIR" "$OUTPUT"
 
 echo "AppImage written to $OUTPUT"

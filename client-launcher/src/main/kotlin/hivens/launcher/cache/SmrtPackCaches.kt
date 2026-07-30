@@ -1,5 +1,6 @@
 package hivens.launcher.cache
 
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
@@ -16,12 +17,14 @@ class SmrtPackCaches(
     val listing: Cache<SmrtPackListing>,
     val summary: Cache<SmrtPackSummary>,
     val manifest: Cache<SmrtPackManifest>,
+    val versions: Cache<SmrtManifestVersions>,
 ) {
     companion object {
         fun passthrough(): SmrtPackCaches = SmrtPackCaches(
             listing = PassthroughCache(),
             summary = PassthroughCache(),
             manifest = PassthroughCache(),
+            versions = PassthroughCache(),
         )
     }
 }

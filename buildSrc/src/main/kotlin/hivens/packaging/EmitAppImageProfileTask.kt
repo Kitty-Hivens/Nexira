@@ -24,8 +24,8 @@ import org.gradle.api.tasks.TaskAction
  * # Sourced by scripts/build-appimage.sh to keep one source of truth
  * # between gradle's customRuntime task and the AppImage jlink call.
  *
- * AURA_JLINK_MODULES="java.base,java.desktop,..."
- * AURA_JLINK_OPTIONS=(
+ * NEXIRA_JLINK_MODULES="java.base,java.desktop,..."
+ * NEXIRA_JLINK_OPTIONS=(
  *     --strip-debug
  *     --no-header-files
  *     --no-man-pages
@@ -38,7 +38,7 @@ import org.gradle.api.tasks.TaskAction
  * Bash array form (rather than space-joined string) is deliberate: it
  * preserves flag-equals-value tokens like `--compress=zip-9` as a single
  * argv element even if jlink ever gains a flag whose value contains
- * whitespace. The shell script unpacks with `"${AURA_JLINK_OPTIONS[@]}"`.
+ * whitespace. The shell script unpacks with `"${NEXIRA_JLINK_OPTIONS[@]}"`.
  *
  * Inputs are the same `Property` values that [CustomRuntimeTask] reads
  * from [PackagingExtension]. UP-TO-DATE works for free; the script only
@@ -73,6 +73,10 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
     @get:Optional
     abstract val includeLocales: Property<String>
 
+    /** `--generate-cds-archive`; see [hivens.packaging.JlinkOptionsExtension]. */
+    @get:Input
+    abstract val generateCdsArchive: Property<Boolean>
+
     // ── Output ────────────────────────────────────────────────────────────
 
     @get:OutputFile
@@ -89,6 +93,7 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
             compress.orNull?.let { add("--compress=$it") }
             vmKind.orNull?.let { add("--vm=$it") }
             includeLocales.orNull?.let { add("--include-locales=$it") }
+            if (generateCdsArchive.get()) add("--generate-cds-archive")
         }
         val moduleList = modules.get().joinToString(",")
         val file = outputFile.get().asFile
@@ -100,8 +105,8 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
             append("# jlink call. Edits go to the packaging { } block in\n")
             append("# client-ui/build.gradle.kts.\n")
             append("\n")
-            append("AURA_JLINK_MODULES=\"").append(moduleList).append("\"\n")
-            append("AURA_JLINK_OPTIONS=(\n")
+            append("NEXIRA_JLINK_MODULES=\"").append(moduleList).append("\"\n")
+            append("NEXIRA_JLINK_OPTIONS=(\n")
             for (flag in flags) {
                 append("    ").append(flag).append("\n")
             }

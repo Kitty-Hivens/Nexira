@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * 1. Config file at `<dataDir>/server-config.json` -- the full data
  *    class serialized; loader merges with defaults so partial files
  *    are fine.
- * 2. System property `aura.conduit.baseurl` -- overrides just the
+ * 2. System property `nexira.conduit.baseurl` -- overrides just the
  *    base URL, leaves everything else at config-file or default.
  *    Useful for one-off "test against mirror right now" CLI workflows.
  *
@@ -29,25 +29,10 @@ data class ServerProtocolConfig(
      */
     val baseUrl: String = DEFAULT_BASE_URL,
 
-    /** SOCKS5 proxy hostname used for the proxy fallback channel. */
-    val proxyHost: String = DEFAULT_PROXY_HOST,
-
-    /** SOCKS5 proxy port. */
-    val proxyPort: Int = DEFAULT_PROXY_PORT,
-
-    /** SOCKS5 proxy username. Public per-protocol value; not a secret. */
-    val proxyUser: String = DEFAULT_PROXY_USER,
-
-    /**
-     * SOCKS5 proxy password. Recovered from smrt-deco -- public
-     * per-protocol value, not a secret.
-     */
-    val proxyPass: String = DEFAULT_PROXY_PASS,
-
     /**
      * OkHttp `connectTimeout`, applied to every client variant the launcher
-     * builds (direct, proxied, insecure). Bumpable for high-latency Mirror
-     * operators via `server-config.json`.
+     * builds (direct, insecure). Bumpable for high-latency Mirror operators
+     * via `server-config.json`.
      */
     val connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
 
@@ -78,15 +63,11 @@ data class ServerProtocolConfig(
 
     companion object {
         const val DEFAULT_BASE_URL    = "https://www.smartycraft.ru"
-        const val DEFAULT_PROXY_HOST  = "proxy.smartycraft.ru"
-        const val DEFAULT_PROXY_PORT  = 58613
-        const val DEFAULT_PROXY_USER  = "smartycraftproxyuser"
-        const val DEFAULT_PROXY_PASS  = "ngyxvpFfiUz4FB2OPx1nqEa4TEKigbKc"
         const val DEFAULT_CONNECT_TIMEOUT_MS = 30_000L
         const val DEFAULT_READ_TIMEOUT_MS    = 300_000L
 
         /** System-property name for the runtime base-URL override. */
-        const val SYSTEM_PROP_BASE_URL = "aura.conduit.baseurl"
+        const val SYSTEM_PROP_BASE_URL = "nexira.conduit.baseurl"
 
         /**
          * Resolve the effective config given a parsed-from-file value. Applies

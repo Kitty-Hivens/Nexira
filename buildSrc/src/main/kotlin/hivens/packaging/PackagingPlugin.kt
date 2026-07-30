@@ -45,6 +45,9 @@ class PackagingPlugin : Plugin<Project> {
         ext.jlink.stripDebug.convention(true)
         ext.jlink.noHeaderFiles.convention(true)
         ext.jlink.noManPages.convention(true)
+        // On by default: without the base CDS archive the JVM refuses app-class
+        // sharing entirely, which is the only cheap lever left on cold start.
+        ext.jlink.generateCdsArchive.convention(true)
         // compress / vmKind / includeLocales: deliberately no convention
         // value -- omission of the flag is meaningful to jlink, and
         // forcing a default would hide that signal.
@@ -67,6 +70,7 @@ class PackagingPlugin : Plugin<Project> {
             compress.convention(ext.jlink.compress)
             vmKind.convention(ext.jlink.vmKind)
             includeLocales.convention(ext.jlink.includeLocales)
+            generateCdsArchive.convention(ext.jlink.generateCdsArchive)
 
             javaHome.convention(resolvedJavaHome)
             outputDir.convention(
@@ -88,6 +92,7 @@ class PackagingPlugin : Plugin<Project> {
             compress.convention(ext.jlink.compress)
             vmKind.convention(ext.jlink.vmKind)
             includeLocales.convention(ext.jlink.includeLocales)
+            generateCdsArchive.convention(ext.jlink.generateCdsArchive)
 
             outputFile.convention(
                 project.layout.buildDirectory.file("generated/packaging/packaging-profile.sh")

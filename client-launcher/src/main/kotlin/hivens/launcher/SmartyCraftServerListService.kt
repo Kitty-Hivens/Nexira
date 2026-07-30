@@ -10,6 +10,7 @@ import hivens.core.cache.PassthroughCache
 import hivens.core.data.DashboardData
 import hivens.core.data.NewsItem
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.launcher.platform.ServerNameValidator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,7 +57,18 @@ class SmartyCraftServerListService(
     private suspend fun loadDashboard(): DashboardData =
         try {
             val response = repository.fetchDashboard()
-            val servers = response.servers.map { getProfile(it) }
+            // assetDir becomes a directory name under clients/ and a cache-file
+            // basename, and it arrives from the server. Screen it here, at the
+            // one point where the list enters the launcher, so no downstream
+            // caller can be handed a name that resolves somewhere else -- the
+            // "reset client" button deletes that directory recursively.
+            val servers = response.servers
+                .filter { srv ->
+                    ServerNameValidator.isValid(srv.assetDir).also { ok ->
+                        if (!ok) logger.warn("Dropping server '{}': its assetDir is not a usable directory name", srv.id)
+                    }
+                }
+                .map { getProfile(it) }
             val news = response.news.map { newsDto ->
                 val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
                 val imageUrl = "${protocolConfig.baseUrl}/images/news/mini/$imageName"

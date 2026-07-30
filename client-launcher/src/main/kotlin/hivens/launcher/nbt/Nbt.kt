@@ -18,8 +18,7 @@ import java.util.zip.GZIPOutputStream
  * JitPack-only and the surface we need is < 300 LOC of binary IO.
  * The cost of taking on an external dep (build-time fetch, version
  * pinning, potential security patches we'd need to track) exceeds
- * the cost of maintaining this. See [[feedback_custom_tooling_on_aura]]
- * for the project's bias here.
+ * the cost of maintaining this.
  *
  * Spec reference: https://minecraft.wiki/w/NBT_format
  */

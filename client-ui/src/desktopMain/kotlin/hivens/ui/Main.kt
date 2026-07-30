@@ -8,6 +8,7 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.io.IconProcessor
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.bootstrap.RecoveryEntry
 import hivens.ui.threshold.BootOutcome
@@ -23,12 +24,15 @@ import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.SkinManager
+import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.notifications.drivers.PackUpdateDriver
+import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
@@ -84,6 +88,9 @@ val uiModule = module {
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
     single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
     single { GameConsoleService(get()) }
+    // AWT-backed icon downscaler for the content scanner (the engine module
+    // stays free of java.desktop; the seam interface lives in core).
+    single<IconProcessor> { ImageIoIconProcessor() }
     // Dev UI-debug overlay switchboard. Process-lifetime so the toggle survives
     // shell recomposition + the crash-restart loop; inert on release builds.
     single { DebugOverlayState() }
@@ -176,12 +183,12 @@ val uiModule = module {
     // Media resolvers feeding the local-only Skinema player (client-media).
     // Wired here: the UI is their only consumer, the launch engine does not
     // know the module. "direct" channel: public CDNs / GitHub, not SC-proxied.
-    single { VideoCacheService(dir = get<Path>().resolve("video-cache"), http = get(named("direct")), scope = get()) }
+    single { VideoCacheService(dir = get<Path>().resolve("video-cache"), transfers = get(), scope = get()) }
     single {
         YtDlpService(
             toolsDir      = get<Path>().resolve("tools"),
             videoCacheDir = get<Path>().resolve("video-cache"),
-            http          = get(named("direct")),
+            transfers     = get(),
             scope         = get(),
         )
     }
@@ -253,6 +260,23 @@ val uiModule = module {
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         ).also { it.start() }
     }
+    // Navigation requests from outside the composition (notification actions,
+    // drivers). AppRoot collects and feeds them into the back stack.
+    single { NavRequests() }
+    // Surfaces pack-update outcomes (background auto-updater + manual flows via
+    // the status hub) into the notification center. Same lifecycle rationale as
+    // InstallDriver.
+    single(createdAtStart = true) {
+        val settingsService: ISettingsService = get()
+        PackUpdateDriver(
+            hub             = get(),
+            repository      = get(),
+            notifications   = get(),
+            nav             = get(),
+            appScope        = get(),
+            stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
+        ).also { it.start() }
+    }
 }
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
@@ -312,6 +336,20 @@ fun main(args: Array<String>) {
         }.onSuccess { result ->
             bootStage.value   = BootStage.Done
             bootOutcome.value = BootOutcome.Ready(result)
+            // Training run for the class archive: -Dnexira.trainAndExit=<ms> boots
+            // to a rendered shell, waits for the first frames so the UI path's
+            // classes are actually loaded, then exits CLEANLY. The clean exit is
+            // the point -- CDS writes the archive at VM exit, so a killed process
+            // leaves nothing behind. Opt-in only; a normal run never sets it.
+            System.getProperty("nexira.trainAndExit")?.let { raw ->
+                val settleMs = (raw.toLongOrNull() ?: 3_000L).coerceIn(0L, 60_000L)
+                thread(name = "nexira-train-exit", isDaemon = true) {
+                    Thread.sleep(settleMs)
+                    LoggerFactory.getLogger("Main")
+                        .info("trainAndExit: boot complete, exiting to flush the class archive")
+                    exitProcess(0)
+                }
+            }
         }.onFailure { e ->
             LoggerFactory.getLogger("Main").error("Boot failed before the shell could start", e)
             runCatching {
@@ -351,7 +389,10 @@ private fun runShellWithRecovery(
     bootStage: MutableStateFlow<BootStage>,
 ) {
     val log = LoggerFactory.getLogger("ShellRecovery")
+    var restarts = 0
     while (true) {
+        val isRestart = restarts > 0
+        restarts++
         // Safe mode runs a standalone window that does NOT build the shell
         // scaffolding (Koin inject, tray init, theme, widget kernel) -- a crash
         // anywhere in that scaffolding is what latched safe mode, so re-running
@@ -396,10 +437,11 @@ private fun runShellWithRecovery(
                             onExit = { exitApplication() },
                         )
                     } else {
-                        // Boot already done on a restart iteration: ShellHost
-                        // sees Ready at first composition and skips the
-                        // threshold, so a recovered shell reappears directly.
-                        ShellHost(pre, bootOutcome, bootStage)
+                        // The restart flag lets ShellHost skip the threshold only
+                        // on a genuine recovery re-entry with boot done -- a first
+                        // boot that finished before the window composed still
+                        // plays it.
+                        ShellHost(pre, bootOutcome, bootStage, isRestart = isRestart)
                     }
                 }
             }

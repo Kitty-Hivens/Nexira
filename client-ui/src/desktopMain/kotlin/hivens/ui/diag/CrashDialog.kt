@@ -1,6 +1,7 @@
 package hivens.ui.diag
 
 import hivens.config.Branding
+import hivens.core.logging.Redactor
 import hivens.launcher.CrashReporter
 import hivens.launcher.diag.IssueReporter
 import java.awt.Desktop
@@ -52,8 +53,11 @@ object CrashDialog {
                 }
             }
             1 -> {
+                // Redacted again on read: the file is written redacted, but a
+                // report left over from an older build is not, and this button
+                // exists to paste it somewhere else.
                 val clipboard = Toolkit.getDefaultToolkit().systemClipboard
-                clipboard.setContents(StringSelection(reportFile.readText()), null)
+                clipboard.setContents(StringSelection(Redactor.redact(reportFile.readText())), null)
             }
             2 -> {
                 openOnDaemonThread("crash-report-open-folder") {

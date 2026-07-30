@@ -5,6 +5,7 @@ import hivens.config.Protocol
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import hivens.core.logging.Redactor
 import hivens.core.platform.OS
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.loader.ResolvedRuntime
@@ -146,9 +147,16 @@ internal class GameCommandBuilder(
         addMacOsStartupFlags(args)
 
         // 3. System Properties (Launcher Identity & Custom Authlib)
+        // Two eras, two bases. Legacy auth/account flows live under the SC
+        // launcher API (/launcher/). The SESSION service -- the join -- lives at
+        // the BARE host over plain http: SC's own patched authlib hardcodes
+        // http://<host>, and both https and /launcher/ variants 404. Modern
+        // authlib (1.16.4+) additionally IGNORES the redirect unless session AND
+        // services are both set, so the pair is emitted together.
         args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
         args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
-        args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.session.host=http://${protocolConfig.sslBypassHost}")
+        args.add("-Dminecraft.api.services.host=http://${protocolConfig.sslBypassHost}")
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
 
@@ -293,6 +301,9 @@ internal class GameCommandBuilder(
         agentJarPath: Path? = null,
         metricsOutPath: Path? = null,
         authlibAgentJarPath: Path? = null,
+        windowWidth: Int? = null,
+        windowHeight: Int? = null,
+        fullScreen: Boolean = false,
     ): List<String> {
         val args = ArrayList<String>()
         args.add(javaExec)
@@ -306,16 +317,22 @@ internal class GameCommandBuilder(
         if (javaMajor <= 8) args.add("-noverify")
         addMacOsStartupFlags(args)
 
-        // authlib redirect: point auth/account/session at the configured host so
+        // authlib redirect: point every era's host set at the SC backend so
         // joining an SC/mirror-derived server authenticates there (same as the SC
-        // path). Mirror-derived packs ONLY -- a Modrinth / local / own pack keeps
-        // the default Mojang hosts so its own auth provider (e.g. real Yggdrasil)
-        // is never redirected to the mirror. No-op today (launcher is all mirror
-        // auth), load-bearing once a second provider exists.
+        // path). Legacy auth/account flows live under /launcher/; the SESSION
+        // service -- the join -- lives at the BARE host over plain http (SC's own
+        // patched authlib hardcodes http://<host>; https and /launcher/ both
+        // 404). Modern authlib (1.16.4+) additionally IGNORES the redirect
+        // unless session AND services are both set -- it then joins against PROD
+        // Mojang and the SC server kicks the session as invalid. Mirror-derived
+        // packs ONLY -- a Modrinth / local / own pack keeps the default Mojang
+        // hosts so its own auth provider (e.g. real Yggdrasil) is never
+        // redirected to the mirror.
         if (redirectAuthHost) {
             args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
             args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
-            args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
+            args.add("-Dminecraft.api.session.host=http://${protocolConfig.sslBypassHost}")
+            args.add("-Dminecraft.api.services.host=http://${protocolConfig.sslBypassHost}")
         }
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
@@ -350,22 +367,42 @@ internal class GameCommandBuilder(
         args.add("--assetsDir"); args.add(sharedAssetsDir.toAbsolutePath().toString())
         args.add("--assetIndex"); args.add(runtime.assetIndexId)
         addSessionAuthArgs(args, session)
+        addWindowArgs(args, windowWidth, windowHeight, fullScreen)
         args.addAll(runtime.gameArgs)
 
         return args
     }
 
     /**
+     * Optional game-window geometry. Fullscreen wins (the client ignores an
+     * explicit size in that mode); otherwise a non-null width/height emits
+     * `--width`/`--height`. A null size means "keep the client's own remembered
+     * size" -- the pack path only passes a value when the instance opted into a
+     * window-size override, so an untouched instance launches unchanged.
+     */
+    private fun addWindowArgs(args: MutableList<String>, width: Int?, height: Int?, fullScreen: Boolean) {
+        if (fullScreen) {
+            args.add("--fullscreen")
+            return
+        }
+        if (width != null && width > 0) { args.add("--width"); args.add(width.toString()) }
+        if (height != null && height > 0) { args.add("--height"); args.add(height.toString()) }
+    }
+
+    /**
      * Ordered `-cp` for a pack: bootstrap jars (launchwrapper / asm /
-     * bootstraplauncher) first, then the client jar, then the rest -- mirrors
-     * the proven legacy Forge classpath ordering. Mods are NOT here; the loader
-     * scans the per-instance mods/ dir.
+     * bootstraplauncher / foundation) first, then the client jar, then the rest
+     * -- mirrors the proven legacy Forge classpath ordering. `foundation` is
+     * Cleanroom's launchwrapper replacement (its `Foundation` bootstrap starts
+     * FMLTweaker), so it takes launchwrapper's boot-first slot. Mods are NOT
+     * here; the loader scans the per-instance mods/ dir.
      */
     private fun packClasspath(runtime: ResolvedRuntime): String {
         val libPaths = runtime.libraries.map { it.path }
         val (boot, rest) = libPaths.partition { p ->
             val n = p.fileName.toString().lowercase()
-            n.contains("launchwrapper") || n.contains("asm") || n.contains("bootstraplauncher")
+            n.contains("launchwrapper") || n.contains("asm") ||
+                n.contains("bootstraplauncher") || n.contains("foundation")
         }
         // listOf(clientJar), NOT `+ clientJar`: a Path is Iterable<Path> over its
         // name segments, so `List<Path> + Path` would spread the client jar into
@@ -376,16 +413,24 @@ internal class GameCommandBuilder(
 
     /**
      * Full `-cp` for a modern (templated) launch: the resolved libraries only,
-     * NOT the vanilla client jar. Modern Forge/NeoForge load minecraft from the
-     * installer's processor output (the slim/srg client) through FML's own path
-     * locator; putting the vanilla client on `-cp` too yields a second module
+     * NOT the class-bearing client jar. Modern Forge/NeoForge load minecraft from
+     * the installer's processor output (the slim/srg client) through FML's own path
+     * locator; putting the class-bearing client on `-cp` too yields a second module
      * named `minecraft` and "reads more than one module named minecraft". Boot
      * modules stay on `-cp` -- the version json's `-DignoreList` tells
      * BootstrapLauncher which entries to keep flat versus promote to modules,
      * mirroring the official launcher.
+     *
+     * The resources-only client jar ([ResolvedRuntime.clientResourcesJar], the
+     * installer's `-extra` output) IS appended: it carries `version.json` but no
+     * classes, so it restores that resource on `-cp` (the official launcher ships
+     * it there) without creating a second `minecraft` module. Without it, mods that
+     * read the MC version from `version.json` as a resource -- CustomSkinLoader --
+     * detect "version 0" and mis-patch.
      */
     private fun modernClasspath(runtime: ResolvedRuntime): String =
-        runtime.libraries.joinToString(File.pathSeparator) { it.path.toAbsolutePath().toString() }
+        (runtime.libraries.map { it.path } + listOfNotNull(runtime.clientResourcesJar))
+            .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
 
     /**
      * Resolves the modern `arguments.jvm` template to concrete tokens. The
@@ -481,6 +526,12 @@ internal class GameCommandBuilder(
     }
 
     private fun addSessionAuthArgs(args: MutableList<String>, session: SessionData) {
+        // The game process echoes this token back in ways no log pattern
+        // predicts -- authlib logs it verbatim when it fails to read it as a
+        // JWT. Registering the value here, at the one point where a token
+        // crosses into the process, masks every such echo.
+        Redactor.registerSecret(session.accessToken)
+
         // Never emit a blank uuid/token. An offline relaunch of a server whose
         // per-server SmartyCraft token was never cached leaves accessToken empty,
         // which puts an empty element in argv ("--accessToken" then "") -- the

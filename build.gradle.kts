@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.multiplatform) apply false
@@ -44,6 +46,15 @@ allprojects {
 subprojects {
     afterEvaluate {
         if (plugins.hasPlugin("java")) {
+            // kotlin("test") carries its own junit-bom, so a module that never
+            // names JUnit still pins one -- an older line than the catalog, and
+            // one that moves on its own whenever Kotlin is bumped. The platform
+            // dependency puts every test classpath on the declared version, which
+            // is what lets a JUnit configuration parameter be set build-wide and
+            // actually hold. KMP modules have no `java` plugin and declare it in
+            // their own test source set instead.
+            dependencies.add("testImplementation", dependencies.platform(rootProject.libs.junit.bom))
+
             configure<JavaPluginExtension> {
                 sourceCompatibility = JavaVersion.VERSION_26
                 targetCompatibility = JavaVersion.VERSION_26
@@ -137,6 +148,21 @@ subprojects {
             // this). A harmless no-op for the pure-JVM module tests.
             "--enable-native-access=ALL-UNNAMED"
         )
+
+        // Per-test bound, so a deadlock names the method instead of only the
+        // module. SEPARATE_THREAD is the load-bearing half: the default mode
+        // measures a test that already returned, which never fires on a hang.
+        // Two minutes is an order of magnitude past the slowest suite here, so
+        // reaching it means stuck, not slow.
+        systemProperty("junit.jupiter.execution.timeout.default", "2m")
+        systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
+
+        // A deadlocked test worker is worse than a failing one: GitHub withholds
+        // a job's log until the job ends, so a hang yields no test report and no
+        // stack -- just a job sitting on the 6-hour limit while the release
+        // behind it waits. Failing here converts that silence into a report.
+        // The slowest module stays under 8 minutes even on one starved core.
+        timeout.set(Duration.ofMinutes(20))
     }
 }
 

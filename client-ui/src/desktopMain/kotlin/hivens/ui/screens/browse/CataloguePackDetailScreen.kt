@@ -55,6 +55,9 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.render.MarkdownHtml
 import hivens.ui.render.openInBrowser
 import hivens.ui.screens.RetryStateBlock
+import hivens.ui.screens.versions.PickerIntent
+import hivens.ui.screens.versions.PickerVersion
+import hivens.ui.screens.versions.VersionPickerWindow
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
@@ -212,14 +215,44 @@ fun CataloguePackDetailScreen(
 
     val pickerTarget = state as? DetailState.Loaded
     if (showPicker && pickerTarget != null) {
-        VersionPickerModal(
-            versions            = pickerTarget.details.versions,
-            installingVersionId = installing?.versionId,
-            onPick              = { v -> showPicker = false; install(pickerTarget.details, v) },
-            onDismiss           = { showPicker = false },
+        val d = pickerTarget.details
+        // The listing arrives newest-first from every source, so the head is the
+        // latest build; nothing here is "installed" yet, that flag belongs to the
+        // instance host.
+        val rows = remember(d.versions) {
+            d.versions.mapIndexed { index, v ->
+                PickerVersion(
+                    id = v.id,
+                    label = v.versionNumber,
+                    channel = v.channel,
+                    publishedAt = v.publishedAt,
+                    changelog = v.changelog,
+                    runtimeLine = runtimeLineOf(v),
+                    latest = index == 0,
+                )
+            }
+        }
+        VersionPickerWindow(
+            title = s.versionPickerInstallTitle,
+            packName = d.title,
+            packIconUrl = d.iconUrl,
+            versions = rows,
+            intentFor = { PickerIntent.Install },
+            busyVersionId = installing?.versionId,
+            onConfirm = { picked ->
+                d.versions.firstOrNull { it.id == picked.id }?.let { install(d, it) }
+                showPicker = false
+            },
+            onDismiss = { showPicker = false },
         )
     }
 }
+
+/** "Minecraft 1.12.2 . Forge", skipping whichever half the source did not declare. */
+private fun runtimeLineOf(v: CataloguePackVersion): String? = listOfNotNull(
+    v.mcVersions.firstOrNull()?.let { "Minecraft $it" },
+    v.loaders.firstOrNull()?.replaceFirstChar(Char::uppercase),
+).joinToString("  ").takeIf { it.isNotBlank() }
 
 @Composable
 private fun DetailBody(details: CataloguePackDetails, installing: InstallProgress?, installError: String?) {
@@ -290,116 +323,6 @@ private fun InstallProgressBlock(p: InstallProgress) {
             LinearProgressIndicator(progress = { p.current.toFloat() / p.total }, modifier = Modifier.fillMaxWidth(), color = NxTheme.colors.primary)
         } else {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NxTheme.colors.primary)
-        }
-    }
-}
-
-@Composable
-private fun VersionRow(version: CataloguePackVersion, installing: Boolean, anyInstalling: Boolean, onInstall: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(glassSurfaceAlpha(if (hovered && !anyInstalling) 0.7f else 0.4f))
-            .clickable(interactionSource = interaction, indication = null, enabled = !anyInstalling, onClick = onInstall)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(
-                text       = version.name.ifBlank { version.versionNumber },
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = NxTheme.colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                version.mcVersions.firstOrNull()?.let { Chip("MC $it") }
-                version.loaders.take(2).forEach { Chip(it.replaceFirstChar { c -> c.uppercase() }) }
-            }
-        }
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(NxTheme.colors.primary.copy(alpha = if (anyInstalling) 0.3f else if (hovered) 1f else 0.85f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (installing) {
-                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-            } else {
-                Symbol(NxIcon.Download, contentDescription = null, tint = Color.White, size = 18.dp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun VersionPickerModal(
-    versions: List<CataloguePackVersion>,
-    installingVersionId: String?,
-    onPick: (CataloguePackVersion) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val s = LocalStrings.current
-    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        Box(
-            modifier         = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 560.dp)
-                    .fillMaxWidth(0.92f)
-                    .heightIn(max = 600.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(NxTheme.colors.surface)
-                    .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
-            ) {
-                // Header: title + count, close in a hover-able circle, then a hairline rule.
-                Row(
-                    modifier              = Modifier.fillMaxWidth().padding(start = 22.dp, end = 14.dp, top = 18.dp, bottom = 14.dp),
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(s.browseDetailVersionTitle, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                        Text("${versions.size}", style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
-                    }
-                    Box(
-                        modifier         = Modifier.size(32.dp).clip(CircleShape).background(glassSurfaceAlpha(0.5f)).clickable(onClick = onDismiss),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Symbol(NxIcon.Close, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 18.dp)
-                    }
-                }
-                HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
-                // LazyColumn, not Column+verticalScroll+forEach: a Modrinth pack can
-                // carry hundreds of versions, and composing every row up front stalls
-                // the modal on open.
-                LazyColumn(
-                    modifier            = Modifier.weight(1f, fill = false).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(versions, key = { it.id }) { v ->
-                        VersionRow(
-                            version       = v,
-                            installing    = installingVersionId == v.id,
-                            anyInstalling = installingVersionId != null,
-                            onInstall     = { onPick(v) },
-                        )
-                        PuppetClick("catalogue.version.${v.id}") { onPick(v) }
-                    }
-                }
-            }
         }
     }
 }

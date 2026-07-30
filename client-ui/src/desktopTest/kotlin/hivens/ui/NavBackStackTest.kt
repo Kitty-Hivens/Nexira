@@ -30,6 +30,32 @@ class NavBackStackTest {
     }
 
     @Test
+    fun versionsScreenPushesOverDetailAndBacksOut() {
+        val nav = NavBackStack(Screen.Library)
+        nav.navigate(Screen.PackDetail("abc"))
+        nav.navigate(Screen.PackVersions("abc"))
+        assertEquals(Screen.PackVersions("abc"), nav.current)
+        assertTrue(nav.back())
+        assertEquals(Screen.PackDetail("abc"), nav.current)
+        assertTrue(nav.back())
+        assertEquals(Screen.Library, nav.current)
+    }
+
+    @Test
+    fun replaceCurrentRestampsTheEntryBackReturnsTo() {
+        // The settings-overlay drill-down: PackDetail marks itself openSettings
+        // before pushing the versions screen, so Back restores the overlay.
+        val nav = NavBackStack(Screen.Library)
+        nav.navigate(Screen.PackDetail("abc"))
+        nav.replaceCurrent(Screen.PackDetail("abc", openSettings = true))
+        nav.navigate(Screen.PackVersions("abc"))
+        assertTrue(nav.back())
+        assertEquals(Screen.PackDetail("abc", openSettings = true), nav.current)
+        assertTrue(nav.back())
+        assertEquals(Screen.Library, nav.current)
+    }
+
+    @Test
     fun backUnwindsDeepFlowToOrigin() {
         // The exact scenario the issue calls out: Browse -> pack detail ->
         // install -> installed detail should back out the way it came in, not

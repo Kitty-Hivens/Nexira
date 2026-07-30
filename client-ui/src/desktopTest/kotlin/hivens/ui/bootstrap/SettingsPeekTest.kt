@@ -1,5 +1,7 @@
 package hivens.ui.bootstrap
 
+import hivens.core.data.SettingsData
+import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.io.path.writeText
 import kotlin.test.Test
@@ -35,6 +37,22 @@ class SettingsPeekTest {
         val peek = SettingsPeek.read(dir)
         assertEquals("en", peek.locale)
         assertEquals(true, peek.useCustomChrome)
+    }
+
+    // The settings screen persists SettingsData; the window host reads the file back by
+    // literal key before Koin exists. Renaming the field on either side would silently
+    // strand the switch on the value it had at install time.
+    @Test
+    fun `a persisted SettingsData is what the peek reads back`() {
+        val json = Json { encodeDefaults = true }
+        for (chrome in listOf(true, false)) {
+            val dir = Files.createTempDirectory("peek")
+            dir.resolve("settings.json")
+                .writeText(json.encodeToString(SettingsData(useCustomChrome = chrome, locale = "de")))
+            val peek = SettingsPeek.read(dir)
+            assertEquals(chrome, peek.useCustomChrome)
+            assertEquals("de", peek.locale)
+        }
     }
 
     @Test

@@ -43,8 +43,9 @@ import kotlinx.coroutines.yield
  * Diagnostics plane: open logs / crash-reports folders, generate a redacted
  * diagnostic bundle ZIP (lazy-busy gated so a double-tap doesn't fire two parallel
  * writes), and after one exists, open the GitHub issue template prefilled with bundle
- * metadata. Each button is wrapped in AprilFools.ChaosButton -- the chaos layer
- * intercepts during the Apr 1-14 window, otherwise renders as a plain button.
+ * metadata. Each button goes through the Flexible event layer -- the April Fools
+ * chaos event intercepts during the Apr 1-14 window, otherwise it renders as a
+ * plain button.
  *
  * Hidden gesture: tap the DIAGNOSTICS section title 5 times to reveal the AprilFools
  * debug panel; tap 5 more to hide it. Lets dev exercise the chaos layer without

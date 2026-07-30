@@ -49,6 +49,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalWidgetRegistry
 
@@ -66,6 +67,7 @@ fun WidgetPalettePanel(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
+    val style = LocalStyle.current
     val registry0 = LocalWidgetRegistry.current
     // Draggable dock: the header drags this offset (session-scoped).
     var paletteOffset by remember { mutableStateOf(Offset.Zero) }
@@ -108,8 +110,8 @@ fun WidgetPalettePanel(
                 .width(280.dp)
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp, start = 0.dp)
-                .shadow(elevation = 18.dp, shape = RoundedCornerShape(14.dp))
-                .clip(RoundedCornerShape(14.dp))
+                .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
+                .clip(RoundedCornerShape(style.panelCorner))
                 // Solid surface, no glass: the panel floats over the right rail,
                 // and stacked translucent layers composited into muddy glass.
                 .background(NxTheme.colors.surface),

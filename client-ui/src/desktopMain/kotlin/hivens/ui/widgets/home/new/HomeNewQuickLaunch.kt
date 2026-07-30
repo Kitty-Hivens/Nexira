@@ -17,7 +17,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.nx.NxButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
@@ -79,12 +78,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            NxButton(
-                label   = qt.buttonLabel ?: p.buttonLabel.ifBlank { s.homeQuickButton },
-                onClick = qt.launch,
-                enabled = qt.canLaunch,
-                icon    = qt.icon,
-            )
+            QuickLaunchButton(qt = qt, defaultLabel = p.buttonLabel.ifBlank { s.homeQuickButton })
         }
     }
 }

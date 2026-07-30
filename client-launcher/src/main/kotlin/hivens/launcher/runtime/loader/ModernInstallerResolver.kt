@@ -1,6 +1,10 @@
 package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
+import hivens.core.io.deleteTree
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
@@ -10,7 +14,6 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -18,7 +21,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -32,8 +34,7 @@ import java.util.concurrent.TimeUnit
  * loader's install processors binpatch the client jar -- a step too large and
  * version-volatile to reimplement. Instead this runs the OFFICIAL installer
  * headless via the managed JDK and consumes what it produces, so upstream
- * changes track for free and no copyrighted bits are redistributed
- * ([[feedback_no_official_runtime_redistribution]]).
+ * changes track for free and no copyrighted bits are redistributed.
  *
  * The installer runs once into a persistent per-`(loader, mc, version)` cache
  * (the `--installClient` target, shaped like a `.minecraft` dir). Re-launches
@@ -48,6 +49,7 @@ import java.util.concurrent.TimeUnit
  */
 class ModernInstallerResolver(
     private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     private val javaManager: IJavaManager,
     private val cacheDir: Path,
@@ -126,7 +128,7 @@ class ModernInstallerResolver(
         }
         // A leftover dir with no marker is a failed prior run -- start clean so
         // the installer never appends to half-written state.
-        deleteRecursively(dotMinecraft)
+        deleteTree(dotMinecraft)
         Files.createDirectories(dotMinecraft)
         // The installer's --installClient mode requires a launcher_profiles.json
         // in the target; it adds a profile entry there.
@@ -232,26 +234,14 @@ class ModernInstallerResolver(
         }
     }
 
+    /**
+     * The installer jar, which the official maven pins with nothing but HTTPS -- its
+     * version is chosen at runtime, so there is no hash to check it against. Staged
+     * through the engine anyway: a cut transfer is retried and resumed instead of
+     * leaving a truncated jar at the final path for the installer to choke on.
+     */
     private suspend fun downloadTo(url: String, dest: Path) {
-        clientProvider.current.prepareGet(url).execute { resp ->
-            if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
-            FileOutputStream(dest.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-        }
-    }
-
-    private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
-            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                Files.delete(file)
-                return FileVisitResult.CONTINUE
-            }
-
-            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-                Files.delete(dir)
-                return FileVisitResult.CONTINUE
-            }
-        })
+        transfers.fetch(Transfer(url = url, dest = dest, skip = SkipIfPresent.Never))
     }
 
     companion object {
@@ -299,11 +289,12 @@ class ModernInstallerResolver(
          *  installer coordinate carries no mc segment. */
         fun neoforge(
             clientProvider: HttpClientProvider,
+            transfers: TransferEngine,
             json: Json,
             javaManager: IJavaManager,
             cacheDir: Path,
         ): ModernInstallerResolver = ModernInstallerResolver(
-            clientProvider, json, javaManager, cacheDir, loaderId = "neoforge",
+            clientProvider, transfers, json, javaManager, cacheDir, loaderId = "neoforge",
             latestVersion = { mc ->
                 val prefix = neoforgeVersionPrefix(mc)
                 json.parseToJsonElement(fetchText(clientProvider, "$NEOFORGE_META_LATEST?filter=$prefix"))
@@ -315,11 +306,12 @@ class ModernInstallerResolver(
         /** Modern Forge: `<mc>-<build>` slug, same shape as the legacy maven. */
         fun forge(
             clientProvider: HttpClientProvider,
+            transfers: TransferEngine,
             json: Json,
             javaManager: IJavaManager,
             cacheDir: Path,
         ): ModernInstallerResolver = ModernInstallerResolver(
-            clientProvider, json, javaManager, cacheDir, loaderId = "forge",
+            clientProvider, transfers, json, javaManager, cacheDir, loaderId = "forge",
             latestVersion = { mc ->
                 pickForgePromotion(json, fetchText(clientProvider, FORGE_PROMOTIONS), mc)
                     ?: throw IOException("no Forge promotion for Minecraft $mc")

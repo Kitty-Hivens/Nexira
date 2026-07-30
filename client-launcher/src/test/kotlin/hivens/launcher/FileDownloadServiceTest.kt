@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.launcher.testTransferEngine
 import hivens.test.buildMockClient
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -34,8 +35,9 @@ class FileDownloadServiceTest {
         workDir = Files.createTempDirectory("aura-fds-test-")
         val protectedPaths = ProtectedPaths(workDir / "protected-paths.json", json)
         val manifestCache  = ManifestCache(workDir / "manifest-cache", json)
+        val provider = buildMockClient("")
         svc = FileDownloadService(
-            buildMockClient(""),
+            testTransferEngine(provider),
             protectedPaths,
             manifestCache,
             hivens.launcher.network.ServerProtocolConfig(),

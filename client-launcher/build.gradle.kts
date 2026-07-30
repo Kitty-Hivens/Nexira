@@ -11,6 +11,10 @@ dependencies {
     implementation(project(":client-auth-microsoft"))
 
     implementation(libs.commons.compress)
+    implementation(libs.jbsdiff)
+    // Xodus (JetBrains): pure-JVM embedded KV, backs the disk cache. No JNA/JNI --
+    // fits the no-native-in-launcher policy below.
+    implementation(libs.xodus.environment)
     implementation(libs.koin.core)
     implementation(libs.slf4j.api)
     // Secret storage: OS keyring + encrypted-file fallback. CredentialsManager
@@ -37,6 +41,7 @@ dependencies {
     // ─── TEST ────────────────────────────────────────────────────────────────
     testImplementation(kotlin("test"))
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.okhttp.tls)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.slf4j.simple)

@@ -2,26 +2,33 @@ package hivens.launcher.smrt
 
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
+import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
-import hivens.launcher.FileDownloadService
+import hivens.core.io.InstanceMutationLock
+import hivens.core.io.fileOpRetry
+import hivens.core.io.resolveWithinRoot
+import hivens.core.net.Digest
+import hivens.core.net.RepairReport
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.of
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
+import hivens.core.update.UpdatePlan
+import hivens.launcher.util.ModArchives
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.util.sha1Of
-import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
-import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.Comparator
 
 /**
- * v2-manifest sync. Parallel to [FileDownloadService] but speaks the
+ * v2-manifest sync. Parallel to [hivens.launcher.FileDownloadService] but speaks the
  * smrt mirror's flat `mods[] + assets[]` shape with a per-entry source
  * pointer, instead of SC's recursive `{directories,files}` tree.
  *
@@ -35,6 +42,7 @@ class SmrtSyncService(
     private val client: SmrtPackClient,
     private val modrinth: ModrinthClient,
     private val protectedPaths: ProtectedPaths,
+    private val transfers: TransferEngine,
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
@@ -50,62 +58,202 @@ class SmrtSyncService(
         progress: ((current: Int, total: Int, filename: String) -> Unit)? = null,
         enabledState: Map<String, Boolean> = emptyMap(),
     ) = withContext(Dispatchers.IO) {
-        val manifest = client.fetchManifest(packId)
-        log.info(
-            "smrt sync: pack={}, pack_version={}, mods={}, assets={}",
-            manifest.packId, manifest.packVersion,
-            manifest.mods.size, manifest.assets.size,
-        )
-
-        if (manifest.schemaVersion != EXPECTED_SCHEMA) {
-            throw IOException(
-                "smrt mirror manifest schema_version=${manifest.schemaVersion}, " +
-                    "expected $EXPECTED_SCHEMA. Update Nexira or the mirror version mismatched."
-            )
-        }
-
-        Files.createDirectories(clientDir)
-
-        // Wipe mods/ when the previous sync used a different source
-        // (SC's mods/{mcversion}/ layout vs mirror's flat mods/).
-        // Forge scans both trees, a duplicate jar loads its coremod
-        // twice, and stacking ASM transformers (FoamFix hashCode
-        // patch) recurse into StackOverflowError on the second pass.
-        // The marker is per-clientDir so each pack tracks its own
-        // source independently.
-        val marker = clientDir.resolve(SOURCE_MARKER_FILE)
-        val previousSource = readSourceMarker(marker)
-        if (previousSource != SOURCE_MIRROR) {
+        // Serialize against a concurrent structural mutation of this instance (an
+        // optional-content toggle relabel), so a rename can't land between the
+        // existence check and the move below. Reads are not gated -- they open
+        // delete-shared and cannot corrupt a rename.
+        InstanceMutationLock.withLock(clientDir) {
+            val manifest = client.fetchManifest(packId)
             log.info(
-                "smrt sync: source change ({} -> {}), wiping mods/",
-                previousSource ?: "<none>", SOURCE_MIRROR,
+                "smrt sync: pack={}, pack_version={}, mods={}, assets={}",
+                manifest.packId, manifest.packVersion,
+                manifest.mods.size, manifest.assets.size,
             )
-            wipeModsDir(clientDir)
-        }
 
-        val total = manifest.mods.size + manifest.assets.size
+            if (manifest.schemaVersion != EXPECTED_SCHEMA) {
+                throw IOException(
+                    "smrt mirror manifest schema_version=${manifest.schemaVersion}, " +
+                        "expected $EXPECTED_SCHEMA. Update Nexira or the mirror version mismatched."
+                )
+            }
+
+            Files.createDirectories(clientDir)
+
+            // Wipe mods/ when the previous sync used a different source
+            // (SC's mods/{mcversion}/ layout vs mirror's flat mods/).
+            // Forge scans both trees, a duplicate jar loads its coremod
+            // twice, and stacking ASM transformers (FoamFix hashCode
+            // patch) recurse into StackOverflowError on the second pass.
+            // The marker is per-clientDir so each pack tracks its own
+            // source independently.
+            val marker = clientDir.resolve(SOURCE_MARKER_FILE)
+            val previousSource = readSourceMarker(marker)
+            val sourceChanged = previousSource != SOURCE_MIRROR
+            if (sourceChanged) {
+                // Noted here, acted on after the downloads succeed. Clearing the
+                // directory up front meant any failure past this point -- one reset
+                // connection out of a hundred files -- left the instance with less
+                // than it started with and nothing to roll back to.
+                log.info(
+                    "smrt sync: source change ({} -> {}), foreign content will be dropped once the new set is in place",
+                    previousSource ?: "<none>", SOURCE_MIRROR,
+                )
+            }
+
+            // Planned first, fetched together. A pack is a hundred files of wildly
+            // different sizes, and one request at a time meant a 300 MB resource pack
+            // stalled every mod behind it -- the plan lets the engine overlap them and
+            // split the large ones into blocks.
+            val plan = ArrayList<Transfer>(manifest.mods.size + manifest.assets.size)
+            for (mod in manifest.mods) {
+                val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+                planMod(mod, clientDir, enabled)?.let { plan += it }
+            }
+            for (asset in manifest.assets) {
+                planAsset(asset, clientDir)?.let { plan += it }
+            }
+            transfers.fetchAll(plan) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
+
+            // Drop manifest-removed mods and catch foreign payloads that
+            // the wipe missed (an SC sync ran between two mirror syncs
+            // without touching the marker, so the wipe gate saw a stale
+            // "mirror" value). Only top-level mods/{expected_filename}
+            // entries survive.
+            val expected = manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
+            if (sourceChanged) pruneForeignEntries(clientDir, expected) else pruneOrphanMods(clientDir, expected)
+
+            writeSourceMarker(marker, SOURCE_MIRROR)
+        }
+    }
+
+    /**
+     * Checks an installed pack against [manifest] and puts right whatever does not
+     * match, fetching as little as the evidence allows.
+     *
+     * Two stages, and the split is about what a check may cost. Everything is first
+     * measured locally against the manifest's size and sha1 -- the same test a
+     * re-sync uses -- because a `modrinth` entry has to be resolved through an API
+     * call before it even has a URL, and doing that for a hundred intact mods would
+     * put a hundred requests behind a button that should mostly find nothing wrong.
+     * Only what fails that test is handed to the engine, which compares it block by
+     * block against the map taken when the file was installed and pulls just the
+     * blocks that differ.
+     *
+     * The consequence is that a damaged file is read twice: once to notice, once to
+     * locate. For a repair the user asked for, that is the right trade -- the
+     * alternative is an API round trip per entry every time.
+     *
+     * Protected paths are left alone. A config the user edited is not damage.
+     */
+    suspend fun verifyAndRepair(
+        clientDir: Path,
+        manifest: SmrtPackManifest,
+        enabledState: Map<String, Boolean> = emptyMap(),
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+    ): RepairReport = withContext(Dispatchers.IO) {
+        InstanceMutationLock.withLock(clientDir) {
+            val total = manifest.mods.size + manifest.assets.size
+            val suspect = ArrayList<Transfer>()
+            for (mod in manifest.mods) {
+                val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+                planMod(mod, clientDir, enabled)?.let { suspect += it }
+            }
+            for (asset in manifest.assets) {
+                planAsset(asset, clientDir)?.let { suspect += it }
+            }
+            log.info("repair: pack={}, {} of {} entries need a closer look", manifest.packId, suspect.size, total)
+            val report = transfers.verifyAndRepair(suspect) { p ->
+                progress?.invoke(p.filesDone, p.filesTotal, p.current)
+            }
+            // Everything the local check cleared counts as intact: it was measured
+            // against the same manifest, just without a round trip.
+            report.copy(checked = total, intact = total - suspect.size + report.intact)
+        }
+    }
+
+    /**
+     * Applies a precomputed [UpdateReconciler] plan against an already-fetched
+     * [manifest]. The CALLER must hold [InstanceMutationLock] for [clientDir]:
+     * this method deliberately does not take it, because [sync] does and the lock
+     * is not reentrant; the update driver holds it across scan + reconcile + apply.
+     *
+     * - toAdd / toUpdate: download the target file. For a mod, [enabledState]
+     *   decides active (`mods/<name>`) vs disabled (`mods/<name>.disabled`) and the
+     *   stale variant is dropped first, so a user's optional-off choice is kept.
+     * - conflicts: the pack's version is written beside the user's edit as
+     *   `<path>.new`; the user's file is never overwritten.
+     * - toDelete: removed (both variants for a mod path).
+     * - skippedProtected: never touched.
+     *
+     * sha1 is verified after every download (a mismatch throws and drops the bad
+     * bytes), same as [sync].
+     */
+    suspend fun applyUpdate(
+        clientDir: Path,
+        manifest: SmrtPackManifest,
+        plan: UpdatePlan,
+        enabledState: Map<String, Boolean> = emptyMap(),
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+    ) = withContext(Dispatchers.IO) {
+        val index = buildEntryIndex(manifest)
+        val total = plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size + plan.toDelete.size
         var current = 0
 
-        for (mod in manifest.mods) {
-            current++
-            progress?.invoke(current, total, mod.filename)
-            val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
-            syncMod(mod, clientDir, enabled)
-        }
-        for (asset in manifest.assets) {
-            current++
-            progress?.invoke(current, total, asset.dest)
-            syncAsset(asset, clientDir)
+        // Same shape as a full sync: the local moves and drops happen while the plan
+        // is built, then everything that needs the network goes in one batch.
+        val fetches = ArrayList<Transfer>(plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size)
+        for (path in plan.toAdd + plan.toUpdate) {
+            val entry = index[path] ?: continue
+            if (path.startsWith(MODS_PREFIX)) {
+                val filename = path.removePrefix(MODS_PREFIX)
+                val enabled = enabledState[filename] ?: true
+                val active = resolveSafe(clientDir, path, "mod $filename")
+                val disabled = resolveSafe(clientDir, "$path.disabled", "mod $filename")
+                val dest = if (enabled) active else disabled
+                val stale = if (enabled) disabled else active
+                runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
+                plan(dest, entry.sha1, entry.size, entry.source, "mod $filename")?.let { fetches += it }
+            } else {
+                val dest = resolveSafe(clientDir, path, "asset $path")
+                plan(dest, entry.sha1, entry.size, entry.source, "asset $path")?.let { fetches += it }
+            }
         }
 
-        // Drop manifest-removed mods and catch foreign payloads that
-        // the wipe missed (an SC sync ran between two mirror syncs
-        // without touching the marker, so the wipe gate saw a stale
-        // "mirror" value). Only top-level mods/{expected_filename}
-        // entries survive.
-        pruneOrphanMods(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+        for (path in plan.conflicts) {
+            val entry = index[path] ?: continue
+            val dest = resolveSafe(clientDir, "$path.new", "conflict $path")
+            plan(dest, entry.sha1, entry.size, entry.source, "conflict $path")?.let { fetches += it }
+        }
 
-        writeSourceMarker(marker, SOURCE_MIRROR)
+        transfers.fetchAll(fetches) { p ->
+            progress?.invoke(p.filesDone, total, p.current)
+        }
+        current = fetches.size
+
+        for (path in plan.toDelete) {
+            current++
+            progress?.invoke(current, total, path)
+            val target = resolveSafe(clientDir, path, "prune $path")
+            runCatching { fileOpRetry("update prune $path") { Files.deleteIfExists(target) } }
+            if (path.startsWith(MODS_PREFIX)) {
+                val disabled = resolveSafe(clientDir, "$path.disabled", "prune $path")
+                runCatching { fileOpRetry("update prune $path disabled") { Files.deleteIfExists(disabled) } }
+            }
+        }
+
+        // Place every mod at active / .disabled per enabledState even when its bytes did
+        // not change: an optional flipped to required (or back) has no toAdd/toUpdate entry
+        // but must still move, or a now-required mod would launch missing.
+        relabel(clientDir, manifest.mods, enabledState)
+    }
+
+    private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
+
+    private fun buildEntryIndex(manifest: SmrtPackManifest): Map<String, ResolvableEntry> {
+        val index = LinkedHashMap<String, ResolvableEntry>()
+        for (mod in manifest.mods) index["$MODS_PREFIX${mod.filename}"] = ResolvableEntry(mod.source, mod.sha1, mod.sizeBytes)
+        for (asset in manifest.assets) index[asset.dest] = ResolvableEntry(asset.source, asset.sha1, asset.sizeBytes)
+        return index
     }
 
     /**
@@ -115,9 +263,10 @@ class SmrtSyncService(
      * name (and thus whether Forge loads it) changes. A variant that is missing
      * on disk is left for the next full sync to fetch.
      */
-    override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
+    override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String> {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return
+        if (!Files.isDirectory(modsDir)) return emptyList()
+        val failed = mutableListOf<String>()
         for (mod in mods) {
             val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
             val active = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
@@ -125,10 +274,22 @@ class SmrtSyncService(
             val from = if (enabled) disabled else active
             val to = if (enabled) active else disabled
             if (Files.exists(from) && !Files.exists(to)) {
-                runCatching { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) }
-                    .onFailure { log.warn("smrt relabel: failed to move {} -> {}", from, to, it) }
+                runCatching {
+                    fileOpRetry("smrt relabel ${mod.filename}") {
+                        Files.move(from, to, StandardCopyOption.REPLACE_EXISTING)
+                    }
+                }.onFailure {
+                    // A lock that outlives the retry means a holder we can't evict --
+                    // typically the running game's classloader, which on Windows keeps
+                    // the jar open without delete-sharing. The intent is already
+                    // persisted in optionalContent, so the next launch's sync applies
+                    // it; record the file instead of pretending the flip took effect.
+                    failed += mod.filename
+                    log.warn("smrt relabel: {} still held after retries; applies on next launch", mod.filename)
+                }
             }
         }
+        return failed
     }
 
     private fun pruneOrphanMods(clientDir: Path, expected: Set<String>) {
@@ -136,13 +297,13 @@ class SmrtSyncService(
         if (!Files.isDirectory(modsDir)) return
         var removed = 0
         Files.walk(modsDir).use { stream ->
-            stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
+            stream.filter { Files.isRegularFile(it) && ModArchives.isLoadable(it.fileName.toString()) }
                 .forEach { jar ->
                     val isCanonical = jar.parent == modsDir &&
                         jar.fileName.toString() in expected
                     if (!isCanonical) {
                         runCatching {
-                            Files.delete(jar)
+                            fileOpRetry("smrt prune $jar") { Files.delete(jar) }
                             removed++
                             log.debug("smrt sync: pruned orphan jar {}", jar)
                         }.onFailure { log.warn("smrt sync: failed to prune {}", jar, it) }
@@ -152,21 +313,33 @@ class SmrtSyncService(
         if (removed > 0) log.info("smrt sync: pruned {} orphan jar(s) from mods/", removed)
     }
 
-    private fun wipeModsDir(clientDir: Path) {
+    /**
+     * Removes everything under `mods/` that the manifest does not name, keeping the
+     * files just downloaded. Replaces the old wipe-then-download order: the same end
+     * state, reached without a window in which the instance holds neither the old
+     * content nor the new one.
+     *
+     * Walked deepest-first so a directory is considered after its children; one that
+     * still holds a kept file refuses to delete and is left alone.
+     */
+    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>) {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return
         var removed = 0
         Files.walk(modsDir).use { stream ->
-            stream.sorted(Comparator.reverseOrder())
-                .forEach { p ->
-                    if (p == modsDir) return@forEach
-                    runCatching {
-                        Files.delete(p)
-                        removed++
-                    }.onFailure { log.warn("smrt sync: failed to wipe {}", p, it) }
+            stream.sorted(Comparator.reverseOrder()).forEach { p ->
+                if (p == modsDir) return@forEach
+                val keep = Files.isRegularFile(p) &&
+                    p.parent == modsDir &&
+                    p.fileName.toString() in expected
+                if (keep) return@forEach
+                runCatching {
+                    fileOpRetry("smrt drop foreign $p") { Files.delete(p) }
+                    removed++
                 }
+            }
         }
-        if (removed > 0) log.info("smrt sync: wiped {} entries from mods/", removed)
+        if (removed > 0) log.info("smrt sync: dropped {} foreign entr(ies) from mods/", removed)
     }
 
     private fun readSourceMarker(marker: Path): String? =
@@ -189,7 +362,7 @@ class SmrtSyncService(
      * removed and the active variant fetched. Forge 1.12.2 scans both `mods/`
      * and `mods/{mcversion}/`, so flat placement still loads.
      */
-    private suspend fun syncMod(mod: SmrtModEntry, clientDir: Path, enabled: Boolean) {
+    private suspend fun planMod(mod: SmrtModEntry, clientDir: Path, enabled: Boolean): Transfer? {
         val modsDir = clientDir.resolve("mods")
         val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
         val disabledDest = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
@@ -198,14 +371,14 @@ class SmrtSyncService(
 
         if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
             Files.createDirectories(dest.parent)
-            Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING)
-            return
+            fileOpRetry("smrt sync move ${mod.filename}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
+            return null
         }
-        runCatching { Files.deleteIfExists(stale) }
-        downloadIfNeeded(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
+        runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
+        return plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
-    private suspend fun syncAsset(asset: SmrtAssetEntry, clientDir: Path) {
+    private suspend fun planAsset(asset: SmrtAssetEntry, clientDir: Path): Transfer? {
         // resolveSafe FIRST: a manifest entry like
         // `../../config/servers.dat` happens to match the protected-
         // suffix list (ProtectedPaths.isProtected lowercases + checks
@@ -221,9 +394,9 @@ class SmrtSyncService(
         // when the file is already present and non-empty.
         if (protectedPaths.isProtected(asset.dest) && fileIsPresentAndNonEmpty(dest)) {
             log.debug("smrt sync: skipping protected {}", asset.dest)
-            return
+            return null
         }
-        downloadIfNeeded(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+        return plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
     }
 
     /**
@@ -247,48 +420,41 @@ class SmrtSyncService(
      * to `toRealPath(NOFOLLOW_LINKS)` per parent component before
      * the startsWith comparison.
      */
-    private fun resolveSafe(root: Path, relative: String, label: String): Path {
-        val resolved = root.resolve(relative).normalize()
-        val rootNormalized = root.normalize()
-        if (!resolved.startsWith(rootNormalized)) {
-            throw IOException(
-                "smrt manifest entry $label resolves outside the instance " +
-                    "directory ($resolved); refusing to write."
-            )
-        }
-        return resolved
-    }
+    private fun resolveSafe(root: Path, relative: String, label: String): Path =
+        resolveWithinRoot(root, relative, label)
 
-    private suspend fun downloadIfNeeded(
+    /**
+     * The transfer for one manifest entry, or null when there is nothing to fetch.
+     *
+     * The up-to-date check happens here rather than being left to the engine
+     * because of what sits between: a `modrinth` source needs an API round trip to
+     * turn into a URL, and doing that for the ninety-odd mods already on disk would
+     * put a hundred needless requests in front of every re-sync.
+     */
+    private suspend fun plan(
         dest: Path,
         expectedSha1: String,
         expectedSize: Long,
         source: SmrtSource,
         label: String,
-    ) {
+    ): Transfer? {
         if (source is SmrtSource.Unknown) {
             // Forward-compat: a source type this launcher version does not
             // understand. Skip the entry instead of failing the whole sync.
             log.warn("smrt sync: skipping {} -- unsupported source type; update the launcher to install it", label)
-            return
+            return null
         }
         if (isUpToDate(dest, expectedSha1, expectedSize)) {
-            return
+            return null
         }
         val url = resolveUrl(source)
         log.debug("smrt sync: fetching {} <- {}", label, url)
-        Files.createDirectories(dest.parent)
-        downloadToFile(url, dest)
-        val onDiskSha = sha1Of(dest)
-        if (!onDiskSha.equals(expectedSha1, ignoreCase = true)) {
-            // Loud failure: delete the bad bytes so a retry refetches,
-            // and surface the mismatch to the user instead of silently
-            // serving wrong content.
-            runCatching { Files.deleteIfExists(dest) }
-            throw IOException(
-                "$label sha1 mismatch after download: expected $expectedSha1, got $onDiskSha"
-            )
-        }
+        return Transfer(
+            url = url,
+            dest = dest,
+            expect = Digest(DigestAlgorithm.SHA1, expectedSha1),
+            size = expectedSize,
+        )
     }
 
     /**
@@ -322,48 +488,11 @@ class SmrtSyncService(
     private fun isUpToDate(dest: Path, expectedSha1: String, expectedSize: Long): Boolean {
         if (!Files.exists(dest) || !Files.isRegularFile(dest)) return false
         if (Files.size(dest) != expectedSize) return false
-        return sha1Of(dest).equals(expectedSha1, ignoreCase = true)
+        return DigestAlgorithm.SHA1.of(dest).equals(expectedSha1, ignoreCase = true)
     }
 
     private fun fileIsPresentAndNonEmpty(p: Path): Boolean =
         Files.exists(p) && Files.isRegularFile(p) && Files.size(p) > 0L
-
-    private suspend fun downloadToFile(url: String, dest: Path) {
-        val tmp = dest.resolveSibling("${dest.fileName}.tmp")
-        runCatching { Files.deleteIfExists(tmp) }
-        client.downloadStreaming(url) { channel ->
-            FileOutputStream(tmp.toFile()).use { out ->
-                val buf = ByteArray(64 * 1024)
-                while (!channel.isClosedForRead) {
-                    val n = channel.readAvailable(buf, 0, buf.size)
-                    if (n <= 0) break
-                    out.write(buf, 0, n)
-                }
-            }
-        }
-        // Non-atomic REPLACE_EXISTING on FAT32/SMB can leave a 0-byte
-        // dest after power loss; Forge then classloads garbage.
-        try {
-            Files.move(
-                tmp,
-                dest,
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
-        } catch (_: AtomicMoveNotSupportedException) {
-            log.warn(
-                "Filesystem at {} does not support ATOMIC_MOVE; non-atomic fallback may leave a 0-byte file on crash",
-                dest.parent,
-            )
-            Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
-        } catch (_: FileAlreadyExistsException) {
-            // Java spec allows ATOMIC_MOVE to ignore REPLACE_EXISTING; some
-            // providers then refuse and raise FileAlreadyExistsException
-            // when dest already exists. Re-sync over an existing jar would
-            // hard-fail without this fallback.
-            Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
-        }
-    }
 
     companion object {
         /**
@@ -375,5 +504,6 @@ class SmrtSyncService(
 
         private const val SOURCE_MARKER_FILE = ".nexira-sync-source"
         private const val SOURCE_MIRROR = "mirror"
+        private const val MODS_PREFIX = "mods/"
     }
 }

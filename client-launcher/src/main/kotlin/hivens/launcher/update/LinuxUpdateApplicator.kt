@@ -2,6 +2,7 @@ package hivens.launcher.update
 
 import hivens.core.api.interfaces.IUpdateApplicator
 import org.slf4j.LoggerFactory
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -44,18 +45,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
                 try {
                     logger.info("Applying Linux update...")
 
-                    // Backup current version
-                    if (Files.exists(currentExe)) {
-                        Files.move(currentExe, backupPath, StandardCopyOption.REPLACE_EXISTING)
-                        logger.info("Backed up current version")
-                    }
-
-                    // Copy new version to the target path
-                    Files.copy(installerPath, targetExe, StandardCopyOption.REPLACE_EXISTING)
-                    logger.info("Copied new version to {}", targetExe)
-
-                    setExecutable(targetExe)
-                    logger.info("Set executable permissions")
+                    swapBinary(installerPath, currentExe, targetExe, backupPath)
 
                     if (currentExe != targetExe) {
                         updateDesktopShortcuts(currentExe, targetExe)
@@ -102,6 +92,47 @@ class LinuxUpdateApplicator : IUpdateApplicator {
             logger.error("Failed to schedule Linux update", e)
             throw e
         }
+    }
+
+    /**
+     * Puts the downloaded AppImage at [targetExe], keeping [currentExe] runnable
+     * throughout.
+     *
+     * Order matters more than it looks. Moving the live binary to [backupPath]
+     * first -- which is what this did -- leaves nothing at the launcher's path
+     * until the copy lands, and this whole sequence runs inside a shutdown
+     * hook: a reboot, a logout that cuts the hook short, or a kill in that
+     * window leaves the user with a `.backup` file, no launcher, and nothing
+     * still running to restore it. The rollback below only helps while the
+     * process is alive to run it.
+     *
+     * So: stage the new image beside the target, back up by COPY rather than
+     * move, and swap it in with a single move. Every failure before that move
+     * leaves the installed launcher exactly as it was, and the move itself
+     * replaces one complete file with another.
+     */
+    internal fun swapBinary(installerPath: Path, currentExe: Path, targetExe: Path, backupPath: Path) {
+        // Beside the target, so the move below stays on one filesystem and can
+        // be atomic. A leftover from an interrupted attempt is overwritten.
+        val staged = targetExe.resolveSibling("${targetExe.fileName}.new")
+        Files.copy(installerPath, staged, StandardCopyOption.REPLACE_EXISTING)
+        setExecutable(staged)
+        logger.info("Staged new version at {}", staged)
+
+        if (Files.exists(currentExe)) {
+            Files.copy(currentExe, backupPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES)
+            logger.info("Backed up current version")
+        }
+
+        try {
+            Files.move(staged, targetExe, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: AtomicMoveNotSupportedException) {
+            // Some filesystems refuse the atomic flag. The replacing move is
+            // still a single operation as far as this process is concerned.
+            Files.move(staged, targetExe, StandardCopyOption.REPLACE_EXISTING)
+        }
+        setExecutable(targetExe)
+        logger.info("Installed new version at {}", targetExe)
     }
 
     private fun setExecutable(path: Path) {
