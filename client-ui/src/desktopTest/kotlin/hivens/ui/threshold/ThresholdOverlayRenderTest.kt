@@ -18,6 +18,7 @@ import java.io.ByteArrayInputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.imageio.ImageIO
+import javax.swing.SwingUtilities
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -42,7 +43,27 @@ class ThresholdOverlayRenderTest {
 
     private data class Frames(val entry: java.awt.image.BufferedImage, val midWave: java.awt.image.BufferedImage, val end: java.awt.image.BufferedImage)
 
+    /**
+     * The scene is built and driven on the AWT event thread, and must stay there.
+     * Compose's `GlobalSnapshotManager` pumps apply-notifications on that thread
+     * on desktop, process-wide and outside any scene. The overlay's exit gate is
+     * a `snapshotFlow`, so its collector resumes from that pump -- inline, since
+     * an `ImageComposeScene` composes under `Dispatchers.Unconfined` -- and goes
+     * on to run composition work there. Driving `render` from the test's own
+     * thread therefore puts two threads in one scene, and they take two locks in
+     * opposite orders: `sendFrame` holds the frame clock's awaiter lock and asks
+     * for the flush dispatcher's, while the resumed collector holds the
+     * dispatcher's and asks for the awaiter's. It needs that exact interleaving,
+     * so it read as a rare hang under CPU contention rather than a broken test.
+     * Anything else composing a `snapshotFlow` off-screen inherits the hazard.
+     */
     private fun runBeat(dark: Boolean, name: String): Frames {
+        val out = arrayOfNulls<Result<Frames>>(1)
+        SwingUtilities.invokeAndWait { out[0] = runCatching { beat(dark, name) } }
+        return out[0]!!.getOrThrow()
+    }
+
+    private fun beat(dark: Boolean, name: String): Frames {
         val tmp = Files.createTempDirectory("threshold-render")
         val stage = MutableStateFlow(BootStage.Modules)
         val outcome = readyOutcome(tmp)
