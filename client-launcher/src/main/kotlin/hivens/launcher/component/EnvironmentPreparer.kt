@@ -1,26 +1,22 @@
 package hivens.launcher.component
 
-import hivens.core.api.HttpClientProvider
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.platform.OS
 import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
-import io.ktor.client.request.prepareGet
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.stream.Collectors
 
-class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
+class EnvironmentPreparer(private val transfers: TransferEngine) {
     private val log = LoggerFactory.getLogger(EnvironmentPreparer::class.java)
-    private val httpClient get() = clientProvider.current
 
     // Modules for Modern versions (1.13+)
     private val lwjgl3Modules = listOf(
@@ -214,22 +210,22 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
 
     private suspend fun tryDownloadAndUnzip(urlStr: String, destDir: Path): Boolean {
         log.info("Downloading: $urlStr")
-        val tempJar = Files.createTempFile("aura_native_", ".jar")
+        // Named after the artifact and kept inside the natives directory: the
+        // partial beside it is what a retry continues from, and a fresh system temp
+        // per attempt cannot be continued at all.
+        val jar = destDir.resolve(DOWNLOAD_DIR).resolve(urlStr.substringAfterLast('/'))
         return try {
-            httpClient.prepareGet(urlStr).execute { httpResponse ->
-                if (!httpResponse.status.isSuccess()) throw IOException("HTTP ${httpResponse.status}")
-                val channel = httpResponse.bodyAsChannel()
-                FileOutputStream(tempJar.toFile()).use { fos ->
-                    channel.copyTo(fos)
-                }
-            }
-            ZipUtils.unzip(tempJar.toFile(), destDir.toFile())
+            // Maven Central pins these by coordinate and publishes no hash we read,
+            // so the archive's own structure is the check: a truncated jar fails to
+            // unzip and the next mirror is tried.
+            transfers.fetch(Transfer(url = urlStr, dest = jar, skip = SkipIfPresent.Never))
+            ZipUtils.unzip(jar.toFile(), destDir.toFile())
             true
         } catch (e: Exception) {
             log.warn("Mirror miss: $urlStr ({})", e.message)
             false
         } finally {
-            Files.deleteIfExists(tempJar)
+            runCatching { Files.deleteIfExists(jar) }
         }
     }
 
@@ -336,4 +332,9 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         }
     }
 
+
+    private companion object {
+        /** Where a natives archive is staged, inside the directory it unpacks into. */
+        const val DOWNLOAD_DIR = ".downloads"
+    }
 }

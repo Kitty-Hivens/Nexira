@@ -1,7 +1,11 @@
 package hivens.launcher
 
 import hivens.launcher.network.ServerProtocolConfig
-import hivens.core.api.HttpClientProvider
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.io.resolveWithinRoot
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.launch.SyncProgress
@@ -10,47 +14,35 @@ import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.data.flatten
 import hivens.core.util.ZipUtils
-import hivens.core.util.retryWithBackoff
 import hivens.launcher.smrt.ModInjector
 import hivens.launcher.util.ClientRootDirs
 import hivens.launcher.util.ModArchives
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.utils.io.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketException
-import java.net.SocketTimeoutException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
-import kotlin.time.Duration.Companion.milliseconds
 
 
 class FileDownloadService(
-    private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val protectedPaths: ProtectedPaths,
     private val manifestCache: ManifestCache,
     private val config: ServerProtocolConfig,
 ) : IFileDownloadService {
-    private val client get() = clientProvider.current
 
     companion object {
         private val logger = LoggerFactory.getLogger(FileDownloadService::class.java)
 
         private const val INDEX_FILENAME = ".extra_unpacked_index.json"
+
+        /** The upstream manifest's own "do not check this hash" sentinel. */
+        private const val MD5_ANY = "any"
 
         private val indexJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     }
@@ -316,226 +308,53 @@ class FileDownloadService(
         // STEP 2: Download
         messageUI?.invoke("Downloading updates ($totalFilesCount files)...")
 
-        // Atomics for thread-safe counting
-        val currentFileCounter = AtomicInteger(0)
-        val downloadedBytesGlobal = AtomicLong(0)
-        val semaphore = Semaphore(5) // Limit of 5 threads
-
-        val startTime = System.currentTimeMillis()
-
-        coroutineScope {
-            // Ticker for progress callbacks. Inherits the parent dispatcher
-            // (Dispatchers.IO from processSession's withContext) instead of
-            // hopping to Main, so this works in headless contexts (puppet
-            // mode, integration tests) where Dispatchers.Main isn't wired.
-            // progressUI lambdas marshal themselves to the right thread if
-            // they need to.
-            val monitorJob = launch {
-                while (isActive) {
-                    val currentBytes = downloadedBytesGlobal.get()
-                    val currentFiles = currentFileCounter.get()
-
-                    val now = System.currentTimeMillis()
-                    val durationSec = (now - startTime) / 1000.0
-                    val bytesPerSec = if (durationSec > 0.1) (currentBytes / durationSec).toLong() else 0L
-
-                    progressUI?.invoke(
-                        SyncProgress(
-                            currentFileIdx  = currentFiles,
-                            totalFiles      = totalFilesCount,
-                            downloadedBytes = currentBytes,
-                            totalBytes      = totalBytesToDownload,
-                            bytesPerSec     = bytesPerSec,
-                        )
-                    )
-
-                    delay(100.milliseconds)
-                    if (currentFiles >= totalFilesCount && currentBytes >= totalBytesToDownload) break
-                }
-            }
-
-            // Downloading
-            val tasks = filesToDownload.map { (rawPath, fileData) ->
-                async(Dispatchers.IO) {
-                    if (!isActive) throw CancellationException()
-
-                    semaphore.withPermit {
-                        if (!isActive) throw CancellationException()
-
-                        val cleanPath = normalizePath(rawPath)
-                        val targetFile = resolveWithinRoot(baseDir, cleanPath, rawPath)
-
-                        downloadFileInternal(rawPath, targetFile, fileData.md5) { bytesRead ->
-                            // We just increase the counter. We don't touch the UI.
-                            downloadedBytesGlobal.addAndGet(bytesRead.toLong())
-                            if (!isActive) throw CancellationException()
-                        }
-
-                        currentFileCounter.incrementAndGet()
-                    }
-                }
-            }
-
-            // We are waiting for all downloads to complete
-            try {
-                tasks.awaitAll()
-            } finally {
-                monitorJob.cancel()
-            }
-
-            // Final update (100%)
-            if (isActive) {
-                progressUI?.invoke(
-                    SyncProgress(
-                        currentFileIdx  = totalFilesCount,
-                        totalFiles      = totalFilesCount,
-                        downloadedBytes = totalBytesToDownload,
-                        totalBytes      = totalBytesToDownload,
-                        bytesPerSec     = 0L,
-                    )
+        // Nothing here decides whether a file is needed -- that was settled above,
+        // by a walk that also rejects a jar whose md5 matches while its archive is
+        // malformed. So every transfer is unconditional: handing the engine a skip
+        // rule keyed on the hash would let exactly those corrupt jars survive.
+        transfers.fetchAll(
+            filesToDownload.map { (rawPath, fileData) ->
+                val cleanPath = normalizePath(rawPath)
+                Transfer(
+                    url = fileUrl(rawPath),
+                    dest = resolveWithinRoot(baseDir, cleanPath, rawPath),
+                    // "any" is the upstream's own do-not-check sentinel, and an
+                    // unverifiable transfer is one the engine must not resume on faith.
+                    expect = fileData.md5.takeIf { it.isNotBlank() && !it.equals(MD5_ANY, ignoreCase = true) }
+                        ?.let { Digest(DigestAlgorithm.MD5, it) },
+                    size = fileData.size,
+                    skip = SkipIfPresent.Never,
                 )
             }
+        ) { p ->
+            progressUI?.invoke(
+                SyncProgress(
+                    currentFileIdx  = p.filesDone,
+                    totalFiles      = totalFilesCount,
+                    downloadedBytes = p.done,
+                    totalBytes      = totalBytesToDownload,
+                    bytesPerSec     = p.bytesPerSecond,
+                )
+            )
         }
+
+        progressUI?.invoke(
+            SyncProgress(
+                currentFileIdx  = totalFilesCount,
+                totalFiles      = totalFilesCount,
+                downloadedBytes = totalBytesToDownload,
+                totalBytes      = totalBytesToDownload,
+                bytesPerSec     = 0L,
+            )
+        )
     }
 
-    /**
-     * Fetches [serverPath] into [localPath], staged through a `.part` sibling.
-     *
-     * The staging is what makes resuming safe. A file reaches this function
-     * precisely because its hash did NOT match, so the stale copy is still on
-     * disk with the old content -- reading its length as a resume offset and
-     * appending produced old-bytes-plus-new-tail, at exactly the length the
-     * manifest expects, which the cheap size check then accepted on every later
-     * sync. Resume now applies only to bytes this download wrote.
-     *
-     * [expectedMd5] closes the other half: a `.part` left by an earlier attempt
-     * may predate a manifest change, so an offset into it is only trustworthy
-     * once the finished file is checked. A mismatch drops the partial and
-     * refetches from zero. The `any` sentinel means the upstream published no
-     * hash, and without one a resume cannot be validated -- so those transfers
-     * start from zero rather than resume on faith.
-     */
-    private suspend fun downloadFileInternal(
-        serverPath: String,
-        localPath: Path,
-        expectedMd5: String,
-        onBytesRead: ((Int) -> Unit)? = null
-    ) {
-        val url = "${config.clientFilesBase}/" +
-                serverPath.split("/").joinToString("/") { segment -> URLEncoder.encode(segment, "UTF-8").replace("+", "%20") }
-        val verifiable = expectedMd5.isNotBlank() && !expectedMd5.equals("any", ignoreCase = true)
-        withContext(Dispatchers.IO) {
-            if (localPath.parent != null) Files.createDirectories(localPath.parent)
-            val part = localPath.resolveSibling("${localPath.fileName}.part")
-            if (!verifiable) runCatching { Files.deleteIfExists(part) }
-
-            // Retry the whole transfer on transient network errors. Long
-            // bodies from the SMARTYcraft host periodically drop mid-stream;
-            // without retry-with-resume a flaky network turns 100MB asset sync
-            // into a Sisyphean restart-from-zero loop.
-            retryWithBackoff(
-                operation = "download $serverPath",
-                shouldRetry = ::isTransientDownloadError,
-            ) {
-                val existing = if (verifiable && Files.exists(part)) Files.size(part) else 0L
-
-                client.prepareGet(url) {
-                    if (existing > 0) header(HttpHeaders.Range, "bytes=$existing-")
-                }.execute { response ->
-                    when (response.status) {
-                        HttpStatusCode.PartialContent -> {
-                            // 206: server is honouring the Range -- append the remainder.
-                            // Report the already-on-disk bytes upfront so the UI's
-                            // total-bytes progress hits 100% on completion. (Long-to-Int
-                            // narrowing is fine here -- modpack assets are well under 2GB.)
-                            if (existing > 0) onBytesRead?.invoke(existing.toInt())
-                            writeBody(response, part, append = true, onBytesRead)
-                        }
-                        HttpStatusCode.OK -> {
-                            // 200: server ignored Range (or we sent none) -- overwrite.
-                            // Don't report existing bytes; we're throwing them away.
-                            writeBody(response, part, append = false, onBytesRead)
-                        }
-                        HttpStatusCode.RequestedRangeNotSatisfiable -> {
-                            // 416: partial on disk is bigger than the upstream file
-                            // (corrupt write or upstream shrank). Clear and let retry
-                            // fetch from byte 0. Throw the dedicated subclass so
-                            // isTransientDownloadError recognizes it as retryable
-                            // -- a plain IOException with this message would NOT
-                            // match the predicate's substring checks and would
-                            // hard-fail instead of recovering.
-                            Files.deleteIfExists(part)
-                            throw RetryableHttpException("HTTP 416 for $url; cleared bad partial, will refetch")
-                        }
-                        else -> throw IOException("HTTP ${response.status} for $url")
-                    }
-                }
-
-                if (verifiable) {
-                    val got = calculateMD5(part)
-                    if (!got.equals(expectedMd5, ignoreCase = true)) {
-                        Files.deleteIfExists(part)
-                        throw RetryableHttpException(
-                            "checksum mismatch for $serverPath (expected $expectedMd5, got $got); refetching"
-                        )
-                    }
-                }
-                // Into place only once the bytes are what the manifest named, so
-                // a failed transfer leaves the previous copy intact instead of a
-                // half-written one the next sync would have to notice.
-                Files.move(part, localPath, StandardCopyOption.REPLACE_EXISTING)
+    /** The upstream URL for a manifest path, each segment encoded on its own. */
+    private fun fileUrl(serverPath: String): String =
+        "${config.clientFilesBase}/" +
+            serverPath.split("/").joinToString("/") { segment ->
+                URLEncoder.encode(segment, "UTF-8").replace("+", "%20")
             }
-        }
-    }
-
-    private suspend fun writeBody(
-        response: HttpResponse,
-        localPath: Path,
-        append: Boolean,
-        onBytesRead: ((Int) -> Unit)?,
-    ) {
-        val channel = response.bodyAsChannel()
-        FileOutputStream(localPath.toFile(), append).use { output ->
-            val buffer = ByteArray(8192)
-            while (!channel.isClosedForRead) {
-                val read = channel.readAvailable(buffer, 0, buffer.size)
-                if (read <= 0) break
-                output.write(buffer, 0, read)
-                onBytesRead?.invoke(read)
-            }
-        }
-    }
-
-    /**
-     * Sentinel for "we deliberately threw to trigger a retry after
-     * fixing local state". Currently the only thrower is the 416
-     * branch in [downloadFileInternal], which deletes the bad partial
-     * before raising this so the next retry fetches from byte 0.
-     * Subclass over string-matching `cause.message` keeps the contract
-     * explicit.
-     */
-    private class RetryableHttpException(message: String) : IOException(message)
-
-    private fun isTransientDownloadError(t: Throwable): Boolean {
-        // CancellationException must NEVER be retried -- it's how the parent
-        // coroutine signals "stop"; swallowing and retrying would deadlock
-        // the launch flow.
-        if (t is CancellationException) return false
-        var cause: Throwable? = t
-        while (cause != null) {
-            if (cause is RetryableHttpException) return true
-            if (cause is ConnectException ||
-                cause is SocketException ||
-                cause is ClosedByteChannelException ||
-                cause is SocketTimeoutException
-            ) return true
-            if (cause is IOException &&
-                cause.message?.contains("Connection reset", ignoreCase = true) == true
-            ) return true
-            cause = cause.cause
-        }
-        return false
-    }
 
     /**
      * Checks whether the file needs to be downloaded (no file, empty, or the hash does not match).

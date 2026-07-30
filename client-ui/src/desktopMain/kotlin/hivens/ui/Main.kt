@@ -183,7 +183,7 @@ val uiModule = module {
     // Media resolvers feeding the local-only Skinema player (client-media).
     // Wired here: the UI is their only consumer, the launch engine does not
     // know the module. "direct" channel: public CDNs / GitHub, not SC-proxied.
-    single { VideoCacheService(dir = get<Path>().resolve("video-cache"), http = get(named("direct")), scope = get()) }
+    single { VideoCacheService(dir = get<Path>().resolve("video-cache"), transfers = get(), scope = get()) }
     single {
         YtDlpService(
             toolsDir      = get<Path>().resolve("tools"),

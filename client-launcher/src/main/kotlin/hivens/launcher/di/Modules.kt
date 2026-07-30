@@ -600,7 +600,7 @@ val runtimeModule = module {
     single<IJavaManager> { JavaManagerService(get(), get()) }
 
     // Direct channel -- Maven Central LWJGL/JInput natives keep strict TLS.
-    single { EnvironmentPreparer(get(named("direct"))) }
+    single { EnvironmentPreparer(get()) }
     single { ClasspathProvider(get()) }
     single { GameCommandBuilder(get()) }
     single { ProcessLogHandler() }
@@ -638,7 +638,9 @@ val launchPipelineModule = module {
         ManifestCache(dataDir.resolve("manifest-cache"), get())
     }
     single<IManifestStore> { get<ManifestCache>() }
-    single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
+    single<IFileDownloadService> {
+        FileDownloadService(get(named("smartycraft")), get(), get(), get<ServerProtocolConfig>())
+    }
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
     single<IInstanceProfileStore> { get<ProfileManager>() }

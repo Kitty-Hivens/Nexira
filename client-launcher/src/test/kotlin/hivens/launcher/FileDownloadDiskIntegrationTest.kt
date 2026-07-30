@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
@@ -836,7 +837,7 @@ class FileDownloadDiskIntegrationTest {
         val manifestCache = ManifestCache(workDir / "manifest-cache", json)
         // Default config -- clientFilesBase resolves to a fake URL but the
         // MockEngine matches by path-suffix so the host is irrelevant.
-        return FileDownloadService(provider, protectedPaths, manifestCache, ServerProtocolConfig())
+        return FileDownloadService(testTransferEngine(provider), protectedPaths, manifestCache, ServerProtocolConfig())
     }
 
     private fun sessionWith(manifest: FileManifest) = SessionData(
