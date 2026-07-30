@@ -128,16 +128,8 @@ class LaunchDriver(
             ActivityPhase.Running(0, 0, state.stage.name.lowercase()),
             actions = setOf(ActivityAction.Cancel),
         )
-        notifications.push(
-            sourceKey = target.sourceKey,
-            sender    = target.displayName,
-            iconUrl   = target.iconUrl,
-            severity  = Severity.Info,
-            kind      = Kind.Progress,
-            title     = s.notifPackPreparing(target.displayName),
-            body      = s.notifPackStage(state.stage.name.lowercase()),
-            progress  = state.progress.coerceIn(0f, 1f),
-        )
+        // Live progress is the activity surface's job; the notification
+        // centre keeps outcomes, which are what its history is for.
     }
 
     private fun onDownloading(target: LaunchTarget, state: LaunchState.Downloading) {
@@ -162,16 +154,8 @@ class LaunchDriver(
         val displayPct =
             if (fraction == null) s.notifPackSyncIndeterminate
             else s.notifPackSyncPercent((fraction * 100).toInt())
-        notifications.push(
-            sourceKey = target.sourceKey,
-            sender    = target.displayName,
-            iconUrl   = target.iconUrl,
-            severity  = Severity.Info,
-            kind      = Kind.Progress,
-            title     = s.notifPackSyncing(target.displayName),
-            body      = s.notifPackSyncBody(state.currentFileIdx, state.totalFiles, displayPct),
-            progress  = notifProgress,
-        )
+        // Live progress is the activity surface's job; the notification
+        // centre keeps outcomes, which are what its history is for.
     }
 
     private fun onRunning(target: LaunchTarget, state: LaunchState.GameRunning) {
