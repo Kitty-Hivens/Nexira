@@ -24,9 +24,9 @@ class FrostTierTest {
     }
 
     @Test
-    fun frostedIsBackdropFillEdge() {
+    fun frostedIsBackdropFillCastShadow() {
         assertEquals(
-            listOf(Backdrop::class, Fill::class, Edge::class),
+            listOf(Backdrop::class, Fill::class, DropShadow::class),
             FrostTier.Frosted.toLayers().map { it::class },
         )
     }
@@ -34,9 +34,28 @@ class FrostTierTest {
     @Test
     fun heavyKeepsLayerOrder() {
         assertEquals(
-            listOf(Backdrop::class, Fill::class, Wash::class, Edge::class, Texture::class),
+            listOf(Backdrop::class, Fill::class, DropShadow::class, Texture::class),
             FrostTier.Heavy.toLayers().map { it::class },
         )
+    }
+
+    /**
+     * Depth is cast from outside the plane, not painted inside it. The inner
+     * bevel lightened a band along the top and darkened one along the bottom,
+     * which is the fill changing value rather than light behaving, and the accent
+     * wash tinted every heavy plane with a colour nothing asked for. Both types
+     * still exist for a caller that assembles its own list; neither is what a
+     * plane is by default.
+     */
+    @Test
+    fun noPresetPaintsDepthInsideTheBody() {
+        for (tier in FrostTier.entries) {
+            val atoms = tier.toLayers().flatMap { if (it is Edge) it.toAtoms() else listOf(it) }
+            assertTrue(
+                atoms.none { it is EdgeHighlight || it is EdgeShadow || it is Wash },
+                "$tier still carries an inner bevel or wash: ${atoms.map { it::class.simpleName }}",
+            )
+        }
     }
 
     @Test
