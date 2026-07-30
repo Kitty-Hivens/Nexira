@@ -98,6 +98,8 @@ class DefaultCache<V>(
         return load(key, loader)
     }
 
+    override suspend fun refresh(key: String, loader: suspend () -> V): V = load(key, loader)
+
     override fun flow(key: String, loader: suspend () -> V): Flow<CacheValue<V>> = flow {
         val entry = lookup(key)
         if (entry != null) {

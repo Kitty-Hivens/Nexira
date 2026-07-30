@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,8 +32,13 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.update.PackUpdateStatus
+import hivens.core.update.PackUpdateStatusHub
+import hivens.core.update.UpdateDirection
+import hivens.ui.Screen
 import hivens.ui.components.InitialsAvatar
 import hivens.ui.components.SourceBadge
+import hivens.ui.navigation.NavRequests
 import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMetaChip
@@ -43,7 +47,9 @@ import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.notifications.IndicationCenter
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.theme.Dimens
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import java.time.Duration
@@ -62,8 +68,8 @@ import org.koin.compose.koinInject
  * detail hop.
  *
  * Source-badge is the small chip next to the title; it differentiates cards
- * from the four [PackOrigin] values at a glance per
- * [[project_home_library_ia]]'s unified-entity-with-source-badge rule.
+ * from the four [PackOrigin] values at a glance, so one list can hold every
+ * source instead of splitting per origin.
  */
 @Composable
 fun PackCard(
@@ -76,6 +82,7 @@ fun PackCard(
     val s = LocalStrings.current
     val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
     val art = rememberPackArt(instance)
+    PuppetClick("library.pack.${instance.id}") { onOpenDetail() }
     val indications: IndicationCenter = koinInject()
     // Remember the flow: launchIndication() ends in a fresh asStateFlow() wrapper each
     // call, so collecting it inline would re-subscribe on every recomposition.
@@ -84,7 +91,7 @@ fun PackCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(132.dp)
+            .height(Dimens.packCardHeight)
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onOpenDetail),
     ) {
@@ -167,7 +174,35 @@ fun PackCard(
         indication?.let {
             LaunchStatusPill(it, Modifier.align(Alignment.TopEnd).padding(10.dp))
         }
+        // Update-available badge from the status hub. The launch pill owns the
+        // corner while a launch is in flight; clicking routes straight to the
+        // versions screen through the nav mediator.
+        if (indication == null) {
+            val hub: PackUpdateStatusHub = koinInject()
+            val nav: NavRequests = koinInject()
+            val statuses by hub.statuses.collectAsState()
+            (statuses[instance.id] as? PackUpdateStatus.Pending)?.let { pending ->
+                UpdateBadgePill(
+                    isRollback = pending.direction == UpdateDirection.Older,
+                    onClick    = { nav.open(Screen.PackVersions(instance.id)) },
+                    modifier   = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                )
+            }
+        }
     }
+}
+
+/** Compact pill for a pending build move; the card-corner sibling of [LaunchStatusPill]. */
+@Composable
+private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val s = LocalStrings.current
+    NxMetaChip(
+        text     = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
+        modifier = modifier,
+        tone     = NxMetaChipTone.OnMedia,
+        dot      = if (isRollback) NxTheme.colors.warnAccent else NxTheme.colors.primary,
+        onClick  = onClick,
+    )
 }
 
 /** Compact launch-state pill overlaid on the card while a launch of this pack is in flight. */
@@ -181,23 +216,7 @@ private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modi
         IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
         IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
     }
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color.Black.copy(alpha = 0.55f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(dotColor))
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelSmall,
-            color      = Color.White,
-            fontWeight = FontWeight.Medium,
-            maxLines   = 1,
-        )
-    }
+    NxMetaChip(text = label, modifier = modifier, tone = NxMetaChipTone.OnMedia, dot = dotColor)
 }
 
 @Composable
@@ -206,7 +225,7 @@ private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
         model              = iconUrl,
         contentDescription = null,
         contentScale       = ContentScale.Crop,
-        modifier           = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+        modifier           = Modifier.size(Dimens.packAvatar).clip(RoundedCornerShape(Dimens.packAvatarCorner)),
         loading            = { Box(Modifier.fillMaxSize().background(hue)) },
         error              = { InitialsAvatar(displayName, hue) },
     )

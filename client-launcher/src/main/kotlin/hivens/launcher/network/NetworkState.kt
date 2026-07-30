@@ -1,7 +1,6 @@
 package hivens.launcher.network
 
 import hivens.core.security.SslBypassEntry
-import hivens.launcher.SettingsService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,10 +11,9 @@ import java.nio.file.Path
 import java.time.Instant
 
 /**
- * Global network policy state -- per-host SSL-bypass set + force-proxy
- * toggle. Each bypass entry carries its own expiry, so accepting a
- * one-off cert outage on `smartycraft.ru` does not silently weaken TLS
- * for unrelated hosts.
+ * Global network policy state -- the per-host SSL-bypass set. Each entry
+ * carries its own expiry, so accepting a one-off cert outage on
+ * `smartycraft.ru` does not silently weaken TLS for unrelated hosts.
  *
  * Persistence: when [initialize] is called with a path, grants /
  * revokes write the current state to that JSON file. On restart the
@@ -55,38 +53,6 @@ object NetworkState {
 
     private fun publishBypasses() {
         _bypassesState.value = bypasses.toList()
-    }
-
-    /**
-     * User opt-in: skip the direct-channel attempt and route every
-     * smartycraft request through the SOCKS5 proxy from the first
-     * call. For users in censored regions / corporate firewalls where
-     * direct connections are blocked. Default false -- direct works
-     * for ~99% of users.
-     *
-     * In-memory here; cross-restart persistence lives in
-     * [SettingsService] (`forceProxyMode` field). UI binding (Settings
-     * → Network → "Force proxy mode") calls [setForceProxyMode] on
-     * toggle change; `SettingsRestoreHook` re-arms the value at startup.
-     */
-    private val _forceProxyState = MutableStateFlow(false)
-
-    /**
-     * Push-side view of [forceProxyMode]. Emits on every [setForceProxyMode]
-     * call so UI sites that want to react to a toggle change (e.g. retry
-     * `CompactNewsFeed` after the user flips proxy mode and the upstream
-     * becomes reachable again) can `collectAsState()` instead of capturing
-     * the value once.
-     */
-    val forceProxyState: StateFlow<Boolean> = _forceProxyState.asStateFlow()
-
-    /** True when the user has opted into proxy-only mode. */
-    fun forceProxyMode(): Boolean = _forceProxyState.value
-
-    /** Set the force-proxy toggle. Settings UI calls this on toggle change. */
-    fun setForceProxyMode(value: Boolean) {
-        _forceProxyState.value = value
-        log.info("Force proxy mode: {}", if (value) "ENABLED -- skipping direct attempt" else "disabled (default)")
     }
 
     /**

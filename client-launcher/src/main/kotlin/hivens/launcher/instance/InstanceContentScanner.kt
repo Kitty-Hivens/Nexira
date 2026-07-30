@@ -9,9 +9,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.zip.ZipFile
+import hivens.core.io.IconProcessor
+import hivens.core.io.SharedZip
+import hivens.core.io.openSharedZip
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
@@ -59,17 +62,40 @@ class InstalledContent(
  * and from-scratch instances all read the same way -- the Content tab no longer
  * depends on a server manifest. One corrupt archive is logged and skipped.
  */
-class InstanceContentScanner {
+class InstanceContentScanner(
+    private val cache: ContentScanCache? = null,
+    /**
+     * Bounds extracted icons (a declared logo can be a multi-MB PNG rendered at
+     * list-row size). Null in headless assemblies; the cache then falls back on
+     * its own entry-size floor and oversized icons simply are not cached.
+     */
+    private val icons: IconProcessor? = null,
+) {
 
     private val log = LoggerFactory.getLogger(InstanceContentScanner::class.java)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     suspend fun scan(instanceDir: Path): List<InstalledContent> = withContext(Dispatchers.IO) {
-        buildList {
+        val items = buildList {
             addAll(scanArchives(instanceDir.resolve("mods"), ContentKind.Mod))
             addAll(scanArchives(instanceDir.resolve("resourcepacks"), ContentKind.ResourcePack))
             addAll(scanArchives(instanceDir.resolve("shaderpacks"), ContentKind.ShaderPack))
         }.sortedBy { it.displayName.lowercase() }
+        // Drop cache entries for files that disappeared since the last scan (a removed
+        // mod). Edits overwrite in place (same key), so only deletions leave orphans.
+        cache?.let { c ->
+            val current = items.mapTo(HashSet()) {
+                instanceDir.resolve(folderFor(it.kind)).resolve(it.fileName).normalize().toString()
+            }
+            c.retain(instanceDir.normalize().toString() + File.separator, current)
+        }
+        items
+    }
+
+    private fun folderFor(kind: ContentKind): String = when (kind) {
+        ContentKind.Mod -> "mods"
+        ContentKind.ResourcePack -> "resourcepacks"
+        ContentKind.ShaderPack -> "shaderpacks"
     }
 
     private fun scanArchives(dir: Path, kind: ContentKind): List<InstalledContent> {
@@ -97,11 +123,18 @@ class InstanceContentScanner {
         val enabled = !rawName.endsWith(DISABLED)
         val fileName = rawName.removeSuffix(DISABLED)
         val size = Files.size(file)
+        val mtime = Files.getLastModifiedTime(file).toMillis()
+        // Key on the canonical (enabled) path so an optional-toggle rename keeps the
+        // entry; validate by size+mtime so a real content change re-parses.
+        val cacheKey = file.parent.resolve(fileName).normalize().toString()
 
-        val meta = when (kind) {
-            ContentKind.Mod -> readModMeta(file)
-            ContentKind.ResourcePack -> readPackMeta(file)
-            ContentKind.ShaderPack -> null
+        val meta: Meta? = when (val hit = cache?.lookup(cacheKey, size, mtime)) {
+            null -> when (kind) {
+                ContentKind.Mod -> readModMeta(file)
+                ContentKind.ResourcePack -> readPackMeta(file)
+                ContentKind.ShaderPack -> null
+            }?.normalizeIcon().also { cache?.put(cacheKey, size, mtime, it?.toCached()) }
+            else -> hit.meta?.toMeta()
         }
         return InstalledContent(
             kind        = kind,
@@ -119,17 +152,23 @@ class InstanceContentScanner {
         )
     }
 
-    /** Fabric/Quilt first (the common modern case), then a light Forge/NeoForge TOML read. */
-    private fun readModMeta(file: Path): Meta? = ZipFile(file.toFile()).use { zip ->
-        zip.getEntry("fabric.mod.json")?.let { return parseFabric(zip, it) }
-        zip.getEntry("quilt.mod.json")?.let { return parseQuilt(zip, it) }
-        (zip.getEntry("META-INF/neoforge.mods.toml") ?: zip.getEntry("META-INF/mods.toml"))
+    /**
+     * TOML first when present: forge-only jars routinely ship a dummy
+     * fabric.mod.json stub ("not a fabric mod") to scold a wrong-loader launch,
+     * and reading it first put the stub's garbage on the row. A genuine
+     * dual-loader jar describes the same mod in both files, so preferring the
+     * TOML loses nothing there.
+     */
+    private fun readModMeta(file: Path): Meta? = openSharedZip(file).use { zip ->
+        (zip.readEntry("META-INF/neoforge.mods.toml") ?: zip.readEntry("META-INF/mods.toml"))
             ?.let { return parseForgeToml(zip, it) }
+        zip.readEntry("fabric.mod.json")?.let { return parseFabric(zip, it) }
+        zip.readEntry("quilt.mod.json")?.let { return parseQuilt(zip, it) }
         null
     }
 
-    private fun parseFabric(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
-        val root = json.parseToJsonElement(zip.getInputStream(entry).readBytes().decodeToString()).jsonObject
+    private fun parseFabric(zip: SharedZip, bytes: ByteArray): Meta {
+        val root = json.parseToJsonElement(bytes.decodeToString()).jsonObject
         val name = root["name"]?.jsonPrimitive?.contentOrNull
         val version = root["version"]?.jsonPrimitive?.contentOrNull
         val description = root["description"]?.jsonPrimitive?.contentOrNull
@@ -153,8 +192,8 @@ class InstanceContentScanner {
         )
     }
 
-    private fun parseQuilt(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
-        val loader = json.parseToJsonElement(zip.getInputStream(entry).readBytes().decodeToString())
+    private fun parseQuilt(zip: SharedZip, bytes: ByteArray): Meta {
+        val loader = json.parseToJsonElement(bytes.decodeToString())
             .jsonObject["quilt_loader"]?.jsonObject
         val meta = loader?.get("metadata")?.jsonObject
         val name = meta?.get("name")?.jsonPrimitive?.contentOrNull
@@ -180,23 +219,38 @@ class InstanceContentScanner {
 
     /**
      * TOML has no bundled parser; a `key = "value"` line scan covers the fields we
-     * show. Dependencies are left out here: forge/neoforge `[[dependencies.<modid>]]`
-     * blocks need section-aware parsing the flat line scan can't do reliably.
+     * show. Values match by their OWN quote style, so an apostrophe inside a
+     * double-quoted name ("Brewin' And Chewin'") no longer truncates the capture.
+     * A `${file.jarVersion}` version placeholder resolves the way the loader
+     * resolves it: from the manifest's Implementation-Version. Dependencies are
+     * left out here: forge/neoforge `[[dependencies.<modid>]]` blocks need
+     * section-aware parsing the flat line scan can't do reliably.
      */
-    private fun parseForgeToml(zip: ZipFile, entry: java.util.zip.ZipEntry): Meta {
-        val text = zip.getInputStream(entry).readBytes().decodeToString()
-        val name = TOML_DISPLAY_NAME.find(text)?.groupValues?.get(1)
-        val version = TOML_VERSION.find(text)?.groupValues?.get(1)?.takeIf { !it.startsWith($$"${") }
-        val logo = TOML_LOGO.find(text)?.groupValues?.get(1)
-        val homepage = TOML_DISPLAY_URL.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
-        val license = TOML_LICENSE.find(text)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
-        val authors = TOML_AUTHORS.find(text)?.groupValues?.get(1)
+    private fun parseForgeToml(zip: SharedZip, bytes: ByteArray): Meta {
+        val text = bytes.decodeToString()
+        val name = TOML_DISPLAY_NAME.tomlValue(text)
+        val version = TOML_VERSION.tomlValue(text)
+            ?.let { raw -> if (raw.startsWith($$"${")) manifestImplementationVersion(zip) else raw }
+            ?.takeIf { it.isNotBlank() }
+        val logo = TOML_LOGO.tomlValue(text)
+        val homepage = TOML_DISPLAY_URL.tomlValue(text)?.takeIf { it.isNotBlank() }
+        val license = TOML_LICENSE.tomlValue(text)?.takeIf { it.isNotBlank() }
+        val authors = TOML_AUTHORS.tomlValue(text)
             ?.split(',')?.map { it.trim() }?.filter { it.isNotBlank() }.orEmpty()
         return Meta(
             name, version, null, logo?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = license, authors = authors,
         )
     }
+
+    /** The value the loader substitutes for `${file.jarVersion}`. */
+    private fun manifestImplementationVersion(zip: SharedZip): String? =
+        zip.readEntry("META-INF/MANIFEST.MF")?.decodeToString()
+            ?.lineSequence()
+            ?.firstOrNull { it.startsWith("Implementation-Version:") }
+            ?.substringAfter(':')
+            ?.trim()
+            ?.ifBlank { null }
 
     /** A field that may be a bare string OR an array of strings -- take the first usable value. */
     private fun firstString(el: JsonElement?): String? {
@@ -214,18 +268,18 @@ class InstanceContentScanner {
     }
 
     /** Resource pack: `pack.mcmeta` description + `pack.png` icon. */
-    private fun readPackMeta(file: Path): Meta? = ZipFile(file.toFile()).use { zip ->
-        val description = zip.getEntry("pack.mcmeta")?.let {
+    private fun readPackMeta(file: Path): Meta? = openSharedZip(file).use { zip ->
+        val description = zip.readEntry("pack.mcmeta")?.let { bytes ->
             runCatching {
-                json.parseToJsonElement(zip.getInputStream(it).readBytes().decodeToString())
+                json.parseToJsonElement(bytes.decodeToString())
                     .jsonObject["pack"]?.jsonObject?.get("description")?.jsonPrimitive?.contentOrNull
             }.getOrNull()
         }
         Meta(null, null, description, readEntryBytes(zip, "pack.png"))
     }
 
-    private fun readEntryBytes(zip: ZipFile, path: String): ByteArray? =
-        zip.getEntry(path.removePrefix("/"))?.let { zip.getInputStream(it).readBytes() }
+    private fun readEntryBytes(zip: SharedZip, path: String): ByteArray? =
+        zip.readEntry(path.removePrefix("/"))
 
     /**
      * Last-resort icon probe: an archive whose metadata declares NO icon may still
@@ -235,17 +289,12 @@ class InstanceContentScanner {
      * letter. Returns null when the archive truly has no recognizable icon.
      */
     fun probeJarIcon(file: Path): ByteArray? = runCatching {
-        ZipFile(file.toFile()).use { zip ->
-            for (name in ICON_CANDIDATES) {
-                val entry = zip.getEntry(name) ?: continue
-                return@use zip.getInputStream(entry).readBytes()
-            }
-            val nested = zip.entries().asSequence().firstOrNull {
-                !it.isDirectory && it.name.startsWith("assets/") && it.name.endsWith("/icon.png")
-            }
-            nested?.let { zip.getInputStream(it).readBytes() }
+        openSharedZip(file).use { zip ->
+            for (name in ICON_CANDIDATES) zip.readEntry(name)?.let { return@use it }
+            val nested = zip.entryNames().firstOrNull { it.startsWith("assets/") && it.endsWith("/icon.png") }
+            nested?.let { zip.readEntry(it) }
         }
-    }.getOrNull()
+    }.getOrNull()?.let { bytes -> icons?.process(bytes) ?: bytes }
 
     /** Drop the extension and trailing version/loader tokens so a bare filename reads cleaner. */
     private fun prettyName(fileName: String): String =
@@ -267,14 +316,37 @@ class InstanceContentScanner {
         val dependencies: List<String> = emptyList(),
     )
 
+    /** Runs the icon through the bound [icons] processor; identity when none is bound or there is no icon. */
+    private fun Meta.normalizeIcon(): Meta {
+        val processor = icons ?: return this
+        val original = icon ?: return this
+        val processed = processor.process(original)
+        return if (processed === original) this
+        else Meta(name, version, description, processed, homepageUrl, license, authors, dependencies)
+    }
+
+    private fun Meta.toCached() =
+        CachedMeta(name, version, description, icon, homepageUrl, license, authors, dependencies)
+
+    private fun CachedMeta.toMeta() =
+        Meta(name, version, description, icon, homepageUrl, license, authors, dependencies)
+
     private companion object {
         const val DISABLED = ".disabled"
-        val TOML_DISPLAY_NAME = Regex("""displayName\s*=\s*["']([^"']*)["']""")
-        val TOML_VERSION = Regex("""\bversion\s*=\s*["']([^"']*)["']""")
-        val TOML_LOGO = Regex("""logoFile\s*=\s*["']([^"']*)["']""")
-        val TOML_DISPLAY_URL = Regex("""displayURL\s*=\s*["']([^"']*)["']""")
-        val TOML_LICENSE = Regex("""(?m)^\s*license\s*=\s*["']([^"']*)["']""")
-        val TOML_AUTHORS = Regex("""authors\s*=\s*["']([^"']*)["']""")
+
+        /** `key = "value"` / `key = 'value'`, each quote style closed by its own kind. */
+        fun tomlString(prefix: String) = Regex("""$prefix\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+
+        /** The captured value of a [tomlString] match: whichever quote group matched. */
+        fun Regex.tomlValue(text: String): String? =
+            find(text)?.let { m -> m.groups[1]?.value ?: m.groups[2]?.value }
+
+        val TOML_DISPLAY_NAME = tomlString("displayName")
+        val TOML_VERSION = tomlString("""\bversion""")
+        val TOML_LOGO = tomlString("logoFile")
+        val TOML_DISPLAY_URL = tomlString("displayURL")
+        val TOML_LICENSE = tomlString("""(?m)^\s*license""")
+        val TOML_AUTHORS = tomlString("authors")
         val ICON_CANDIDATES = listOf("icon.png", "pack.png", "logo.png", "icon.jpg", "logo.jpg")
         // Platform / loader ids that are always present and add no signal to a "requires" list.
         val PLATFORM_DEPS = setOf("minecraft", "java", "fabricloader", "quilt_loader", "quilted_fabric_api")

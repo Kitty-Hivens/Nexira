@@ -19,9 +19,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 SCAN_EXTS = {".kt", ".kts", ".java"}
-SCAN_DIRS = ["client-config", "client-core", "client-launcher", "client-ui", "buildSrc"]
 
 EXCLUDE_PATH_FRAGMENTS = ("/build/", "/.gradle/", "/.idea/")
+
+# Scan roots are derived, not listed. A hand-maintained list is how nx-ui and the
+# widget modules went unscanned: they were added after the list was written and
+# nothing noticed. Any top-level directory carrying sources qualifies, so a module
+# added tomorrow is covered the day it lands.
+def scan_dirs() -> list[Path]:
+    roots = [p for p in sorted(ROOT.iterdir()) if p.is_dir() and (p / "src").is_dir()]
+    build_src = ROOT / "buildSrc"
+    if build_src.is_dir() and build_src not in roots:
+        roots.append(build_src)
+    return roots
 
 
 @dataclass(frozen=True)
@@ -132,10 +142,7 @@ def scan_file(path: Path) -> list[Hit]:
 
 def walk_targets() -> list[Path]:
     out: list[Path] = []
-    for d in SCAN_DIRS:
-        root = ROOT / d
-        if not root.is_dir():
-            continue
+    for root in scan_dirs():
         for p in root.rglob("*"):
             if p.suffix not in SCAN_EXTS:
                 continue

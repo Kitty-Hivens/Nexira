@@ -1,24 +1,27 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.api.dto.smrt.SmrtBuildDiff
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IMirrorPackClient
+import hivens.core.cache.read
 import hivens.launcher.cache.SmrtPackCaches
 import io.ktor.client.request.get
-import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import java.io.IOException
 
 /**
  * Thin HTTP wrapper for the smrt mirror's `/v1/...` endpoints. Uses the
- * "direct" HttpClient (strict TLS, no SOCKS proxy) since the mirror is public
+ * "direct" HttpClient (strict TLS, no per-host bypass) since the mirror is public
  * CDN-fronted and needs none of the SC channel's special handling. Modrinth
  * reads live in [hivens.launcher.modrinth.ModrinthClient].
  */
@@ -44,9 +47,17 @@ class SmrtPackClient(
         }
     }
 
-    override suspend fun fetchManifest(packId: String): SmrtPackManifest {
+    override suspend fun fetchManifest(packId: String): SmrtPackManifest =
+        fetchManifest(packId, forceRefresh = false)
+
+    /**
+     * The pack's current manifest. [forceRefresh] bypasses the cache TTL and is
+     * for a check the user asked for; an ambient read must leave it false or a
+     * screen opening turns into an unconditional round trip.
+     */
+    suspend fun fetchManifest(packId: String, forceRefresh: Boolean): SmrtPackManifest {
         val url = "$mirrorBase/v1/packs/$packId/manifest"
-        return caches.manifest.get(url) { getJson(url) }
+        return caches.manifest.read(url, forceRefresh) { getJson(url) }
     }
 
     /**
@@ -65,9 +76,13 @@ class SmrtPackClient(
         return caches.manifest.get(url) { getJson(url) }
     }
 
-    suspend fun fetchSummary(packId: String): SmrtPackSummary {
+    override suspend fun fetchSummary(packId: String): SmrtPackSummary =
+        fetchSummary(packId, forceRefresh = false)
+
+    /** The pack summary. See [fetchManifest] for what [forceRefresh] costs. */
+    suspend fun fetchSummary(packId: String, forceRefresh: Boolean): SmrtPackSummary {
         val url = "$mirrorBase/v1/packs/$packId"
-        return caches.summary.get(url) { getJson(url) }
+        return caches.summary.read(url, forceRefresh) { getJson(url) }
     }
 
     suspend fun listPacks(): SmrtPackListing {
@@ -76,30 +91,45 @@ class SmrtPackClient(
     }
 
     /**
-     * Stream a download through a caller-supplied consumer. The
-     * consumer must drain (or copy out of) the channel before the
-     * lambda returns -- the underlying response is closed on exit and
-     * the channel becomes invalid.
-     *
-     * The `prepareGet().execute { }` pattern is mandatory here: a
-     * plain `get(url).bodyAsChannel()` would route through ktor's
-     * SavedHttpCall, which loads the entire response into a single
-     * ByteArray before exposing the channel. On a 24 MB resource pack
-     * with concurrent downloads that triggers OutOfMemoryError on the
-     * compose-desktop heap. execute{} bypasses SavedHttpCall and gives
-     * a true streaming channel; the 64 KB read loop downstream keeps
-     * resident memory bounded regardless of file size.
+     * The per-build listing the mirror retains for a pack, newest first. The
+     * server order is canonical (publish-date across channels); callers must
+     * not re-sort by version tuples.
      */
-    suspend fun downloadStreaming(url: String, consume: suspend (ByteReadChannel) -> Unit) {
-        httpProvider.current.prepareGet(url) {
-            headers.append("User-Agent", USER_AGENT)
-        }.execute { resp ->
-            if (!resp.status.isSuccess()) {
-                val body = runCatching { resp.bodyAsText() }.getOrDefault("")
-                throw IOException("GET $url failed: ${resp.status} body=$body")
-            }
-            consume(resp.bodyAsChannel())
-        }
+    suspend fun listBuilds(packId: String, forceRefresh: Boolean = false): SmrtManifestVersions {
+        val url = "$mirrorBase/v1/packs/$packId/manifest/versions"
+        return caches.versions.read(url, forceRefresh) { getJson(url) }
+    }
+
+    /**
+     * Stale-then-fresh view of the build listing: emits the cached one at once
+     * when it is merely stale, then the reloaded one. A one-shot [listBuilds]
+     * would hand back the stale list and refresh into the void, which is how a
+     * version screen ends up missing the newest builds until it is reopened.
+     */
+    fun buildsStream(packId: String): Flow<SmrtManifestVersions> {
+        val url = "$mirrorBase/v1/packs/$packId/manifest/versions"
+        return caches.versions.flow(url) { getJson(url) }.map { it.value }
+    }
+
+    /**
+     * Drop the cached views of [packId] that an applied update makes stale: the
+     * summary's latest-version pointer, the build listing, and the "current"
+     * manifest. Version-pinned manifests are immutable and stay cached.
+     */
+    suspend fun invalidatePack(packId: String) {
+        caches.summary.invalidate("$mirrorBase/v1/packs/$packId")
+        caches.versions.invalidate("$mirrorBase/v1/packs/$packId/manifest/versions")
+        caches.manifest.invalidate("$mirrorBase/v1/packs/$packId/manifest")
+    }
+
+    /**
+     * Structured change summary between two retained builds. Display data for
+     * the versions screen (registry-enriched version labels); uncached -- a
+     * (from, to) pair is immutable but the pair space is wide and reads are rare.
+     */
+    override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff {
+        val url = "$mirrorBase/v1/packs/$packId/diff?from=${from.encodeURLParameter()}&to=${to.encodeURLParameter()}"
+        return getJson(url)
     }
 
     private suspend inline fun <reified T> getJson(url: String): T {

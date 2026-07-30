@@ -250,7 +250,7 @@ class LauncherServiceTest {
         // download path. Our pre-populated natives + assets short-circuit
         // both prepare steps, so a dead client catches any regression
         // that drops us into the download path unintentionally.
-        val envPreparer = EnvironmentPreparer(deadHttpClientProvider())
+        val envPreparer = EnvironmentPreparer(testTransferEngine(deadHttpClientProvider()))
         val commandBuilder = GameCommandBuilder()
         val logHandler = ProcessLogHandler()
         val service = LauncherService(
@@ -265,12 +265,13 @@ class LauncherServiceTest {
                 librariesDir = workDir / "libraries",
                 assetsDir = workDir / "assets",
                 clientProvider = deadHttpClientProvider(),
+                transfers = testTransferEngine(deadHttpClientProvider()),
                 json = json,
             ),
             profilerStore = ProfilerProfileStore(json),
             agentExtractor = AgentExtractor(workDir),
             // SC server path never reaches the SC-binding step; dead deps satisfy the ctor.
-            authlibSwapper = SmrtAuthlibSwapper(deadHttpClientProvider(), ServerProtocolConfig(), workDir),
+            authlibSwapper = SmrtAuthlibSwapper(testTransferEngine(deadHttpClientProvider()), ServerProtocolConfig(), workDir),
             sharedAssetsDir = workDir / "assets",
             sharedLibrariesDir = workDir / "libraries",
         )

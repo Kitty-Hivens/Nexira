@@ -1,5 +1,6 @@
 package hivens.launcher.runtime
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.loader.LoaderProfile
 import hivens.launcher.runtime.loader.LoaderRegistry
@@ -56,6 +57,7 @@ class RuntimeProvisionerTest {
         librariesDir = librariesDir,
         assetsDir = assetsDir,
         clientProvider = HttpClientProvider { client },
+        transfers = testTransferEngine(HttpClientProvider { client }),
         json = json,
         osName = osName,
         osArch = osArch,
@@ -129,6 +131,44 @@ class RuntimeProvisionerTest {
     }
 
     @Test
+    fun `a library path climbing out of the libraries root is refused`() {
+        // artifact.path comes from the per-version json, which carries no
+        // signature of its own -- the sha1 chain hanging off it authenticates
+        // the bytes, never the document that names them. So the destination is
+        // the server's to choose unless it is bounded.
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "1.12", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 9, url = "https://piston/client.jar")),
+            libraries = listOf(
+                MojangLibrary(
+                    name = "evil:lib:1",
+                    downloads = MojangLibraryDownloads(
+                        MojangArtifact("../../../../.config/autostart/evil.desktop", "l", 6, "https://libs/evil"),
+                    ),
+                ),
+            ),
+        )
+        val index = MojangAssetIndex(objects = emptyMap())
+
+        assertFailsWith<IOException> { p.planVanillaDownloads("1.12.2", version, index) }
+    }
+
+    @Test
+    fun `an asset hash climbing out of the assets root is refused`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }))
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "1.12", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 9, url = "https://piston/client.jar")),
+        )
+        // The hash is pasted straight into the object path, so it decides where
+        // the object lands as much as any explicit path field does.
+        val index = MojangAssetIndex(objects = mapOf("x" to MojangAssetObject("../../../../evil", 4)))
+
+        assertFailsWith<IOException> { p.planVanillaDownloads("1.12.2", version, index) }
+    }
+
+    @Test
     fun `native jar paths pick host-matching classifiers from both manifest shapes`() {
         val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
         val version = MojangVersion(
@@ -168,7 +208,7 @@ class RuntimeProvisionerTest {
             ),
         )
 
-        val natives = p.nativeJarPaths(version)
+        val natives = p.nativeLibraries(version).map { it.path }
 
         assertEquals(2, natives.size, "exactly the two linux natives, got $natives")
         assertTrue(natives.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar")))
@@ -405,6 +445,7 @@ class RuntimeProvisionerTest {
             librariesDir = librariesDir,
             assetsDir = assetsDir,
             clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
             json = json,
             loaderRegistry = LoaderRegistry(listOf(stub)),
             osName = "Linux",

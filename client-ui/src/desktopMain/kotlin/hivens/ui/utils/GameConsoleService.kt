@@ -10,11 +10,13 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
 import java.io.File
@@ -50,7 +52,7 @@ data class ConsoleSnapshot(
  *
  * The in-memory buffer is a sliding window: only the latest [maxLines] entries
  * are kept; older entries drop off the front but remain on disk and page back
- * via [loadHistoryBefore] (see [[project_console_sliding_window]]).
+ * via [loadHistoryBefore].
  *
  * Constructor-injected [paths] (not a static `PlatformPaths.system()`) so the
  * singleton honors a mid-session data-dir migration. One Koin singleton shared
@@ -124,6 +126,7 @@ class GameConsoleService(
         data class StartSession(val packId: String?) : Msg
         data object Clear : Msg
         data class LoadHistory(val count: Int, val result: CompletableDeferred<List<LogEntry>>) : Msg
+        data class Close(val done: CompletableDeferred<Unit>) : Msg
     }
 
     /**
@@ -143,10 +146,22 @@ class GameConsoleService(
         }
     }
 
+    /**
+     * Turns a raw game line into an entry: ANSI escapes become colour runs, the
+     * stripped text is redacted, and the runs are kept only when redaction did
+     * not move offsets (it rarely fires, so coloured lines stay coloured).
+     */
+    private fun entryOf(text: String, type: LogType): LogEntry {
+        val parsed = parseAnsi(text)
+        val redacted = Redactor.redact(parsed.text)
+        val colors = if (redacted == parsed.text) parsed.runs else emptyList()
+        return LogEntry(redacted, type, colors = colors)
+    }
+
     private fun apply(msg: Msg) {
         when (msg) {
             is Msg.Append -> {
-                val entry = LogEntry(Redactor.redact(msg.text), msg.type)
+                val entry = entryOf(msg.text, msg.type)
                 buffer.addLast(entry)
                 trim()
                 writeLine(entry)
@@ -157,7 +172,7 @@ class GameConsoleService(
                 // to one updating line. NOT mirrored to the file (launcher-
                 // internal provisioning ticks; archiving every tick would bloat
                 // the file and break the disk/line-index alignment).
-                val entry = LogEntry(Redactor.redact(msg.text), msg.type)
+                val entry = entryOf(msg.text, msg.type)
                 val prev = slotEntries[msg.slotId]
                 val idx = if (prev != null) buffer.indexOf(prev) else -1
                 if (idx >= 0) {
@@ -176,6 +191,10 @@ class GameConsoleService(
                 historyOffset = 0
             }
             is Msg.LoadHistory -> msg.result.complete(pageHistory(msg.count))
+            is Msg.Close -> {
+                closeWriter()
+                msg.done.complete(Unit)
+            }
         }
     }
 
@@ -223,6 +242,34 @@ class GameConsoleService(
         val result = CompletableDeferred<List<LogEntry>>()
         channel.trySend(Msg.LoadHistory(count, result))
         return result.await()
+    }
+
+    /**
+     * Stop the drainer and let go of the session file. Routed through the channel
+     * so the writer is closed by its owner thread, after every already-queued line
+     * has been mirrored.
+     *
+     * The Koin singleton lives as long as the process, so nothing in the shell
+     * calls this; it exists for callers that must release the handle while the
+     * process keeps running -- a test tearing down its temp dir, or a data-dir
+     * migration. Windows refuses to delete or move a file that is still open.
+     * Idempotent: a second call finds the channel closed and returns.
+     */
+    suspend fun close() {
+        val done = CompletableDeferred<Unit>()
+        val queued = channel.trySend(Msg.Close(done)).isSuccess
+        // Bounded on purpose. The drainer owns the writer, so the handshake is
+        // what keeps queued lines ordered ahead of the close -- but a drainer
+        // that died on an unexpected throw would otherwise strand the caller
+        // forever, and a console mirror is never worth hanging a shutdown over.
+        val acked = queued && withTimeoutOrNull(CLOSE_ACK_TIMEOUT_MS) { done.await() } != null
+        channel.close()
+        scope.cancel()
+        if (queued && !acked) {
+            // Nothing is draining any more, so there is no writer to race with.
+            log.warn("Console drainer did not acknowledge close; releasing the session file directly")
+            closeWriter()
+        }
     }
 
     // ── Drainer-thread implementation ────────────────────────────────────────
@@ -449,6 +496,9 @@ class GameConsoleService(
     companion object {
         private const val MARKER_WARN  = "[WARN]"
         private const val MARKER_ERROR = "[ERROR]"
+
+        /** How long [close] waits for the drainer to hand the writer back. */
+        private const val CLOSE_ACK_TIMEOUT_MS = 5_000L
 
         /** Filesystem-safe form of a pack/server id for log file names. */
         private fun sanitizeId(id: String): String =

@@ -91,4 +91,12 @@ data class PackInstance(
      * update / safely delete, leaving user-added files (which are NOT in here) alone.
      */
     val installedManifest: FileManifest? = null,
+    /**
+     * Whether this instance auto-updates to the mirror's latest build. True
+     * (default) = follow latest; false = pinned, i.e. the user opted out of
+     * auto-updates and stays on [pinnedPackVersion] until they update by hand.
+     * Distinct from [pinnedPackVersion], which always records the CURRENT
+     * installed version regardless of this policy.
+     */
+    val followLatest: Boolean = true,
 )

@@ -1,5 +1,7 @@
 package hivens.launcher.instance
 
+import hivens.core.io.InstanceMutationLock
+import hivens.core.io.fileOpRetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -27,26 +29,34 @@ class InstanceContentManager {
     /** Flip a content item on/off by adding or removing the `.disabled` suffix. */
     suspend fun setEnabled(instanceDir: Path, kind: ContentKind, fileName: String, enabled: Boolean) =
         withContext(Dispatchers.IO) {
-            val dir = instanceDir.resolve(folderFor(kind))
-            val on = dir.resolve(fileName)
-            val off = dir.resolve("$fileName.disabled")
-            runCatching {
-                if (enabled) {
-                    if (Files.exists(off)) Files.move(off, on, StandardCopyOption.ATOMIC_MOVE)
-                } else {
-                    if (Files.exists(on)) Files.move(on, off, StandardCopyOption.ATOMIC_MOVE)
-                }
-            }.onFailure { log.warn("Toggle {} ({}) failed: {}", fileName, enabled, it.message) }
+            InstanceMutationLock.withLock(instanceDir) {
+                val dir = instanceDir.resolve(folderFor(kind))
+                val on = dir.resolve(fileName)
+                val off = dir.resolve("$fileName.disabled")
+                runCatching {
+                    fileOpRetry("toggle $fileName") {
+                        if (enabled) {
+                            if (Files.exists(off)) Files.move(off, on, StandardCopyOption.ATOMIC_MOVE)
+                        } else {
+                            if (Files.exists(on)) Files.move(on, off, StandardCopyOption.ATOMIC_MOVE)
+                        }
+                    }
+                }.onFailure { log.warn("Toggle {} ({}) failed: {}", fileName, enabled, it.message) }
+            }
         }
 
     /** Remove the item, whether currently enabled or `.disabled`. */
     suspend fun delete(instanceDir: Path, kind: ContentKind, fileName: String) =
         withContext(Dispatchers.IO) {
-            val dir = instanceDir.resolve(folderFor(kind))
-            runCatching {
-                Files.deleteIfExists(dir.resolve(fileName))
-                Files.deleteIfExists(dir.resolve("$fileName.disabled"))
-            }.onFailure { log.warn("Delete {} failed: {}", fileName, it.message) }
+            InstanceMutationLock.withLock(instanceDir) {
+                val dir = instanceDir.resolve(folderFor(kind))
+                runCatching {
+                    fileOpRetry("delete $fileName") {
+                        Files.deleteIfExists(dir.resolve(fileName))
+                        Files.deleteIfExists(dir.resolve("$fileName.disabled"))
+                    }
+                }.onFailure { log.warn("Delete {} failed: {}", fileName, it.message) }
+            }
         }
 
     /**
@@ -56,14 +66,16 @@ class InstanceContentManager {
      */
     suspend fun addFiles(instanceDir: Path, kind: ContentKind, sources: List<Path>): Int =
         withContext(Dispatchers.IO) {
-            val dir = instanceDir.resolve(folderFor(kind))
-            Files.createDirectories(dir)
-            sources.count { src ->
-                val target = dir.resolve(src.name)
-                runCatching {
-                    if (Files.exists(target)) false
-                    else { Files.copy(src, target); true }
-                }.getOrElse { log.warn("Add {} failed: {}", src, it.message); false }
+            InstanceMutationLock.withLock(instanceDir) {
+                val dir = instanceDir.resolve(folderFor(kind))
+                Files.createDirectories(dir)
+                sources.count { src ->
+                    val target = dir.resolve(src.name)
+                    runCatching {
+                        if (Files.exists(target)) false
+                        else { fileOpRetry("add ${src.name}") { Files.copy(src, target) }; true }
+                    }.getOrElse { log.warn("Add {} failed: {}", src, it.message); false }
+                }
             }
         }
 }

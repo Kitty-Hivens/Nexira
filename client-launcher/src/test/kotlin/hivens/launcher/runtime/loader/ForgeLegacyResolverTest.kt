@@ -1,5 +1,6 @@
 package hivens.launcher.runtime.loader
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -58,7 +59,7 @@ class ForgeLegacyResolverTest {
                 else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
             }
         }
-        val resolver = ForgeLegacyResolver(HttpClientProvider { HttpClient(engine) }, json, forgeMavenBase = MAVEN_BASE)
+        val resolver = ForgeLegacyResolver(HttpClientProvider { HttpClient(engine) }, testTransferEngine(HttpClientProvider { HttpClient(engine) }), json, forgeMavenBase = MAVEN_BASE)
 
         val profile = resolver.resolve("1.12.2", "14.23.5.2860")
 
@@ -80,26 +81,26 @@ class ForgeLegacyResolverTest {
 
     @Test
     fun `extractTweakArgs falls back to the canonical FML tweaker when absent`() {
-        val resolver = ForgeLegacyResolver(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }, json)
+        val resolver = ForgeLegacyResolver(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }, testTransferEngine(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }), json)
         assertEquals(ForgeLegacyResolver.DEFAULT_TWEAK_ARGS, resolver.extractTweakArgs(null))
         assertEquals(ForgeLegacyResolver.DEFAULT_TWEAK_ARGS, resolver.extractTweakArgs("--username x --gameDir y"))
     }
 
     @Test
     fun `resolveForgeBuild keeps a published build`() = runTest {
-        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, json, forgeMavenBase = MAVEN_BASE)
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, testTransferEngine(HttpClientProvider { HttpClient(metadataEngine()) }), json, forgeMavenBase = MAVEN_BASE)
         assertEquals("14.23.5.2864", r.resolveForgeBuild("1.12.2", "14.23.5.2864"))
     }
 
     @Test
     fun `resolveForgeBuild maps a non-published SC-custom build to latest official`() = runTest {
-        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, json, forgeMavenBase = MAVEN_BASE)
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, testTransferEngine(HttpClientProvider { HttpClient(metadataEngine()) }), json, forgeMavenBase = MAVEN_BASE)
         assertEquals("14.23.5.2864", r.resolveForgeBuild("1.12.2", "14.23.5.2922"))
     }
 
     @Test
     fun `compareForgeBuilds orders by numeric tuple`() {
-        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }, json)
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }, testTransferEngine(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }), json)
         assertTrue(r.compareForgeBuilds("14.23.5.2860", "14.23.5.2864") < 0)
         assertTrue(r.compareForgeBuilds("14.23.5.2922", "14.23.5.2864") > 0)
     }

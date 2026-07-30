@@ -1,6 +1,7 @@
 package hivens.core.cache
 
 import hivens.test.TestClock
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
@@ -9,6 +10,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -213,6 +215,46 @@ class DefaultCacheTest {
         // inFlight must have been cleared in the leader's finally, so a fresh get
         // becomes a new leader rather than awaiting a dead deferred.
         assertEquals("v2", cache.get("k") { "v2" })
+    }
+
+    @Test
+    fun `refresh reloads inside the TTL, where get would have answered from cache`() = runTest {
+        val clock = TestClock()
+        val calls = AtomicInteger(0)
+        var current = "old"
+        val cache = cache(MapDiskStore<String>(), CacheConfig(ttlMs = 10_000), clock)
+        val loader: suspend () -> String = { calls.incrementAndGet(); current }
+
+        assertEquals("old", cache.get("k", loader))
+        current = "new"
+
+        // Well inside the TTL: this is exactly the window where a "check now"
+        // button used to report a stale answer as if it had just looked.
+        assertEquals("old", cache.get("k", loader))
+        assertEquals(1, calls.get())
+
+        assertEquals("new", cache.refresh("k", loader))
+        assertEquals(2, calls.get(), "refresh must reach the loader despite a fresh entry")
+        assertEquals("new", cache.get("k", loader), "the refreshed value replaces the cached one")
+        assertEquals(2, calls.get())
+    }
+
+    @Test
+    fun `concurrent refreshes collapse to one upstream load`() = runTest {
+        val clock = TestClock()
+        val calls = AtomicInteger(0)
+        val gate = CompletableDeferred<Unit>()
+        val cache = cache(MapDiskStore<String>(), CacheConfig(ttlMs = 1_000), clock)
+        val loader: suspend () -> String = { calls.incrementAndGet(); gate.await(); "v" }
+
+        val a = async { cache.refresh("k", loader) }
+        val b = async { cache.refresh("k", loader) }
+        runCurrent()
+        gate.complete(Unit)
+
+        assertEquals("v", a.await())
+        assertEquals("v", b.await())
+        assertEquals(1, calls.get(), "a burst of explicit refreshes is still one call")
     }
 
     @Test

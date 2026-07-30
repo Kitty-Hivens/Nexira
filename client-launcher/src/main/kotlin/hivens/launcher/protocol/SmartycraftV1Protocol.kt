@@ -1,9 +1,9 @@
 package hivens.launcher.protocol
 
 import hivens.config.Protocol
+import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IServerProtocol
 import hivens.core.api.protocol.*
-import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.ServerProtocolConfig
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -31,12 +31,12 @@ import org.slf4j.LoggerFactory
  *   second attempt uses the fresh hash. Caller sees a single
  *   successful `loader()`.
  *
- * Out of scope: HTTP retry / channel switching (handled by
- * [ChannelRouter]), response caching (repositories cache themselves),
- * crash-report submission (Nexira uses Beacon, not server-side).
+ * Out of scope: HTTP retry (each caller decides), response caching
+ * (repositories cache themselves), crash-report submission (Nexira uses
+ * Beacon, not server-side).
  */
 class SmartycraftV1Protocol(
-    private val router: ChannelRouter,
+    private val clientProvider: HttpClientProvider,
     private val json: Json,
     private val launcherHashCache: LauncherHashCache,
     private val config: ServerProtocolConfig,
@@ -127,22 +127,20 @@ class SmartycraftV1Protocol(
         val jsonPayload = json.encodeToString(UploadRequest(login = login))
         val signature = SmartycraftSignatureBuilder.forUpload(uid, login)
         return try {
-            val raw = router.execute { client ->
-                val response = client.post(config.authUrl) {
-                    setBody(MultiPartFormDataContent(
-                        formData {
-                            append("action", action)
-                            append("json", jsonPayload)
-                            append("check", signature)
-                            append(binaryFieldName, bytes, Headers.build {
-                                append(HttpHeaders.ContentType, "image/png")
-                                append(HttpHeaders.ContentDisposition, "filename=\"$binaryFieldName.png\"")
-                            })
-                        }
-                    ))
-                }
-                response.body<String>().trim()
+            val response = clientProvider.current.post(config.authUrl) {
+                setBody(MultiPartFormDataContent(
+                    formData {
+                        append("action", action)
+                        append("json", jsonPayload)
+                        append("check", signature)
+                        append(binaryFieldName, bytes, Headers.build {
+                            append(HttpHeaders.ContentType, "image/png")
+                            append(HttpHeaders.ContentDisposition, "filename=\"$binaryFieldName.png\"")
+                        })
+                    }
+                ))
             }
+            val raw = response.body<String>().trim()
             parseJsonTolerant<StatusOnlyResponse>(raw)
                 ?: StatusOnlyResponse(status = "ERROR", message = "Malformed $action response")
         } catch (e: Exception) {
@@ -155,14 +153,13 @@ class SmartycraftV1Protocol(
      * Network failures propagate as exceptions; each caller decides
      * whether to retry (auth flow via [hivens.core.util.retryWithBackoff])
      * or surface as an ERROR-status response. Swallowing here would hide
-     * IOException from the shouldRetry predicate and make the SOCKS h2
-     * reset retry chain dead code.
+     * IOException from the shouldRetry predicate and make that retry chain
+     * dead code.
      */
-    private suspend fun postForm(params: Parameters): String =
-        router.execute { client ->
-            val response = client.post(config.authUrl) { setBody(FormDataContent(params)) }
-            response.body<String>().trim()
-        }
+    private suspend fun postForm(params: Parameters): String {
+        val response = clientProvider.current.post(config.authUrl) { setBody(FormDataContent(params)) }
+        return response.body<String>().trim()
+    }
 
     private inline fun <reified T> parseJsonTolerant(raw: String): T? {
         if (raw.isBlank()) return null

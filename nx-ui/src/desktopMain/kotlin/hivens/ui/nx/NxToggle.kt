@@ -23,7 +23,8 @@ import hivens.ui.theme.NxTheme
  * in-plane settings row. The one toggle row every section composes, so a
  * boolean setting reads the same everywhere instead of each screen rolling its
  * own switch row (Rule 0/D04). [enabled] greys the row; [accent] overrides the
- * checked track for semantic toggles.
+ * checked track for semantic toggles. [trailing] renders between the text and
+ * the switch (a side badge, a meta chip) without the caller re-rolling the row.
  */
 @Composable
 fun NxToggle(
@@ -34,6 +35,7 @@ fun NxToggle(
     icon: IconKey? = null,
     enabled: Boolean = true,
     accent: Color? = null,
+    trailing: (@Composable () -> Unit)? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val alpha = if (enabled) 1f else 0.4f
@@ -70,6 +72,10 @@ fun NxToggle(
             }
         }
         Spacer(Modifier.width(12.dp))
+        if (trailing != null) {
+            trailing()
+            Spacer(Modifier.width(12.dp))
+        }
         NxSwitch(
             checked         = checked,
             onCheckedChange = onCheckedChange,

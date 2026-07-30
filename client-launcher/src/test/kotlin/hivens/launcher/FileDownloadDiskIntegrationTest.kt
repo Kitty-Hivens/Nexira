@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
@@ -578,6 +579,164 @@ class FileDownloadDiskIntegrationTest {
             "failed sync must NOT mark manifest as cleanly-synced")
     }
 
+    // ── Resume correctness ─────────────────────────────────────────────────
+
+    @Test
+    fun `an updated file is replaced, not appended to`() = runBlocking {
+        // The ordinary case: a mod changed upstream. The stale copy is on disk
+        // and its hash no longer matches, which is exactly why it is being
+        // downloaded -- so its length must not be read as a resume offset. A
+        // range-honouring server used to turn that into old-bytes plus new-tail,
+        // at the length the manifest expects, which the cheap size check then
+        // accepted forever after.
+        val oldBytes = "OLD-VERSION-OF-THE-MOD".toByteArray()
+        val newBytes = "NEW-VERSION-OF-THE-MOD-WITH-MORE".toByteArray()
+        val stale = clientDir.resolve("mods/foo.jar")
+        Files.createDirectories(stale.parent)
+        Files.write(stale, oldBytes)
+
+        val svc = service(HttpClientProvider(rangeHonouringClient(newBytes)))
+        svc.processSession(
+            sessionWith(manifestOf(mapOf("mods/foo.jar" to newBytes))),
+            "Industrial", clientDir, null, null, null, null,
+        )
+
+        assertEquals(newBytes.toList(), Files.readAllBytes(stale).toList(),
+            "the updated file must be the upstream bytes, not a splice of both versions")
+    }
+
+    @Test
+    fun `a download that completes with the wrong bytes leaves the previous copy in place`() = runBlocking {
+        // Deliberately a transfer that SUCCEEDS and then fails verification, not
+        // one that 500s. A server that never sends a body leaves the file alone
+        // whatever the staging does, so testing against that proves nothing --
+        // the damage came from bytes reaching the live path before anything
+        // checked them.
+        val oldBytes = "THE-WORKING-MOD".toByteArray()
+        val stale = clientDir.resolve("mods/foo.jar")
+        Files.createDirectories(stale.parent)
+        Files.write(stale, oldBytes)
+
+        val declared = "WHAT-THE-MANIFEST-PROMISES".toByteArray()
+        val svc = service(HttpClientProvider(alwaysRespondingClient("WRONG-BYTES-FROM-THE-HOST".toByteArray())))
+        runCatching {
+            svc.processSession(
+                sessionWith(manifestOf(mapOf("mods/foo.jar" to declared))),
+                "Industrial", clientDir, null, null, null, null,
+            )
+        }
+
+        assertEquals(oldBytes.toList(), Files.readAllBytes(stale).toList(),
+            "a sync that could not deliver the declared bytes must not damage what already worked")
+    }
+
+    @Test
+    fun `bytes that do not match the manifest hash never reach the file`() = runBlocking {
+        // The manifest names one thing and the host serves another -- a stale
+        // CDN edge, or a middlebox. Nothing downstream re-hashes, so without a
+        // check here the wrong bytes simply become the installed file.
+        val declared = "WHAT-THE-MANIFEST-PROMISES".toByteArray()
+        val served = "SOMETHING-ELSE-ENTIRELY-XX".toByteArray()
+        val target = clientDir.resolve("mods/foo.jar")
+
+        val svc = service(HttpClientProvider(alwaysRespondingClient(served)))
+        runCatching {
+            svc.processSession(
+                sessionWith(manifestOf(mapOf("mods/foo.jar" to declared))),
+                "Industrial", clientDir, null, null, null, null,
+            )
+        }
+
+        assertTrue(!Files.exists(target), "bytes that failed the hash check were installed anyway")
+    }
+
+    @Test
+    fun `strict mod check deletes a foreign zip, which a 1_7_10 loader would have run`() = runBlocking {
+        // Forge 1.7.10 discovers mods matching `(.+).(zip|jar)$`; the pattern is
+        // gone by 1.12.2. The launcher does not get to assume the newer loader,
+        // since a SmartyCraft server with no version in the list defaults to
+        // 1.7.10, so a prune that only knew about .jar left a loadable file.
+        val files = mapOf("mods/keeper.jar" to "keep me".toByteArray())
+        val (svc, _) = newService(files)
+
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.write(clientDir.resolve("mods/cheat.zip"), "loadable on 1.7.10".toByteArray())
+
+        svc.processSession(
+            sessionWith(manifestOf(files)), "Industrial", clientDir,
+            null, null, null, null,
+            strictModCheck = true,
+        )
+
+        assertTrue(!Files.exists(clientDir.resolve("mods/cheat.zip")),
+            "a foreign .zip in mods/ survived the strict check")
+        assertTrue(Files.exists(clientDir.resolve("mods/keeper.jar")),
+            "the manifest jar must still survive")
+    }
+
+    // ── Hostile manifest ───────────────────────────────────────────────────
+
+    @Test
+    fun `a manifest entry climbing out of the instance writes nothing outside it`() = runBlocking {
+        // The manifest is a document the server sends, so its paths are the
+        // server's to choose. Nested `..` keys flatten to `mods/../../..`,
+        // whose first segment still reads as a known root directory, and
+        // Path.resolve does not normalise -- the write used to land wherever
+        // the entry pointed. The realistic target is a startup file.
+        //
+        // Served by a mock that answers every URL, deliberately: matching by
+        // path made the test vacuous, because ktor normalises the dot segments
+        // out of the request and the unmatched-URL branch failed the sync
+        // before anything was written. The transport must not be what stops
+        // this -- the boundary check must.
+        val payload = "#!/bin/sh\necho pwned".toByteArray()
+        val escaping = "mods/../../../pwned.sh"
+        // The climb goes through mods/, and the OS only resolves `..` through a
+        // directory that exists -- without this the write fails on its own and
+        // the test proves nothing. Every synced instance has one.
+        Files.createDirectories(clientDir.resolve("mods"))
+        val svc = service(HttpClientProvider(alwaysRespondingClient(payload)))
+
+        assertFails {
+            svc.processSession(
+                session = sessionWith(manifestOf(mapOf(escaping to payload))),
+                serverId = "Industrial",
+                targetDir = clientDir,
+                extraCheckSum = null,
+                ignoredFiles = null,
+                messageUI = null,
+                progressUI = null,
+            )
+        }
+
+        // clientDir is <workDir>/clients/Industrial, so three levels up is
+        // workDir's parent -- outside the sandbox entirely. Assert against the
+        // resolved location rather than trusting the exception alone.
+        val escaped = clientDir.resolve(escaping).normalize()
+        assertTrue(!Files.exists(escaped), "a manifest entry wrote outside the instance: $escaped")
+    }
+
+    @Test
+    fun `an absolute manifest entry lands inside the instance, not at its own path`() = runBlocking {
+        // Not a traversal on this platform, and worth pinning as such: the
+        // leading empty segment is not a known root directory, so normalizePath
+        // strips it as a server-name prefix and what remains is relative. The
+        // boundary check still stands behind that for the shapes it does not
+        // neutralise -- a Windows drive-qualified path splits into one segment
+        // and stays absolute. Refusal itself is covered in PathBoundaryTest.
+        val marker = workDir / "absolute-escape.txt"
+        val payload = "x".toByteArray()
+        val entry = marker.toString()
+        val manifest = FileManifest(files = mapOf(entry to FileData(md5 = md5Hex(payload), size = payload.size.toLong())))
+        val (svc, _) = newService(mapOf(entry to payload))
+
+        runCatching {
+            svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+        }
+
+        assertTrue(!Files.exists(marker), "an absolute entry wrote to its own path")
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /**
@@ -625,12 +784,60 @@ class FileDownloadDiskIntegrationTest {
         return service(HttpClientProvider { client })
     }
 
+    /**
+     * Serves [payload] for any URL. Used where the point of the test is what
+     * the service does with a path, so a mock that 404s an unexpected URL
+     * would hide the behaviour under test.
+     */
+    private fun alwaysRespondingClient(payload: ByteArray): () -> HttpClient = {
+        HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    respond(
+                        content = ByteReadChannel(payload),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf("Content-Type", "application/octet-stream"),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Serves [payload] and honours a Range header with a 206, which is what
+     * makes the resume path run at all. A server that ignores Range hides the
+     * behaviour these tests are about.
+     */
+    private fun rangeHonouringClient(payload: ByteArray): () -> HttpClient = {
+        HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val range = request.headers[io.ktor.http.HttpHeaders.Range]
+                    val from = range?.removePrefix("bytes=")?.substringBefore('-')?.toIntOrNull() ?: 0
+                    if (from > 0 && from <= payload.size) {
+                        respond(
+                            content = ByteReadChannel(payload.copyOfRange(from, payload.size)),
+                            status = HttpStatusCode.PartialContent,
+                            headers = headersOf("Content-Type", "application/octet-stream"),
+                        )
+                    } else {
+                        respond(
+                            content = ByteReadChannel(payload),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf("Content-Type", "application/octet-stream"),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun service(provider: HttpClientProvider): FileDownloadService {
         val protectedPaths = ProtectedPaths(workDir / "protected-paths.json", json)
         val manifestCache = ManifestCache(workDir / "manifest-cache", json)
         // Default config -- clientFilesBase resolves to a fake URL but the
         // MockEngine matches by path-suffix so the host is irrelevant.
-        return FileDownloadService(provider, protectedPaths, manifestCache, ServerProtocolConfig())
+        return FileDownloadService(testTransferEngine(provider), protectedPaths, manifestCache, ServerProtocolConfig())
     }
 
     private fun sessionWith(manifest: FileManifest) = SessionData(

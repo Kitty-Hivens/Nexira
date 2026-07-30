@@ -3,6 +3,20 @@
 Changelog von Nexira auf Deutsch. Gepflegt ab Version 2.3.4-beta4; die
 vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
 
+## [2.4.0-beta] - 2026-07-30
+
+2.4.0-beta setzt die Vorschau fort und baut neu, was der Launcher mit dem Netzwerk tut. Jede Datei, die er auf die Platte holt -- eine Laufzeitumgebung, ein JDK, ein Pack, eine Mod, ein Loader-Installer, sein eigenes Update -- läuft jetzt über eine einzige Transfer-Engine, die erneut versucht, dort weitermacht, wo die Verbindung abriss, und auf einen Mirror ausweicht; eine geprüfte Datei behält eine Blockkarte, sodass ein beschädigtes Pack über seine beschädigten Blöcke repariert statt neu geladen wird. Die Builds eines Packs bekommen einen eigenen Bildschirm mit Änderungen je Build, Wechsel und Rückrollen, und Pack-Updates melden sich selbst im Benachrichtigungszentrum. Nightly-Builds und ein Vorabversionen-Schalter ersetzen das Update-Manager-Fenster. Ein Härtungs-Durchgang hält Sitzungs-Tokens aus Logs und Diagnosepaketen heraus, begrenzt eine akzeptierte Zertifikatsausnahme auf den Host, für den sie erteilt wurde, und beschränkt jeden Pfad und jedes Archiv, das ein Server-Dokument wählen darf. ProGuard ist weg, und das Linux-AppImage sinkt auf ~74 MB.
+
+### Highlights
+- **Dies ist eine Beta**. Sie trägt alles seit der 2.4.0-Vorschau -- melde Kaputtes bitte weiterhin im Issue-Tracker.
+- **Downloads, die eine schlechte Verbindung überstehen**. Jeder Download wiederholt jetzt und macht dort weiter, wo er stehenblieb, statt neu zu beginnen, große Dateien werden in parallel geholten Blöcken übertragen, und es gibt einen Wechsel auf einen anderen Mirror -- ein Abbruch mitten in einer 200-MB-Laufzeitumgebung oder einem 300-MB-Resourcepack kostet Sekunden, nicht den ganzen Transfer.
+- **Ein Pack reparieren, statt es neu zu laden**. Die Pack-Einstellungen bekommen Prüfen und Reparieren: geprüft wird gegen den Build, an den das Pack gebunden ist, und geholt werden nur die beschädigten Teile der beschädigten Dateien. Deine eigenen Jars, deine abgeschalteten optionalen Mods und deine bearbeiteten Configs bleiben unangetastet.
+- **Jeder Build eines Packs, mit seinen Änderungen**. Ein Versionsbildschirm listet die vorgehaltenen Builds des Mirrors und zeigt, was jeder hinzufügt, aktualisiert und entfernt -- so wechselst du auf einen bestimmten Build oder rollst zurück, mit der Änderung vor Augen.
+- **Updates melden sich selbst**. Ein neuer Pack-Build löst eine Benachrichtigung aus, und die Bibliothekskarte trägt eine anklickbare Update-Pille, statt dass ein Update still oder gar nicht passiert.
+- **SmartyCraft-Server auf modernem Minecraft**. Der Beitritt zum Server eines SC-gebundenen Packs auf einer modernen Version funktioniert, und die Skins anderer Spieler werden geladen, statt auf den Standard zurückzufallen.
+- **Ein leichterer Launcher**. Das Linux-AppImage sinkt von ~95,6 MB auf ~74 MB, ein eigenes Hintergrundbild wird in der Größe deines Displays zwischengespeichert statt bei jedem Start in voller Auflösung dekodiert, und der Inhalte-Tab knackt nicht mehr bei jedem Öffnen alle Jars neu.
+- **Dein Sitzungs-Token bleibt aus den Logs heraus**. Es erreicht `game.log` nicht mehr, der Absturzbericht und das Diagnosepaket werden schon beim Schreiben bereinigt, und die Anmeldedatei wird nur für dich lesbar angelegt.
+
 ## [2.4.0-preview] - 2026-07-14
 
 2.4.0 öffnet den Launcher zur weiteren Mod-Welt. Ein neuer Browse-Tab sucht und installiert Modrinth-Modpacks, importiert eine `.mrpack`, ein CurseForge-Zip oder eine Instanz aus einem anderen Launcher und baut ein Pack von Grund auf; ein Kleiderschrank verwaltet Skins und Umhänge über einer überarbeiteten 3D-Figur; der Launcher kann dem Farbschema des Desktops folgen; und ein Boot-Screen plus ein Wiederherstellungsmodus tragen einen Start, der schiefgeht. Darunter zieht die gesamte Oberfläche auf ein einziges Designsystem um, die Start-Engine teilt sich in GUI-freie Module mit einer nativen CLI, und der Build wechselt auf Java 26.

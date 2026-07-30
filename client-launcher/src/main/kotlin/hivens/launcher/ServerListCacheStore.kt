@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.core.api.model.ServerProfile
+import hivens.launcher.platform.ServerNameValidator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -48,10 +49,9 @@ interface ServerListCacheStore {
  * { "schema_version": 1, "servers": [ <ServerProfile>, ... ] }
  * ```
  *
- * The versioned envelope mirrors [JsonPackRepository] so the same
- * schema-evolution story applies: a future bump branches on
- * `schema_version` cleanly instead of guessing whether a bare array
- * is "valid empty" or "v0 corruption".
+ * The versioned envelope keeps a clean schema-evolution story: a future
+ * bump branches on `schema_version` instead of guessing whether a bare
+ * array is "valid empty" or "v0 corruption".
  *
  * Behaviour contract:
  *  - Missing file -> empty list, no log noise (cold start).
@@ -87,7 +87,14 @@ class JsonServerListCacheStore(
                     file, parsed.schemaVersion, SCHEMA_VERSION,
                 )
             }
-            parsed.servers
+            // Screened on the way out as well as on the way in. This file holds
+            // whatever a previous build accepted, so an assetDir that would not
+            // be admitted today must not re-enter through it.
+            parsed.servers.filter { profile ->
+                ServerNameValidator.isValid(profile.assetDir).also { ok ->
+                    if (!ok) log.warn("Dropping cached server '{}': its assetDir is not a usable directory name", profile.name)
+                }
+            }
         } catch (e: Exception) {
             log.error("Failed to load servers cache at {} -- starting empty", file, e)
             emptyList()

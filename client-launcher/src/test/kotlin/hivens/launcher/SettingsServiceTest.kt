@@ -19,8 +19,8 @@ import kotlin.test.assertEquals
 
 /**
  * #189 -- SettingsService is read by Compose UI threads (settings screen
- * recomposition) and IO coroutines (startup load, Conduit force-proxy
- * restore). Without coordination two concurrent saves could race the file
+ * recomposition) and IO coroutines (startup load, override restore).
+ * Without coordination two concurrent saves could race the file
  * write and the UI could observe a half-applied SettingsData.
  */
 class SettingsServiceTest {

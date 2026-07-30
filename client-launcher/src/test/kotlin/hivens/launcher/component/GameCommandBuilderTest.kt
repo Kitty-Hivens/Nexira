@@ -164,7 +164,11 @@ class GameCommandBuilderTest {
     fun `build includes auth host overrides`() {
         val cmd = build("1.7.10")
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
-        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+        // The session pair lives at the BARE host over plain http -- SC's own
+        // patched authlib hardcodes that environment; /launcher/ and https 404.
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=http://") && !it.contains("/launcher") })
+        // Modern authlib ignores the redirect wholesale without services.host.
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=http://") && !it.contains("/launcher") })
     }
 
     @Test
@@ -581,7 +585,8 @@ class GameCommandBuilderTest {
         val cmd = packCommand(redirectAuthHost = true)
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
         assertTrue(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
-        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=http://") && !it.contains("/launcher") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.services.host=http://") && !it.contains("/launcher") })
     }
 
     @Test
@@ -592,6 +597,7 @@ class GameCommandBuilderTest {
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+        assertFalse(cmd.any { it.startsWith("-Dminecraft.api.services.host=") })
     }
 
     @Test
@@ -638,6 +644,73 @@ class GameCommandBuilderTest {
             "client jar must be a single full-path cp entry, got: $parts",
         )
         assertTrue(parts.none { it.contains("${File.separator}mods${File.separator}") }, "mods stay off the classpath")
+    }
+
+    // A Cleanroom runtime -- launchwrapper-family like forgeRuntime, but the
+    // bootstrap is top.outlands.foundation.boot.Foundation (launchwrapper's
+    // replacement) rather than launchwrapper itself.
+    private fun cleanroomRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("com.google.guava:guava:33.6.0-jre"), Path.of("/libs/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.ow2.asm:asm:9.10.1"), Path.of("/libs/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar")),
+            ResolvedLibrary(MavenCoord.parse("top.outlands:foundation:0.19.8"), Path.of("/libs/top/outlands/foundation/0.19.8/foundation-0.19.8.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.lwjgl:lwjgl-glfw:3.4.1"), Path.of("/libs/org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1.jar")),
+            ResolvedLibrary(MavenCoord.parse("com.cleanroommc:cleanroom:0.6.4-alpha"), Path.of("/libs/com/cleanroommc/cleanroom/0.6.4-alpha/cleanroom-0.6.4-alpha.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar"),
+        mainClass = "top.outlands.foundation.boot.Foundation",
+        assetIndexId = "1.12",
+        gameArgs = listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"),
+        javaMajor = 25,
+    )
+
+    @Test
+    fun `buildPackCommand puts the Cleanroom Foundation bootstrap ahead of the client jar`() {
+        val rt = cleanroomRuntime()
+        val cmd = packCommand(rt, javaMajor = 25)
+        val parts = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        val foundationIdx = parts.indexOfFirst { it.contains("foundation") }
+        val clientIdx = parts.indexOf(rt.clientJar.toAbsolutePath().toString())
+        assertTrue(foundationIdx >= 0, "foundation jar present, got: $parts")
+        assertTrue(clientIdx >= 0, "client jar is one entry, got: $parts")
+        assertTrue(foundationIdx < clientIdx, "Foundation must precede the client jar; got: $parts")
+        assertTrue(parts[0].contains("foundation") || parts[0].contains("asm"), "bootstrap jar first, got ${parts[0]}")
+    }
+
+    // A modern (BootstrapLauncher) runtime -- drives modernClasspath, unlike the
+    // legacy launchwrapper forgeRuntime.
+    private fun modernRuntime(clientResources: Path? = null) = forgeRuntime().copy(
+        libraries = forgeRuntime().libraries + ResolvedLibrary(
+            MavenCoord.parse("cpw.mods:bootstraplauncher:1.1.2"),
+            Path.of("/libs/cpw/mods/bootstraplauncher/1.1.2/bootstraplauncher-1.1.2.jar"),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.21.1/minecraft-1.21.1.jar"),
+        mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher",
+        clientResourcesJar = clientResources,
+    )
+
+    @Test
+    fun `modern -cp carries the resources-only client jar for its version json but never the class-bearing client`() {
+        val extra = Path.of("/libs/net/minecraft/client/1.21.1-20240808.144430/client-1.21.1-20240808.144430-extra.jar")
+        val cmd = packCommand(modernRuntime(clientResources = extra), javaMajor = 21)
+        val cp = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        assertTrue(
+            cp.contains(extra.toAbsolutePath().toString()),
+            "the -extra (version.json, no classes) jar must be on -cp so CustomSkinLoader reads the real MC version; got: $cp",
+        )
+        // The class-bearing client stays OFF -cp -- a second `minecraft` module
+        // would break BootstrapLauncher ("reads more than one module named minecraft").
+        assertFalse(
+            cp.contains(modernRuntime().clientJar.toAbsolutePath().toString()),
+            "the class-bearing client jar must NOT be on -cp; got: $cp",
+        )
+    }
+
+    @Test
+    fun `modern -cp omits the resources jar when the runtime has none`() {
+        val cmd = packCommand(modernRuntime(clientResources = null), javaMajor = 21)
+        val cp = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        assertFalse(cp.any { it.endsWith("-extra.jar") }, "no resources jar expected on -cp; got: $cp")
     }
 
     @Test
@@ -777,5 +850,51 @@ class GameCommandBuilderTest {
         val cmd = packCommand()
         assertTrue(cmd.none { it.startsWith("-javaagent:") }, "no -javaagent without paths")
         assertTrue(cmd.none { it.startsWith("-Dnexira.profiler.out=") }, "no out-property without paths")
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // buildPackCommand -- optional game-window geometry
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private fun packCommandWindow(width: Int?, height: Int?, fullScreen: Boolean) = builder.buildPackCommand(
+        javaExec = "/usr/bin/java",
+        memoryMB = 4096,
+        gameDir = Path.of("/tmp/instances/Industrial"),
+        sharedAssetsDir = Path.of("/tmp/shared/assets"),
+        sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+        nativesDirName = "bin/natives-1.12.2",
+        versionLabel = "Forge 1.12.2",
+        javaMajor = 8,
+        runtime = forgeRuntime(),
+        session = session(),
+        jvmArgsOverride = null,
+        windowWidth = width,
+        windowHeight = height,
+        fullScreen = fullScreen,
+    )
+
+    @Test
+    fun `buildPackCommand omits window geometry when no size is given`() {
+        val cmd = packCommand()
+        assertFalse(cmd.contains("--width"), "no --width by default")
+        assertFalse(cmd.contains("--height"), "no --height by default")
+        assertFalse(cmd.contains("--fullscreen"), "no --fullscreen by default")
+    }
+
+    @Test
+    fun `buildPackCommand emits width and height when a size is given`() {
+        val cmd = packCommandWindow(width = 1280, height = 720, fullScreen = false)
+        assertEquals("1280", cmd[cmd.indexOf("--width") + 1])
+        assertEquals("720", cmd[cmd.indexOf("--height") + 1])
+        assertFalse(cmd.contains("--fullscreen"))
+    }
+
+    @Test
+    fun `buildPackCommand emits fullscreen and drops the size in fullscreen mode`() {
+        // Fullscreen wins: the client ignores an explicit size, so we do not pass one.
+        val cmd = packCommandWindow(width = 1280, height = 720, fullScreen = true)
+        assertTrue(cmd.contains("--fullscreen"))
+        assertFalse(cmd.contains("--width"))
+        assertFalse(cmd.contains("--height"))
     }
 }

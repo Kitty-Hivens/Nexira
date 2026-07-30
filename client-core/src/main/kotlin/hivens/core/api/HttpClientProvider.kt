@@ -8,8 +8,8 @@ import io.ktor.client.HttpClient
  * on the next request without rebuilding the singleton.
  *
  * Two providers registered in `client-launcher/.../di/Modules.kt`:
- *   - default          -- Smartycraft channel (SOCKS-proxied, SSL-bypass-aware)
- *   - named("direct")  -- third-party CDNs (GitHub, BellSoft, Maven Central; no proxy, strict TLS)
+ *   - default          -- Smartycraft channel, SSL-bypass-aware
+ *   - named("direct")  -- everything else (GitHub, BellSoft, Maven Central, the mirror; strict TLS)
  */
 class HttpClientProvider(private val selector: () -> HttpClient) {
     val current: HttpClient get() = selector()

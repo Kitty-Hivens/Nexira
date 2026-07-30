@@ -8,7 +8,7 @@ import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.launcher.bootstrap.AutoLoginCoordinator.Resolution
-import hivens.launcher.network.ServerProtocolConfig
+import hivens.launcher.network.NetworkState
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -19,11 +19,9 @@ import kotlin.test.assertTrue
 
 class AutoLoginCoordinatorTest {
 
-    // The offline branch returns before touching the network deps, so strict
-    // mocks here also assert they are never called.
+    // The offline branch returns before touching the network deps, so a strict
+    // mock here also asserts it is never called.
     private val authService: AuthProvider = mockk()
-    private val insecure: AuthProvider = mockk()
-    private val protocolConfig: ServerProtocolConfig = mockk(relaxed = true)
 
     private suspend fun resolve(settings: SettingsData, saved: SessionData?, msa: MsaAuthProvider? = null) =
         AutoLoginCoordinator.resolveSession(
@@ -31,8 +29,6 @@ class AutoLoginCoordinatorTest {
             saved = saved,
             lastServerId = null,
             authService = authService,
-            insecureAuthService = insecure,
-            protocolConfig = protocolConfig,
             msaProvider = msa,
         )
 
@@ -148,6 +144,26 @@ class AutoLoginCoordinatorTest {
     fun `an unclassifiable failure resolves to Rejected`() = runTest {
         coEvery { authService.login(any(), any(), any()) } throws IllegalStateException("boom")
         assertIs<Resolution.Rejected>(resolve(SettingsData(), saved = scSaved))
+    }
+
+    @Test
+    fun `a certificate error stops auto-login instead of granting itself a bypass`() = runTest {
+        coEvery { authService.login(any(), any(), any()) } throws
+            AuthException(AuthStatus.INTERNAL_ERROR, "certificate expired", isSslError = true)
+        NetworkState.clearForTests()
+        try {
+            assertIs<Resolution.CertificateUntrusted>(resolve(SettingsData(), saved = scSaved))
+            // The point of the resolution. Turning certificate checking off is
+            // the user's decision, taken at the login panel's prompt; having
+            // saved a password once is not that decision, and the attacker who
+            // presents the bad certificate is the one who profits from it.
+            assertTrue(
+                NetworkState.listBypasses().isEmpty(),
+                "auto-login must not grant a bypass on its own",
+            )
+        } finally {
+            NetworkState.clearForTests()
+        }
     }
 
     // ── backoff policy ───────────────────────────────────────────────────────

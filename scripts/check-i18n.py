@@ -9,8 +9,8 @@
 # HardcodedText lint, so without this gate a hardcoded string sails through
 # the compiler, the tests, and review unnoticed. This is the call-site guard.
 #
-# High-precision heuristic: a Cyrillic run inside a string literal in
-# client-ui code is almost always a hardcoded RU UI string. The locale files
+# High-precision heuristic: a Cyrillic run inside a string literal in Compose UI
+# code is almost always a hardcoded RU UI string. The locale files
 # and build output are excluded by path; comments may carry Cyrillic notes
 # and are skipped; and the @PropLabel / @Widget(...) / displayName annotation
 # ARGUMENT is stripped before the scan -- the key it carries is a compile-time
@@ -34,9 +34,37 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCAN_ROOT = ROOT / "client-ui" / "src" / "desktopMain"
 SCAN_EXT = ".kt"
 EXCLUDE_DIR_PARTS = {"build", "i18n"}
+
+# Which modules count as Compose UI is asked of the build file, not kept as a
+# list here: the heuristic below is only sound where Compose is, and a list is
+# how nx-ui went unscanned after it was split out of client-ui. Any module whose
+# build applies a Compose plugin or depends on the runtime qualifies, so the next
+# UI module is covered the day it lands.
+COMPOSE_MARKERS = ("plugins.compose", "org.jetbrains.compose", "compose.runtime")
+
+# Main source sets only. A render test hardcodes labels on purpose -- the rule is
+# about what ships, and a test fixture is not user-facing text.
+def _is_main_source_set(path: Path) -> bool:
+    return path.name == "main" or path.name.endswith("Main")
+
+
+def scan_roots() -> list[Path]:
+    roots: list[Path] = []
+    for module in sorted(ROOT.iterdir()):
+        build_file = module / "build.gradle.kts"
+        src = module / "src"
+        if not src.is_dir() or not build_file.is_file():
+            continue
+        try:
+            build_text = build_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if not any(marker in build_text for marker in COMPOSE_MARKERS):
+            continue
+        roots.extend(p for p in sorted(src.iterdir()) if p.is_dir() and _is_main_source_set(p))
+    return roots
 
 # An i18n-allow marker on a line exempts it (escape hatch / false-positive
 # override). Convention: put it in a trailing comment -- "// i18n-allow".
@@ -92,9 +120,10 @@ def _excluded(path: Path) -> bool:
 
 
 def walk_targets() -> list[Path]:
-    if not SCAN_ROOT.is_dir():
-        return []
-    return [p for p in SCAN_ROOT.rglob("*" + SCAN_EXT) if not _excluded(p)]
+    out: list[Path] = []
+    for root in scan_roots():
+        out.extend(p for p in root.rglob("*" + SCAN_EXT) if not _excluded(p))
+    return out
 
 
 def main() -> int:
@@ -108,7 +137,7 @@ def main() -> int:
         "paths",
         nargs="*",
         type=Path,
-        help="restrict scan to these paths (default: client-ui desktopMain).",
+        help="restrict scan to these paths (default: every Compose module's main sources).",
     )
     args = parser.parse_args()
 

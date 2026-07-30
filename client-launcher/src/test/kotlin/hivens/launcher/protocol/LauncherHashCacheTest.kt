@@ -1,7 +1,7 @@
 package hivens.launcher.protocol
 
 import hivens.config.Storage
-import hivens.launcher.network.ChannelRouter
+import hivens.core.api.HttpClientProvider
 import hivens.launcher.network.ServerProtocolConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -47,7 +47,7 @@ class LauncherHashCacheTest {
         val downloads = AtomicInteger(0)
         val cache = LauncherHashCache(
             dataDir = dataDir,
-            router = countingRouter(downloads, body = "fake-jar-bytes".toByteArray()),
+            clientProvider = countingProvider(downloads, body = "fake-jar-bytes".toByteArray()),
             config = ServerProtocolConfig(),
         )
 
@@ -70,7 +70,7 @@ class LauncherHashCacheTest {
     fun `successful refresh updates get() and persists to cache file`() = runBlocking {
         val cache = LauncherHashCache(
             dataDir = dataDir,
-            router = countingRouter(AtomicInteger(0), body = "fake-jar-bytes".toByteArray()),
+            clientProvider = countingProvider(AtomicInteger(0), body = "fake-jar-bytes".toByteArray()),
             config = ServerProtocolConfig(),
         )
 
@@ -83,12 +83,12 @@ class LauncherHashCacheTest {
     @Test
     fun `empty download body returns null without consuming a refresh slot`() = runBlocking {
         // Edge case: server returned 200 OK but with zero bytes (CDN glitch,
-        // misconfigured proxy). Refresh must signal failure so the caller can
+        // truncated response). Refresh must signal failure so the caller can
         // surface "client too old" rather than persist an MD5 of empty bytes.
         val downloads = AtomicInteger(0)
         val cache = LauncherHashCache(
             dataDir = dataDir,
-            router = countingRouter(downloads, body = ByteArray(0)),
+            clientProvider = countingProvider(downloads, body = ByteArray(0)),
             config = ServerProtocolConfig(),
         )
 
@@ -96,7 +96,7 @@ class LauncherHashCacheTest {
         assertEquals(1, downloads.get(), "the network attempt did happen -- slot is consumed")
     }
 
-    private fun countingRouter(counter: AtomicInteger, body: ByteArray): ChannelRouter {
+    private fun countingProvider(counter: AtomicInteger, body: ByteArray): HttpClientProvider {
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler {
@@ -109,8 +109,6 @@ class LauncherHashCacheTest {
                 }
             }
         }
-        // ChannelRouter needs both clients but for these tests both go to the
-        // same counting MockEngine -- we're not exercising fallback behavior.
-        return ChannelRouter(direct = client, proxy = client)
+        return HttpClientProvider { client }
     }
 }

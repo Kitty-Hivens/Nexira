@@ -10,7 +10,6 @@ import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
 import hivens.auth.microsoft.MsaAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
-import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.MsaConfig
 import hivens.launcher.network.MsaConfigLoader
@@ -19,6 +18,7 @@ import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
 import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.TransferEngine
 import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
@@ -39,8 +39,10 @@ import hivens.launcher.AgentExtractor
 import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.FabricLikeResolver
 import hivens.launcher.runtime.loader.ForgeLegacyResolver
+import hivens.launcher.runtime.loader.Lwjgl3ifyResolver
 import hivens.launcher.runtime.loader.ForgeResolver
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ModernInstallerResolver
@@ -70,7 +72,14 @@ import hivens.launcher.imports.ModrinthAppSource
 import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
+import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
+import hivens.core.io.IconProcessor
+import hivens.core.update.PackUpdater
+import hivens.core.update.PackUpdateStatusHub
+import hivens.launcher.instance.ContentScanCache
+import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
@@ -81,6 +90,11 @@ import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.ApplyRecovery
+import hivens.launcher.update.PackAutoUpdateService
+import hivens.launcher.update.PackSnapshotService
+import hivens.launcher.update.PackUpdateService
 import hivens.launcher.update.DesktopIntegration
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
@@ -91,27 +105,41 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import java.net.Authenticator
 import kotlinx.serialization.json.Json
 import okhttp3.Call
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
+import okhttp3.Protocol as HttpProtocol
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
+import org.koin.dsl.bind
 import org.koin.dsl.module
-import java.net.InetSocketAddress
-import java.net.PasswordAuthentication
-import java.net.Proxy
+import java.net.Socket
 import java.nio.file.Path
+import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.HostnameVerifier
+import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLEngine
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.TrustManager
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+
+/**
+ * Concurrent requests OkHttp will run against one host on the direct channel.
+ * Matches the transfer engine's own ceiling; see the dispatcher note there.
+ */
+private const val MAX_REQUESTS_PER_HOST = 8
 
 /**
  * Module responsible for network interaction.
@@ -136,78 +164,39 @@ val networkModule = module {
     }
 
     // ── Smartycraft channel ───────────────────────────────────────────────────
-    // SOCKS-proxied. Required for everything on `*.smartycraft.ru`. See the
-    // routing taxonomy in [HttpClientProvider]'s KDoc.
+    // Everything on `*.smartycraft.ru`. See the routing taxonomy in
+    // [HttpClientProvider]'s KDoc.
 
     /**
-     * Smartycraft secure client. SSL verification on, SOCKS proxy always on.
-     * Backs the default (smartycraft) [HttpClientProvider]. Proxy creds and
-     * host/port come from [ServerProtocolConfig] (Conduit Phase 3) so a
-     * Mirror server with different proxy infra can plug in via config file.
-     */
-    single<OkHttpClient> {
-        val cfg: ServerProtocolConfig = get()
-
-        // Authenticator.setDefault is JVM-wide; SOCKS5 auth has no per-client
-        // hook (OkHttp delegates SOCKS connect to JDK SocksSocketImpl which
-        // only consults the global Authenticator). Scope the response so the
-        // creds never leak to a third-party HTTP/HTTPS proxy that an unrelated
-        // JVM caller might be talking to -- only this exact SOCKS host/port
-        // gets answered.
-        Authenticator.setDefault(object : Authenticator() {
-            override fun getPasswordAuthentication(): PasswordAuthentication? {
-                if (requestorType != RequestorType.PROXY) return null
-                if (requestingHost != cfg.proxyHost) return null
-                if (requestingPort != cfg.proxyPort) return null
-                return PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
-            }
-        })
-
-        OkHttpClient.Builder()
-            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
-            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
-            .build()
-    }
-
-    /**
-     * Smartycraft insecure client (SSL verification disabled).
-     * Registered only for the explicit "connect anyway" user flow.
-     * Never injected by default -- must be requested by `named("insecure")`.
+     * Smartycraft bypass client. Backs the explicit "connect anyway" user
+     * flow; requested by `named("insecure")` or handed out by the default
+     * [HttpClientProvider] once a grant exists, so a caller that has just
+     * granted a bypass can stay on the regular `authService` and reach the
+     * same transport.
      *
-     * The default `HttpClientProvider` already returns this insecure
-     * client when `NetworkState.bypassFor()` is true (see
-     * `single<HttpClientProvider>` below), so a caller that has just
-     * granted bypass via `NetworkState.grantBypass()` can switch back
-     * to the regular `authService` and reach the same transport. The
-     * `named("insecure")` chain (this client + dependent ChannelRouter
-     * / IServerProtocol / AuthProvider) is therefore redundant for the
-     * standard "Connect anyway" flow and is slated for removal once
-     * the UI call sites are migrated. Until then it stays -- still
-     * useful as a one-shot insecure transport that doesn't require
-     * touching `NetworkState`.
+     * It is NOT a trust-nothing client: see [buildBypassScopedSsl]. Skipping
+     * verification is scoped to a host the user granted, so this client
+     * validates every other host exactly as the direct one does.
      */
     single<OkHttpClient>(named("insecure")) {
         val cfg: ServerProtocolConfig = get()
-        val (socketFactory, trustManager) = buildTrustAllSsl()
+        val (socketFactory, trustManager) = buildBypassScopedSsl()
 
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
-            .hostnameVerifier { _, _ -> true }
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
+            .hostnameVerifier(bypassScopedHostnameVerifier())
             .build()
     }
 
     // ── Direct channel ────────────────────────────────────────────────────────
-    // No proxy, strict TLS. For third-party CDNs (GitHub releases, BellSoft
-    // JDKs, Maven Central). Survives any SMARTYcraft proxy outage by design --
-    // the auto-updater must keep working when the upstream proxy doesn't.
+    // Strict TLS, no per-host exceptions. Carries every outbound call the
+    // launcher makes apart from the SSL-bypass escape hatch above.
 
     /**
-     * Direct-channel client. No proxy, no SSL bypass. Backs the
-     * [HttpClientProvider] qualified `named("direct")`.
+     * Direct-channel client. Backs both the default [HttpClientProvider] and
+     * the one qualified `named("direct")`.
      *
      * SSL bypass is intentionally not honored here: the third-party CDNs
      * we hit on this channel have rock-solid TLS, and silently widening the
@@ -219,51 +208,74 @@ val networkModule = module {
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
+            // HTTP/1.1 only. This channel carries the pack downloads, which are
+            // fetched one file at a time, so multiplexing buys nothing while h2's
+            // framing adds a failure mode we have seen in the wild: a middlebox on
+            // a filtered route resets the stream mid-body with PROTOCOL_ERROR and
+            // the transfer dies. One request per connection has no stream to reset.
+            .protocols(listOf(HttpProtocol.HTTP_1_1))
+            // Raised in step with the transfer engine's permit ceiling. OkHttp allows
+            // five requests per host by default, so a pool that grew past that would
+            // queue inside the client, measure the extra permit as no gain, and hand
+            // it straight back -- the engine would never be able to use what it asked
+            // for. The engine, not this number, decides how many actually run.
+            .dispatcher(Dispatcher().apply { maxRequestsPerHost = MAX_REQUESTS_PER_HOST })
             .build()
     }
 
     /**
-     * Default (smartycraft) [HttpClientProvider] -- thin wrapper that resolves
-     * the correct channel + cert mode on every request.
+     * Default (smartycraft) [HttpClientProvider] -- hands out the bypass
+     * client while a grant for the smartycraft host is live, the direct one
+     * otherwise. Reading [NetworkState] per request rather than at
+     * construction is what lets a grant made mid-session take effect on the
+     * next call instead of after a relaunch.
      *
-     * Per-request decision (mirrors [ChannelRouter] for AuthProvider):
-     *   - SSL bypass active for the smartycraft host -> insecure (proxy + no TLS check)
-     *   - forceProxyMode toggle on -> secure proxy
-     *   - default -> direct (no proxy)
-     *
-     * Pre-fix the provider always returned a proxy-only client regardless of
-     * the user's force-proxy toggle, so `SkinManager` and `FileDownloadService`
-     * never honored the setting -- the Settings switch only affected auth
-     * routing via ChannelRouter, while skin and client-file traffic stayed
-     * pinned to the SOCKS hop. Users whose network couldn't reach
-     * `proxy.smartycraft.ru:58613` saw login work (direct-first via
-     * ChannelRouter) but skins / news images / pack syncs fail silently.
-     * Now every smartycraft.ru request reads [NetworkState] freshly, so the
-     * Settings toggle takes effect on the next call without a relaunch.
+     * This choice is routing, not enforcement: the bypass client scopes its
+     * own relaxation to granted hosts, so picking it for a request to some
+     * other host still validates that host normally.
      */
     single {
         val cfg: ServerProtocolConfig = get()
         val direct   = buildHttpClient(get<OkHttpClient>(named("direct")),   get())
-        val secure   = buildHttpClient(get<OkHttpClient>(),                  get())
         val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
         HttpClientProvider {
-            when {
-                NetworkState.bypassFor(cfg.sslBypassHost) -> insecure
-                NetworkState.forceProxyMode()             -> secure
-                else                                      -> direct
-            }
+            if (NetworkState.bypassFor(cfg.sslBypassHost)) insecure else direct
         }
     }
 
     /**
      * Direct-channel [HttpClientProvider]. Inject this (`named("direct")`)
-     * for any outbound call that does NOT need to tunnel through the
-     * SMARTYcraft proxy -- see routing notes in [HttpClientProvider].
+     * for any outbound call that must never inherit a bypass the user
+     * granted for the smartycraft host -- see routing notes in
+     * [HttpClientProvider].
      */
     single<HttpClientProvider>(named("direct")) {
         val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
         HttpClientProvider { direct }
     }
+
+    /**
+     * The one downloader. Every path that writes network bytes to disk goes
+     * through it, so retry, resume, block-parallel transfer, verification and the
+     * concurrency decision are the same wherever the bytes came from.
+     *
+     * Bound to the direct channel: the runtime CDNs, the mirror, the JDK hosts and
+     * GitHub all keep strict TLS, and none of them has any business inheriting an
+     * SSL bypass the user granted for the smartycraft host.
+     */
+    single { TransferEngine(get<HttpClientProvider>(named("direct"))) }
+
+    /**
+     * The same downloader on the smartycraft channel, for the bytes that come from
+     * the SC client distribution.
+     *
+     * Two instances rather than one because the channel decision is not the
+     * engine's to make: this one follows the bypass-aware provider, so a grant the
+     * user made for the smartycraft host applies to its transfers and to nothing
+     * else. They also each keep their own concurrency controller, which is right --
+     * they are measuring different hosts.
+     */
+    single(named("smartycraft")) { TransferEngine(get<HttpClientProvider>()) }
 
     /**
      * Smartycraft-routed `okhttp3.Call.Factory` for callers that consume the
@@ -278,62 +290,34 @@ val networkModule = module {
      * adjacent registrations under one diff.
      */
     single<Call.Factory> {
-        val cfg: ServerProtocolConfig = get()
         val direct   = get<OkHttpClient>(named("direct"))
-        val secure   = get<OkHttpClient>()
         val insecure = get<OkHttpClient>(named("insecure"))
         Call.Factory { request ->
-            val client = when {
-                NetworkState.bypassFor(cfg.sslBypassHost) -> insecure
-                NetworkState.forceProxyMode()             -> secure
-                else                                      -> direct
-            }
+            // The request's own host, not the configured smartycraft one. This
+            // factory backs the process-wide Coil loader, so keying on a fixed
+            // host meant a grant for smartycraft also relaxed pack art from the
+            // mirror and Modrinth.
+            val client = if (NetworkState.bypassFor(request.url.host)) insecure else direct
             client.newCall(request)
         }
     }
 
     // ── Conduit (network refactor) ──────────────────────────────────────────
     // IServerProtocol abstracts all `*.smartycraft.ru` traffic so repositories
-    // don't know URL paths or `action=` strings. ChannelRouter is the
-    // direct-default + proxy-fallback gate (Conduit Phase 2):
-    //
-    // Default channel: ChannelRouter wraps a direct + a proxied OkHttpClient.
-    // Each call tries direct first; on IOException retries via proxy. Users in
-    // censored networks toggle Settings -> Network -> "Force proxy mode" to
-    // skip the direct attempt (see NetworkState.forceProxyMode).
-    //
-    // Insecure channel: separate IServerProtocol bound for SSL-bypass login
-    // retry -- uses a router that wraps the insecure-direct + insecure-proxy
-    // pair so the bypass survives the fallback chain.
+    // don't know URL paths or `action=` strings. The default binding follows
+    // the bypass-aware provider; the `named("insecure")` one is pinned to the
+    // trust-all client for the explicit "connect anyway" login retry.
     //
     // Wire spec lives in docs/dev/smartycraft-v1-protocol.md.
 
-    single<ChannelRouter> {
-        ChannelRouter(
-            direct = buildHttpClient(get<OkHttpClient>(named("direct")), get()),
-            proxy  = buildHttpClient(get<OkHttpClient>(),                 get()),
-        )
-    }
-    single<ChannelRouter>(named("insecure")) {
-        // Insecure direct + insecure proxy. Used when user has accepted SSL
-        // bypass for the host; fallback still works, just without TLS check.
-        val cfg: ServerProtocolConfig = get()
-        val (socketFactory, trustManager) = buildTrustAllSsl()
-        val insecureDirect = OkHttpClient.Builder()
-            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
-            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
-            .sslSocketFactory(socketFactory, trustManager)
-            .hostnameVerifier { _, _ -> true }
-            .build()
-        ChannelRouter(
-            direct = buildHttpClient(insecureDirect,                       get()),
-            proxy  = buildHttpClient(get<OkHttpClient>(named("insecure")), get()),
-        )
+    single<HttpClientProvider>(named("insecure")) {
+        val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
+        HttpClientProvider { insecure }
     }
 
     // ServerProtocolConfig -- Conduit Phase 3. Loads from
     // <dataDir>/server-config.json with smartycraft.ru defaults if absent.
-    // Optional system-property override aura.conduit.baseurl gates a runtime
+    // Optional system-property override nexira.conduit.baseurl gates a runtime
     // base URL change for Mirror development / test environments (gated by
     // ExperimentalConduitOverride opt-in inside the loader).
     single<ServerProtocolConfig> {
@@ -348,17 +332,17 @@ val networkModule = module {
     }
 
     single { LauncherHashCache(
-        dataDir = get<Path>().toFile(),
-        router  = get<ChannelRouter>(),
-        config  = get<ServerProtocolConfig>(),
+        dataDir        = get<Path>().toFile(),
+        clientProvider = get<HttpClientProvider>(),
+        config         = get<ServerProtocolConfig>(),
     ) }
 
     single<IServerProtocol> {
-        SmartycraftV1Protocol(get<ChannelRouter>(), get(), get<LauncherHashCache>(), get<ServerProtocolConfig>())
+        SmartycraftV1Protocol(get<HttpClientProvider>(), get(), get<LauncherHashCache>(), get<ServerProtocolConfig>())
     }
     single<IServerProtocol>(named("insecure")) {
         SmartycraftV1Protocol(
-            get<ChannelRouter>(named("insecure")),
+            get<HttpClientProvider>(named("insecure")),
             get(),
             get<LauncherHashCache>(),
             get<ServerProtocolConfig>(),
@@ -434,9 +418,9 @@ val authModule = module {
     // Offline-play provider + the Microsoft provider + the registry the content
     // router and launch gate consult. Microsoft is always constructible but only
     // JOINS the registry -- and so surfaces in the login UI and activates its
-    // launch gate -- when a client id is configured. It uses the proxy-free
-    // "direct" HTTP client (login.microsoftonline.com / xboxlive must not go
-    // through the SC SOCKS channel).
+    // launch gate -- when a client id is configured. It uses the "direct" HTTP
+    // client so login.microsoftonline.com / xboxlive keep strict TLS whatever
+    // bypass the user granted for the SC host.
     single { OfflineAuthProvider() }
     single { MsaAuthProvider(get<HttpClientProvider>(named("direct")), get<MsaConfig>().clientId) }
     single {
@@ -458,6 +442,13 @@ val authModule = module {
 val cacheModule = module {
     single<Clock> { SystemClock }
     single { CacheFactory(rootDir = get<Path>().resolve("cache"), json = get(), scope = get(), clock = get()) }
+    // Content-scan cache (Xodus-backed) + the scanner that reads it, so re-opening a
+    // pack's Content tab reads parsed mod metadata from the DB instead of re-cracking
+    // every jar. Keyed by canonical path, validated by size+mtime.
+    single { ContentScanCache(get<CacheFactory>().environment(), "content-scan", get()) }
+    // Icon processor is bound by the UI module (ImageIO lives outside the
+    // headless engine); a GUI-less assembly scans without one.
+    single { InstanceContentScanner(get(), getOrNull<IconProcessor>()) }
     single { smrtPackCaches() }
     single { modrinthCaches() }
 }
@@ -469,12 +460,12 @@ val cacheModule = module {
 val mirrorModule = module {
     // Hivens Mirror sync. Uses the "direct" HttpClient because
     // smrt.hivens.dev and Modrinth are public CDN-fronted endpoints
-    // that don't need the SC channel's SOCKS proxy or SSL bypass.
+    // that must not inherit an SSL bypass granted for the SC host.
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
-    single { ModrinthClient(get(named("direct")), caches = get()) }
-    single { SmrtSyncService(get(), get(), get()) }
+    single { ModrinthClient(get(named("direct")), get(), caches = get()) }
+    single { SmrtSyncService(get(), get(), get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by
     // origin so the Browse UI stays source-agnostic.
@@ -534,17 +525,50 @@ val mirrorModule = module {
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
-    // raw.githubusercontent.com are public, no SC proxy. The planner is what
-    // both sync paths (LauncherController, AutoSyncService) consult.
-    single { OpenSmrtHelperResolver(get(named("direct")), get(), get()) }
+    // raw.githubusercontent.com keep strict TLS. The planner is what both
+    // sync paths (LauncherController, AutoSyncService) consult.
+    single { OpenSmrtHelperResolver(get(named("direct")), get(), get(), get()) }
     single { SmartyModPlanner(get<OpenSmrtHelperResolver>()::resolve, get()) }
     // SC-bound pack authlib swap. Default (smartycraft) channel: the patched jar
     // is pulled from the SC client distribution, same source as the server-list sync.
-    single { SmrtAuthlibSwapper(get(), get<ServerProtocolConfig>(), get()) }
+    single { SmrtAuthlibSwapper(get(named("smartycraft")), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
+    // Instance-level mutations that reach past the registry (full delete, detach).
+    single { PackInstanceService(repository = get(), dataDir = get()) }
+    // Update write side: moves an installed mirror instance to another build
+    // (forward update or version switch) via the reconcile engine. Concrete
+    // SmrtPackClient for the summary/version-list poll the interface slice lacks.
+    single { PackSnapshotService(dataDir = get(), json = get()) }
+    single { ApplyJournal(dataDir = get(), json = get()) }
+    // Startup rollback for updates a hard crash interrupted (journal + snapshot).
+    single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get()) }
+    // Also bound as the PackUpdater contract: the UI injects the interface so
+    // render tests can substitute a fake; the auto-updater keeps the concrete type.
+    single {
+        PackUpdateService(
+            client = get<SmrtPackClient>(),
+            syncService = get(),
+            repository = get(),
+            protectedPaths = get(),
+            snapshotService = get(),
+            journal = get(),
+            dataDir = get(),
+        )
+    } bind PackUpdater::class
+    // Background auto-updater over installed mirror instances. Reads the current
+    // auto-update policy each pass via the settings service. Also bound as the
+    // status hub so UI badges and manual flows share one state.
+    single {
+        val settings = get<ISettingsService>()
+        PackAutoUpdateService(
+            repository = get(),
+            updater = get<PackUpdateService>(),
+            settingsProvider = { settings.getSettings() },
+        )
+    } bind PackUpdateStatusHub::class
     single {
         MrpackInstaller(
-            clientProvider = get(named("direct")),
+            transfers = get(),
             json = get(),
             javaManager = get(),
             runtimeProvisioner = get(),
@@ -572,25 +596,26 @@ val mirrorModule = module {
  * loader library provisioning, and the adaptive-heap profiler.
  */
 val runtimeModule = module {
-    // Direct channel -- BellSoft JDK CDN does not require the SMARTYcraft proxy.
-    single<IJavaManager> { JavaManagerService(get(), get(named("direct"))) }
+    // Direct channel -- the BellSoft JDK CDN keeps strict TLS.
+    single<IJavaManager> { JavaManagerService(get(), get()) }
 
-    // Direct channel -- Maven Central LWJGL/JInput natives don't need the proxy.
-    single { EnvironmentPreparer(get(named("direct"))) }
+    // Direct channel -- Maven Central LWJGL/JInput natives keep strict TLS.
+    single { EnvironmentPreparer(get()) }
     single { ClasspathProvider(get()) }
     single { GameCommandBuilder(get()) }
     single { ProcessLogHandler() }
 
     // Canonical runtime provisioner -- vanilla + loader libraries from the
     // official Mojang/Forge CDNs into the shared roots. Direct channel: these
-    // CDNs do not use the SMARTYcraft proxy (same rationale as JavaManagerService).
-    single { ForgeLegacyResolver(get(named("direct")), get()) }
+    // CDNs keep strict TLS (same rationale as JavaManagerService).
+    single { ForgeLegacyResolver(get(named("direct")), get(), get()) }
     single { loaderRegistry() }
     single {
         RuntimeProvisioner(
             librariesDir = get<PlatformPaths>().librariesDir,
             assetsDir = get<PlatformPaths>().assetsDir,
             clientProvider = get(named("direct")),
+            transfers = get(),
             json = get(),
             loaderRegistry = get(),
         )
@@ -613,7 +638,9 @@ val launchPipelineModule = module {
         ManifestCache(dataDir.resolve("manifest-cache"), get())
     }
     single<IManifestStore> { get<ManifestCache>() }
-    single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
+    single<IFileDownloadService> {
+        FileDownloadService(get(named("smartycraft")), get(), get(), get<ServerProtocolConfig>())
+    }
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
     single<IInstanceProfileStore> { get<ProfileManager>() }
@@ -670,13 +697,14 @@ val launchPipelineModule = module {
 
 /**
  * In-app update + build-from-source stack. Direct channel only -- GitHub
- * releases must stay reachable even when the SMARTYcraft proxy is down,
+ * releases must stay reachable however the SmartyCraft host is behaving,
  * otherwise the auto-updater cannot ship the fix that restores connectivity.
  */
 val updateModule = module {
     single {
         UpdateService(
             clientProvider  = get(named("direct")),
+            transfers       = get(),
             json            = get(),
             dataDirectory   = get(),
             settingsService = get()
@@ -724,9 +752,8 @@ val appModule = module {
         SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
 
-    // Replays persisted user-experimental overrides (forceProxyMode,
-    // mimicVersionOverride) into their respective global state holders
-    // on Koin start. `createdAtStart = true` makes this run during
+    // Replays the persisted mimicVersionOverride into its global state
+    // holder on Koin start. `createdAtStart = true` makes this run during
     // `startKoin { modules(...) }` so the values are live before the
     // first protocol call.
     single(createdAtStart = true) { SettingsRestoreHook(get()) }
@@ -770,14 +797,14 @@ val appModule = module {
         SmartyCraftServerListService(get(), get(), get(), dashboardCache())
     }
 
-    // JSON-on-disk pack registry. Persists installed PackInstances
-    // to <dataDir>/packs.json so Library reflects real state across
-    // launches. Empty file -> empty list (cold start UX is the
-    // Library Empty CTA pointing at Browse).
+    // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
+    // entry per id so a mutation is an O(1) put, not a full-file rewrite. Migrates a
+    // legacy packs.json on first open (renamed to *.migrated). Empty -> empty list.
     single<IPackRepository> {
         val dataDir: Path = get()
-        JsonPackRepository(
-            file = dataDir.resolve(Storage.PACKS_FILE),
+        XodusPackRepository(
+            dbDir = dataDir.resolve("db"),
+            legacyPacksFile = dataDir.resolve(Storage.PACKS_FILE),
             json = get(),
         )
     }
@@ -801,6 +828,7 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
         listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
+        versions = f.create("pack-versions", SmrtManifestVersions.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
     )
 }
 
@@ -846,11 +874,13 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
         listOf(
             ForgeResolver(
                 legacy = get<ForgeLegacyResolver>(),
-                modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), loaderCacheDir),
+                modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), get(), loaderCacheDir),
             ),
-            ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), loaderCacheDir),
+            ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), get(), loaderCacheDir),
             FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
             FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
+            CleanroomResolver(get(named("direct")), get(), get()),
+            Lwjgl3ifyResolver(get(named("direct")), get()),
         ),
     )
 }
@@ -881,17 +911,82 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
  * Allows connecting to servers with expired certificates
  * when the user explicitly accepts the risk.
  */
-private fun buildTrustAllSsl(): Pair<SSLSocketFactory, X509TrustManager> {
-    val trustManager = object : X509TrustManager {
-        override fun checkClientTrusted(
-            chain: Array<X509Certificate>, authType: String
-        ) = Unit
-        override fun checkServerTrusted(
-            chain: Array<X509Certificate>, authType: String
-        ) = Unit
-        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+/**
+ * TLS for the bypass channel, scoped to the host the connection is actually
+ * being made to.
+ *
+ * A bypass is a grant for one host. Building a client that trusts everything
+ * and then choosing that client by a rule elsewhere makes the choosing rule
+ * the security boundary, and a rule in a DI lambda is a poor place for one:
+ * the process-wide Coil loader shares this client, so a grant for the
+ * SmartyCraft host used to turn certificate checking off for pack art from
+ * the mirror and from Modrinth too.
+ *
+ * Here the peer's own name decides. Verification is skipped only while
+ * [NetworkState] holds a live grant for that exact host; every other host on
+ * the same client gets full platform validation. Which client a call site
+ * picks is then a routing detail, not a security decision.
+ */
+private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
+    val platform = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+        .apply { init(null as KeyStore?) }
+        .trustManagers
+        .filterIsInstance<X509ExtendedTrustManager>()
+        .first()
+
+    val trustManager = object : X509ExtendedTrustManager() {
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) {
+            if (granted(peerHostOf(socket))) return
+            platform.checkServerTrusted(chain, authType, socket)
+        }
+
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) {
+            if (granted(engine?.peerHost)) return
+            platform.checkServerTrusted(chain, authType, engine)
+        }
+
+        /**
+         * The socket-less overload carries no peer identity, so there is no
+         * host to match a grant against. Validate for real rather than guess.
+         * OkHttp always takes one of the overloads above.
+         */
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) =
+            platform.checkServerTrusted(chain, authType)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) =
+            platform.checkClientTrusted(chain, authType, socket)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) =
+            platform.checkClientTrusted(chain, authType, engine)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) =
+            platform.checkClientTrusted(chain, authType)
+
+        override fun getAcceptedIssuers(): Array<X509Certificate> = platform.acceptedIssuers
     }
+
     val ctx = SSLContext.getInstance("TLS")
-    ctx.init(null, arrayOf(trustManager), SecureRandom())
+    ctx.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
     return ctx.socketFactory to trustManager
+}
+
+/** True when the user currently holds a bypass for [host]. Null host never matches. */
+private fun granted(host: String?): Boolean = host != null && NetworkState.bypassFor(host)
+
+/**
+ * Peer name for an in-progress handshake. `handshakeSession` is the JSSE hook
+ * meant for exactly this window; `socket.inetAddress` is deliberately not used,
+ * since it would resolve a name by reverse DNS and match a grant against
+ * something the user never agreed to.
+ */
+private fun peerHostOf(socket: Socket?): String? =
+    (socket as? SSLSocket)?.handshakeSession?.peerHost
+
+/**
+ * Hostname verification for the bypass channel: skipped for a host under a
+ * live grant, the platform check for everything else.
+ */
+private fun bypassScopedHostnameVerifier(): HostnameVerifier {
+    val platform = HttpsURLConnection.getDefaultHostnameVerifier()
+    return HostnameVerifier { host, session -> granted(host) || platform.verify(host, session) }
 }

@@ -20,7 +20,7 @@ import java.util.zip.ZipOutputStream
  *
  * Bundle layout:
  * ```
- * aura-diagnostic-<sessionId>-<timestamp>.zip
+ * nexira-diagnostic-<sessionId>-<timestamp>.zip
  *   ├── system-info.txt    OS/JVM/RAM/CPU/heap/property snapshot
  *   ├── action-ring.txt    last N ActionRing entries with timestamps
  *   ├── logs/
@@ -55,13 +55,18 @@ object DiagnosticBundle {
     fun create(paths: PlatformPaths): Path {
         val sessionId = System.getProperty("nexira.sessionId", "unknown")
         val timestamp = tsFmt.format(Instant.now())
-        val output = paths.dataDir.resolve("aura-diagnostic-$sessionId-$timestamp.zip")
+        val output = paths.dataDir.resolve("nexira-diagnostic-$sessionId-$timestamp.zip")
 
         Files.createDirectories(paths.dataDir)
 
         ZipOutputStream(Files.newOutputStream(output)).use { zip ->
-            writeText(zip, "system-info.txt", buildSystemInfo(paths))
-            writeText(zip, "action-ring.txt", buildActionRing())
+            // Both go through Redactor like the log files do. The bundle is
+            // offered to the user as redacted, and these two were the entries
+            // that were not: an action-ring line quotes whatever a call site
+            // recorded, and a path line carries the account name the OS put in
+            // it.
+            writeText(zip, "system-info.txt", Redactor.redact(buildSystemInfo(paths)))
+            writeText(zip, "action-ring.txt", Redactor.redact(buildActionRing()))
 
             // Live log files. Each file is isolated: a single broken file
             // (locked, malformed UTF-8, permission denied) MUST NOT abort the
@@ -116,7 +121,10 @@ object DiagnosticBundle {
         appendLine()
         appendLine(" OS         : ${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})")
         appendLine(" JVM        : ${System.getProperty("java.version")} (${System.getProperty("java.vendor")})")
-        appendLine(" JVM home   : ${System.getProperty("java.home")}")
+        // Folded too: a Gradle- or SDKMAN-provisioned JDK lives under the home
+        // directory, so this line carried the account name as readily as the
+        // four below it.
+        appendLine(" JVM home   : ${abbreviateHome(System.getProperty("java.home") ?: "")}")
         appendLine(" Locale     : ${java.util.Locale.getDefault()}")
         appendLine(" Timezone   : ${java.util.TimeZone.getDefault().id}")
         appendLine()
@@ -125,10 +133,31 @@ object DiagnosticBundle {
         appendLine(" Total heap : ${rt.totalMemory() / 1_000_000} MB")
         appendLine(" Free heap  : ${rt.freeMemory() / 1_000_000} MB")
         appendLine()
-        appendLine(" user.home  : ${System.getProperty("user.home")}")
-        appendLine(" user.dir   : ${System.getProperty("user.dir")}")
-        appendLine(" data.dir   : ${paths.dataDir.toAbsolutePath()}")
-        appendLine(" logs.dir   : ${paths.logsDir.toAbsolutePath()}")
+        // Paths with the home prefix folded back to `~`. Support needs the
+        // shape of the layout -- which drive, whether the data dir was moved,
+        // how deep it sits -- and none of that needs the account name the OS
+        // baked into every one of these four lines.
+        appendLine(" user.home  : ${abbreviateHome(System.getProperty("user.home"))}")
+        appendLine(" user.dir   : ${abbreviateHome(System.getProperty("user.dir"))}")
+        appendLine(" data.dir   : ${abbreviateHome(paths.dataDir.toAbsolutePath().toString())}")
+        appendLine(" logs.dir   : ${abbreviateHome(paths.logsDir.toAbsolutePath().toString())}")
+    }
+
+    /**
+     * `/home/alice/.local/share/nexira` -> `~/.local/share/nexira`. The home
+     * directory itself becomes a bare `~`. Returns [path] unchanged when it
+     * does not sit under the home directory, since an absolute path elsewhere
+     * (a second drive, a moved data dir) carries no account name to begin with.
+     */
+    internal fun abbreviateHome(path: String, home: String = System.getProperty("user.home") ?: ""): String {
+        if (home.isBlank()) return path
+        val normalisedHome = home.trimEnd('/', '\\')
+        return when {
+            path == normalisedHome -> "~"
+            path.startsWith(normalisedHome + "/") || path.startsWith(normalisedHome + "\\") ->
+                "~" + path.substring(normalisedHome.length)
+            else -> path
+        }
     }
 
     private fun buildActionRing(): String = buildString {

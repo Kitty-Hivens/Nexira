@@ -37,10 +37,12 @@ data class InstanceRuntime(
     val windowHeight: Int = 530,
     val fullScreen: Boolean = false,
     /**
-     * Server identity (in whatever shape the pack's origin uses --
-     * SC server id, mirror server id, or `host:port` for a manual
-     * entry) to connect to immediately after launch. Null = stay on
-     * the in-game multiplayer screen for the user to pick.
+     * Emit an explicit game-window size (`--width`/`--height`) at launch from
+     * [windowWidth]/[windowHeight]. Default false so an instance keeps the
+     * client's own remembered size; the pack window's resolution editor flips
+     * it true on an explicit pick. A fresh opt-in field, mirroring [fixedMemory]
+     * -- instances persisted before it stay on the client default rather than a
+     * stale 925x530.
      */
-    val autoConnectServerId: String? = null,
+    val windowSizeOverride: Boolean = false,
 )

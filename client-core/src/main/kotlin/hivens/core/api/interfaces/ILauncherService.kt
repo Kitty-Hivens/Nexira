@@ -81,10 +81,13 @@ interface ILauncherService {
         javaPathOverride: Path?,
         allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean = false,
-        // Redirect authlib's auth/account/session hosts at the configured mirror
-        // host. Mirror-derived packs only; a Modrinth / local / own pack leaves
-        // the default Mojang hosts so its own auth provider is not redirected.
-        redirectAuthHost: Boolean = true,
+        // Point authlib's auth/account/session hosts at the SmartyCraft host.
+        // Only for a session that IS an SC one -- the redirect decides where the
+        // token in hand gets presented, so it defaults to off: a caller that
+        // forgets it sends nothing anywhere unexpected, and the cost of the
+        // wrong default in that direction is a join that fails loudly rather
+        // than a token handed to the wrong host.
+        redirectAuthHost: Boolean = false,
         // Attach the authlib-redirect agent for an SC-bound join (default
         // mechanism). No effect on non-SC packs.
         useNetworkAgent: Boolean = true,

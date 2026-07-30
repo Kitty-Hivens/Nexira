@@ -103,16 +103,18 @@ private enum class ContentFilter(val kind: ContentKind?) {
  * [InstanceContentScanner] -- origin-agnostic, so it works for mirror, Modrinth
  * and from-scratch packs alike. Display is always on; managing (toggle / delete)
  * is unlocked once the instance is detached from its pack ([PackOrigin.Local]),
- * matching "detach, then make it your own". A tracked pack shows a detach prompt.
+ * matching "detach, then make it your own". Detaching itself lives in the pack's
+ * Data settings, not here: it costs the instance its update source, so it must not
+ * sit one click away on a browsing surface.
  */
 @Composable
-fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modifier = Modifier) {
+fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
     val paths: PlatformPaths = koinInject()
     val instanceDir = remember(instance.instanceDirName) {
         paths.dataDir.resolve("instances").resolve(instance.instanceDirName)
     }
-    val scanner = remember { InstanceContentScanner() }
+    val scanner: InstanceContentScanner = koinInject()
     val manager = remember { InstanceContentManager() }
     val mirrorClient: IMirrorPackClient = koinInject()
     val controller: LauncherController = koinInject()
@@ -266,13 +268,6 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
         modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (!isLocal) DetachBanner(
-            // On a mirror pack the optional toggles below already work; the banner
-            // sells detach for the rest (add / delete / required). Other origins
-            // can't manage anything until detached -- the stronger copy.
-            body     = if (isMirror) s.contentTrackedOptionalBody else s.contentDetachBody,
-            onDetach = onDetach,
-        )
         Toolbar(
             query          = query,
             onQuery        = { query = it },
@@ -366,26 +361,6 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
             resolveProject = { resolveProject(target) },
             onDismiss      = { detailsOf = null },
         )
-    }
-}
-
-@Composable
-private fun DetachBanner(body: String, onDetach: () -> Unit) {
-    val s = LocalStrings.current
-    Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.5f))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(s.contentDetachTitle, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
-        }
-        NxButton(label = s.contentDetachButton, onClick = onDetach)
     }
 }
 

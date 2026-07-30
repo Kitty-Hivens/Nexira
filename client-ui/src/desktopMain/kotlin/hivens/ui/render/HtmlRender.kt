@@ -1,6 +1,8 @@
 package hivens.ui.render
 
 import androidx.compose.foundation.background
+import java.util.Locale
+import org.slf4j.LoggerFactory
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,8 +84,27 @@ fun markdownToHtml(markdown: String): String {
     return HtmlGenerator(markdown, tree, flavour).generateHtml()
 }
 
+/**
+ * True when [url] is safe to hand to the platform opener.
+ *
+ * Only http and https. These links arrive in pack descriptions and mod
+ * metadata -- text a third party wrote -- and `Desktop.browse` passes whatever
+ * it gets to the system handler, which acts on `file:`, `smb:` and every
+ * scheme some installed application has registered for. A link that reads like
+ * a homepage should not be able to open a local file or reach for a network
+ * share, and the user sees the label, not the target.
+ */
+fun isBrowsableUrl(url: String): Boolean {
+    val scheme = runCatching { URI(url) }.getOrNull()?.scheme?.lowercase(Locale.ROOT) ?: return false
+    return scheme == "http" || scheme == "https"
+}
+
 /** Open a link in the system browser; best-effort, never throws into the UI. */
 fun openInBrowser(url: String) {
+    if (!isBrowsableUrl(url)) {
+        LoggerFactory.getLogger("HtmlRender").warn("Refusing to open a link that is not http(s): {}", url.take(120))
+        return
+    }
     runCatching {
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
             Desktop.getDesktop().browse(URI(url))

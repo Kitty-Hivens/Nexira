@@ -93,6 +93,11 @@ interface AppStrings {
     val settingsThemeModeSystem: String
     val settingsThemeModeWallpaper: String
     val settingsThemeModeSystemUnavailable: String
+    val settingsPaletteFromWallpaper: String
+    val settingsPaletteFromWallpaperDesc: String
+    val settingsCustomChrome: String
+    val settingsCustomChromeDesc: String
+    val settingsCustomChromeTiling: String
     val settingsCloseAfterLaunch: String
     val settingsCloseAfterLaunchDesc: String
     val settingsSaved: String
@@ -390,6 +395,13 @@ interface AppStrings {
     val settingsMandatoryUpdatesDesc: String
     val settingsAutoSyncAllPacks: String
     val settingsAutoSyncAllPacksDesc: String
+    val settingsAutoUpdatePacks: String
+    val settingsAutoUpdatePacksDesc: String
+    val settingsAmberPolicy: String
+    val settingsAmberPolicyDesc: String
+    val settingsAmberPolicyAsk: String
+    val settingsAmberPolicyApply: String
+    val settingsAmberPolicyHold: String
     val settingsJvmBuilder: String
     val settingsJvmBuilderDesc: String
     val settingsAdaptiveMemory: String
@@ -423,9 +435,9 @@ interface AppStrings {
     fun aprilCloseEscapeCount(current: Int, max: Int): String
 
     // --- 2FA (TOTP) ---
-    // Code-path scaffolding kept for future auth providers that DO support 2FA
-    // (see [[project_client_auth_extraction]]). For the SmartyCraft provider
-    // these strings are unused at runtime; the banner copy below is what the
+    // Code-path scaffolding kept for future auth providers that DO support 2FA.
+    // For the SmartyCraft provider these strings are unused at runtime; the
+    // banner copy below is what the
     // user actually sees when the upstream demands a 2FA code.
     val auth2faTitle: String
     val auth2faPrompt: String
@@ -457,10 +469,6 @@ interface AppStrings {
     val sslBypassRevoke: String
     /** Receives a pre-formatted local date/time string. */
     fun sslBypassExpiresAt(formatted: String): String
-
-    // --- Force proxy mode (Settings → Network) — Conduit Phase 2 ---
-    val settingsForceProxyTitle: String
-    val settingsForceProxyDesc: String
 
     // --- Smarty server controls (Settings → Smarty) ---
     val settingsSectionSmarty: String
@@ -778,11 +786,6 @@ interface AppStrings {
 
     // ── Library / PackDetail / Content tab ──────────────────────────────
     val contentTabUnsupportedOrigin: String
-    val contentDetachTitle: String
-    val contentDetachBody: String
-    /** Tracked mirror packs: optional mods already toggle; detach for the rest. */
-    val contentTrackedOptionalBody: String
-    val contentDetachButton: String
     val contentAddFiles: String
     val contentFindProjects: String
     val contentSearchPlaceholder: String
@@ -859,6 +862,139 @@ interface AppStrings {
     val packDetailTabWorlds: String
     val packDetailTabLogs: String
     val packDetailTabSettings: String
+    val packVersionSection: String
+    val packVersionInstalled: String
+    val packVersionCheck: String
+    val packVersionUpToDate: String
+    fun packVersionAvailable(version: String): String
+    val packVersionSafe: String
+    val packVersionNeedsCare: String
+    val packVersionUpdateNow: String
+    val packVersionFollowLatest: String
+    val packVersionFollowLatestDesc: String
+    fun packVersionLatestBuilt(version: String, publishedAt: String): String
+    val packVersionSwitch: String
+    val packVersionCurrentTag: String
+    val packVersionUpdateBadge: String
+    /** Ambient badge when the mirror's current build is OLDER than the installed one. */
+    val packVersionRollbackBadge: String
+    /** Banner title for that case; the neutral [packVersionAvailable] would read as an update. */
+    fun packVersionRolledBack(version: String): String
+    /** Action label for a move that is not forward. */
+    val packVersionSwitchNow: String
+    val packVersionCheckFailed: String
+
+    // Version picker (shared by the catalogue install flow and an installed instance)
+    val versionPickerInstallTitle: String
+    val versionPickerChangeTitle: String
+    val versionPickerSearch: String
+    fun versionPickerCount(n: Int): String
+    val versionPickerEmpty: String
+    val versionPickerNoChangelog: String
+    val versionPickerWarning: String
+    fun versionPickerInstall(version: String): String
+    fun versionPickerUpgrade(version: String): String
+    fun versionPickerRollback(version: String): String
+    fun versionPickerSwitch(version: String): String
+
+    // Pack versions screen (build list + per-build changelog)
+    val packVersionsTitle: String
+    val packVersionsAllVersions: String
+    val packVersionsLatestTag: String
+    fun packVersionsRebuilds(n: Int): String
+    val packVersionsChannelRelease: String
+    val packVersionsChannelBeta: String
+    val packVersionsChannelAlpha: String
+    fun packVersionsCounts(mods: Int, assets: Int): String
+    val packVersionsDiffVsPrevious: String
+    val packVersionsDiffVsInstalled: String
+    val packVersionsIdentical: String
+    val packVersionsFirstBuild: String
+    fun packVersionsAdded(n: Int): String
+    fun packVersionsUpdated(n: Int): String
+    fun packVersionsRemoved(n: Int): String
+    val packVersionsSectionMods: String
+    val packVersionsSectionAssets: String
+    val packVersionsSectionPack: String
+    val packVersionsNotes: String
+    val packVersionsSwitchTo: String
+    val packVersionsConfirmTitle: String
+    fun packVersionsConfirmBody(from: String, to: String): String
+    fun packVersionsPlanCounts(add: Int, update: Int, remove: Int): String
+    fun packVersionsConflicts(n: Int): String
+    fun packVersionsApplying(current: Int, total: Int, name: String): String
+    fun packVersionsApplied(version: String): String
+    fun packVersionsFailed(reason: String): String
+    val packVersionsRetry: String
+    val packVersionsLoadError: String
+
+    // Pack settings window (floating, section rail)
+    val packSettingsTitle: String
+    val packSettingsClose: String
+    val packSettingsCategoryGeneral: String
+    val packSettingsCategoryRuntime: String
+    val packSettingsCategoryVersion: String
+    val packSettingsCategoryContent: String
+    val packSettingsCategoryData: String
+    // General
+    val packSettingsIdentity: String
+    val packSettingsName: String
+    val packSettingsNamePlaceholder: String
+    val packSettingsNotes: String
+    val packSettingsNotesPlaceholder: String
+    val packSettingsSource: String
+    fun packSettingsForkedFrom(name: String): String
+    val packSettingsPackId: String
+    // Runtime
+    val packSettingsMemory: String
+    val packSettingsEnvironment: String
+    val packSettingsJava: String
+    fun packSettingsJavaManaged(major: Int): String
+    val packSettingsJavaCustom: String
+    val packSettingsJavaPathPlaceholder: String
+    val packSettingsJavaReset: String
+    val packSettingsJvmArgs: String
+    val packSettingsJvmArgsDefault: String
+    val packSettingsJvmArgsEdit: String
+    val packSettingsWindow: String
+    val packSettingsWindowOverride: String
+    val packSettingsWindowOverrideDesc: String
+    val packSettingsWidth: String
+    val packSettingsHeight: String
+    val packSettingsFullscreen: String
+    // Content
+    val packSettingsOptional: String
+    val packSettingsOptionalNone: String
+    val packContentPresenceClient: String
+    val packContentPresenceServer: String
+    val packContentPresenceBoth: String
+    val packContentPresenceCoremod: String
+    val packSettingsDependencies: String
+    val packSettingsDependenciesNone: String
+    fun packSettingsMissing(name: String): String
+    val packSettingsContentUnavailable: String
+    val packSettingsContentLoading: String
+    // Data
+    val packSettingsStorage: String
+    val packSettingsFolder: String
+    val packSettingsOpenFolder: String
+    val packSettingsSizeComputing: String
+    val packSettingsDetach: String
+    val packSettingsDetachDesc: String
+    val packSettingsDetachAction: String
+    val packSettingsRepair: String
+    val packSettingsRepairDesc: String
+    val packSettingsRepairAction: String
+    /** Outcome line: how much was looked at, and how much had to be put back. */
+    fun packSettingsRepairDone(checked: Int, repaired: Int): String
+    fun packSettingsRepairProgress(current: Int, total: Int, name: String): String
+    val packSettingsDangerZone: String
+    val packSettingsDelete: String
+    val packSettingsDeleteDesc: String
+    // Version -- restore points
+    val packVersionSnapshots: String
+    val packVersionRestore: String
+    val packVersionSnapshotsHint: String
     val consoleSessionLive: String
     fun consoleSessionPickerLabel(current: String): String
 
@@ -869,6 +1005,10 @@ interface AppStrings {
     val packDetailPlay: String
     /** Shown above the Play button when the user is not authenticated. */
     val packDetailPlayLoginRequired: String
+    /** Wait state on the hero Play pill while the launch prepares or syncs. */
+    val packPlayWait: String
+    /** Run state on the hero Play pill; activating it stops the game. */
+    val packPlayExit: String
     val packDetailNotFoundTitle: String
     val packDetailNotFoundHint: String
     val packDetailNotFoundBack: String
@@ -906,6 +1046,10 @@ interface AppStrings {
     // --- Notification driver templates (pack install lifecycle) ---
     fun notifInstallSyncing(packName: String): String
     fun notifInstallDone(packName: String): String
+    fun notifPackUpdatePending(packName: String, version: String): String
+    fun notifPackUpdated(packName: String, version: String): String
+    fun notifPackUpdateFailed(packName: String): String
+    val notifActionOpenVersions: String
     fun notifInstallFailed(packName: String): String
     fun notifInstallCancelled(packName: String): String
     val notifActionCancel: String

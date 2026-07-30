@@ -10,7 +10,7 @@ import java.nio.file.Path
 
 /**
  * Reads and writes settings from both Compose UI threads (settings
- * screen recomposition) and IO coroutines (startup load, force-proxy
+ * screen recomposition) and IO coroutines (startup load, override
  * restore). Without coordination two concurrent saves could race the
  * file write and the UI could observe a half-applied SettingsData; all
  * cache access goes through the same monitor lock.

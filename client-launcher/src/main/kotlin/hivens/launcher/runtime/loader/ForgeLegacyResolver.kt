@@ -1,6 +1,9 @@
 package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangArguments
 import hivens.launcher.runtime.MojangLibrary
@@ -8,13 +11,11 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,10 +24,8 @@ import java.util.zip.ZipFile
 /**
  * Forge resolver for the launchwrapper era (<= 1.12.2). These versions need NO
  * install-time processors: the official vanilla client plus the forge libraries
- * on the classpath is enough (validated live 2026-05-29 -- the official client
- * + canonical Forge ran the full Industrial pack; see
- * [[project_industrial_mechanics]]). Modern Forge / NeoForge (1.13+) DO patch
- * the client and are a separate resolver.
+ * on the classpath is enough, validated against a full 1.12.2 modpack. Modern
+ * Forge / NeoForge (1.13+) DO patch the client and are a separate resolver.
  *
  * The official installer carries a `version.json` that is a vanilla overlay:
  * `mainClass` = launchwrapper, the forge library set, and
@@ -37,6 +36,7 @@ import java.util.zip.ZipFile
  */
 class ForgeLegacyResolver(
     private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     private val forgeMavenBase: String = FORGE_MAVEN,
 ) : LoaderResolver {
@@ -95,21 +95,8 @@ class ForgeLegacyResolver(
      * `minecraftArguments`; the vanilla game args (username, gameDir, ...) are
      * produced by the command builder. Falls back to the canonical FML tweaker.
      */
-    internal fun extractTweakArgs(minecraftArguments: String?): List<String> {
-        val tokens = minecraftArguments?.trim()?.split(Regex("\\s+")).orEmpty()
-        val out = ArrayList<String>()
-        var i = 0
-        while (i < tokens.size) {
-            if (tokens[i] == "--tweakClass" && i + 1 < tokens.size) {
-                out += "--tweakClass"
-                out += tokens[i + 1]
-                i += 2
-            } else {
-                i++
-            }
-        }
-        return out.ifEmpty { DEFAULT_TWEAK_ARGS }
-    }
+    internal fun extractTweakArgs(minecraftArguments: String?): List<String> =
+        extractTweakClassArgs(minecraftArguments).ifEmpty { DEFAULT_TWEAK_ARGS }
 
     /**
      * The Forge build to actually install. Returns [requested] when it is
@@ -155,11 +142,14 @@ class ForgeLegacyResolver(
         return 0
     }
 
+    /**
+     * The installer jar, which the official maven pins with nothing but HTTPS -- its
+     * version is chosen at runtime, so there is no hash to check it against. Staged
+     * through the engine anyway: a cut transfer is retried and resumed instead of
+     * leaving a truncated jar at the final path for the installer to choke on.
+     */
     private suspend fun downloadTo(url: String, dest: Path) {
-        clientProvider.current.prepareGet(url).execute { resp ->
-            if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
-            FileOutputStream(dest.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-        }
+        transfers.fetch(Transfer(url = url, dest = dest, skip = SkipIfPresent.Never))
     }
 
     companion object {

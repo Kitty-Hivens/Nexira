@@ -132,12 +132,29 @@ check_asset() {
     fi
 }
 
-check_asset "Setup\.exe$"      "Windows Installer (.exe)"
-check_asset "Portable\.zip$"   "Windows Portable (.zip)"
-check_asset "\.AppImage$"      "Linux AppImage"
-check_asset "aarch64\.dmg$"    "macOS DMG (Apple Silicon)"
-check_asset "x86_64\.dmg$"     "macOS DMG (Intel)"
-check_asset "SHA256SUMS"       "SHA256 checksums file"
+# Same as check_asset but a miss is a warning, not a failure -- for assets that
+# are legitimately absent from a fresh release (community builds uploaded
+# out-of-band). Keeps the "has it landed yet?" signal without failing the run.
+check_asset_optional() {
+    local pattern="$1"
+    local label="$2"
+    local found
+    found=$(echo "$RELEASE_JSON" | jq -r ".assets[].name" | grep -c "$pattern" || true)
+    if [[ "$found" -ge 1 ]]; then
+        ok "$label found"
+    else
+        warn "$label not yet uploaded (community build, out-of-band)"
+    fi
+}
+
+check_asset "Setup\.exe$"        "Windows Installer (.exe)"
+check_asset "Portable\.zip$"     "Windows Portable (.zip)"
+check_asset "\.AppImage$"        "Linux AppImage"
+check_asset "aarch64\.dmg$"      "macOS DMG (Apple Silicon)"
+# Community-tier, not officially supported: dispatched manually after the tag,
+# so it is frequently absent when this runs. Filename ends -x86_64-community.dmg.
+check_asset_optional "x86_64-community\.dmg$" "macOS DMG (Intel, community)"
+check_asset "SHA256SUMS"         "SHA256 checksums file"
 
 echo ""
 

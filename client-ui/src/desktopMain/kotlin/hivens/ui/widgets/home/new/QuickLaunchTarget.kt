@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
 import hivens.auth.OfflineAuthProvider
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
@@ -17,8 +18,11 @@ import hivens.ui.Screen
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
+import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.nx.PlayButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -127,4 +131,44 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
             launch = { ctx.onScreenChange(Screen.Profile) },
         )
     }
+}
+
+/**
+ * The shared launch pill for the home widgets, walking the same launch states
+ * the pack-detail hero does off [IndicationCenter]: a running target turns
+ * into Exit (stops the game), prepare/sync shows the inert wait, and otherwise
+ * it plays / offline-plays / routes to sign-in per the resolved [qt]. Keeps the
+ * one launch affordance in one place instead of each widget re-deriving it.
+ *
+ * [defaultLabel] is the play label the widget wants when the affordance carries
+ * none (the resolver overrides it only for the offline / sign-in cases).
+ */
+@Composable
+internal fun QuickLaunchButton(
+    qt: QuickLaunchTarget,
+    defaultLabel: String,
+    modifier: Modifier = Modifier,
+    iconOnly: Boolean = false,
+) {
+    val s = LocalStrings.current
+    val indications: IndicationCenter = koinInject()
+    val controller: LauncherController = koinInject()
+    val indication by indications.launchIndication(qt.target.id).collectAsState()
+
+    val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
+    val running = indication is LaunchIndication.Running
+
+    PlayButton(
+        label    = when {
+            running -> s.packPlayExit
+            busy    -> s.packPlayWait
+            else    -> qt.buttonLabel ?: defaultLabel
+        },
+        icon     = if (running) NxIcon.Stop else qt.icon,
+        busy     = busy,
+        onClick  = if (running) { { controller.abort() } } else qt.launch,
+        enabled  = if (running) true else qt.canLaunch,
+        iconOnly = iconOnly,
+        modifier = modifier,
+    )
 }

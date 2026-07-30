@@ -67,21 +67,42 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   review-gate:
     name: Review Gate
-    # Nightlies are unreviewed bleeding-dev builds (tagged off dev HEAD, no PR),
-    # so the gate is skipped for -nightly tags. It still guards every real release.
-    if: ${{ !contains(github.ref_name, 'nightly') }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
       contents: read
     steps:
       - name: Verify HEAD originates from a reviewed PR
+        # Nightlies are unreviewed bleeding-dev builds (tagged off dev HEAD, no
+        # PR of their own), so the gate does not apply to them. The exemption is
+        # decided inside the script rather than by an `if:` on the step, because
+        # the expression language has no substring operator and the tag must be
+        # read the same way ReleaseChannel.classify reads it. It stays off the
+        # JOB either way: a skipped job is inherited by everything downstream
+        # through the implicit success() over the needs chain, so gating the job
+        # silently skipped changelog and every build under it -- a green run
+        # that shipped nothing. The gate still guards every real release.
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_SHA:   ${{ github.sha }}
-          GH_REPO:  ${{ github.repository }}
+          GH_TOKEN:     ${{ secrets.GITHUB_TOKEN }}
+          GH_SHA:       ${{ github.sha }}
+          GH_REPO:      ${{ github.repository }}
+          GH_REF_NAME:  ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          # The prerelease suffix must START with "nightly", matching
+          # ReleaseChannel.classify. The former `contains(ref_name, 'nightly')`
+          # accepted the substring anywhere, so a tag like v9.9.9-rc1nightly
+          # walked past this gate while classify still sorted it as Beta and
+          # shipped it to everyone on a pre-release channel.
+          SUFFIX="${GH_REF_NAME#*-}"
+          if [ "$SUFFIX" != "$GH_REF_NAME" ]; then
+            case "$SUFFIX" in
+              nightly*)
+                echo "Nightly tag $GH_REF_NAME -- the review gate does not apply."
+                exit 0
+                ;;
+            esac
+          fi
           echo "Resolving PR for HEAD $GH_SHA on $GH_REPO..."
           PR=$(gh pr list --repo "$GH_REPO" --state merged --search "sha:$GH_SHA" --json number --jq '.[0].number // empty')
           if [ -z "$PR" ]; then
@@ -155,9 +176,6 @@ jobs:
     name: Run Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: review-gate
-    # Run when the gate PASSED or was SKIPPED (nightly), but not when it FAILED
-    # (an unreviewed stable release) -- a real failure still blocks the pipeline.
-    if: ${{ always() && needs.review-gate.result != 'failure' }}
     # fail-fast: false — one OS failing shouldn't kill the others; we want
     # to see ALL platform-specific failures in one run, not race-of-the-first.
     # shell: bash so steps work identically on Windows runners (PowerShell's
@@ -170,9 +188,9 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -181,17 +199,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test --continue
+        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-ui:desktopTest --continue
 
       - name: Upload test reports
         if: always()   # we publish it even if it falls, so we can see what's broken
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
           path: |
             client-config/build/reports/tests/
             client-core/build/reports/tests/
             client-launcher/build/reports/tests/
+            client-ui/build/reports/tests/
 
   # ─────────────────────────────────────────────────────────────────────────
   # Extract changelog section for this version from CHANGELOG.md
@@ -204,7 +223,7 @@ jobs:
       notes: ${{ steps.extract.outputs.notes }}
       version: ${{ steps.version.outputs.value }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Resolve version
         id: version
@@ -256,9 +275,9 @@ jobs:
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -303,7 +322,7 @@ jobs:
           Compress-Archive -Path "$src\*" `
             -DestinationPath "Nexira-$env:APP_VERSION-Windows-Portable.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-artifacts
           path: |
@@ -320,9 +339,9 @@ jobs:
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -358,7 +377,7 @@ jobs:
 
       - name: Cache appimagetool
         id: cache-appimagetool
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: appimagetool
           key: ${{ steps.appimagetool-key.outputs.key }}
@@ -401,7 +420,7 @@ jobs:
           JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
           ./scripts/build-appimage.sh "$APP_VERSION" "$JAR"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-artifacts
           path: Nexira-${{ env.APP_VERSION }}-x86_64.AppImage
@@ -434,9 +453,9 @@ jobs:
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -460,7 +479,7 @@ jobs:
           mv client-ui/build/customDmg/*.dmg \
              "Nexira-$APP_VERSION-aarch64.dmg"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-artifacts-aarch64
           path: Nexira-${{ env.APP_VERSION }}-aarch64.dmg
@@ -500,9 +519,9 @@ jobs:
       # with `./scripts/compose-release-body.sh: No such file or directory`
       # (regression introduced by CI-modernize #6 on PR #128 when the
       # release-body composition was extracted out of inline yaml).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           # Pattern broadened from `*-artifacts` to `*-artifacts*` so the
           # per-arch macOS suffixes (macos-artifacts-aarch64,
@@ -578,7 +597,7 @@ jobs:
             echo "$EOF_DELIM"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           name: Nexira v${{ env.APP_VERSION }}
           body: ${{ steps.body.outputs.body }}

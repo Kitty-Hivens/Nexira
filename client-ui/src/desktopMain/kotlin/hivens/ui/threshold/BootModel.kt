@@ -52,12 +52,27 @@ class BarMotion(
      * value for the final sweep-to-full when boot completes early.
      */
     fun tick(dtMs: Float, target: Float, ceiling: Float, tauMs: Float = defaultTauMs): Float {
+        // A stalled frame clock (the shell's first composition, an iconified
+        // window) delivers one giant dt; unclamped it snaps the bar to its goal
+        // in a single visible frame -- the exact pop the always-shown readout
+        // exists to avoid.
+        val dt = dtMs.coerceAtMost(MAX_TICK_MS)
         val goal = target.coerceIn(displayed, 1f)
-        val alpha = 1f - exp(-dtMs / tauMs)
+        val alpha = 1f - exp(-dt / tauMs)
         displayed += (goal - displayed) * alpha
         if (displayed >= goal - 0.0005f && displayed < ceiling) {
-            displayed = min(ceiling, displayed + creepPerSecond * dtMs / 1000f)
+            displayed = min(ceiling, displayed + creepPerSecond * dt / 1000f)
         }
+        // The exponential never lands exactly on 1 while the segment
+        // quantization needs exactly 1 to light the last segment; snap once
+        // close enough so a full bar is reachable in bounded time (~370ms at
+        // the sweep tau). The jump is at most one segment-step -- the same
+        // chunk-by-chunk motion the fill always has.
+        if (goal >= 1f && displayed > 0.995f) displayed = 1f
         return displayed
+    }
+
+    private companion object {
+        const val MAX_TICK_MS = 34f
     }
 }

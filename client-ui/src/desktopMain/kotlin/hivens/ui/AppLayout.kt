@@ -34,6 +34,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.NxTheme
@@ -63,6 +64,7 @@ fun AppLayout(
     onCloseApp: () -> Unit,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
+    onReplaceScreen: (Screen) -> Unit = {},
     onBack: () -> Unit,
     canGoBack: Boolean,
     canGoForward: Boolean,
@@ -76,6 +78,8 @@ fun AppLayout(
     themeMode: ThemeMode = ThemeMode.Manual,
     onThemeModeChanged: (ThemeMode) -> Unit = {},
     systemThemeAvailable: Boolean = false,
+    paletteFromWallpaper: Boolean = true,
+    onPaletteFromWallpaperChanged: (Boolean) -> Unit = {},
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -207,6 +211,8 @@ fun AppLayout(
                             themeMode = themeMode,
                             onThemeModeChanged = onThemeModeChanged,
                             systemThemeAvailable = systemThemeAvailable,
+                            paletteFromWallpaper = paletteFromWallpaper,
+                            onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
                             uiStyle           = uiStyle,
                             onUiStyleChanged  = onUiStyleChanged,
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
@@ -245,8 +251,22 @@ fun AppLayout(
 
                     is Screen.PackDetail ->
                         PackDetailScreen(
+                            instanceId          = screen.instanceId,
+                            appState            = appState,
+                            onBack              = onBack,
+                            initialShowSettings = screen.openSettings,
+                            onOpenVersions      = { fromSettings ->
+                                // Coming from the settings overlay: stamp the current
+                                // stack entry so Back restores the overlay, not the
+                                // bare pack page.
+                                if (fromSettings) onReplaceScreen(Screen.PackDetail(screen.instanceId, openSettings = true))
+                                onScreenChange(Screen.PackVersions(screen.instanceId))
+                            },
+                        )
+
+                    is Screen.PackVersions ->
+                        PackVersionsScreen(
                             instanceId = screen.instanceId,
-                            appState   = appState,
                             onBack     = onBack,
                         )
                 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
+import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -143,16 +144,17 @@ internal fun AppearanceSection(
             themeSwitchState = isChecked; onToggleTheme()
         }
 
-        // Home view variant. Lets the user A/B between the legacy Dashboard and the
-        // Library-first surface; the parent updates routing on change.
+        // Home view variant. The modern widget-composed home is the default and
+        // leads; the legacy Dashboard and the Library-first surface follow. The
+        // parent updates routing on change.
         PickerBlock(s.settingsHomeViewTitle, s.settingsHomeViewSub) {
+            NxChoiceChip(s.settingsHomeViewNew,     homeView == HomeView.New)          { onHomeViewChanged(HomeView.New) }
             NxChoiceChip(s.settingsHomeViewClassic, homeView == HomeView.Classic)      { onHomeViewChanged(HomeView.Classic) }
             NxChoiceChip(s.settingsHomeViewLibrary, homeView == HomeView.LibraryFirst) { onHomeViewChanged(HomeView.LibraryFirst) }
-            NxChoiceChip(s.settingsHomeViewNew,     homeView == HomeView.New)          { onHomeViewChanged(HomeView.New) }
         }
+        PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
         PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
         PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
-        PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
 
         // UI style variant. Independent axis from palette -- governs form, surface
         // treatment, motion. Celestia (current) and Brut (sharp / flat).
@@ -162,6 +164,29 @@ internal fun AppearanceSection(
         }
         PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
         PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
+
+        // Window chrome. `undecorated` is fixed when the window is created, so the flip
+        // lands at the next launch and the row says so rather than looking inert. On a
+        // tiling WM nothing downstream of the flag is active -- the frame stays
+        // OS-decorated, the caption buttons and drag area stand down regardless -- so
+        // the row is disabled there instead of offering a switch that changes nothing.
+        NxToggle(
+            label       = s.settingsCustomChrome,
+            checked     = form.useCustomChrome,
+            description = s.settingsCustomChromeDesc,
+            icon        = NxIcon.Computer,
+            enabled     = !IS_TILING_WM,
+        ) { form.useCustomChrome = it; save() }
+        if (IS_TILING_WM) {
+            Text(
+                text  = s.settingsCustomChromeTiling,
+                style = MaterialTheme.typography.bodySmall,
+                color = NxTheme.colors.textSecondary,
+            )
+        }
+        PuppetToggle("settings.useCustomChrome", form.useCustomChrome, enabled = !IS_TILING_WM) {
+            form.useCustomChrome = it; save()
+        }
     }
 
     Spacer(Modifier.height(16.dp))
@@ -232,10 +257,11 @@ internal fun DayNightRow(
 /**
  * A labelled single-select chip group (title + sub + wrapping [NxChoiceChip]s). The
  * chips wrap to a second line on a narrow pane instead of the longest label shrinking
- * per character.
+ * per character. Shared across the settings sections so every enum choice reads the
+ * same.
  */
 @Composable
-private fun PickerBlock(
+internal fun PickerBlock(
     title: String,
     sub: String,
     chips: @Composable FlowRowScope.() -> Unit,

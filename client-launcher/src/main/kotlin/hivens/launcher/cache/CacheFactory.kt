@@ -11,6 +11,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import jetbrains.exodus.env.Environment
+import jetbrains.exodus.env.EnvironmentConfig
+import jetbrains.exodus.env.Environments
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -26,12 +30,44 @@ class CacheFactory(
     private val clock: Clock = SystemClock,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    // One Xodus environment for every cache namespace (each namespace is a named
+    // store) under <cache>/xodus -- one transactional log-structured DB instead of a
+    // JSON file per key. Pure-JVM (no JNA/JNI), so it fits the no-native-in-launcher
+    // policy. Opened on first use; closed on JVM shutdown (and the OS releases the
+    // dir lock on process death even if that hook is skipped).
+    private var shutdownHook: Thread? = null
+    private val env: Environment by lazy {
+        val dir = rootDir.resolve("xodus")
+        Files.createDirectories(dir)
+        // Management off: Xodus registers a reflection-only Standard MBean we never
+        // consume, and a classpath shrinker that strips its by-name MBean interface
+        // (as the old release ProGuard pass did) makes registration throw
+        // NotCompliantMBeanException before the shell starts. Disabling it sidesteps both.
+        val config = EnvironmentConfig().setManagementEnabled(false)
+        Environments.newInstance(dir.toFile(), config).also { e ->
+            val hook = Thread { runCatching { e.close() } }
+            shutdownHook = hook
+            Runtime.getRuntime().addShutdownHook(hook)
+        }
+    }
+
+    /** Closes the cache environment and drops its shutdown hook. No-op if it was never opened. */
+    fun close() {
+        val hook = shutdownHook ?: return
+        runCatching { Runtime.getRuntime().removeShutdownHook(hook) }
+        runCatching { env.close() }
+        shutdownHook = null
+    }
+
     fun <V> create(namespace: String, serializer: KSerializer<V>, config: CacheConfig<V>): Cache<V> {
-        val disk = JsonDiskStore(rootDir.resolve(namespace), serializer, json)
+        val disk = XodusDiskStore(env, namespace, serializer, json)
         return DefaultCache(disk, config, scope, clock, namespace, ioDispatcher)
     }
 
     /** In-memory only (no disk persistence) -- single-flight + TTL + SWR, no serializer needed. */
     fun <V> createInMemory(namespace: String, config: CacheConfig<V>): Cache<V> =
         DefaultCache(NoOpDiskStore(), config, scope, clock, namespace, ioDispatcher)
+
+    /** The shared cache environment, for a caller that needs a bespoke store (e.g. the content-scan cache). */
+    fun environment(): Environment = env
 }

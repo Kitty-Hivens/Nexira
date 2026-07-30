@@ -288,4 +288,66 @@ class JvmArgsBuilderTest {
         val ids = JvmArgsPresets.all.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "Duplicate preset ids: $ids")
     }
+
+    // ─── fromArgs round-trip (seeds the editor from stored args) ──────────
+
+    @Test
+    fun `every preset round-trips through fromArgs exactly`() {
+        // fromArgs(preset.toArgString()).toArgs() must reproduce the preset's args
+        // token-for-token -- otherwise seeding the editor from stored args would
+        // silently mutate them on the next Apply.
+        for (preset in JvmArgsPresets.all) {
+            val original = preset.config.toArgs()
+            val rebuilt = JvmConfig.fromArgs(preset.config.toArgString()).toArgs()
+            assertEquals(original, rebuilt, "Preset ${preset.id} did not round-trip")
+        }
+    }
+
+    @Test
+    fun `passthrough flags survive a round-trip verbatim at the end`() {
+        // The bug this fixes: a custom -D flag was wiped when the editor reseeded
+        // from the default preset instead of the stored args.
+        val stored = JvmArgsPresets.Aikar.config.toArgString() +
+            " -Dcustomskinloader.ignorePatchFailure=true -Xss2M"
+        val rebuilt = JvmConfig.fromArgs(stored)
+        // Both unknown flags land in custom, in order, and re-emit at the tail.
+        assertEquals(listOf("-Dcustomskinloader.ignorePatchFailure=true", "-Xss2M"), rebuilt.custom)
+        val out = rebuilt.toArgs()
+        assertEquals("-Xss2M", out.last())
+        assertEquals("-Dcustomskinloader.ignorePatchFailure=true", out[out.size - 2])
+        // ...and the Aikar recipe is still intact ahead of them.
+        for (flag in JvmArgsPresets.Aikar.config.toArgs()) {
+            assertTrue(flag in out, "Aikar flag $flag lost when custom flags were present")
+        }
+    }
+
+    @Test
+    fun `a GC-mismatched tuning flag is kept as passthrough not dropped`() {
+        // A G1 knob under ZGC is not modelled by the Z path, so it must survive in
+        // custom rather than being silently eaten by the non-matching GC.
+        val rebuilt = JvmConfig.fromArgs("-XX:+UseZGC -XX:+ZGenerational -XX:MaxGCPauseMillis=999 -Dx=1")
+        assertEquals(GcChoice.Z, rebuilt.gc)
+        assertTrue("-XX:MaxGCPauseMillis=999" in rebuilt.custom)
+        assertTrue("-Dx=1" in rebuilt.custom)
+        val out = rebuilt.toArgs()
+        assertTrue("-XX:MaxGCPauseMillis=999" in out)
+        assertTrue("-XX:+ZGenerational" in out)
+    }
+
+    @Test
+    fun `blank input yields the default config`() {
+        assertEquals(JvmConfig().toArgs(), JvmConfig.fromArgs("   ").toArgs())
+    }
+
+    @Test
+    fun `custom knob values are parsed back into structured fields`() {
+        // A tweaked preset (lowered pause target) must reflect in the G1 field,
+        // not leak into custom.
+        val stored = JvmArgsPresets.Aikar.config.copy(
+            g1 = G1Tuning.AikarDefaults.copy(maxPauseMs = 100),
+        ).toArgString()
+        val rebuilt = JvmConfig.fromArgs(stored)
+        assertEquals(100, rebuilt.g1.maxPauseMs)
+        assertTrue(rebuilt.custom.isEmpty(), "no tokens should spill into custom")
+    }
 }

@@ -1,6 +1,8 @@
 package hivens.launcher.curseforge
 
 import hivens.core.api.dto.curseforge.CfManifest
+import hivens.core.io.UnpackBudget
+import hivens.core.io.UnpackLimits
 import hivens.core.api.dto.curseforge.CfModLoader
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.IPackRepository
@@ -106,6 +108,7 @@ class CurseForgeZipInstaller(
     }
 
     private fun extractOverrides(zip: ZipFile, prefix: String, clientDir: Path) {
+        val budget = UnpackBudget(UnpackLimits.PACK_CONTENT, "CurseForge overrides")
         val entries = zip.entries()
         while (entries.hasMoreElements()) {
             val entry = entries.nextElement()
@@ -114,7 +117,8 @@ class CurseForgeZipInstaller(
             if (relative.isEmpty()) continue
             val dest = safeResolve(clientDir, relative)
             Files.createDirectories(dest.parent)
-            zip.getInputStream(entry).use { input -> Files.copy(input, dest, StandardCopyOption.REPLACE_EXISTING) }
+            budget.entry()
+            zip.getInputStream(entry).use { input -> budget.copyTo(input, dest) }
         }
     }
 

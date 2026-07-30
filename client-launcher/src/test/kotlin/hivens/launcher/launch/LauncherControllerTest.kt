@@ -12,6 +12,7 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.launch.LaunchError
@@ -334,6 +335,7 @@ class LauncherControllerTest {
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
                 displayName        = any(),
                 onLog              = any(),
             )
@@ -402,11 +404,12 @@ class LauncherControllerTest {
         packId: String = "test-sc",
         serverId: String = "Industrial",
         authRequirement: PackAuthRequirement? = PackAuthRequirement.SmartyCraft(serverId),
+        origin: PackOrigin = PackOrigin.Mirror,
     ): hivens.core.data.PackInstance {
         val instance = hivens.core.data.PackInstance(
             id                    = id,
             packRef               = hivens.core.data.PackReference(
-                origin  = hivens.core.data.PackOrigin.Mirror,
+                origin  = origin,
                 id      = packId,
                 version = "v1",
             ),
@@ -463,6 +466,7 @@ class LauncherControllerTest {
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
                 displayName        = any(),
                 onLog              = any(),
             )
@@ -545,16 +549,18 @@ class LauncherControllerTest {
     }
 
     @Test
-    fun `pack with Industrial display name synthesizes SC requirement when manifest has none`() = runTest {
+    fun `smartycraft-origin pack derives its SC requirement from the pack id`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
 
-        // No authRequirement on the manifest; the name-based fallback
-        // recognises "Industrial" and synthesizes SC("Industrial").
+        // No authRequirement on the manifest; an SC-origin pack derives the
+        // binding from its packRef id (the mirror name table is gone -- mirror
+        // packs declare the binding in the manifest auth block instead).
         // Same no-password setup, so the precondition surfaces.
         val instance = scBoundPackInstance(
-            packId          = "industrial",
+            packId          = "Industrial",
             displayName     = "Industrial",
             authRequirement = null,
+            origin          = PackOrigin.Smartycraft,
         )
         val controller = newController(this)
         controller.launchPackInstance(
@@ -568,15 +574,15 @@ class LauncherControllerTest {
         assertEquals(
             LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY),
             state.reason,
-            "Industrial fallback must drive the same precondition surface as an explicit requirement",
+            "an id-derived requirement must drive the same precondition surface as an explicit one",
         )
     }
 
     @Test
-    fun `fallback SC requirement is forwarded to launchPackClient, not dropped`() = runTest {
-        // Guards the snapshot-forwarding bug: when the requirement comes from the
-        // name-based fallback (manifest authRequirement = null), the service must
-        // still receive it, or the SC-binding step (authlib swap) never runs.
+    fun `derived SC requirement is forwarded to launchPackClient, not dropped`() = runTest {
+        // Guards the snapshot-forwarding bug: when the requirement is DERIVED by
+        // the router (manifest authRequirement = null, SC origin), the service
+        // must still receive it, or the SC-binding step (authlib swap) never runs.
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
         credentialsManager.save(
@@ -592,12 +598,17 @@ class LauncherControllerTest {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
                 clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
-                adaptiveEnabled = any(), displayName = any(), onLog = any(),
+                adaptiveEnabled = any(), redirectAuthHost = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
-        val instance = scBoundPackInstance(packId = "Industrial", displayName = "Industrial", authRequirement = null)
+        val instance = scBoundPackInstance(
+            packId          = "Industrial",
+            displayName     = "Industrial",
+            authRequirement = null,
+            origin          = PackOrigin.Smartycraft,
+        )
         val controller = newController(this)
         controller.launchPackInstance(
             currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
@@ -607,7 +618,7 @@ class LauncherControllerTest {
 
         assertEquals(
             PackAuthRequirement.SmartyCraft("Industrial"), manifestPassed.captured.authRequirement,
-            "the effective (fallback) requirement must reach the service so SC-binding runs",
+            "the effective (derived) requirement must reach the service so SC-binding runs",
         )
     }
 
@@ -648,6 +659,72 @@ class LauncherControllerTest {
 
         assertEquals(false, agentFlag.captured, "useNetworkAgent must be forwarded as set")
         assertEquals(true, swapFlag.captured, "useSmartycraftAuthLib must be forwarded as set")
+    }
+
+    @Test
+    fun `a mirror pack with no SC binding does not get the auth host redirected`() = runTest {
+        // PackAuthRouter resolves a mirror pack with no auth block to Microsoft.
+        // The redirect used to key on the pack ORIGIN, so that pack launched with
+        // -Dminecraft.api.session.host pointed at the SC host while carrying a
+        // Microsoft token -- the token would have gone to SC as soon as the
+        // provider is registered.
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val redirect = slot<Boolean>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                redirectAuthHost = capture(redirect), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "ms-token"),
+            packInstance   = scBoundPackInstance(authRequirement = null, origin = PackOrigin.Mirror),
+        )
+        advanceUntilIdle()
+
+        assertEquals(false, redirect.captured, "a Microsoft-resolved pack must keep the Mojang auth hosts")
+    }
+
+    @Test
+    fun `an SC-bound pack still gets the auth host redirected`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val redirect = slot<Boolean>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                redirectAuthHost = capture(redirect), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(true, redirect.captured, "an SC join still needs the redirect")
     }
 
     @Test

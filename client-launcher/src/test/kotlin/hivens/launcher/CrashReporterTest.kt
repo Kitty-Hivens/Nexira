@@ -8,6 +8,7 @@ import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -82,5 +83,22 @@ class CrashReporterTest {
         if (report.actions.isEmpty()) {
             assertTrue(text.contains("(none recorded)"), "empty action ring should render the placeholder")
         }
+    }
+
+    @Test
+    fun `a token echoed by an exception message does not reach the report file`() {
+        // The dialog this file feeds asks the user to send it to the
+        // developers. Exception messages echo what the failing call was given,
+        // and a request URL carries the token in a parameter.
+        val token = "a3f19c7b42e08d5169bc0724fe3a81d0"
+        val boom = IllegalStateException(
+            "GET https://example.invalid/api?accessToken=$token failed with 500"
+        )
+
+        val file = reporter.saveToDisk(reporter.generate(boom, Thread.currentThread()))
+
+        val text = file.readText()
+        assertFalse(text.contains(token), "the crash report on disk carries a live token")
+        assertTrue(text.contains("IllegalStateException"), "redaction must not eat the diagnosis")
     }
 }
