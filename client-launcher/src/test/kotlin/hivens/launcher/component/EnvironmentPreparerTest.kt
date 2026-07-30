@@ -1,5 +1,6 @@
 package hivens.launcher.component
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.test.buildMockClient
 import io.ktor.client.HttpClient
@@ -31,7 +32,7 @@ class EnvironmentPreparerTest {
     @BeforeTest
     fun setup() {
         workDir = Files.createTempDirectory("aura-envprep-test-")
-        svc = EnvironmentPreparer(buildMockClient(""))
+        svc = EnvironmentPreparer(testTransferEngine(buildMockClient("")))
     }
 
     @AfterTest
@@ -231,7 +232,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNatives(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNatives(
                     clientRoot = clientRoot,
                     nativesDirName = "bin/natives-1.7.10",
                     version = "1.7.10",
@@ -256,7 +257,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNatives(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNatives(
                     clientRoot, "bin/natives-1.7.10", "1.7.10",
                 )
             }
@@ -275,7 +276,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNatives(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNatives(
                     clientRoot, "bin/natives-1.7.10", "1.7.10",
                 )
             }
@@ -297,7 +298,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNatives(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNatives(
                     clientRoot, "bin/natives-1.7.10", "1.7.10",
                 )
             }
@@ -321,7 +322,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNatives(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNatives(
                     clientRoot, "bin/natives-1.7.10", "1.7.10",
                 )
             }
@@ -350,7 +351,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(provider).prepareNatives(
+                EnvironmentPreparer(testTransferEngine(provider)).prepareNatives(
                     clientRoot, "bin/natives-1.7.10", "1.7.10",
                 )
             }
@@ -372,7 +373,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(provider).prepareNatives(
+                EnvironmentPreparer(testTransferEngine(provider)).prepareNatives(
                     clientRoot, "bin/natives-1.21.1", "1.21.1",
                 )
             }
@@ -395,7 +396,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNativesFromManifest(
                     clientRoot, "bin/natives-1.20.1", listOf(jar),
                 )
             }
@@ -415,7 +416,7 @@ class EnvironmentPreparerTest {
 
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNativesFromManifest(
                     clientRoot, "bin/natives-1.20.1", listOf(jar),
                 )
             }
@@ -434,7 +435,7 @@ class EnvironmentPreparerTest {
         withSystemProp("os.name", "Linux") {
             runBlocking {
                 // Bogus jar path -- must NOT be consulted because the dir is already valid.
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNativesFromManifest(
                     clientRoot, "bin/natives-1.20.1", listOf(clientRoot / "does-not-exist.jar"),
                 )
             }
@@ -448,7 +449,7 @@ class EnvironmentPreparerTest {
         val clientRoot = workDir
         withSystemProp("os.name", "Linux") {
             runBlocking {
-                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                EnvironmentPreparer(testTransferEngine(deadHttpClientProvider())).prepareNativesFromManifest(
                     clientRoot, "bin/natives-1.20.1", emptyList(),
                 )
             }

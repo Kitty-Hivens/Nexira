@@ -250,7 +250,7 @@ class LauncherServiceTest {
         // download path. Our pre-populated natives + assets short-circuit
         // both prepare steps, so a dead client catches any regression
         // that drops us into the download path unintentionally.
-        val envPreparer = EnvironmentPreparer(deadHttpClientProvider())
+        val envPreparer = EnvironmentPreparer(testTransferEngine(deadHttpClientProvider()))
         val commandBuilder = GameCommandBuilder()
         val logHandler = ProcessLogHandler()
         val service = LauncherService(

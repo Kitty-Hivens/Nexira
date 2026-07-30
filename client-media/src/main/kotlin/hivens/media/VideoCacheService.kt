@@ -1,20 +1,16 @@
 package hivens.media
 
-import hivens.core.api.HttpClientProvider
-import io.ktor.client.request.prepareGet
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.FileTime
 import java.security.MessageDigest
 
@@ -30,7 +26,7 @@ import java.security.MessageDigest
  */
 class VideoCacheService(
     private val dir: Path,
-    private val http: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val scope: CoroutineScope,
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
 ) {
@@ -63,29 +59,20 @@ class VideoCacheService(
     private suspend fun download(url: String, target: Path) {
         if (isUsable(target)) return
         Files.createDirectories(dir)
-        val part = target.resolveSibling("${target.fileName}.part")
         try {
-            http.current.prepareGet(url).execute { resp ->
-                if (!resp.status.isSuccess()) throw IOException("GET $url -> ${resp.status}")
-                FileOutputStream(part.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-            }
-            if (runCatching { Files.size(part) }.getOrDefault(0L) <= 0L) {
+            // A video is the one thing here that is reliably large, and the cache key
+            // is a hash of the url -- so the destination is stable, its partial can be
+            // continued across attempts and across runs, and the transfer runs in
+            // blocks rather than as one stream that a wobble has to restart.
+            transfers.fetch(Transfer(url = url, dest = target, skip = SkipIfPresent.Never))
+            if (runCatching { Files.size(target) }.getOrDefault(0L) <= 0L) {
+                Files.deleteIfExists(target)
                 throw IOException("Empty video body from $url")
             }
-            moveInto(part, target)
             evictOverCap()
         } catch (e: Exception) {
-            runCatching { Files.deleteIfExists(part) }
             log.warn("Video download failed for {}", url, e)
             throw e
-        }
-    }
-
-    private fun moveInto(part: Path, target: Path) {
-        try {
-            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING)
         }
     }
 
