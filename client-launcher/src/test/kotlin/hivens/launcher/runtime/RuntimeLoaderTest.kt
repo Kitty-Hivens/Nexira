@@ -359,6 +359,7 @@ class RuntimeLoaderTest {
     fun `ensureRuntime via CleanroomResolver swaps LWJGL2 for LWJGL3 and host-filters natives`() = runTest {
         val resolver = CleanroomResolver(
             clientProvider = HttpClientProvider { HttpClient(swapEngine(mutableListOf())) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(swapEngine(mutableListOf())) }),
             json = json,
             releaseBase = "https://cr.invalid/dl",
         )

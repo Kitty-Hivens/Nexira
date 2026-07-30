@@ -271,7 +271,7 @@ class LauncherServiceTest {
             profilerStore = ProfilerProfileStore(json),
             agentExtractor = AgentExtractor(workDir),
             // SC server path never reaches the SC-binding step; dead deps satisfy the ctor.
-            authlibSwapper = SmrtAuthlibSwapper(deadHttpClientProvider(), ServerProtocolConfig(), workDir),
+            authlibSwapper = SmrtAuthlibSwapper(testTransferEngine(deadHttpClientProvider()), ServerProtocolConfig(), workDir),
             sharedAssetsDir = workDir / "assets",
             sharedLibrariesDir = workDir / "libraries",
         )

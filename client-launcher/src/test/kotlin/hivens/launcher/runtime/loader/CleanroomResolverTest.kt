@@ -1,5 +1,6 @@
 package hivens.launcher.runtime.loader
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.MavenCoord
 import io.ktor.client.HttpClient
@@ -34,6 +35,7 @@ class CleanroomResolverTest {
     // buildProfile never touches the http client; a stub keeps the ctor happy.
     private val resolver = CleanroomResolver(
         clientProvider = HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) },
+        transfers = testTransferEngine(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }),
         json = json,
     )
 
@@ -114,13 +116,17 @@ class CleanroomResolverTest {
             }
         }.toByteArray()
         val installerUrl = "https://cr.invalid/dl/9.9.9-alpha/cleanroom-9.9.9-alpha-installer.jar"
+        // One provider for both, since the installer download is the request under
+        // test: an engine over its own mock would serve something else entirely.
+        val provider = HttpClientProvider {
+            HttpClient(MockEngine { req ->
+                if (req.url.toString() == installerUrl) respond(ByteReadChannel(badInstaller), HttpStatusCode.OK)
+                else respond("missing", HttpStatusCode.NotFound)
+            })
+        }
         val net = CleanroomResolver(
-            clientProvider = HttpClientProvider {
-                HttpClient(MockEngine { req ->
-                    if (req.url.toString() == installerUrl) respond(ByteReadChannel(badInstaller), HttpStatusCode.OK)
-                    else respond("missing", HttpStatusCode.NotFound)
-                })
-            },
+            clientProvider = provider,
+            transfers = testTransferEngine(provider),
             json = json,
             releaseBase = "https://cr.invalid/dl",
         )
