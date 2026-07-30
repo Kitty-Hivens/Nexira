@@ -1001,7 +1001,6 @@ object GermanStrings : AppStrings {
     override val editorSurfShortOverlay                 = "Schwebend"
 
     override val activityPillCancel                     = "Abbrechen"
-    override val activityPillStop                       = "Stoppen"
     override val activityPillPause                      = "Pause"
     override fun activityPillMeasure(done: Long, total: Long) = "$done von $total"
 

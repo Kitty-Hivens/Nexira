@@ -34,6 +34,11 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
+ * The scene has to be big enough for what it composes. An undersized one clamps
+ * the pill's height through the parent constraint and then everything downstream
+ * -- a control spilling past the body, a perimeter that looks detached from it --
+ * reads as a layout defect in the widget rather than in the harness.
+ *
  * Sheet of the pill's states across both styles and both palettes, plus the two
  * measurements worth pinning: the body separates from whatever it floats over,
  * and the perimeter measure actually advances with the value.
@@ -45,7 +50,7 @@ import kotlin.test.assertTrue
 class ActivityPillRenderTest {
 
     private val width = 980
-    private val rowHeight = 76
+    private val rowHeight = 132
 
     private fun activity(
         key: String,
@@ -67,10 +72,6 @@ class ActivityPillRenderTest {
     private val running = activity(
         "install:Industrial", ActivityKind.Install, "Industrial",
         ActivityPhase.Running(34, 97, "AmbientSounds.jar"), setOf(ActivityAction.Cancel),
-    )
-    private val game = activity(
-        "game:SkyBlock", ActivityKind.Game, "SkyBlock",
-        ActivityPhase.Running(0, 0), setOf(ActivityAction.Stop),
     )
     private val failed = activity(
         "install:Create", ActivityKind.Install, "Create", ActivityPhase.Failed("timeout"),
@@ -115,7 +116,6 @@ class ActivityPillRenderTest {
     private fun Sheet(props: PillProps) {
         val commands: ActivityCommands? = null // static sheet: nothing to click
         Box(Modifier.height(44.dp)) { Pill(running, props, commands, EnglishStrings, 520.dp) }
-        Box(Modifier.height(44.dp)) { Pill(game, props, commands, EnglishStrings, 520.dp) }
         Box(Modifier.height(44.dp)) { Pill(failed, props, commands, EnglishStrings, 520.dp) }
     }
 

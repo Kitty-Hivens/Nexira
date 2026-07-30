@@ -1,18 +1,19 @@
 package hivens.core.activity
 
 /**
- * What the launcher is doing. Drives the glyph and, more importantly, how the
- * measure reads: [Game] has no fraction to show and is narrated by elapsed time
- * from [Activity.startedAtMillis], while the rest carry a done/total.
+ * What the launcher is doing. Every kind is work in progress with an end; a
+ * running game is deliberately not one of them -- that is a state the user can
+ * see out of the window, and it has its own controls on the pack surface.
  */
-enum class ActivityKind { Install, Update, Sync, Repair, Launch, Game }
+enum class ActivityKind { Install, Update, Sync, Repair, Launch }
 
 /**
  * A control an activity offers. Deliberately not a label: the frontend maps
  * these onto localised strings, so the registry stays free of i18n and of the
- * UI module.
+ * UI module. Stopping a running game is not here, because a running game is not
+ * an activity -- see [ActivityKind].
  */
-enum class ActivityAction { Cancel, Pause, Stop }
+enum class ActivityAction { Cancel, Pause }
 
 sealed interface ActivityPhase {
     /**

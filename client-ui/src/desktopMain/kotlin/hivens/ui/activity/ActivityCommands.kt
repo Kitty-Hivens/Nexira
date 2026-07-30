@@ -36,11 +36,6 @@ class ActivityCommands(
                 ActivityKind.Launch -> controller.abort()
                 else -> unhandled(activity, action)
             }
-            // The same abort the pack hero's Stop already calls.
-            ActivityAction.Stop -> when (activity.kind) {
-                ActivityKind.Game -> controller.abort()
-                else -> unhandled(activity, action)
-            }
             // No source advertises Pause yet: nothing in the transfer layer can
             // hold a job and resume it. The capability exists so the surface has
             // a name for it when one can.

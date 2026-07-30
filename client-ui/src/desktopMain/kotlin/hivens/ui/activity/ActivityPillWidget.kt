@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityAction
-import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
 import hivens.core.activity.ActivityRegistry
 import hivens.ui.i18n.AppStrings
@@ -253,11 +252,7 @@ internal fun Pill(
                     NxButton(
                         label = action.label(s),
                         onClick = { commands?.perform(activity, action) },
-                        style = if (action == ActivityAction.Stop) {
-                            NxButtonStyle.Destructive
-                        } else {
-                            NxButtonStyle.Tertiary
-                        },
+                        style = NxButtonStyle.Tertiary,
                         icon = action.icon(),
                         compact = true,
                     )
@@ -390,7 +385,6 @@ private fun Activity.fraction(): Float? {
  * game read as one object rather than two designs.
  */
 private fun Activity.measure(s: AppStrings): String? {
-    if (kind == ActivityKind.Game) return null // elapsed time is composed by the caller's clock
     val failed = phase as? ActivityPhase.Failed
     if (failed != null) return failed.reason
     val running = phase as? ActivityPhase.Running ?: return null
@@ -403,13 +397,11 @@ private fun Activity.measure(s: AppStrings): String? {
 
 private fun ActivityAction.icon(): IconKey = when (this) {
     ActivityAction.Cancel -> NxIcon.Close
-    ActivityAction.Stop -> NxIcon.Stop
     ActivityAction.Pause -> NxIcon.Pause
 }
 
 private fun ActivityAction.label(s: AppStrings): String = when (this) {
     ActivityAction.Cancel -> s.activityPillCancel
-    ActivityAction.Stop -> s.activityPillStop
     ActivityAction.Pause -> s.activityPillPause
 }
 

@@ -1000,7 +1000,6 @@ object EnglishStrings : AppStrings {
     override val editorSurfShortOverlay                 = "Floating"
 
     override val activityPillCancel                     = "Cancel"
-    override val activityPillStop                       = "Stop"
     override val activityPillPause                      = "Pause"
     override fun activityPillMeasure(done: Long, total: Long) = "$done of $total"
 
