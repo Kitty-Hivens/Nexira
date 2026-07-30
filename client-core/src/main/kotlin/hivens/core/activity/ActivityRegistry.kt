@@ -175,7 +175,8 @@ class ActivityRegistry(
     private fun redact(phase: ActivityPhase): ActivityPhase = when (phase) {
         is ActivityPhase.Running ->
             phase.detail?.let { phase.copy(detail = Redactor.redact(it)) } ?: phase
-        is ActivityPhase.Failed -> phase.copy(reason = Redactor.redact(phase.reason))
+        is ActivityPhase.Failed ->
+            phase.reason?.let { phase.copy(reason = Redactor.redact(it)) } ?: phase
         ActivityPhase.Succeeded, ActivityPhase.Cancelled -> phase
     }
 

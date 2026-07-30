@@ -25,6 +25,8 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.SkinManager
 import hivens.ui.navigation.NavRequests
+import hivens.core.activity.ActivityRegistry
+import hivens.ui.activity.ActivityDriver
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
@@ -232,6 +234,10 @@ val uiModule = module {
         )
     }
     single { IndicationCenter() }
+    // One account of what the launcher is doing, read by the activity surface.
+    // Redaction, rate limiting and the caps are the registry's own contract --
+    // see its KDoc for why each is load-bearing on permanent chrome.
+    single { ActivityRegistry(scope = get()) }
     single { SessionRegistry(appScope = get()) }
     single {
         val settingsService: ISettingsService = get()
@@ -239,6 +245,7 @@ val uiModule = module {
             controller      = get(),
             notifications   = get(),
             indications     = get(),
+            activities      = get(),
             sessions        = get(),
             gameConsole     = get(),
             appScope        = get(),
@@ -258,6 +265,21 @@ val uiModule = module {
             notifications   = get(),
             appScope        = get(),
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
+        ).also { it.start() }
+    }
+    // Feeds the self-identifying services (installs, updates, sync) into the
+    // activity registry. Launch and game entries come from LaunchDriver, which
+    // is the only place that knows which pack a LaunchState belongs to.
+    // createdAtStart for the same reason as InstallDriver: the collector must
+    // be live before the first report can fire.
+    single(createdAtStart = true) {
+        ActivityDriver(
+            registry   = get(),
+            installs   = get(),
+            updates    = get(),
+            sync       = get(),
+            repository = get(),
+            appScope   = get(),
         ).also { it.start() }
     }
     // Navigation requests from outside the composition (notification actions,

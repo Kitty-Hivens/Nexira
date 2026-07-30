@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -32,6 +33,7 @@ class ActivityRegistryTest {
             ),
         )
         val reason = (reg.activities.value.single().phase as ActivityPhase.Failed).reason
+        assertNotNull(reason)
         assertTrue("<redacted>" in reason, "token should be masked, got: $reason")
         assertTrue("abc123def456ghi" !in reason, "raw token survived: $reason")
     }

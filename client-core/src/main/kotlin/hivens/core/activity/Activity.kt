@@ -25,8 +25,13 @@ sealed interface ActivityPhase {
 
     data object Succeeded : ActivityPhase
 
-    /** [reason] is an exception message and is redacted on the way in. */
-    data class Failed(val reason: String) : ActivityPhase
+    /**
+     * [reason] is an exception message and is redacted on the way in. Null when
+     * the source genuinely has none to give -- the sync service reports a count
+     * of failures, not a cause -- so the frontend can say "failed" in its own
+     * words instead of the driver inventing a sentence outside the string table.
+     */
+    data class Failed(val reason: String? = null) : ActivityPhase
 
     data object Cancelled : ActivityPhase
 }
