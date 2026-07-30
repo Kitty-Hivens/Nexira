@@ -1011,6 +1011,11 @@ object RussianStrings : AppStrings {
     override val notifActionOpenVersions                = "Открыть версии"
     override fun notifInstallFailed(packName: String)   = "$packName не удалось установить"
     override fun notifInstallCancelled(packName: String) = "Установка $packName отменена"
+    override val activityPillCancel                     = "Отменить"
+    override val activityPillStop                       = "Остановить"
+    override val activityPillPause                      = "Пауза"
+    override fun activityPillMeasure(done: Long, total: Long) = "$done из $total"
+
     override val notifActionCancel                      = "Отменить"
     override val notifActionShowConsole                 = "Открыть консоль"
     override val notifActionStop                        = "Остановить"
@@ -1167,6 +1172,11 @@ object RussianStrings : AppStrings {
         "widget.notes.scratch.placeholder" to "Напишите что-нибудь...",
         "widget.notes.scratch.title" to "Заголовок",
         "widget.notifications.history" to "История сообщений",
+        "widget.activity.pill" to "Активность",
+        "widget.activity.pill.progress" to "Мера",
+        "widget.activity.pill.anchor" to "Привязка",
+        "widget.activity.pill.heightDp" to "Высота",
+        "widget.activity.pill.showActions" to "Показывать управление",
         "widget.notifications.history.expandUp" to "Раскрывать вверх",
         "widget.notifications.history.clock12h" to "12-часовой формат (am/pm)",
         "widget.notifications.history.verticalTime" to "Время в столбик",

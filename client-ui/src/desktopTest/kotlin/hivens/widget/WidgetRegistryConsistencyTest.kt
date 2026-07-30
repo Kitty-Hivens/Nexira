@@ -50,6 +50,8 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.top",
             "appshell.region.body",
             "appshell.topbar.breadcrumb",
+            // floating activity account over the content column
+            "appshell.activity.pill",
             // editor-2 sample widgets
             "home.new.clock",
             "home.new.spacer",
@@ -176,6 +178,8 @@ class WidgetRegistryConsistencyTest {
             // per-instance state widgets (props alongside their runtime state)
             "notes.scratch",
             "checklist",
+            // floating activity account (measure / anchor / frost / height props)
+            "appshell.activity.pill",
         )
         assertEquals(
             expected,

@@ -26,6 +26,7 @@ import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.SkinManager
 import hivens.ui.navigation.NavRequests
 import hivens.core.activity.ActivityRegistry
+import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
@@ -238,6 +239,10 @@ val uiModule = module {
     // Redaction, rate limiting and the caps are the registry's own contract --
     // see its KDoc for why each is load-bearing on permanent chrome.
     single { ActivityRegistry(scope = get()) }
+    // Turns the capabilities the registry advertises back into calls. Kept
+    // out of the model on purpose: a lambda field would break Activity's
+    // equality and the registry's throttle depends on it.
+    single { ActivityCommands(installs = get(), controller = get()) }
     single { SessionRegistry(appScope = get()) }
     single {
         val settingsService: ISettingsService = get()

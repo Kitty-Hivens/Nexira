@@ -997,6 +997,11 @@ object GermanStrings : AppStrings {
     override val notifActionOpenVersions                = "Versionen öffnen"
     override fun notifInstallFailed(packName: String)   = "$packName konnte nicht installiert werden"
     override fun notifInstallCancelled(packName: String) = "Installation von $packName abgebrochen"
+    override val activityPillCancel                     = "Abbrechen"
+    override val activityPillStop                       = "Stoppen"
+    override val activityPillPause                      = "Pause"
+    override fun activityPillMeasure(done: Long, total: Long) = "$done von $total"
+
     override val notifActionCancel                      = "Abbrechen"
     override val notifActionShowConsole                 = "Konsole anzeigen"
     override val notifActionStop                        = "Stoppen"
@@ -1153,6 +1158,11 @@ object GermanStrings : AppStrings {
         "widget.notes.scratch.placeholder" to "Schreib etwas...",
         "widget.notes.scratch.title" to "Titel",
         "widget.notifications.history" to "Nachrichtenverlauf",
+        "widget.activity.pill" to "Aktivität",
+        "widget.activity.pill.progress" to "Anzeige",
+        "widget.activity.pill.anchor" to "Ausrichtung",
+        "widget.activity.pill.heightDp" to "Höhe",
+        "widget.activity.pill.showActions" to "Steuerung zeigen",
         "widget.notifications.history.expandUp" to "Nach oben ausklappen",
         "widget.notifications.history.clock12h" to "12-Stunden-Format (am/pm)",
         "widget.notifications.history.verticalTime" to "Zeit gestapelt",
