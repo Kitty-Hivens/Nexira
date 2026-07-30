@@ -2,6 +2,11 @@ package hivens.launcher.runtime
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.io.resolveWithinRoot
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.platform.Platform
 import hivens.launcher.runtime.loader.DownloadProgress
 import hivens.launcher.runtime.loader.LibrarySpec
@@ -52,6 +57,7 @@ class RuntimeProvisioner(
     private val librariesDir: Path,
     private val assetsDir: Path,
     private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     private val loaderRegistry: LoaderRegistry = LoaderRegistry(emptyList()),
     osName: String = System.getProperty("os.name", ""),
@@ -239,9 +245,11 @@ class RuntimeProvisioner(
 
         val tasks = planVanillaDownloads(mcVersion, version, assetIndex)
         log.info("vanilla runtime {}: {} files to verify/fetch (assetIndex={})", mcVersion, tasks.size, assetIndexId)
-        tasks.forEachIndexed { i, task ->
-            progress(i + 1, tasks.size, task.dest.fileName.toString())
-            fetchIfNeeded(task)
+        // One request at a time over a few thousand asset objects was the slowest
+        // part of a first launch, and a single reset anywhere in it failed the whole
+        // provisioning run with nothing retried.
+        transfers.fetchAll(tasks.map { it.toTransfer() }) { p ->
+            progress(p.filesDone, p.filesTotal, p.current)
         }
 
         VanillaRuntime(
@@ -475,39 +483,29 @@ class RuntimeProvisioner(
             buf.toByteArray()
         }
 
-    /**
-     * Skip when the file is already present at the right size (content is
-     * addressed by hash in its path for objects, and pinned by the manifest
-     * sha1 for libraries -- a same-size collision is not a realistic threat,
-     * and re-hashing thousands of objects on every launch is not worth it).
-     * Freshly downloaded bytes are always sha1-verified.
-     */
     private suspend fun fetchIfNeeded(task: DownloadTask) {
-        if (Files.isRegularFile(task.dest) && (task.size <= 0 || Files.size(task.dest) == task.size)) {
-            return
-        }
-        Files.createDirectories(task.dest.parent)
-        // Unique temp per writer: the shared libraries root can be provisioned
-        // concurrently (a launch and an import fetching the same lib), so a fixed
-        // "<dest>.tmp" sibling would let two downloads clobber each other's bytes.
-        // The finally drops a partial temp on any failure.
-        val tmp = Files.createTempFile(task.dest.parent, "${task.dest.fileName}.", ".tmp")
-        try {
-            httpClient.prepareGet(task.url).execute { resp ->
-                if (!resp.status.isSuccess()) throw IOException("GET ${task.url} -> HTTP ${resp.status}")
-                FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-            }
-            if (task.sha1.isNotBlank()) {
-                val actual = sha1Of(tmp)
-                if (!actual.equals(task.sha1, ignoreCase = true)) {
-                    throw IOException("sha1 mismatch for ${task.url}: expected ${task.sha1}, got $actual")
-                }
-            }
-            moveAtomic(tmp, task.dest)
-        } finally {
-            runCatching { Files.deleteIfExists(tmp) }
-        }
+        transfers.fetch(task.toTransfer())
     }
+
+    /**
+     * Skip when the file is already present at the right size: content here is
+     * addressed by hash in its own path (asset objects) or pinned by the manifest
+     * sha1 at a maven coordinate (libraries), a same-size collision is not a
+     * realistic threat, and re-hashing thousands of objects on every launch is
+     * minutes of disk for an answer the paths already gave. An entry whose upstream
+     * declares no size falls back to presence for the same reason -- refetching it
+     * every launch would cost the network instead.
+     *
+     * Freshly downloaded bytes are always verified against the sha1 when there is
+     * one, by the engine, before anything is published.
+     */
+    private fun DownloadTask.toTransfer(): Transfer = Transfer(
+        url = url,
+        dest = dest,
+        expect = sha1.takeIf { it.isNotBlank() }?.let { Digest(DigestAlgorithm.SHA1, it) },
+        size = size,
+        skip = if (size > 0L) SkipIfPresent.BySize else SkipIfPresent.Presence,
+    )
 
     private fun writeBytes(dest: Path, bytes: ByteArray) {
         Files.createDirectories(dest.parent)

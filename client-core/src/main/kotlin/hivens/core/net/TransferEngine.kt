@@ -29,7 +29,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -84,10 +83,33 @@ class TransferEngine(
      * The shared runtime roots get provisioned from more than one place at once --
      * a launch and an import can want the same library -- and two writers on one
      * journal would each mark blocks the other is still writing. The previous
-     * answer to that was a unique temp file per writer, which avoids the
-     * collision by giving up resume.
+     * answer to that was a unique temp file per writer, which avoids the collision
+     * by giving up resume.
+     *
+     * Reference-counted so the map does not accumulate an entry per file for the
+     * life of the process: a vanilla runtime alone is thousands of destinations,
+     * and none of them is interesting once its transfer is done. Striping instead
+     * would bound the map too, at the cost of an unrelated transfer waiting behind
+     * a multi-minute one that happened to hash to the same stripe.
      */
-    private val destLocks = ConcurrentHashMap<Path, Mutex>()
+    private val destLocks = HashMap<Path, DestLock>()
+
+    private class DestLock {
+        val mutex = Mutex()
+        var users = 0
+    }
+
+    private suspend fun <T> withDestLock(dest: Path, block: suspend () -> T): T {
+        val key = dest.normalize()
+        val lock = synchronized(destLocks) { destLocks.getOrPut(key) { DestLock() }.also { it.users++ } }
+        try {
+            return lock.mutex.withLock { block() }
+        } finally {
+            synchronized(destLocks) {
+                if (--lock.users == 0) destLocks.remove(key, lock)
+            }
+        }
+    }
 
     /**
      * Fetch [t] to its destination. Returns the bytes actually pulled from the
@@ -95,11 +117,11 @@ class TransferEngine(
      */
     suspend fun fetch(t: Transfer, onProgress: (done: Long, total: Long) -> Unit = { _, _ -> }): Long =
         withContext(Dispatchers.IO) {
-            destLocks.computeIfAbsent(t.dest.normalize()) { Mutex() }.withLock {
+            withDestLock(t.dest) {
                 if (alreadySatisfied(t)) {
                     val size = t.size.coerceAtLeast(0L)
                     onProgress(size, size)
-                    return@withLock 0L
+                    return@withDestLock 0L
                 }
                 t.dest.parent?.let { Files.createDirectories(it) }
                 fetchFromAnySource(t, onProgress)
@@ -507,6 +529,7 @@ class TransferEngine(
         val sizeMatches = { t.size > 0L && runCatching { Files.size(t.dest) == t.size }.getOrDefault(false) }
         return when (t.skip) {
             SkipIfPresent.Never -> false
+            SkipIfPresent.Presence -> true
             SkipIfPresent.BySize -> sizeMatches()
             SkipIfPresent.ByDigest -> {
                 val expect = t.expect ?: return sizeMatches()

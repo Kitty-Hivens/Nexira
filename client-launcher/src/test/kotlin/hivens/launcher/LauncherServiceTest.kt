@@ -265,6 +265,7 @@ class LauncherServiceTest {
                 librariesDir = workDir / "libraries",
                 assetsDir = workDir / "assets",
                 clientProvider = deadHttpClientProvider(),
+                transfers = testTransferEngine(deadHttpClientProvider()),
                 json = json,
             ),
             profilerStore = ProfilerProfileStore(json),
