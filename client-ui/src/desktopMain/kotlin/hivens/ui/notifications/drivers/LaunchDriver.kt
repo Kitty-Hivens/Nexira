@@ -1,6 +1,9 @@
 package hivens.ui.notifications.drivers
 
 import hivens.auth.OfflineAuthProvider
+import hivens.core.activity.ActivityKind
+import hivens.core.activity.ActivityPhase
+import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
@@ -39,6 +42,10 @@ class LaunchDriver(
     private val controller: LauncherController,
     private val notifications: NotificationCenter,
     private val indications: IndicationCenter,
+    // The single account of what the launcher is doing. This driver is the
+    // only place that knows which pack a LaunchState belongs to, so launch
+    // and game entries are reported from here rather than from ActivityDriver.
+    private val activities: ActivityRegistry,
     private val sessions: SessionRegistry,
     private val gameConsole: GameConsoleService,
     private val appScope: CoroutineScope,
@@ -101,6 +108,11 @@ class LaunchDriver(
                 log.warn("LaunchDriver observation aborted for ${target.id}", e)
                 indications.setLaunchIndication(target.id, null)
                 sessions.unregister(target.id)
+                // The observer died, not the work. Whatever the registry is
+                // narrating for this target is no longer being updated, so
+                // drop it rather than leave a frozen measure on screen.
+                activities.dismiss(launchKey(target))
+                activities.dismiss(gameKey(target))
             }
         }
         observerJobs.put(target.id, job)?.cancel()
@@ -109,6 +121,7 @@ class LaunchDriver(
     private fun onPrepare(target: LaunchTarget, state: LaunchState.Prepare) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Preparing)
+        reportActivity(target, ActivityKind.Launch, ActivityPhase.Running(0, 0, state.stage.name.lowercase()))
         notifications.push(
             sourceKey = target.sourceKey,
             sender    = target.displayName,
@@ -131,6 +144,11 @@ class LaunchDriver(
             else                       -> 0f
         }
         indications.setLaunchIndication(target.id, LaunchIndication.Downloading(fraction))
+        reportActivity(
+            target,
+            ActivityKind.Launch,
+            ActivityPhase.Running(state.downloadedBytes, state.totalBytes),
+        )
 
         val s = stringsProvider()
         val notifProgress: Float = fraction ?: Float.NaN
@@ -152,6 +170,13 @@ class LaunchDriver(
     private fun onRunning(target: LaunchTarget, state: LaunchState.GameRunning) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Running)
+        // Preparation is done and the game is up: the launch entry settles and
+        // a game entry takes over, narrated by elapsed time rather than a
+        // fraction. No Stop control is offered yet -- terminating the process
+        // tree is not implemented, and a control that looks live and does
+        // nothing is worse than no control.
+        activities.dismiss(launchKey(target))
+        reportActivity(target, ActivityKind.Game, ActivityPhase.Running(0, 0))
         sessions.register(
             packInstanceId  = target.id,
             packDisplayName = target.displayName,
@@ -191,6 +216,8 @@ class LaunchDriver(
     private fun onError(target: LaunchTarget, reason: LaunchError) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Failed)
+        activities.dismiss(gameKey(target))
+        reportActivity(target, ActivityKind.Launch, ActivityPhase.Failed(humanReason(reason, stringsProvider())))
         sessions.unregister(target.id)
         gameConsole.detachCommandSink()
         notifications.push(
@@ -244,6 +271,8 @@ class LaunchDriver(
         // Idle after non-Idle = clean exit (code 0). Group history stays
         // so the user can scroll back through the run.
         indications.setLaunchIndication(target.id, null)
+        activities.dismiss(launchKey(target))
+        reportActivity(target, ActivityKind.Game, ActivityPhase.Succeeded)
         sessions.unregister(target.id)
         gameConsole.detachCommandSink()
         notifications.push(
@@ -254,6 +283,19 @@ class LaunchDriver(
             kind      = Kind.OneShot,
             title     = s.notifPackSessionEnded(target.displayName),
             body      = null,
+        )
+    }
+
+    private fun launchKey(target: LaunchTarget) = "launch:${target.id}"
+    private fun gameKey(target: LaunchTarget) = "game:${target.id}"
+
+    private fun reportActivity(target: LaunchTarget, kind: ActivityKind, phase: ActivityPhase) {
+        activities.report(
+            key     = if (kind == ActivityKind.Game) gameKey(target) else launchKey(target),
+            kind    = kind,
+            title   = target.displayName,
+            iconUrl = target.iconUrl,
+            phase   = phase,
         )
     }
 
