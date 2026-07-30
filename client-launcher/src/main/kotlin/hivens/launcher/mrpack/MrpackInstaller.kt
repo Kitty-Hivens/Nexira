@@ -1,6 +1,10 @@
 package hivens.launcher.mrpack
 
-import hivens.core.api.HttpClientProvider
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.io.UnpackBudget
 import hivens.core.io.UnpackLimits
 import hivens.core.api.interfaces.IJavaManager
@@ -11,18 +15,11 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
-import hivens.launcher.util.sha1Of
-import hivens.launcher.util.sha512Of
-import io.ktor.client.request.prepareGet
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -49,7 +46,7 @@ import java.util.zip.ZipFile
  * tampered mirror can't substitute content -- not even by omitting sha1.
  */
 class MrpackInstaller(
-    private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     private val javaManager: IJavaManager,
     private val runtimeProvisioner: RuntimeProvisioner,
@@ -91,9 +88,8 @@ class MrpackInstaller(
             //    on the client; optional client content installs by default
             //    (per-entry opt-out is the optional-mods system's job later).
             val files = index.files.filter { it.env?.client != ENV_UNSUPPORTED }
-            files.forEachIndexed { i, file ->
-                progress(i + 1, files.size, file.path)
-                downloadFile(file, clientDir)
+            transfers.fetchAll(files.map { transferFor(it, clientDir) }) { p ->
+                progress(p.filesDone, p.filesTotal, p.current)
             }
 
             // 2. Verbatim trees. client-overrides wins over overrides on a clash.
@@ -135,11 +131,9 @@ class MrpackInstaller(
     }
 
     /**
-     * Download a `.mrpack` from [url] to a temp file, install it, then delete
-     * the temp. [source] stamps the instance's origin/id/version so the update
-     * flow can find newer versions later -- this is the Modrinth catalogue
-     * install path. The download uses the same streaming + close pattern as the
-     * per-file fetch so a large pack archive never lands wholly in memory.
+     * Download a `.mrpack` from [url], install it, then drop the archive. [source]
+     * stamps the instance's origin/id/version so the update flow can find newer
+     * versions later -- this is the Modrinth catalogue install path.
      */
     suspend fun installFromUrl(
         url: String,
@@ -149,16 +143,16 @@ class MrpackInstaller(
         onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
-        val tmp = Files.createTempFile("nexira-mrpack-", ".mrpack")
-        try {
-            clientProvider.current.prepareGet(url).execute { resp ->
-                if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
-                FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-            }
-            install(tmp, source, iconUrl, bannerUrl, onReserveDir, progress)
-        } finally {
-            runCatching { Files.deleteIfExists(tmp) }
-        }
+        // Named after the pack rather than a fresh temp file per attempt, and inside
+        // the data dir: a pack archive runs to hundreds of megabytes, and a partial
+        // that a relaunch cannot find is a download that starts over.
+        val archive = dataDir.resolve(DOWNLOADS_DIR).resolve(sanitize("${source.id}-${source.version ?: "latest"}") + ".mrpack")
+        transfers.fetch(Transfer(url = url, dest = archive, skip = SkipIfPresent.Never))
+        val instance = install(archive, source, iconUrl, bannerUrl, onReserveDir, progress)
+        // Dropped only once the install is through. A failure leaves the archive for
+        // the next attempt to continue from instead of pulling it again.
+        runCatching { Files.deleteIfExists(archive) }
+        instance
     }
 
     /**
@@ -174,50 +168,29 @@ class MrpackInstaller(
         return null to ""
     }
 
-    private suspend fun downloadFile(file: MrpackFile, clientDir: Path) {
+    /**
+     * The transfer for one index entry, pinned to the strongest hash the index
+     * carries.
+     *
+     * An entry with downloads but NO usable hash is rejected outright rather than
+     * fetched unverified: a hostile index can simply omit sha1, so treating a
+     * missing hash as "skip the check" is a content-substitution hole.
+     *
+     * Every url the entry lists is kept as a mirror, in the index's own order.
+     */
+    private fun transferFor(file: MrpackFile, clientDir: Path): Transfer {
         val dest = safeResolve(clientDir, file.path)
         if (file.downloads.isEmpty()) throw IOException("mrpack file ${file.path} has no download URL")
-        // Verify against the strongest hash the index pins. An entry with
-        // downloads but NO usable hash is rejected outright: an unverifiable
-        // download is a content-substitution hole (a hostile index can simply
-        // omit sha1), not a soft "skip the check".
-        val sha512 = file.hashes[HASH_SHA512]
-        val sha1 = file.hashes[HASH_SHA1]
-        if (sha512 == null && sha1 == null) {
-            throw IOException("mrpack file ${file.path} pins no sha1/sha512; refusing unverifiable download")
-        }
-        Files.createDirectories(dest.parent)
-        val tmp = dest.resolveSibling("${dest.fileName}.part")
-
-        var lastError: Exception? = null
-        for (url in file.downloads) {
-            try {
-                clientProvider.current.prepareGet(url).execute { resp ->
-                    if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
-                    FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-                }
-                verifyHash(file.path, tmp, sha512, sha1)
-                moveAtomic(tmp, dest)
-                return
-            } catch (e: Exception) {
-                lastError = e
-                runCatching { Files.deleteIfExists(tmp) }
-                log.warn("mrpack: download {} from {} failed: {}", file.path, url, e.message)
-            }
-        }
-        throw IOException("all downloads failed for ${file.path}", lastError)
-    }
-
-    /** Verifies [tmp] against the strongest pinned hash (sha512 preferred). */
-    private fun verifyHash(path: String, tmp: Path, sha512: String?, sha1: String?) {
-        val (expected, actual, algo) = when {
-            sha512 != null -> Triple(sha512, sha512Of(tmp), "sha512")
-            sha1 != null -> Triple(sha1, sha1Of(tmp), "sha1")
-            else -> return
-        }
-        if (!actual.equals(expected, ignoreCase = true)) {
-            throw IOException("$algo mismatch for $path: expected $expected, got $actual")
-        }
+        val expect = file.hashes[HASH_SHA512]?.let { Digest(DigestAlgorithm.SHA512, it) }
+            ?: file.hashes[HASH_SHA1]?.let { Digest(DigestAlgorithm.SHA1, it) }
+            ?: throw IOException("mrpack file ${file.path} pins no sha1/sha512; refusing unverifiable download")
+        return Transfer(
+            url = file.downloads.first(),
+            dest = dest,
+            expect = expect,
+            size = file.fileSize,
+            mirrors = file.downloads.drop(1),
+        )
     }
 
     private fun extractOverrides(zip: ZipFile, prefix: String, clientDir: Path) {
@@ -264,6 +237,7 @@ class MrpackInstaller(
         const val ENV_UNSUPPORTED = "unsupported"
         const val HASH_SHA1 = "sha1"
         const val HASH_SHA512 = "sha512"
+        const val DOWNLOADS_DIR = "downloads"
 
         /** Modrinth dependency key -> LoaderRegistry id, checked in this order. */
         val LOADER_KEYS = linkedMapOf(

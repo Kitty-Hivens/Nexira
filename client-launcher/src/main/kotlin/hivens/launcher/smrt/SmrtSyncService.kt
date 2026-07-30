@@ -8,28 +8,26 @@ import hivens.core.api.interfaces.IPackSyncService
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
-import hivens.core.util.retryWithBackoff
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.of
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.update.UpdatePlan
-import hivens.launcher.FileDownloadService
 import hivens.launcher.util.ModArchives
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.util.sha1Of
-import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.Comparator
 
 /**
- * v2-manifest sync. Parallel to [FileDownloadService] but speaks the
+ * v2-manifest sync. Parallel to [hivens.launcher.FileDownloadService] but speaks the
  * smrt mirror's flat `mods[] + assets[]` shape with a per-entry source
  * pointer, instead of SC's recursive `{directories,files}` tree.
  *
@@ -43,6 +41,7 @@ class SmrtSyncService(
     private val client: SmrtPackClient,
     private val modrinth: ModrinthClient,
     private val protectedPaths: ProtectedPaths,
+    private val transfers: TransferEngine,
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
@@ -100,20 +99,19 @@ class SmrtSyncService(
                 )
             }
 
-            val total = manifest.mods.size + manifest.assets.size
-            var current = 0
-
+            // Planned first, fetched together. A pack is a hundred files of wildly
+            // different sizes, and one request at a time meant a 300 MB resource pack
+            // stalled every mod behind it -- the plan lets the engine overlap them and
+            // split the large ones into blocks.
+            val plan = ArrayList<Transfer>(manifest.mods.size + manifest.assets.size)
             for (mod in manifest.mods) {
-                current++
-                progress?.invoke(current, total, mod.filename)
                 val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
-                syncMod(mod, clientDir, enabled)
+                planMod(mod, clientDir, enabled)?.let { plan += it }
             }
             for (asset in manifest.assets) {
-                current++
-                progress?.invoke(current, total, asset.dest)
-                syncAsset(asset, clientDir)
+                planAsset(asset, clientDir)?.let { plan += it }
             }
+            transfers.fetchAll(plan) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
 
             // Drop manifest-removed mods and catch foreign payloads that
             // the wipe missed (an SC sync ran between two mirror syncs
@@ -155,9 +153,10 @@ class SmrtSyncService(
         val total = plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size + plan.toDelete.size
         var current = 0
 
+        // Same shape as a full sync: the local moves and drops happen while the plan
+        // is built, then everything that needs the network goes in one batch.
+        val fetches = ArrayList<Transfer>(plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size)
         for (path in plan.toAdd + plan.toUpdate) {
-            current++
-            progress?.invoke(current, total, path)
             val entry = index[path] ?: continue
             if (path.startsWith(MODS_PREFIX)) {
                 val filename = path.removePrefix(MODS_PREFIX)
@@ -167,20 +166,23 @@ class SmrtSyncService(
                 val dest = if (enabled) active else disabled
                 val stale = if (enabled) disabled else active
                 runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
-                downloadIfNeeded(dest, entry.sha1, entry.size, entry.source, "mod $filename")
+                plan(dest, entry.sha1, entry.size, entry.source, "mod $filename")?.let { fetches += it }
             } else {
                 val dest = resolveSafe(clientDir, path, "asset $path")
-                downloadIfNeeded(dest, entry.sha1, entry.size, entry.source, "asset $path")
+                plan(dest, entry.sha1, entry.size, entry.source, "asset $path")?.let { fetches += it }
             }
         }
 
         for (path in plan.conflicts) {
-            current++
-            progress?.invoke(current, total, path)
             val entry = index[path] ?: continue
             val dest = resolveSafe(clientDir, "$path.new", "conflict $path")
-            downloadIfNeeded(dest, entry.sha1, entry.size, entry.source, "conflict $path")
+            plan(dest, entry.sha1, entry.size, entry.source, "conflict $path")?.let { fetches += it }
         }
+
+        transfers.fetchAll(fetches) { p ->
+            progress?.invoke(p.filesDone, total, p.current)
+        }
+        current = fetches.size
 
         for (path in plan.toDelete) {
             current++
@@ -314,7 +316,7 @@ class SmrtSyncService(
      * removed and the active variant fetched. Forge 1.12.2 scans both `mods/`
      * and `mods/{mcversion}/`, so flat placement still loads.
      */
-    private suspend fun syncMod(mod: SmrtModEntry, clientDir: Path, enabled: Boolean) {
+    private suspend fun planMod(mod: SmrtModEntry, clientDir: Path, enabled: Boolean): Transfer? {
         val modsDir = clientDir.resolve("mods")
         val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
         val disabledDest = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
@@ -324,13 +326,13 @@ class SmrtSyncService(
         if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
             Files.createDirectories(dest.parent)
             fileOpRetry("smrt sync move ${mod.filename}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
-            return
+            return null
         }
         runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
-        downloadIfNeeded(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
+        return plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
-    private suspend fun syncAsset(asset: SmrtAssetEntry, clientDir: Path) {
+    private suspend fun planAsset(asset: SmrtAssetEntry, clientDir: Path): Transfer? {
         // resolveSafe FIRST: a manifest entry like
         // `../../config/servers.dat` happens to match the protected-
         // suffix list (ProtectedPaths.isProtected lowercases + checks
@@ -346,9 +348,9 @@ class SmrtSyncService(
         // when the file is already present and non-empty.
         if (protectedPaths.isProtected(asset.dest) && fileIsPresentAndNonEmpty(dest)) {
             log.debug("smrt sync: skipping protected {}", asset.dest)
-            return
+            return null
         }
-        downloadIfNeeded(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+        return plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
     }
 
     /**
@@ -375,36 +377,38 @@ class SmrtSyncService(
     private fun resolveSafe(root: Path, relative: String, label: String): Path =
         resolveWithinRoot(root, relative, label)
 
-    private suspend fun downloadIfNeeded(
+    /**
+     * The transfer for one manifest entry, or null when there is nothing to fetch.
+     *
+     * The up-to-date check happens here rather than being left to the engine
+     * because of what sits between: a `modrinth` source needs an API round trip to
+     * turn into a URL, and doing that for the ninety-odd mods already on disk would
+     * put a hundred needless requests in front of every re-sync.
+     */
+    private suspend fun plan(
         dest: Path,
         expectedSha1: String,
         expectedSize: Long,
         source: SmrtSource,
         label: String,
-    ) {
+    ): Transfer? {
         if (source is SmrtSource.Unknown) {
             // Forward-compat: a source type this launcher version does not
             // understand. Skip the entry instead of failing the whole sync.
             log.warn("smrt sync: skipping {} -- unsupported source type; update the launcher to install it", label)
-            return
+            return null
         }
         if (isUpToDate(dest, expectedSha1, expectedSize)) {
-            return
+            return null
         }
         val url = resolveUrl(source)
         log.debug("smrt sync: fetching {} <- {}", label, url)
-        Files.createDirectories(dest.parent)
-        downloadToFile(url, dest)
-        val onDiskSha = sha1Of(dest)
-        if (!onDiskSha.equals(expectedSha1, ignoreCase = true)) {
-            // Loud failure: delete the bad bytes so a retry refetches,
-            // and surface the mismatch to the user instead of silently
-            // serving wrong content.
-            runCatching { fileOpRetry("smrt drop bad download $label") { Files.deleteIfExists(dest) } }
-            throw IOException(
-                "$label sha1 mismatch after download: expected $expectedSha1, got $onDiskSha"
-            )
-        }
+        return Transfer(
+            url = url,
+            dest = dest,
+            expect = Digest(DigestAlgorithm.SHA1, expectedSha1),
+            size = expectedSize,
+        )
     }
 
     /**
@@ -438,87 +442,11 @@ class SmrtSyncService(
     private fun isUpToDate(dest: Path, expectedSha1: String, expectedSize: Long): Boolean {
         if (!Files.exists(dest) || !Files.isRegularFile(dest)) return false
         if (Files.size(dest) != expectedSize) return false
-        return sha1Of(dest).equals(expectedSha1, ignoreCase = true)
+        return DigestAlgorithm.SHA1.of(dest).equals(expectedSha1, ignoreCase = true)
     }
 
     private fun fileIsPresentAndNonEmpty(p: Path): Boolean =
         Files.exists(p) && Files.isRegularFile(p) && Files.size(p) > 0L
-
-    /**
-     * Fetches [url] into [dest], retrying a broken transfer and continuing from
-     * where it stopped rather than starting over.
-     *
-     * Both halves matter on a route that breaks mid-body -- the failure this was
-     * written for is a middlebox resetting the connection partway through a large
-     * file. Without the retry one reset file fails the whole pack; without the
-     * resume the retry re-fetches everything already on disk and is just as likely
-     * to be cut at the same point, so a big file on a bad line never completes.
-     *
-     * The partial lives in the same `.tmp` the commit moves from, so a resumed
-     * attempt appends to real bytes. A server that ignores the range answers with
-     * the whole resource, and then the partial is dropped and the write starts at
-     * zero -- correct either way, just slower.
-     *
-     * A partial the host refuses to continue is dropped so the next attempt starts
-     * from zero. Keeping it would make the offset permanent: a transfer cut after
-     * its last byte, or a file the mirror republished shorter, leaves a `.tmp` no
-     * shorter than the object, and every attempt from then on -- this run and every
-     * later one -- asks for a range the host has nothing to answer with.
-     */
-    private suspend fun downloadToFile(url: String, dest: Path) {
-        val tmp = dest.resolveSibling("${dest.fileName}.tmp")
-        retryWithBackoff(
-            operation = "smrt download ${dest.fileName}",
-            shouldRetry = { it is IOException },
-        ) {
-            val have = if (Files.exists(tmp)) runCatching { Files.size(tmp) }.getOrDefault(0L) else 0L
-            try {
-                client.downloadStreaming(url, resumeFrom = have) { resumed, channel ->
-                    if (!resumed && have > 0L) {
-                        log.debug("smrt sync: range ignored for {}, restarting the transfer", dest.fileName)
-                    }
-                    val append = resumed && have > 0L
-                    if (!append) runCatching { Files.deleteIfExists(tmp) }
-                    FileOutputStream(tmp.toFile(), append).use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        while (!channel.isClosedForRead) {
-                            val n = channel.readAvailable(buf, 0, buf.size)
-                            if (n <= 0) break
-                            out.write(buf, 0, n)
-                        }
-                    }
-                }
-            } catch (e: RangeNotSatisfiableException) {
-                log.warn("smrt sync: partial for {} is unusable ({} bytes), restarting from zero", dest.fileName, have)
-                runCatching { Files.deleteIfExists(tmp) }
-                throw e
-            }
-        }
-        // Non-atomic REPLACE_EXISTING on FAT32/SMB can leave a 0-byte
-        // dest after power loss; Forge then classloads garbage.
-        fileOpRetry("smrt download commit ${dest.fileName}") {
-            try {
-                Files.move(
-                    tmp,
-                    dest,
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE,
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                log.warn(
-                    "Filesystem at {} does not support ATOMIC_MOVE; non-atomic fallback may leave a 0-byte file on crash",
-                    dest.parent,
-                )
-                Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
-            } catch (_: FileAlreadyExistsException) {
-                // Java spec allows ATOMIC_MOVE to ignore REPLACE_EXISTING; some
-                // providers then refuse and raise FileAlreadyExistsException
-                // when dest already exists. Re-sync over an existing jar would
-                // hard-fail without this fallback.
-                Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
-            }
-        }
-    }
 
     companion object {
         /**

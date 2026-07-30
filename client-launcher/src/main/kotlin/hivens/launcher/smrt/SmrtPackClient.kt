@@ -10,31 +10,14 @@ import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.cache.read
 import hivens.launcher.cache.SmrtPackCaches
 import io.ktor.client.request.get
-import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import java.io.IOException
-
-/**
- * The host refused a resume offset: what is already on disk is at least as long
- * as the object being fetched, so there is no remainder to send.
- *
- * Separate from the generic transport failure because the caller has to drop its
- * partial before trying again. A retry that keeps the offset asks the same
- * unanswerable question and gets the same refusal, for as many attempts as it is
- * given and on every later run too.
- */
-class RangeNotSatisfiableException(url: String) :
-    IOException("GET $url: resume offset is past the end of the resource")
 
 /**
  * Thin HTTP wrapper for the smrt mirror's `/v1/...` endpoints. Uses the
@@ -147,57 +130,6 @@ class SmrtPackClient(
     override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff {
         val url = "$mirrorBase/v1/packs/$packId/diff?from=${from.encodeURLParameter()}&to=${to.encodeURLParameter()}"
         return getJson(url)
-    }
-
-    /**
-     * Stream a download through a caller-supplied consumer. The
-     * consumer must drain (or copy out of) the channel before the
-     * lambda returns -- the underlying response is closed on exit and
-     * the channel becomes invalid.
-     *
-     * The `prepareGet().execute { }` pattern is mandatory here: a
-     * plain `get(url).bodyAsChannel()` would route through ktor's
-     * SavedHttpCall, which loads the entire response into a single
-     * ByteArray before exposing the channel. On a 24 MB resource pack
-     * with concurrent downloads that triggers OutOfMemoryError on the
-     * compose-desktop heap. execute{} bypasses SavedHttpCall and gives
-     * a true streaming channel; the 64 KB read loop downstream keeps
-     * resident memory bounded regardless of file size.
-     */
-    suspend fun downloadStreaming(url: String, consume: suspend (ByteReadChannel) -> Unit) {
-        downloadStreaming(url, resumeFrom = 0L) { _, channel -> consume(channel) }
-    }
-
-    /**
-     * Resuming variant. With [resumeFrom] above zero the request carries a range
-     * header, and [consume] is told whether the server honoured it: `true` means the
-     * channel continues from that offset and the caller appends, `false` means the
-     * response is the whole resource from the start and whatever was kept must be
-     * discarded. A server that ignores ranges is normal, so this is a fact to act on
-     * rather than an error.
-     *
-     * An offset the host refuses outright raises [RangeNotSatisfiableException] --
-     * distinct from a transport failure, since only the caller can drop the partial
-     * that made the offset unusable.
-     */
-    suspend fun downloadStreaming(
-        url: String,
-        resumeFrom: Long,
-        consume: suspend (resumed: Boolean, ByteReadChannel) -> Unit,
-    ) {
-        httpProvider.current.prepareGet(url) {
-            headers.append("User-Agent", USER_AGENT)
-            if (resumeFrom > 0L) headers.append(HttpHeaders.Range, "bytes=$resumeFrom-")
-        }.execute { resp ->
-            if (resumeFrom > 0L && resp.status == HttpStatusCode.RequestedRangeNotSatisfiable) {
-                throw RangeNotSatisfiableException(url)
-            }
-            if (!resp.status.isSuccess()) {
-                val body = runCatching { resp.bodyAsText() }.getOrDefault("")
-                throw IOException("GET $url failed: ${resp.status} body=$body")
-            }
-            consume(resp.status == HttpStatusCode.PartialContent, resp.bodyAsChannel())
-        }
     }
 
     private suspend inline fun <reified T> getJson(url: String): T {

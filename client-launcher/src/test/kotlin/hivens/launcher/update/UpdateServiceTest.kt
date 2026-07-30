@@ -1,5 +1,6 @@
 package hivens.launcher.update
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.ReleaseChannel
 import hivens.core.data.SettingsData
@@ -70,8 +71,13 @@ class UpdateServiceTest {
         } else {
             withManifest + MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound)
         }
+        // One provider for both: the mock queue is stateful, so a second client
+        // over its own queue would answer the engine's requests out of step with
+        // the service's.
+        val provider = buildMockClient(*withMeta.toTypedArray())
         return UpdateService(
-            clientProvider = buildMockClient(*withMeta.toTypedArray()),
+            clientProvider = provider,
+            transfers = testTransferEngine(provider),
             json = json,
             dataDirectory = tempDir,
             settingsService = settings,
@@ -87,18 +93,20 @@ class UpdateServiceTest {
     ): UpdateService {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
+        val provider = buildMockClient(
+            // Manifest first -- substring "release-manifest" is more specific
+            // than "releases/latest" and must win the match.
+            MockResponse(urlContains = "release-manifest", body = releaseManifestJson()),
+            MockResponse(urlContains = "releases/latest",  body = body,      status = status),
+            MockResponse(urlContains = "releases",         body = "[$body]", status = status),
+            // checkForUpdate always probes the channel meta; without this it
+            // falls back to the "[$body]" entry above and relies on
+            // UpdateChannelMeta failing to decode it.
+            MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound)
+        )
         return UpdateService(
-            clientProvider = buildMockClient(
-                // Manifest first -- substring "release-manifest" is more specific
-                // than "releases/latest" and must win the match.
-                MockResponse(urlContains = "release-manifest", body = releaseManifestJson()),
-                MockResponse(urlContains = "releases/latest",  body = body,      status = status),
-                MockResponse(urlContains = "releases",         body = "[$body]", status = status),
-                // checkForUpdate always probes the channel meta; without this it
-                // falls back to the "[$body]" entry above and relies on
-                // UpdateChannelMeta failing to decode it.
-                MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound)
-            ),
+            clientProvider = provider,
+            transfers = testTransferEngine(provider),
             json = json,
             dataDirectory = tempDir,
             settingsService = settings,
@@ -754,6 +762,7 @@ class UpdateServiceTest {
 
         val svc = UpdateService(
             clientProvider = buildMockClient(body = "{}"),
+            transfers = testTransferEngine(buildMockClient(body = "{}")),
             json = json,
             dataDirectory = tempDir,
             settingsService = fakeSettings()

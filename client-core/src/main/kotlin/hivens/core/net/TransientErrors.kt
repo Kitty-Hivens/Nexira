@@ -49,20 +49,16 @@ fun isTransientTransferError(t: Throwable): Boolean {
             -> return true
             else -> Unit
         }
-        // Two message-based checks, deliberately. Neither type is reachable from
+        // Message-based checks, deliberately. The types are not reachable from
         // here: okhttp's StreamResetException lives in an internal package, and a
-        // reset arriving as a plain IOException carries the reason only in text.
-        // The Windows sharing-violation text is localized and must never be
-        // matched this way, but these two are protocol strings from a library we
-        // ship, not from the OS.
+        // reset that arrives as a plain IOException carries its reason only in
+        // text. The Windows sharing-violation text is localized and must never be
+        // matched this way, but these are protocol strings from a library we ship,
+        // not from the OS.
         if (cause is IOException) {
-            val message = cause.message
             if (cause.javaClass.simpleName == "StreamResetException") return true
-            if (message != null && (
-                    message.contains("Connection reset", ignoreCase = true) ||
-                        message.contains("unexpected end of stream", ignoreCase = true)
-                    )
-            ) {
+            val message = cause.message
+            if (message != null && TRANSIENT_MESSAGES.any { message.contains(it, ignoreCase = true) }) {
                 return true
             }
         }
@@ -77,3 +73,15 @@ fun isTransientTransferError(t: Throwable): Boolean {
  * failure; the bound keeps a self-referential chain from spinning here.
  */
 private const val MAX_CAUSE_DEPTH = 12
+
+/**
+ * `stream was reset` is okhttp's own wording for the h2 case this whole retry
+ * path was written for -- a middlebox sending RST_STREAM mid-body. It is matched
+ * by text as well as by type because the type does not always survive the trip:
+ * ktor wraps, and the reason can reach us as a plain IOException.
+ */
+private val TRANSIENT_MESSAGES = listOf(
+    "connection reset",
+    "unexpected end of stream",
+    "stream was reset",
+)

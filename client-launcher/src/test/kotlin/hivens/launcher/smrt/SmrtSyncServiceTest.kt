@@ -1,5 +1,6 @@
 package hivens.launcher.smrt
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
@@ -118,7 +119,12 @@ class SmrtSyncServiceTest {
         val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR_BASE, json)
         val modrinth = ModrinthClient(provider, json)
-        return SmrtSyncService(client, modrinth, ProtectedPaths(tempDir("pp").resolve("pp.json"), json))
+        return SmrtSyncService(
+            client,
+            modrinth,
+            ProtectedPaths(tempDir("pp").resolve("pp.json"), json),
+            testTransferEngine(provider),
+        )
     }
 
     @Test
@@ -151,9 +157,9 @@ class SmrtSyncServiceTest {
     fun `a partial left behind is continued rather than refetched`() = runTest {
         val dir = tempDir("sync-resume")
         val mods = Files.createDirectories(dir.resolve("mods"))
-        // What a transfer cut mid-body leaves: the head of the object in the temp
-        // file the commit moves from.
-        Files.write(mods.resolve("req.jar.tmp"), reqBytes.copyOfRange(0, 4))
+        // What a transfer cut mid-body leaves: the head of the object in the partial
+        // the commit moves from.
+        Files.write(mods.resolve("req.jar.part"), reqBytes.copyOfRange(0, 4))
 
         val ranges = mutableListOf<Long>()
         rangeAwareService(ranges).sync("test", dir)
@@ -170,7 +176,7 @@ class SmrtSyncServiceTest {
         // launcher, crash, a commit that could not take the lock. The offset is at
         // the end of the object, so the host answers 416 and keeps answering it for
         // as long as the partial decides the offset.
-        Files.write(mods.resolve("req.jar.tmp"), reqBytes + "TRAILING".toByteArray())
+        Files.write(mods.resolve("req.jar.part"), reqBytes + "TRAILING".toByteArray())
 
         rangeAwareService().sync("test", dir)
 
@@ -181,7 +187,7 @@ class SmrtSyncServiceTest {
     fun `a host that ignores the range restarts the transfer instead of appending`() = runTest {
         val dir = tempDir("sync-no-range")
         val mods = Files.createDirectories(dir.resolve("mods"))
-        Files.write(mods.resolve("req.jar.tmp"), reqBytes.copyOfRange(0, 4))
+        Files.write(mods.resolve("req.jar.part"), reqBytes.copyOfRange(0, 4))
 
         rangeAwareService(ignoreRanges = true).sync("test", dir)
 

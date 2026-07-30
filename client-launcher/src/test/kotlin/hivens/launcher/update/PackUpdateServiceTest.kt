@@ -1,5 +1,6 @@
 package hivens.launcher.update
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.interfaces.IPackRepository
@@ -137,7 +138,7 @@ class PackUpdateServiceTest {
         }
         private val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR, json)
-        val sync = SmrtSyncService(client, ModrinthClient(provider, json), protectedPaths)
+        val sync = SmrtSyncService(client, ModrinthClient(provider, json), protectedPaths, testTransferEngine(provider))
         private val snapshots = PackSnapshotService(dataDir, json)
         val journal = ApplyJournal(dataDir, json)
         val service = PackUpdateService(client, sync, repo, protectedPaths, snapshots, journal, dataDir)

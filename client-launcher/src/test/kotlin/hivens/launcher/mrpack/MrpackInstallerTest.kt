@@ -65,7 +65,7 @@ class MrpackInstallerTest {
     private fun bareInstaller(): MrpackInstaller {
         val dead = HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.NotFound) }) }
         val provisioner = RuntimeProvisioner(tempDir("libs"), tempDir("assets"), dead, testTransferEngine(dead), json)
-        return MrpackInstaller(dead, json, fakeJava, provisioner, FakeRepository(), tempDir("data"))
+        return MrpackInstaller(testTransferEngine(dead), json, fakeJava, provisioner, FakeRepository(), tempDir("data"))
     }
 
     @Test
@@ -142,7 +142,7 @@ class MrpackInstallerTest {
             versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
         )
         val repo = FakeRepository()
-        val installer = MrpackInstaller(provider, json, fakeJava, provisioner, repo, dataDir)
+        val installer = MrpackInstaller(testTransferEngine(provider), json, fakeJava, provisioner, repo, dataDir)
 
         val instance = installer.install(buildMrpack())
 
@@ -170,7 +170,7 @@ class MrpackInstallerTest {
             loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
             versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
         )
-        val installer = MrpackInstaller(provider, json, fakeJava, provisioner, FakeRepository(), tempDir("data"))
+        val installer = MrpackInstaller(testTransferEngine(provider), json, fakeJava, provisioner, FakeRepository(), tempDir("data"))
 
         val instance = installer.install(
             buildMrpack(),

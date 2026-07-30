@@ -107,6 +107,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import okhttp3.Call
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.Protocol as HttpProtocol
 import org.koin.core.module.dsl.singleOf
@@ -133,6 +134,12 @@ import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+
+/**
+ * Concurrent requests OkHttp will run against one host on the direct channel.
+ * Matches the transfer engine's own ceiling; see the dispatcher note there.
+ */
+private const val MAX_REQUESTS_PER_HOST = 8
 
 /**
  * Module responsible for network interaction.
@@ -207,6 +214,12 @@ val networkModule = module {
             // a filtered route resets the stream mid-body with PROTOCOL_ERROR and
             // the transfer dies. One request per connection has no stream to reset.
             .protocols(listOf(HttpProtocol.HTTP_1_1))
+            // Raised in step with the transfer engine's permit ceiling. OkHttp allows
+            // five requests per host by default, so a pool that grew past that would
+            // queue inside the client, measure the extra permit as no gain, and hand
+            // it straight back -- the engine would never be able to use what it asked
+            // for. The engine, not this number, decides how many actually run.
+            .dispatcher(Dispatcher().apply { maxRequestsPerHost = MAX_REQUESTS_PER_HOST })
             .build()
     }
 
@@ -440,7 +453,7 @@ val mirrorModule = module {
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
     single { ModrinthClient(get(named("direct")), caches = get()) }
-    single { SmrtSyncService(get(), get(), get()) }
+    single { SmrtSyncService(get(), get(), get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by
     // origin so the Browse UI stays source-agnostic.
@@ -543,7 +556,7 @@ val mirrorModule = module {
     } bind PackUpdateStatusHub::class
     single {
         MrpackInstaller(
-            clientProvider = get(named("direct")),
+            transfers = get(),
             json = get(),
             javaManager = get(),
             runtimeProvisioner = get(),
@@ -677,6 +690,7 @@ val updateModule = module {
     single {
         UpdateService(
             clientProvider  = get(named("direct")),
+            transfers       = get(),
             json            = get(),
             dataDirectory   = get(),
             settingsService = get()
