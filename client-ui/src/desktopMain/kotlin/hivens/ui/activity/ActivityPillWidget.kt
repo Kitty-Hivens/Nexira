@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,10 +28,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +62,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.FrostTier
@@ -131,6 +136,9 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     val subject = remember(activities) {
         activities.lastOrNull { it.phase is ActivityPhase.Failed } ?: activities.lastOrNull()
     }
+    // Collapsed narrates one; the rest are still there and the object has to say
+    // so, or the surface silently drops what the registry is holding.
+    var expanded by remember { mutableStateOf(false) }
 
     // The object must not outgrow the column it floats in: a long pack name on a
     // narrow window would otherwise push it past the edge, since the pill sizes to
@@ -159,7 +167,9 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                     targetWidth = { ballPx },
                 ) + fadeOut(tween(style.animationDurationMs(140))),
             ) {
-                subject?.let { Pill(it, props, commands, s, cap) }
+                if (subject != null) {
+                    Pill(subject, activities, expanded, { expanded = !expanded }, props, commands, s, cap)
+                }
             }
         }
     }
@@ -169,6 +179,9 @@ fun ActivityPillWidget(instance: WidgetInstance) {
 @Composable
 internal fun Pill(
     activity: Activity,
+    all: List<Activity> = listOf(activity),
+    expanded: Boolean = false,
+    onToggleExpand: () -> Unit = {},
     props: PillProps,
     commands: ActivityCommands?,
     s: AppStrings,
@@ -215,7 +228,7 @@ internal fun Pill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            Subject(activity, fraction, accent, props.progress)
+            SubjectStack(activity, all, fraction, accent, props.progress)
             // Collapsed keeps the ball and nothing else: the object is still
             // present and still measures, it just stops narrating. The same
             // shape the unfurl starts from, so there is one drawing rather
@@ -246,7 +259,23 @@ internal fun Pill(
                     NxProgressBar(progress = fraction, color = accent)
                 }
             }
+            // What the stack could not fit. Without it the surface silently
+            // drops what the registry is holding.
+            if (all.size > STACK_MAX) {
+                Text(
+                    text = s.activityPillMore(all.size - STACK_MAX),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                )
+            }
             Spacer(Modifier.width(2.dp))
+            // The break between what this is about and what can be done to it.
+            // Without it the row reads as one undifferentiated strip.
+            if (props.showActions && activity.actions.isNotEmpty()) {
+                VerticalDivider(Modifier.height(20.dp), color = colors.outline)
+                Spacer(Modifier.width(2.dp))
+            }
             if (props.showActions) {
                 activity.actions.forEach { action ->
                     NxButton(
@@ -255,6 +284,13 @@ internal fun Pill(
                         style = NxButtonStyle.Tertiary,
                         icon = action.icon(),
                         compact = true,
+                    )
+                }
+                if (all.size > 1) {
+                    NxIconButton(
+                        icon = if (expanded) NxIcon.ExpandMore else NxIcon.ExpandLess,
+                        contentDescription = s.activityPillExpand,
+                        onClick = onToggleExpand,
                     )
                 }
             }
@@ -341,35 +377,57 @@ private fun EdgeMeasure(
     }
 }
 
-/** Leading icon; carries the measure itself under the Ring treatment. */
+/**
+ * The subject zone. One face per activity, overlapping, newest in front, because
+ * a single icon in front of a list of four says the launcher is doing one thing.
+ * Past [STACK_MAX] the count in the row carries the remainder rather than the
+ * stack growing into an unreadable smear.
+ */
 @Composable
-private fun Subject(activity: Activity, fraction: Float?, accent: Color, mode: PillProgress) {
-    val tint = NxTheme.colors.decorativeColor(activity.key)
-    val initials = activity.title.take(2).uppercase()
-    val shape = LocalStyle.current.badgeStyle.shape()
-
+private fun SubjectStack(
+    lead: Activity,
+    all: List<Activity>,
+    fraction: Float?,
+    accent: Color,
+    mode: PillProgress,
+) {
+    // Lead in front: it is the one the row is describing.
+    val shown = (listOf(lead) + all.filter { it.key != lead.key }).take(STACK_MAX)
     Box(contentAlignment = Alignment.Center) {
-        SubcomposeAsyncImage(
-            model = activity.iconUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(28.dp).clip(shape),
-            loading = { Box(Modifier.fillMaxSize().background(tint)) },
-            error = {
-                Box(Modifier.fillMaxSize().background(tint), contentAlignment = Alignment.Center) {
-                    Text(
-                        initials,
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            },
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(-STACK_OVERLAP)) {
+            shown.reversed().forEach { Face(it) }
+        }
         if (mode == PillProgress.Ring) {
             EdgeMeasure(fraction, accent, RoundedCornerShape(50), Modifier.size(36.dp))
         }
     }
+}
+
+@Composable
+private fun Face(activity: Activity) {
+    val tint = NxTheme.colors.decorativeColor(activity.key)
+    val initials = activity.title.take(2).uppercase()
+    val shape = LocalStyle.current.badgeStyle.shape()
+    // The ring is the body colour, so the faces read as separate discs rather
+    // than one blob when they overlap.
+    val ring = NxTheme.colors.surfaceContainerHigh
+    SubcomposeAsyncImage(
+        model = activity.iconUrl,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.size(28.dp).border(2.dp, ring, shape).clip(shape),
+        loading = { Box(Modifier.fillMaxSize().background(tint)) },
+        error = {
+            Box(Modifier.fillMaxSize().background(tint), contentAlignment = Alignment.Center) {
+                Text(
+                    initials,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        },
+    )
 }
 
 /** Null when the job's size is unknown, which the measure renders as busy. */
@@ -413,3 +471,9 @@ private const val MAX_WIDTH_SHARE = 0.72f
 
 /** Share of the perimeter the indeterminate arc covers. */
 private const val INDETERMINATE_SPAN = 0.22f
+
+/** Faces the stack shows before the row's count takes over. */
+private const val STACK_MAX = 3
+
+/** How far each face hides behind the one in front of it. */
+private val STACK_OVERLAP = 11.dp

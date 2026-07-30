@@ -1000,6 +1000,9 @@ object GermanStrings : AppStrings {
     override val editorSurfOverlay                      = "Schwebende Ebene"
     override val editorSurfShortOverlay                 = "Schwebend"
 
+    override val activityPillExpand                     = "Alle zeigen"
+    override fun activityPillMore(count: Int)           = "+$count"
+
     override val activityPillCancel                     = "Abbrechen"
     override val activityPillPause                      = "Pause"
     override fun activityPillMeasure(done: Long, total: Long) = "$done von $total"
