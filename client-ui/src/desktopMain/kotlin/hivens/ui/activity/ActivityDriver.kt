@@ -64,13 +64,22 @@ class ActivityDriver(
     private suspend fun onUpdates(statuses: Map<String, PackUpdateStatus>) {
         for ((instanceId, status) in statuses) {
             val phase = when (status) {
-                PackUpdateStatus.Checking  -> ActivityPhase.Running(0, 0)
                 is PackUpdateStatus.Updated -> ActivityPhase.Succeeded
                 is PackUpdateStatus.Failed  -> ActivityPhase.Failed(status.reason)
-                // Up-to-date and pending are facts about a pack, not work in
-                // flight. The card badge and the update banner carry those; the
-                // activity surface narrates what is happening right now.
-                PackUpdateStatus.UpToDate, is PackUpdateStatus.Pending -> continue
+                // Not work in flight, so nothing to narrate -- and skipping the
+                // report is not enough: the status map keeps its last value, so a
+                // check that settles would leave whatever was reported before it
+                // on screen for the rest of the session. Drop the entry instead.
+                //
+                // Checking is deliberately in this group. An update check is a
+                // sub-second call that usually answers from cache, and a surface
+                // that flashes for every one of them is noise, not information.
+                PackUpdateStatus.Checking,
+                PackUpdateStatus.UpToDate,
+                is PackUpdateStatus.Pending -> {
+                    registry.dismiss("update:$instanceId")
+                    continue
+                }
             }
             val name = repository.get(instanceId)?.displayName ?: instanceId
             registry.report(
