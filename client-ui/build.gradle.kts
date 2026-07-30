@@ -41,7 +41,23 @@ kotlin {
         // JUnit 4 purely by KMP default, which left it out of the build-wide
         // per-test timeout (a JUnit 5 configuration parameter). The tests use
         // kotlin.test only, so kotlin("test") just resolves to the junit5 variant.
-        testRuns["test"].executionTask.configure { useJUnitPlatform() }
+        testRuns["test"].executionTask.configure {
+            useJUnitPlatform()
+            // The timeout's preemptive mode deadlocks the suites it is meant to
+            // guard, so this module opts out of it. Preemption needs the test
+            // body on its own thread, and these tests drive an ImageComposeScene
+            // whose composition work Compose still dispatches to the AWT event
+            // thread -- two threads in one scene, taking the frame clock's
+            // awaiter lock and the flush dispatcher's lock in opposite orders.
+            // sendFrame resumes an awaiter holding the first and asks for the
+            // second; withFrameNanos adds one holding the second and asks for the
+            // first. It needs that exact interleaving, so it surfaced as a macOS
+            // hang under load rather than a repeatable failure: 2 of 5 runs
+            // against a CPU burner, 0 of 5 idle, the JVM naming it a deadlock in
+            // every dump taken while it hung. The 20-minute task timeout stays as
+            // this module's backstop; it names the module, not the method.
+            systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SAME_THREAD")
+        }
     }
 
     sourceSets {
