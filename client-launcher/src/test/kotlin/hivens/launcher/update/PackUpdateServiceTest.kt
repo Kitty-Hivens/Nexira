@@ -138,7 +138,7 @@ class PackUpdateServiceTest {
         }
         private val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR, json)
-        val sync = SmrtSyncService(client, ModrinthClient(provider, json), protectedPaths, testTransferEngine(provider))
+        val sync = SmrtSyncService(client, ModrinthClient(provider, testTransferEngine(provider), json), protectedPaths, testTransferEngine(provider))
         private val snapshots = PackSnapshotService(dataDir, json)
         val journal = ApplyJournal(dataDir, json)
         val service = PackUpdateService(client, sync, repo, protectedPaths, snapshots, journal, dataDir)

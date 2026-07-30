@@ -120,7 +120,7 @@ class SmrtSyncServiceTest {
     private fun serviceWith(engine: MockEngine): SmrtSyncService {
         val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR_BASE, json)
-        val modrinth = ModrinthClient(provider, json)
+        val modrinth = ModrinthClient(provider, testTransferEngine(provider), json)
         return SmrtSyncService(
             client,
             modrinth,

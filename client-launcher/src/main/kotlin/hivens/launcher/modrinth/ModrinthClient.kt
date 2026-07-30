@@ -1,21 +1,20 @@
 package hivens.launcher.modrinth
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
 import io.ktor.client.request.get
-import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import java.io.FileOutputStream
 import java.io.IOException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -31,6 +30,7 @@ import java.nio.file.Path
  */
 class ModrinthClient(
     private val httpProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json = DEFAULT_JSON,
     private val caches: ModrinthCaches = ModrinthCaches.passthrough(),
 ) {
@@ -104,14 +104,17 @@ class ModrinthClient(
         } ?: versions.firstOrNull()
     }
 
-    /** Stream a mod jar to [target] (parents created); no-op if it already exists. */
+    /**
+     * Fetch a mod jar to [target]; a file already there is left alone.
+     *
+     * Modrinth pins hashes on the version metadata, but the browser hands this
+     * function a bare url, so there is nothing here to verify against -- the
+     * transfer is retried and resumed, and the jar's own structure is what the
+     * content scanner checks afterwards.
+     */
     suspend fun downloadTo(url: String, target: Path): Unit = withContext(Dispatchers.IO) {
         if (Files.exists(target)) return@withContext
-        target.parent?.let { Files.createDirectories(it) }
-        httpProvider.current.prepareGet(url) { headers.append("User-Agent", USER_AGENT) }.execute { resp ->
-            if (!resp.status.isSuccess()) throw IOException("GET $url -> ${resp.status}")
-            FileOutputStream(target.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-        }
+        transfers.fetch(Transfer(url = url, dest = target, userAgent = USER_AGENT, skip = SkipIfPresent.Presence))
     }
 
     private suspend inline fun <reified T> getJson(url: String): T {
