@@ -269,7 +269,11 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
     }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        // Floated card, same treatment as the hero above: full-bleed square
+        // edges read as a foreign element next to the rounded cards the rest
+        // of the screen is built from.
+        modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        shape    = RoundedCornerShape(LocalStyle.current.cardCorner),
         // Glass tint, not solid: a solid fill broke the app's translucent
         // aesthetic and left a hard seam against the right panel. The
         // wallpaper stays softly visible while the tint keeps dense
