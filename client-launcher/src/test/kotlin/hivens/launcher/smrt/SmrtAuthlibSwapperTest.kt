@@ -1,5 +1,6 @@
 package hivens.launcher.smrt
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
@@ -57,7 +58,7 @@ class SmrtAuthlibSwapperTest {
         val client = HttpClient(MockEngine) {
             engine { addHandler { respond(ByteReadChannel(handlerBytes), HttpStatusCode.OK) } }
         }
-        return SmrtAuthlibSwapper(HttpClientProvider { client }, ServerProtocolConfig(), dir)
+        return SmrtAuthlibSwapper(testTransferEngine(HttpClientProvider { client }), ServerProtocolConfig(), dir)
     }
 
     @Test

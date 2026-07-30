@@ -1,6 +1,9 @@
 package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangArguments
 import hivens.launcher.runtime.MojangLibrary
@@ -8,13 +11,11 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -35,6 +36,7 @@ import java.util.zip.ZipFile
  */
 class ForgeLegacyResolver(
     private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     private val forgeMavenBase: String = FORGE_MAVEN,
 ) : LoaderResolver {
@@ -140,11 +142,14 @@ class ForgeLegacyResolver(
         return 0
     }
 
+    /**
+     * The installer jar, which the official maven pins with nothing but HTTPS -- its
+     * version is chosen at runtime, so there is no hash to check it against. Staged
+     * through the engine anyway: a cut transfer is retried and resumed instead of
+     * leaving a truncated jar at the final path for the installer to choke on.
+     */
     private suspend fun downloadTo(url: String, dest: Path) {
-        clientProvider.current.prepareGet(url).execute { resp ->
-            if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
-            FileOutputStream(dest.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-        }
+        transfers.fetch(Transfer(url = url, dest = dest, skip = SkipIfPresent.Never))
     }
 
     companion object {

@@ -266,6 +266,18 @@ val networkModule = module {
     single { TransferEngine(get<HttpClientProvider>(named("direct"))) }
 
     /**
+     * The same downloader on the smartycraft channel, for the bytes that come from
+     * the SC client distribution.
+     *
+     * Two instances rather than one because the channel decision is not the
+     * engine's to make: this one follows the bypass-aware provider, so a grant the
+     * user made for the smartycraft host applies to its transfers and to nothing
+     * else. They also each keep their own concurrency controller, which is right --
+     * they are measuring different hosts.
+     */
+    single(named("smartycraft")) { TransferEngine(get<HttpClientProvider>()) }
+
+    /**
      * Smartycraft-routed `okhttp3.Call.Factory` for callers that consume the
      * OkHttp call API directly (Coil's image fetcher today; no Ktor [HttpClient]
      * adapter on its side). Mirrors the per-request channel decision the
@@ -515,11 +527,11 @@ val mirrorModule = module {
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
     // raw.githubusercontent.com keep strict TLS. The planner is what both
     // sync paths (LauncherController, AutoSyncService) consult.
-    single { OpenSmrtHelperResolver(get(named("direct")), get(), get()) }
+    single { OpenSmrtHelperResolver(get(named("direct")), get(), get(), get()) }
     single { SmartyModPlanner(get<OpenSmrtHelperResolver>()::resolve, get()) }
     // SC-bound pack authlib swap. Default (smartycraft) channel: the patched jar
     // is pulled from the SC client distribution, same source as the server-list sync.
-    single { SmrtAuthlibSwapper(get(), get<ServerProtocolConfig>(), get()) }
+    single { SmrtAuthlibSwapper(get(named("smartycraft")), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     // Instance-level mutations that reach past the registry (full delete, detach).
     single { PackInstanceService(repository = get(), dataDir = get()) }
@@ -596,7 +608,7 @@ val runtimeModule = module {
     // Canonical runtime provisioner -- vanilla + loader libraries from the
     // official Mojang/Forge CDNs into the shared roots. Direct channel: these
     // CDNs keep strict TLS (same rationale as JavaManagerService).
-    single { ForgeLegacyResolver(get(named("direct")), get()) }
+    single { ForgeLegacyResolver(get(named("direct")), get(), get()) }
     single { loaderRegistry() }
     single {
         RuntimeProvisioner(
@@ -860,12 +872,12 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
         listOf(
             ForgeResolver(
                 legacy = get<ForgeLegacyResolver>(),
-                modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), loaderCacheDir),
+                modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), get(), loaderCacheDir),
             ),
-            ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), loaderCacheDir),
+            ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), get(), loaderCacheDir),
             FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
             FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
-            CleanroomResolver(get(named("direct")), get()),
+            CleanroomResolver(get(named("direct")), get(), get()),
             Lwjgl3ifyResolver(get(named("direct")), get()),
         ),
     )

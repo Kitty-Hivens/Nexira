@@ -1,25 +1,22 @@
 package hivens.launcher.smrt
 
-import hivens.core.api.HttpClientProvider
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
+import hivens.core.net.of
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.flatten
-import hivens.core.util.retryWithBackoff
 import hivens.launcher.network.ServerProtocolConfig
-import io.ktor.client.request.prepareGet
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
-import java.io.IOException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
 
 /**
  * Supplies the SmartyCraft-patched `authlib` jar for an SC-bound pack launch.
@@ -43,13 +40,12 @@ import java.security.MessageDigest
  * launch rather than spawning a guaranteed 403.
  */
 class SmrtAuthlibSwapper(
-    private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val config: ServerProtocolConfig,
     dataDirectory: Path,
 ) {
     private val log = LoggerFactory.getLogger(SmrtAuthlibSwapper::class.java)
     private val cacheRoot = dataDirectory.resolve("smrt-authlib")
-    private val client get() = clientProvider.current
 
     /**
      * Returns the local path to the SC-patched authlib for [serverId], downloading
@@ -81,32 +77,27 @@ class SmrtAuthlibSwapper(
         if (verifies(dest, data.md5)) return@withContext dest
 
         return@withContext try {
-            Files.createDirectories(dest.parent)
             val url = "${config.clientFilesBase}/" +
                 rawPath.split("/").joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
             log.info("authlib swap: downloading {} <- {}", fileName, url)
-            // The SC channel drops mid-stream periodically; this jar is
-            // mandatory (a miss blocks the launch), so retry transient failures.
-            retryWithBackoff(
-                operation = "authlib $fileName",
-                // A permanent 4xx (renamed/absent artifact) won't fix itself --
-                // retrying only adds ~13s of backoff before the inevitable miss.
-                // The transient stream drops this retry exists for surface as a
-                // plain IOException and still retry.
-                shouldRetry = { it !is CancellationException && !(it is HttpStatusException && it.statusCode in 400..499) },
-            ) {
-                downloadToFile(url, dest)
-            }
-            if (verifies(dest, data.md5)) {
-                dest
-            } else {
-                log.warn(
-                    "authlib swap: md5 mismatch for {} (expected {}, got {}); discarding",
-                    fileName, data.md5, md5Of(dest),
+            // The SC channel drops mid-stream periodically and this jar is mandatory
+            // -- a miss blocks the launch -- so the transfer is retried, resumed, and
+            // verified before it is published. A permanent 4xx still ends it at once:
+            // a renamed or absent artifact will not fix itself, and retrying only
+            // spends backoff on the way to the same miss.
+            transfers.fetch(
+                Transfer(
+                    url = url,
+                    dest = dest,
+                    // "any" is the SC manifest's own skip-the-check sentinel; there is
+                    // nothing to verify against, so presence has to be the answer.
+                    expect = data.md5.takeIf { it.isNotBlank() && it != MD5_ANY }
+                        ?.let { Digest(DigestAlgorithm.MD5, it) },
+                    size = data.size,
+                    skip = if (data.md5 == MD5_ANY) SkipIfPresent.Presence else SkipIfPresent.ByDigest,
                 )
-                Files.deleteIfExists(dest)
-                null
-            }
+            )
+            dest
         } catch (e: CancellationException) {
             // An aborted launch must cancel cleanly, not surface as AuthlibUnavailable
             // (which would overwrite the abort's Idle state with an error).
@@ -136,48 +127,14 @@ class SmrtAuthlibSwapper(
 
     /** True when [p] satisfies [expectedMd5], honouring the SC "any" skip-check sentinel. */
     private fun verifies(p: Path, expectedMd5: String): Boolean = when {
-        expectedMd5 == "any" -> Files.isRegularFile(p) && Files.size(p) > 0
+        expectedMd5 == MD5_ANY -> Files.isRegularFile(p) && Files.size(p) > 0
         expectedMd5.isBlank() -> false
         else -> md5Of(p)?.equals(expectedMd5, ignoreCase = true) == true
     }
 
-    private suspend fun downloadToFile(url: String, dest: Path) {
-        val tmp = dest.resolveSibling("${dest.fileName}.tmp")
-        try {
-            client.prepareGet(url).execute { response ->
-                if (response.status.value != 200) {
-                    throw HttpStatusException(response.status.value, "HTTP ${response.status} for $url")
-                }
-                val channel = response.bodyAsChannel()
-                FileOutputStream(tmp.toFile()).use { out ->
-                    val buf = ByteArray(64 * 1024)
-                    while (!channel.isClosedForRead) {
-                        val n = channel.readAvailable(buf, 0, buf.size)
-                        if (n <= 0) break
-                        out.write(buf, 0, n)
-                    }
-                }
-            }
-            Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
-        } finally {
-            runCatching { Files.deleteIfExists(tmp) }
-        }
-    }
-
     private fun md5Of(p: Path): String? {
         if (!Files.isRegularFile(p)) return null
-        return runCatching {
-            val md = MessageDigest.getInstance("MD5")
-            Files.newInputStream(p).use { input ->
-                val buf = ByteArray(64 * 1024)
-                while (true) {
-                    val n = input.read(buf)
-                    if (n <= 0) break
-                    md.update(buf, 0, n)
-                }
-            }
-            md.digest().joinToString("") { "%02x".format(it) }
-        }.getOrNull()
+        return runCatching { DigestAlgorithm.MD5.of(p) }.getOrNull()
     }
 
     private fun sanitize(id: String): String =
@@ -185,8 +142,8 @@ class SmrtAuthlibSwapper(
 
     private companion object {
         private val AUTHLIB_JAR = Regex("^authlib-.*\\.jar$", RegexOption.IGNORE_CASE)
+
+        /** The SC manifest's "do not check this one" hash sentinel. */
+        private const val MD5_ANY = "any"
     }
 }
-
-/** A non-2xx HTTP response; carries the status so the retry predicate can skip permanent 4xx. */
-private class HttpStatusException(val statusCode: Int, message: String) : IOException(message)

@@ -1,24 +1,22 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.data.SmrtHelperDescriptor
 import hivens.core.data.SmrtHelperVariant
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.prepareGet
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
-import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -39,6 +37,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class OpenSmrtHelperResolver(
     private val clientProvider: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val json: Json,
     dataDirectory: Path,
 ) {
@@ -115,64 +114,18 @@ class OpenSmrtHelperResolver(
 
     private suspend fun downloadVerified(mcVersion: String, variant: SmrtHelperVariant): Path? {
         val dest = helpersDir.resolve(helperFileName(mcVersion))
-        if (sha256Of(dest)?.equals(variant.sha256, ignoreCase = true) == true) {
-            return dest
-        }
+        val url = "https://github.com/$OPEN_SMRT_REPO/releases/download/${variant.tag}/${variant.asset}"
         return try {
-            Files.createDirectories(helpersDir)
-            val url = "https://github.com/$OPEN_SMRT_REPO/releases/download/${variant.tag}/${variant.asset}"
-            log.info("open-smrt helper: downloading {} <- {}", dest.fileName, url)
-            downloadToFile(url, dest)
-            val onDisk = sha256Of(dest)
-            if (onDisk?.equals(variant.sha256, ignoreCase = true) != true) {
-                log.warn(
-                    "open-smrt helper: SHA-256 mismatch for {} (expected {}, got {}); discarding",
-                    variant.asset, variant.sha256, onDisk,
-                )
-                Files.deleteIfExists(dest)
-                null
-            } else {
-                dest
-            }
+            // The pinned SHA-256 does all three jobs here: it decides whether the
+            // copy on disk is already the right one, it is what fresh bytes are
+            // checked against, and a mismatch leaves the destination untouched -- so
+            // a bad download can no longer take out a good local jar.
+            transfers.fetch(Transfer(url, dest, Digest(DigestAlgorithm.SHA256, variant.sha256)))
+            dest
         } catch (e: Exception) {
-            log.warn("open-smrt helper: download failed for {}", variant.asset, e)
-            runCatching { Files.deleteIfExists(dest) }
+            log.warn("open-smrt helper: could not obtain {}", variant.asset, e)
             null
         }
-    }
-
-    private suspend fun downloadToFile(url: String, dest: Path) {
-        val tmp = dest.resolveSibling("${dest.fileName}.tmp")
-        runCatching { Files.deleteIfExists(tmp) }
-        client.prepareGet(url).execute { response ->
-            if (response.status.value != 200) throw java.io.IOException("HTTP ${response.status} for $url")
-            val channel = response.bodyAsChannel()
-            FileOutputStream(tmp.toFile()).use { out ->
-                val buf = ByteArray(64 * 1024)
-                while (!channel.isClosedForRead) {
-                    val n = channel.readAvailable(buf, 0, buf.size)
-                    if (n <= 0) break
-                    out.write(buf, 0, n)
-                }
-            }
-        }
-        Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
-    }
-
-    private fun sha256Of(p: Path): String? {
-        if (!Files.isRegularFile(p)) return null
-        return runCatching {
-            val md = MessageDigest.getInstance("SHA-256")
-            Files.newInputStream(p).use { input ->
-                val buf = ByteArray(64 * 1024)
-                while (true) {
-                    val n = input.read(buf)
-                    if (n <= 0) break
-                    md.update(buf, 0, n)
-                }
-            }
-            md.digest().joinToString("") { "%02x".format(it) }
-        }.getOrNull()
     }
 
     companion object {
