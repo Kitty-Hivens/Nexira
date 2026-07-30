@@ -14,6 +14,7 @@ import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -64,6 +65,7 @@ class TransferEngine(
     private val http: HttpClientProvider,
     private val gate: AdaptiveGate = AdaptiveGate(),
     private val journals: JournalStore = JournalStore(),
+    private val blockMaps: BlockMapStore = BlockMapStore(),
     private val blockSize: Int = DEFAULT_BLOCK_SIZE,
     private val parallelThreshold: Long = DEFAULT_PARALLEL_THRESHOLD,
     private val attempts: Int = DEFAULT_ATTEMPTS,
@@ -154,6 +156,146 @@ class TransferEngine(
     }
 
     /**
+     * Checks every transfer against what it is supposed to be and puts right what
+     * is not, fetching as little as the evidence allows.
+     *
+     * A file with a block map is compared block by block and only the blocks that
+     * differ are pulled, so a corrupted sector in a large pack asset costs
+     * megabytes instead of the whole file. Without a map -- a small file, or one
+     * installed before its map existed -- the whole-file digest is the only
+     * available verdict and a full refetch is the only available repair.
+     *
+     * Repair writes the corrected blocks into the file in place. That is safe
+     * precisely because the file is already known to be wrong: a crash partway
+     * leaves it no less usable than it was, and the whole-file digest is checked
+     * again afterwards. If it still does not match, the file is fetched from
+     * scratch rather than left in a state nobody can vouch for.
+     */
+    suspend fun verifyAndRepair(
+        transfers: List<Transfer>,
+        onProgress: (TransferProgress) -> Unit = {},
+    ): RepairReport = withContext(Dispatchers.IO) {
+        val repaired = ArrayList<String>()
+        val failed = LinkedHashMap<String, String>()
+        var intact = 0
+        var moved = 0L
+        val tracker = SetProgress(transfers.sumOf { it.size.coerceAtLeast(0L) }, transfers.size, onProgress)
+
+        for (t in transfers) {
+            tracker.starting(t)
+            val label = t.dest.fileName.toString()
+            try {
+                val outcome = verifyOne(t)
+                moved += outcome.bytesFetched
+                if (outcome.wasBroken) repaired += label else intact++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                failed[label] = e.message ?: e::class.simpleName.orEmpty()
+                log.warn("repair: {} could not be put right", label, e)
+            }
+            tracker.finished(t)
+        }
+        RepairReport(
+            checked = transfers.size,
+            intact = intact,
+            repaired = repaired,
+            bytesFetched = moved,
+            failed = failed,
+        )
+    }
+
+    private data class VerifyOutcome(val wasBroken: Boolean, val bytesFetched: Long)
+
+    private suspend fun verifyOne(t: Transfer): VerifyOutcome = withDestLock(t.dest) {
+        val expect = t.expect
+        if (!Files.isRegularFile(t.dest)) {
+            return@withDestLock VerifyOutcome(true, fetchLocked(t))
+        }
+        if (expect == null) {
+            // Nothing to check against, so the only claim that can be made is that
+            // something is there -- which it is.
+            return@withDestLock VerifyOutcome(false, 0L)
+        }
+        val map = blockMaps.read(t.dest)?.takeIf { it.applies(expect, t.size, blockSize) }
+        if (map == null) {
+            val actual = expect.algorithm.of(t.dest)
+            if (expect.matches(actual)) return@withDestLock VerifyOutcome(false, 0L)
+            log.info("repair: {} does not match its digest and has no block map; refetching in full", t.dest.fileName)
+            return@withDestLock VerifyOutcome(true, fetchLocked(t))
+        }
+
+        val onDisk = expect.algorithm.ofWithBlocks(t.dest, map.blockSize)
+        if (expect.matches(onDisk.whole)) return@withDestLock VerifyOutcome(false, 0L)
+        val bad = map.blocks.indices.filter { onDisk.blocks.getOrNull(it) != map.blocks[it] }
+        if (bad.isEmpty()) {
+            // The blocks all agree and the whole file does not, which means the map
+            // and the file disagree about the length. Nothing here is trustworthy.
+            log.info("repair: {} has a block map that does not describe it; refetching in full", t.dest.fileName)
+            return@withDestLock VerifyOutcome(true, fetchLocked(t))
+        }
+        log.info("repair: {} is missing {} of {} blocks", t.dest.fileName, bad.size, map.blocks.size)
+        val patched = runCatching { patchBlocks(t, map, bad) }
+        val fixed = patched.getOrNull()
+        if (fixed != null && expect.matches(expect.algorithm.of(t.dest))) {
+            return@withDestLock VerifyOutcome(true, fixed)
+        }
+        log.info("repair: block repair of {} did not settle it; refetching in full", t.dest.fileName)
+        VerifyOutcome(true, (fixed ?: 0L) + fetchLocked(t))
+    }
+
+    /** Pulls [bad] blocks straight into the destination. Returns the bytes fetched. */
+    private suspend fun patchBlocks(t: Transfer, map: BlockMap, bad: List<Int>): Long {
+        val url = t.sources.first()
+        var moved = 0L
+        for (group in bad.chunked(blocksInFlight)) {
+            moved += coroutineScope {
+                group.map { index ->
+                    async(Dispatchers.IO) {
+                        val range = map.rangeOf(index)
+                        withBlockRetry(t, index) {
+                            gate.withPermit { fetchRange(t, url, t.dest, range, null) }
+                        }
+                        range.last - range.first + 1
+                    }
+                }.awaitAll().sum()
+            }
+        }
+        return moved
+    }
+
+    /**
+     * A block, with the transfer's retry budget spent on it alone. Repair has no
+     * journal to fall back on -- it is patching a live file -- so a block that will
+     * not arrive has to give up and let the caller refetch the whole thing.
+     */
+    private suspend fun withBlockRetry(t: Transfer, index: Int, block: suspend () -> Unit) {
+        var lastError: Throwable? = null
+        repeat(attempts) { attempt ->
+            try {
+                return block()
+            } catch (e: RangeNotSatisfiableException) {
+                // The object is shorter than the map claims. No number of attempts
+                // changes that, and the caller's refetch is the answer.
+                throw e
+            } catch (e: Throwable) {
+                if (!isTransientTransferError(e)) throw e
+                gate.onTransientError()
+                lastError = e
+                if (attempt < attempts - 1) delay(backoffMs.getOrElse(attempt) { backoffMs.last() }.milliseconds)
+            }
+        }
+        throw lastError ?: IOException("block $index of ${t.dest.fileName} was never attempted")
+    }
+
+    /** [fetch] without taking the destination lock, for callers that already hold it. */
+    private suspend fun fetchLocked(t: Transfer): Long {
+        t.dest.parent?.let { Files.createDirectories(it) }
+        blockMaps.delete(t.dest)
+        return fetchFromAnySource(t) { _, _ -> }
+    }
+
+    /**
      * Walks the sources in order, each with the full retry budget before the next
      * is tried. A transfer one attempt from finishing must not be sent to another
      * host to start over, which is what fallback-instead-of-retry does.
@@ -173,8 +315,18 @@ class TransferEngine(
                 try {
                     fetched += runAttempts(t, url, partial, onProgress)
                     val expect = t.expect
+                    var snapped: FileDigests? = null
                     if (expect != null) {
-                        val actual = expect.algorithm.of(partial)
+                        // One read answers both questions for a large file: whether the
+                        // bytes are right, and -- since they are -- what each block of
+                        // them hashes to. Taken separately that would be a second full
+                        // read of a 300 MB file for a map we could have had for free.
+                        snapped = if (worthBlocking(partial)) {
+                            expect.algorithm.ofWithBlocks(partial, blockSize)
+                        } else {
+                            FileDigests(expect.algorithm.of(partial), emptyList(), blockSize)
+                        }
+                        val actual = snapped.whole
                         if (!expect.matches(actual)) {
                             dropPartial(partial)
                             journals.delete(partial)
@@ -191,6 +343,7 @@ class TransferEngine(
                     }
                     commit(partial, t.dest)
                     journals.delete(partial)
+                    recordBlockMap(t, snapped)
                     return fetched
                 } catch (e: Throwable) {
                     if (!isTransientTransferError(e)) throw e
@@ -365,33 +518,53 @@ class TransferEngine(
         index: Int,
         progress: BlockProgress,
     ) {
-        val range = journal.rangeOf(index)
+        try {
+            fetchRange(t, url, partial, journal.rangeOf(index), progress)
+        } catch (e: RangeNotSatisfiableException) {
+            // The object is shorter than the journal says, so the whole plan is
+            // stale. Drop it and let the retry re-plan against a fresh response.
+            dropPartial(partial)
+            journals.delete(partial)
+            throw e
+        }
+    }
+
+    /**
+     * Fetches one byte range into [target] at its own offsets.
+     *
+     * Positional writes, so callers may run several ranges of one file at once, and
+     * so a range can be written into a file that already exists -- which is what
+     * repair does. A range that arrives short is not written off as done: the
+     * partial bytes sit at the right offsets and are simply overwritten when the
+     * range is asked for again.
+     */
+    private suspend fun fetchRange(
+        t: Transfer,
+        url: String,
+        target: Path,
+        range: LongRange,
+        progress: BlockProgress?,
+    ) {
         val expected = range.last - range.first + 1
         request(t, url, "bytes=${range.first}-${range.last}") { resp ->
             if (resp.status == HttpStatusCode.OK) throw RangeIgnoredException(url)
-            if (resp.status == HttpStatusCode.RequestedRangeNotSatisfiable) {
-                // The object is shorter than the journal says, so the whole plan is
-                // stale. Drop it and let the retry re-plan against a fresh response.
-                dropPartial(partial)
-                journals.delete(partial)
-                throw RangeNotSatisfiableException(url)
-            }
+            if (resp.status == HttpStatusCode.RequestedRangeNotSatisfiable) throw RangeNotSatisfiableException(url)
             if (!resp.status.isSuccess()) throw httpFailure(url, resp)
-            FileChannel.open(partial, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { file ->
+            FileChannel.open(target, StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { file ->
                 var at = range.first
                 val got = drain(resp) { chunk, length ->
                     if (at + length > range.last + 1) {
-                        throw IOException("block $index of ${t.dest.fileName} overran its range")
+                        throw IOException("range ${range.first}-${range.last} of ${t.dest.fileName} overran itself")
                     }
                     val buffer = ByteBuffer.wrap(chunk, 0, length)
                     while (buffer.hasRemaining()) at += file.write(buffer, at)
-                    progress.advance(length.toLong())
+                    progress?.advance(length.toLong())
                 }
                 if (got != expected) {
-                    // The block stays unmarked, so the retry asks for the whole range
-                    // again; the bytes already at those offsets are simply rewritten.
-                    progress.rewind(got)
-                    throw EOFException("block $index of ${t.dest.fileName} ended at $got of $expected bytes")
+                    progress?.rewind(got)
+                    throw EOFException(
+                        "range ${range.first}-${range.last} of ${t.dest.fileName} ended at $got of $expected bytes"
+                    )
                 }
             }
         }
@@ -539,6 +712,33 @@ class TransferEngine(
                 runCatching { expect.matches(expect.algorithm.of(t.dest)) }.getOrDefault(false)
             }
         }
+    }
+
+    /**
+     * Whether a file is large enough for a block map to be worth keeping. Below the
+     * threshold a whole-file read is cheaper than the bookkeeping, and refetching a
+     * small file is not a repair worth optimising.
+     */
+    private fun worthBlocking(file: Path): Boolean =
+        runCatching { Files.size(file) >= parallelThreshold }.getOrDefault(false)
+
+    /**
+     * Stores the block hashes taken while the bytes were being verified, so a later
+     * repair can find the damaged part of the file instead of replacing all of it.
+     */
+    private fun recordBlockMap(t: Transfer, snapped: FileDigests?) {
+        val expect = t.expect ?: return
+        if (snapped == null || snapped.blocks.isEmpty()) return
+        blockMaps.write(
+            t.dest,
+            BlockMap(
+                algorithm = expect.algorithm,
+                digest = snapped.whole,
+                size = runCatching { Files.size(t.dest) }.getOrDefault(-1L),
+                blockSize = snapped.blockSize,
+                blocks = snapped.blocks,
+            ),
+        )
     }
 
     private fun partialOf(dest: Path): Path = dest.resolveSibling("${dest.fileName}.part")
