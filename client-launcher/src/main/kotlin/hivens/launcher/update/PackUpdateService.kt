@@ -13,6 +13,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.fileManifestOf
 import hivens.core.data.flatten
 import hivens.core.io.InstanceMutationLock
+import hivens.core.net.RepairReport
 import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
@@ -191,6 +192,36 @@ class PackUpdateService(
                 UpdateOutcome.Applied(target.packVersion, compat, plan)
             }
         }
+    }
+
+    /**
+     * Verify an installed instance against the build it is pinned to, and put right
+     * whatever does not match. Returns what was checked, what was wrong, and what
+     * the repair actually cost in bytes.
+     *
+     * The manifest comes from the PINNED version, not the mirror's latest: a repair
+     * restores the pack the user has, and measuring it against a newer build would
+     * report every changed file as damage and then "fix" it into an update nobody
+     * asked for.
+     */
+    suspend fun verifyAndRepair(
+        instance: PackInstance,
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+    ): RepairReport = withContext(Dispatchers.IO) {
+        val packId = instance.packRef.id
+        val version = currentVersionOf(instance)
+        val manifest = if (version != null) {
+            client.fetchManifestVersion(packId, version)
+        } else {
+            client.fetchManifest(packId)
+        }
+        val enabledState = OptionalContentRules.enabledState(manifest.mods, instance.optionalContent)
+        val report = syncService.verifyAndRepair(clientDirOf(instance), manifest, enabledState, progress)
+        log.info(
+            "repair: pack={} version={} checked={} intact={} repaired={} fetched={}B failed={}",
+            packId, version, report.checked, report.intact, report.repaired.size, report.bytesFetched, report.failed.size,
+        )
+        report
     }
 
     private suspend fun previewFor(instance: PackInstance, target: SmrtPackManifest): UpdateCheck {

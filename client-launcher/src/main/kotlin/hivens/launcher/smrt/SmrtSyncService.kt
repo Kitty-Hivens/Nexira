@@ -9,6 +9,7 @@ import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
 import hivens.core.net.Digest
+import hivens.core.net.RepairReport
 import hivens.core.net.DigestAlgorithm
 import hivens.core.net.of
 import hivens.core.net.Transfer
@@ -122,6 +123,51 @@ class SmrtSyncService(
             if (sourceChanged) pruneForeignEntries(clientDir, expected) else pruneOrphanMods(clientDir, expected)
 
             writeSourceMarker(marker, SOURCE_MIRROR)
+        }
+    }
+
+    /**
+     * Checks an installed pack against [manifest] and puts right whatever does not
+     * match, fetching as little as the evidence allows.
+     *
+     * Two stages, and the split is about what a check may cost. Everything is first
+     * measured locally against the manifest's size and sha1 -- the same test a
+     * re-sync uses -- because a `modrinth` entry has to be resolved through an API
+     * call before it even has a URL, and doing that for a hundred intact mods would
+     * put a hundred requests behind a button that should mostly find nothing wrong.
+     * Only what fails that test is handed to the engine, which compares it block by
+     * block against the map taken when the file was installed and pulls just the
+     * blocks that differ.
+     *
+     * The consequence is that a damaged file is read twice: once to notice, once to
+     * locate. For a repair the user asked for, that is the right trade -- the
+     * alternative is an API round trip per entry every time.
+     *
+     * Protected paths are left alone. A config the user edited is not damage.
+     */
+    suspend fun verifyAndRepair(
+        clientDir: Path,
+        manifest: SmrtPackManifest,
+        enabledState: Map<String, Boolean> = emptyMap(),
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+    ): RepairReport = withContext(Dispatchers.IO) {
+        InstanceMutationLock.withLock(clientDir) {
+            val total = manifest.mods.size + manifest.assets.size
+            val suspect = ArrayList<Transfer>()
+            for (mod in manifest.mods) {
+                val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+                planMod(mod, clientDir, enabled)?.let { suspect += it }
+            }
+            for (asset in manifest.assets) {
+                planAsset(asset, clientDir)?.let { suspect += it }
+            }
+            log.info("repair: pack={}, {} of {} entries need a closer look", manifest.packId, suspect.size, total)
+            val report = transfers.verifyAndRepair(suspect) { p ->
+                progress?.invoke(p.filesDone, p.filesTotal, p.current)
+            }
+            // Everything the local check cleared counts as intact: it was measured
+            // against the same manifest, just without a round trip.
+            report.copy(checked = total, intact = total - suspect.size + report.intact)
         }
     }
 

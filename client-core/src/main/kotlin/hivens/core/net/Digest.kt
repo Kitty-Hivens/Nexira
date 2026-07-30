@@ -19,6 +19,7 @@ data class Digest(val algorithm: DigestAlgorithm, val value: String) {
     fun matches(hex: String): Boolean = value.equals(hex, ignoreCase = true)
 }
 
+@kotlinx.serialization.Serializable
 enum class DigestAlgorithm(val jcaName: String, val blockSizeHint: Int = 64 * 1024) {
     MD5("MD5"),
     SHA1("SHA-1"),

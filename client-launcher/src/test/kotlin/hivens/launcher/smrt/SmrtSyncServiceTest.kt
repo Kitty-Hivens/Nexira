@@ -1,6 +1,7 @@
 package hivens.launcher.smrt
 
 import hivens.launcher.testTransferEngine
+import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
@@ -20,6 +21,7 @@ import java.security.MessageDigest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -181,6 +183,53 @@ class SmrtSyncServiceTest {
         rangeAwareService().sync("test", dir)
 
         assertContentEquals(reqBytes, Files.readAllBytes(mods.resolve("req.jar")), "refetched file")
+    }
+
+    // --- verify and repair ---
+
+    @Test
+    fun `repair on an untouched install reports everything intact and fetches nothing`() = runTest {
+        val dir = tempDir("repair-clean")
+        val service = syncService()
+        service.sync("test", dir)
+        val manifest = json.decodeFromString(SmrtPackManifest.serializer(), manifest())
+
+        val report = service.verifyAndRepair(dir, manifest)
+
+        assertEquals(2, report.checked, "both mods were not accounted for")
+        assertEquals(2, report.intact)
+        assertEquals(0L, report.bytesFetched, "an intact pack cost network traffic")
+    }
+
+    @Test
+    fun `repair replaces a mod that was damaged on disk`() = runTest {
+        val dir = tempDir("repair-damaged")
+        val service = syncService()
+        service.sync("test", dir)
+        val manifest = json.decodeFromString(SmrtPackManifest.serializer(), manifest())
+
+        // What a bad sector, a truncating copy or a half-finished manual edit leaves.
+        Files.write(dir.resolve("mods/req.jar"), "DAMAGED!".toByteArray())
+
+        val report = service.verifyAndRepair(dir, manifest)
+
+        assertContentEquals(reqBytes, Files.readAllBytes(dir.resolve("mods/req.jar")), "the mod was not restored")
+        assertEquals(listOf("req.jar"), report.repaired)
+        assertEquals(1, report.intact, "the untouched optional was not counted as intact")
+    }
+
+    @Test
+    fun `repair puts back a mod that was deleted outright`() = runTest {
+        val dir = tempDir("repair-missing")
+        val service = syncService()
+        service.sync("test", dir)
+        val manifest = json.decodeFromString(SmrtPackManifest.serializer(), manifest())
+        Files.delete(dir.resolve("mods/req.jar"))
+
+        val report = service.verifyAndRepair(dir, manifest)
+
+        assertContentEquals(reqBytes, Files.readAllBytes(dir.resolve("mods/req.jar")))
+        assertEquals(listOf("req.jar"), report.repaired)
     }
 
     @Test
