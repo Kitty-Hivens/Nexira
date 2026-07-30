@@ -2,6 +2,15 @@
   "schema_version": 7,
   "graph": {
     "surfaces": {
+      "appshell.overlay": {
+        "slots": {
+          "bottom": {
+            "widgets": [
+              { "kind": "appshell.activity.pill", "instance_id": "appshell-activity-pill-default" }
+            ]
+          }
+        }
+      },
       "appshell.root": {
         "slots": {
           "regions": {
