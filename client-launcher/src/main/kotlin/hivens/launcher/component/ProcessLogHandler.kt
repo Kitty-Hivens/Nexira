@@ -46,12 +46,12 @@ internal class ProcessLogHandler {
                 try {
                     // Read raw chunks and split into lines ourselves rather than
                     // BufferedReader.readLine(): a game whose stdout has no newlines
-                    // (Cleanroom's broken log config eats the trailing `%n` on the
-                    // console appender) would otherwise buffer the entire run into
-                    // one line, emitted only at EOF -- no live output, and one
-                    // monster line the console pane chokes on. The assembler also
-                    // breaks on a length cap, so such a stream still shows up live
-                    // and stays renderable.
+                    // (a console layout whose `%n` sits inside an unresolved pattern
+                    // converter never emits one) would otherwise buffer the entire
+                    // run into a single line, delivered at EOF -- no live output, and
+                    // one monster line to render. The assembler falls back to the
+                    // record header and then to a length cap, so such a stream still
+                    // arrives live, per record, and stays renderable.
                     while (true) {
                         val n = reader.read(buf)
                         if (n < 0) break
@@ -174,24 +174,44 @@ internal class ProcessLogHandler {
 }
 
 /**
- * Splits a stream of character chunks into lines: on `\n` (dropping a trailing
- * `\r` of a `\r\n` pair) and on a [maxLen] cap so a newline-starved stream still
- * yields bounded, live lines instead of one buffer-until-EOF monster. [onLine]
- * fires per completed line; [finish] flushes any trailing partial line.
+ * Splits a stream of character chunks into lines. `\n` is the primary boundary
+ * (a trailing `\r` of a `\r\n` pair is dropped). A stream that stops producing
+ * newlines falls back to splitting on the log-record header `[HH:MM:SS]`, and
+ * finally on a [maxLen] cap, so it still yields live, bounded lines instead of
+ * one buffer-until-EOF monster. [onLine] fires per completed line; [finish]
+ * flushes any trailing partial line.
+ *
+ * The record fallback latches only after [starveThreshold] characters arrive
+ * with no newline, and unlatches on the next one. A healthy stream therefore
+ * never splits on a bracketed timestamp that happens to sit inside a chat
+ * message; a stream whose layout swallowed its `%n` splits per record from the
+ * first backlog onward.
  */
-internal class LineAssembler(private val maxLen: Int, private val onLine: (String) -> Unit) {
+internal class LineAssembler(
+    private val maxLen: Int,
+    private val starveThreshold: Int = maxLen / 4,
+    private val onLine: (String) -> Unit,
+) {
 
     private val sb = StringBuilder()
+    private var starved = false
 
     fun feed(chunk: CharArray, len: Int) {
         for (i in 0 until len) {
             val c = chunk[i]
             if (c == '\n') {
                 flush()
-            } else {
-                sb.append(c)
-                if (sb.length >= maxLen) flush()
+                starved = false
+                continue
             }
+            sb.append(c)
+            if (!starved && sb.length >= starveThreshold) {
+                starved = true
+                splitRecords()
+            } else if (starved && c == ']') {
+                splitRecords()
+            }
+            if (sb.length >= maxLen) flushCapped()
         }
     }
 
@@ -203,5 +223,96 @@ internal class LineAssembler(private val maxLen: Int, private val onLine: (Strin
         if (sb.isNotEmpty() && sb[sb.length - 1] == '\r') sb.setLength(sb.length - 1)
         onLine(sb.toString())
         sb.setLength(0)
+    }
+
+    // Emits every complete record ahead of the last header in the buffer. The
+    // trailing record stays buffered -- more of it may still be coming.
+    private fun splitRecords() {
+        var cut = nextRecordStart()
+        while (cut > 0) {
+            onLine(sb.substring(0, cut))
+            sb.delete(0, cut)
+            cut = nextRecordStart()
+        }
+    }
+
+    // Offset of the next record header past index 0, colour prefix included, or
+    // -1. A header at offset 0 (or one whose colour prefix reaches back to it)
+    // is the buffer's own start, not a boundary.
+    private fun nextRecordStart(): Int {
+        var p = 1
+        while (p + HEADER_LEN <= sb.length) {
+            if (isHeaderAt(p)) {
+                val cut = backOverAnsi(p)
+                if (cut > 0) return cut
+                p += HEADER_LEN
+            } else {
+                p++
+            }
+        }
+        return -1
+    }
+
+    // `[HH:MM:SS]` -- the one part of a log record every layout in the wild keeps
+    // intact, whatever it does to the level, the logger name or the message.
+    private fun isHeaderAt(i: Int): Boolean =
+        sb[i] == '[' && sb[i + 3] == ':' && sb[i + 6] == ':' && sb[i + 9] == ']' &&
+            sb[i + 1].isDigit() && sb[i + 2].isDigit() &&
+            sb[i + 4].isDigit() && sb[i + 5].isDigit() &&
+            sb[i + 7].isDigit() && sb[i + 8].isDigit()
+
+    // Walks back over the SGR sequences that colour the header so the cut lands
+    // before them; otherwise every record would open with the previous record's
+    // dangling escape.
+    private fun backOverAnsi(start: Int): Int {
+        var i = start
+        while (i >= 2) {
+            val esc = lastEscapeBefore(i)
+            if (esc < 0 || esc + 1 >= i || sb[esc + 1] != '[') break
+            var j = esc + 2
+            while (j < i && sb[j] in '0'..'?') j++
+            if (j >= i || sb[j] != 'm' || j + 1 != i) break
+            i = esc
+        }
+        return i
+    }
+
+    // Cap flush: retain a half-written escape so the cut never lands mid-sequence.
+    // Splitting there would strand the tail (`93m`) at the head of the next line,
+    // where -- no ESC left to mark it -- it renders as literal text.
+    private fun flushCapped() {
+        val keep = incompleteEscapeStart()
+        if (keep <= 0) {
+            onLine(sb.toString())
+            sb.setLength(0)
+        } else {
+            onLine(sb.substring(0, keep))
+            sb.delete(0, keep)
+        }
+    }
+
+    private fun lastEscapeBefore(end: Int): Int {
+        for (i in end - 1 downTo 0) if (sb[i] == ESC) return i
+        return -1
+    }
+
+    // Offset of a trailing escape sequence that has not reached its final byte,
+    // or -1 when the buffer ends on a complete one.
+    private fun incompleteEscapeStart(): Int {
+        val esc = lastEscapeBefore(sb.length)
+        if (esc < 0) return -1
+        if (esc == sb.length - 1) return esc
+        return when (sb[esc + 1]) {
+            '[' -> if ((esc + 2 until sb.length).any { sb[it] in '@'..'~' }) -1 else esc
+            ']' -> if ((esc + 2 until sb.length).any { sb[it] == BEL }) -1 else esc
+            else -> -1
+        }
+    }
+
+    private companion object {
+        const val ESC = '\u001B'
+        const val BEL = '\u0007'
+        /** Length of `[HH:MM:SS]`. */
+        const val HEADER_LEN = 10
     }
 }
