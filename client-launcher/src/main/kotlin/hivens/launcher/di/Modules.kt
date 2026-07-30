@@ -464,7 +464,7 @@ val mirrorModule = module {
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
-    single { ModrinthClient(get(named("direct")), caches = get()) }
+    single { ModrinthClient(get(named("direct")), get(), caches = get()) }
     single { SmrtSyncService(get(), get(), get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by

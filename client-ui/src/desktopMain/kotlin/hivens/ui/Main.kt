@@ -188,7 +188,7 @@ val uiModule = module {
         YtDlpService(
             toolsDir      = get<Path>().resolve("tools"),
             videoCacheDir = get<Path>().resolve("video-cache"),
-            http          = get(named("direct")),
+            transfers     = get(),
             scope         = get(),
         )
     }

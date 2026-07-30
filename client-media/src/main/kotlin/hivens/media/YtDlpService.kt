@@ -1,13 +1,11 @@
 package hivens.media
 
-import hivens.core.api.HttpClientProvider
+import hivens.core.net.SkipIfPresent
+import hivens.core.net.Transfer
+import hivens.core.net.TransferEngine
 import hivens.core.platform.Arch
 import hivens.core.platform.OS
 import hivens.core.platform.Platform
-import io.ktor.client.request.prepareGet
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +13,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
-import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -40,7 +37,7 @@ import java.util.concurrent.TimeUnit
 class YtDlpService(
     private val toolsDir: Path,
     private val videoCacheDir: Path,
-    private val http: HttpClientProvider,
+    private val transfers: TransferEngine,
     private val scope: CoroutineScope,
     private val maxCacheBytes: Long = DEFAULT_MAX_CACHE_BYTES,
 ) {
@@ -127,20 +124,16 @@ class YtDlpService(
         return local.toString()
     }
 
+    /**
+     * The tool binary from its release page. Nothing upstream publishes a hash we
+     * read, so the check is the same one the install path already makes: the binary
+     * has to answer `--version` before it is used.
+     */
     private suspend fun downloadBinary(asset: String, target: Path) {
-        Files.createDirectories(toolsDir)
-        val url = "$RELEASE_BASE/$asset"
-        val part = target.resolveSibling("${target.fileName}.part")
-        try {
-            http.current.prepareGet(url).execute { resp ->
-                if (!resp.status.isSuccess()) throw IOException("GET $url -> ${resp.status}")
-                FileOutputStream(part.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
-            }
-            if (runCatching { Files.size(part) }.getOrDefault(0L) <= 0L) throw IOException("Empty yt-dlp download")
-            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING)
-        } catch (e: Exception) {
-            runCatching { Files.deleteIfExists(part) }
-            throw e
+        transfers.fetch(Transfer(url = "$RELEASE_BASE/$asset", dest = target, skip = SkipIfPresent.Never))
+        if (runCatching { Files.size(target) }.getOrDefault(0L) <= 0L) {
+            Files.deleteIfExists(target)
+            throw IOException("Empty yt-dlp download")
         }
     }
 

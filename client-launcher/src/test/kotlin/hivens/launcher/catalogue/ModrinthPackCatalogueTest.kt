@@ -1,5 +1,6 @@
 package hivens.launcher.catalogue
 
+import hivens.launcher.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.PackOrigin
 import hivens.launcher.modrinth.ModrinthClient
@@ -44,7 +45,8 @@ class ModrinthPackCatalogueTest {
                 respond(ByteReadChannel(body.toByteArray()), HttpStatusCode.OK, headersOf("Content-Type", "application/json"))
             }
         }
-        return ModrinthPackCatalogue(ModrinthClient(HttpClientProvider { HttpClient(engine) }))
+        val provider = HttpClientProvider { HttpClient(engine) }
+        return ModrinthPackCatalogue(ModrinthClient(provider, testTransferEngine(provider)))
     }
 
     @Test
