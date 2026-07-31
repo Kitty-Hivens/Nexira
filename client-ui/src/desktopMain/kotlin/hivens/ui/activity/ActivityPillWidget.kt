@@ -107,7 +107,7 @@ data class PillProps(
     // once it cannot, every coat above the body is either invisible or a second
     // fill shifting a tone the ladder already chose.
     @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Clear,
-    @PropLabel("widget.activity.pill.heightDp") @PropRange(40.0, 76.0) val heightDp: Int = 58,
+    @PropLabel("widget.activity.pill.heightDp") @PropRange(40.0, 76.0) val heightDp: Int = 56,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.activity.pill.showActions") val showActions: Boolean = true,
 )
@@ -253,9 +253,10 @@ internal fun Pill(
         // weight in a Row with unbounded width is undefined -- which is how the
         // controls ended up drawn outside the body.
         modifier = Modifier
-            // Height is a floor, not a fixture: the object is as tall as what it
-            // holds plus its padding, which is what stops it reading as something
-            // squeezed into a strip.
+            // A floor the content is meant to meet, not exceed. Set above what the
+            // row needs and the surplus becomes slack the arrangement spreads
+            // around, which reads as everything inside sitting a few pixels off
+            // from where it belongs.
             .heightIn(min = height)
             // Width has a floor too. Without one a short pack name collapses the
             // object into a chip and it stops reading as a place where the
@@ -305,7 +306,7 @@ internal fun Pill(
             ) {
                 Text(
                     text = activity.title,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = colors.textPrimary,
                     maxLines = 1,

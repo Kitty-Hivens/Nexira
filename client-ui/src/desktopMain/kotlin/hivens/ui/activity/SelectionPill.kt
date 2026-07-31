@@ -93,7 +93,7 @@ internal fun SelectionPill(
             // stranded in the middle of the object's empty half.
             Text(
                 text = s.selectionCount(selection.items.size),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.textPrimary,
                 maxLines = 1,
