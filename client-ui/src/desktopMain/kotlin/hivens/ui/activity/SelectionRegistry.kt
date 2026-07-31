@@ -7,8 +7,12 @@ import kotlinx.coroutines.flow.asStateFlow
 /** What a bulk action does, so the surface can label and tone it without knowing the view. */
 enum class SelectionActionKind { Enable, Disable, Delete }
 
-/** One selected thing, as much of it as a surface needs to show. */
-data class SelectionItem(val key: String, val title: String, val iconUrl: String? = null)
+/**
+ * One selected thing, as much of it as a surface needs to show. [icon] is
+ * anything the image loader accepts -- an address, or the bytes an archive
+ * carries inside itself, which is what most content actually has.
+ */
+data class SelectionItem(val key: String, val title: String, val icon: Any? = null)
 
 /**
  * [blockedReason] null means the action can run. Set, it is the sentence the

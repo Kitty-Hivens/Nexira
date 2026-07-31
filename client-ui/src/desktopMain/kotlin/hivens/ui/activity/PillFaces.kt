@@ -32,12 +32,17 @@ import hivens.ui.theme.decorativeColor
  * by the same object, and a stack that looked subtly different between the two
  * would say they are two objects taking turns.
  *
+ * [icon] is whatever the image loader can take: a URL for something fetched, or
+ * the raw bytes a mod carries inside its own jar. Most content has the second
+ * and no address at all, so a face typed to a URL showed initials for nearly
+ * everything.
+ *
  * Rounded squares rather than discs: at this size and overlap circles read as one
  * smear, while a square corner keeps each face a separate thing. The radius still
  * follows the form axis, so a square style squares these too.
  */
 @Composable
-internal fun StackFace(key: String, title: String, iconUrl: String?, onClick: (() -> Unit)? = null) {
+internal fun StackFace(key: String, title: String, icon: Any?, onClick: (() -> Unit)? = null) {
     val tint = NxTheme.colors.decorativeColor(key)
     val initials = title.take(2).uppercase()
     val shape = RoundedCornerShape(faceCorner())
@@ -45,7 +50,7 @@ internal fun StackFace(key: String, title: String, iconUrl: String?, onClick: ((
     // rather than merging into a single blob.
     val ring = NxTheme.colors.surfaceContainerHigh
     SubcomposeAsyncImage(
-        model = iconUrl,
+        model = icon,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier
