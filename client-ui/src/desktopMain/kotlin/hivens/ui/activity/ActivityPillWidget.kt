@@ -3,24 +3,31 @@ package hivens.ui.activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +84,7 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -90,11 +99,11 @@ enum class PillAnchor { Left, Center }
 @Serializable
 data class PillProps(
     @PropLabel("widget.activity.pill.progress") val progress: PillProgress = PillProgress.Edge,
-    @PropLabel("widget.activity.pill.anchor") val anchor: PillAnchor = PillAnchor.Left,
+    @PropLabel("widget.activity.pill.anchor") val anchor: PillAnchor = PillAnchor.Center,
     // Flat rather than Clear: Clear is a bodiless glass coat, which reads over a
     // wallpaper and disappears over the near-black default ground.
     @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Heavy,
-    @PropLabel("widget.activity.pill.heightDp") @PropRange(22.0, 56.0) val heightDp: Int = 44,
+    @PropLabel("widget.activity.pill.heightDp") @PropRange(40.0, 76.0) val heightDp: Int = 58,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.activity.pill.showActions") val showActions: Boolean = true,
 )
@@ -136,9 +145,13 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     val subject = remember(activities) {
         activities.lastOrNull { it.phase is ActivityPhase.Failed } ?: activities.lastOrNull()
     }
-    // Collapsed narrates one; the rest are still there and the object has to say
-    // so, or the surface silently drops what the registry is holding.
-    var expanded by remember { mutableStateOf(false) }
+    // A pick survives a re-emission but not the job leaving: the stack is the
+    // control, so choosing a face is how the user changes what is narrated. One
+    // line stays one line -- the alternative, growing into a list of rows, is the
+    // toast stack this surface replaced, moored to a different corner.
+    var picked by remember { mutableStateOf<String?>(null) }
+    val subjectKey = picked?.takeIf { key -> activities.any { it.key == key } }
+    val shown = subjectKey?.let { key -> activities.first { it.key == key } } ?: subject
 
     // The object must not outgrow the column it floats in: a long pack name on a
     // narrow window would otherwise push it past the edge, since the pill sizes to
@@ -153,22 +166,32 @@ fun ActivityPillWidget(instance: WidgetInstance) {
         ) {
             AnimatedVisibility(
                 visible = subject != null,
-                // Born from the ball: the initial width is the pill's own height,
-                // which at a 50% corner is a circle. Start-anchored, so the
-                // subject icon does not move while the body unrolls past it.
-                enter = expandHorizontally(
-                    animationSpec = tween(style.animationDurationMs(420)),
-                    expandFrom = Alignment.Start,
-                    initialWidth = { ballPx },
+                // Stage one: the object arrives as a ball, rising into place with
+                // an overshoot. It is not yet a panel and does not pretend to be
+                // one -- there is nothing to read until it has drawn itself out.
+                enter = slideInVertically(
+                    animationSpec = tween(style.animationDurationMs(260), easing = ArriveEasing),
+                    initialOffsetY = { it * 2 },
+                ) + scaleIn(
+                    animationSpec = tween(style.animationDurationMs(260), easing = ArriveEasing),
+                    initialScale = 0.5f,
                 ) + fadeIn(tween(style.animationDurationMs(160))),
-                exit = shrinkHorizontally(
-                    animationSpec = tween(style.animationDurationMs(260)),
-                    shrinkTowards = Alignment.Start,
-                    targetWidth = { ballPx },
-                ) + fadeOut(tween(style.animationDurationMs(140))),
+                exit = scaleOut(
+                    animationSpec = tween(style.animationDurationMs(200)),
+                    targetScale = 0.96f,
+                ) + fadeOut(tween(style.animationDurationMs(160))),
             ) {
                 if (subject != null) {
-                    Pill(subject, activities, expanded, { expanded = !expanded }, props, commands, s, cap)
+                    // Stage two: having landed, it opens. Width comes from the
+                    // content and the corner travels from a circle to the panel's
+                    // own radius, so one object becomes the other rather than a
+                    // ball being swapped for a bar.
+                    var open by remember(subject.key) { mutableStateOf(false) }
+                    LaunchedEffect(subject.key) {
+                        delay(style.animationDurationMs(220).toLong())
+                        open = true
+                    }
+                    Pill(shown ?: subject, activities, { picked = it.key }, props, commands, s, cap, open)
                 }
             }
         }
@@ -180,19 +203,29 @@ fun ActivityPillWidget(instance: WidgetInstance) {
 internal fun Pill(
     activity: Activity,
     all: List<Activity> = listOf(activity),
-    expanded: Boolean = false,
-    onToggleExpand: () -> Unit = {},
+    onPick: (Activity) -> Unit = {},
     props: PillProps,
     commands: ActivityCommands?,
     s: AppStrings,
     maxWidth: Dp,
+    open: Boolean = true,
 ) {
     val style = LocalStyle.current
     val colors = NxTheme.colors
     val height = props.heightDp.dp
-    // A pill and a circle are the same shape; Brut squares both through the
-    // badge spec, the same place every other small shell reads its corner.
-    val shape = style.badgeStyle.shape()
+    // A panel's corner, not a capsule's. A fully rounded object at this size
+    // reads as a chip no matter what is in it; the radius is what makes it a
+    // container. It comes from the panel token so the form axis still decides --
+    // Brut takes it to near-square without a switch of its own.
+    //
+    // While the object is opening it travels from a circle to that radius, which
+    // is the second half of the arrival: one shape becoming another.
+    val corner by animateDpAsState(
+        targetValue = if (open) style.panelCorner else height / 2,
+        animationSpec = tween(style.animationDurationMs(380), easing = OpenEasing),
+        label = "pillCorner",
+    )
+    val shape = RoundedCornerShape(corner)
     val fraction = activity.fraction()
     val failed = activity.phase as? ActivityPhase.Failed
     val accent = if (failed != null) colors.criticalAccent else colors.progressAccent
@@ -202,7 +235,17 @@ internal fun Pill(
         // The bound is required, not optional: the title takes a weight, and a
         // weight in a Row with unbounded width is undefined -- which is how the
         // controls ended up drawn outside the body.
-        modifier = Modifier.height(height).widthIn(max = maxWidth).clip(shape),
+        modifier = Modifier
+            // Height is a floor, not a fixture: the object is as tall as what it
+            // holds plus its padding, which is what stops it reading as something
+            // squeezed into a strip.
+            .heightIn(min = height)
+            // Width has a floor too. Without one a short pack name collapses the
+            // object into a chip and it stops reading as a place where the
+            // launcher reports things.
+            .widthIn(min = minOf(MIN_WIDTH, maxWidth), max = maxWidth)
+            .animateContentSize(tween(style.animationDurationMs(380), easing = OpenEasing))
+            .clip(shape),
         shape = shape,
         tier = props.frostTier,
         // Opaque body: the object floats over arbitrary content, so the
@@ -223,57 +266,56 @@ internal fun Pill(
         }
         Row(
             modifier = Modifier
-                .padding(horizontal = if (props.collapsed) 8.dp else 7.dp)
+                .padding(start = if (props.collapsed) 11.dp else 10.dp, end = 14.dp)
                 .height(height),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
         ) {
-            SubjectStack(activity, all, fraction, accent, props.progress)
+            SubjectStack(activity, all, fraction, accent, props.progress, onPick)
             // Collapsed keeps the ball and nothing else: the object is still
             // present and still measures, it just stops narrating. The same
             // shape the unfurl starts from, so there is one drawing rather
             // than a separate compact variant.
-            if (props.collapsed) return@Row
-            Text(
-                text = activity.title,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // The title yields first: the measure and the controls are the
-                // parts a truncation would make useless.
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            activity.measure(s)?.let {
+            if (props.collapsed || !open) return@Row
+            // One weighted lane holds the name and the measure and absorbs all the
+            // free width, which is what pushes the controls to the far edge. Two
+            // competing weights split the row instead, and the name elided with
+            // half the object standing empty beside it.
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary,
+                    text = activity.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    // The name yields first: the measure is the part a truncation
+                    // would make useless.
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                activity.measure(s)?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (props.progress == PillProgress.Bar) {
                 Box(Modifier.width(120.dp)) {
                     NxProgressBar(progress = fraction, color = accent)
                 }
             }
-            // What the stack could not fit. Without it the surface silently
-            // drops what the registry is holding.
-            if (all.size > STACK_MAX) {
-                Text(
-                    text = s.activityPillMore(all.size - STACK_MAX),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary,
-                    maxLines = 1,
-                )
-            }
-            Spacer(Modifier.width(2.dp))
             // The break between what this is about and what can be done to it.
             // Without it the row reads as one undifferentiated strip.
             if (props.showActions && activity.actions.isNotEmpty()) {
-                VerticalDivider(Modifier.height(20.dp), color = colors.outline)
+                VerticalDivider(Modifier.height(26.dp), color = colors.outline)
                 Spacer(Modifier.width(2.dp))
             }
             if (props.showActions) {
@@ -284,13 +326,6 @@ internal fun Pill(
                         style = NxButtonStyle.Tertiary,
                         icon = action.icon(),
                         compact = true,
-                    )
-                }
-                if (all.size > 1) {
-                    NxIconButton(
-                        icon = if (expanded) NxIcon.ExpandMore else NxIcon.ExpandLess,
-                        contentDescription = s.activityPillExpand,
-                        onClick = onToggleExpand,
                     )
                 }
             }
@@ -390,12 +425,19 @@ private fun SubjectStack(
     fraction: Float?,
     accent: Color,
     mode: PillProgress,
+    onPick: (Activity) -> Unit,
 ) {
     // Lead in front: it is the one the row is describing.
     val shown = (listOf(lead) + all.filter { it.key != lead.key }).take(STACK_MAX)
     Box(contentAlignment = Alignment.Center) {
+        // Reversed order with a reversed arrangement: the lead is drawn last, so
+        // it is on top, and lands leftmost. The overflow tile is the tail --
+        // furthest right, furthest back -- one more of the same object rather
+        // than a note after the title.
+        val hidden = all.size - shown.size
         Row(horizontalArrangement = Arrangement.spacedBy(-STACK_OVERLAP)) {
-            shown.reversed().forEach { Face(it) }
+            shown.reversed().forEach { face -> Face(face) { onPick(face) } }
+            if (hidden > 0) OverflowFace(hidden)
         }
         if (mode == PillProgress.Ring) {
             EdgeMeasure(fraction, accent, RoundedCornerShape(50), Modifier.size(36.dp))
@@ -403,11 +445,37 @@ private fun SubjectStack(
     }
 }
 
+/** The rest of the stack, as a face of its own. */
 @Composable
-private fun Face(activity: Activity) {
+private fun OverflowFace(count: Int) {
+    val shape = RoundedCornerShape(faceCorner())
+    Box(
+        Modifier.size(FACE_SIZE).clip(shape)
+            .background(NxTheme.colors.surfaceContainer)
+            .border(1.5.dp, NxTheme.colors.surfaceContainerHigh, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "+$count",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = NxTheme.colors.textSecondary,
+        )
+    }
+}
+
+/** Face radius, capped so it never becomes a disc but still squares under Brut. */
+@Composable
+private fun faceCorner(): Dp = minOf(LocalStyle.current.panelCorner, 9.dp)
+
+@Composable
+private fun Face(activity: Activity, onClick: () -> Unit) {
     val tint = NxTheme.colors.decorativeColor(activity.key)
     val initials = activity.title.take(2).uppercase()
-    val shape = LocalStyle.current.badgeStyle.shape()
+    // Rounded squares. Circles at this size and overlap read as one smear; a
+    // square corner keeps each face a separate object, and the radius still
+    // follows the form axis.
+    val shape = RoundedCornerShape(faceCorner())
     // The ring is the body colour, so the faces read as separate discs rather
     // than one blob when they overlap.
     val ring = NxTheme.colors.surfaceContainerHigh
@@ -415,7 +483,7 @@ private fun Face(activity: Activity) {
         model = activity.iconUrl,
         contentDescription = null,
         contentScale = ContentScale.Crop,
-        modifier = Modifier.size(28.dp).border(2.dp, ring, shape).clip(shape),
+        modifier = Modifier.size(FACE_SIZE).clip(shape).border(1.5.dp, ring, shape).clickable(onClick = onClick),
         loading = { Box(Modifier.fillMaxSize().background(tint)) },
         error = {
             Box(Modifier.fillMaxSize().background(tint), contentAlignment = Alignment.Center) {
@@ -476,4 +544,16 @@ private const val INDETERMINATE_SPAN = 0.22f
 private const val STACK_MAX = 3
 
 /** How far each face hides behind the one in front of it. */
-private val STACK_OVERLAP = 11.dp
+private val STACK_OVERLAP = 8.dp
+
+/** Diameter of one face in the subject stack. */
+private val FACE_SIZE = 32.dp
+
+/** Floor on the object's width, so it reads as a panel rather than a chip. */
+private val MIN_WIDTH = 380.dp
+
+/** Arrival: overshoots, the way something landing does. */
+private val ArriveEasing = CubicBezierEasing(0.15f, 1.4f, 0.64f, 0.96f)
+
+/** Opening: fast then settling, with no overshoot to fight the arrival's. */
+private val OpenEasing = CubicBezierEasing(0.16f, 0.84f, 0.28f, 1f)
