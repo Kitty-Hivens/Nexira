@@ -49,8 +49,8 @@ import kotlin.test.assertTrue
  */
 class ActivityPillRenderTest {
 
-    private val width = 980
-    private val rowHeight = 132
+    private val width = 1180
+    private val rowHeight = 176
 
     private fun activity(
         key: String,
@@ -118,11 +118,28 @@ class ActivityPillRenderTest {
         return Bitmap.makeFromImage(image)
     }
 
+    private val selection = Selection(
+        items = listOf(
+            SelectionItem("mods:sodium.jar", "Sodium"),
+            SelectionItem("mods:iris.jar", "Iris"),
+            SelectionItem("mods:jei.jar", "JEI"),
+            SelectionItem("mods:rei.jar", "REI"),
+        ),
+        actions = listOf(
+            SelectionAction(SelectionActionKind.Enable) {},
+            SelectionAction(SelectionActionKind.Disable) {},
+            SelectionAction(SelectionActionKind.Delete) {},
+        ),
+        clear = {},
+    )
+
     @Composable
     private fun Sheet(props: PillProps) {
         val commands: ActivityCommands? = null // static sheet: nothing to click
-        Box(Modifier.height(44.dp)) { Pill(running, listOf(running, failed, sync, repair), {}, props, commands, EnglishStrings, 520.dp) }
-        Box(Modifier.height(44.dp)) { Pill(failed, listOf(failed), {}, props, commands, EnglishStrings, 520.dp) }
+        Box { Pill(running, listOf(running, failed, sync, repair), {}, props, commands, EnglishStrings, 720.dp) }
+        Box { Pill(failed, listOf(failed), {}, props, commands, EnglishStrings, 720.dp) }
+        // Selection holds the body while the launcher's own work stays at the lead.
+        Box { SelectionPill(selection, running, props, EnglishStrings, 720.dp) }
     }
 
     @Test
@@ -156,7 +173,7 @@ class ActivityPillRenderTest {
                 "install:A", ActivityKind.Install, "A", ActivityPhase.Running(done, 100),
             )
             val bmp = render(CelestiaStyle, true, Color(0xFF121212), "measure-$done") {
-                Box(Modifier.height(44.dp)) { Pill(one, listOf(one), {}, PillProps(), null, EnglishStrings, 520.dp) }
+                Box { Pill(one, listOf(one), {}, PillProps(), null, EnglishStrings, 720.dp) }
             }
             var hits = 0
             // Whole frame: at a low value the arc sits on the pill's lower edge,

@@ -138,6 +138,8 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     val props = instance.rememberProps<PillProps>()
     val registry: ActivityRegistry = koinInject()
     val commands: ActivityCommands = koinInject()
+    val selections: SelectionRegistry = koinInject()
+    val selection by selections.selection.collectAsState()
     val activities by registry.activities.collectAsState()
     val style = LocalStyle.current
     val s = LocalStrings.current
@@ -169,7 +171,7 @@ fun ActivityPillWidget(instance: WidgetInstance) {
             verticalAlignment = Alignment.Bottom,
         ) {
             AnimatedVisibility(
-                visible = subject != null,
+                visible = subject != null || selection != null,
                 // Stage one: the object arrives as a ball, rising into place with
                 // an overshoot. It is not yet a panel and does not pretend to be
                 // one -- there is nothing to read until it has drawn itself out.
@@ -185,17 +187,28 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                     targetScale = 0.96f,
                 ) + fadeOut(tween(style.animationDurationMs(160))),
             ) {
-                if (subject != null) {
+                val hasBody = selection != null || subject != null
+                if (hasBody) {
                     // Stage two: having landed, it opens. Width comes from the
                     // content and the corner travels from a circle to the panel's
                     // own radius, so one object becomes the other rather than a
                     // ball being swapped for a bar.
-                    var open by remember(subject.key) { mutableStateOf(false) }
-                    LaunchedEffect(subject.key) {
+                    val birthKey = selection?.let { "selection" } ?: subject?.key
+                    var open by remember(birthKey) { mutableStateOf(false) }
+                    LaunchedEffect(birthKey) {
                         delay(style.animationDurationMs(220).toLong())
                         open = true
                     }
-                    Pill(shown ?: subject, activities, { picked = it.key }, props, commands, s, cap, open)
+                    // Selection takes the body. What the launcher is doing on its
+                    // own carries on underneath -- its lead face stays at the left
+                    // as a token so nothing is lost, and clicking it drops the
+                    // selection and hands the body back.
+                    val sel = selection
+                    if (sel != null) {
+                        SelectionPill(sel, shown ?: subject, props, s, cap, open)
+                    } else if (subject != null) {
+                        Pill(shown ?: subject, activities, { picked = it.key }, props, commands, s, cap, open)
+                    }
                 }
             }
         }
@@ -446,66 +459,15 @@ private fun SubjectStack(
         // than a note after the title.
         val hidden = all.size - shown.size
         Row(horizontalArrangement = Arrangement.spacedBy(-STACK_OVERLAP)) {
-            shown.reversed().forEach { face -> Face(face) { onPick(face) } }
-            if (hidden > 0) OverflowFace(hidden)
+            shown.reversed().forEach { face ->
+                StackFace(face.key, face.title, face.iconUrl) { onPick(face) }
+            }
+            if (hidden > 0) StackOverflow(hidden)
         }
         if (mode == PillProgress.Ring) {
             EdgeMeasure(fraction, accent, RoundedCornerShape(50), Modifier.size(36.dp))
         }
     }
-}
-
-/** The rest of the stack, as a face of its own. */
-@Composable
-private fun OverflowFace(count: Int) {
-    val shape = RoundedCornerShape(faceCorner())
-    Box(
-        Modifier.size(FACE_SIZE).clip(shape)
-            .background(NxTheme.colors.surfaceContainer)
-            .border(1.5.dp, NxTheme.colors.surfaceContainerHigh, shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            "+$count",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = NxTheme.colors.textSecondary,
-        )
-    }
-}
-
-/** Face radius, capped so it never becomes a disc but still squares under Brut. */
-@Composable
-private fun faceCorner(): Dp = minOf(LocalStyle.current.panelCorner, 9.dp)
-
-@Composable
-private fun Face(activity: Activity, onClick: () -> Unit) {
-    val tint = NxTheme.colors.decorativeColor(activity.key)
-    val initials = activity.title.take(2).uppercase()
-    // Rounded squares. Circles at this size and overlap read as one smear; a
-    // square corner keeps each face a separate object, and the radius still
-    // follows the form axis.
-    val shape = RoundedCornerShape(faceCorner())
-    // The ring is the body colour, so the faces read as separate discs rather
-    // than one blob when they overlap.
-    val ring = NxTheme.colors.surfaceContainerHigh
-    SubcomposeAsyncImage(
-        model = activity.iconUrl,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier.size(FACE_SIZE).clip(shape).border(1.5.dp, ring, shape).clickable(onClick = onClick),
-        loading = { Box(Modifier.fillMaxSize().background(tint)) },
-        error = {
-            Box(Modifier.fillMaxSize().background(tint), contentAlignment = Alignment.Center) {
-                Text(
-                    initials,
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        },
-    )
 }
 
 /** Null when the job's size is unknown, which the measure renders as busy. */
@@ -558,8 +520,6 @@ private const val STACK_MAX = 3
 /** How far each face hides behind the one in front of it. */
 private val STACK_OVERLAP = 8.dp
 
-/** Diameter of one face in the subject stack. */
-private val FACE_SIZE = 32.dp
 
 /** Floor on the object's width, so it reads as a panel rather than a chip. */
 private val MIN_WIDTH = 380.dp

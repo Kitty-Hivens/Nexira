@@ -69,7 +69,14 @@ import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.platform.PlatformPaths
 import hivens.core.smrt.ModIconResolver
+import androidx.compose.runtime.DisposableEffect
+import hivens.ui.activity.Selection
+import hivens.ui.activity.SelectionAction
+import hivens.ui.activity.SelectionActionKind
+import hivens.ui.activity.SelectionItem
+import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.nx.NxCheckbox
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
@@ -127,6 +134,40 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     var query by remember(instance.id) { mutableStateOf("") }
     var filter by remember(instance.id) { mutableStateOf(ContentFilter.All) }
     var pendingDelete by remember(instance.id) { mutableStateOf<InstalledContent?>(null) }
+    var pendingBulkDelete by remember(instance.id) { mutableStateOf<List<InstalledContent>>(emptyList()) }
+    var selectedKeys by remember(instance.id) { mutableStateOf(emptySet<String>()) }
+    val selections: SelectionRegistry = koinInject()
+
+    // The selection lives on the activity surface, so this view publishes it and
+    // takes it back down on the way out. Leaving the tab with rows still ticked
+    // would otherwise leave a bar offering to delete things the user can no
+    // longer see.
+    val picked = remember(items, selectedKeys) {
+        items.orEmpty().filter { it.selectionKey() in selectedKeys }
+    }
+    DisposableEffect(picked) {
+        val published = if (picked.isEmpty()) null else Selection(
+            items = picked.map { SelectionItem(it.selectionKey(), it.displayName) },
+            actions = listOf(
+                SelectionAction(SelectionActionKind.Enable) {
+                    scope.launch {
+                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, true) }
+                        selectedKeys = emptySet(); scanTick++
+                    }
+                },
+                SelectionAction(SelectionActionKind.Disable) {
+                    scope.launch {
+                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, false) }
+                        selectedKeys = emptySet(); scanTick++
+                    }
+                },
+                SelectionAction(SelectionActionKind.Delete) { pendingBulkDelete = picked },
+            ),
+            clear = { selectedKeys = emptySet() },
+        )
+        selections.set(published)
+        onDispose { selections.clearIf(published) }
+    }
     var detailsOf by remember(instance.id) { mutableStateOf<InstalledContent?>(null) }
     var browsing by remember(instance.id) { mutableStateOf(false) }
 
@@ -309,6 +350,11 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                             val freeEdit = isLocal || c.kind != ContentKind.Mod
                             ContentRow(
                                 content          = c,
+                                selected         = if (freeEdit) c.selectionKey() in selectedKeys else null,
+                                onSelect         = { on ->
+                                    selectedKeys = if (on) selectedKeys + c.selectionKey()
+                                                   else selectedKeys - c.selectionKey()
+                                },
                                 iconState        = iconCache["${c.kind}:${c.fileName}"],
                                 effectiveEnabled = when {
                                     manifestEntry != null && !manifestEntry.required -> optionalState[c.fileName] ?: c.enabled
@@ -343,6 +389,22 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+
+    if (pendingBulkDelete.isNotEmpty()) {
+        val targets = pendingBulkDelete
+        DestructiveConfirmDialog(
+            title        = s.contentDeleteTitle,
+            body         = s.contentBulkDeleteBody(targets.size),
+            confirmLabel = s.editorDelete,
+            onConfirm    = {
+                scope.launch {
+                    targets.forEach { manager.delete(instanceDir, it.kind, it.fileName) }
+                    selectedKeys = emptySet(); pendingBulkDelete = emptyList(); scanTick++
+                }
+            },
+            onDismiss    = { pendingBulkDelete = emptyList() },
+        )
     }
 
     pendingDelete?.let { target ->
@@ -454,6 +516,10 @@ private fun ContentRow(
     iconState: ContentIconState?,
     effectiveEnabled: Boolean,
     showToggle: Boolean,
+    // Null on a row the pack owns: selecting what cannot be acted on would offer
+    // a bulk control that does nothing to half of what it counts.
+    selected: Boolean?,
+    onSelect: (Boolean) -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: (() -> Unit)?,
     onDetails: () -> Unit,
@@ -471,6 +537,9 @@ private fun ContentRow(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (selected != null) {
+            NxCheckbox(checked = selected, onCheckedChange = onSelect)
+        }
         ContentIcon(iconState, content.fileName, content.displayName, dim)
         Column(Modifier.weight(1f)) {
             Text(
@@ -754,3 +823,6 @@ private fun humanSize(bytes: Long): String = when {
     bytes >= 1024      -> "${bytes / 1024} KB"
     else               -> "$bytes B"
 }
+
+/** Stable across a rescan: kind plus filename is what the row is keyed on too. */
+private fun InstalledContent.selectionKey(): String = "$kind:$fileName"

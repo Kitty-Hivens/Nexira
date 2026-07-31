@@ -28,6 +28,7 @@ import hivens.ui.navigation.NavRequests
 import hivens.core.activity.ActivityRegistry
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
+import hivens.ui.activity.SelectionRegistry
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
@@ -243,6 +244,9 @@ val uiModule = module {
     // out of the model on purpose: a lambda field would break Activity's
     // equality and the registry's throttle depends on it.
     single { ActivityCommands(installs = get(), controller = get(), registry = get()) }
+    // What the current view has selected. App-scoped so the surface can read it
+    // without knowing which screen published it; the view clears it on the way out.
+    single { SelectionRegistry() }
     single { SessionRegistry(appScope = get()) }
     single {
         val settingsService: ISettingsService = get()
