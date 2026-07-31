@@ -98,4 +98,4 @@ internal fun StackOverflow(count: Int) {
 private fun faceCorner(): Dp = minOf(LocalStyle.current.panelCorner, 9.dp)
 
 /** Diameter of one face in a subject stack. */
-internal val FACE_SIZE = 32.dp
+internal val FACE_SIZE = 36.dp
