@@ -59,6 +59,16 @@ class DragSelectTest {
     }
 
     @Test
+    fun `a run covers every row between two samples, in either direction`() {
+        // A pointer moving faster than the event rate steps over rows. Marking
+        // only what is under it leaves holes, and a run with holes is not the run
+        // the user drew -- which is what "sometimes it skips" looks like.
+        assertEquals(listOf(3, 4, 5, 6), between(3, 6).toList())
+        assertEquals(listOf(3, 4, 5, 6), between(6, 3).toList(), "dragging up covers the same rows")
+        assertEquals(listOf(4), between(4, 4).toList(), "standing still covers one row")
+    }
+
+    @Test
     fun `the drag paints rather than toggles`() {
         // Begun on an unselected row it selects everything it crosses, including
         // rows already selected, so a path drawn back over itself is stable.
