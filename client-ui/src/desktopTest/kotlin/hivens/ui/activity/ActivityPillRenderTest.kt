@@ -87,14 +87,25 @@ class ActivityPillRenderTest {
     /** Accent captured out of the real theme, so the probe cannot drift from it. */
     private var accent: Color = Color.Unspecified
 
+    /**
+     * Rendered at the density the app actually runs at, not at a comfortable one.
+     * A sheet drawn at 2x on a display that runs at 1x makes every proportion
+     * judgement wrong by a factor of two, and the judgements are the whole reason
+     * the sheet exists.
+     */
     private fun render(
         style: StyleSpec,
         dark: Boolean,
         ground: Color,
         name: String,
+        scale: Float = 1f,
         content: @Composable () -> Unit,
     ): Bitmap {
-        val scene = ImageComposeScene(width = width, height = rowHeight * 3, density = Density(2f)) {
+        val scene = ImageComposeScene(
+            width = (width * scale).toInt(),
+            height = (rowHeight * 3 * scale).toInt(),
+            density = Density(scale),
+        ) {
             // The real theme entry point rather than a hand-provided palette: what
             // the sheet shows is then what the app resolves, tonal ladder included.
             NxTheme(useDarkTheme = dark, style = style) {
@@ -114,7 +125,7 @@ class ActivityPillRenderTest {
         scene.close()
         val out = File("build/render").apply { mkdirs() }
         image.encodeToData(EncodedImageFormat.PNG)?.bytes
-            ?.let { File(out, "activity-pill-$name.png").writeBytes(it) }
+            ?.let { File(out, "activity-pill-$name@${scale.toInt()}x.png").writeBytes(it) }
         return Bitmap.makeFromImage(image)
     }
 
@@ -155,10 +166,14 @@ class ActivityPillRenderTest {
         )
         for ((name, styling, ground) in cases) {
             val (style, dark) = styling
+            // Both, so a proportion can be judged at the scale it will be seen at.
+            render(style, dark, ground, name, scale = 2f) { Sheet(PillProps()) }
             val bmp = render(style, dark, ground, name) { Sheet(PillProps()) }
-            // Sample inside the first pill's body, past the leading icon.
-            val body = bmp.getColor(300, 76)
-            val bg = bmp.getColor(width - 20, 20)
+            // Sampled as a fraction of the frame, not at pixels that happened to
+            // work at one density. The whole point of rendering at the app's own
+            // scale is lost if the probe still assumes a different one.
+            val body = bmp.getColor(bmp.width / 3, bmp.height / 8)
+            val bg = bmp.getColor(bmp.width - 4, bmp.height - 4)
             assertTrue(
                 !near(body, bg, tolerance = 10),
                 "pill body must not match the ground: body=${hex(body)} ground=${hex(bg)}",

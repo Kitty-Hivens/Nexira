@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -86,29 +87,29 @@ internal fun SelectionPill(
         ) {
             SelectionStack(selection.items, ambient)
             if (!open) return@Row
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = s.selectionCount(selection.items.size),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                NxButton(
-                    label = s.selectionClear,
-                    onClick = selection.clear,
-                    style = NxButtonStyle.Tertiary,
-                    icon = NxIcon.Close,
-                    compact = true,
-                )
-            }
+            // Count, rule, clear: one tight cluster about what is picked. The rule
+            // belongs inside it, separating the fact from the way to undo it --
+            // parked between the cluster and the verbs it left the clear button
+            // stranded in the middle of the object's empty half.
+            Text(
+                text = s.selectionCount(selection.items.size),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            VerticalDivider(Modifier.height(20.dp), color = colors.outline)
+            NxButton(
+                label = s.selectionClear,
+                onClick = selection.clear,
+                style = NxButtonStyle.Tertiary,
+                icon = NxIcon.Close,
+                compact = true,
+            )
+            // The verbs live at the far edge, the way a toolbar's do.
+            Spacer(Modifier.weight(1f))
             if (props.showActions && selection.actions.isNotEmpty()) {
-                VerticalDivider(Modifier.height(26.dp), color = colors.outline)
                 selection.actions.forEach { action ->
                     NxTooltip(text = action.blockedReason.orEmpty(), enabled = action.blockedReason != null) {
                         NxButton(
@@ -135,7 +136,7 @@ internal fun SelectionPill(
 private fun SelectionStack(items: List<SelectionItem>, ambient: Activity?) {
     Box(contentAlignment = Alignment.Center) {
         Row(horizontalArrangement = Arrangement.spacedBy(-8.dp)) {
-            items.take(3).reversed().forEach { StackFace(it.key, it.title, it.iconUrl) }
+            items.take(3).reversed().forEach { StackFace(it.key, it.title, it.icon) }
             val hidden = items.size - minOf(items.size, 3)
             if (hidden > 0) StackOverflow(hidden)
             // The launcher's own work, still present while the selection holds the

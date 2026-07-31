@@ -228,7 +228,9 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     val blocked = if (locked > 0) s.selectionBlockedByPack(locked) else null
     DisposableEffect(picked) {
         val published = if (picked.isEmpty()) null else Selection(
-            items = picked.map { SelectionItem(it.selectionKey(), it.displayName) },
+            items = picked.map {
+                SelectionItem(it.selectionKey(), it.displayName, iconCache[it.selectionKey()]?.model())
+            },
             actions = listOf(
                 SelectionAction(SelectionActionKind.Enable, blockedReason = blocked) {
                     scope.launch {
@@ -867,3 +869,10 @@ private fun humanSize(bytes: Long): String = when {
 
 /** Stable across a rescan: kind plus filename is what the row is keyed on too. */
 private fun InstalledContent.selectionKey(): String = "$kind:$fileName"
+
+/** What the image loader should be handed for this icon, if anything. */
+private fun ContentIconState.model(): Any? = when (this) {
+    is ContentIconState.Bytes -> data
+    is ContentIconState.Url -> url
+    ContentIconState.None -> null
+}
