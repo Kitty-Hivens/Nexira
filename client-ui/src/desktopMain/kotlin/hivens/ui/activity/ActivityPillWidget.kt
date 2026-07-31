@@ -101,12 +101,12 @@ enum class PillAnchor { Left, Center }
 data class PillProps(
     @PropLabel("widget.activity.pill.progress") val progress: PillProgress = PillProgress.Edge,
     @PropLabel("widget.activity.pill.anchor") val anchor: PillAnchor = PillAnchor.Center,
-    // Flat, not Heavy. The body is opaque -- it has to be, since the object floats
-    // over arbitrary content and cannot let it read through -- so a blur under it
-    // is invisible by construction. Heavy costs a wallpaper blur per frame and
-    // shows nothing for it. Clear is wrong for the opposite reason: it is a
-    // bodiless coat and vanishes over the near-black default ground.
-    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Flat,
+    // Clear, which paired with the opaque body below is the plainest plane there
+    // is: the tonal body, the hairline, the cast shadow, nothing else. The object
+    // floats over arbitrary content so it cannot let anything read through, and
+    // once it cannot, every coat above the body is either invisible or a second
+    // fill shifting a tone the ladder already chose.
+    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Clear,
     @PropLabel("widget.activity.pill.heightDp") @PropRange(40.0, 76.0) val heightDp: Int = 58,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.activity.pill.showActions") val showActions: Boolean = true,
