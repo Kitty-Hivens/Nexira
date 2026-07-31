@@ -95,6 +95,12 @@ object GuiBootstrap {
      * after a data-dir move reports against the live paths.
      */
     private fun installGuiCrashHandler(crashReporter: AtomicReference<CrashReporter>) {
+        // Touched while the process is healthy. The dialog is loaded lazily
+        // otherwise, and the one moment it is wanted is the one where loading a
+        // class may no longer work -- a replaced image, a rebuild over a live
+        // process. The log this was found in shows exactly that: the crash was
+        // reported to disk and then the dialog meant to surface it failed too.
+        runCatching { CrashDialog::class.java.name }
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)
