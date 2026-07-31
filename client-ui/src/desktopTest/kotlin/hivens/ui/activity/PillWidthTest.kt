@@ -14,6 +14,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.RussianStrings
+import hivens.core.activity.Activity
+import hivens.core.activity.ActivityKind
+import hivens.core.activity.ActivityPhase
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
@@ -40,6 +44,12 @@ class PillWidthTest {
     private val ground = Color(0xFF101014)
     private val cap = 700.dp
 
+    /** What the launcher is doing underneath, which takes a face in the stack too. */
+    private val probeAmbient = Activity(
+        key = "install:Industrial", kind = ActivityKind.Install, title = "Industrial",
+        iconUrl = null, phase = ActivityPhase.Running(34, 97), startedAtMillis = 0, updatedAtMillis = 0,
+    )
+
     private fun item(n: Int, title: String = "Sodium") =
         SelectionItem("mods:$n", title)
 
@@ -51,28 +61,73 @@ class PillWidthTest {
 
     internal fun measure(count: Int): Int = widthOf(selectionOf(count))
 
+    private fun widthOf(selection: Selection, maxWidth: Dp = cap, russian: Boolean = false): Int {
+        val bmp = frameOf(selection, maxWidth, russian)
+        val g = ground.toArgb()
+        val cols = (0 until frame).filter { x -> (0 until 140).any { y -> !near(bmp.getColor(x, y), g) } }
+        return if (cols.isEmpty()) 0 else cols.last() - cols.first() + 1
+    }
+
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun widthOf(selection: Selection, maxWidth: Dp = cap): Int {
+    private fun frameOf(selection: Selection, maxWidth: Dp, russian: Boolean = false): Bitmap {
+        val strings = if (russian) RussianStrings else EnglishStrings
+        val ambient = if (russian) probeAmbient else null
         val scene = ImageComposeScene(width = frame, height = 140, density = Density(1f)) {
             NxTheme(useDarkTheme = true, style = CelestiaStyle) {
                 CompositionLocalProvider(
                     LocalStyle provides CelestiaStyle,
-                    LocalStrings provides EnglishStrings,
+                    LocalStrings provides strings,
                 ) {
                     Box(Modifier.fillMaxSize().background(ground).padding(20.dp)) {
-                        SelectionPill(selection, null, PillProps(), EnglishStrings, maxWidth)
+                        SelectionPill(selection, ambient, PillProps(), strings, maxWidth)
                     }
                 }
             }
         }
         val image = scene.render()
         scene.close()
-        val bmp = Bitmap.makeFromImage(image)
+        return Bitmap.makeFromImage(image)
+    }
+
+    /**
+     * Pixels between the last content ink and the object's trailing edge. Content
+     * is whatever matches neither the page behind nor the object's own body, so
+     * the body itself does not count as ink.
+     */
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun trailingGap(selection: Selection, maxWidth: Dp, russian: Boolean = false): Int {
+        val bmp = frameOf(selection, maxWidth, russian)
         val g = ground.toArgb()
-        val cols = (0 until frame).filter { x ->
-            (0 until 140).any { y -> !near(bmp.getColor(x, y), g) }
+
+        // The body tone is whatever covers the most of the frame after the page
+        // itself: it is the largest single area there is. Reading it from a
+        // position instead put the cast shadow in its place, since a shadow
+        // reaches past the object and is neither the page nor the body.
+        val tally = HashMap<Int, Int>()
+        for (x in 0 until frame) for (y in 0 until 140) {
+            val c = bmp.getColor(x, y)
+            if (!near(c, g)) tally[c] = (tally[c] ?: 0) + 1
         }
-        return if (cols.isEmpty()) 0 else cols.last() - cols.first() + 1
+        val body = tally.maxByOrNull { it.value }?.key ?: return 0
+
+        // The object is where its body is; the shadow around it is not the object.
+        val bodyCols = (0 until frame).filter { x -> (0 until 140).any { y -> near(bmp.getColor(x, y), body, 6) } }
+        if (bodyCols.isEmpty()) return 0
+        val right = bodyCols.last()
+
+        // The object's own hairline sits on its edge and matches neither the page
+        // nor the body, so counting it as content made the gap read as one pixel
+        // whether the row fitted or not. The rim is not content.
+        val rim = 3
+        val inkCols = bodyCols.filter { x ->
+            x > bodyCols.first() + rim && x < right - rim &&
+                (0 until 140).any { y ->
+                    val c = bmp.getColor(x, y)
+                    !near(c, g) && !near(c, body, tolerance = 16)
+                }
+        }
+        return if (inkCols.isEmpty()) right - bodyCols.first() else right - inkCols.last()
     }
 
     private fun Color.toArgb(): Int =
@@ -119,5 +174,16 @@ class PillWidthTest {
     fun `a narrow allowance is respected over the content`() {
         val narrow = widthOf(selectionOf(4), maxWidth = 320.dp)
         assertTrue(narrow <= 322, "content must yield to the ceiling: $narrow")
+    }
+
+    @Test
+    fun `an object that fits keeps its trailing inset`() {
+        // The inset is what says the row fitted rather than being cut at the clip.
+        // It does NOT prove the narrow case: below the natural width the count
+        // elides and the object still reports an intact inset while an element may
+        // have been dropped. What that case needs is a measurement of how many
+        // controls survived, and this is not it.
+        val gap = trailingGap(selectionOf(3), maxWidth = cap, russian = true)
+        assertTrue(gap >= 8, "a fitting row should not run into its own edge, gap=$gap px")
     }
 }
