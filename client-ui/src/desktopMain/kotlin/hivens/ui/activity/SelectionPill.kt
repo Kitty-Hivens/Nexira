@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -107,7 +108,12 @@ internal fun SelectionPill(
                 icon = NxIcon.Close,
                 compact = true,
             )
+            // An explicit gap, not a weighted one. The object is as wide as what it
+            // holds, so there is no free space for a weight to spread -- and with
+            // nothing between them the verbs sat against the clear control and the
+            // whole row read as one undifferentiated run of buttons.
             if (props.showActions && selection.actions.isNotEmpty()) {
+                Spacer(Modifier.width(CLUSTER_GAP))
                 selection.actions.forEach { action ->
                     NxTooltip(text = action.blockedReason.orEmpty(), enabled = action.blockedReason != null) {
                         NxButton(
@@ -155,3 +161,6 @@ private fun SelectionActionKind.icon() = when (this) {
     SelectionActionKind.Disable -> NxIcon.VisibilityOff
     SelectionActionKind.Delete -> NxIcon.Delete
 }
+
+/** Space between what is picked and what can be done to it. */
+private val CLUSTER_GAP = 20.dp
