@@ -6,7 +6,9 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
@@ -49,7 +51,17 @@ internal fun Modifier.dragSelect(
     selecting: Boolean,
 ): Modifier = composed {
     val scope = rememberCoroutineScope()
-    pointerInput(listState, selecting) {
+    // Read through the latest composition, never keyed on. Keying on "is a
+    // selection running" meant the first hold flipped that flag, Compose restarted
+    // the block, and the drag was cancelled by its own first pick -- so only the
+    // second drag of a session appeared to work. Reading them this way also keeps
+    // a long-lived gesture from acting on a stale set of what is already selected.
+    val currentKeyAt by rememberUpdatedState(keyAt)
+    val currentIsSelected by rememberUpdatedState(isSelected)
+    val currentSetSelected by rememberUpdatedState(setSelected)
+    val currentSelecting by rememberUpdatedState(selecting)
+
+    pointerInput(listState) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             var autoScroll: Job? = null
@@ -65,9 +77,9 @@ internal fun Modifier.dragSelect(
             }
 
             if (liftedEarly) {
-                if (selecting) {
+                if (currentSelecting) {
                     indexAt(listState, down.position)?.let { index ->
-                        keyAt(index)?.let { key -> setSelected(key, !isSelected(key)) }
+                        currentKeyAt(index)?.let { key -> currentSetSelected(key, !currentIsSelected(key)) }
                     }
                 }
                 return@awaitEachGesture
@@ -75,9 +87,10 @@ internal fun Modifier.dragSelect(
 
             // Held. The row under the finger decides both the first pick and what
             // the rest of the drag does.
-            val startKey = indexAt(listState, down.position)?.let(keyAt) ?: return@awaitEachGesture
-            val paint = paintValue(isSelected(startKey))
-            setSelected(startKey, paint)
+            var lastIndex = indexAt(listState, down.position) ?: return@awaitEachGesture
+            val startKey = currentKeyAt(lastIndex) ?: return@awaitEachGesture
+            val paint = paintValue(currentIsSelected(startKey))
+            currentSetSelected(startKey, paint)
 
             try {
                 while (true) {
@@ -91,8 +104,16 @@ internal fun Modifier.dragSelect(
                     if (!change.pressed) break
                     change.consume()
 
-                    indexAt(listState, change.position)?.let { index ->
-                        keyAt(index)?.let { key -> setSelected(key, paint) }
+                    val index = indexAt(listState, change.position)
+                    if (index != null) {
+                        // Everything between the last row and this one, not only the
+                        // one under the pointer. A pointer moving faster than the
+                        // event rate steps over rows, and a run with holes in it is
+                        // not the run the user drew.
+                        for (i in between(lastIndex, index)) {
+                            currentKeyAt(i)?.let { key -> currentSetSelected(key, paint) }
+                        }
+                        lastIndex = index
                     }
 
                     // Rows below the fold are still part of the run the user is
@@ -108,13 +129,21 @@ internal fun Modifier.dragSelect(
     }
 }
 
-/** Which visible row the pointer is over, if any. */
+/**
+ * Which row the pointer is over. Falls to the nearest one when the pointer sits
+ * in the space between two rows: a gap belongs to no item, so answering nothing
+ * there drops a press that began in one and stalls a drag passing through.
+ */
 private fun indexAt(listState: LazyListState, position: Offset): Int? {
     val y = position.y.toInt()
-    return listState.layoutInfo.visibleItemsInfo
-        .firstOrNull { y >= it.offset && y < it.offset + it.size }
-        ?.index
+    val visible = listState.layoutInfo.visibleItemsInfo
+    if (visible.isEmpty()) return null
+    visible.firstOrNull { y >= it.offset && y < it.offset + it.size }?.let { return it.index }
+    return visible.minByOrNull { abs(it.offset + it.size / 2 - y) }?.index
 }
+
+/** Every index from [from] to [to], whichever way round they arrived. */
+internal fun between(from: Int, to: Int): IntRange = if (to >= from) from..to else to..from
 
 /**
  * How hard to scroll for a pointer at [y] in a viewport [viewportHeight] tall:
