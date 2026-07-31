@@ -5,8 +5,6 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +71,7 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.core.smrt.ModIconResolver
 import androidx.compose.runtime.DisposableEffect
 import hivens.ui.activity.Selection
+import hivens.ui.activity.dragSelect
 import hivens.ui.activity.SelectionAction
 import hivens.ui.activity.SelectionActionKind
 import hivens.ui.activity.SelectionItem
@@ -351,7 +350,15 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                 Box(Modifier.fillMaxSize().hoverable(hover)) {
                     LazyColumn(
                         state               = listState,
-                        modifier            = Modifier.fillMaxSize(),
+                        modifier            = Modifier.fillMaxSize().dragSelect(
+                            listState   = listState,
+                            keyAt       = { index -> visible.getOrNull(index)?.selectionKey() },
+                            isSelected  = { it in selectedKeys },
+                            setSelected = { key, on ->
+                                selectedKeys = if (on) selectedKeys + key else selectedKeys - key
+                            },
+                            selecting   = selectedKeys.isNotEmpty(),
+                        ),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         items(items = visible, key = { "${it.kind}:${it.fileName}" }) { c ->
@@ -365,13 +372,6 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                             ContentRow(
                                 content          = c,
                                 selected         = c.selectionKey() in selectedKeys,
-                                selecting        = selectedKeys.isNotEmpty(),
-                                onPress          = {
-                                    val key = c.selectionKey()
-                                    selectedKeys = if (key in selectedKeys) selectedKeys - key
-                                                   else selectedKeys + key
-                                },
-                                onLongPress      = { selectedKeys = selectedKeys + c.selectionKey() },
                                 iconState        = iconCache["${c.kind}:${c.fileName}"],
                                 effectiveEnabled = when {
                                     manifestEntry != null && !manifestEntry.required -> optionalState[c.fileName] ?: c.enabled
@@ -537,10 +537,10 @@ private fun ContentRow(
     // ragged the left edge of the whole list and told the user the difference
     // before they had asked a question it answers; what a row can have DONE to it
     // is a property of the action, not of whether it may be pointed at.
+    //
+    // The gesture itself belongs to the list: a drag is followed across children,
+    // and a row only ever hears about itself.
     selected: Boolean,
-    selecting: Boolean,
-    onPress: () -> Unit,
-    onLongPress: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: (() -> Unit)?,
     onDetails: () -> Unit,
@@ -557,14 +557,6 @@ private fun ContentRow(
                 if (selected) NxTheme.colors.primary.copy(alpha = 0.14f)
                 else glassSurfaceAlpha(0.4f),
             )
-            .pointerInput(selecting) {
-                detectTapGestures(
-                    // A press picks while a selection is running, so the second
-                    // and third items cost one tap each rather than a hold apiece.
-                    onTap = { if (selecting) onPress() },
-                    onLongPress = { onLongPress() },
-                )
-            }
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
