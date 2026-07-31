@@ -139,14 +139,23 @@ internal fun SelectionPill(
     }
 }
 
-/** Count, the way to undo it, and the verbs -- all at one level of detail. */
+/** The whole row at one level of detail: subject, count, undo, verbs. */
 @Composable
-private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled: Boolean) {
+private fun Body(
+    selection: Selection,
+    ambient: Activity?,
+    s: AppStrings,
+    props: PillProps,
+    open: Boolean,
+    labelled: Boolean,
+) {
     val colors = NxTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 6.dp),
     ) {
+        SelectionStack(selection.items, ambient)
+        if (!open) return@Row
         Text(
             text = s.selectionCount(selection.items.size),
             style = MaterialTheme.typography.titleMedium,
