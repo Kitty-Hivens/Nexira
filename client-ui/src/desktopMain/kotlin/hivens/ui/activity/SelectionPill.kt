@@ -30,6 +30,8 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxFit
+import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
@@ -131,6 +133,85 @@ internal fun SelectionPill(
                             compact = true,
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Count, the way to undo it, and the verbs -- all at one level of detail. */
+@Composable
+private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled: Boolean) {
+    val colors = NxTheme.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 6.dp),
+    ) {
+        Text(
+            text = s.selectionCount(selection.items.size),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        VerticalDivider(Modifier.height(20.dp), color = colors.outline)
+        if (labelled) {
+            NxButton(
+                label = s.selectionClear,
+                onClick = selection.clear,
+                style = NxButtonStyle.Tertiary,
+                icon = NxIcon.Close,
+                compact = true,
+            )
+        } else {
+            NxTooltip(text = s.selectionClear) {
+                NxIconButton(NxIcon.Close, s.selectionClear, selection.clear)
+            }
+        }
+        if (props.showActions && selection.actions.isNotEmpty()) {
+            Spacer(Modifier.width(if (labelled) CLUSTER_GAP else 8.dp))
+            VerticalDivider(Modifier.height(26.dp), color = colors.outline)
+            Verbs(selection, s, labelled)
+        }
+    }
+}
+
+/**
+ * The verbs, with or without their labels. Without, the name moves into the
+ * tooltip, so a control that has shrunk still says what it is -- and a blocked
+ * one still says why.
+ */
+@Composable
+private fun Verbs(selection: Selection, s: AppStrings, labelled: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 4.dp),
+    ) {
+        selection.actions.forEach { action ->
+            val name = action.kind.label(s)
+            val hint = action.blockedReason ?: name
+            NxTooltip(text = hint, enabled = action.blockedReason != null || !labelled) {
+                if (labelled) {
+                    NxButton(
+                        label = name,
+                        onClick = action.run,
+                        style = if (action.kind == SelectionActionKind.Delete) {
+                            NxButtonStyle.Destructive
+                        } else {
+                            NxButtonStyle.Tertiary
+                        },
+                        icon = action.kind.icon(),
+                        enabled = action.blockedReason == null,
+                        compact = true,
+                    )
+                } else {
+                    NxIconButton(
+                        icon = action.kind.icon(),
+                        contentDescription = name,
+                        onClick = action.run,
+                        enabled = action.blockedReason == null,
+                    )
                 }
             }
         }
