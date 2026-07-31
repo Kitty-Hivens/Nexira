@@ -70,6 +70,10 @@ fun NxButton(
     }
     val bordered = style == NxButtonStyle.Secondary
     val dim = if (enabled) 1f else 0.45f
+    // Alpha alone does not read as off on a filled style: a destructive button at
+    // forty-five percent is still a saturated slab, so a blocked delete looked
+    // armed. Disabled drops the fill entirely, which is what "disabled" already
+    // looks like on the quiet styles -- one appearance for one state.
     val pad = if (compact) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
               else PaddingValues(horizontal = 18.dp, vertical = 10.dp)
 
@@ -82,7 +86,10 @@ fun NxButton(
             modifier              = modifier
                 .let { if (minHeight != null) it.heightIn(min = minHeight) else it }
                 .clip(shape)
-                .background(container.copy(alpha = container.alpha * dim))
+                .background(
+                    if (enabled) container
+                    else Color.Transparent,
+                )
                 .let { if (bordered) it.border(1.dp, palette.outline.copy(alpha = dim), shape) else it }
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(pad),
