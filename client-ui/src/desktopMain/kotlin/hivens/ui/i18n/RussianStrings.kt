@@ -760,6 +760,7 @@ object RussianStrings : AppStrings {
     override val selectionDelete                = "Удалить"
     override fun selectionCount(count: Int)     = "Выбрано: $count"
     override val selectionClear                 = "Снять"
+    override fun selectionBlockedByPack(count: Int) = "Из выбранного паку принадлежит: $count. Отсоедините сборку, чтобы ими управлять."
     override val contentActionDetails           = "Детали"
     override val contentActionOpenPage          = "Открыть страницу"
     override val contentDetailAuthors           = "Авторы"

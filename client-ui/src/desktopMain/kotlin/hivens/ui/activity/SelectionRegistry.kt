@@ -10,7 +10,16 @@ enum class SelectionActionKind { Enable, Disable, Delete }
 /** One selected thing, as much of it as a surface needs to show. */
 data class SelectionItem(val key: String, val title: String, val iconUrl: String? = null)
 
-data class SelectionAction(val kind: SelectionActionKind, val run: () -> Unit)
+/**
+ * [blockedReason] null means the action can run. Set, it is the sentence the
+ * surface shows on hover -- a control that is merely dead teaches nothing, and
+ * the user is left guessing which of the things they picked is the problem.
+ */
+data class SelectionAction(
+    val kind: SelectionActionKind,
+    val blockedReason: String? = null,
+    val run: () -> Unit,
+)
 
 /**
  * What the user has selected in the view they are looking at.

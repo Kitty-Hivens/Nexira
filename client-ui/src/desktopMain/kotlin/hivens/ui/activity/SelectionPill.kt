@@ -29,6 +29,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
@@ -109,17 +110,20 @@ internal fun SelectionPill(
             if (props.showActions && selection.actions.isNotEmpty()) {
                 VerticalDivider(Modifier.height(26.dp), color = colors.outline)
                 selection.actions.forEach { action ->
-                    NxButton(
-                        label = action.kind.label(s),
-                        onClick = action.run,
-                        style = if (action.kind == SelectionActionKind.Delete) {
-                            NxButtonStyle.Destructive
-                        } else {
-                            NxButtonStyle.Tertiary
-                        },
-                        icon = action.kind.icon(),
-                        compact = true,
-                    )
+                    NxTooltip(text = action.blockedReason.orEmpty(), enabled = action.blockedReason != null) {
+                        NxButton(
+                            label = action.kind.label(s),
+                            onClick = action.run,
+                            style = if (action.kind == SelectionActionKind.Delete) {
+                                NxButtonStyle.Destructive
+                            } else {
+                                NxButtonStyle.Tertiary
+                            },
+                            icon = action.kind.icon(),
+                            enabled = action.blockedReason == null,
+                            compact = true,
+                        )
+                    }
                 }
             }
         }
