@@ -258,10 +258,10 @@ internal fun Pill(
             // around, which reads as everything inside sitting a few pixels off
             // from where it belongs.
             .heightIn(min = height)
-            // Width has a floor too. Without one a short pack name collapses the
-            // object into a chip and it stops reading as a place where the
-            // launcher reports things.
-            .widthIn(min = minOf(MIN_WIDTH, maxWidth), max = maxWidth)
+            // A ceiling only. A floor forces the object wider than what is in it
+            // and the surplus becomes a gap down the middle, which reads as two
+            // unrelated clusters rather than one object.
+            .widthIn(max = maxWidth)
             .animateContentSize(tween(style.animationDurationMs(380), easing = OpenEasing))
             .clip(shape),
         shape = shape,
@@ -300,7 +300,7 @@ internal fun Pill(
             // competing weights split the row instead, and the name elided with
             // half the object standing empty beside it.
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f, fill = false),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -522,8 +522,6 @@ private const val STACK_MAX = 3
 private val STACK_OVERLAP = 8.dp
 
 
-/** Floor on the object's width, so it reads as a panel rather than a chip. */
-private val MIN_WIDTH = 380.dp
 
 /** Arrival: overshoots, the way something landing does. */
 private val ArriveEasing = CubicBezierEasing(0.15f, 1.4f, 0.64f, 0.96f)

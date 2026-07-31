@@ -107,8 +107,6 @@ internal fun SelectionPill(
                 icon = NxIcon.Close,
                 compact = true,
             )
-            // The verbs live at the far edge, the way a toolbar's do.
-            Spacer(Modifier.weight(1f))
             if (props.showActions && selection.actions.isNotEmpty()) {
                 selection.actions.forEach { action ->
                     NxTooltip(text = action.blockedReason.orEmpty(), enabled = action.blockedReason != null) {

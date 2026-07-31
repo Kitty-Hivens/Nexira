@@ -138,8 +138,8 @@ class ActivityPillRenderTest {
         ),
         actions = listOf(
             SelectionAction(SelectionActionKind.Enable) {},
-            SelectionAction(SelectionActionKind.Disable) {},
-            SelectionAction(SelectionActionKind.Delete) {},
+            SelectionAction(SelectionActionKind.Disable, blockedReason = "3 of these belong to the pack.") {},
+            SelectionAction(SelectionActionKind.Delete, blockedReason = "3 of these belong to the pack.") {},
         ),
         clear = {},
     )

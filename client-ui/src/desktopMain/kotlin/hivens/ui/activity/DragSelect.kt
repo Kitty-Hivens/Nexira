@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.CoroutineScope
@@ -80,7 +81,12 @@ internal fun Modifier.dragSelect(
 
             try {
                 while (true) {
-                    val event = awaitPointerEvent()
+                    // Initial pass, so the movement is claimed before the list's
+                    // own scroll sees it. On the main pass the scrollable has
+                    // already taken the drag and turned it into scrolling, which
+                    // is why holding and moving selected only the row it started
+                    // on.
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
                     if (!change.pressed) break
                     change.consume()
