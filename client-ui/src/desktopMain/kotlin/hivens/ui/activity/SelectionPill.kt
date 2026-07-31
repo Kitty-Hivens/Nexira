@@ -92,48 +92,12 @@ internal fun SelectionPill(
         ) {
             SelectionStack(selection.items, ambient)
             if (!open) return@Row
-            // Count, rule, clear: one tight cluster about what is picked. The rule
-            // belongs inside it, separating the fact from the way to undo it --
-            // parked between the cluster and the verbs it left the clear button
-            // stranded in the middle of the object's empty half.
-            Text(
-                text = s.selectionCount(selection.items.size),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            VerticalDivider(Modifier.height(20.dp), color = colors.outline)
-            NxButton(
-                label = s.selectionClear,
-                onClick = selection.clear,
-                style = NxButtonStyle.Tertiary,
-                icon = NxIcon.Close,
-                compact = true,
-            )
-            // An explicit gap, not a weighted one. The object is as wide as what it
-            // holds, so there is no free space for a weight to spread -- and with
-            // nothing between them the verbs sat against the clear control and the
-            // whole row read as one undifferentiated run of buttons.
-            if (props.showActions && selection.actions.isNotEmpty()) {
-                Spacer(Modifier.width(CLUSTER_GAP))
-                selection.actions.forEach { action ->
-                    NxTooltip(text = action.blockedReason.orEmpty(), enabled = action.blockedReason != null) {
-                        NxButton(
-                            label = action.kind.label(s),
-                            onClick = action.run,
-                            style = if (action.kind == SelectionActionKind.Delete) {
-                                NxButtonStyle.Destructive
-                            } else {
-                                NxButtonStyle.Tertiary
-                            },
-                            icon = action.kind.icon(),
-                            enabled = action.blockedReason == null,
-                            compact = true,
-                        )
-                    }
-                }
+            // A later sibling deliberately: a row hands a non-weighted child the
+            // width left after the ones before it, so the fallback is judged
+            // against what the subject stack actually left rather than against the
+            // whole allowance.
+            NxFit(compact = { Body(selection, s, props, labelled = false) }) {
+                Body(selection, s, props, labelled = true)
             }
         }
     }
@@ -145,7 +109,7 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
     val colors = NxTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 2.dp),
     ) {
         Text(
             text = s.selectionCount(selection.items.size),
@@ -170,7 +134,7 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
             }
         }
         if (props.showActions && selection.actions.isNotEmpty()) {
-            Spacer(Modifier.width(if (labelled) CLUSTER_GAP else 8.dp))
+            Spacer(Modifier.width(if (labelled) CLUSTER_GAP else 4.dp))
             VerticalDivider(Modifier.height(26.dp), color = colors.outline)
             Verbs(selection, s, labelled)
         }
@@ -186,7 +150,7 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
 private fun Verbs(selection: Selection, s: AppStrings, labelled: Boolean) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (labelled) 12.dp else 0.dp),
     ) {
         selection.actions.forEach { action ->
             val name = action.kind.label(s)
