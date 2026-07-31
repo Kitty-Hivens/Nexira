@@ -3,6 +3,7 @@ package hivens.ui.activity
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityKind
+import hivens.core.activity.ActivityRegistry
 import hivens.launcher.PackInstallService
 import hivens.launcher.launch.LauncherController
 import org.slf4j.LoggerFactory
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory
 class ActivityCommands(
     private val installs: PackInstallService,
     private val controller: LauncherController,
+    private val registry: ActivityRegistry,
 ) {
     private val log = LoggerFactory.getLogger(ActivityCommands::class.java)
 
@@ -36,6 +38,8 @@ class ActivityCommands(
                 ActivityKind.Launch -> controller.abort()
                 else -> unhandled(activity, action)
             }
+            // Acts on the record rather than the work, so it needs no source.
+            ActivityAction.Dismiss -> registry.dismiss(activity.key)
             // No source advertises Pause yet: nothing in the transfer layer can
             // hold a job and resume it. The capability exists so the surface has
             // a name for it when one can.

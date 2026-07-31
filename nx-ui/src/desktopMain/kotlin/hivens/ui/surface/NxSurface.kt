@@ -79,9 +79,13 @@ fun NxSurface(
     val dark = bodyColor.luminance() < 0.5f
     val coat = if (glass) tier.coatLayers() else emptyList()
 
+    val bodyAlpha = if (opaque) 1f else bodyFloor(dark)
     val layers = buildList {
-        addAll(coat.filterIsInstance<Backdrop>())          // blurred wallpaper, under the body
-        add(Body(role, if (opaque) 1f else bodyFloor(dark)))
+        // A blur under a body nothing can see through is work thrown away: the
+        // wallpaper slice gets sampled and blurred every frame and is then
+        // covered completely. An opaque surface skips it.
+        if (bodyAlpha < 1f) addAll(coat.filterIsInstance<Backdrop>())
+        add(Body(role, bodyAlpha))
         addAll(coat.filterNot { it is Backdrop })          // wash / texture / edge bands, over the body
         if (hairline) add(EdgeBorder(explicitColor = bevelHairline(bodyColor)))
         if (interactionSource != null) add(StateOverlay())

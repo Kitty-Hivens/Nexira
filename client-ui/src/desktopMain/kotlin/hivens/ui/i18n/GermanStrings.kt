@@ -1003,6 +1003,7 @@ object GermanStrings : AppStrings {
     override val activityPillExpand                     = "Alle zeigen"
     override fun activityPillMore(count: Int)           = "+$count"
 
+    override val activityPillDismiss                    = "Ausblenden"
     override val activityPillCancel                     = "Abbrechen"
     override val activityPillPause                      = "Pause"
     override fun activityPillMeasure(done: Long, total: Long) = "$done von $total"

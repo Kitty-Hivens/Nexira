@@ -1002,6 +1002,7 @@ object EnglishStrings : AppStrings {
     override val activityPillExpand                     = "Show all"
     override fun activityPillMore(count: Int)           = "+$count"
 
+    override val activityPillDismiss                    = "Dismiss"
     override val activityPillCancel                     = "Cancel"
     override val activityPillPause                      = "Pause"
     override fun activityPillMeasure(done: Long, total: Long) = "$done of $total"
