@@ -242,7 +242,7 @@ val uiModule = module {
     // Turns the capabilities the registry advertises back into calls. Kept
     // out of the model on purpose: a lambda field would break Activity's
     // equality and the registry's throttle depends on it.
-    single { ActivityCommands(installs = get(), controller = get()) }
+    single { ActivityCommands(installs = get(), controller = get(), registry = get()) }
     single { SessionRegistry(appScope = get()) }
     single {
         val settingsService: ISettingsService = get()

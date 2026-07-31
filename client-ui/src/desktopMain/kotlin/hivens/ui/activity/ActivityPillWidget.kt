@@ -63,6 +63,7 @@ import coil3.compose.SubcomposeAsyncImage
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityPhase
+import hivens.core.activity.isTerminal
 import hivens.core.activity.ActivityRegistry
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -100,9 +101,12 @@ enum class PillAnchor { Left, Center }
 data class PillProps(
     @PropLabel("widget.activity.pill.progress") val progress: PillProgress = PillProgress.Edge,
     @PropLabel("widget.activity.pill.anchor") val anchor: PillAnchor = PillAnchor.Center,
-    // Flat rather than Clear: Clear is a bodiless glass coat, which reads over a
-    // wallpaper and disappears over the near-black default ground.
-    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Heavy,
+    // Flat, not Heavy. The body is opaque -- it has to be, since the object floats
+    // over arbitrary content and cannot let it read through -- so a blur under it
+    // is invisible by construction. Heavy costs a wallpaper blur per frame and
+    // shows nothing for it. Clear is wrong for the opposite reason: it is a
+    // bodiless coat and vanishes over the near-black default ground.
+    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Flat,
     @PropLabel("widget.activity.pill.heightDp") @PropRange(40.0, 76.0) val heightDp: Int = 58,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.activity.pill.showActions") val showActions: Boolean = true,
@@ -319,7 +323,13 @@ internal fun Pill(
                 Spacer(Modifier.width(2.dp))
             }
             if (props.showActions) {
-                activity.actions.forEach { action ->
+                // A settled entry has no work left to act on, so what it needs is
+                // a way off the surface. A failure in particular never leaves by
+                // age -- that is deliberate, and it is why this has to exist.
+                val controls =
+                    if (activity.phase.isTerminal) activity.actions + ActivityAction.Dismiss
+                    else activity.actions
+                controls.forEach { action ->
                     NxButton(
                         label = action.label(s),
                         onClick = { commands?.perform(activity, action) },
@@ -524,11 +534,13 @@ private fun Activity.measure(s: AppStrings): String? {
 private fun ActivityAction.icon(): IconKey = when (this) {
     ActivityAction.Cancel -> NxIcon.Close
     ActivityAction.Pause -> NxIcon.Pause
+    ActivityAction.Dismiss -> NxIcon.Close
 }
 
 private fun ActivityAction.label(s: AppStrings): String = when (this) {
     ActivityAction.Cancel -> s.activityPillCancel
     ActivityAction.Pause -> s.activityPillPause
+    ActivityAction.Dismiss -> s.activityPillDismiss
 }
 
 /** Weight of the perimeter measure. Reads at any density; see [EdgeMeasure]. */

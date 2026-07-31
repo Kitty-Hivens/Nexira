@@ -13,7 +13,18 @@ enum class ActivityKind { Install, Update, Sync, Repair, Launch }
  * UI module. Stopping a running game is not here, because a running game is not
  * an activity -- see [ActivityKind].
  */
-enum class ActivityAction { Cancel, Pause }
+enum class ActivityAction {
+    Cancel,
+    Pause,
+
+    /**
+     * Take the entry off the surface. Unlike the others this is not something a
+     * source can do -- it acts on the record, not the work -- so the surface adds
+     * it rather than a driver advertising it. A failure never leaves by age, which
+     * makes this the only way one goes.
+     */
+    Dismiss,
+}
 
 sealed interface ActivityPhase {
     /**

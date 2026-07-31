@@ -1059,6 +1059,7 @@ interface AppStrings {
     val activityPillExpand: String
     fun activityPillMore(count: Int): String
 
+    val activityPillDismiss: String
     val activityPillCancel: String
     val activityPillPause: String
     fun activityPillMeasure(done: Long, total: Long): String

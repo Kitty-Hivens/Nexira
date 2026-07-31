@@ -1017,6 +1017,7 @@ object RussianStrings : AppStrings {
     override val activityPillExpand                     = "Показать все"
     override fun activityPillMore(count: Int)           = "+$count"
 
+    override val activityPillDismiss                    = "Убрать"
     override val activityPillCancel                     = "Отменить"
     override val activityPillPause                      = "Пауза"
     override fun activityPillMeasure(done: Long, total: Long) = "$done из $total"
