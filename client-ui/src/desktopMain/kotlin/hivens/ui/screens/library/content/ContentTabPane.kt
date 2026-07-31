@@ -5,6 +5,8 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -76,7 +78,6 @@ import hivens.ui.activity.SelectionActionKind
 import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.nx.NxCheckbox
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
@@ -142,32 +143,6 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     // takes it back down on the way out. Leaving the tab with rows still ticked
     // would otherwise leave a bar offering to delete things the user can no
     // longer see.
-    val picked = remember(items, selectedKeys) {
-        items.orEmpty().filter { it.selectionKey() in selectedKeys }
-    }
-    DisposableEffect(picked) {
-        val published = if (picked.isEmpty()) null else Selection(
-            items = picked.map { SelectionItem(it.selectionKey(), it.displayName) },
-            actions = listOf(
-                SelectionAction(SelectionActionKind.Enable) {
-                    scope.launch {
-                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, true) }
-                        selectedKeys = emptySet(); scanTick++
-                    }
-                },
-                SelectionAction(SelectionActionKind.Disable) {
-                    scope.launch {
-                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, false) }
-                        selectedKeys = emptySet(); scanTick++
-                    }
-                },
-                SelectionAction(SelectionActionKind.Delete) { pendingBulkDelete = picked },
-            ),
-            clear = { selectedKeys = emptySet() },
-        )
-        selections.set(published)
-        onDispose { selections.clearIf(published) }
-    }
     var detailsOf by remember(instance.id) { mutableStateOf<InstalledContent?>(null) }
     var browsing by remember(instance.id) { mutableStateOf(false) }
 
@@ -237,6 +212,43 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
 
     // filename -> manifest entry, for classifying scanned rows on a tracked mirror pack.
     val manifestMods = remember(manifest) { manifest?.mods?.associateBy { it.filename }.orEmpty() }
+
+    val picked = remember(items, selectedKeys) {
+        items.orEmpty().filter { it.selectionKey() in selectedKeys }
+    }
+    // Anything may be picked; what stops an action is the pack owning some of
+    // what was picked. Naming the count is the difference between a dead button
+    // and one that explains itself.
+    val locked = remember(picked, isLocal, manifestMods) {
+        picked.count { c ->
+            val entry = if (c.kind == ContentKind.Mod) manifestMods[c.fileName] else null
+            !(isLocal || c.kind != ContentKind.Mod) && (entry == null || entry.required)
+        }
+    }
+    val blocked = if (locked > 0) s.selectionBlockedByPack(locked) else null
+    DisposableEffect(picked) {
+        val published = if (picked.isEmpty()) null else Selection(
+            items = picked.map { SelectionItem(it.selectionKey(), it.displayName) },
+            actions = listOf(
+                SelectionAction(SelectionActionKind.Enable, blockedReason = blocked) {
+                    scope.launch {
+                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, true) }
+                        selectedKeys = emptySet(); scanTick++
+                    }
+                },
+                SelectionAction(SelectionActionKind.Disable, blockedReason = blocked) {
+                    scope.launch {
+                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, false) }
+                        selectedKeys = emptySet(); scanTick++
+                    }
+                },
+                SelectionAction(SelectionActionKind.Delete, blockedReason = blocked) { pendingBulkDelete = picked },
+            ),
+            clear = { selectedKeys = emptySet() },
+        )
+        selections.set(published)
+        onDispose { selections.clearIf(published) }
+    }
 
     // Flip an optional mod through the persisted optional-content path: apply the
     // toggle (dependency-aware), reflect it immediately, then persist + relabel on
@@ -350,11 +362,14 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                             val freeEdit = isLocal || c.kind != ContentKind.Mod
                             ContentRow(
                                 content          = c,
-                                selected         = if (freeEdit) c.selectionKey() in selectedKeys else null,
-                                onSelect         = { on ->
-                                    selectedKeys = if (on) selectedKeys + c.selectionKey()
-                                                   else selectedKeys - c.selectionKey()
+                                selected         = c.selectionKey() in selectedKeys,
+                                selecting        = selectedKeys.isNotEmpty(),
+                                onPress          = {
+                                    val key = c.selectionKey()
+                                    selectedKeys = if (key in selectedKeys) selectedKeys - key
+                                                   else selectedKeys + key
                                 },
+                                onLongPress      = { selectedKeys = selectedKeys + c.selectionKey() },
                                 iconState        = iconCache["${c.kind}:${c.fileName}"],
                                 effectiveEnabled = when {
                                     manifestEntry != null && !manifestEntry.required -> optionalState[c.fileName] ?: c.enabled
@@ -516,10 +531,14 @@ private fun ContentRow(
     iconState: ContentIconState?,
     effectiveEnabled: Boolean,
     showToggle: Boolean,
-    // Null on a row the pack owns: selecting what cannot be acted on would offer
-    // a bulk control that does nothing to half of what it counts.
-    selected: Boolean?,
-    onSelect: (Boolean) -> Unit,
+    // Every row selects. A control that appears on some rows and not others
+    // ragged the left edge of the whole list and told the user the difference
+    // before they had asked a question it answers; what a row can have DONE to it
+    // is a property of the action, not of whether it may be pointed at.
+    selected: Boolean,
+    selecting: Boolean,
+    onPress: () -> Unit,
+    onLongPress: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onDelete: (() -> Unit)?,
     onDetails: () -> Unit,
@@ -532,15 +551,37 @@ private fun ContentRow(
         modifier              = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
-            .background(glassSurfaceAlpha(0.4f))
+            .background(
+                if (selected) NxTheme.colors.primary.copy(alpha = 0.14f)
+                else glassSurfaceAlpha(0.4f),
+            )
+            .pointerInput(selecting) {
+                detectTapGestures(
+                    // A press picks while a selection is running, so the second
+                    // and third items cost one tap each rather than a hold apiece.
+                    onTap = { if (selecting) onPress() },
+                    onLongPress = { onLongPress() },
+                )
+            }
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (selected != null) {
-            NxCheckbox(checked = selected, onCheckedChange = onSelect)
+        // The tick rides the icon rather than taking a column of its own, which
+        // is what keeps every row the same shape whether or not anything is
+        // selected. Messaging apps settled on this for the same reason.
+        Box {
+            ContentIcon(iconState, content.fileName, content.displayName, dim)
+            if (selected) {
+                Box(
+                    Modifier.matchParentSize().clip(MaterialTheme.shapes.small)
+                        .background(NxTheme.colors.primary.copy(alpha = 0.72f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.onPrimary, size = 16.dp)
+                }
+            }
         }
-        ContentIcon(iconState, content.fileName, content.displayName, dim)
         Column(Modifier.weight(1f)) {
             Text(
                 text       = content.displayName,

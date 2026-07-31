@@ -802,6 +802,7 @@ interface AppStrings {
     val selectionDelete: String
     fun selectionCount(count: Int): String
     val selectionClear: String
+    fun selectionBlockedByPack(count: Int): String
     val contentActionDetails: String
     val contentActionOpenPage: String
     val contentDetailAuthors: String

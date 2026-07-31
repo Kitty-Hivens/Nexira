@@ -759,6 +759,7 @@ object GermanStrings : AppStrings {
     override val selectionDelete                = "Löschen"
     override fun selectionCount(count: Int)     = "$count ausgewählt"
     override val selectionClear                 = "Aufheben"
+    override fun selectionBlockedByPack(count: Int) = "$count davon gehören zum Pack. Instanz lösen, um sie zu verwalten."
     override val contentActionDetails           = "Details"
     override val contentActionOpenPage          = "Seite öffnen"
     override val contentDetailAuthors           = "Autoren"
