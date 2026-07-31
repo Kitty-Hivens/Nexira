@@ -796,6 +796,12 @@ interface AppStrings {
     val contentFilterShaderPacks: String
     val contentDeleteTitle: String
     val contentDeleteBody: String
+    fun contentBulkDeleteBody(count: Int): String
+    val selectionEnable: String
+    val selectionDisable: String
+    val selectionDelete: String
+    fun selectionCount(count: Int): String
+    val selectionClear: String
     val contentActionDetails: String
     val contentActionOpenPage: String
     val contentDetailAuthors: String
