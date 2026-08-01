@@ -59,6 +59,11 @@ class PackagingPlugin : Plugin<Project> {
         val resolvedJavaHome = System.getProperty("java.home")
             ?: error("System property java.home is not set; cannot locate jlink.")
 
+        // Derived, never configured separately: the CDS dump must run under the
+        // same module-system flags the launchers pass, and deriving them from the
+        // one jvmArgs list removes the drift that a second list would invite.
+        val cdsDump = ext.jvmArgs.map { ModuleSystemArgs.filter(it) }
+
         project.tasks.register<CustomRuntimeTask>("customRuntime") {
             group = "packaging"
             description = "Builds a custom JDK runtime image via jlink for distribution."
@@ -71,6 +76,7 @@ class PackagingPlugin : Plugin<Project> {
             vmKind.convention(ext.jlink.vmKind)
             includeLocales.convention(ext.jlink.includeLocales)
             generateCdsArchive.convention(ext.jlink.generateCdsArchive)
+            cdsDumpArgs.convention(cdsDump)
 
             javaHome.convention(resolvedJavaHome)
             outputDir.convention(
@@ -93,6 +99,7 @@ class PackagingPlugin : Plugin<Project> {
             vmKind.convention(ext.jlink.vmKind)
             includeLocales.convention(ext.jlink.includeLocales)
             generateCdsArchive.convention(ext.jlink.generateCdsArchive)
+            cdsDumpArgs.convention(cdsDump)
 
             outputFile.convention(
                 project.layout.buildDirectory.file("generated/packaging/packaging-profile.sh")

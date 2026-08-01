@@ -33,12 +33,21 @@ import org.gradle.api.tasks.TaskAction
  *     --vm=server
  *     --include-locales=en,ru,de
  * )
+ * NEXIRA_GENERATE_CDS=1
+ * NEXIRA_JVM_MODULE_OPTIONS=(
+ *     --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED
+ *     --enable-native-access=ALL-UNNAMED
+ * )
  * ```
  *
  * Bash array form (rather than space-joined string) is deliberate: it
  * preserves flag-equals-value tokens like `--compress=zip-9` as a single
  * argv element even if jlink ever gains a flag whose value contains
  * whitespace. The shell script unpacks with `"${NEXIRA_JLINK_OPTIONS[@]}"`.
+ *
+ * `NEXIRA_JVM_MODULE_OPTIONS` is consumed twice by the script -- once to dump
+ * the base CDS archive, once to write the AppRun launch line -- which is the
+ * point: [ModuleSystemArgs] explains why those two have to be the same set.
  *
  * Inputs are the same `Property` values that [CustomRuntimeTask] reads
  * from [PackagingExtension]. UP-TO-DATE works for free; the script only
@@ -73,9 +82,13 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
     @get:Optional
     abstract val includeLocales: Property<String>
 
-    /** `--generate-cds-archive`; see [hivens.packaging.JlinkOptionsExtension]. */
+    /** Base CDS archive; see [hivens.packaging.JlinkOptionsExtension]. */
     @get:Input
     abstract val generateCdsArchive: Property<Boolean>
+
+    /** Module-system flags for the CDS dump and the AppRun launch line; see [ModuleSystemArgs]. */
+    @get:Input
+    abstract val cdsDumpArgs: ListProperty<String>
 
     // ── Output ────────────────────────────────────────────────────────────
 
@@ -93,7 +106,6 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
             compress.orNull?.let { add("--compress=$it") }
             vmKind.orNull?.let { add("--vm=$it") }
             includeLocales.orNull?.let { add("--include-locales=$it") }
-            if (generateCdsArchive.get()) add("--generate-cds-archive")
         }
         val moduleList = modules.get().joinToString(",")
         val file = outputFile.get().asFile
@@ -108,6 +120,12 @@ abstract class EmitAppImageProfileTask : DefaultTask() {
             append("NEXIRA_JLINK_MODULES=\"").append(moduleList).append("\"\n")
             append("NEXIRA_JLINK_OPTIONS=(\n")
             for (flag in flags) {
+                append("    ").append(flag).append("\n")
+            }
+            append(")\n")
+            append("NEXIRA_GENERATE_CDS=").append(if (generateCdsArchive.get()) "1" else "0").append("\n")
+            append("NEXIRA_JVM_MODULE_OPTIONS=(\n")
+            for (flag in cdsDumpArgs.get()) {
                 append("    ").append(flag).append("\n")
             }
             append(")\n")

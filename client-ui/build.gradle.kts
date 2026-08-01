@@ -474,6 +474,11 @@ packaging {
     // NEXIRA_WAYLAND_TRIAL flow is gone (Liberica swap commit e573318);
     // -Dawt.appClassName is JBR-only honour, dropped in the same
     // commit; jna.nosys was a dorkbox/JBR rudiment, also dropped.
+    //
+    // The module-system entries below (--add-opens / --enable-native-access)
+    // are read a second time by the packaging plugin: the base CDS archive is
+    // dumped under exactly them, and the AppImage AppRun is written from them.
+    // Adding one here is enough -- nothing downstream needs a matching edit.
     jvmArgs.set(buildList {
         addAll(listOf(
             "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
@@ -496,9 +501,10 @@ packaging {
         // Windows: the class-data archive lives next to the app. The Inno installer
         // is per-user (PrivilegesRequired=lowest, {localappdata}\Nexira\Programs), so
         // $APPDIR -- expanded by the jpackage launcher at run time -- is writable.
-        // The JVM writes the archive on the first clean exit and refreshes it once a
-        // jar update makes it stale, so nothing ships in the installer and CI gains
-        // no training step. The Linux equivalent lives in scripts/build-appimage.sh.
+        // The JVM writes the archive on the first clean exit, so nothing ships in the
+        // installer and CI gains no training step. It does not, however, rewrite an
+        // archive that a new jar made stale -- setup.iss deletes the old one on
+        // install for that. The Linux equivalent lives in scripts/build-appimage.sh.
         //
         // macOS is deliberately excluded: a bundle in /Applications is not
         // user-writable, so it needs a launcher that can point the archive at the
