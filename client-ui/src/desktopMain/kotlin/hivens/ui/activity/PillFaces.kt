@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
@@ -85,7 +86,7 @@ internal fun StackOverflow(count: Int) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            "+$count",
+            LocalStrings.current.activityPillMore(count),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = NxTheme.colors.textSecondary,

@@ -26,6 +26,8 @@ import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.SkinManager
 import hivens.ui.navigation.NavRequests
 import hivens.core.activity.ActivityRegistry
+import hivens.launcher.PackInstallService
+import hivens.core.update.PackUpdateStatusHub
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
@@ -284,9 +286,9 @@ val uiModule = module {
     single(createdAtStart = true) {
         ActivityDriver(
             registry   = get(),
-            installs   = get(),
-            updates    = get(),
-            sync       = get(),
+            installs   = get<PackInstallService>().installs,
+            updates    = get<PackUpdateStatusHub>().statuses,
+            sync       = get<AutoSyncService>().snapshot,
             repository = get(),
             appScope   = get(),
         ).also { it.start() }

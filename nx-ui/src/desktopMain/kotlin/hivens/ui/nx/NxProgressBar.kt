@@ -54,7 +54,11 @@ fun NxProgressBar(
     val corner = style.badgeStyle.corner
     val still = style.animationMultiplier == 0f
 
-    val target = progress?.coerceIn(0f, 1f)
+    // NaN passes coerceIn -- both of its comparisons are false against NaN -- and
+    // then becomes the animation's current value, so every later valid value
+    // interpolates from it and the bar stays empty for good, silently. A job whose
+    // size is not known is what null already means, so NaN joins it.
+    val target = progress?.takeIf { !it.isNaN() }?.coerceIn(0f, 1f)
 
     // Eased so a coarse feed (a file finishing, a block landing) does not step
     // the bar. Motion-off collapses the tween to 1ms, so the value still lands.
