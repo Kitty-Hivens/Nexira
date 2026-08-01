@@ -1026,6 +1026,11 @@ object EnglishStrings : AppStrings {
     override val notifReasonOfflineNoClient             = "Pack files missing on disk"
     override val notifReasonOfflineNoManifest           = "No cached manifest; go online once to sync"
     override val notifReasonTwoFactorExpired            = "Sign in again to refresh credentials"
+    override val notifSessionStaleTitle                 = "Session was not refreshed"
+    override val notifSessionStaleRejected              = "The auth server refused the sign-in. The game starts on the old session, but joining the server will most likely fail: sign in again."
+    override val notifSessionStaleUnreachable           = "The auth server could not be reached. The game starts on the old session; if the server turns you away, try again later."
+    override val notifSessionStaleUnknown               = "The session could not be refreshed. The game starts on the old session."
+    override val notifSessionStaleNoPassword            = "No saved password, so the session is never refreshed. Once it expires the server stops letting you in: sign in again."
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Sign in to SmartyCraft to play this pack"
         else                                          -> "Sign in with '$providerKey' to play this pack"

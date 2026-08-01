@@ -2,7 +2,9 @@ package hivens.launcher.launch
 
 import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
+import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
+import hivens.core.data.AuthStatus
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -17,6 +19,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.core.io.InstanceMutationLock
+import hivens.core.launch.AuthRefreshFailure
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -386,9 +389,11 @@ class LauncherController(
                 }
             } catch (e: Exception) {
                 // Non-2FA auth failure: log and continue with the existing
-                // (possibly stale) session -- graceful degradation, the game
-                // itself will reject if the token has truly expired.
-                emit(LaunchLogEvent.AuthFailed(e.message))
+                // (possibly stale) session -- graceful degradation, since the
+                // token in hand is often still good. The classified cause is
+                // what lets the UI warn now instead of leaving the rejection
+                // to surface inside the game as "Failed to verify username".
+                emit(LaunchLogEvent.AuthFailed(e.message, classifyAuthFailure(e)))
             }
         }
 
@@ -763,11 +768,32 @@ class LauncherController(
             }
         } catch (e: Exception) {
             // Non-2FA login failure: log + keep the existing session. Same
-            // graceful-degradation as the SC server path -- a real expired token
-            // surfaces as a more specific reject from the game itself.
-            emit(LaunchLogEvent.AuthFailed(e.message))
+            // graceful-degradation as the SC server path, and the same reason
+            // for classifying: without it the only account of a rejected
+            // refresh is the game's own join failure, which names neither the
+            // launcher nor the session.
+            emit(LaunchLogEvent.AuthFailed(e.message, classifyAuthFailure(e)))
             currentSession
         }
+    }
+
+    /**
+     * Maps a failed pre-spawn refresh onto the distinction the UI acts on.
+     *
+     * A network-shaped failure never reached the auth server, so the token in
+     * hand is as good (or as stale) as it was before the attempt. Anything the
+     * server answered with -- bad credentials, dead session, locked account --
+     * is a verdict on those credentials, and the game's join will get the same
+     * one. INTERNAL_ERROR is deliberately NOT a rejection: the auth layer uses
+     * it as its catch-all for failures it could not attribute, and calling
+     * those "the server refused you" would send the user to re-enter a password
+     * that was never the problem.
+     */
+    private fun classifyAuthFailure(e: Exception): AuthRefreshFailure = when {
+        e !is AuthException -> AuthRefreshFailure.Unknown
+        e.isNetworkError || e.isSslError -> AuthRefreshFailure.Unreachable
+        e.status == AuthStatus.INTERNAL_ERROR -> AuthRefreshFailure.Unknown
+        else -> AuthRefreshFailure.Rejected
     }
 
     /**

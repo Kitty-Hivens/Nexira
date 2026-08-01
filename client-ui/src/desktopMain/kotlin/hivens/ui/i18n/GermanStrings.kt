@@ -1027,6 +1027,11 @@ object GermanStrings : AppStrings {
     override val notifReasonOfflineNoClient             = "Pack-Dateien fehlen auf der Platte"
     override val notifReasonOfflineNoManifest           = "Kein Manifest im Cache; einmal online gehen, um zu synchronisieren"
     override val notifReasonTwoFactorExpired            = "Bitte erneut anmelden, um die Anmeldedaten zu aktualisieren"
+    override val notifSessionStaleTitle                 = "Sitzung wurde nicht erneuert"
+    override val notifSessionStaleRejected              = "Der Anmeldeserver hat die Anmeldung abgelehnt. Das Spiel startet mit der alten Sitzung, der Serverbeitritt wird aber sehr wahrscheinlich fehlschlagen: bitte erneut anmelden."
+    override val notifSessionStaleUnreachable           = "Der Anmeldeserver war nicht erreichbar. Das Spiel startet mit der alten Sitzung; wenn der Server dich abweist, versuche es spaeter erneut."
+    override val notifSessionStaleUnknown               = "Die Sitzung konnte nicht erneuert werden. Das Spiel startet mit der alten Sitzung."
+    override val notifSessionStaleNoPassword            = "Kein gespeichertes Passwort, daher wird die Sitzung nie erneuert. Nach Ablauf laesst der Server dich nicht mehr ein: bitte erneut anmelden."
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Bei SmartyCraft anmelden, um dieses Pack zu spielen"
         else                                          -> "Anmeldung bei '$providerKey' nötig, um dieses Pack zu spielen"
