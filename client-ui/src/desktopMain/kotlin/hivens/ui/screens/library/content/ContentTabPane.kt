@@ -212,6 +212,52 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     // filename -> manifest entry, for classifying scanned rows on a tracked mirror pack.
     val manifestMods = remember(manifest) { manifest?.mods?.associateBy { it.filename }.orEmpty() }
 
+    // Flip an optional mod through the persisted optional-content path: apply the
+    // toggle (dependency-aware), reflect it immediately, then persist + relabel on
+    // the launcher scope (outlives this composable, so navigating away mid-flip
+    // still reaches disk). No rescan: [optionalState] already drives the UI.
+    fun toggleOptional(fileName: String, enable: Boolean) {
+        val m = manifest ?: return
+        val next = OptionalContentRules.applyToggle(m.mods, optionalState, fileName, enable)
+        optionalState = next
+        controller.setOptionalModsAsync(instance, m, OptionalContentRules.togglesFrom(m.mods, next))
+    }
+
+    /** True for a row whose enabled state lives in the pack's optional content rather than on disk. */
+    fun isOptionalMod(c: InstalledContent): Boolean =
+        c.kind == ContentKind.Mod && manifestMods[c.fileName]?.required == false
+
+    /**
+     * The same routing a single row does, over a whole selection.
+     *
+     * An optional mod on a tracked pack is enabled by the pack's optional-content
+     * state; a user-owned file is enabled by its name on disk. A bulk action that
+     * knew only the second wrote to disk for both, and since the list renders from
+     * the optional state, the pack's mods appeared not to react at all -- the
+     * write went somewhere nothing was reading, and the next sync would have
+     * undone it.
+     *
+     * The optional half is folded into one state and persisted once: applying the
+     * toggles one at a time from a captured state would keep only the last.
+     */
+    fun setEnabledForSelection(targets: List<InstalledContent>, enable: Boolean) {
+        val (optional, onDisk) = targets.partition(::isOptionalMod)
+        val m = manifest
+        if (m != null && optional.isNotEmpty()) {
+            var next = optionalState
+            optional.forEach { next = OptionalContentRules.applyToggle(m.mods, next, it.fileName, enable) }
+            optionalState = next
+            controller.setOptionalModsAsync(instance, m, OptionalContentRules.togglesFrom(m.mods, next))
+        }
+        if (onDisk.isNotEmpty()) {
+            scope.launch {
+                onDisk.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, enable) }
+                scanTick++
+            }
+        }
+        selectedKeys = emptySet()
+    }
+
     val picked = remember(items, selectedKeys) {
         items.orEmpty().filter { it.selectionKey() in selectedKeys }
     }
@@ -232,16 +278,10 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
             },
             actions = listOf(
                 SelectionAction(SelectionActionKind.Enable, blockedReason = blocked) {
-                    scope.launch {
-                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, true) }
-                        selectedKeys = emptySet(); scanTick++
-                    }
+                    setEnabledForSelection(picked, true)
                 },
                 SelectionAction(SelectionActionKind.Disable, blockedReason = blocked) {
-                    scope.launch {
-                        picked.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, false) }
-                        selectedKeys = emptySet(); scanTick++
-                    }
+                    setEnabledForSelection(picked, false)
                 },
                 SelectionAction(SelectionActionKind.Delete, blockedReason = blocked) { pendingBulkDelete = picked },
             ),
@@ -251,16 +291,6 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
         onDispose { selections.clearIf(published) }
     }
 
-    // Flip an optional mod through the persisted optional-content path: apply the
-    // toggle (dependency-aware), reflect it immediately, then persist + relabel on
-    // the launcher scope (outlives this composable, so navigating away mid-flip
-    // still reaches disk). No rescan: [optionalState] already drives the UI.
-    fun toggleOptional(fileName: String, enable: Boolean) {
-        val m = manifest ?: return
-        val next = OptionalContentRules.applyToggle(m.mods, optionalState, fileName, enable)
-        optionalState = next
-        controller.setOptionalModsAsync(instance, m, OptionalContentRules.togglesFrom(m.mods, next))
-    }
 
     val current = items
     val visible = remember(current, query, filter) {
