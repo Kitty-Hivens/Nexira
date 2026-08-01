@@ -104,6 +104,13 @@ class LaunchDriver(
                         }
                     }
             } catch (e: CancellationException) {
+                // Cancellation is the ORDINARY way an observer ends -- starting a
+                // second launch cancels every prior one a few lines below. Letting
+                // it rethrow past the cleanup left this target's activity entry as
+                // Running for the rest of the session: an in-flight entry is never
+                // evicted by age, and the surface only offers Dismiss once a phase
+                // is terminal, so nothing could ever remove it.
+                activities.dismiss(launchKey(target))
                 throw e
             } catch (e: Exception) {
                 log.warn("LaunchDriver observation aborted for ${target.id}", e)

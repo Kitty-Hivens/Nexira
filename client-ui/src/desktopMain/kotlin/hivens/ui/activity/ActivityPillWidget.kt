@@ -17,15 +17,12 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -53,13 +50,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.SubcomposeAsyncImage
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityAction
 import hivens.core.activity.ActivityPhase
@@ -69,9 +63,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
-import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.FrostTier
@@ -79,7 +71,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.decorativeColor
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -143,8 +134,6 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     val activities by registry.activities.collectAsState()
     val style = LocalStyle.current
     val s = LocalStrings.current
-    // Resolved here: the enter/exit spec lambdas are not composable.
-    val ballPx = with(LocalDensity.current) { props.heightDp.dp.roundToPx() }
 
     // One line, so one subject. A failure outranks live work -- it is the only
     // record the user gets -- and otherwise the newest job narrates.
@@ -266,6 +255,10 @@ internal fun Pill(
             .clip(shape),
         shape = shape,
         tier = props.frostTier,
+        // It floats over the page, so it casts. Missing here while the selection
+        // body set it meant the same object gained a shadow the moment a selection
+        // took over and lost it again afterwards.
+        elevated = true,
         // Opaque body: the object floats over arbitrary content, so the
         // legibility floor cannot depend on what happens to be behind it.
         opaque = true,

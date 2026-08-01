@@ -40,7 +40,13 @@ fun NxFit(
 
         val width = placeables.maxOfOrNull { it.width } ?: 0
         val height = placeables.maxOfOrNull { it.height } ?: 0
-        layout(width.coerceAtMost(constraints.maxWidth), height) {
+        // Answered within the incoming constraints, not merely under the ceiling.
+        // Reporting a content size under a fillMaxWidth or a fixed height breaks
+        // the contract the parent measured against.
+        layout(
+            width.coerceIn(constraints.minWidth, constraints.maxWidth),
+            height.coerceIn(constraints.minHeight, constraints.maxHeight),
+        ) {
             placeables.forEach { it.place(0, 0) }
         }
     }

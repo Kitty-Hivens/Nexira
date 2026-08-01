@@ -108,7 +108,12 @@ fun NxSurface(
         // first did not: it only shifts the tone the ladder already chose.
         if (bodyAlpha < 1f) addAll(coat.filterNot { it is Backdrop })
         else addAll(coat.filterNot { it is Backdrop || it is Fill })
-        if (elevated && none { it is DropShadow }) add(DropShadow())
+        // Authoritative in both directions. A preset carries its own DropShadow, so
+        // testing only for absence meant Frosted and Heavy were always lifted and
+        // the flag could add a shadow but never remove one -- half of the split it
+        // exists to make.
+        removeAll { it is DropShadow }
+        if (elevated) add(DropShadow())
         if (hairline) add(EdgeBorder(explicitColor = bevelHairline(bodyColor)))
         if (interactionSource != null) add(StateOverlay())
     }

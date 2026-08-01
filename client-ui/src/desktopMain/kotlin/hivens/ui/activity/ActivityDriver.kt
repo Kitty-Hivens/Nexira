@@ -10,8 +10,8 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.AutoSyncService
 import hivens.launcher.InstallPhase
 import hivens.launcher.InstallSnapshot
-import hivens.launcher.PackInstallService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -28,16 +28,47 @@ import kotlinx.coroutines.launch
  */
 class ActivityDriver(
     private val registry: ActivityRegistry,
-    private val installs: PackInstallService,
-    private val updates: PackUpdateStatusHub,
-    private val sync: AutoSyncService,
+    // Flows rather than the services that own them. The driver reads exactly one
+    // property from each, and depending on the whole service made it impossible
+    // to exercise without standing up the installer graph and the sync service --
+    // which is why the first test for this file tested the registry instead.
+    private val installs: StateFlow<Map<String, InstallSnapshot>>,
+    private val updates: StateFlow<Map<String, PackUpdateStatus>>,
+    private val sync: StateFlow<AutoSyncService.Snapshot>,
     private val repository: IPackRepository,
     private val appScope: CoroutineScope,
 ) {
+    /**
+     * The phase last handed to the registry per key, so an unchanged one is not
+     * handed over again.
+     *
+     * Every source here keeps its settled entries: the install service holds a
+     * terminal snapshot until something dismisses it, the update hub never drops
+     * a key, and the sync snapshot keeps its last per-server state. Each of them
+     * re-emits the WHOLE map on any change to any member, so without this gate a
+     * failure the user dismissed came straight back on the next tick of an
+     * unrelated job -- and a settled entry had its eviction timer restarted ten
+     * times a second, which meant it never left at all.
+     */
+    private val reported = HashMap<String, ActivityPhase>()
+
     fun start() {
-        appScope.launch { installs.installs.collect { it.values.forEach(::onInstall) } }
-        appScope.launch { updates.statuses.collect(::onUpdates) }
-        appScope.launch { sync.snapshot.collect(::onSync) }
+        appScope.launch { installs.collect { it.values.forEach(::onInstall) } }
+        appScope.launch { updates.collect(::onUpdates) }
+        appScope.launch { sync.collect(::onSync) }
+    }
+
+    /** Report only what changed. Returns false when the registry already has this. */
+    private fun changed(key: String, phase: ActivityPhase): Boolean {
+        if (reported[key] == phase) return false
+        reported[key] = phase
+        return true
+    }
+
+    /** Forget a key so the next genuine report is treated as new. */
+    private fun forget(key: String) {
+        reported.remove(key)
+        registry.dismiss(key)
     }
 
     private fun onInstall(snapshot: InstallSnapshot) {
@@ -47,8 +78,10 @@ class ActivityDriver(
             is InstallPhase.Failed    -> ActivityPhase.Failed(p.message)
             InstallPhase.Cancelled    -> ActivityPhase.Cancelled
         }
+        val key = "install:${snapshot.key}"
+        if (!changed(key, phase)) return
         registry.report(
-            key     = "install:${snapshot.key}",
+            key     = key,
             kind    = ActivityKind.Install,
             title   = snapshot.title,
             iconUrl = snapshot.iconUrl,
@@ -77,13 +110,15 @@ class ActivityDriver(
                 PackUpdateStatus.Checking,
                 PackUpdateStatus.UpToDate,
                 is PackUpdateStatus.Pending -> {
-                    registry.dismiss("update:$instanceId")
+                    forget("update:$instanceId")
                     continue
                 }
             }
+            val key = "update:$instanceId"
+            if (!changed(key, phase)) continue
             val name = repository.get(instanceId)?.displayName ?: instanceId
             registry.report(
-                key   = "update:$instanceId",
+                key   = key,
                 kind  = ActivityKind.Update,
                 title = name,
                 phase = phase,
@@ -110,12 +145,21 @@ class ActivityDriver(
                 AutoSyncService.ServerState.SYNCED -> ActivityPhase.Succeeded
                 AutoSyncService.ServerState.FAILED -> ActivityPhase.Failed()
                 // Queued and skipped are not work in flight and have no outcome
-                // worth a line of chrome.
+                // worth a line of chrome. Dropping the entry rather than skipping
+                // the report is the point: a server that goes SYNCING -> SKIPPED
+                // (two-factor with no cached manifest, a missing helper) would
+                // otherwise leave its in-flight entry on a surface that never
+                // evicts one by age.
                 AutoSyncService.ServerState.QUEUED,
-                AutoSyncService.ServerState.SKIPPED -> continue
+                AutoSyncService.ServerState.SKIPPED -> {
+                    forget("sync:$serverId")
+                    continue
+                }
             }
+            val key = "sync:$serverId"
+            if (!changed(key, phase)) continue
             registry.report(
-                key   = "sync:$serverId",
+                key   = key,
                 kind  = ActivityKind.Sync,
                 title = serverId,
                 phase = phase,
