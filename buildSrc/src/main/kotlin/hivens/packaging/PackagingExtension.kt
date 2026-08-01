@@ -129,18 +129,23 @@ abstract class JlinkOptionsExtension {
     abstract val includeLocales: Property<String>
 
     /**
-     * `--generate-cds-archive`. Writes the base CDS archive (`lib/server/classes.jsa`)
-     * into the runtime image. Without it the image has no base archive, and the JVM
-     * refuses app-class sharing outright -- `-XX:ArchiveClassesAtExit` and
-     * `-XX:+AutoCreateSharedArchive` both fail with "unsupported when base CDS archive
-     * is not loaded", so there is no way to cut class-loading off the cold start.
+     * Writes the base CDS archive (`lib/server/classes.jsa`) into the runtime image.
+     * Without it the image has no base archive, and the JVM refuses app-class sharing
+     * outright -- `-XX:ArchiveClassesAtExit` and `-XX:+AutoCreateSharedArchive` both
+     * fail with "unsupported when base CDS archive is not loaded", so there is no way
+     * to cut class-loading off the cold start.
+     *
+     * The dump runs as `<image>/bin/java -Xshare:dump` under the module-system flags
+     * taken from [PackagingExtension.jvmArgs], rather than through jlink's
+     * `--generate-cds-archive`; see [ModuleSystemArgs] for why the flag set at dump
+     * time has to equal the one the launcher uses.
      *
      * Costs image size (tens of MB uncompressed, though it compresses well under the
      * outer squashfs/LZMA). Enabled by default: the runtime ships once per install,
      * while the startup cost is paid on every launch.
      *
-     * Note: jlink runs the target JVM to dump the archive, so it cannot be generated
-     * when cross-building for another architecture.
+     * Note: the dump runs the target JVM, so it cannot be produced when cross-building
+     * for another architecture.
      */
     abstract val generateCdsArchive: Property<Boolean>
 }

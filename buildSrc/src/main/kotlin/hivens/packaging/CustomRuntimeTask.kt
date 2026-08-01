@@ -64,11 +64,20 @@ abstract class CustomRuntimeTask : DefaultTask() {
     @get:Optional
     abstract val includeLocales: Property<String>
 
-    /** `--generate-cds-archive`. Without the base archive in the image, app-class
+    /** Base CDS archive (`lib/server/classes.jsa`). Without it in the image, app-class
      *  sharing (`-XX:ArchiveClassesAtExit`, `-XX:+AutoCreateSharedArchive`) is
      *  rejected by the JVM, so class loading cannot be cut off the cold start. */
     @get:Input
     abstract val generateCdsArchive: Property<Boolean>
+
+    /**
+     * Module-system flags the archive is dumped under -- the [ModuleSystemArgs]
+     * subset of the launcher's jvmArgs. The dump has to see the same set the
+     * launcher passes, or the JVM discards the archived module graph and logs a
+     * `Mismatched values for property jdk.module.*` error per flag on every run.
+     */
+    @get:Input
+    abstract val cdsDumpArgs: ListProperty<String>
 
     /**
      * Absolute path of the JDK whose jlink + jmods we invoke. Treated as
@@ -116,20 +125,30 @@ abstract class CustomRuntimeTask : DefaultTask() {
             compress.orNull?.let { add("--compress=$it") }
             vmKind.orNull?.let { add("--vm=$it") }
             includeLocales.orNull?.let { add("--include-locales=$it") }
-            if (generateCdsArchive.get()) add("--generate-cds-archive")
             add("--output"); add(out.absolutePath)
         }
 
         execOperations.exec { commandLine(args) }
 
-        // jlink emits two archives: classes.jsa (compressed oops) and
-        // classes_nocoops.jsa for the uncompressed-oops mode. The launcher's heap
-        // is always far below the 32 GB coops threshold, so the nocoops variant is
-        // never mapped -- dead weight worth ~14 MB on disk and ~3 MB in the
-        // compressed distributable. Dropping it is safe: a run that somehow
-        // disabled compressed oops would simply fall back to no class sharing.
+        // Base archive via the image's own `java -Xshare:dump`, not jlink's
+        // --generate-cds-archive: jlink dumps with a bare flag set, and an archive
+        // whose recorded jdk.module.* properties differ from the launcher's is
+        // rejected for module-graph purposes at every launch. Passing cdsDumpArgs
+        // here is what keeps the two ends equal.
+        //
+        // Bonus over the jlink plugin: -Xshare:dump writes only the compressed-oops
+        // archive. jlink also emitted classes_nocoops.jsa for the >32 GB heap mode
+        // the launcher never reaches -- ~14 MB of image that had to be deleted again.
         if (generateCdsArchive.get()) {
-            fileSystem.delete { delete(out.resolve("lib/server/classes_nocoops.jsa")) }
+            execOperations.exec {
+                commandLine(
+                    buildList {
+                        add(out.resolve("bin/java").absolutePath)
+                        add("-Xshare:dump")
+                        addAll(cdsDumpArgs.get())
+                    }
+                )
+            }
         }
     }
 }
