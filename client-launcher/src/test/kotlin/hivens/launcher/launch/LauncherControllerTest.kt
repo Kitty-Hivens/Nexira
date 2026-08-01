@@ -2,6 +2,7 @@ package hivens.launcher.launch
 
 import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
+import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IJavaManager
@@ -10,11 +11,13 @@ import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
+import hivens.core.launch.AuthRefreshFailure
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -237,6 +240,78 @@ class LauncherControllerTest {
         }
 
         collectorJob.cancel()
+    }
+
+    @Test
+    fun `a refresh that never reached the server is classified Unreachable`() = runTest {
+        val failure = authFailureFor(
+            AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: connection reset", isNetworkError = true),
+        )
+        assertEquals(AuthRefreshFailure.Unreachable, failure?.cause, "network-shaped failure judged no credentials")
+    }
+
+    @Test
+    fun `a server-side rejection is classified Rejected`() = runTest {
+        val failure = authFailureFor(AuthException(AuthStatus.PASSWORD, "Invalid password"))
+        assertEquals(AuthRefreshFailure.Rejected, failure?.cause, "the server answered and refused")
+    }
+
+    @Test
+    fun `an unattributed auth failure stays Unknown`() = runTest {
+        // INTERNAL_ERROR is the auth layer's catch-all. Reading it as a rejection
+        // would tell the user to re-enter a password that was never judged.
+        val failure = authFailureFor(AuthException(AuthStatus.INTERNAL_ERROR, "boom"))
+        assertEquals(AuthRefreshFailure.Unknown, failure?.cause, "unattributed failure must not read as a rejection")
+    }
+
+    /**
+     * Runs a launch whose pre-spawn refresh throws [thrown] and returns the
+     * resulting [LaunchLogEvent.AuthFailed]. The launch continues past the
+     * failed refresh -- that is the behaviour under test -- so the spawn path
+     * is stubbed through to a clean exit.
+     */
+    private suspend fun TestScope.authFailureFor(thrown: Exception): LaunchLogEvent.AuthFailed? {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { authService.login(any(), any(), any()) } throws thrown
+        coJustRun {
+            downloadService.processSession(
+                session = any(),
+                serverId = any(),
+                targetDir = any(),
+                extraCheckSum = any(),
+                ignoredFiles = any(),
+                messageUI = any(),
+                progressUI = any(),
+                verifyUI = any(),
+                injectModJar = any(),
+                strictModCheck = any(),
+                helperKeepGlobs = any(),
+            )
+        }
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        every { handle.terminate() } just runs
+        coEvery {
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+
+        val controller = newController(this)
+        val collected = mutableListOf<LaunchLogEvent>()
+        val collectorJob = launch { controller.events.toList(collected) }
+
+        controller.launch(
+            currentSession = SessionData(
+                playerName = "tester",
+                accessToken = "stale-token",
+                cachedPassword = "pw",
+                fileManifest = FileManifest(),
+            ),
+            server = server,
+        )
+        advanceUntilIdle()
+        collectorJob.cancel()
+
+        return collected.filterIsInstance<LaunchLogEvent.AuthFailed>().firstOrNull()
     }
 
     @Test

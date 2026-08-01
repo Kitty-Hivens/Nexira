@@ -1086,6 +1086,13 @@ interface AppStrings {
     val notifReasonTwoFactorExpired: String
     fun notifReasonMissingAuthProvider(providerKey: String): String
 
+    // --- Stale-session warning (pre-spawn refresh failed, launch continues) ---
+    val notifSessionStaleTitle: String
+    val notifSessionStaleRejected: String
+    val notifSessionStaleUnreachable: String
+    val notifSessionStaleUnknown: String
+    val notifSessionStaleNoPassword: String
+
     // --- Notification relative-time formatter (header label) ---
     val notifTimeNow: String
     fun notifTimeSeconds(seconds: Long): String

@@ -1041,6 +1041,11 @@ object RussianStrings : AppStrings {
     override val notifReasonOfflineNoClient             = "Файлы сборки отсутствуют на диске"
     override val notifReasonOfflineNoManifest           = "Нет кэша манифеста; выйди в сеть один раз для синхронизации"
     override val notifReasonTwoFactorExpired            = "Войди ещё раз, чтобы обновить учётные данные"
+    override val notifSessionStaleTitle                 = "Сессия не обновилась"
+    override val notifSessionStaleRejected              = "Сервер авторизации отклонил вход. Игра запустится со старой сессией, но зайти на сервер, скорее всего, не выйдет: войди в аккаунт заново."
+    override val notifSessionStaleUnreachable           = "Связаться с сервером авторизации не вышло. Игра запустится со старой сессией; если сервер не пустит, попробуй позже."
+    override val notifSessionStaleUnknown               = "Обновить сессию не удалось. Игра запустится со старой сессией."
+    override val notifSessionStaleNoPassword            = "Пароль не сохранён, поэтому сессия не обновляется. Когда она истечёт, сервер перестанет пускать: войди в аккаунт заново."
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Войдите в SmartyCraft, чтобы играть на этой сборке"
         else                                          -> "Нужен вход в '$providerKey', чтобы играть"
