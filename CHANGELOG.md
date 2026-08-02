@@ -26,6 +26,16 @@ lives in this English file.
 
 ## [Unreleased]
 
+## [2.4.0-beta2] - 2026-08-02
+
+2.4.0-beta2 closes the gap between what a pack says it is and what actually launches. An instance is held to the list of files the pack consists of before every spawn, not only when it syncs, so a jar added by hand between two syncs no longer rides along. A launch also carries only a session it earned: offline, an unverified instance, and a refresh that could not go through all start the game with the token stripped. Alongside that, a failed pre-spawn refresh finally says so instead of surfacing as Minecraft's own "Failed to verify username", and the packaged runtime stops reporting a class-data archive mismatch at error level on every launch.
+
+### Highlights
+- **A pack launches as the pack.** Files added to an installed pack's `mods/` are removed before the game starts, and the launcher names what it removed. Only what the pack itself declares loads.
+- **Your token stays out of launches that did not earn it.** An offline launch, an instance the launcher could not vouch for, and a launch that could not reach the login server all start the game without a session token.
+- **The launcher tells you when your session is stale.** Instead of the game refusing your server join with "Failed to verify username", the launcher says up front that it could not refresh the session and what to do about it.
+- **A quieter, lighter start.** The packaged runtime no longer prints class-data archive errors at every launch, and a stale archive after an update no longer silently disables class sharing.
+
 ### Changed
 - A pack is held to its own contents on every launch, not just when it syncs. `SmrtSyncService` already deleted everything `mods/` held that the manifest does not name, but only during install, update and repair -- and the gap between two of those is where a jar gets dropped in by hand, a cheat client among them. Sync now writes the names the pack consists of into the instance (`.nexira-mods`), and `enforceRoster` holds the directory to that list right before spawn: anything else goes, including a jar hidden a level down, since the loader scans those too. It answers off disk, so an offline launch is held to the same rule. An instance with no roster (installed before the file existed) is left untouched and reported unverified rather than emptied -- "no roster" and "a pack with no mods" are indistinguishable, and guessing wrong costs someone their install.
 - A launch only carries a session token it earned for that launch. Three cases now strip it and mark the session offline: an offline launch (which used to hand a live `accessToken` to the game process for a session that has no server to join), an instance whose contents nothing vouched for, and a pre-spawn refresh that did not go through -- which also covers a flaky connection, since a launch that could not reach the auth server IS an offline launch, and saying so up front beats a client that looks online until the server refuses the join. Removed files are named in the console and in a notification, so a mod that disappeared reads as a decision rather than as the launcher eating an install.
