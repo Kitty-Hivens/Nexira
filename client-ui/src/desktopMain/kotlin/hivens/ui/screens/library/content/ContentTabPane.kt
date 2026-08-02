@@ -69,6 +69,13 @@ import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.platform.PlatformPaths
 import hivens.core.smrt.ModIconResolver
+import androidx.compose.runtime.DisposableEffect
+import hivens.ui.activity.Selection
+import hivens.ui.activity.dragSelect
+import hivens.ui.activity.SelectionAction
+import hivens.ui.activity.SelectionActionKind
+import hivens.ui.activity.SelectionItem
+import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxKebabButton
@@ -127,6 +134,14 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     var query by remember(instance.id) { mutableStateOf("") }
     var filter by remember(instance.id) { mutableStateOf(ContentFilter.All) }
     var pendingDelete by remember(instance.id) { mutableStateOf<InstalledContent?>(null) }
+    var pendingBulkDelete by remember(instance.id) { mutableStateOf<List<InstalledContent>>(emptyList()) }
+    var selectedKeys by remember(instance.id) { mutableStateOf(emptySet<String>()) }
+    val selections: SelectionRegistry = koinInject()
+
+    // The selection lives on the activity surface, so this view publishes it and
+    // takes it back down on the way out. Leaving the tab with rows still ticked
+    // would otherwise leave a bar offering to delete things the user can no
+    // longer see.
     var detailsOf by remember(instance.id) { mutableStateOf<InstalledContent?>(null) }
     var browsing by remember(instance.id) { mutableStateOf(false) }
 
@@ -207,6 +222,75 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
         optionalState = next
         controller.setOptionalModsAsync(instance, m, OptionalContentRules.togglesFrom(m.mods, next))
     }
+
+    /** True for a row whose enabled state lives in the pack's optional content rather than on disk. */
+    fun isOptionalMod(c: InstalledContent): Boolean =
+        c.kind == ContentKind.Mod && manifestMods[c.fileName]?.required == false
+
+    /**
+     * The same routing a single row does, over a whole selection.
+     *
+     * An optional mod on a tracked pack is enabled by the pack's optional-content
+     * state; a user-owned file is enabled by its name on disk. A bulk action that
+     * knew only the second wrote to disk for both, and since the list renders from
+     * the optional state, the pack's mods appeared not to react at all -- the
+     * write went somewhere nothing was reading, and the next sync would have
+     * undone it.
+     *
+     * The optional half is folded into one state and persisted once: applying the
+     * toggles one at a time from a captured state would keep only the last.
+     */
+    fun setEnabledForSelection(targets: List<InstalledContent>, enable: Boolean) {
+        val (optional, onDisk) = targets.partition(::isOptionalMod)
+        val m = manifest
+        if (m != null && optional.isNotEmpty()) {
+            var next = optionalState
+            optional.forEach { next = OptionalContentRules.applyToggle(m.mods, next, it.fileName, enable) }
+            optionalState = next
+            controller.setOptionalModsAsync(instance, m, OptionalContentRules.togglesFrom(m.mods, next))
+        }
+        if (onDisk.isNotEmpty()) {
+            scope.launch {
+                onDisk.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, enable) }
+                scanTick++
+            }
+        }
+        selectedKeys = emptySet()
+    }
+
+    val picked = remember(items, selectedKeys) {
+        items.orEmpty().filter { it.selectionKey() in selectedKeys }
+    }
+    // Anything may be picked; what stops an action is the pack owning some of
+    // what was picked. Naming the count is the difference between a dead button
+    // and one that explains itself.
+    val locked = remember(picked, isLocal, manifestMods) {
+        picked.count { c ->
+            val entry = if (c.kind == ContentKind.Mod) manifestMods[c.fileName] else null
+            !(isLocal || c.kind != ContentKind.Mod) && (entry == null || entry.required)
+        }
+    }
+    val blocked = if (locked > 0) s.selectionBlockedByPack(locked) else null
+    DisposableEffect(picked) {
+        val published = if (picked.isEmpty()) null else Selection(
+            items = picked.map {
+                SelectionItem(it.selectionKey(), it.displayName, iconCache[it.selectionKey()]?.model())
+            },
+            actions = listOf(
+                SelectionAction(SelectionActionKind.Enable, blockedReason = blocked) {
+                    setEnabledForSelection(picked, true)
+                },
+                SelectionAction(SelectionActionKind.Disable, blockedReason = blocked) {
+                    setEnabledForSelection(picked, false)
+                },
+                SelectionAction(SelectionActionKind.Delete, blockedReason = blocked) { pendingBulkDelete = picked },
+            ),
+            clear = { selectedKeys = emptySet() },
+        )
+        selections.set(published)
+        onDispose { selections.clearIf(published) }
+    }
+
 
     val current = items
     val visible = remember(current, query, filter) {
@@ -296,7 +380,15 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                 Box(Modifier.fillMaxSize().hoverable(hover)) {
                     LazyColumn(
                         state               = listState,
-                        modifier            = Modifier.fillMaxSize(),
+                        modifier            = Modifier.fillMaxSize().dragSelect(
+                            listState   = listState,
+                            keyAt       = { index -> visible.getOrNull(index)?.selectionKey() },
+                            isSelected  = { it in selectedKeys },
+                            setSelected = { key, on ->
+                                selectedKeys = if (on) selectedKeys + key else selectedKeys - key
+                            },
+                            selecting   = selectedKeys.isNotEmpty(),
+                        ),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         items(items = visible, key = { "${it.kind}:${it.fileName}" }) { c ->
@@ -309,6 +401,7 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                             val freeEdit = isLocal || c.kind != ContentKind.Mod
                             ContentRow(
                                 content          = c,
+                                selected         = c.selectionKey() in selectedKeys,
                                 iconState        = iconCache["${c.kind}:${c.fileName}"],
                                 effectiveEnabled = when {
                                     manifestEntry != null && !manifestEntry.required -> optionalState[c.fileName] ?: c.enabled
@@ -343,6 +436,22 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+
+    if (pendingBulkDelete.isNotEmpty()) {
+        val targets = pendingBulkDelete
+        DestructiveConfirmDialog(
+            title        = s.contentDeleteTitle,
+            body         = s.contentBulkDeleteBody(targets.size),
+            confirmLabel = s.editorDelete,
+            onConfirm    = {
+                scope.launch {
+                    targets.forEach { manager.delete(instanceDir, it.kind, it.fileName) }
+                    selectedKeys = emptySet(); pendingBulkDelete = emptyList(); scanTick++
+                }
+            },
+            onDismiss    = { pendingBulkDelete = emptyList() },
+        )
     }
 
     pendingDelete?.let { target ->
@@ -454,6 +563,14 @@ private fun ContentRow(
     iconState: ContentIconState?,
     effectiveEnabled: Boolean,
     showToggle: Boolean,
+    // Every row selects. A control that appears on some rows and not others
+    // ragged the left edge of the whole list and told the user the difference
+    // before they had asked a question it answers; what a row can have DONE to it
+    // is a property of the action, not of whether it may be pointed at.
+    //
+    // The gesture itself belongs to the list: a drag is followed across children,
+    // and a row only ever hears about itself.
+    selected: Boolean,
     onToggle: (Boolean) -> Unit,
     onDelete: (() -> Unit)?,
     onDetails: () -> Unit,
@@ -466,12 +583,29 @@ private fun ContentRow(
         modifier              = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
-            .background(glassSurfaceAlpha(0.4f))
+            .background(
+                if (selected) NxTheme.colors.primary.copy(alpha = 0.14f)
+                else glassSurfaceAlpha(0.4f),
+            )
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ContentIcon(iconState, content.fileName, content.displayName, dim)
+        // The tick rides the icon rather than taking a column of its own, which
+        // is what keeps every row the same shape whether or not anything is
+        // selected. Messaging apps settled on this for the same reason.
+        Box {
+            ContentIcon(iconState, content.fileName, content.displayName, dim)
+            if (selected) {
+                Box(
+                    Modifier.matchParentSize().clip(MaterialTheme.shapes.small)
+                        .background(NxTheme.colors.primary.copy(alpha = 0.72f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.onPrimary, size = 16.dp)
+                }
+            }
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 text       = content.displayName,
@@ -753,4 +887,14 @@ private fun humanSize(bytes: Long): String = when {
     bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
     bytes >= 1024      -> "${bytes / 1024} KB"
     else               -> "$bytes B"
+}
+
+/** Stable across a rescan: kind plus filename is what the row is keyed on too. */
+private fun InstalledContent.selectionKey(): String = "$kind:$fileName"
+
+/** What the image loader should be handed for this icon, if anything. */
+private fun ContentIconState.model(): Any? = when (this) {
+    is ContentIconState.Bytes -> data
+    is ContentIconState.Url -> url
+    ContentIconState.None -> null
 }

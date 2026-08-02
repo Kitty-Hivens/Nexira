@@ -112,6 +112,21 @@ data class EdgeBorder(
 /** Outer drop shadow / glow -- drawn outside the clip; gated on softGlowEnabled. */
 data class EdgeGlow(val role: FrostRole = FrostRole.Primary, val elevationDp: Float = 12f) : SurfaceLayer
 
+/**
+ * A cast shadow: neutral, outside the clip, under the whole plane.
+ *
+ * Distinct from [EdgeGlow], which is an accent-coloured bloom for emphasis, and
+ * from [EdgeShadow], which is not a shadow at all -- that one darkens a band
+ * inside the body, so it reads as the colour dropping rather than as light being
+ * blocked, and on a heavily rounded plane its straight band cuts across the
+ * corner arcs.
+ *
+ * [elevationDp] null takes the active style's panel elevation, which is how the
+ * form axis gets to decide: Brut sets it to zero and the plane sits flat, with
+ * no separate switch to keep in sync.
+ */
+data class DropShadow(val elevationDp: Float? = null) : SurfaceLayer
+
 /** Subtle texture so large glass areas do not band. */
 data class Texture(val grainAlpha: Float = 0.04f) : SurfaceLayer
 
@@ -142,13 +157,31 @@ fun frostColor(role: FrostRole): Color = NxTheme.colors.frost(role)
 @kotlinx.serialization.Serializable
 enum class FrostTier { Clear, Flat, Frosted, Heavy }
 
+/**
+ * The presets carry a body, an optional blur, and a cast shadow. What they no
+ * longer carry is the inner bevel ([EdgeHighlight] / [EdgeShadow]) or the accent
+ * [Wash].
+ *
+ * The bevel painted a white band along the top and a black band along the bottom
+ * of every panel. Neither is light: they are the fill getting lighter and darker
+ * in two places, in pure white and pure black rather than anything from the
+ * palette, so a plane lost saturation for depth it never actually gained. Both
+ * bands drew as straight rectangles too, which is invisible at a card's corner
+ * radius and obvious at a pill's.
+ *
+ * The wash tinted every heavy plane with the primary at ten percent, so surfaces
+ * picked up an accent nobody asked them for and every nested one multiplied it.
+ *
+ * All three types still exist. A caller who wants them assembles its own layer
+ * list; they are simply not what a plane is by default.
+ */
 fun FrostTier.toLayers(): List<SurfaceLayer> = when (this) {
     // Clear is the transparent tier: a lone glass coat, no body. NxSurface renders it
     // bodiless (see NxSurface); a raw FrostSurface just draws the fill, same as Flat.
     FrostTier.Clear   -> listOf(Fill(alpha = 0.35f))
     FrostTier.Flat    -> listOf(Fill(alpha = 0.35f)) // matches the rail's glassSurfaceAlpha(0.35) for a seamless chrome
-    FrostTier.Frosted -> listOf(Backdrop(), Fill(alpha = 0.55f), Edge())
-    FrostTier.Heavy   -> listOf(Backdrop(blurRadiusDp = 28f), Fill(alpha = 0.45f), Wash(), Edge(border = true), Texture())
+    FrostTier.Frosted -> listOf(Backdrop(), Fill(alpha = 0.55f), DropShadow())
+    FrostTier.Heavy   -> listOf(Backdrop(blurRadiusDp = 28f), Fill(alpha = 0.45f), DropShadow(), Texture())
 }
 
 /** A [Body]'s alpha is the slider-independent floor (Rule 2): the plane must read
@@ -179,12 +212,21 @@ fun FrostSurface(
 
     val atoms = remember(layers) { layers.flatMap { if (it is Edge) it.toAtoms() else listOf(it) } }
     val glow = remember(atoms, softGlow) { if (softGlow) atoms.filterIsInstance<EdgeGlow>().firstOrNull() else null }
+    val panelElevation = LocalStyle.current.panelElevation
+    val cast = remember(atoms) { atoms.filterIsInstance<DropShadow>().firstOrNull() }
     // A Fill with nothing opaque or blurred beneath it is a bare glass coat; over a
     // wallpaper on a light palette that lands in mud (Rule 4). "Unbacked" marks that
     // case so such a Fill draws opaque on light -- see the Fill branch below.
     val unbacked = remember(atoms) { atoms.none { it is Backdrop || it is Body } }
 
     var outer = modifier
+    if (cast != null) {
+        // Ungated and neutral: this is the plane being above the page, not an
+        // emphasis effect. Zero elevation draws nothing, which is what a flat
+        // style asks for.
+        val elevation = cast.elevationDp?.dp ?: panelElevation
+        if (elevation > 0.dp) outer = outer.shadow(elevation, shape, clip = false)
+    }
     if (glow != null) {
         val glowColor = colors.frost(glow.role)
         // clip = false so the unclipped hairline overlay below is not re-clipped by
@@ -251,8 +293,9 @@ fun FrostSurface(
                     // clip's rounded-corner AA ate the thin stroke at the corners.
                     is EdgeBorder -> Unit
 
-                    is Edge -> Unit     // already expanded to atoms before this loop
-                    is EdgeGlow -> Unit // handled as the outer drop shadow above
+                    is Edge -> Unit       // already expanded to atoms before this loop
+                    is EdgeGlow -> Unit   // handled as the outer bloom above
+                    is DropShadow -> Unit // cast outside the clip, above
 
                     is Texture -> Box(Modifier.matchParentSize().drawBehind {
                         // Stand-in depth break: a faint diagonal wash. True film grain

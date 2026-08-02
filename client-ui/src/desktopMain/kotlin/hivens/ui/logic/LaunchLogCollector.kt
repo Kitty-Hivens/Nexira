@@ -61,6 +61,10 @@ fun LaunchLogCollector(
                     "${s.stateAuthFail}: ${event.message ?: ""}",
                     LogType.WARN,
                 )
+                is LaunchLogEvent.ForeignContentRemoved -> gameConsole.append(
+                    s.stateForeignContentRemoved(event.paths.size, event.paths.joinToString(", ")),
+                    LogType.WARN,
+                )
                 is LaunchLogEvent.OfflineSkipSync -> gameConsole.append(s.stateOfflineSkipSync, LogType.INFO)
                 is LaunchLogEvent.Launching -> gameConsole.append(s.stateLaunching, LogType.INFO)
                 is LaunchLogEvent.ProcessOutput -> {

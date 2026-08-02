@@ -130,6 +130,50 @@ class SmrtSyncServiceTest {
     }
 
     @Test
+    fun `enforceRoster drops what the pack does not name and keeps what it does`() = runTest {
+        val dir = tempDir("enforce")
+        val service = syncService()
+        service.sync("test", dir)
+
+        // A hand-placed jar, and one hidden a level down -- the loader scans both.
+        Files.write(dir.resolve("mods/wurst.jar"), "CHEAT".toByteArray())
+        Files.createDirectories(dir.resolve("mods/extra"))
+        Files.write(dir.resolve("mods/extra/hidden.jar"), "CHEAT".toByteArray())
+
+        val verdict = service.enforceRoster(dir)
+
+        assertTrue(verdict.verified, "the sync above wrote a roster, so the check could be made")
+        assertFalse(Files.exists(dir.resolve("mods/wurst.jar")), "foreign jar removed")
+        assertFalse(Files.exists(dir.resolve("mods/extra/hidden.jar")), "foreign jar in a subdirectory removed")
+        assertTrue(Files.exists(dir.resolve("mods/req.jar")), "pack mod kept")
+        assertTrue(
+            Files.exists(dir.resolve("mods/opt.jar.disabled")),
+            "an optional the user turned off is part of the pack and stays",
+        )
+        assertEquals(
+            setOf("wurst.jar", "extra/hidden.jar", "extra"),
+            verdict.removed.toSet(),
+            "the report names what went, so the user is not left guessing",
+        )
+    }
+
+    @Test
+    fun `enforceRoster leaves an instance with no roster alone and reports it unverified`() = runTest {
+        val dir = tempDir("no-roster")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/whatever.jar"), "BYTES".toByteArray())
+
+        val verdict = syncService().enforceRoster(dir)
+
+        assertFalse(verdict.verified, "nothing to check against")
+        assertTrue(
+            Files.exists(dir.resolve("mods/whatever.jar")),
+            "an absent roster must not be read as an empty pack -- that would wipe a working instance",
+        )
+        assertTrue(verdict.removed.isEmpty())
+    }
+
+    @Test
     fun `optional default-off lands as disabled, required stays active`() = runTest {
         val dir = tempDir("sync")
         syncService().sync("test", dir)

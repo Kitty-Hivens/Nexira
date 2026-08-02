@@ -245,6 +245,8 @@ object EnglishStrings : AppStrings {
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Offline mode — authentication skipped"
     override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
+    override fun stateForeignContentRemoved(count: Int, names: String) =
+        "Removed $count file(s) the pack does not include: $names"
     override val stateOfflineNoClient      = "Client files not found. Download them online first."
     override val stateOfflineNoManifest    = "No cached manifest for this server. Log in online at least once before launching offline."
 
@@ -755,6 +757,13 @@ object EnglishStrings : AppStrings {
     override val contentFilterShaderPacks       = "Shaders"
     override val contentDeleteTitle             = "Delete file?"
     override val contentDeleteBody              = "The file is removed from disk for good."
+    override fun contentBulkDeleteBody(count: Int) = "$count files are removed from disk for good."
+    override val selectionEnable                = "Enable"
+    override val selectionDisable               = "Disable"
+    override val selectionDelete                = "Delete"
+    override fun selectionCount(count: Int)     = "$count selected"
+    override val selectionClear                 = "Clear"
+    override fun selectionBlockedByPack(count: Int) = "$count of these belong to the pack. Detach the instance to manage them."
     override val contentActionDetails           = "Details"
     override val contentActionOpenPage          = "Open page"
     override val contentDetailAuthors           = "Authors"
@@ -996,6 +1005,17 @@ object EnglishStrings : AppStrings {
     override val notifActionOpenVersions                = "Open versions"
     override fun notifInstallFailed(packName: String)   = "$packName failed to install"
     override fun notifInstallCancelled(packName: String) = "$packName install cancelled"
+    override val editorSurfOverlay                      = "Floating layer"
+    override val editorSurfShortOverlay                 = "Floating"
+
+    override val activityPillExpand                     = "Show all"
+    override fun activityPillMore(count: Int)           = "+$count"
+
+    override val activityPillDismiss                    = "Dismiss"
+    override val activityPillCancel                     = "Cancel"
+    override val activityPillPause                      = "Pause"
+    override fun activityPillMeasure(done: Long, total: Long) = "$done of $total"
+
     override val notifActionCancel                      = "Cancel"
     override val notifActionShowConsole                 = "Show console"
     override val notifActionStop                        = "Stop"
@@ -1008,6 +1028,12 @@ object EnglishStrings : AppStrings {
     override val notifReasonOfflineNoClient             = "Pack files missing on disk"
     override val notifReasonOfflineNoManifest           = "No cached manifest; go online once to sync"
     override val notifReasonTwoFactorExpired            = "Sign in again to refresh credentials"
+    override val notifSessionStaleTitle                 = "Session was not refreshed"
+    override val notifSessionStaleRejected              = "The auth server refused the sign-in. The game starts on the old session, but joining the server will most likely fail: sign in again."
+    override val notifSessionStaleUnreachable           = "The auth server could not be reached. The game starts on the old session; if the server turns you away, try again later."
+    override val notifSessionStaleUnknown               = "The session could not be refreshed. The game starts on the old session."
+    override val notifSessionStaleNoPassword            = "No saved password, so the session is never refreshed. Once it expires the server stops letting you in: sign in again."
+    override fun notifForeignContentRemovedTitle(count: Int) = "Removed $count file(s) not in the pack"
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Sign in to SmartyCraft to play this pack"
         else                                          -> "Sign in with '$providerKey' to play this pack"
@@ -1152,6 +1178,11 @@ object EnglishStrings : AppStrings {
         "widget.notes.scratch.placeholder" to "Write something...",
         "widget.notes.scratch.title" to "Title",
         "widget.notifications.history" to "Message history",
+        "widget.activity.pill" to "Activity",
+        "widget.activity.pill.progress" to "Measure",
+        "widget.activity.pill.anchor" to "Anchor",
+        "widget.activity.pill.heightDp" to "Height",
+        "widget.activity.pill.showActions" to "Show controls",
         "widget.notifications.history.expandUp" to "Expand upward",
         "widget.notifications.history.clock12h" to "12-hour clock (am/pm)",
         "widget.notifications.history.verticalTime" to "Stacked time",

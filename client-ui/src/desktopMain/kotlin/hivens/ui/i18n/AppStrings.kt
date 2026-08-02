@@ -253,6 +253,8 @@ interface AppStrings {
     // --- Launcher States: Offline ---
     val stateOfflineSkipAuth: String
     val stateOfflineSkipSync: String
+    /** Files dropped from mods/ before spawn because the pack does not name them. */
+    fun stateForeignContentRemoved(count: Int, names: String): String
     val stateOfflineNoClient: String
     val stateOfflineNoManifest: String
 
@@ -796,6 +798,13 @@ interface AppStrings {
     val contentFilterShaderPacks: String
     val contentDeleteTitle: String
     val contentDeleteBody: String
+    fun contentBulkDeleteBody(count: Int): String
+    val selectionEnable: String
+    val selectionDisable: String
+    val selectionDelete: String
+    fun selectionCount(count: Int): String
+    val selectionClear: String
+    fun selectionBlockedByPack(count: Int): String
     val contentActionDetails: String
     val contentActionOpenPage: String
     val contentDetailAuthors: String
@@ -1052,6 +1061,18 @@ interface AppStrings {
     val notifActionOpenVersions: String
     fun notifInstallFailed(packName: String): String
     fun notifInstallCancelled(packName: String): String
+    // Activity pill -- the floating account of what the launcher is doing.
+    val editorSurfOverlay: String
+    val editorSurfShortOverlay: String
+
+    val activityPillExpand: String
+    fun activityPillMore(count: Int): String
+
+    val activityPillDismiss: String
+    val activityPillCancel: String
+    val activityPillPause: String
+    fun activityPillMeasure(done: Long, total: Long): String
+
     val notifActionCancel: String
 
     val notifActionShowConsole: String
@@ -1066,6 +1087,16 @@ interface AppStrings {
     val notifReasonOfflineNoManifest: String
     val notifReasonTwoFactorExpired: String
     fun notifReasonMissingAuthProvider(providerKey: String): String
+
+    // --- Stale-session warning (pre-spawn refresh failed, launch continues) ---
+    val notifSessionStaleTitle: String
+    val notifSessionStaleRejected: String
+    val notifSessionStaleUnreachable: String
+    val notifSessionStaleUnknown: String
+    val notifSessionStaleNoPassword: String
+
+    /** Title for the launch-time removal of files the pack does not include. */
+    fun notifForeignContentRemovedTitle(count: Int): String
 
     // --- Notification relative-time formatter (header label) ---
     val notifTimeNow: String

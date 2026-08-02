@@ -279,7 +279,10 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             if (installError != null) {
                 Text(installError, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error)
             }
-            if (installing != null) InstallProgressBlock(installing)
+            // No in-page progress block: the activity surface narrates the
+            // install, and it survives leaving this page while a block bound to
+            // the screen cannot. Two of them on one install was the state the
+            // surface was built to end.
         }
 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -298,32 +301,6 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
     }
     videoLink?.let { url ->
         FullscreenVideo(url = url, onDismiss = { videoLink = null })
-    }
-}
-
-@Composable
-private fun InstallProgressBlock(p: InstallProgress) {
-    val s = LocalStrings.current
-    Column(
-        modifier            = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(NxTheme.colors.surface).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text       = s.browseDetailInstallRunningTitle,
-            style      = MaterialTheme.typography.titleSmall,
-            color      = NxTheme.colors.textPrimary,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text  = if (p.total > 0) s.browseDetailInstallProgress(p.filename, p.current, p.total) else s.browseDetailInstallStarting,
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
-        )
-        if (p.total > 0) {
-            LinearProgressIndicator(progress = { p.current.toFloat() / p.total }, modifier = Modifier.fillMaxWidth(), color = NxTheme.colors.primary)
-        } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NxTheme.colors.primary)
-        }
     }
 }
 
