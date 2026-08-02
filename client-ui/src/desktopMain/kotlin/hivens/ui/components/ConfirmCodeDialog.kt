@@ -73,6 +73,9 @@ private const val CODE_LENGTH = 6
  *        cells so the user sees what went wrong without losing what they typed.
  * @param isSubmitting disables input and submit while a verify round-trip is in
  *        flight.
+ * @param puppetPrefix namespace for the control-surface ids. The same dialog answers
+ *        two different demands -- the login form's and a launch's -- and a driver that
+ *        cannot tell them apart answers the wrong one and calls the run green.
  */
 @Composable
 fun ConfirmCodeDialog(
@@ -80,6 +83,7 @@ fun ConfirmCodeDialog(
     onSubmit: (String) -> Unit,
     errorMessage: String? = null,
     isSubmitting: Boolean = false,
+    puppetPrefix: String = "login.twoFactor",
 ) {
     val s = LocalStrings.current
     var code by remember { mutableStateOf("") }
@@ -120,7 +124,7 @@ fun ConfirmCodeDialog(
                     color = NxTheme.colors.textSecondary,
                 )
 
-                PuppetField("login.twoFactor.code", code, enabled = !isSubmitting) { accept(it) }
+                PuppetField("$puppetPrefix.code", code, enabled = !isSubmitting) { accept(it) }
 
                 Box {
                     // The real input, invisible but focused: it owns the caret, the
@@ -175,14 +179,14 @@ fun ConfirmCodeDialog(
                         style   = NxButtonStyle.Tertiary,
                         enabled = !isSubmitting,
                     )
-                    PuppetClick("login.twoFactor.cancel", enabled = !isSubmitting) { onDismiss() }
+                    PuppetClick("$puppetPrefix.cancel", enabled = !isSubmitting) { onDismiss() }
                     Spacer(Modifier.width(8.dp))
                     NxButton(
                         label   = s.auth2faSubmit,
                         onClick = { onSubmit(code) },
                         enabled = complete && !isSubmitting,
                     )
-                    PuppetClick("login.twoFactor.submit", enabled = complete && !isSubmitting) {
+                    PuppetClick("$puppetPrefix.submit", enabled = complete && !isSubmitting) {
                         onSubmit(code)
                     }
                 }

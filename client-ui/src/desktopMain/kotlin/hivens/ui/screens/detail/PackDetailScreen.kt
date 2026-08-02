@@ -161,6 +161,17 @@ fun PackDetailScreen(
     val authedSession = (appState as? AppState.Authenticated)?.session
     val launchIndication by indications.launchIndication(pack.id).collectAsState()
 
+    // The hero's play/abort are the only way to drive a pack launch, so the control
+    // surface has to reach them -- a scenario that cannot start a launch cannot check
+    // what a launch does to the instance.
+    PuppetClick("packDetail.play", enabled = authedSession != null) {
+        authedSession?.let { session ->
+            launchDriver.observe(LaunchTarget.Pack(pack))
+            controller.launchPackInstance(session, pack)
+        }
+    }
+    PuppetClick("packDetail.abort") { controller.abort() }
+
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
