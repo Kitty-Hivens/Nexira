@@ -398,15 +398,7 @@ class RuntimeProvisioner(
      * wrong-platform library artifacts (rare for non-native 1.12.2 libs)
      * out of the shared root.
      */
-    internal fun isLibraryAllowed(rules: List<MojangRule>): Boolean {
-        if (rules.isEmpty()) return true
-        var allowed = false
-        for (rule in rules) {
-            val matches = rule.os?.name?.let { it == mojangOs } ?: true
-            if (matches) allowed = rule.action == "allow"
-        }
-        return allowed
-    }
+    internal fun isLibraryAllowed(rules: List<MojangRule>): Boolean = libraryRulesAllow(rules, mojangOs)
 
     internal fun clientJarRelPath(mcVersion: String): String =
         "net/minecraft/minecraft/$mcVersion/minecraft-$mcVersion.jar"

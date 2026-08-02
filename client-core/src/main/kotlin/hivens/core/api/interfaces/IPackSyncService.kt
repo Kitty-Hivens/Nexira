@@ -32,14 +32,22 @@ interface IPackSyncService {
 /**
  * Outcome of holding an instance to its pack.
  *
- * [verified] false means there was no roster to check against -- an instance from
- * before the file existed, or one whose roster could not be read. Nothing is deleted
- * in that case (an empty roster is indistinguishable from "the pack has no mods", and
- * acting on the guess would empty a working instance), but the launch is not entitled
- * to a session token either: an unverified instance is exactly the one that might be
- * carrying something it should not.
+ * [verified] false means the instance was NOT brought in line with the pack, for
+ * either of two reasons, and both deny the launch a session token.
+ *
+ * The first is that there was no roster to check against -- an instance from before
+ * the file existed, or one whose roster could not be read. Nothing is deleted in that
+ * case (an empty roster is indistinguishable from "the pack has no mods", and acting
+ * on the guess would empty a working instance).
+ *
+ * The second is [blocked]: files the roster does not name that could not be removed --
+ * read-only, denied by permissions, or held open. That is not a technicality. Making
+ * the file undeletable is precisely how one keeps something in `mods/` across a launch,
+ * so a failed delete has to read as "this instance is not what the pack says it is",
+ * never as "nothing to remove".
  */
 data class RosterVerdict(
     val verified: Boolean,
     val removed: List<String> = emptyList(),
+    val blocked: List<String> = emptyList(),
 )

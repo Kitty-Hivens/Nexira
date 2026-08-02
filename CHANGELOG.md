@@ -26,6 +26,11 @@ lives in this English file.
 
 ## [Unreleased]
 
+### Fixed
+- A file in `mods/` that cannot be deleted no longer passes for a clean instance. The pre-spawn sweep removed foreign entries inside `runCatching`, so a jar made read-only (or otherwise undeletable) stayed on disk while the sweep reported nothing removed and the instance was still judged verified -- which handed the launch a full session token. A refused delete is now the loudest signal there is: making a file undeletable is exactly how one keeps it across a launch, so `RosterVerdict` carries the blocked paths, the verdict is false whenever any remain, and the launch drops to no token. Directories left standing because they still hold a kept file are not counted as obstructions.
+- The sweep no longer eats the launcher's own bookkeeping. `.nexira-blocks`, the block maps that let a repair fetch damaged blocks instead of whole files, lives beside the mods and was being deleted as foreign content -- silently, since the next repair simply refetched everything. `BlockMapStore.DIR_NAME` is now public precisely so anything sweeping a content directory can recognise it.
+- A pack whose loader version json lists a library for another platform installs again. NeoForge's json carries `ca.weblite:java-objc-bridge` behind an `osx` rule; the installer rightly does not produce it on Windows or Linux, and harvesting it anyway failed the whole install with "installer did not produce library". Libraries are now filtered through their rules before harvest, using the same evaluation the classpath builder already applied -- extracted to `libraryRulesAllow` so both paths share one answer.
+
 ## [2.4.0-beta2] - 2026-08-02
 
 2.4.0-beta2 closes the gap between what a pack says it is and what actually launches. An instance is held to the list of files the pack consists of before every spawn, not only when it syncs, so a jar added by hand between two syncs no longer rides along. A launch also carries only a session it earned: offline, an unverified instance, and a refresh that could not go through all start the game with the token stripped. Alongside that, a failed pre-spawn refresh finally says so instead of surfacing as Minecraft's own "Failed to verify username", and the packaged runtime stops reporting a class-data archive mismatch at error level on every launch.

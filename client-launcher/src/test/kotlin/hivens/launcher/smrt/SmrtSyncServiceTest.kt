@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -155,6 +156,30 @@ class SmrtSyncServiceTest {
             verdict.removed.toSet(),
             "the report names what went, so the user is not left guessing",
         )
+    }
+
+    @Test
+    fun `a foreign jar that cannot be deleted leaves the instance unverified`() = runTest {
+        // The bypass this pins: mark the file read-only (or deny delete on it) and the
+        // sweep's failure used to be swallowed, so the jar stayed AND the launch was
+        // treated as verified -- which is what hands it a session token.
+        val dir = tempDir("blocked")
+        val service = syncService()
+        service.sync("test", dir)
+
+        val planted = dir.resolve("mods/cheat.jar")
+        Files.write(planted, "CHEAT".toByteArray())
+        val perms = Files.getPosixFilePermissions(dir.resolve("mods"))
+        Files.setPosixFilePermissions(dir.resolve("mods"), setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE))
+        try {
+            val verdict = service.enforceRoster(dir)
+
+            assertFalse(verdict.verified, "a jar that refused to go means the instance is not what the pack says")
+            assertEquals(listOf("cheat.jar"), verdict.blocked, "and it is named, not silently dropped from the report")
+            assertTrue(Files.exists(planted), "the file is still there -- that is the point")
+        } finally {
+            Files.setPosixFilePermissions(dir.resolve("mods"), perms)
+        }
     }
 
     @Test
