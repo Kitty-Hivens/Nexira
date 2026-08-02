@@ -376,6 +376,9 @@ class LauncherController(
                     emit(LaunchLogEvent.NoPassword)
                 }
             } catch (_: TwoFactorRequiredException) {
+                // The demand itself says the account is two-factor; the UI persists
+                // that so later launches stop logging in behind the user's back.
+                emit(LaunchLogEvent.TwoFactorDetected)
                 // 2FA account -- refusing to prompt the user for a code every
                 // time they click Play. The cached accessToken in `session` is
                 // from a previous successful 2FA flow and is what the game uses
@@ -800,6 +803,7 @@ class LauncherController(
             emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
             fresh
         } catch (_: TwoFactorRequiredException) {
+            emit(LaunchLogEvent.TwoFactorDetected)
             val cached = manifestCache.loadManifest(serverId)
             if (cached != null) {
                 ActionRing.record(

@@ -74,6 +74,13 @@ sealed class LaunchLogEvent {
      */
     data object TwoFactorSessionKept : LaunchLogEvent()
 
+    /**
+     * A launch ran into the second-factor gate, which means the account answers to
+     * one whatever the stored session says. The UI persists that, so later launches
+     * stop logging in -- every login invalidates the session the user unlocked.
+     */
+    data object TwoFactorDetected : LaunchLogEvent()
+
     data object OfflineSkipSync : LaunchLogEvent()
 
     data object Launching : LaunchLogEvent()
