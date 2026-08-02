@@ -9,6 +9,7 @@ import hivens.core.logging.Redactor
 import hivens.core.platform.OS
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.loader.ResolvedRuntime
+import hivens.launcher.security.JvmArgPolicy
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
@@ -116,6 +117,25 @@ internal class GameCommandBuilder(
     )
 
     /**
+     * Splits and, for a launch that will carry a token, filters the user's own
+     * JVM arguments through [JvmArgPolicy]. What is refused is logged rather
+     * than dropped in silence -- a flag that quietly stops applying reads as the
+     * launcher being broken.
+     */
+    private fun userJvmArgs(raw: String?, restrict: Boolean): List<String> {
+        if (raw.isNullOrBlank()) return emptyList()
+        if (!restrict) return raw.trim().split(Regex("\\s+"))
+        val result = JvmArgPolicy.filter(raw)
+        if (result.refused.isNotEmpty()) {
+            logger.warn(
+                "Refused {} JVM argument(s) on a server-bound launch: {}",
+                result.refused.size, result.refused,
+            )
+        }
+        return result.kept
+    }
+
+    /**
      * Collects a list of arguments for [ProcessBuilder].
      *
      * @return An ordered list of strings, ready to be passed to the OS process.
@@ -192,7 +212,7 @@ internal class GameCommandBuilder(
         }
 
         if (!target.jvmArgsOverride.isNullOrBlank()) {
-            args.addAll(target.jvmArgsOverride.trim().split(Regex("\\s+")))
+            args.addAll(userJvmArgs(target.jvmArgsOverride, restrict = true))
         } else {
             args.addAll(gcArgs)
         }
@@ -298,6 +318,10 @@ internal class GameCommandBuilder(
         session: SessionData,
         jvmArgsOverride: String?,
         redirectAuthHost: Boolean = true,
+        // Hold the user's own JVM arguments to what a launch carrying a session
+        // token may pass on. Same partition as the roster sweep and the
+        // environment seal: a pack with no server binding is its owner's game.
+        restrictJvmArgs: Boolean = true,
         agentJarPath: Path? = null,
         metricsOutPath: Path? = null,
         authlibAgentJarPath: Path? = null,
@@ -341,9 +365,7 @@ internal class GameCommandBuilder(
         args.add("-Djava.library.path=$nativesPath")
         args.add("-Dfml.ignoreInvalidMinecraftCertificates=true")
 
-        if (!jvmArgsOverride.isNullOrBlank()) {
-            args.addAll(jvmArgsOverride.trim().split(Regex("\\s+")))
-        }
+        args.addAll(userJvmArgs(jvmArgsOverride, restrictJvmArgs))
         if (usesModernArgs) {
             args.addAll(modernJvmArgs(runtime, gameDir, sharedAssetsDir, sharedLibrariesDir, nativesPath, versionLabel))
             // Java 9+ Vector API speeds up some mods (JEI, Ars Nouveau); only
