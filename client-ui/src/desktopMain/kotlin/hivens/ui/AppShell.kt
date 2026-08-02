@@ -405,6 +405,28 @@ fun FrameWindowScope.AppShellContent(
     // event-to-string mapping.
     hivens.ui.logic.LaunchLogCollector(events = controller.events, gameConsole = gameConsole)
 
+    // Persist "this account answers to a second factor" the first time a launch runs
+    // into the gate. The flag is what stops later launches from logging in again, and
+    // a login invalidates the session the user unlocked with a code -- so a session
+    // restored from disk (written before the flag existed) would otherwise keep the
+    // launcher re-authenticating and breaking itself.
+    val accountStore: hivens.auth.AccountStore = koinInject()
+    LaunchedEffect(controller) {
+        controller.events.collect { event ->
+            if (event !is hivens.core.launch.LaunchLogEvent.TwoFactorDetected) return@collect
+            val saved = accountStore.accountFor(hivens.core.data.PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+            if (saved == null || saved.twoFactor) return@collect
+            runCatching {
+                accountStore.saveAccount(
+                    saved.copy(twoFactor = true),
+                    hivens.core.data.PackAuthRequirement.SmartyCraft.PROVIDER_KEY,
+                )
+            }.onSuccess {
+                ActionRing.record("Marked ${saved.playerName} as a 2FA account: no silent re-login from here")
+            }
+        }
+    }
+
 
     // Bumped each time the .show signal fires; the Window content uses it
     // to invoke window.toFront() / requestFocus() so a duplicate-launch

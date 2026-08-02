@@ -167,6 +167,13 @@ class SmrtSyncService(
             val report = transfers.verifyAndRepair(suspect) { p ->
                 progress?.invoke(p.filesDone, p.filesTotal, p.current)
             }
+            // A verify is a full comparison against the manifest, so it is exactly the
+            // moment the instance can be vouched for -- write the roster here too.
+            // Without this, "verify and repair" checked every file and still left the
+            // instance unverified at launch, which is not a distinction anyone can be
+            // expected to guess.
+            writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+
             // Everything the local check cleared counts as intact: it was measured
             // against the same manifest, just without a round trip.
             report.copy(checked = total, intact = total - suspect.size + report.intact)
