@@ -94,15 +94,15 @@ interface ILauncherService {
         // Swap SC's patched authlib jar onto the classpath instead (opt-in
         // fallback to the agent). No effect on non-SC packs.
         useSmartycraftAuthLib: Boolean = false,
-        // Strip the loader hooks (LD_PRELOAD and friends) from the game's
-        // environment as well as the JVM's own alternative argument lists,
-        // which go on every launch. Carries the caller's server-binding
-        // answer: a bound launch is handed a session token, and an inherited
-        // LD_PRELOAD is a way to run code beside it that no command-line
-        // policy can see. Defaults to on for the same reason redirectAuthHost
-        // defaults to off -- a caller that forgets it errs toward the launch
-        // that carries less, not more.
-        sealEnvironment: Boolean = true,
+        // This launch will be handed a session token, so what runs beside the
+        // game is the launcher's business. Carries the caller's server-binding
+        // answer and decides three things at once, because they are one
+        // question: the environment loses its loader hooks, the user's own JVM
+        // arguments are held to tuning rather than ways to load code, and the
+        // natives are re-derived instead of trusted. Defaults to on for the
+        // same reason redirectAuthHost defaults to off -- a caller that forgets
+        // it errs toward the launch that carries less, not more.
+        boundLaunch: Boolean = true,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,
     ): SpawnResult

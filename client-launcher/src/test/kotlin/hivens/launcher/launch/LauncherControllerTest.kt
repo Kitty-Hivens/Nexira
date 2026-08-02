@@ -419,7 +419,7 @@ class LauncherControllerTest {
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
-                sealEnvironment        = any(), displayName        = any(),
+                boundLaunch        = any(), displayName        = any(),
                 onLog              = any(),
             )
         } returns SpawnResult.Started(handle)
@@ -550,7 +550,7 @@ class LauncherControllerTest {
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
-                sealEnvironment        = any(), displayName        = any(),
+                boundLaunch        = any(), displayName        = any(),
                 onLog              = any(),
             )
         } returns SpawnResult.Started(handle)
@@ -681,7 +681,7 @@ class LauncherControllerTest {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
                 clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
-                adaptiveEnabled = any(), redirectAuthHost = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
+                adaptiveEnabled = any(), redirectAuthHost = any(), boundLaunch = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -728,7 +728,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = capture(agentFlag),
-                useSmartycraftAuthLib = capture(swapFlag), sealEnvironment = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = capture(swapFlag), boundLaunch = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -762,7 +762,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -795,7 +795,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -904,7 +904,7 @@ class LauncherControllerTest {
                 sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }

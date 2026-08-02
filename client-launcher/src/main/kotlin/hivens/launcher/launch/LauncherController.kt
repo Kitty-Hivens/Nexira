@@ -665,7 +665,7 @@ class LauncherController(
                     // effective requirement -- the router answers Microsoft for
                     // every mirror pack, which would seal a solo pack too and
                     // cost its owner MangoHud for nothing.
-                    sealEnvironment      = serverBound,
+                    boundLaunch      = serverBound,
                     // Auth mechanism for an SC-bound join: the redirect agent
                     // (default on) and/or SC's patched authlib jar (default off,
                     // fallback). Both no-op on non-SC packs.
