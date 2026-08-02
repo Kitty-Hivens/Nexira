@@ -9,7 +9,6 @@ import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
-import hivens.core.net.BlockMapStore
 import hivens.core.net.Digest
 import hivens.core.net.RepairReport
 import hivens.core.net.DigestAlgorithm
@@ -259,9 +258,10 @@ class SmrtSyncService(
      * network -- including an offline launch, which is exactly when a hand-placed jar
      * would otherwise go unchallenged. [sync] and [applyUpdate] write it.
      *
-     * Same rule as [pruneForeignEntries]: only top-level `mods/<name>` entries the
-     * roster names survive, so a jar hidden in a subdirectory is removed as well --
-     * the loader scans those too.
+     * Only loadable archives are touched. A jar or zip outside the roster is the
+     * whole problem -- it is what a loader would execute -- while everything else
+     * under `mods/` is data: mod caches, Connector's remapped-jar store, our own
+     * block maps. Deleting those protects nothing and costs a rebuild at best.
      */
     override suspend fun enforceRoster(clientDir: Path): RosterVerdict = withContext(Dispatchers.IO) {
         val roster = readRoster(clientDir)
@@ -374,13 +374,17 @@ class SmrtSyncService(
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
-                // The launcher's own bookkeeping is not foreign content. Block maps
-                // live beside the mods they describe, and dropping them is silent --
-                // the next repair refetches whole files instead of damaged blocks.
-                if (modsDir.relativize(p).firstOrNull()?.toString() == BlockMapStore.DIR_NAME) return@forEach
-                val keep = Files.isRegularFile(p) &&
-                    p.parent == modsDir &&
-                    p.fileName.toString() in expected
+                // Dot-directories are tooling state, not content: Connector keeps its
+                // remapped jars in `.connector`, we keep block maps in
+                // `.nexira-blocks`. Emptying them makes the next launch rebuild
+                // everything and defends against nothing -- no loader reads them as
+                // mods. Directories are never removed, for the same reason.
+                if (modsDir.relativize(p).firstOrNull()?.toString()?.startsWith(".") == true) return@forEach
+                if (!Files.isRegularFile(p)) return@forEach
+                // Only what a loader would execute. A config, or a leftover .tmp
+                // beside the mods, is not a way to run code.
+                if (!ModArchives.isLoadable(p.fileName.toString())) return@forEach
+                val keep = p.parent == modsDir && p.fileName.toString() in expected
                 if (keep) return@forEach
                 // Joined over the path's own segments rather than toString(): the
                 // report is read by a person and matched against manifest paths, both

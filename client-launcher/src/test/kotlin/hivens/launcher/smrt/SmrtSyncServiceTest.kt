@@ -136,10 +136,17 @@ class SmrtSyncServiceTest {
         val service = syncService()
         service.sync("test", dir)
 
-        // A hand-placed jar, and one hidden a level down -- the loader scans both.
+        // A hand-placed jar, one a level down, and the kinds of file that are NOT
+        // a way to run code: tooling caches in dot-directories (Connector's remapped
+        // jars, our block maps) and a stray temp file.
         Files.write(dir.resolve("mods/wurst.jar"), "CHEAT".toByteArray())
         Files.createDirectories(dir.resolve("mods/extra"))
         Files.write(dir.resolve("mods/extra/hidden.jar"), "CHEAT".toByteArray())
+        Files.createDirectories(dir.resolve("mods/.connector/temp"))
+        Files.write(dir.resolve("mods/.connector/bobby_mapped.jar"), "CACHE".toByteArray())
+        Files.createDirectories(dir.resolve("mods/.nexira-blocks"))
+        Files.write(dir.resolve("mods/.nexira-blocks/req.jar.blocks"), "MAP".toByteArray())
+        Files.write(dir.resolve("mods/Uranus.jar.tmp"), "PARTIAL".toByteArray())
 
         val verdict = service.enforceRoster(dir)
 
@@ -151,10 +158,16 @@ class SmrtSyncServiceTest {
             Files.exists(dir.resolve("mods/opt.jar.disabled")),
             "an optional the user turned off is part of the pack and stays",
         )
+        assertTrue(
+            Files.exists(dir.resolve("mods/.connector/bobby_mapped.jar")),
+            "a loader's own cache is not foreign content -- wiping it costs a rebuild and protects nothing",
+        )
+        assertTrue(Files.exists(dir.resolve("mods/.nexira-blocks/req.jar.blocks")), "block maps survive")
+        assertTrue(Files.exists(dir.resolve("mods/Uranus.jar.tmp")), "a non-loadable leftover is not executable")
         assertEquals(
-            setOf("wurst.jar", "extra/hidden.jar", "extra"),
+            setOf("wurst.jar", "extra/hidden.jar"),
             verdict.removed.toSet(),
-            "the report names what went, so the user is not left guessing",
+            "only loadable archives outside the roster are touched",
         )
     }
 
