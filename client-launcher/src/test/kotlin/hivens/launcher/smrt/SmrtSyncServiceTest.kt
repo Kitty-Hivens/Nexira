@@ -228,6 +228,34 @@ class SmrtSyncServiceTest {
         assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the pack itself is untouched")
     }
 
+    /**
+     * The property the pre-spawn seal rests on. The check that decides a launch's
+     * session has to precede the sign-in it authorises, and the runtime is
+     * provisioned after that, so the two moments are far apart. Asking again has
+     * to notice what arrived in between -- and "verified" alone does not say so,
+     * since the second sweep removes the newcomer and then reports itself clean.
+     * Agreement is `removed` being empty, not `verified` being true.
+     */
+    @Test
+    fun `asking a second time reports what arrived in between`() = runTest {
+        val dir = tempDir("seal")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+        val service = syncService()
+
+        val gate = service.enforceRoster(dir, baseline)
+        assertTrue(gate.verified)
+        assertTrue(gate.removed.isEmpty(), "nothing to remove at the gate")
+
+        // The window: a jar dropped in while the runtime provisions.
+        Files.write(dir.resolve("mods/freecam.jar"), "CHEAT".toByteArray())
+
+        val seal = service.enforceRoster(dir, baseline)
+        assertEquals(listOf("freecam.jar"), seal.removed, "the second look names the newcomer")
+        assertTrue(seal.verified, "and having removed it, calls the instance clean -- which is why removed is what the seal reads")
+    }
+
     // --- the baseline answers what the roster file cannot -----------------------
 
     private fun sha1Hex(bytes: ByteArray): String =

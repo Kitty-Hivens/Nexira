@@ -144,6 +144,7 @@ internal class LauncherService(
         useNetworkAgent: Boolean,
         useSmartycraftAuthLib: Boolean,
         boundLaunch: Boolean,
+        seal: (suspend () -> Boolean)?,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): SpawnResult = try {
@@ -252,6 +253,13 @@ internal class LauncherService(
             fullScreen = runtime.fullScreen,
         )
 
+        // Last statement before the process exists: everything is provisioned,
+        // the command is built, and nothing else stands between here and the
+        // game reading mods/.
+        if (seal != null && !seal()) {
+            log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
+            throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
+        }
         SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog)))
     } catch (e: PackPrepBlocked) {
         // SC-binding step could not complete; surface the carried reason.
