@@ -250,6 +250,8 @@ val uiModule = module {
     // without knowing which screen published it; the view clears it on the way out.
     single { SelectionRegistry() }
     single { SessionRegistry(appScope = get()) }
+    // One-slot handoff: the launch driver parks "needs a code", the shell answers.
+    single { hivens.ui.notifications.TwoFactorLaunchGate() }
     single {
         val settingsService: ISettingsService = get()
         LaunchDriver(
@@ -263,6 +265,7 @@ val uiModule = module {
             offlineProvider = get(),
             settingsService = settingsService,
             credentialStore = get(),
+            twoFactorGate   = get(),
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         )
     }

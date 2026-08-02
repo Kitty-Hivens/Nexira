@@ -15,8 +15,10 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -135,10 +137,19 @@ class SmrtSyncServiceTest {
         val service = syncService()
         service.sync("test", dir)
 
-        // A hand-placed jar, and one hidden a level down -- the loader scans both.
+        // A hand-placed jar, one a level down, and the kinds of file that are NOT
+        // a way to run code: tooling caches in dot-directories (Connector's remapped
+        // jars, our block maps) and a stray temp file.
         Files.write(dir.resolve("mods/wurst.jar"), "CHEAT".toByteArray())
         Files.createDirectories(dir.resolve("mods/extra"))
         Files.write(dir.resolve("mods/extra/hidden.jar"), "CHEAT".toByteArray())
+        Files.createDirectories(dir.resolve("mods/.connector/temp"))
+        Files.write(dir.resolve("mods/.connector/bobby_mapped.jar"), "CACHE".toByteArray())
+        Files.createDirectories(dir.resolve("mods/.nexira-blocks"))
+        Files.write(dir.resolve("mods/.nexira-blocks/req.jar.blocks"), "MAP".toByteArray())
+        Files.write(dir.resolve("mods/Uranus.jar.tmp"), "PARTIAL".toByteArray())
+        // A dot-NAMED jar is not tooling state: the loader reads it like any other.
+        Files.write(dir.resolve("mods/.cheat.jar"), "CHEAT".toByteArray())
 
         val verdict = service.enforceRoster(dir)
 
@@ -150,11 +161,51 @@ class SmrtSyncServiceTest {
             Files.exists(dir.resolve("mods/opt.jar.disabled")),
             "an optional the user turned off is part of the pack and stays",
         )
-        assertEquals(
-            setOf("wurst.jar", "extra/hidden.jar", "extra"),
-            verdict.removed.toSet(),
-            "the report names what went, so the user is not left guessing",
+        assertTrue(
+            Files.exists(dir.resolve("mods/.connector/bobby_mapped.jar")),
+            "a loader's own cache is not foreign content -- wiping it costs a rebuild and protects nothing",
         )
+        assertTrue(Files.exists(dir.resolve("mods/.nexira-blocks/req.jar.blocks")), "block maps survive")
+        assertTrue(Files.exists(dir.resolve("mods/Uranus.jar.tmp")), "a non-loadable leftover is not executable")
+        assertFalse(
+            Files.exists(dir.resolve("mods/.cheat.jar")),
+            "a leading dot must not smuggle a jar past the sweep -- the loader still loads it",
+        )
+        assertEquals(
+            setOf("wurst.jar", "extra/hidden.jar", ".cheat.jar"),
+            verdict.removed.toSet(),
+            "only loadable archives outside the roster are touched",
+        )
+    }
+
+    @Test
+    fun `a foreign jar that cannot be deleted leaves the instance unverified`() = runTest {
+        // The bypass this pins: mark the file read-only (or deny delete on it) and the
+        // sweep's failure used to be swallowed, so the jar stayed AND the launch was
+        // treated as verified -- which is what hands it a session token.
+        val dir = tempDir("blocked")
+        val service = syncService()
+        service.sync("test", dir)
+
+        // Denying the delete is expressed through directory permissions, which is a
+        // POSIX notion; Windows models this with ACLs and the test does not apply
+        // there. The behaviour under test is platform-independent -- what varies is
+        // only how one arranges for a delete to fail.
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runTest
+
+        val planted = dir.resolve("mods/cheat.jar")
+        Files.write(planted, "CHEAT".toByteArray())
+        val perms = Files.getPosixFilePermissions(dir.resolve("mods"))
+        Files.setPosixFilePermissions(dir.resolve("mods"), setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE))
+        try {
+            val verdict = service.enforceRoster(dir)
+
+            assertFalse(verdict.verified, "a jar that refused to go means the instance is not what the pack says")
+            assertEquals(listOf("cheat.jar"), verdict.blocked, "and it is named, not silently dropped from the report")
+            assertTrue(Files.exists(planted), "the file is still there -- that is the point")
+        } finally {
+            Files.setPosixFilePermissions(dir.resolve("mods"), perms)
+        }
     }
 
     @Test

@@ -10,6 +10,7 @@ import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangLibrary
 import hivens.launcher.runtime.flattenArguments
+import hivens.launcher.runtime.libraryRulesAllow
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -88,7 +89,13 @@ class ModernInstallerResolver(
             )
             val os = OS.platform.mojang
             LoaderProfile(
-                libraries = version.libraries.map { harvest(it, dotMinecraft) },
+                // Rules first: a version json lists every platform's libraries, and
+                // the installer only produces the ones this host needs. Harvesting a
+                // mac-only entry (ca.weblite:java-objc-bridge) on Windows fails the
+                // whole install over a file that was never meant to be there.
+                libraries = version.libraries
+                    .filter { libraryRulesAllow(it.rules, os) }
+                    .map { harvest(it, dotMinecraft) },
                 mainClass = version.mainClass,
                 jvmArgs = version.arguments?.let { flattenArguments(it.jvm, os) } ?: emptyList(),
                 gameArgs = version.arguments?.let { flattenArguments(it.game, os) } ?: emptyList(),

@@ -361,7 +361,12 @@ class LauncherController(
             try {
                 val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
                     ?: session.cachedPassword
-                if (!pass.isNullOrEmpty()) {
+                if (session.twoFactor && !session.mintedNow) {
+                    // Same as the pack path: mint the session for this launch rather
+                    // than trust a stored one nothing can vouch for.
+                    fail(LaunchError.TwoFactorExpired)
+                    return Prepared.Bail
+                } else if (!pass.isNullOrEmpty()) {
                     session = authService.login(session.playerName, pass, targetServerId)
                     onSessionRefreshed?.invoke(session)
                     emit(LaunchLogEvent.AuthSucceeded(session.uuid))
@@ -369,6 +374,9 @@ class LauncherController(
                     emit(LaunchLogEvent.NoPassword)
                 }
             } catch (_: TwoFactorRequiredException) {
+                // The demand itself says the account is two-factor; the UI persists
+                // that so later launches stop logging in behind the user's back.
+                emit(LaunchLogEvent.TwoFactorDetected)
                 // 2FA account -- refusing to prompt the user for a code every
                 // time they click Play. The cached accessToken in `session` is
                 // from a previous successful 2FA flow and is what the game uses
@@ -782,11 +790,22 @@ class LauncherController(
             fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
             return null
         }
+        if (currentSession.twoFactor && !currentSession.mintedNow) {
+            // A second-factor account gets a session minted for THIS launch. Carrying
+            // the stored one forward is cheaper but not verifiable: any login from
+            // anywhere -- a second pack, another machine -- has since invalidated it,
+            // and the player would find out only when the server refuses the join.
+            // One code per launch buys a token that is known good at spawn time.
+            // The UI answers this by prompting and relaunching with the fresh session.
+            fail(LaunchError.TwoFactorExpired)
+            return null
+        }
         return try {
             val fresh = authService.login(playerName, pass, serverId)
             emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
             fresh
         } catch (_: TwoFactorRequiredException) {
+            emit(LaunchLogEvent.TwoFactorDetected)
             val cached = manifestCache.loadManifest(serverId)
             if (cached != null) {
                 ActionRing.record(

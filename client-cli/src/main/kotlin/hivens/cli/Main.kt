@@ -187,6 +187,7 @@ private fun renderEvent(event: LaunchLogEvent): String = when (event) {
         "removed ${event.paths.size} file(s) absent from the pack: ${event.paths.joinToString(", ")}"
     LaunchLogEvent.InstanceUnverified ->
         "instance not verified (no roster on disk); launching without a token -- sync the pack"
+    LaunchLogEvent.TwoFactorDetected -> "(2FA account detected; no silent re-login from here)"
     LaunchLogEvent.OfflineSkipSync -> "(offline: skipping file sync)"
     LaunchLogEvent.Launching -> "launching game process..."
     is LaunchLogEvent.Error -> "error: ${renderError(event.reason)}"

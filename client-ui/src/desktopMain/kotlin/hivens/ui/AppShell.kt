@@ -33,6 +33,8 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
+import hivens.ui.notifications.TwoFactorLaunchGate
+import hivens.core.launch.LaunchLogEvent
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
@@ -404,6 +406,33 @@ fun FrameWindowScope.AppShellContent(
     // `client-ui` types (i18n, console). See `LaunchLogCollector` for the
     // event-to-string mapping.
     hivens.ui.logic.LaunchLogCollector(events = controller.events, gameConsole = gameConsole)
+
+
+    // Persist "this account answers to a second factor" the first time a launch runs
+    // into the gate. The flag is what stops later launches from logging in again, and
+    // a login invalidates the session the user unlocked with a code -- so a session
+    // restored from disk (written before the flag existed) would otherwise keep the
+    // launcher re-authenticating and breaking itself.
+    val accountStore: AccountStore = koinInject()
+    LaunchedEffect(controller) {
+        controller.events.collect { event ->
+            if (event !is LaunchLogEvent.TwoFactorDetected) return@collect
+            val saved = withContext(Dispatchers.IO) {
+                accountStore.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+            }
+            if (saved == null || saved.twoFactor) return@collect
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    accountStore.saveAccount(
+                        saved.copy(twoFactor = true),
+                        PackAuthRequirement.SmartyCraft.PROVIDER_KEY,
+                    )
+                }
+            }.onSuccess {
+                ActionRing.record("Marked ${saved.playerName} as a 2FA account: no silent re-login from here")
+            }
+        }
+    }
 
 
     // Bumped each time the .show signal fires; the Window content uses it
@@ -1006,6 +1035,10 @@ fun FrameWindowScope.AppShellContent(
                 paletteFromWallpaper = paletteFromWallpaper,
             ) {
                 DebugOverlay(debugOverlay)
+                // Inside the theme on purpose: the prompt is a Dialog with its own
+                // composition, and raised from outside it finds no NxColors and takes
+                // the shell down.
+                hivens.ui.components.TwoFactorPromptHost()
             }
             // Synthetic resize grips -- undecorated drops the native border. Only
             // with custom chrome (else the OS frame resizes); self-gates to

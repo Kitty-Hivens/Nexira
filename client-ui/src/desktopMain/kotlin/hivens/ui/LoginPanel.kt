@@ -87,10 +87,9 @@ fun LoginPanel(
 
     // 2FA flow state. Which path a TWOAUTH demand takes is decided by the
     // provider's AuthCapabilities.supports2FA: a capable provider opens the
-    // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path; the
-    // SmartyCraft provider sets supports2FA = false, so the demand surfaces the
-    // [twoFactorUnsupported] banner instead (its 2FA login succeeds on the wire
-    // but breaks every game-side authenticated call after).
+    // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path, which is
+    // now what SmartyCraft takes. The [twoFactorUnsupported] banner remains for a
+    // provider that raises the demand without being able to answer it.
     //
     // [service] is the provider that raised the demand. The SSL-bypass retry
     // logs in through insecureAuthService, whose pendingTwoFactor cache is a
@@ -147,11 +146,8 @@ fun LoginPanel(
                         service = service,
                     )
                 } else {
-                    // The wire-side completeTwoFactor() works for the login
-                    // itself, but the issued accessToken breaks every game-side
-                    // authenticated call after that. Rather than ship a
-                    // half-functional flow, the banner explains and asks the
-                    // user to disable 2FA on the site.
+                    // The provider raised a second-factor demand it cannot
+                    // complete. Nothing to prompt for, so say so plainly.
                     hivens.core.diag.ActionRing.record(
                         "Login: 2FA detected, rejected (unsupported on this provider)"
                     )

@@ -40,6 +40,31 @@ data class SessionData(
      * never written to credentials.json. Null for non-Microsoft sessions.
      */
     val refreshToken: String? = null,
+
+    /**
+     * True once this account has answered a second factor. It is a standing
+     * property of the account, not of this particular sign-in, and it exists to
+     * stop the launcher from logging in again.
+     *
+     * SmartyCraft mints a new `uid` on every `login` and invalidates the previous
+     * one, so a background re-login destroys the session the user just unlocked
+     * with a code -- which is why 2FA read as unusable: auto-sync logged in per
+     * server and the confirmed session died under the player. Anything tempted to
+     * refresh silently must check this first and go with the session in hand.
+     */
+    val twoFactor: Boolean = false,
+
+    /**
+     * True only for a session minted moments ago by an interactive sign-in, and never
+     * persisted: [hivens.core.api.interfaces.ICredentialStore] rebuilds sessions
+     * without it, so anything restored from disk reads false.
+     *
+     * That is the whole point. A two-factor launch demands a session made FOR that
+     * launch; without a way to tell "just minted" from "was lying around", the
+     * relaunch that answers the demand would trip the same demand again and ask for
+     * code after code.
+     */
+    val mintedNow: Boolean = false,
 ) {
     // Redact the three secrets (accessToken / cachedPassword / refreshToken) so a
     // stray log line or an exception carrying the session never prints them. The
