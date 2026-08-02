@@ -233,6 +233,7 @@ internal class LauncherService(
             session = sessionData,
             jvmArgsOverride = runtime.jvmArgs,
             redirectAuthHost = redirectAuthHost,
+            restrictJvmArgs = sealEnvironment,
             agentJarPath = adaptive.agentJar,
             metricsOutPath = adaptive.metricsOut,
             authlibAgentJarPath = authlibAgent,
