@@ -228,6 +228,97 @@ class SmrtSyncServiceTest {
         assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the pack itself is untouched")
     }
 
+    // --- the baseline answers what the roster file cannot -----------------------
+
+    private fun sha1Hex(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-1").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+
+    /**
+     * The case the roster file cannot see at all: the name is one the pack
+     * declared, so a comparison of names is satisfied by the replacement.
+     */
+    @Test
+    fun `a jar overwritten in place fails the verdict and is not deleted`() = runTest {
+        val dir = tempDir("baseline-swap")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertFalse(verdict.verified, "the bytes are not the pack's, so no token")
+        assertEquals(listOf("req.jar"), verdict.mismatched)
+        assertTrue(
+            Files.exists(dir.resolve("mods/req.jar")),
+            "not deleted -- removing it mid-launch leaves the pack incomplete and the repair path is what fixes it",
+        )
+    }
+
+    @Test
+    fun `matching bytes verify, and a foreign jar still goes`() = runTest {
+        val dir = tempDir("baseline-ok")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+        Files.write(dir.resolve("mods/freecam.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertTrue(verdict.verified)
+        assertTrue(verdict.mismatched.isEmpty())
+        assertEquals(listOf("freecam.jar"), verdict.removed)
+    }
+
+    /**
+     * A name added to the roster file is how one gets a jar past a comparison of
+     * names. The baseline is not on disk beside the mods, so the same edit does
+     * nothing.
+     */
+    @Test
+    fun `a roster file edited beside the mods does not widen the baseline`() = runTest {
+        val dir = tempDir("baseline-outranks")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+        Files.write(dir.resolve("mods/freecam.jar"), "CHEAT".toByteArray())
+        Files.write(dir.resolve(".nexira-mods"), "req.jar\nfreecam.jar\n".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertEquals(listOf("freecam.jar"), verdict.removed, "the file on disk does not get a vote")
+        assertTrue(verdict.verified)
+    }
+
+    /** An optional mod turned off is the same bytes under another name. */
+    @Test
+    fun `a disabled optional is not tampering`() = runTest {
+        val dir = tempDir("baseline-disabled")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/opt.jar.disabled"), "GENUINE".toByteArray())
+        val sha = sha1Hex("GENUINE".toByteArray())
+        val baseline = mapOf("opt.jar" to sha, "opt.jar.disabled" to sha)
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertTrue(verdict.verified)
+        assertTrue(verdict.removed.isEmpty())
+    }
+
+    /** Instances predating the baseline keep the older, weaker answer. */
+    @Test
+    fun `no baseline falls back to the roster file`() = runTest {
+        val dir = tempDir("baseline-absent")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "ANY".toByteArray())
+        Files.write(dir.resolve(".nexira-mods"), "req.jar\n".toByteArray())
+
+        val verdict = syncService().enforceRoster(dir, expected = null)
+
+        assertTrue(verdict.verified, "names are all the old answer has")
+        assertTrue(verdict.mismatched.isEmpty())
+    }
+
     @Test
     fun `enforceRoster leaves an instance with no roster alone and reports it unverified`() = runTest {
         val dir = tempDir("no-roster")

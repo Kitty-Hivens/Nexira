@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import java.nio.file.StandardCopyOption
 import java.util.Comparator
 
@@ -273,8 +274,12 @@ class SmrtSyncService(
      * under `mods/` is data: mod caches, Connector's remapped-jar store, our own
      * block maps. Deleting those protects nothing and costs a rebuild at best.
      */
-    override suspend fun enforceRoster(clientDir: Path): RosterVerdict = withContext(Dispatchers.IO) {
-        val roster = readRoster(clientDir)
+    override suspend fun enforceRoster(clientDir: Path, expected: Map<String, String>?): RosterVerdict = withContext(Dispatchers.IO) {
+        // The baseline outranks the roster file wherever it exists. Both answer
+        // "which names belong here", but only one of them also answers "and with
+        // which bytes", and only one of them lives somewhere its subject cannot
+        // simply edit.
+        val roster = expected?.keys ?: readRoster(clientDir)
         if (roster.isEmpty()) {
             log.warn("mods enforce: no roster for {}, mods/ left alone and the launch stays unverified", clientDir.fileName)
             return@withContext RosterVerdict(verified = false)
@@ -288,14 +293,57 @@ class SmrtSyncService(
                 sweep.blocked.size, clientDir.fileName, sweep.blocked,
             )
         }
+        // The sweep answers by name. With a baseline there is a second question --
+        // whether what kept its name kept its bytes -- and that is where a jar
+        // overwritten in place gets caught, which no name comparison can see.
+        val mismatched = if (expected == null) emptyList() else digestMismatches(clientDir, expected)
+        if (mismatched.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} file(s) in {} do not match the pack's baseline: {}",
+                mismatched.size, clientDir.fileName, mismatched,
+            )
+        }
         RosterVerdict(
             // Anything left behind means the instance was not brought in line, and a
             // file that resists deletion is the likeliest thing to have been left on
             // purpose.
-            verified = sweep.blocked.isEmpty(),
+            verified = sweep.blocked.isEmpty() && mismatched.isEmpty(),
             removed = sweep.removed,
             blocked = sweep.blocked,
+            mismatched = mismatched,
         )
+    }
+
+    /**
+     * Names the pack declares whose bytes on disk are not the bytes it declared.
+     * A missing file is not a mismatch -- that is an incomplete install, which the
+     * sync and repair paths own; this asks only about what is there.
+     */
+    private fun digestMismatches(clientDir: Path, expected: Map<String, String>): List<String> {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return emptyList()
+        val bad = mutableListOf<String>()
+        for ((name, sha1) in expected) {
+            if (sha1.isBlank()) continue
+            val file = modsDir.resolve(name)
+            if (!Files.isRegularFile(file)) continue
+            val actual = runCatching { sha1Of(file) }.getOrNull()
+            if (actual == null || !actual.equals(sha1, ignoreCase = true)) bad += name
+        }
+        return bad.sorted()
+    }
+
+    private fun sha1Of(file: Path): String {
+        val digest = MessageDigest.getInstance("SHA-1")
+        Files.newInputStream(file).use { input ->
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     /** What one sweep of `mods/` managed to remove, and what refused to go. */
