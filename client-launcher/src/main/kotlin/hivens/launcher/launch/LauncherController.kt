@@ -658,6 +658,14 @@ class LauncherController(
                     // Microsoft token to the SC host. Same test the service uses
                     // for its SC binding, so the two cannot disagree.
                     redirectAuthHost     = authRequirement?.scServerId != null,
+                    // Same partition the roster sweep uses, and for the same
+                    // reason: a bound launch is handed a token, so the loader
+                    // hooks it inherits are a way to run code beside it. Taken
+                    // from the manifest's own declaration rather than the
+                    // effective requirement -- the router answers Microsoft for
+                    // every mirror pack, which would seal a solo pack too and
+                    // cost its owner MangoHud for nothing.
+                    sealEnvironment      = serverBound,
                     // Auth mechanism for an SC-bound join: the redirect agent
                     // (default on) and/or SC's patched authlib jar (default off,
                     // fallback). Both no-op on non-SC packs.

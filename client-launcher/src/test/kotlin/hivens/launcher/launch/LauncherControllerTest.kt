@@ -419,7 +419,7 @@ class LauncherControllerTest {
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
-                displayName        = any(),
+                sealEnvironment        = any(), displayName        = any(),
                 onLog              = any(),
             )
         } returns SpawnResult.Started(handle)
@@ -550,7 +550,7 @@ class LauncherControllerTest {
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
-                displayName        = any(),
+                sealEnvironment        = any(), displayName        = any(),
                 onLog              = any(),
             )
         } returns SpawnResult.Started(handle)
@@ -583,7 +583,7 @@ class LauncherControllerTest {
         // authlib; it returns SpawnResult.Failed carrying the semantic reason.
         coEvery {
             launcherService.launchPackClient(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
         } returns SpawnResult.Failed(LaunchError.AuthlibUnavailable("1.12.2"))
 
@@ -626,7 +626,7 @@ class LauncherControllerTest {
             state.reason,
         )
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
@@ -681,7 +681,7 @@ class LauncherControllerTest {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
                 clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
-                adaptiveEnabled = any(), redirectAuthHost = any(), displayName = any(), onLog = any(),
+                adaptiveEnabled = any(), redirectAuthHost = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -728,7 +728,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = capture(agentFlag),
-                useSmartycraftAuthLib = capture(swapFlag), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = capture(swapFlag), sealEnvironment = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -762,7 +762,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -795,7 +795,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -904,7 +904,7 @@ class LauncherControllerTest {
                 sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), sealEnvironment = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -947,7 +947,7 @@ class LauncherControllerTest {
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.TwoFactorExpired, state.reason)
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -991,7 +991,7 @@ class LauncherControllerTest {
         val handle = mockk<LaunchHandle>()
         coEvery { handle.awaitExit() } returns 0
         coEvery {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
@@ -1024,7 +1024,7 @@ class LauncherControllerTest {
         assertEquals(LaunchState.Idle, controller.state.value)
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
         coVerify(exactly = 1) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
