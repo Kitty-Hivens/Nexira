@@ -362,7 +362,10 @@ class SmrtSyncService(
                 if (keep) return@forEach
                 runCatching {
                     fileOpRetry("smrt drop foreign $p") { Files.delete(p) }
-                    removed += modsDir.relativize(p).toString()
+                    // Joined over the path's own segments rather than toString(): the
+                    // report is read by a person and matched against manifest paths,
+                    // both of which use '/' whatever the host separator is.
+                    removed += modsDir.relativize(p).joinToString("/")
                 }
             }
         }
