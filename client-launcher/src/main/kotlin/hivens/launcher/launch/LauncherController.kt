@@ -388,12 +388,13 @@ class LauncherController(
                     return Prepared.Bail
                 }
             } catch (e: Exception) {
-                // Non-2FA auth failure: log and continue with the existing
-                // (possibly stale) session -- graceful degradation, since the
-                // token in hand is often still good. The classified cause is
-                // what lets the UI warn now instead of leaving the rejection
-                // to surface inside the game as "Failed to verify username".
+                // No fresh session, so no session at all: same rule as the pack
+                // path. Carrying the previous token forward is what produced the
+                // launch that looks fine until the server answers "Failed to verify
+                // username" with nothing pointing back here.
                 emit(LaunchLogEvent.AuthFailed(e.message, classifyAuthFailure(e)))
+                emit(LaunchLogEvent.OfflineSkipAuth)
+                session = session.toOffline()
             }
         }
 
@@ -571,11 +572,42 @@ class LauncherController(
             return Prepared.Bail
         }
 
+        // 2b. The instance is what the pack says it is, or it does not launch with
+        // what was added to it. Sync already drops anything the manifest does not
+        // name, but it only runs on install / update / repair, and the window
+        // between two of those is wide enough to drop a jar into mods/ by hand --
+        // a cheat client among them. Held against the roster written on disk at
+        // sync time, so this works with no network and an offline launch is
+        // covered too.
+        val verdict = smrtSyncService.enforceRoster(clientDir)
+        if (verdict.removed.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${refreshedInstance.displayName}: removed ${verdict.removed.size} file(s) absent from the pack",
+            )
+            emit(LaunchLogEvent.ForeignContentRemoved(verdict.removed))
+        }
+
         // 3. Auth requirement: refresh the session right before spawn. Mirrors
         // the SC server path's pre-spawn re-auth.
+        //
+        // Three ways a launch ends up without a token, and they share one rule:
+        // the game process only gets a session that was earned for THIS launch.
+        //
+        // - Offline: the pack path used to carry the live session anyway, so an
+        //   offline launch handed a working accessToken to the game -- the one
+        //   launch where the token buys nothing, since there is no server to join.
+        // - Unverified instance: no roster means nothing vouched for what is in
+        //   mods/, and a token is exactly what an unvouched-for jar would want.
+        // - A refresh that did not go through: covered in preparePackAuth.
         val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
         var session = currentSession
-        if (authRequirement != null) {
+        if (settings.isOfflineMode || !verdict.verified) {
+            if (!verdict.verified) {
+                ActionRing.record("Pack launch ${refreshedInstance.displayName}: unverified instance, launching without a token")
+            }
+            emit(LaunchLogEvent.OfflineSkipAuth)
+            session = session.toOffline()
+        } else if (authRequirement != null) {
             setStage(PrepareStage.AUTH, 0.4f)
             session = preparePackAuth(authRequirement, currentSession, refreshedInstance)
                 ?: return Prepared.Bail
@@ -767,15 +799,30 @@ class LauncherController(
                 null
             }
         } catch (e: Exception) {
-            // Non-2FA login failure: log + keep the existing session. Same
-            // graceful-degradation as the SC server path, and the same reason
-            // for classifying: without it the only account of a rejected
-            // refresh is the game's own join failure, which names neither the
-            // launcher nor the session.
+            // A refresh that did not go through means this launch has no session it
+            // earned, so it gets none: the pack starts offline with the token
+            // stripped rather than carrying the old one into the game process. That
+            // covers the flaky-connection case as well -- a launch that could not
+            // reach the auth server IS an offline launch, and saying so up front
+            // beats a client that looks online until the server refuses the join.
             emit(LaunchLogEvent.AuthFailed(e.message, classifyAuthFailure(e)))
-            currentSession
+            emit(LaunchLogEvent.OfflineSkipAuth)
+            currentSession.toOffline()
         }
     }
+
+    /**
+     * The same session with nothing on it that could join a server: vanilla offline
+     * uuid, no token, marked offline (which is what puts `--userType legacy` on the
+     * command line). Minting the offline uuid from the player name rather than
+     * keeping the online one is what makes singleplayer worlds line up with other
+     * launchers' offline mode.
+     */
+    private fun SessionData.toOffline(): SessionData = copy(
+        uuid = if (offline) uuid else OfflineIdentity.dashlessUuidFor(playerName),
+        accessToken = "",
+        offline = true,
+    )
 
     /**
      * Maps a failed pre-spawn refresh onto the distinction the UI acts on.

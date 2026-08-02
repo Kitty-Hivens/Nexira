@@ -146,6 +146,21 @@ class LaunchDriver(
      */
     private fun onLaunchEvent(target: LaunchTarget, event: LaunchLogEvent) {
         val s = stringsProvider()
+        if (event is LaunchLogEvent.ForeignContentRemoved) {
+            // Its own group and sticky: a mod that vanished without a word reads as
+            // the launcher breaking the pack. Naming the files is what separates
+            // "your added jar was removed" from "something ate my install".
+            notifications.push(
+                sourceKey = "content:${target.id}",
+                sender    = target.displayName,
+                iconUrl   = target.iconUrl,
+                severity  = Severity.Warn,
+                kind      = Kind.Sticky,
+                title     = s.notifForeignContentRemovedTitle(event.paths.size),
+                body      = event.paths.joinToString(", "),
+            )
+            return
+        }
         val (severity, body) = staleSessionWarning(event, s) ?: return
         notifications.push(
             // Own group rather than target.sourceKey: a launch that goes on to

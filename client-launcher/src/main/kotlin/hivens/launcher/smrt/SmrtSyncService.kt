@@ -5,6 +5,7 @@ import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
+import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
@@ -123,6 +124,7 @@ class SmrtSyncService(
             if (sourceChanged) pruneForeignEntries(clientDir, expected) else pruneOrphanMods(clientDir, expected)
 
             writeSourceMarker(marker, SOURCE_MIRROR)
+            writeRoster(clientDir, expected)
         }
     }
 
@@ -245,6 +247,31 @@ class SmrtSyncService(
         // not change: an optional flipped to required (or back) has no toAdd/toUpdate entry
         // but must still move, or a now-required mod would launch missing.
         relabel(clientDir, manifest.mods, enabledState)
+
+        writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+    }
+
+    /**
+     * See [IPackSyncService.enforceRoster].
+     *
+     * The roster comes off disk rather than from the mirror, so this holds with no
+     * network -- including an offline launch, which is exactly when a hand-placed jar
+     * would otherwise go unchallenged. [sync] and [applyUpdate] write it.
+     *
+     * Same rule as [pruneForeignEntries]: only top-level `mods/<name>` entries the
+     * roster names survive, so a jar hidden in a subdirectory is removed as well --
+     * the loader scans those too.
+     */
+    override suspend fun enforceRoster(clientDir: Path): RosterVerdict = withContext(Dispatchers.IO) {
+        val roster = readRoster(clientDir)
+        if (roster.isEmpty()) {
+            log.warn("mods enforce: no roster for {}, mods/ left alone and the launch stays unverified", clientDir.fileName)
+            return@withContext RosterVerdict(verified = false)
+        }
+        val removed = InstanceMutationLock.withLock(clientDir) {
+            pruneForeignEntries(clientDir, roster)
+        }
+        RosterVerdict(verified = true, removed = removed)
     }
 
     private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
@@ -322,10 +349,10 @@ class SmrtSyncService(
      * Walked deepest-first so a directory is considered after its children; one that
      * still holds a kept file refuses to delete and is left alone.
      */
-    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>) {
+    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): List<String> {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return
-        var removed = 0
+        if (!Files.isDirectory(modsDir)) return emptyList()
+        val removed = mutableListOf<String>()
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
@@ -335,11 +362,30 @@ class SmrtSyncService(
                 if (keep) return@forEach
                 runCatching {
                     fileOpRetry("smrt drop foreign $p") { Files.delete(p) }
-                    removed++
+                    removed += modsDir.relativize(p).toString()
                 }
             }
         }
-        if (removed > 0) log.info("smrt sync: dropped {} foreign entr(ies) from mods/", removed)
+        if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)
+        return removed
+    }
+
+    /**
+     * The set of `mods/` names the installed pack consists of, one per line. Written
+     * on every sync and update so a launch can hold the instance to it without asking
+     * the mirror; read back as a set, blank lines dropped.
+     */
+    private fun readRoster(clientDir: Path): Set<String> =
+        clientDir.resolve(ROSTER_FILE).toFile()
+            .takeIf { it.isFile }
+            ?.runCatching { readLines().map(String::trim).filter { line -> line.isNotEmpty() }.toSet() }
+            ?.onFailure { log.warn("mods enforce: unreadable roster, treating as absent", it) }
+            ?.getOrNull()
+            .orEmpty()
+
+    private fun writeRoster(clientDir: Path, expected: Set<String>) {
+        runCatching { clientDir.resolve(ROSTER_FILE).toFile().writeText(expected.sorted().joinToString("\n")) }
+            .onFailure { log.warn("smrt sync: failed to write mods roster", it) }
     }
 
     private fun readSourceMarker(marker: Path): String? =
@@ -503,6 +549,9 @@ class SmrtSyncService(
         const val EXPECTED_SCHEMA = 2
 
         private const val SOURCE_MARKER_FILE = ".nexira-sync-source"
+
+        /** Names `mods/` may hold, written by sync/update and enforced on launch. */
+        private const val ROSTER_FILE = ".nexira-mods"
         private const val SOURCE_MIRROR = "mirror"
         private const val MODS_PREFIX = "mods/"
     }

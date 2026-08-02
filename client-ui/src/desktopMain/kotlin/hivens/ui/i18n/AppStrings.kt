@@ -253,6 +253,8 @@ interface AppStrings {
     // --- Launcher States: Offline ---
     val stateOfflineSkipAuth: String
     val stateOfflineSkipSync: String
+    /** Files dropped from mods/ before spawn because the pack does not name them. */
+    fun stateForeignContentRemoved(count: Int, names: String): String
     val stateOfflineNoClient: String
     val stateOfflineNoManifest: String
 
@@ -1092,6 +1094,9 @@ interface AppStrings {
     val notifSessionStaleUnreachable: String
     val notifSessionStaleUnknown: String
     val notifSessionStaleNoPassword: String
+
+    /** Title for the launch-time removal of files the pack does not include. */
+    fun notifForeignContentRemovedTitle(count: Int): String
 
     // --- Notification relative-time formatter (header label) ---
     val notifTimeNow: String

@@ -52,6 +52,13 @@ sealed class LaunchLogEvent {
         val cause: AuthRefreshFailure = AuthRefreshFailure.Unknown,
     ) : LaunchLogEvent()
 
+    /**
+     * Files removed from `mods/` before spawn because the pack does not name them.
+     * Carries the relative paths so the console can list exactly what went, rather
+     * than leaving the user to guess why a mod they added is not loading.
+     */
+    data class ForeignContentRemoved(val paths: List<String>) : LaunchLogEvent()
+
     data object OfflineSkipSync : LaunchLogEvent()
 
     data object Launching : LaunchLogEvent()
