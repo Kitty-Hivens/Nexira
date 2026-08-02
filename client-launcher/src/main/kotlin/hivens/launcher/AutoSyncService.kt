@@ -170,6 +170,13 @@ class AutoSyncService(
             //     server in the queue.
             var sessionFailed = false
             val session: SessionData? = try {
+                // A 2FA account is not logged in again, ever, from here. The damage
+                // is done by the REQUEST, not by its failure: SmartyCraft mints a new
+                // uid per login and invalidates the previous one, so a background
+                // sync across N servers wipes the session the player just unlocked
+                // with a code. Sync what the cached manifest allows and leave the
+                // session alone.
+                if (creds.twoFactor) throw TwoFactorRequiredException(uid = null, login = creds.playerName)
                 authService.login(creds.playerName, pass, server.assetDir)
             } catch (_: TwoFactorRequiredException) {
                 val cached = manifestCache.loadManifest(server.assetDir)
@@ -182,7 +189,10 @@ class AutoSyncService(
                     updateServerState(server.assetDir, ServerState.SKIPPED)
                     null
                 } else {
-                    creds.copy(fileManifest = cached, serverId = server.assetDir)
+                    // Carried forward for this pass; the flag is persisted where the
+                    // code is actually answered (the login form), since this service
+                    // deliberately holds a read-only view of the credentials.
+                    creds.copy(fileManifest = cached, serverId = server.assetDir, twoFactor = true)
                 }
             } catch (e: Exception) {
                 log.warn("Auto-sync login failed for {}: {}", server.assetDir, e.message)

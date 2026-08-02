@@ -34,7 +34,10 @@ class SmartyCraftAuthProvider(
 
     override val id = "smartycraft"
     override val displayName = "SmartyCraft"
-    override val capabilities = AuthCapabilities(supports2FA = false)
+    // The second factor works; what did not was logging in again afterwards.
+    // See completeTwoFactor: SmartyCraft mints a new uid per login and kills the
+    // previous one, so the code has to unlock the session already in hand.
+    override val capabilities = AuthCapabilities(supports2FA = true)
 
     /**
      * Per-user cache of the [LoginResponse] returned alongside a TWOAUTH status,
@@ -141,12 +144,12 @@ class SmartyCraftAuthProvider(
             )
         }
 
-        // twoauth=OK. Two reconstruction strategies:
-        //   1. The cached TWOAUTH response is sometimes complete -- promote it
-        //      to a SessionData directly (avoids strategy 2's loop hazard).
-        //   2. Otherwise a single re-login. If THAT returns TWOAUTH again
-        //      (server routes through the gate even without real 2FA), give up
-        //      with TWO_FACTOR_EXPIRED rather than loop.
+        // twoauth=OK unlocks the session that CAME WITH the TWOAUTH response --
+        // it returns a bare status and no session of its own. Logging in again to
+        // "get" one is what used to happen here and it cannot work: a second login
+        // mints a new uid, invalidates the one just unlocked, and answers TWOAUTH
+        // again, so the user is asked for code after code while every confirmed
+        // session dies behind them. Measured against the live API, not guessed.
         val passwordEncoded = HashUtils.md5(password)
         val key = CacheKey(username, passwordEncoded, serverId)
         val cachedResponse = pendingTwoFactor.remove(key)
@@ -155,23 +158,22 @@ class SmartyCraftAuthProvider(
         // accessToken. uuid+playername populated but session null would build a
         // SessionData with an empty accessToken; the game dies at the auth host
         // with no signal back.
-        if (cachedResponse != null &&
-            cachedResponse.uuid != null &&
-            cachedResponse.playername != null &&
-            cachedResponse.session != null
+        if (cachedResponse == null ||
+            cachedResponse.uuid == null ||
+            cachedResponse.playername == null ||
+            cachedResponse.session == null
         ) {
-            return buildSessionData(cachedResponse, password, serverId)
-                .also { cacheSession(key, it) }
-        }
-
-        return try {
-            login(username, password, serverId)
-        } catch (_: TwoFactorRequiredException) {
+            // Nothing to unlock: the demand arrived without a session (or the
+            // dialog outlived it). Restarting the whole login is the only way
+            // forward, and saying so beats silently re-logging in.
             throw AuthException(
                 AuthStatus.TWO_FACTOR_EXPIRED,
-                "2FA verification didn't unlock the session. Please log in again.",
+                "The 2FA session expired before the code arrived. Please log in again.",
             )
         }
+        return buildSessionData(cachedResponse, password, serverId)
+            .copy(twoFactor = true)
+            .also { cacheSession(key, it) }
     }
 
     /**

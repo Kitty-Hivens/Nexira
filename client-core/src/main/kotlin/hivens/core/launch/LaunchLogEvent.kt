@@ -67,6 +67,13 @@ sealed class LaunchLogEvent {
      */
     data object InstanceUnverified : LaunchLogEvent()
 
+    /**
+     * A second-factor session was carried into the launch as-is. Refreshing it is
+     * what breaks it -- SmartyCraft invalidates the previous uid on every login --
+     * so this is the healthy path, not a degradation.
+     */
+    data object TwoFactorSessionKept : LaunchLogEvent()
+
     data object OfflineSkipSync : LaunchLogEvent()
 
     data object Launching : LaunchLogEvent()
