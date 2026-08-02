@@ -26,6 +26,16 @@ lives in this English file.
 
 ## [Unreleased]
 
+## [2.4.0-beta3] - 2026-08-02
+
+2.4.0-beta3 makes two-factor accounts playable and closes the ways a mod could ride into a pack uninvited. Signing in with a second factor now works end to end: the code is asked once when you press Play, and the game starts on a session minted for that launch. On the content side, a pack is held to its own file list before every spawn, files that refuse to be deleted are treated as the obstruction they are, and the sweep touches only what a loader would execute -- caches, configs and the launcher's own bookkeeping are left alone.
+
+### Highlights
+- **Two-factor accounts can play.** Sign-in with a code works, and it is asked once per launch instead of over and over. Every background re-login that used to invalidate your session behind your back is gone.
+- **A pack launches as the pack.** Jars added to an installed pack are removed before the game starts, and a file that cannot be removed means the launch goes ahead without a sign-in rather than pretending everything is fine.
+- **Only mods are swept.** Mod caches, configs and leftovers are no longer deleted along with them -- previously a launch could wipe a loader's remapped-jar cache and cost you a full rebuild.
+- **Packs install again where a platform library is not shipped.** A pack whose loader lists a macOS-only library no longer fails to install on Windows and Linux.
+
 ### Added
 - A launch by a two-factor account mints its session for that launch: the code is asked once when you press Play, and the game starts on a token that is known good at spawn. Carrying the stored session forward was cheaper but unverifiable -- SmartyCraft invalidates a session on any later login, from a second pack or another machine, and the player found out only when the server refused the join. The demand now stops the launch instead of spawning a doomed one, the shell prompts, and the same target starts again with the fresh session, so one click and one code is the whole interaction.
 - Two-factor sign-in works on SmartyCraft accounts. It never did before, and the reason was ours: the launcher logged in more often than the protocol allows. SmartyCraft mints a new `uid` on every `login` and invalidates the previous one, so background auto-sync (one login per server) and the pre-spawn refresh kept destroying the session the player had just unlocked with a code -- which is what produced an endless demand for codes. Measured against the live API: the `TWOAUTH` response already carries a usable `session`, `uuid` and the client manifest, `twoauth` replies with a bare status and no session of its own, and a second `login` after it answers `TWOAUTH` again while killing what the code just unlocked. So `completeTwoFactor` no longer re-logs in -- it unlocks the session that came with the demand -- `supports2FA` is on, and a session that answered a second factor is marked so that nothing refreshes it behind the player's back: auto-sync does not send the request at all, and both launch paths carry the session as-is. A code is asked for once per session, and again only when the game itself is refused.
