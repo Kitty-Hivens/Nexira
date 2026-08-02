@@ -9,11 +9,14 @@ import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.interfaces.IPackRepository
+import hivens.core.api.interfaces.IPackSyncService
+import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
@@ -83,6 +86,7 @@ class LauncherControllerTest {
 
     private lateinit var sandbox: Path
     private lateinit var authService: AuthProvider
+    private lateinit var packSyncService: IPackSyncService
     private lateinit var settingsService: ISettingsService
     private lateinit var downloadService: IFileDownloadService
     private lateinit var javaManagerService: IJavaManager
@@ -149,6 +153,10 @@ class LauncherControllerTest {
         // The registry only reads provider ids; the controller's SC gate checks
         // contains("smartycraft").
         every { authService.id } returns "smartycraft"
+        // An installed pack carries a roster, so the default fixture is a verified
+        // instance; the unverified case is its own test.
+        packSyncService = mockk(relaxed = true)
+        coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = true)
     }
 
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
@@ -170,7 +178,7 @@ class LauncherControllerTest {
         profileManager     = profileManager,
         packRepository     = packRepository,
         smrtPackClient     = smrtPackClient,
-        smrtSyncService    = mockk(relaxed = true),
+        smrtSyncService    = packSyncService,
         smartyPlanner      = smartyPlanner,
         dataDirectory      = sandbox,
         appScope           = scope,
@@ -800,6 +808,63 @@ class LauncherControllerTest {
         advanceUntilIdle()
 
         assertEquals(true, redirect.captured, "an SC join still needs the redirect")
+    }
+
+    @Test
+    fun `an unverified instance launches with no token`() = runTest {
+        // No roster on disk -- nothing vouched for what is in mods/, so the game
+        // process gets a session that cannot join anything.
+        coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = false)
+
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "online-uuid", accessToken = "live-token"),
+        )
+
+        assertEquals("", session?.accessToken, "an unverified instance must not carry a token")
+        assertEquals(true, session?.offline, "and it must be marked offline")
+    }
+
+    @Test
+    fun `a refresh that could not reach the auth server drops to offline`() = runTest {
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+        )
+        coEvery { authService.login(any(), any(), any()) } throws
+            AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: connection reset", isNetworkError = true)
+
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+            packInstance = scBoundPackInstance(),
+        )
+
+        assertEquals("", session?.accessToken, "a launch that never reached auth is an offline launch")
+        assertEquals(true, session?.offline)
+    }
+
+    /** Launches a pack and returns the [SessionData] the spawn actually received. */
+    private suspend fun TestScope.capturePackSession(
+        currentSession: SessionData,
+        packInstance: PackInstance = scBoundPackInstance(authRequirement = null),
+    ): SessionData? {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(currentSession = currentSession, packInstance = packInstance)
+        advanceUntilIdle()
+        return captured.captured.takeIf { captured.isCaptured }
     }
 
     @Test

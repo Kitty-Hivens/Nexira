@@ -183,6 +183,8 @@ private fun renderEvent(event: LaunchLogEvent): String = when (event) {
     // hopeful after Unreachable and hopeless after Rejected.
     is LaunchLogEvent.AuthFailed ->
         "auth failed (${event.cause.name.lowercase()}): ${event.message ?: "unknown error"}"
+    is LaunchLogEvent.ForeignContentRemoved ->
+        "removed ${event.paths.size} file(s) absent from the pack: ${event.paths.joinToString(", ")}"
     LaunchLogEvent.OfflineSkipSync -> "(offline: skipping file sync)"
     LaunchLogEvent.Launching -> "launching game process..."
     is LaunchLogEvent.Error -> "error: ${renderError(event.reason)}"

@@ -243,6 +243,8 @@ object RussianStrings : AppStrings {
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
+    override fun stateForeignContentRemoved(count: Int, names: String) =
+        "Удалено файлов, которых нет в сборке: $count ($names)"
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
     override val stateOfflineNoManifest    = "Нет кеша манифеста для этого сервера. Войдите онлайн хотя бы раз перед запуском оффлайн."
 
@@ -1046,6 +1048,7 @@ object RussianStrings : AppStrings {
     override val notifSessionStaleUnreachable           = "Связаться с сервером авторизации не вышло. Игра запустится со старой сессией; если сервер не пустит, попробуй позже."
     override val notifSessionStaleUnknown               = "Обновить сессию не удалось. Игра запустится со старой сессией."
     override val notifSessionStaleNoPassword            = "Пароль не сохранён, поэтому сессия не обновляется. Когда она истечёт, сервер перестанет пускать: войди в аккаунт заново."
+    override fun notifForeignContentRemovedTitle(count: Int) = "Удалено файлов вне сборки: $count"
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Войдите в SmartyCraft, чтобы играть на этой сборке"
         else                                          -> "Нужен вход в '$providerKey', чтобы играть"

@@ -245,6 +245,8 @@ object EnglishStrings : AppStrings {
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Offline mode — authentication skipped"
     override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
+    override fun stateForeignContentRemoved(count: Int, names: String) =
+        "Removed $count file(s) the pack does not include: $names"
     override val stateOfflineNoClient      = "Client files not found. Download them online first."
     override val stateOfflineNoManifest    = "No cached manifest for this server. Log in online at least once before launching offline."
 
@@ -1031,6 +1033,7 @@ object EnglishStrings : AppStrings {
     override val notifSessionStaleUnreachable           = "The auth server could not be reached. The game starts on the old session; if the server turns you away, try again later."
     override val notifSessionStaleUnknown               = "The session could not be refreshed. The game starts on the old session."
     override val notifSessionStaleNoPassword            = "No saved password, so the session is never refreshed. Once it expires the server stops letting you in: sign in again."
+    override fun notifForeignContentRemovedTitle(count: Int) = "Removed $count file(s) not in the pack"
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Sign in to SmartyCraft to play this pack"
         else                                          -> "Sign in with '$providerKey' to play this pack"
