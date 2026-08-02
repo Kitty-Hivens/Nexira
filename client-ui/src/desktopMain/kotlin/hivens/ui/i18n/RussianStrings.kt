@@ -1049,6 +1049,8 @@ object RussianStrings : AppStrings {
     override val notifSessionStaleUnknown               = "Обновить сессию не удалось. Игра запустится со старой сессией."
     override val notifSessionStaleNoPassword            = "Пароль не сохранён, поэтому сессия не обновляется. Когда она истечёт, сервер перестанет пускать: войди в аккаунт заново."
     override fun notifForeignContentRemovedTitle(count: Int) = "Удалено файлов вне сборки: $count"
+    override val notifInstanceUnverifiedTitle           = "Состав сборки не подтверждён"
+    override val notifInstanceUnverifiedBody            = "На диске нет описания того, из чего состоит эта сборка, поэтому игра запускается без входа и на сервер не пустит. Синхронизируй пак (Настройки -> Проверить и починить) и запусти снова."
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Войдите в SmartyCraft, чтобы играть на этой сборке"
         else                                          -> "Нужен вход в '$providerKey', чтобы играть"
