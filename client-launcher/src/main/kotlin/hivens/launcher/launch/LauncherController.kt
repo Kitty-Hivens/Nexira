@@ -376,25 +376,15 @@ class LauncherController(
             } catch (_: TwoFactorRequiredException) {
                 // The demand itself says the account is two-factor; the UI persists
                 // that so later launches stop logging in behind the user's back.
+                //
+                // And it stops here rather than continuing on the stored session: a
+                // cached manifest would let the sync run, but the game would still be
+                // handed a token nothing minted for this launch, which is exactly what
+                // the code prompt exists to prevent.
                 emit(LaunchLogEvent.TwoFactorDetected)
-                // 2FA account -- refusing to prompt the user for a code every
-                // time they click Play. The cached accessToken in `session` is
-                // from a previous successful 2FA flow and is what the game uses
-                // anyway. Augment it with a cached manifest (same path the
-                // offline branch takes) so processSession has something to walk.
-                val cached = manifestCache.loadManifest(targetServerId)
-                if (cached != null) {
-                    session = session.copy(fileManifest = cached)
-                    ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
-                } else {
-                    // No cached manifest and no fresh login -- bail with the
-                    // semantic TwoFactorExpired reason so the UI renders an
-                    // actionable "re-login from the form" message instead of a
-                    // generic internal-error path.
-                    ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId -- re-login required")
-                    fail(LaunchError.TwoFactorExpired)
-                    return Prepared.Bail
-                }
+                ActionRing.record("Launch: second factor required for $targetServerId")
+                fail(LaunchError.TwoFactorExpired)
+                return Prepared.Bail
             } catch (e: Exception) {
                 // No fresh session, so no session at all: same rule as the pack
                 // path. Carrying the previous token forward is what produced the
@@ -816,20 +806,15 @@ class LauncherController(
             emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
             fresh
         } catch (_: TwoFactorRequiredException) {
+            // First contact with the gate, before the account is flagged. Carrying the
+            // stored session forward here was the old plan and it is the failure the
+            // prompt exists to prevent: the launch would go on with a token nothing
+            // minted for it. Stop and let the gate ask for a code, same as the flagged
+            // path above.
             emit(LaunchLogEvent.TwoFactorDetected)
-            val cached = manifestCache.loadManifest(serverId)
-            if (cached != null) {
-                ActionRing.record(
-                    "Pack launch ${instance.displayName}: 2FA account, using cached manifest for '$serverId'",
-                )
-                currentSession.copy(fileManifest = cached)
-            } else {
-                ActionRing.record(
-                    "Pack launch ${instance.displayName}: 2FA + no cached manifest for '$serverId' -- re-login required",
-                )
-                fail(LaunchError.TwoFactorExpired)
-                null
-            }
+            ActionRing.record("Pack launch ${instance.displayName}: second factor required for '$serverId'")
+            fail(LaunchError.TwoFactorExpired)
+            null
         } catch (e: Exception) {
             // A refresh that did not go through means this launch has no session it
             // earned, so it gets none: the pack starts offline with the token
