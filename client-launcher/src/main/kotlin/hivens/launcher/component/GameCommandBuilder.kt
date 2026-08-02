@@ -117,6 +117,26 @@ internal class GameCommandBuilder(
     )
 
     /**
+     * Closes the JVM's attach listener for a launch carrying a session token.
+     *
+     * Without it, any process running as the same user loads an agent into the
+     * live game through the attach socket -- `jattach`, `jcmd`, the Attach API
+     * -- which needs no cooperation from the launcher at all, since it happens
+     * after the command line stopped mattering. Placed after the user's own
+     * arguments so it wins on order as well as by policy, HotSpot taking the
+     * last occurrence of a flag.
+     *
+     * The cost is real and worth naming: a thread dump of the game (`jstack`,
+     * `jcmd`) stops working, so a hang in someone's bug report is harder to
+     * read. It buys the convenient half of runtime injection; ptrace and
+     * `/proc/pid/mem` are not addressable from in here and are not pretended to
+     * be.
+     */
+    private fun addAttachGuard(args: MutableList<String>, restrict: Boolean) {
+        if (restrict) args.add("-XX:+DisableAttachMechanism")
+    }
+
+    /**
      * Splits and, for a launch that will carry a token, filters the user's own
      * JVM arguments through [JvmArgPolicy]. What is refused is logged rather
      * than dropped in silence -- a flag that quietly stops applying reads as the
@@ -216,6 +236,7 @@ internal class GameCommandBuilder(
         } else {
             args.addAll(gcArgs)
         }
+        addAttachGuard(args, restrict = true)
 
         args.add("-Xms${minOf(memoryMB, 512)}M")
         args.add("-Xmx${memoryMB}M")
@@ -366,6 +387,7 @@ internal class GameCommandBuilder(
         args.add("-Dfml.ignoreInvalidMinecraftCertificates=true")
 
         args.addAll(userJvmArgs(jvmArgsOverride, restrictJvmArgs))
+        addAttachGuard(args, restrictJvmArgs)
         if (usesModernArgs) {
             args.addAll(modernJvmArgs(runtime, gameDir, sharedAssetsDir, sharedLibrariesDir, nativesPath, versionLabel))
             // Java 9+ Vector API speeds up some mods (JEI, Ars Nouveau); only

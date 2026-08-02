@@ -120,12 +120,27 @@ class EnvironmentPreparer(private val transfers: TransferEngine) {
         clientRoot: Path,
         nativesDirName: String,
         nativeJars: List<Path>,
+        rebuild: Boolean = false,
     ) = withContext(Dispatchers.IO) {
         val nativesDir = clientRoot.resolve(nativesDirName)
         val osSuffix = OS.platform.lwjgl
 
-        if (isFolderValidForOs(nativesDir, osSuffix)) {
-            log.info("Natives valid for $osSuffix.")
+        // The folder check answers "is there something loadable here", which is
+        // what a first launch needs and not what a launch carrying a session
+        // token needs. `java.library.path` points here, so whatever sits under
+        // these names is what the JVM loads -- and a native library runs inside
+        // the game process, which is a stronger position than any mod has. The
+        // contents are wholly derived from jars already verified on download, so
+        // a bound launch re-derives them rather than trusting what it finds.
+        val trustFolder = !rebuild || !allPresent(nativeJars)
+        if (trustFolder && isFolderValidForOs(nativesDir, osSuffix)) {
+            if (rebuild) {
+                // Wiping with no complete source to rebuild from would cost the
+                // instance its natives for a reason the user cannot act on.
+                log.error("Natives cannot be re-derived for $osSuffix -- source jars incomplete, keeping what is on disk")
+            } else {
+                log.info("Natives valid for $osSuffix.")
+            }
             return@withContext
         }
         if (Files.exists(nativesDir)) {
@@ -153,6 +168,10 @@ class EnvironmentPreparer(private val transfers: TransferEngine) {
             log.error("CRITICAL: manifest natives incomplete for $osSuffix")
         }
     }
+
+    /** Every declared native jar is on disk, so a rebuild can complete. */
+    private fun allPresent(nativeJars: List<Path>): Boolean =
+        nativeJars.isNotEmpty() && nativeJars.all { Files.isRegularFile(it) }
 
     /**
      * Downloading for old versions (1.7.10, 1.12.2) -> LWJGL 2.

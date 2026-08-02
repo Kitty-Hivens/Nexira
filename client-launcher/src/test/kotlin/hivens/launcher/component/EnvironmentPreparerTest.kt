@@ -43,6 +43,68 @@ class EnvironmentPreparerTest {
     // os.name -> LWJGL classifier suffix now lives on Platform.lwjgl; see
     // client-core OSTest.
 
+    // ── natives are derived material, not user data ──────────────────────────
+
+    private fun hostNativeName(): String = when (hivens.core.platform.OS.platform.lwjgl) {
+        "windows" -> "lwjgl.dll"
+        "macos" -> "lwjgl.dylib"
+        else -> "lwjgl.so"
+    }
+
+    /** A jar carrying one native under the host platform's own name. */
+    private fun nativeJar(name: String, bytes: ByteArray): Path {
+        val jar = workDir / name
+        ZipOutputStream(Files.newOutputStream(jar)).use { zip ->
+            zip.putNextEntry(ZipEntry(hostNativeName()))
+            zip.write(bytes)
+            zip.closeEntry()
+        }
+        return jar
+    }
+
+    @Test
+    fun `an unbound launch keeps what it finds in the natives folder`() = runBlocking {
+        val jar = nativeJar("lwjgl-natives.jar", "genuine".toByteArray())
+        val nativesDir = (workDir / "bin/natives").also { Files.createDirectories(it) }
+        Files.write(nativesDir / hostNativeName(), "tampered".toByteArray())
+
+        svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(jar), rebuild = false)
+
+        assertEquals("tampered", Files.readString(nativesDir / hostNativeName()))
+    }
+
+    /**
+     * The folder is what `java.library.path` points at, so whatever sits under
+     * these names is what the JVM loads into the game process. A launch that
+     * will carry a token re-derives it from the jars instead.
+     */
+    @Test
+    fun `a bound launch re-derives the natives it was given`() = runBlocking {
+        val jar = nativeJar("lwjgl-natives.jar", "genuine".toByteArray())
+        val nativesDir = (workDir / "bin/natives").also { Files.createDirectories(it) }
+        Files.write(nativesDir / hostNativeName(), "tampered".toByteArray())
+
+        svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(jar), rebuild = true)
+
+        assertEquals("genuine", Files.readString(nativesDir / hostNativeName()))
+    }
+
+    /**
+     * Wiping with no complete source to rebuild from would cost the instance its
+     * natives for a reason its owner cannot act on, so the incomplete case keeps
+     * what is on disk rather than emptying the folder.
+     */
+    @Test
+    fun `a rebuild with a missing source jar does not empty the folder`() = runBlocking {
+        val nativesDir = (workDir / "bin/natives").also { Files.createDirectories(it) }
+        Files.write(nativesDir / hostNativeName(), "on-disk".toByteArray())
+
+        svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(workDir / "absent.jar"), rebuild = true)
+
+        assertTrue(Files.exists(nativesDir / hostNativeName()))
+        assertEquals("on-disk", Files.readString(nativesDir / hostNativeName()))
+    }
+
     // ── isFolderValidForOs: per-platform native-extension presence check ──
 
     @Test
