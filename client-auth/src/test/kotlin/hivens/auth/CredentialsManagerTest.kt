@@ -358,4 +358,24 @@ class CredentialsManagerTest {
 
         override fun clear(service: String, account: String): Boolean = entries.remove(key(service, account)) != null
     }
+
+    @Test
+    fun `the two-factor flag survives a save and reload`() {
+        val mgr = newManager()
+        mgr.saveAccount(
+            SessionData(playerName = "tester", uuid = "u1", uid = "uid1", accessToken = "tok", twoFactor = true),
+            "smartycraft",
+        )
+        // A property of the account, not of one sign-in: lose it on reload and the
+        // launcher re-authenticates before a launch, which invalidates the session
+        // the user unlocked with a code.
+        assertTrue(mgr.accountFor("smartycraft")?.twoFactor == true, "flag must come back from disk")
+
+        // A later save that does not know about it must not clear it.
+        mgr.saveAccount(
+            SessionData(playerName = "tester", uuid = "u1", uid = "uid1", accessToken = "tok2"),
+            "smartycraft",
+        )
+        assertTrue(mgr.accountFor("smartycraft")?.twoFactor == true, "an ordinary re-save must not unset it")
+    }
 }
