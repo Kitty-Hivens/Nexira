@@ -59,6 +59,14 @@ sealed class LaunchLogEvent {
      */
     data class ForeignContentRemoved(val paths: List<String>) : LaunchLogEvent()
 
+    /**
+     * The instance carries no roster, so nothing could vouch for what is in it and
+     * the launch goes ahead without a session token. Distinct from
+     * [OfflineSkipAuth]: the user did not choose this, and the way out (sync the
+     * pack) is not something they can guess from an offline notice.
+     */
+    data object InstanceUnverified : LaunchLogEvent()
+
     data object OfflineSkipSync : LaunchLogEvent()
 
     data object Launching : LaunchLogEvent()

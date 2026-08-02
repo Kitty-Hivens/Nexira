@@ -602,10 +602,12 @@ class LauncherController(
         val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
         var session = currentSession
         if (settings.isOfflineMode || !verdict.verified) {
-            if (!verdict.verified) {
+            if (verdict.verified) {
+                emit(LaunchLogEvent.OfflineSkipAuth)
+            } else {
                 ActionRing.record("Pack launch ${refreshedInstance.displayName}: unverified instance, launching without a token")
+                emit(LaunchLogEvent.InstanceUnverified)
             }
-            emit(LaunchLogEvent.OfflineSkipAuth)
             session = session.toOffline()
         } else if (authRequirement != null) {
             setStage(PrepareStage.AUTH, 0.4f)
