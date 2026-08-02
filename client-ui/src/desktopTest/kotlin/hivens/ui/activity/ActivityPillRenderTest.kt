@@ -158,7 +158,7 @@ class ActivityPillRenderTest {
         // The pill's whole premise is that it reads over arbitrary content, so
         // the one thing that must hold in every combination is that its body is
         // not the same tone as what is behind it. A near-black ground is the
-        // hardest case -- it is the default with no wallpaper (#454).
+        // hardest case -- it is the default with no wallpaper.
         val cases = listOf(
             Triple("celestia-dark", CelestiaStyle to true, Color(0xFF121212)),
             Triple("brut-dark", BrutStyle to true, Color(0xFF121212)),
