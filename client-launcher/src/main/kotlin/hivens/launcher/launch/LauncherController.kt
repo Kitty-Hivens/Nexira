@@ -362,12 +362,10 @@ class LauncherController(
                 val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
                     ?: session.cachedPassword
                 if (session.twoFactor) {
-                    // Never refresh a second-factor session on its own: a new login
-                    // invalidates the uid the user unlocked with a code, so the
-                    // "refresh" would be the thing that breaks the launch. Go with
-                    // what is in hand -- if the server has since dropped it, the
-                    // join is refused and the UI asks for a code then.
-                    emit(LaunchLogEvent.TwoFactorSessionKept)
+                    // Same as the pack path: mint the session for this launch rather
+                    // than trust a stored one nothing can vouch for.
+                    fail(LaunchError.TwoFactorExpired)
+                    return Prepared.Bail
                 } else if (!pass.isNullOrEmpty()) {
                     session = authService.login(session.playerName, pass, targetServerId)
                     onSessionRefreshed?.invoke(session)
@@ -793,10 +791,14 @@ class LauncherController(
             return null
         }
         if (currentSession.twoFactor) {
-            // Same rule as the server-list path: the code unlocked THIS session and
-            // a fresh login would kill it.
-            emit(LaunchLogEvent.TwoFactorSessionKept)
-            return currentSession
+            // A second-factor account gets a session minted for THIS launch. Carrying
+            // the stored one forward is cheaper but not verifiable: any login from
+            // anywhere -- a second pack, another machine -- has since invalidated it,
+            // and the player would find out only when the server refuses the join.
+            // One code per launch buys a token that is known good at spawn time.
+            // The UI answers this by prompting and relaunching with the fresh session.
+            fail(LaunchError.TwoFactorExpired)
+            return null
         }
         return try {
             val fresh = authService.login(playerName, pass, serverId)
