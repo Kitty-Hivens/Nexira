@@ -24,6 +24,7 @@ import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
+import hivens.launcher.security.LaunchEnvironment
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import kotlinx.coroutines.CancellationException
 import org.slf4j.LoggerFactory
@@ -107,7 +108,9 @@ internal class LauncherService(
             metricsOutPath = adaptive.metricsOut,
         )
 
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, onLog)))
+        // The SC server list is server-bound by construction -- every launch on it
+        // presents a session to someone's server.
+        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, sealEnvironment = true, onLog = onLog)))
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -139,6 +142,7 @@ internal class LauncherService(
         redirectAuthHost: Boolean,
         useNetworkAgent: Boolean,
         useSmartycraftAuthLib: Boolean,
+        sealEnvironment: Boolean,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): SpawnResult = try {
@@ -237,7 +241,7 @@ internal class LauncherService(
             fullScreen = runtime.fullScreen,
         )
 
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, onLog)))
+        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, sealEnvironment, onLog)))
     } catch (e: PackPrepBlocked) {
         // SC-binding step could not complete; surface the carried reason.
         SpawnResult.Failed(e.error)
@@ -304,11 +308,19 @@ internal class LauncherService(
     private fun spawnProcess(
         command: List<String>,
         clientRootPath: Path,
+        sealEnvironment: Boolean,
         onLog: (String, LauncherLogType) -> Unit,
     ): Process {
         val pb = ProcessBuilder(command)
         pb.directory(clientRootPath.toFile())
         pb.redirectErrorStream(false)
+        // The game inherits this process's environment, which inherited the
+        // session's, so a value in a shell profile reaches every launch. Named in
+        // the log rather than dropped quietly: a user who set one deliberately is
+        // owed the reason their tool stopped attaching.
+        LaunchEnvironment.seal(pb.environment(), sealEnvironment).forEach {
+            onLog("Sealed $it out of the game environment", LauncherLogType.INFO)
+        }
         onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
         val process = pb.start()
         logHandler.attach(process, onLog)
