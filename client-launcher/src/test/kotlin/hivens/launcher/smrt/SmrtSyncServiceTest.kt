@@ -147,6 +147,8 @@ class SmrtSyncServiceTest {
         Files.createDirectories(dir.resolve("mods/.nexira-blocks"))
         Files.write(dir.resolve("mods/.nexira-blocks/req.jar.blocks"), "MAP".toByteArray())
         Files.write(dir.resolve("mods/Uranus.jar.tmp"), "PARTIAL".toByteArray())
+        // A dot-NAMED jar is not tooling state: the loader reads it like any other.
+        Files.write(dir.resolve("mods/.cheat.jar"), "CHEAT".toByteArray())
 
         val verdict = service.enforceRoster(dir)
 
@@ -164,8 +166,12 @@ class SmrtSyncServiceTest {
         )
         assertTrue(Files.exists(dir.resolve("mods/.nexira-blocks/req.jar.blocks")), "block maps survive")
         assertTrue(Files.exists(dir.resolve("mods/Uranus.jar.tmp")), "a non-loadable leftover is not executable")
+        assertFalse(
+            Files.exists(dir.resolve("mods/.cheat.jar")),
+            "a leading dot must not smuggle a jar past the sweep -- the loader still loads it",
+        )
         assertEquals(
-            setOf("wurst.jar", "extra/hidden.jar"),
+            setOf("wurst.jar", "extra/hidden.jar", ".cheat.jar"),
             verdict.removed.toSet(),
             "only loadable archives outside the roster are touched",
         )

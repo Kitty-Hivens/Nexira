@@ -172,7 +172,15 @@ class SmrtSyncService(
             // Without this, "verify and repair" checked every file and still left the
             // instance unverified at launch, which is not a distinction anyone can be
             // expected to guess.
-            writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+            //
+            // Only when the repair actually finished, though: a run that could not
+            // fetch half the pack has not established anything, and vouching for it
+            // would hand the next launch a token over an instance still missing files.
+            if (report.failed.isEmpty()) {
+                writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+            } else {
+                log.warn("repair: {} entr(ies) still unresolved -- instance stays unverified: {}", report.failed.size, report.failed.keys)
+            }
 
             // Everything the local check cleared counts as intact: it was measured
             // against the same manifest, just without a round trip.
@@ -386,7 +394,12 @@ class SmrtSyncService(
                 // `.nexira-blocks`. Emptying them makes the next launch rebuild
                 // everything and defends against nothing -- no loader reads them as
                 // mods. Directories are never removed, for the same reason.
-                if (modsDir.relativize(p).firstOrNull()?.toString()?.startsWith(".") == true) return@forEach
+                val rel = modsDir.relativize(p)
+                // Inside a dot-DIRECTORY, not merely dot-named: `.connector/x.jar` is
+                // tooling state, while `.cheat.jar` sitting in mods/ is a mod the
+                // loader will happily read (its discovery matches `.+\.jar`, leading
+                // dot and all). Testing the first segment alone let that one through.
+                if (rel.nameCount > 1 && rel.getName(0).toString().startsWith(".")) return@forEach
                 if (!Files.isRegularFile(p)) return@forEach
                 // Only what a loader would execute. A config, or a leftover .tmp
                 // beside the mods, is not a way to run code.
@@ -396,12 +409,12 @@ class SmrtSyncService(
                 // Joined over the path's own segments rather than toString(): the
                 // report is read by a person and matched against manifest paths, both
                 // of which use '/' whatever the host separator is.
-                val rel = modsDir.relativize(p).joinToString("/")
+                val relText = rel.joinToString("/")
                 runCatching { fileOpRetry("smrt drop foreign $p") { Files.delete(p) } }
-                    .onSuccess { removed += rel }
-                    // A directory that still holds a kept file is expected here and is
-                    // not an obstruction; anything else refused to go and is reported.
-                    .onFailure { if (!Files.isDirectory(p)) blocked += rel }
+                    .onSuccess { removed += relText }
+                    // Only regular files reach this point, so a refusal is always an
+                    // obstruction: something is holding the file or denying the delete.
+                    .onFailure { blocked += relText }
             }
         }
         if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)

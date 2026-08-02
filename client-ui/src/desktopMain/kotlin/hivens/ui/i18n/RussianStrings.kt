@@ -243,7 +243,6 @@ object RussianStrings : AppStrings {
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
-    override val stateTwoFactorSessionKept = "Аккаунт с 2FA — используем подтверждённую сессию (обновление её обнулит)"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "Удалено файлов, которых нет в сборке: $count ($names)"
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."

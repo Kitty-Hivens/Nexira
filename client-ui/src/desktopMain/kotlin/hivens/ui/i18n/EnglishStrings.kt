@@ -245,7 +245,6 @@ object EnglishStrings : AppStrings {
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Offline mode — authentication skipped"
     override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
-    override val stateTwoFactorSessionKept = "2FA account -- keeping the confirmed session (refreshing it would invalidate it)"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "Removed $count file(s) the pack does not include: $names"
     override val stateOfflineNoClient      = "Client files not found. Download them online first."

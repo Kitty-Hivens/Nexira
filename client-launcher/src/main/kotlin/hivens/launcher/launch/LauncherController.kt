@@ -361,7 +361,7 @@ class LauncherController(
             try {
                 val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
                     ?: session.cachedPassword
-                if (session.twoFactor) {
+                if (session.twoFactor && !session.mintedNow) {
                     // Same as the pack path: mint the session for this launch rather
                     // than trust a stored one nothing can vouch for.
                     fail(LaunchError.TwoFactorExpired)
@@ -790,7 +790,7 @@ class LauncherController(
             fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
             return null
         }
-        if (currentSession.twoFactor) {
+        if (currentSession.twoFactor && !currentSession.mintedNow) {
             // A second-factor account gets a session minted for THIS launch. Carrying
             // the stored one forward is cheaper but not verifiable: any login from
             // anywhere -- a second pack, another machine -- has since invalidated it,

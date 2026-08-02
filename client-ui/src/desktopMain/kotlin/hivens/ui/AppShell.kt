@@ -33,6 +33,8 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
+import hivens.ui.notifications.TwoFactorLaunchGate
+import hivens.core.launch.LaunchLogEvent
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
@@ -409,7 +411,7 @@ fun FrameWindowScope.AppShellContent(
     // is answered. One code per launch, then the same target starts again with a
     // session minted for it -- the player clicks Play once and types a code once.
     val accountStore: hivens.auth.AccountStore = koinInject()
-    val twoFactorGate: hivens.ui.notifications.TwoFactorLaunchGate = koinInject()
+    val twoFactorGate: TwoFactorLaunchGate = koinInject()
     val authProvider: hivens.auth.AuthProvider = koinInject()
     val gatePending by twoFactorGate.pending.collectAsState()
     var gateUid by remember { mutableStateOf<String?>(null) }
@@ -421,7 +423,9 @@ fun FrameWindowScope.AppShellContent(
         gateUid = null
         gateError = null
         val request = gatePending ?: return@LaunchedEffect
-        val stored = accountStore.accountFor(hivens.core.data.PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+        val stored = withContext(Dispatchers.IO) {
+            accountStore.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+        }
         val pass = stored?.cachedPassword
         if (stored == null || pass.isNullOrEmpty()) {
             // Nothing to log in with; the launch cannot proceed and saying so beats a
@@ -431,10 +435,18 @@ fun FrameWindowScope.AppShellContent(
             return@LaunchedEffect
         }
         // The demand carries the uid the code must be signed against, so provoke it.
-        runCatching { withContext(Dispatchers.IO) { authProvider.login(stored.playerName, pass, stored.serverId.orEmpty()) } }
+        runCatching { withContext(Dispatchers.IO) { authProvider.login(stored.playerName, pass, request.serverId) } }
             .onSuccess { fresh ->
-                // The account dropped its second factor between launches: nothing to ask.
-                twoFactorGate.resume(fresh)
+                // The account dropped its second factor between launches: nothing to
+                // ask, and the flag has to go -- it is sticky on save, so leaving it
+                // would keep auto-sync degraded for the rest of the account's life.
+                withContext(Dispatchers.IO) {
+                    accountStore.saveAccount(
+                        fresh.copy(twoFactor = false),
+                        PackAuthRequirement.SmartyCraft.PROVIDER_KEY,
+                    )
+                }
+                twoFactorGate.resume(fresh.copy(mintedNow = true))
             }
             .onFailure { failure ->
                 if (failure is hivens.core.api.TwoFactorRequiredException) gateUid = failure.uid.orEmpty()
@@ -453,23 +465,30 @@ fun FrameWindowScope.AppShellContent(
                 gateBusy = true
                 gateError = null
                 gateScope.launch {
-                    val stored = accountStore.accountFor(hivens.core.data.PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                    val stored = withContext(Dispatchers.IO) {
+                        accountStore.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                    }
                     val pass = stored?.cachedPassword.orEmpty()
                     runCatching {
                         withContext(Dispatchers.IO) {
                             authProvider.completeTwoFactor(
                                 username = stored?.playerName.orEmpty(),
                                 password = pass,
-                                serverId = stored?.serverId.orEmpty(),
+                                serverId = pendingRequest.serverId,
                                 uid = gateUid.orEmpty(),
                                 code = code,
                             )
                         }
+                    }.mapCatching { session ->
+                        // Inside the same runCatching: a vault write can fail (libvault
+                        // degrades rather than prompts), and letting that escape left
+                        // the dialog open with no error and the gate stuck forever.
+                        withContext(Dispatchers.IO) {
+                            accountStore.saveAccount(session, PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                        }
+                        session
                     }.onSuccess { session ->
                         gateBusy = false
-                        withContext(Dispatchers.IO) {
-                            accountStore.saveAccount(session, hivens.core.data.PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
-                        }
                         twoFactorGate.resume(session)
                     }.onFailure { failure ->
                         gateBusy = false
@@ -489,13 +508,13 @@ fun FrameWindowScope.AppShellContent(
     // launcher re-authenticating and breaking itself.
     LaunchedEffect(controller) {
         controller.events.collect { event ->
-            if (event !is hivens.core.launch.LaunchLogEvent.TwoFactorDetected) return@collect
-            val saved = accountStore.accountFor(hivens.core.data.PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+            if (event !is LaunchLogEvent.TwoFactorDetected) return@collect
+            val saved = accountStore.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
             if (saved == null || saved.twoFactor) return@collect
             runCatching {
                 accountStore.saveAccount(
                     saved.copy(twoFactor = true),
-                    hivens.core.data.PackAuthRequirement.SmartyCraft.PROVIDER_KEY,
+                    PackAuthRequirement.SmartyCraft.PROVIDER_KEY,
                 )
             }.onSuccess {
                 ActionRing.record("Marked ${saved.playerName} as a 2FA account: no silent re-login from here")

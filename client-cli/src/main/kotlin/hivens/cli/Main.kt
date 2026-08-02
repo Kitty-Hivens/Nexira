@@ -188,7 +188,6 @@ private fun renderEvent(event: LaunchLogEvent): String = when (event) {
     LaunchLogEvent.InstanceUnverified ->
         "instance not verified (no roster on disk); launching without a token -- sync the pack"
     LaunchLogEvent.TwoFactorDetected -> "(2FA account detected; no silent re-login from here)"
-    LaunchLogEvent.TwoFactorSessionKept -> "(2FA: keeping the confirmed session; a refresh would invalidate it)"
     LaunchLogEvent.OfflineSkipSync -> "(offline: skipping file sync)"
     LaunchLogEvent.Launching -> "launching game process..."
     is LaunchLogEvent.Error -> "error: ${renderError(event.reason)}"
