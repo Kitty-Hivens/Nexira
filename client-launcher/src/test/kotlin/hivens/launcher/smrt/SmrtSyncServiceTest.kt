@@ -15,6 +15,7 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
@@ -185,6 +186,12 @@ class SmrtSyncServiceTest {
         val dir = tempDir("blocked")
         val service = syncService()
         service.sync("test", dir)
+
+        // Denying the delete is expressed through directory permissions, which is a
+        // POSIX notion; Windows models this with ACLs and the test does not apply
+        // there. The behaviour under test is platform-independent -- what varies is
+        // only how one arranges for a delete to fail.
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runTest
 
         val planted = dir.resolve("mods/cheat.jar")
         Files.write(planted, "CHEAT".toByteArray())
