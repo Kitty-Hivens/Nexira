@@ -4,6 +4,10 @@ import hivens.core.data.SessionData
 import hivens.core.launch.SyncProgress
 import java.nio.file.Path
 
+@Deprecated(
+    "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). Do not build on it -- nothing new should reach clients/.",
+    level = DeprecationLevel.WARNING,
+)
 interface IFileDownloadService {
     /**
      * Parses the manifest, downloads files, unpacks `extra.zip`.
