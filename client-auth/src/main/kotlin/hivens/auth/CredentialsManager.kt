@@ -73,6 +73,12 @@ class CredentialsManager(
             uuid = session.uuid,
             uid = session.uid.ifBlank { null },
             displayName = session.playerName,
+            // Sticky: a re-login that happens to arrive without the flag must not
+            // clear what an earlier second factor established.
+            twoFactor = session.twoFactor ||
+                readAccountsFile()?.accounts?.firstOrNull {
+                    it.accountId == accountId && it.providerId == providerId
+                }?.twoFactor == true,
         )
         val current = readAccountsFile() ?: SavedAccountsFile()
         val merged = current.accounts.filterNot { it.accountId == accountId && it.providerId == providerId } + account
@@ -125,6 +131,7 @@ class CredentialsManager(
             accessToken = accessToken,
             cachedPassword = secret(account, FIELD_PASSWORD),
             refreshToken = secret(account, FIELD_REFRESH_TOKEN),
+            twoFactor = account.twoFactor,
             status = null,
         )
     }
@@ -271,6 +278,15 @@ class CredentialsManager(
         val uuid: String = "",
         val uid: String? = null,
         val displayName: String = "",
+        /**
+         * Whether this account answers to a second factor. Persisted because it is a
+         * property of the ACCOUNT, not of one sign-in: a session restored without it
+         * looks ordinary, and the launcher then re-authenticates before a launch --
+         * which on SmartyCraft invalidates the session the user just unlocked with a
+         * code. Absent in records written before this field existed, and false is the
+         * right reading there: the gate marks the account the first time it is seen.
+         */
+        val twoFactor: Boolean = false,
     )
 
     @Serializable
