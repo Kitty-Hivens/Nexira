@@ -580,21 +580,6 @@ class LauncherController(
             return Prepared.Bail
         }
 
-        // 2b. The instance is what the pack says it is, or it does not launch with
-        // what was added to it. Sync already drops anything the manifest does not
-        // name, but it only runs on install / update / repair, and the window
-        // between two of those is wide enough to drop a jar into mods/ by hand --
-        // a cheat client among them. Held against the roster written on disk at
-        // sync time, so this works with no network and an offline launch is
-        // covered too.
-        val verdict = smrtSyncService.enforceRoster(clientDir)
-        if (verdict.removed.isNotEmpty()) {
-            ActionRing.record(
-                "Pack launch ${refreshedInstance.displayName}: removed ${verdict.removed.size} file(s) absent from the pack",
-            )
-            emit(LaunchLogEvent.ForeignContentRemoved(verdict.removed))
-        }
-
         // 3. Auth requirement: refresh the session right before spawn. Mirrors
         // the SC server path's pre-spawn re-auth.
         //
@@ -608,6 +593,32 @@ class LauncherController(
         //   mods/, and a token is exactly what an unvouched-for jar would want.
         // - A refresh that did not go through: covered in preparePackAuth.
         val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
+
+        // 2b. Hold the instance to the pack -- but only where a token is at stake.
+        // A server-bound pack is the case that matters: we are about to hand the
+        // game a session that logs into someone's server, and a jar the pack never
+        // named is what that session would be lent to. A pack with no binding has no
+        // server and gets no token, so what its owner puts in mods/ is their game and
+        // none of our business.
+        //
+        // Held against the roster written to the instance at sync time, so it answers
+        // with no network and an offline launch is covered too.
+        // The manifest's OWN declaration, not the router's answer: the router falls
+        // back to Microsoft for any mirror pack, so it is true of a solo pack as well
+        // and would put every instance under the strict rule again.
+        val serverBound = manifestSnapshot.authRequirement != null
+        val verdict = if (serverBound) {
+            smrtSyncService.enforceRoster(clientDir)
+        } else {
+            RosterVerdict(verified = true)
+        }
+        if (verdict.removed.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${refreshedInstance.displayName}: removed ${verdict.removed.size} file(s) absent from the pack",
+            )
+            emit(LaunchLogEvent.ForeignContentRemoved(verdict.removed))
+        }
+
         var session = currentSession
         if (settings.isOfflineMode || !verdict.verified) {
             if (verdict.verified) {

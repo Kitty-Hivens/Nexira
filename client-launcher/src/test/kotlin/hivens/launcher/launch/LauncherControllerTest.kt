@@ -811,6 +811,21 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `a pack with no server binding is neither swept nor stripped of a token`() = runTest {
+        // The strictness exists because a bound pack is handed a session that logs
+        // into someone's server. A pack with no binding gets no token and has no
+        // server, so what its owner keeps in mods/ is their own game.
+        coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = false)
+
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+            packInstance = scBoundPackInstance(authRequirement = null),
+        )
+
+        coVerify(exactly = 0) { packSyncService.enforceRoster(any()) }
+    }
+
+    @Test
     fun `an unverified instance launches with no token`() = runTest {
         // No roster on disk -- nothing vouched for what is in mods/, so the game
         // process gets a session that cannot join anything.
@@ -818,6 +833,9 @@ class LauncherControllerTest {
 
         val session = capturePackSession(
             SessionData(playerName = "tester", uuid = "online-uuid", accessToken = "live-token"),
+            // The strict rule applies to a pack that declares a binding -- that is the
+            // launch which would otherwise be handed a session for someone's server.
+            packInstance = scBoundPackInstance(),
         )
 
         assertEquals("", session?.accessToken, "an unverified instance must not carry a token")
@@ -841,7 +859,11 @@ class LauncherControllerTest {
         coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = false)
         val events = mutableListOf<LaunchLogEvent>()
 
-        capturePackSession(SessionData(playerName = "tester", uuid = "u", accessToken = "live"), events = events)
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+            packInstance = scBoundPackInstance(),
+            events = events,
+        )
 
         assertTrue(
             events.any { it is LaunchLogEvent.InstanceUnverified },
