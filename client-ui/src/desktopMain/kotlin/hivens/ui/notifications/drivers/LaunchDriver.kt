@@ -7,6 +7,7 @@ import hivens.core.activity.ActivityPhase
 import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.launch.AuthRefreshFailure
 import hivens.core.launch.LaunchError
@@ -286,7 +287,14 @@ class LaunchDriver(
             // again, so the player clicks Play once and types a code once.
             indications.setLaunchIndication(target.id, null)
             activities.dismiss(launchKey(target))
-            twoFactorGate.request(target.displayName) { session ->
+            val serverId = when (target) {
+                is LaunchTarget.Server -> target.server.assetDir
+                is LaunchTarget.Pack -> (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.SmartyCraft)
+                    ?.serverId
+                    ?: (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.Both)?.serverId
+                    ?: ""
+            }
+            twoFactorGate.request(target.displayName, serverId) { session ->
                 appScope.launch {
                     observe(target)
                     when (target) {

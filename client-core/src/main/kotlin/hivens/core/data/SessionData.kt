@@ -53,6 +53,18 @@ data class SessionData(
      * refresh silently must check this first and go with the session in hand.
      */
     val twoFactor: Boolean = false,
+
+    /**
+     * True only for a session minted moments ago by an interactive sign-in, and never
+     * persisted: [hivens.core.api.interfaces.ICredentialStore] rebuilds sessions
+     * without it, so anything restored from disk reads false.
+     *
+     * That is the whole point. A two-factor launch demands a session made FOR that
+     * launch; without a way to tell "just minted" from "was lying around", the
+     * relaunch that answers the demand would trip the same demand again and ask for
+     * code after code.
+     */
+    val mintedNow: Boolean = false,
 ) {
     // Redact the three secrets (accessToken / cachedPassword / refreshToken) so a
     // stray log line or an exception carrying the session never prints them. The

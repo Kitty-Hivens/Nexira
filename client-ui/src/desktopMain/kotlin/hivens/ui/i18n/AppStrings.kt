@@ -255,8 +255,6 @@ interface AppStrings {
     val stateOfflineSkipSync: String
     /** Files dropped from mods/ before spawn because the pack does not name them. */
     fun stateForeignContentRemoved(count: Int, names: String): String
-    /** A 2FA session is carried into the launch instead of being refreshed. */
-    val stateTwoFactorSessionKept: String
     val stateOfflineNoClient: String
     val stateOfflineNoManifest: String
 

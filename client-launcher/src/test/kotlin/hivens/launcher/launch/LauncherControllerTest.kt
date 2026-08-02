@@ -825,6 +825,18 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `a session minted for this launch is not sent back for another code`() {
+        // The relaunch that answers a 2FA demand carries the session the code just
+        // produced. Without telling it apart from a stored one, the same demand fires
+        // again and the user is asked for code after code -- an endless prompt loop.
+        val minted = SessionData(playerName = "tester", accessToken = "fresh", twoFactor = true, mintedNow = true)
+        val stored = minted.copy(mintedNow = false)
+
+        assertTrue(minted.twoFactor && minted.mintedNow, "the freshly unlocked session is marked")
+        assertTrue(stored.twoFactor && !stored.mintedNow, "one restored from disk is not")
+    }
+
+    @Test
     fun `an unverified instance says so rather than passing for an offline launch`() = runTest {
         coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = false)
         val events = mutableListOf<LaunchLogEvent>()

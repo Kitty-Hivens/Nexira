@@ -172,7 +172,7 @@ class SmartyCraftAuthProvider(
             )
         }
         return buildSessionData(cachedResponse, password, serverId)
-            .copy(twoFactor = true)
+            .copy(twoFactor = true, mintedNow = true)
             .also { cacheSession(key, it) }
     }
 

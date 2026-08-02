@@ -23,10 +23,15 @@ class TwoFactorLaunchGate {
 
     /**
      * @param label what is being launched, for the prompt to name.
+     * @param serverId the SmartyCraft server this launch signs in for. The stored
+     *        credentials do not carry one -- the credential store rebuilds sessions
+     *        without it -- and a login against a blank server mints a token for the
+     *        wrong place, so the target has to supply it.
      * @param relaunch restarts that launch with the session the code produced.
      */
     data class Request(
         val label: String,
+        val serverId: String,
         val relaunch: (SessionData) -> Unit,
     )
 
@@ -34,8 +39,8 @@ class TwoFactorLaunchGate {
     val pending: StateFlow<Request?> = _pending.asStateFlow()
 
     /** Latest request wins: a second launch supersedes a prompt nobody answered. */
-    fun request(label: String, relaunch: (SessionData) -> Unit) {
-        _pending.value = Request(label, relaunch)
+    fun request(label: String, serverId: String, relaunch: (SessionData) -> Unit) {
+        _pending.value = Request(label, serverId, relaunch)
     }
 
     /** The user answered: hand the session to the waiting relaunch and close the slot. */
