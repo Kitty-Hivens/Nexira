@@ -1034,6 +1034,8 @@ object EnglishStrings : AppStrings {
     override val notifSessionStaleUnknown               = "The session could not be refreshed. The game starts on the old session."
     override val notifSessionStaleNoPassword            = "No saved password, so the session is never refreshed. Once it expires the server stops letting you in: sign in again."
     override fun notifForeignContentRemovedTitle(count: Int) = "Removed $count file(s) not in the pack"
+    override val notifInstanceUnverifiedTitle           = "Pack contents not verified"
+    override val notifInstanceUnverifiedBody            = "Nothing on disk says what this pack consists of, so the game starts without a sign-in and cannot join a server. Sync the pack (Settings -> Verify and repair) and launch again."
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Sign in to SmartyCraft to play this pack"
         else                                          -> "Sign in with '$providerKey' to play this pack"

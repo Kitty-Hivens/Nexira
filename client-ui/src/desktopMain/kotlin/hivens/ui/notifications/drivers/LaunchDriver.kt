@@ -161,6 +161,21 @@ class LaunchDriver(
             )
             return
         }
+        if (event is LaunchLogEvent.InstanceUnverified) {
+            // Critical and sticky, and it names the way out: the launch looks normal
+            // until the player tries to join a server, and nothing else on screen
+            // would tell them why they were refused.
+            notifications.push(
+                sourceKey = "content:${target.id}",
+                sender    = target.displayName,
+                iconUrl   = target.iconUrl,
+                severity  = Severity.Critical,
+                kind      = Kind.Sticky,
+                title     = s.notifInstanceUnverifiedTitle,
+                body      = s.notifInstanceUnverifiedBody,
+            )
+            return
+        }
         val (severity, body) = staleSessionWarning(event, s) ?: return
         notifications.push(
             // Own group rather than target.sourceKey: a launch that goes on to

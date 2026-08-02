@@ -65,6 +65,10 @@ fun LaunchLogCollector(
                     s.stateForeignContentRemoved(event.paths.size, event.paths.joinToString(", ")),
                     LogType.WARN,
                 )
+                is LaunchLogEvent.InstanceUnverified -> gameConsole.append(
+                    s.notifInstanceUnverifiedBody,
+                    LogType.WARN,
+                )
                 is LaunchLogEvent.OfflineSkipSync -> gameConsole.append(s.stateOfflineSkipSync, LogType.INFO)
                 is LaunchLogEvent.Launching -> gameConsole.append(s.stateLaunching, LogType.INFO)
                 is LaunchLogEvent.ProcessOutput -> {
