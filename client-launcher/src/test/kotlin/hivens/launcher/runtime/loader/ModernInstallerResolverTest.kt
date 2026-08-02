@@ -5,6 +5,9 @@ import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IJavaManager
 import hivens.launcher.runtime.MojangArtifact
 import hivens.launcher.runtime.MojangLibrary
+import hivens.launcher.runtime.MojangOs
+import hivens.launcher.runtime.MojangRule
+import hivens.launcher.runtime.libraryRulesAllow
 import hivens.launcher.runtime.MojangLibraryDownloads
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -87,6 +90,29 @@ class ModernInstallerResolverTest {
         } finally {
             staging.toFile().deleteRecursively()
         }
+    }
+
+    @Test
+    fun `a library ruled out for this host is not harvested`() {
+        // The failure this pins: a NeoForge version json lists ca.weblite:java-objc-bridge
+        // behind an osx rule, the installer rightly does not produce it on Windows or
+        // Linux, and harvesting it anyway failed the whole pack install.
+        val macOnly = MojangLibrary(
+            name = "ca.weblite:java-objc-bridge:1.1",
+            rules = listOf(MojangRule("allow", MojangOs("osx"))),
+        )
+        val everywhere = MojangLibrary(name = "net.foo:bar:1.0")
+
+        assertEquals(
+            listOf(everywhere),
+            listOf(everywhere, macOnly).filter { libraryRulesAllow(it.rules, "windows") },
+            "a mac-only library must be dropped before harvest on windows",
+        )
+        assertEquals(
+            listOf(everywhere, macOnly),
+            listOf(everywhere, macOnly).filter { libraryRulesAllow(it.rules, "osx") },
+            "and kept on the host it was meant for",
+        )
     }
 
     @Test

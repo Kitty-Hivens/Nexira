@@ -9,6 +9,7 @@ import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
+import hivens.core.net.BlockMapStore
 import hivens.core.net.Digest
 import hivens.core.net.RepairReport
 import hivens.core.net.DigestAlgorithm
@@ -268,11 +269,27 @@ class SmrtSyncService(
             log.warn("mods enforce: no roster for {}, mods/ left alone and the launch stays unverified", clientDir.fileName)
             return@withContext RosterVerdict(verified = false)
         }
-        val removed = InstanceMutationLock.withLock(clientDir) {
+        val sweep = InstanceMutationLock.withLock(clientDir) {
             pruneForeignEntries(clientDir, roster)
         }
-        RosterVerdict(verified = true, removed = removed)
+        if (sweep.blocked.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} entr(ies) could not be removed from {}: {}",
+                sweep.blocked.size, clientDir.fileName, sweep.blocked,
+            )
+        }
+        RosterVerdict(
+            // Anything left behind means the instance was not brought in line, and a
+            // file that resists deletion is the likeliest thing to have been left on
+            // purpose.
+            verified = sweep.blocked.isEmpty(),
+            removed = sweep.removed,
+            blocked = sweep.blocked,
+        )
     }
+
+    /** What one sweep of `mods/` managed to remove, and what refused to go. */
+    private data class Sweep(val removed: List<String>, val blocked: List<String>)
 
     private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
 
@@ -349,28 +366,35 @@ class SmrtSyncService(
      * Walked deepest-first so a directory is considered after its children; one that
      * still holds a kept file refuses to delete and is left alone.
      */
-    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): List<String> {
+    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): Sweep {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return emptyList()
+        if (!Files.isDirectory(modsDir)) return Sweep(emptyList(), emptyList())
         val removed = mutableListOf<String>()
+        val blocked = mutableListOf<String>()
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
+                // The launcher's own bookkeeping is not foreign content. Block maps
+                // live beside the mods they describe, and dropping them is silent --
+                // the next repair refetches whole files instead of damaged blocks.
+                if (modsDir.relativize(p).firstOrNull()?.toString() == BlockMapStore.DIR_NAME) return@forEach
                 val keep = Files.isRegularFile(p) &&
                     p.parent == modsDir &&
                     p.fileName.toString() in expected
                 if (keep) return@forEach
-                runCatching {
-                    fileOpRetry("smrt drop foreign $p") { Files.delete(p) }
-                    // Joined over the path's own segments rather than toString(): the
-                    // report is read by a person and matched against manifest paths,
-                    // both of which use '/' whatever the host separator is.
-                    removed += modsDir.relativize(p).joinToString("/")
-                }
+                // Joined over the path's own segments rather than toString(): the
+                // report is read by a person and matched against manifest paths, both
+                // of which use '/' whatever the host separator is.
+                val rel = modsDir.relativize(p).joinToString("/")
+                runCatching { fileOpRetry("smrt drop foreign $p") { Files.delete(p) } }
+                    .onSuccess { removed += rel }
+                    // A directory that still holds a kept file is expected here and is
+                    // not an obstruction; anything else refused to go and is reported.
+                    .onFailure { if (!Files.isDirectory(p)) blocked += rel }
             }
         }
         if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)
-        return removed
+        return Sweep(removed, blocked)
     }
 
     /**
