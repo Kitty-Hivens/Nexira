@@ -14,6 +14,10 @@ interface ILauncherService {
      * [SpawnResult] -- [SpawnResult.Started] with the process handle, or
      * [SpawnResult.Failed] carrying the semantic launch error.
      */
+    @Deprecated(
+        "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). New work belongs on launchPackClient.",
+        level = DeprecationLevel.WARNING,
+    )
     suspend fun launchClient(
         sessionData: SessionData,
         serverProfile: ServerProfile,
@@ -23,6 +27,10 @@ interface ILauncherService {
     ): SpawnResult
 
     /** Same as [launchClient], plus streams stdout / stderr through [onLog]. */
+    @Deprecated(
+        "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). New work belongs on launchPackClient.",
+        level = DeprecationLevel.WARNING,
+    )
     suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
