@@ -27,6 +27,7 @@ lives in this English file.
 ## [Unreleased]
 
 ### Fixed
+- The strict content rule applies to packs that declare a server binding, not to every pack. It exists because a bound launch is handed a session that signs into someone's server, and a jar the pack never named is what that session would be lent to; a pack with no binding has no server and receives no token, so what its owner keeps in `mods/` is their own game. The check also could not have distinguished the two before: `PackAuthRouter.requirementFor` falls back to Microsoft for any mirror pack, so "has a requirement" was true of a solo pack as well -- the manifest's own declaration is what decides now.
 - An ordinary sync no longer deletes a loader's cache. `pruneOrphanMods` removed every loadable file that was not a top-level entry the manifest names, which on a Connector pack meant wiping `.connector`'s remapped jars on each sync -- silently, at the cost of a full remap on the next launch. The two sweeps (source-change wipe and stray-jar prune) collapse into one rule that matches what is actually being defended against: a `.jar` or `.zip` the pack does not name goes, dot-directories are not walked, and nothing else under `mods/` is the sweep's business. The source marker stays as a log line; it no longer selects behaviour, because there is only one behaviour left. The recursion into subdirectories is a 1.12.2 leftover from SC's `mods/<mcversion>/` layout -- on a modern pack the only things down there are other tools' caches.
 
 ## [2.4.0-beta3] - 2026-08-02
