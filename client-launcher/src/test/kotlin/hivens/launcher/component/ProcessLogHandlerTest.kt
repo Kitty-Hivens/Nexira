@@ -119,9 +119,13 @@ class ProcessLogHandlerTest {
 
     // ── line assembly ───────────────────────────────────────────────────────
 
-    private fun assemble(vararg chunks: String, maxLen: Int = 8192): List<String> {
+    private fun assemble(
+        vararg chunks: String,
+        maxLen: Int = 8192,
+        starveThreshold: Int = maxLen / 4,
+    ): List<String> {
         val out = ArrayList<String>()
-        val a = LineAssembler(maxLen) { out.add(it) }
+        val a = LineAssembler(maxLen, starveThreshold) { out.add(it) }
         for (ch in chunks) a.feed(ch.toCharArray(), ch.length)
         a.finish()
         return out
@@ -150,5 +154,58 @@ class ProcessLogHandlerTest {
 
     @Test fun `assembler emits a blank line for a bare newline`() {
         assertEquals(listOf(""), assemble("\n"))
+    }
+
+    // ── record fallback for a newline-starved stream ────────────────────────
+
+    @Test fun `newline starved stream splits per log record`() {
+        val run = "[15:39:30] [main|Foundation] 1468" +
+            "[15:39:31] [main|FML] 2024" +
+            "[15:39:33] [main|Cleanroom] 4348"
+        assertEquals(
+            listOf(
+                "[15:39:30] [main|Foundation] 1468",
+                "[15:39:31] [main|FML] 2024",
+                "[15:39:33] [main|Cleanroom] 4348",
+            ),
+            assemble(run, starveThreshold = 20),
+        )
+    }
+
+    @Test fun `record split survives a boundary between chunks`() {
+        assertEquals(
+            listOf("[15:39:30] [main|FML] a", "[15:39:31] [main|FML] b"),
+            assemble("[15:39:30] [main|F", "ML] a[15:39:31] [main|FML] b", starveThreshold = 20),
+        )
+    }
+
+    @Test fun `healthy line is not split on a timestamp inside the message`() {
+        // The threshold never trips, so a chat line quoting a clock stays whole.
+        assertEquals(
+            listOf("[15:39:30] [main/INFO]: <Steve> meet at [12:00:00] sharp"),
+            assemble("[15:39:30] [main/INFO]: <Steve> meet at [12:00:00] sharp\n"),
+        )
+    }
+
+    @Test fun `a newline unlatches the record fallback`() {
+        val out = assemble("x".repeat(45), "\n", "[10:00:00] a [11:00:00] b\n", starveThreshold = 40)
+        assertEquals(listOf("x".repeat(45), "[10:00:00] a [11:00:00] b"), out)
+    }
+
+    @Test fun `record split cuts before the colour prefix, not inside it`() {
+        val run = "$esc[93m[15:39:30]$esc[m msg1 $esc[93m[15:39:31]$esc[m msg2"
+        assertEquals(
+            listOf("$esc[93m[15:39:30]$esc[m msg1 ", "$esc[93m[15:39:31]$esc[m msg2"),
+            assemble(run, starveThreshold = 20),
+        )
+    }
+
+    @Test fun `cap flush keeps a half written escape with its remainder`() {
+        // Cutting at the cap mid-sequence stranded the tail ("93m") at the head of
+        // the next line, where it rendered as literal text.
+        assertEquals(
+            listOf("a".repeat(10), "$esc[93m"),
+            assemble("a".repeat(10) + "$esc[93m", maxLen = 12, starveThreshold = 10_000),
+        )
     }
 }

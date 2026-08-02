@@ -883,6 +883,7 @@ private fun surfaceIcon(surface: SurfaceId): IconKey =
         "appshell.rightrail" -> NxIcon.ViewQuilt
         "appshell.topbar"    -> NxIcon.Layers
         "appshell.body"      -> NxIcon.ViewQuilt
+        "appshell.overlay"   -> NxIcon.Layers
         else                 -> NxIcon.Home
     }
 
@@ -895,6 +896,7 @@ private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = w
     "appshell.rightrail"  -> s.editorSurfShortRightRail
     "appshell.topbar"     -> s.editorSurfShortTopBar
     "appshell.body"       -> s.editorSurfShortBody
+    "appshell.overlay"    -> s.editorSurfShortOverlay
     "about"               -> s.editorSurfShortAbout
     "bg.settings"         -> s.editorSurfShortBg
     "profile"             -> s.editorSurfShortProfile
@@ -912,6 +914,7 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
     "appshell.rightrail"  -> s.editorSurfRightRail
     "appshell.topbar"     -> s.editorSurfTopBar
     "appshell.body"       -> s.editorSurfBody
+    "appshell.overlay"    -> s.editorSurfOverlay
     "about"               -> s.editorSurfAbout
     "bg.settings"         -> s.editorSurfBg
     "profile"             -> s.editorSurfProfile
@@ -1029,6 +1032,7 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
     // surface (when there is one) is first, so it stays the default selection.
     return listOfNotNull(main) + listOf(
         SurfaceId("appshell.topbar"),
+        SurfaceId("appshell.overlay"),
         SurfaceId("appshell.leftrail"),
         SurfaceId("appshell.rightrail"),
         SurfaceId("appshell.body"),

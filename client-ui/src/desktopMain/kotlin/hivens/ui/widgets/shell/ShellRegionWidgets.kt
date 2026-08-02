@@ -233,8 +233,17 @@ fun ShellCenterRegion(instance: WidgetInstance) {
                 drawPath(wedge, chrome)
             },
         )
+        // Floating overlay lane. Inside the centre rather than at the window
+        // root so anything docked here is bounded by the content column and
+        // never rides over the rails, and above centerBody so it is not
+        // scrolled away by whatever screen is mounted. It reserves no space:
+        // an empty slot measures to nothing and an occupied one draws on top.
+        SlotRenderer(SurfaceId(OVERLAY_SURFACE), SlotId("bottom"), Modifier.fillMaxSize())
     }
 }
+
+/** Sub-surface for widgets that float over the content rather than sit in it. */
+private const val OVERLAY_SURFACE = "appshell.overlay"
 
 private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width -- it is not part of the layout; reopen via Ctrl+N / edit-mode Tune
 private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-collapses the right rail

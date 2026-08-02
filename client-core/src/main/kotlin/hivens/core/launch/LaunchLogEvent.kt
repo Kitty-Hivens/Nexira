@@ -41,8 +41,23 @@ sealed class LaunchLogEvent {
     /** Cached credentials missing or blank; auth attempted with offline fallback. */
     data object NoPassword : LaunchLogEvent()
 
-    /** Non-2FA auth failure; flow continues with stale session if any. */
-    data class AuthFailed(val message: String?) : LaunchLogEvent()
+    /**
+     * Non-2FA auth failure; flow continues with stale session if any. [cause]
+     * separates the cases the UI has to phrase differently -- see
+     * [AuthRefreshFailure], which is the whole reason this carries more than
+     * the exception's message.
+     */
+    data class AuthFailed(
+        val message: String?,
+        val cause: AuthRefreshFailure = AuthRefreshFailure.Unknown,
+    ) : LaunchLogEvent()
+
+    /**
+     * Files removed from `mods/` before spawn because the pack does not name them.
+     * Carries the relative paths so the console can list exactly what went, rather
+     * than leaving the user to guess why a mod they added is not loading.
+     */
+    data class ForeignContentRemoved(val paths: List<String>) : LaunchLogEvent()
 
     data object OfflineSkipSync : LaunchLogEvent()
 
@@ -60,4 +75,27 @@ sealed class LaunchLogEvent {
      * (and only when) they want the full log.
      */
     data class Error(val reason: LaunchError) : LaunchLogEvent()
+}
+
+/**
+ * Why the pre-spawn session refresh did not produce a fresh token.
+ *
+ * The launch continues regardless -- the previous token is often still good,
+ * and refusing to start a game over a refresh that may not have mattered would
+ * cost more launches than it saves. What the outcome does decide is how the
+ * UI phrases it, because the two failures need different advice: a server that
+ * rejected the credentials will reject the game's join too ("Failed to verify
+ * username" once the client is already in the multiplayer menu, with nothing
+ * pointing back at the launcher), while a server nothing could reach says
+ * nothing about whether the token in hand still works.
+ */
+enum class AuthRefreshFailure {
+    /** The auth server answered and refused: bad credentials, dead session, locked account. */
+    Rejected,
+
+    /** Nothing reached the auth server (DNS, connect, reset, TLS), so the credentials were never judged. */
+    Unreachable,
+
+    /** Anything else -- an unrecognised failure that is not safe to describe as either of the above. */
+    Unknown,
 }

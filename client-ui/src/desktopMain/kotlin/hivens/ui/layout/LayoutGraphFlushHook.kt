@@ -1,5 +1,6 @@
 package hivens.ui.layout
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 
@@ -21,19 +22,21 @@ import org.slf4j.LoggerFactory
 class LayoutGraphFlushHook(
     private val repo: LayoutGraphRepository,
 ) {
+
+    // Every lambda below is instantiated here rather than at shutdown, because a
+    // lambda's class loads when its first instance is created. A shutdown hook
+    // that first touches its own generated classes while the process is exiting
+    // cannot run at all if what it was compiled from is no longer readable -- a
+    // self-update that replaced the running image, or a rebuild over a live
+    // process. Losing the flush is exactly the case the flush exists for.
+    private val flush: suspend CoroutineScope.() -> Unit = { repo.flush() }
+    private val body: () -> Unit = { runBlocking(block = flush) }
+    private val onFailure: (Throwable) -> Unit = { err ->
+        LoggerFactory.getLogger("LayoutGraphFlushHook").warn("Layout flush on shutdown failed", err)
+    }
+    private val task = Runnable { runCatching(body).onFailure(onFailure) }
+
     init {
-        Runtime.getRuntime().addShutdownHook(
-            Thread(
-                {
-                    runCatching {
-                        runBlocking { repo.flush() }
-                    }.onFailure { err ->
-                        LoggerFactory.getLogger("LayoutGraphFlushHook")
-                            .warn("Layout flush on shutdown failed", err)
-                    }
-                },
-                "nexira-layout-flush",
-            )
-        )
+        Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-layout-flush"))
     }
 }

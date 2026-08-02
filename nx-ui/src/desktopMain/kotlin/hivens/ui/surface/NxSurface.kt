@@ -60,17 +60,35 @@ fun NxSurface(
     tier: FrostTier = FrostTier.Frosted,
     hairline: Boolean = true,
     opaque: Boolean = false,
+    /**
+     * Whether the plane sits above the page and casts a shadow for it. Separate
+     * from [tier] on purpose: how much a surface blurs and whether it is lifted
+     * are different questions, and a tier that answered both meant a chrome rail
+     * could not be plain without also being flat on the page, nor lifted without
+     * also being frosted. The elevation itself comes from the active style, so a
+     * flat form takes it to nothing.
+     */
+    elevated: Boolean = false,
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    // Clear is the transparent tier: no opaque body, no bevel -- just the thin glass coat.
+    // Clear is the transparent tier: no body, no bevel, just the thin glass coat.
     // On dark it reads as glass over the wallpaper; on light FrostSurface floors the
     // unbacked Fill to opaque (Rule 4). It tints from the Fill's own Surface role @0.35,
-    // NOT the [level] ladder role -- [level] is inert here -- keeping exact parity with the
-    // old glassSurfaceAlpha(0.35) chrome. It fades on dark with no wallpaper: the
+    // NOT the [level] ladder role -- [level] is inert there -- keeping exact parity with
+    // the old glassSurfaceAlpha(0.35) chrome. It fades on dark with no wallpaper: the
     // deliberate, chosen cost of Clear.
-    if (tier == FrostTier.Clear) {
-        FrostSurface(if (glass) tier.toLayers() else emptyList(), modifier, shape, interactionSource, content)
+    //
+    // [opaque] overrides that. A surface that must not let content read through is not
+    // asking for a coat at all, so Clear plus opaque is the plainest plane the library
+    // has: the tonal body, the bevel hairline, and whatever depth the tier casts. No
+    // fill over a fill, no blur under something solid, nothing to tune.
+    if (tier == FrostTier.Clear && !opaque) {
+        val bare = buildList {
+            if (glass) addAll(tier.toLayers())
+            if (elevated) add(DropShadow())
+        }
+        FrostSurface(bare, modifier, shape, interactionSource, content)
         return
     }
 
@@ -79,10 +97,23 @@ fun NxSurface(
     val dark = bodyColor.luminance() < 0.5f
     val coat = if (glass) tier.coatLayers() else emptyList()
 
+    val bodyAlpha = if (opaque) 1f else bodyFloor(dark)
     val layers = buildList {
-        addAll(coat.filterIsInstance<Backdrop>())          // blurred wallpaper, under the body
-        add(Body(role, if (opaque) 1f else bodyFloor(dark)))
-        addAll(coat.filterNot { it is Backdrop })          // wash / texture / edge bands, over the body
+        // A blur under a body nothing can see through is work thrown away: the
+        // wallpaper slice gets sampled and blurred every frame and is then
+        // covered completely. An opaque surface skips it.
+        if (bodyAlpha < 1f) addAll(coat.filterIsInstance<Backdrop>())
+        add(Body(role, bodyAlpha))
+        // A translucent coat over a solid body is a second fill doing nothing the
+        // first did not: it only shifts the tone the ladder already chose.
+        if (bodyAlpha < 1f) addAll(coat.filterNot { it is Backdrop })
+        else addAll(coat.filterNot { it is Backdrop || it is Fill })
+        // Authoritative in both directions. A preset carries its own DropShadow, so
+        // testing only for absence meant Frosted and Heavy were always lifted and
+        // the flag could add a shadow but never remove one -- half of the split it
+        // exists to make.
+        removeAll { it is DropShadow }
+        if (elevated) add(DropShadow())
         if (hairline) add(EdgeBorder(explicitColor = bevelHairline(bodyColor)))
         if (interactionSource != null) add(StateOverlay())
     }

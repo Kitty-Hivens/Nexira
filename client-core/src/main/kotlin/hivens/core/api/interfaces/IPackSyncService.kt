@@ -16,4 +16,30 @@ interface IPackSyncService {
      * empty list means every flip landed.
      */
     fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String>
+
+    /**
+     * Holds an installed instance to the pack it claims to be: deletes everything
+     * under `mods/` the pack does not name, and reports whether the check could be
+     * made at all.
+     *
+     * Called before every spawn, not just on sync, because the gap between two syncs
+     * is where a jar gets added by hand. Answers from the roster written to the
+     * instance at sync time, so an offline launch is held to the same rule.
+     */
+    suspend fun enforceRoster(clientDir: Path): RosterVerdict
 }
+
+/**
+ * Outcome of holding an instance to its pack.
+ *
+ * [verified] false means there was no roster to check against -- an instance from
+ * before the file existed, or one whose roster could not be read. Nothing is deleted
+ * in that case (an empty roster is indistinguishable from "the pack has no mods", and
+ * acting on the guess would empty a working instance), but the launch is not entitled
+ * to a session token either: an unverified instance is exactly the one that might be
+ * carrying something it should not.
+ */
+data class RosterVerdict(
+    val verified: Boolean,
+    val removed: List<String> = emptyList(),
+)

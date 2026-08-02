@@ -62,11 +62,21 @@ fun NxButton(
         NxButtonStyle.Secondary   -> Color.Transparent
         NxButtonStyle.Tertiary    -> Color.Transparent
     }
-    val content: Color = when (style) {
-        NxButtonStyle.Primary     -> Color.White
-        NxButtonStyle.Destructive -> Color.White
-        NxButtonStyle.Secondary   -> palette.textPrimary
-        NxButtonStyle.Tertiary    -> palette.primary
+    // Alpha alone does not read as off on a filled style: a destructive button at
+    // forty-five percent is still a saturated slab, so a blocked delete looked
+    // armed. Disabled drops the fill entirely, which is what "disabled" already
+    // looks like on the quiet styles -- one appearance for one state.
+    //
+    // Which means the ink has to move with it. White was chosen to sit on a filled
+    // primary or error; with the fill gone it lands on the page instead, and white
+    // at forty-five percent over a light surface is about 1.1:1 -- the label simply
+    // is not there. A disabled control has to be readable, that is the whole point
+    // of showing it rather than hiding it.
+    val content: Color = when {
+        !enabled -> palette.textPrimary
+        style == NxButtonStyle.Primary || style == NxButtonStyle.Destructive -> Color.White
+        style == NxButtonStyle.Secondary -> palette.textPrimary
+        else -> palette.primary
     }
     val bordered = style == NxButtonStyle.Secondary
     val dim = if (enabled) 1f else 0.45f
@@ -82,7 +92,10 @@ fun NxButton(
             modifier              = modifier
                 .let { if (minHeight != null) it.heightIn(min = minHeight) else it }
                 .clip(shape)
-                .background(container.copy(alpha = container.alpha * dim))
+                .background(
+                    if (enabled) container
+                    else Color.Transparent,
+                )
                 .let { if (bordered) it.border(1.dp, palette.outline.copy(alpha = dim), shape) else it }
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(pad),

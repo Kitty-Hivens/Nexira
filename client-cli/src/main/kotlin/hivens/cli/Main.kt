@@ -179,7 +179,12 @@ private fun renderEvent(event: LaunchLogEvent): String = when (event) {
     LaunchLogEvent.OfflineSkipAuth -> "(offline: skipping auth)"
     is LaunchLogEvent.AuthSucceeded -> "auth ok (${event.uuid})"
     LaunchLogEvent.NoPassword -> "(no cached password; offline fallback)"
-    is LaunchLogEvent.AuthFailed -> "auth failed: ${event.message ?: "unknown error"}"
+    // The cause decides what a stale session means here too: launching on it is
+    // hopeful after Unreachable and hopeless after Rejected.
+    is LaunchLogEvent.AuthFailed ->
+        "auth failed (${event.cause.name.lowercase()}): ${event.message ?: "unknown error"}"
+    is LaunchLogEvent.ForeignContentRemoved ->
+        "removed ${event.paths.size} file(s) absent from the pack: ${event.paths.joinToString(", ")}"
     LaunchLogEvent.OfflineSkipSync -> "(offline: skipping file sync)"
     LaunchLogEvent.Launching -> "launching game process..."
     is LaunchLogEvent.Error -> "error: ${renderError(event.reason)}"

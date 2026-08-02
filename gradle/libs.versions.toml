@@ -65,7 +65,11 @@ jbsdiff           = "1.0"
 # 0.1.2: private D-Bus connection (dbus_bus_get_private) so a sibling libdbus
 # user's pump (libnotify, libvault) can't steal the tray host's property queries
 # off the shared bus -- the tray icon now renders on cold start.
-libtray           = "0.1.2"
+# 0.1.3: the polling thread answers the tray host itself, so a reply is no
+# longer held until the pump's poll interval expires -- opening the menu cost
+# ~1s per D-Bus round trip. Icon pixmaps marshal in one call instead of one
+# downcall per byte, and oversized icons are scaled before a backend sees them.
+libtray           = "0.1.3"
 
 # Pure-Panama desktop notifications (Kitty-Hivens/libnotify) -- freedesktop
 # Notifications over D-Bus on Linux, WinRT toast on Windows, NSUserNotification

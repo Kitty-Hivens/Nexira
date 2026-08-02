@@ -124,6 +124,14 @@ Source: "client-ui\build\customJpackageImage\Nexira\*"; \
   DestDir: "{app}"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; Class-data archive from the previous install. The launcher writes it next to
+; the jar it was dumped from (-XX:SharedArchiveFile=$APPDIR\app.jsa) and the JVM
+; does not re-create a stale one: leaving it behind makes every launch of the new
+; build report a class-path mismatch and run without class sharing. Removing it
+; here lets the first launch after an update write a fresh one.
+Type: files; Name: "{app}\app\app.jsa"
+
 [Icons]
 ; Start Menu
 Name: "{autoprograms}\{#MyAppName}"; \

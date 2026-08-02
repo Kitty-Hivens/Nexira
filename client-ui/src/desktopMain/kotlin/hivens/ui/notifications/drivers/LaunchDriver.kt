@@ -1,10 +1,16 @@
 package hivens.ui.notifications.drivers
 
 import hivens.auth.OfflineAuthProvider
+import hivens.core.activity.ActivityAction
+import hivens.core.activity.ActivityKind
+import hivens.core.activity.ActivityPhase
+import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
+import hivens.core.launch.AuthRefreshFailure
 import hivens.core.launch.LaunchError
+import hivens.core.launch.LaunchLogEvent
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.i18n.AppStrings
@@ -39,6 +45,10 @@ class LaunchDriver(
     private val controller: LauncherController,
     private val notifications: NotificationCenter,
     private val indications: IndicationCenter,
+    // The single account of what the launcher is doing. This driver is the
+    // only place that knows which pack a LaunchState belongs to, so launch
+    // and game entries are reported from here rather than from ActivityDriver.
+    private val activities: ActivityRegistry,
     private val sessions: SessionRegistry,
     private val gameConsole: GameConsoleService,
     private val appScope: CoroutineScope,
@@ -70,6 +80,14 @@ class LaunchDriver(
         observerJobs.values.forEach { it.cancel() }
         observerJobs.clear()
         val job = appScope.launch {
+            // The session warnings ride LauncherController.events, not its
+            // state: a refresh that failed does not change the launch state at
+            // all -- that is the whole problem being fixed. Cancelled in the
+            // finally below, since collecting a SharedFlow never completes on
+            // its own and would keep this job alive past the launch.
+            val sessionWarnings = launch {
+                controller.events.collect { event -> onLaunchEvent(target, event) }
+            }
             try {
                 // dropWhile-until-Prepare handles BOTH stale-Idle and stale-
                 // terminal (Error / GameRunning from a previous launch).
@@ -96,29 +114,81 @@ class LaunchDriver(
                         }
                     }
             } catch (e: CancellationException) {
+                // Cancellation is the ORDINARY way an observer ends -- starting a
+                // second launch cancels every prior one a few lines below. Letting
+                // it rethrow past the cleanup left this target's activity entry as
+                // Running for the rest of the session: an in-flight entry is never
+                // evicted by age, and the surface only offers Dismiss once a phase
+                // is terminal, so nothing could ever remove it.
+                activities.dismiss(launchKey(target))
                 throw e
             } catch (e: Exception) {
                 log.warn("LaunchDriver observation aborted for ${target.id}", e)
                 indications.setLaunchIndication(target.id, null)
                 sessions.unregister(target.id)
+                // The observer died, not the work. Whatever the registry is
+                // narrating for this target is no longer being updated, so
+                // drop it rather than leave a frozen measure on screen.
+                activities.dismiss(launchKey(target))
+            } finally {
+                sessionWarnings.cancel()
             }
         }
         observerJobs.put(target.id, job)?.cancel()
     }
 
+    /**
+     * Says out loud that the launch is going ahead on a session it could not
+     * refresh. Nothing here stops the launch: the old token is frequently still
+     * valid, and the rejection -- when it does come -- arrives as the game's own
+     * "Failed to verify username", which names neither the launcher nor the
+     * session and leaves the player reconnecting at random until it works.
+     */
+    private fun onLaunchEvent(target: LaunchTarget, event: LaunchLogEvent) {
+        val s = stringsProvider()
+        if (event is LaunchLogEvent.ForeignContentRemoved) {
+            // Its own group and sticky: a mod that vanished without a word reads as
+            // the launcher breaking the pack. Naming the files is what separates
+            // "your added jar was removed" from "something ate my install".
+            notifications.push(
+                sourceKey = "content:${target.id}",
+                sender    = target.displayName,
+                iconUrl   = target.iconUrl,
+                severity  = Severity.Warn,
+                kind      = Kind.Sticky,
+                title     = s.notifForeignContentRemovedTitle(event.paths.size),
+                body      = event.paths.joinToString(", "),
+            )
+            return
+        }
+        val (severity, body) = staleSessionWarning(event, s) ?: return
+        notifications.push(
+            // Own group rather than target.sourceKey: a launch that goes on to
+            // fail pushes its own Critical entry, and folding the two would let
+            // whichever landed last speak for both.
+            sourceKey = "auth:${target.id}",
+            sender    = target.displayName,
+            iconUrl   = target.iconUrl,
+            severity  = severity,
+            // Sticky: it is read after the game window has taken focus, so an
+            // auto-dismissing toast would expire behind it unseen.
+            kind      = Kind.Sticky,
+            title     = s.notifSessionStaleTitle,
+            body      = body,
+        )
+    }
+
     private fun onPrepare(target: LaunchTarget, state: LaunchState.Prepare) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Preparing)
-        notifications.push(
-            sourceKey = target.sourceKey,
-            sender    = target.displayName,
-            iconUrl   = target.iconUrl,
-            severity  = Severity.Info,
-            kind      = Kind.Progress,
-            title     = s.notifPackPreparing(target.displayName),
-            body      = s.notifPackStage(state.stage.name.lowercase()),
-            progress  = state.progress.coerceIn(0f, 1f),
+        reportActivity(
+            target,
+            ActivityKind.Launch,
+            ActivityPhase.Running(0, 0, state.stage.name.lowercase()),
+            actions = setOf(ActivityAction.Cancel),
         )
+        // Live progress is the activity surface's job; the notification
+        // centre keeps outcomes, which are what its history is for.
     }
 
     private fun onDownloading(target: LaunchTarget, state: LaunchState.Downloading) {
@@ -131,27 +201,30 @@ class LaunchDriver(
             else                       -> 0f
         }
         indications.setLaunchIndication(target.id, LaunchIndication.Downloading(fraction))
+        reportActivity(
+            target,
+            ActivityKind.Launch,
+            ActivityPhase.Running(state.downloadedBytes, state.totalBytes),
+            actions = setOf(ActivityAction.Cancel),
+        )
 
         val s = stringsProvider()
         val notifProgress: Float = fraction ?: Float.NaN
         val displayPct =
             if (fraction == null) s.notifPackSyncIndeterminate
             else s.notifPackSyncPercent((fraction * 100).toInt())
-        notifications.push(
-            sourceKey = target.sourceKey,
-            sender    = target.displayName,
-            iconUrl   = target.iconUrl,
-            severity  = Severity.Info,
-            kind      = Kind.Progress,
-            title     = s.notifPackSyncing(target.displayName),
-            body      = s.notifPackSyncBody(state.currentFileIdx, state.totalFiles, displayPct),
-            progress  = notifProgress,
-        )
+        // Live progress is the activity surface's job; the notification
+        // centre keeps outcomes, which are what its history is for.
     }
 
     private fun onRunning(target: LaunchTarget, state: LaunchState.GameRunning) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Running)
+        // The launch is over, so its entry goes. A running game is not this
+        // surface's business: it is a state the user can see out of the window,
+        // and it already has its places -- the pack hero's control, the session
+        // list, the console. The activity surface narrates work in progress.
+        activities.dismiss(launchKey(target))
         sessions.register(
             packInstanceId  = target.id,
             packDisplayName = target.displayName,
@@ -191,6 +264,7 @@ class LaunchDriver(
     private fun onError(target: LaunchTarget, reason: LaunchError) {
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Failed)
+        reportActivity(target, ActivityKind.Launch, ActivityPhase.Failed(humanReason(reason, stringsProvider())))
         sessions.unregister(target.id)
         gameConsole.detachCommandSink()
         notifications.push(
@@ -244,6 +318,7 @@ class LaunchDriver(
         // Idle after non-Idle = clean exit (code 0). Group history stays
         // so the user can scroll back through the run.
         indications.setLaunchIndication(target.id, null)
+        activities.dismiss(launchKey(target))
         sessions.unregister(target.id)
         gameConsole.detachCommandSink()
         notifications.push(
@@ -254,6 +329,24 @@ class LaunchDriver(
             kind      = Kind.OneShot,
             title     = s.notifPackSessionEnded(target.displayName),
             body      = null,
+        )
+    }
+
+    private fun launchKey(target: LaunchTarget) = "launch:${target.id}"
+
+    private fun reportActivity(
+        target: LaunchTarget,
+        kind: ActivityKind,
+        phase: ActivityPhase,
+        actions: Set<ActivityAction> = emptySet(),
+    ) {
+        activities.report(
+            key     = launchKey(target),
+            kind    = kind,
+            title   = target.displayName,
+            iconUrl = target.iconUrl,
+            phase   = phase,
+            actions = actions,
         )
     }
 
@@ -269,4 +362,29 @@ class LaunchDriver(
         LaunchError.OfflineNoManifest      -> s.notifReasonOfflineNoManifest
         LaunchError.TwoFactorExpired       -> s.notifReasonTwoFactorExpired
     }
+}
+
+/**
+ * Severity + body for a launch event that leaves the session unrefreshed, or
+ * null for every event that says nothing about the session.
+ *
+ * A rejection and a missing password both rate [Severity.Critical]: the server
+ * has already decided, and the game's join will be told the same thing. An
+ * unreachable auth server is a [Severity.Warn] because the token being carried
+ * may well still be accepted -- nothing judged it.
+ *
+ * Top-level rather than a driver method so it can be exercised without the
+ * driver's DI graph, which is the same reason the flow contract is tested apart
+ * from the driver in `LaunchDriverTest`.
+ */
+internal fun staleSessionWarning(event: LaunchLogEvent, s: AppStrings): Pair<Severity, String>? = when (event) {
+    is LaunchLogEvent.AuthFailed -> when (event.cause) {
+        AuthRefreshFailure.Rejected    -> Severity.Critical to s.notifSessionStaleRejected
+        AuthRefreshFailure.Unreachable -> Severity.Warn to s.notifSessionStaleUnreachable
+        AuthRefreshFailure.Unknown     -> Severity.Warn to s.notifSessionStaleUnknown
+    }
+    // No saved password means no refresh ever happens, so this one is not a
+    // transient miss -- it is the state the account is in.
+    is LaunchLogEvent.NoPassword -> Severity.Critical to s.notifSessionStaleNoPassword
+    else -> null
 }

@@ -243,6 +243,8 @@ object RussianStrings : AppStrings {
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
+    override fun stateForeignContentRemoved(count: Int, names: String) =
+        "Удалено файлов, которых нет в сборке: $count ($names)"
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
     override val stateOfflineNoManifest    = "Нет кеша манифеста для этого сервера. Войдите онлайн хотя бы раз перед запуском оффлайн."
 
@@ -754,6 +756,13 @@ object RussianStrings : AppStrings {
     override val contentFilterShaderPacks       = "Шейдеры"
     override val contentDeleteTitle             = "Удалить файл?"
     override val contentDeleteBody              = "Файл будет удалён с диска навсегда."
+    override fun contentBulkDeleteBody(count: Int) = "Файлов будет удалено с диска безвозвратно: $count."
+    override val selectionEnable                = "Включить"
+    override val selectionDisable               = "Отключить"
+    override val selectionDelete                = "Удалить"
+    override fun selectionCount(count: Int)     = "Выбрано: $count"
+    override val selectionClear                 = "Снять"
+    override fun selectionBlockedByPack(count: Int) = "Из выбранного паку принадлежит: $count. Отсоедините сборку, чтобы ими управлять."
     override val contentActionDetails           = "Детали"
     override val contentActionOpenPage          = "Открыть страницу"
     override val contentDetailAuthors           = "Авторы"
@@ -1011,6 +1020,17 @@ object RussianStrings : AppStrings {
     override val notifActionOpenVersions                = "Открыть версии"
     override fun notifInstallFailed(packName: String)   = "$packName не удалось установить"
     override fun notifInstallCancelled(packName: String) = "Установка $packName отменена"
+    override val editorSurfOverlay                      = "Плавающий слой"
+    override val editorSurfShortOverlay                 = "Плавающий"
+
+    override val activityPillExpand                     = "Показать все"
+    override fun activityPillMore(count: Int)           = "+$count"
+
+    override val activityPillDismiss                    = "Убрать"
+    override val activityPillCancel                     = "Отменить"
+    override val activityPillPause                      = "Пауза"
+    override fun activityPillMeasure(done: Long, total: Long) = "$done из $total"
+
     override val notifActionCancel                      = "Отменить"
     override val notifActionShowConsole                 = "Открыть консоль"
     override val notifActionStop                        = "Остановить"
@@ -1023,6 +1043,12 @@ object RussianStrings : AppStrings {
     override val notifReasonOfflineNoClient             = "Файлы сборки отсутствуют на диске"
     override val notifReasonOfflineNoManifest           = "Нет кэша манифеста; выйди в сеть один раз для синхронизации"
     override val notifReasonTwoFactorExpired            = "Войди ещё раз, чтобы обновить учётные данные"
+    override val notifSessionStaleTitle                 = "Сессия не обновилась"
+    override val notifSessionStaleRejected              = "Сервер авторизации отклонил вход. Игра запустится со старой сессией, но зайти на сервер, скорее всего, не выйдет: войди в аккаунт заново."
+    override val notifSessionStaleUnreachable           = "Связаться с сервером авторизации не вышло. Игра запустится со старой сессией; если сервер не пустит, попробуй позже."
+    override val notifSessionStaleUnknown               = "Обновить сессию не удалось. Игра запустится со старой сессией."
+    override val notifSessionStaleNoPassword            = "Пароль не сохранён, поэтому сессия не обновляется. Когда она истечёт, сервер перестанет пускать: войди в аккаунт заново."
+    override fun notifForeignContentRemovedTitle(count: Int) = "Удалено файлов вне сборки: $count"
     override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Войдите в SmartyCraft, чтобы играть на этой сборке"
         else                                          -> "Нужен вход в '$providerKey', чтобы играть"
@@ -1167,6 +1193,11 @@ object RussianStrings : AppStrings {
         "widget.notes.scratch.placeholder" to "Напишите что-нибудь...",
         "widget.notes.scratch.title" to "Заголовок",
         "widget.notifications.history" to "История сообщений",
+        "widget.activity.pill" to "Активность",
+        "widget.activity.pill.progress" to "Мера",
+        "widget.activity.pill.anchor" to "Привязка",
+        "widget.activity.pill.heightDp" to "Высота",
+        "widget.activity.pill.showActions" to "Показывать управление",
         "widget.notifications.history.expandUp" to "Раскрывать вверх",
         "widget.notifications.history.clock12h" to "12-часовой формат (am/pm)",
         "widget.notifications.history.verticalTime" to "Время в столбик",
