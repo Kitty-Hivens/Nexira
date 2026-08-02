@@ -247,6 +247,7 @@ object EnglishStrings : AppStrings {
     override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "Removed $count file(s) the pack does not include: $names"
+    override val stateContentChanged       = "The pack was modified, so the launch was stopped. Please do not modify a pack's files."
     override val stateOfflineNoClient      = "Client files not found. Download them online first."
     override val stateOfflineNoManifest    = "No cached manifest for this server. Log in online at least once before launching offline."
 

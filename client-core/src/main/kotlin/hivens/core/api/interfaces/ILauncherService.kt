@@ -103,6 +103,13 @@ interface ILauncherService {
         // same reason redirectAuthHost defaults to off -- a caller that forgets
         // it errs toward the launch that carries less, not more.
         boundLaunch: Boolean = true,
+        // Asked once more with the runtime provisioned and the command built,
+        // immediately before the process starts. The check that decided this
+        // launch's session had to run before the sign-in it authorises, and the
+        // provisioning that follows can take minutes, so the two moments are far
+        // apart and the gap is where a file gets added by hand. Returning false
+        // stops the launch. Null means nothing to re-assert.
+        seal: (suspend () -> Boolean)? = null,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,
     ): SpawnResult

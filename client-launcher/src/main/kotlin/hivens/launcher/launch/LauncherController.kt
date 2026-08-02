@@ -698,6 +698,21 @@ class LauncherController(
                     // every mirror pack, which would seal a solo pack too and
                     // cost its owner MangoHud for nothing.
                     boundLaunch      = serverBound,
+                    // Agreement, not validity: a second sweep that had to remove
+                    // something would report itself verified afterwards, and the
+                    // thing it removed is precisely what arrived after the gate.
+                    seal = if (!serverBound || !verdict.verified) null else {
+                        {
+                            val again = smrtSyncService.enforceRoster(clientDir, modBaseline(refreshedInstance))
+                            val agrees = again.verified && again.removed.isEmpty() && again.blocked.isEmpty()
+                            if (!agrees) {
+                                ActionRing.record(
+                                    "Pack launch ${refreshedInstance.displayName}: contents changed between the check and the spawn",
+                                )
+                            }
+                            agrees
+                        }
+                    },
                     // Auth mechanism for an SC-bound join: the redirect agent
                     // (default on) and/or SC's patched authlib jar (default off,
                     // fallback). Both no-op on non-SC packs.

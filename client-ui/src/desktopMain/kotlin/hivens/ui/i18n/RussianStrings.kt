@@ -245,6 +245,7 @@ object RussianStrings : AppStrings {
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "Удалено файлов, которых нет в сборке: $count ($names)"
+    override val stateContentChanged       = "Сборка была изменена, запуск остановлен. Просим не модифицировать файлы сборки."
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
     override val stateOfflineNoManifest    = "Нет кеша манифеста для этого сервера. Войдите онлайн хотя бы раз перед запуском оффлайн."
 

@@ -245,6 +245,7 @@ object GermanStrings : AppStrings {
     override val stateOfflineSkipSync      = "Offlinemodus — Dateisynchronisierung übersprungen, lokale Dateien werden verwendet"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "$count Datei(en) entfernt, die nicht zum Paket gehoeren: $names"
+    override val stateContentChanged       = "Das Modpack wurde verandert, der Start wurde abgebrochen. Bitte andern Sie die Dateien eines Modpacks nicht."
     override val stateOfflineNoClient      = "Client-Dateien nicht gefunden. Zuerst online herunterladen."
     override val stateOfflineNoManifest    = "Kein zwischengespeichertes Manifest für diesen Server. Mindestens einmal online anmelden, bevor offline gestartet wird."
 
