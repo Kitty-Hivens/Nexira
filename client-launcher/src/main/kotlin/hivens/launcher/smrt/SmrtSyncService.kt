@@ -80,25 +80,15 @@ class SmrtSyncService(
 
             Files.createDirectories(clientDir)
 
-            // Wipe mods/ when the previous sync used a different source
-            // (SC's mods/{mcversion}/ layout vs mirror's flat mods/).
-            // Forge scans both trees, a duplicate jar loads its coremod
-            // twice, and stacking ASM transformers (FoamFix hashCode
-            // patch) recurse into StackOverflowError on the second pass.
-            // The marker is per-clientDir so each pack tracks its own
-            // source independently.
+            // Which source laid this instance out last. SC used mods/<mcversion>/,
+            // the mirror uses a flat mods/ -- worth a line in the log when it changes,
+            // since a duplicate coremod from the old layout is a stack overflow rather
+            // than a visible error. The sweep below needs no special case for it: it
+            // removes archives the manifest does not name wherever they sit.
             val marker = clientDir.resolve(SOURCE_MARKER_FILE)
             val previousSource = readSourceMarker(marker)
-            val sourceChanged = previousSource != SOURCE_MIRROR
-            if (sourceChanged) {
-                // Noted here, acted on after the downloads succeed. Clearing the
-                // directory up front meant any failure past this point -- one reset
-                // connection out of a hundred files -- left the instance with less
-                // than it started with and nothing to roll back to.
-                log.info(
-                    "smrt sync: source change ({} -> {}), foreign content will be dropped once the new set is in place",
-                    previousSource ?: "<none>", SOURCE_MIRROR,
-                )
+            if (previousSource != SOURCE_MIRROR) {
+                log.info("smrt sync: source is now {} (was {})", SOURCE_MIRROR, previousSource ?: "<none>")
             }
 
             // Planned first, fetched together. A pack is a hundred files of wildly
@@ -121,7 +111,12 @@ class SmrtSyncService(
             // "mirror" value). Only top-level mods/{expected_filename}
             // entries survive.
             val expected = manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
-            if (sourceChanged) pruneForeignEntries(clientDir, expected) else pruneOrphanMods(clientDir, expected)
+            // One rule for both cases. The old split -- wipe everything on a source
+            // change, drop stray jars otherwise -- dates from the clients era, where
+            // SC laid mods out under mods/<mcversion>/ and a duplicate coremod loaded
+            // twice. Since the sweep only ever removes archives the manifest does not
+            // name, the migration case needs nothing extra.
+            pruneForeignEntries(clientDir, expected)
 
             writeSourceMarker(marker, SOURCE_MIRROR)
             writeRoster(clientDir, expected)
@@ -351,26 +346,6 @@ class SmrtSyncService(
         return failed
     }
 
-    private fun pruneOrphanMods(clientDir: Path, expected: Set<String>) {
-        val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return
-        var removed = 0
-        Files.walk(modsDir).use { stream ->
-            stream.filter { Files.isRegularFile(it) && ModArchives.isLoadable(it.fileName.toString()) }
-                .forEach { jar ->
-                    val isCanonical = jar.parent == modsDir &&
-                        jar.fileName.toString() in expected
-                    if (!isCanonical) {
-                        runCatching {
-                            fileOpRetry("smrt prune $jar") { Files.delete(jar) }
-                            removed++
-                            log.debug("smrt sync: pruned orphan jar {}", jar)
-                        }.onFailure { log.warn("smrt sync: failed to prune {}", jar, it) }
-                    }
-                }
-        }
-        if (removed > 0) log.info("smrt sync: pruned {} orphan jar(s) from mods/", removed)
-    }
 
     /**
      * Removes everything under `mods/` that the manifest does not name, keeping the

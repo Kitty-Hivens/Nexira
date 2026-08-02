@@ -209,6 +209,26 @@ class SmrtSyncServiceTest {
     }
 
     @Test
+    fun `a plain sync keeps the loader cache it finds under mods`() = runTest {
+        // The regression this pins: the ordinary sync path removed any loadable file
+        // outside mods/ root, which took out Connector's remapped-jar cache on every
+        // single sync -- silently, at the cost of a full remap next launch.
+        val dir = tempDir("cache-kept")
+        val service = syncService()
+        service.sync("test", dir)
+        Files.createDirectories(dir.resolve("mods/.connector"))
+        Files.write(dir.resolve("mods/.connector/bobby_mapped.jar"), "CACHE".toByteArray())
+
+        service.sync("test", dir)
+
+        assertTrue(
+            Files.exists(dir.resolve("mods/.connector/bobby_mapped.jar")),
+            "a loader's own cache is not foreign content",
+        )
+        assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the pack itself is untouched")
+    }
+
+    @Test
     fun `enforceRoster leaves an instance with no roster alone and reports it unverified`() = runTest {
         val dir = tempDir("no-roster")
         Files.createDirectories(dir.resolve("mods"))

@@ -26,6 +26,9 @@ lives in this English file.
 
 ## [Unreleased]
 
+### Fixed
+- An ordinary sync no longer deletes a loader's cache. `pruneOrphanMods` removed every loadable file that was not a top-level entry the manifest names, which on a Connector pack meant wiping `.connector`'s remapped jars on each sync -- silently, at the cost of a full remap on the next launch. The two sweeps (source-change wipe and stray-jar prune) collapse into one rule that matches what is actually being defended against: a `.jar` or `.zip` the pack does not name goes, dot-directories are not walked, and nothing else under `mods/` is the sweep's business. The source marker stays as a log line; it no longer selects behaviour, because there is only one behaviour left. The recursion into subdirectories is a 1.12.2 leftover from SC's `mods/<mcversion>/` layout -- on a modern pack the only things down there are other tools' caches.
+
 ## [2.4.0-beta3] - 2026-08-02
 
 2.4.0-beta3 makes two-factor accounts playable and closes the ways a mod could ride into a pack uninvited. Signing in with a second factor now works end to end: the code is asked once when you press Play, and the game starts on a session minted for that launch. On the content side, a pack is held to its own file list before every spawn, files that refuse to be deleted are treated as the obstruction they are, and the sweep touches only what a loader would execute -- caches, configs and the launcher's own bookkeeping are left alone.
