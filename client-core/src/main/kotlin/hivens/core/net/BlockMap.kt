@@ -82,9 +82,16 @@ class BlockMapStore(private val json: Json = DEFAULT_JSON) {
         return parent.resolve(DIR_NAME).resolve("${dest.fileName}.blocks")
     }
 
-    private companion object {
-        val log = LoggerFactory.getLogger(BlockMapStore::class.java)
-        val DEFAULT_JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    companion object {
+        private val log = LoggerFactory.getLogger(BlockMapStore::class.java)
+        private val DEFAULT_JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+        /**
+         * Directory the maps live in, beside the files they describe. Public because
+         * anything that sweeps a content directory has to recognise it as the
+         * launcher's own bookkeeping: deleting it is silent -- the next repair simply
+         * refetches whole files instead of the damaged blocks.
+         */
         const val DIR_NAME = ".nexira-blocks"
     }
 }

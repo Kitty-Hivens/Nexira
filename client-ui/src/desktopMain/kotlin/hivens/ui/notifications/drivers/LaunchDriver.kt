@@ -7,6 +7,7 @@ import hivens.core.activity.ActivityPhase
 import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.launch.AuthRefreshFailure
 import hivens.core.launch.LaunchError
@@ -56,6 +57,8 @@ class LaunchDriver(
     private val offlineProvider: OfflineAuthProvider,
     private val settingsService: ISettingsService,
     private val credentialStore: ICredentialStore,
+    // Where "this launch needs a code" is parked for the shell to answer.
+    private val twoFactorGate: hivens.ui.notifications.TwoFactorLaunchGate,
     // Read on each push so a locale change in Settings is picked up
     // mid-launch without restarting the driver.
     private val stringsProvider: () -> AppStrings,
@@ -278,6 +281,30 @@ class LaunchDriver(
 
     private fun onError(target: LaunchTarget, reason: LaunchError) {
         val s = stringsProvider()
+        if (reason == LaunchError.TwoFactorExpired) {
+            // Not a failure to report -- a step the launch is waiting on. The shell
+            // prompts, and the fresh session comes back here to start the same target
+            // again, so the player clicks Play once and types a code once.
+            indications.setLaunchIndication(target.id, null)
+            activities.dismiss(launchKey(target))
+            val serverId = when (target) {
+                is LaunchTarget.Server -> target.server.assetDir
+                is LaunchTarget.Pack -> (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.SmartyCraft)
+                    ?.serverId
+                    ?: (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.Both)?.serverId
+                    ?: ""
+            }
+            twoFactorGate.request(target.displayName, serverId) { session ->
+                appScope.launch {
+                    observe(target)
+                    when (target) {
+                        is LaunchTarget.Pack -> controller.launchPackInstance(session, target.instance)
+                        is LaunchTarget.Server -> controller.launch(session, target.server)
+                    }
+                }
+            }
+            return
+        }
         indications.setLaunchIndication(target.id, LaunchIndication.Failed)
         reportActivity(target, ActivityKind.Launch, ActivityPhase.Failed(humanReason(reason, stringsProvider())))
         sessions.unregister(target.id)

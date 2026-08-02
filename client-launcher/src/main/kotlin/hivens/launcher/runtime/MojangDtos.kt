@@ -129,6 +129,28 @@ data class MojangOs(
     val name: String? = null,
 )
 
+/**
+ * Whether a library with these [rules] belongs on [mojangOs].
+ *
+ * Rules are evaluated in order and the last matching one wins, which is how a
+ * version json expresses "allow everywhere, disallow on osx" and the reverse.
+ * No rules at all means the library is unconditional.
+ *
+ * Anyone reading a version json has to apply this, not just the classpath
+ * builder: a mac-only entry like `ca.weblite:java-objc-bridge` is absent from a
+ * Windows install by design, and treating its absence as a failed install
+ * blocks the pack over a file that must not be there.
+ */
+fun libraryRulesAllow(rules: List<MojangRule>, mojangOs: String): Boolean {
+    if (rules.isEmpty()) return true
+    var allowed = false
+    for (rule in rules) {
+        val matches = rule.os?.name?.let { it == mojangOs } ?: true
+        if (matches) allowed = rule.action == "allow"
+    }
+    return allowed
+}
+
 // -- the asset index (e.g. 1.12.json) --------------------------------------
 
 @Serializable

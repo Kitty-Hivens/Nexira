@@ -167,6 +167,21 @@ class SmrtSyncService(
             val report = transfers.verifyAndRepair(suspect) { p ->
                 progress?.invoke(p.filesDone, p.filesTotal, p.current)
             }
+            // A verify is a full comparison against the manifest, so it is exactly the
+            // moment the instance can be vouched for -- write the roster here too.
+            // Without this, "verify and repair" checked every file and still left the
+            // instance unverified at launch, which is not a distinction anyone can be
+            // expected to guess.
+            //
+            // Only when the repair actually finished, though: a run that could not
+            // fetch half the pack has not established anything, and vouching for it
+            // would hand the next launch a token over an instance still missing files.
+            if (report.failed.isEmpty()) {
+                writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
+            } else {
+                log.warn("repair: {} entr(ies) still unresolved -- instance stays unverified: {}", report.failed.size, report.failed.keys)
+            }
+
             // Everything the local check cleared counts as intact: it was measured
             // against the same manifest, just without a round trip.
             report.copy(checked = total, intact = total - suspect.size + report.intact)
@@ -258,9 +273,10 @@ class SmrtSyncService(
      * network -- including an offline launch, which is exactly when a hand-placed jar
      * would otherwise go unchallenged. [sync] and [applyUpdate] write it.
      *
-     * Same rule as [pruneForeignEntries]: only top-level `mods/<name>` entries the
-     * roster names survive, so a jar hidden in a subdirectory is removed as well --
-     * the loader scans those too.
+     * Only loadable archives are touched. A jar or zip outside the roster is the
+     * whole problem -- it is what a loader would execute -- while everything else
+     * under `mods/` is data: mod caches, Connector's remapped-jar store, our own
+     * block maps. Deleting those protects nothing and costs a rebuild at best.
      */
     override suspend fun enforceRoster(clientDir: Path): RosterVerdict = withContext(Dispatchers.IO) {
         val roster = readRoster(clientDir)
@@ -268,11 +284,27 @@ class SmrtSyncService(
             log.warn("mods enforce: no roster for {}, mods/ left alone and the launch stays unverified", clientDir.fileName)
             return@withContext RosterVerdict(verified = false)
         }
-        val removed = InstanceMutationLock.withLock(clientDir) {
+        val sweep = InstanceMutationLock.withLock(clientDir) {
             pruneForeignEntries(clientDir, roster)
         }
-        RosterVerdict(verified = true, removed = removed)
+        if (sweep.blocked.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} entr(ies) could not be removed from {}: {}",
+                sweep.blocked.size, clientDir.fileName, sweep.blocked,
+            )
+        }
+        RosterVerdict(
+            // Anything left behind means the instance was not brought in line, and a
+            // file that resists deletion is the likeliest thing to have been left on
+            // purpose.
+            verified = sweep.blocked.isEmpty(),
+            removed = sweep.removed,
+            blocked = sweep.blocked,
+        )
     }
+
+    /** What one sweep of `mods/` managed to remove, and what refused to go. */
+    private data class Sweep(val removed: List<String>, val blocked: List<String>)
 
     private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
 
@@ -349,28 +381,44 @@ class SmrtSyncService(
      * Walked deepest-first so a directory is considered after its children; one that
      * still holds a kept file refuses to delete and is left alone.
      */
-    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): List<String> {
+    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): Sweep {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return emptyList()
+        if (!Files.isDirectory(modsDir)) return Sweep(emptyList(), emptyList())
         val removed = mutableListOf<String>()
+        val blocked = mutableListOf<String>()
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
-                val keep = Files.isRegularFile(p) &&
-                    p.parent == modsDir &&
-                    p.fileName.toString() in expected
+                // Dot-directories are tooling state, not content: Connector keeps its
+                // remapped jars in `.connector`, we keep block maps in
+                // `.nexira-blocks`. Emptying them makes the next launch rebuild
+                // everything and defends against nothing -- no loader reads them as
+                // mods. Directories are never removed, for the same reason.
+                val rel = modsDir.relativize(p)
+                // Inside a dot-DIRECTORY, not merely dot-named: `.connector/x.jar` is
+                // tooling state, while `.cheat.jar` sitting in mods/ is a mod the
+                // loader will happily read (its discovery matches `.+\.jar`, leading
+                // dot and all). Testing the first segment alone let that one through.
+                if (rel.nameCount > 1 && rel.getName(0).toString().startsWith(".")) return@forEach
+                if (!Files.isRegularFile(p)) return@forEach
+                // Only what a loader would execute. A config, or a leftover .tmp
+                // beside the mods, is not a way to run code.
+                if (!ModArchives.isLoadable(p.fileName.toString())) return@forEach
+                val keep = p.parent == modsDir && p.fileName.toString() in expected
                 if (keep) return@forEach
-                runCatching {
-                    fileOpRetry("smrt drop foreign $p") { Files.delete(p) }
-                    // Joined over the path's own segments rather than toString(): the
-                    // report is read by a person and matched against manifest paths,
-                    // both of which use '/' whatever the host separator is.
-                    removed += modsDir.relativize(p).joinToString("/")
-                }
+                // Joined over the path's own segments rather than toString(): the
+                // report is read by a person and matched against manifest paths, both
+                // of which use '/' whatever the host separator is.
+                val relText = rel.joinToString("/")
+                runCatching { fileOpRetry("smrt drop foreign $p") { Files.delete(p) } }
+                    .onSuccess { removed += relText }
+                    // Only regular files reach this point, so a refusal is always an
+                    // obstruction: something is holding the file or denying the delete.
+                    .onFailure { blocked += relText }
             }
         }
         if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)
-        return removed
+        return Sweep(removed, blocked)
     }
 
     /**
