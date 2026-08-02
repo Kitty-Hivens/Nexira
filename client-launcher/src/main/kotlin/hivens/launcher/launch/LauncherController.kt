@@ -361,7 +361,14 @@ class LauncherController(
             try {
                 val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
                     ?: session.cachedPassword
-                if (!pass.isNullOrEmpty()) {
+                if (session.twoFactor) {
+                    // Never refresh a second-factor session on its own: a new login
+                    // invalidates the uid the user unlocked with a code, so the
+                    // "refresh" would be the thing that breaks the launch. Go with
+                    // what is in hand -- if the server has since dropped it, the
+                    // join is refused and the UI asks for a code then.
+                    emit(LaunchLogEvent.TwoFactorSessionKept)
+                } else if (!pass.isNullOrEmpty()) {
                     session = authService.login(session.playerName, pass, targetServerId)
                     onSessionRefreshed?.invoke(session)
                     emit(LaunchLogEvent.AuthSucceeded(session.uuid))
@@ -781,6 +788,12 @@ class LauncherController(
             )
             fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
             return null
+        }
+        if (currentSession.twoFactor) {
+            // Same rule as the server-list path: the code unlocked THIS session and
+            // a fresh login would kill it.
+            emit(LaunchLogEvent.TwoFactorSessionKept)
+            return currentSession
         }
         return try {
             val fresh = authService.login(playerName, pass, serverId)

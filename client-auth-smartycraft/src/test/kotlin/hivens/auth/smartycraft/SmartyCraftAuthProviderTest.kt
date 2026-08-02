@@ -141,24 +141,20 @@ class SmartyCraftAuthProviderTest {
     }
 
     @Test
-    fun `completeTwoFactor falls back to re-login when cached TWOAUTH lacks session field`() = runTest {
-        // Audit-pass catch on the 25-commit batch: a TWOAUTH response that
-        // populated uuid + playername but left session null was promoting
-        // through the cache path and producing a SessionData with empty
-        // accessToken -- which would die at the smartycraft auth-host with
-        // no signal back to the launcher. Force the re-login fallback
-        // when session is absent so the OK response (which carries it) can
-        // populate the field.
-        var loginAttempt = 0
+    fun `completeTwoFactor refuses when the TWOAUTH response carried no session`() = runTest {
+        // Measured against the live API: `twoauth` answers with a bare status, and a
+        // second `login` mints a new uid that INVALIDATES the one just unlocked --
+        // so re-logging in to "obtain" a session destroys the session. When the
+        // TWOAUTH response brought none, there is nothing to unlock and the only
+        // honest answer is to send the user back through a full login.
         val proto = FakeServerProtocol().apply {
             loginResult = {
-                loginAttempt += 1
-                if (loginAttempt == 1) LoginResponse(
+                LoginResponse(
                     status = "TWOAUTH", uid = "abc-uid-128",
                     uuid = "550e8400e29b41d4a716446655440000",
                     playername = "TestPlayer",
                     session = null,
-                ) else ok().copy(uid = "abc-uid-128")
+                )
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
@@ -166,28 +162,26 @@ class SmartyCraftAuthProviderTest {
         val ex = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
         }
-        val session = service.completeTwoFactor(
-            username = "user", password = "pass", serverId = "Industrial",
-            uid = ex.uid!!, code = "123456",
-        )
-        assertEquals("TestPlayer", session.playerName)
-        // 2 login calls = cold + re-login (cache promotion was correctly
-        // skipped because session was null). Without this guard the test
-        // would see 1 login call and an empty accessToken on the result.
-        assertEquals(2, proto.loginCalls.size)
+        val failure = assertFailsWith<AuthException> {
+            service.completeTwoFactor(
+                username = "user", password = "pass", serverId = "Industrial",
+                uid = ex.uid!!, code = "123456",
+            )
+        }
+        assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, failure.status)
+        assertEquals(1, proto.loginCalls.size, "no second login: it would kill the session it means to fetch")
     }
 
     @Test
-    fun `completeTwoFactor falls back to single re-login when cached TWOAUTH is sparse`() = runTest {
-        // Spec's minimal-shape case: TWOAUTH response carries only the uid
-        // (no uuid / playername / session), so cache promotion can't build a
-        // SessionData. Fall through to one re-login attempt.
+    fun `a completed second factor marks the session so nothing refreshes it later`() = runTest {
         val proto = FakeServerProtocol().apply {
-            var loginAttempt = 0
             loginResult = {
-                loginAttempt += 1
-                if (loginAttempt == 1) LoginResponse(status = "TWOAUTH", uid = "abc-uid-128")
-                else ok().copy(uid = "abc-uid-128")
+                LoginResponse(
+                    status = "TWOAUTH", uid = "abc-uid-128",
+                    uuid = "550e8400e29b41d4a716446655440000",
+                    playername = "TestPlayer",
+                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                )
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
@@ -200,7 +194,8 @@ class SmartyCraftAuthProviderTest {
             uid = ex.uid!!, code = "123456",
         )
         assertEquals("TestPlayer", session.playerName)
-        assertEquals(2, proto.loginCalls.size, "fallback re-login fires when cache too sparse")
+        assertTrue(session.twoFactor, "the flag is what stops auto-sync and pre-spawn refresh from logging in again")
+        assertEquals(1, proto.loginCalls.size, "the unlocked session is used as-is")
     }
 
     @Test

@@ -69,6 +69,7 @@ fun LaunchLogCollector(
                     s.notifInstanceUnverifiedBody,
                     LogType.WARN,
                 )
+                is LaunchLogEvent.TwoFactorSessionKept -> gameConsole.append(s.stateTwoFactorSessionKept, LogType.INFO)
                 is LaunchLogEvent.OfflineSkipSync -> gameConsole.append(s.stateOfflineSkipSync, LogType.INFO)
                 is LaunchLogEvent.Launching -> gameConsole.append(s.stateLaunching, LogType.INFO)
                 is LaunchLogEvent.ProcessOutput -> {
