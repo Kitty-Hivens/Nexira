@@ -1098,6 +1098,10 @@ interface AppStrings {
     /** Title for the launch-time removal of files the pack does not include. */
     fun notifForeignContentRemovedTitle(count: Int): String
 
+    /** Launch went ahead without a session token because the instance carries no roster. */
+    val notifInstanceUnverifiedTitle: String
+    val notifInstanceUnverifiedBody: String
+
     // --- Notification relative-time formatter (header label) ---
     val notifTimeNow: String
     fun notifTimeSeconds(seconds: Long): String

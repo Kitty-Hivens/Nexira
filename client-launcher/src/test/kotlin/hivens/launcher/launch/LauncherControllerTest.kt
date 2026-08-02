@@ -825,6 +825,19 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `an unverified instance says so rather than passing for an offline launch`() = runTest {
+        coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = false)
+        val events = mutableListOf<LaunchLogEvent>()
+
+        capturePackSession(SessionData(playerName = "tester", uuid = "u", accessToken = "live"), events = events)
+
+        assertTrue(
+            events.any { it is LaunchLogEvent.InstanceUnverified },
+            "the user chose neither offline nor this; the reason needs its own event -- got $events",
+        )
+    }
+
+    @Test
     fun `a refresh that could not reach the auth server drops to offline`() = runTest {
         credentialsManager.save(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
@@ -845,6 +858,7 @@ class LauncherControllerTest {
     private suspend fun TestScope.capturePackSession(
         currentSession: SessionData,
         packInstance: PackInstance = scBoundPackInstance(authRequirement = null),
+        events: MutableList<LaunchLogEvent>? = null,
     ): SessionData? {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
@@ -862,8 +876,10 @@ class LauncherControllerTest {
         coJustRun { packRepository.put(any()) }
 
         val controller = newController(this)
+        val collectorJob = events?.let { sink -> launch { controller.events.toList(sink) } }
         controller.launchPackInstance(currentSession = currentSession, packInstance = packInstance)
         advanceUntilIdle()
+        collectorJob?.cancel()
         return captured.captured.takeIf { captured.isCaptured }
     }
 
