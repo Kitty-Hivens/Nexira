@@ -17,6 +17,7 @@ import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
+import hivens.core.data.flatten
 import hivens.core.diag.ActionRing
 import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.AuthRefreshFailure
@@ -130,6 +131,32 @@ class LauncherController(
         toggles: List<ContentToggle>,
     ) {
         appScope.launch { setOptionalMods(instance, manifest, toggles) }
+    }
+
+    /**
+     * The pack's own `mods/` baseline as filename -> sha1, from the installed
+     * manifest recorded at install and after every apply.
+     *
+     * An optional mod that is off sits beside its canonical name as `.disabled`;
+     * it is the same bytes under another name, so both map to the same digest and
+     * a toggle does not read as tampering.
+     *
+     * Null when the instance predates the baseline. The caller then falls back to
+     * the roster file, which is weaker -- see [hivens.core.api.interfaces.IPackSyncService.enforceRoster].
+     */
+    private fun modBaseline(instance: PackInstance): Map<String, String>? {
+        val flattened = instance.installedManifest?.flatten() ?: return null
+        val mods = flattened.entries
+            .filter { it.key.startsWith("mods/") && it.key.count { c -> c == '/' } == 1 }
+        if (mods.isEmpty()) return null
+        return buildMap {
+            for ((path, data) in mods) {
+                val name = path.removePrefix("mods/")
+                val sha1 = data.sha1
+                put(name, sha1)
+                put("$name.disabled", sha1)
+            }
+        }
     }
 
     private val _state = MutableStateFlow<LaunchState>(LaunchState.Idle)
@@ -598,9 +625,14 @@ class LauncherController(
         // and would put every instance under the strict rule again.
         val serverBound = manifestSnapshot.authRequirement != null
         val verdict = if (serverBound) {
-            smrtSyncService.enforceRoster(clientDir)
+            smrtSyncService.enforceRoster(clientDir, modBaseline(refreshedInstance))
         } else {
             RosterVerdict(verified = true)
+        }
+        if (verdict.mismatched.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${refreshedInstance.displayName}: ${verdict.mismatched.size} file(s) do not match the pack's own bytes",
+            )
         }
         if (verdict.removed.isNotEmpty()) {
             ActionRing.record(

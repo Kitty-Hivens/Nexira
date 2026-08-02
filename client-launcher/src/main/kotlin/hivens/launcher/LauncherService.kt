@@ -24,6 +24,7 @@ import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
+import hivens.launcher.security.JavaBinary
 import hivens.launcher.security.LaunchEnvironment
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import kotlinx.coroutines.CancellationException
@@ -211,6 +212,15 @@ internal class LauncherService(
         }
 
         log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
+
+        // A launch that will carry a token runs the interpreter it was given, and
+        // that interpreter decides everything the command line just decided. A
+        // wrapper script in its place makes all of it someone else's choice.
+        if (boundLaunch && !JavaBinary.isNativeExecutable(Path.of(javaExec))) {
+            log.error("Refusing a bound launch: {} is not a native executable", javaExec)
+            onLog("The Java runtime at $javaExec is not a program -- refusing to launch", LauncherLogType.ERROR)
+            throw PackPrepBlocked(LaunchError.Internal("java-not-executable"))
+        }
 
         // 4. Natives stay per-instance, but are now extracted from the jars the
         // provisioner resolved from the manifest -- so the LWJGL version matches
