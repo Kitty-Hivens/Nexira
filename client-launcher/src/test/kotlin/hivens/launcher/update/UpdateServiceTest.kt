@@ -678,6 +678,51 @@ class UpdateServiceTest {
         assertFalse(update.isCritical, "prose is not a declaration")
     }
 
+    // --- publication order is not version order -------------------------------
+
+    /**
+     * The live case: a beta cut after a nightly leads the page, and the ladder
+     * ranks nightly above beta, so the head of the list compares OLDER than the
+     * installed build. Taking the head answered "up to date" while a newer
+     * nightly sat one row down.
+     */
+    @Test
+    fun `a beta published after a nightly does not hide the newer nightly`() = runTest {
+        val svc = createService(
+            MockResponse(
+                urlContains = "releases",
+                body = "[" + listOf(
+                    githubReleaseJson(tagName = "v2.4.0-beta4", name = "Nexira v2.4.0-beta4", prerelease = true),
+                    githubReleaseJson(tagName = "v2.4.0-nightly1498", name = "Nexira v2.4.0-nightly1498", prerelease = true),
+                    githubReleaseJson(tagName = "v2.4.0-nightly1475", name = "Nexira v2.4.0-nightly1475", prerelease = true),
+                ).joinToString(",") + "]",
+            ),
+            currentVersion = "2.4.0-nightly1475",
+        )
+
+        val update = svc.checkForUpdate()
+
+        assertNotNull(update, "a newer nightly exists further down the page")
+        assertEquals("v2.4.0-nightly1498", update.version)
+    }
+
+    /** The ladder still holds: a beta is not an upgrade for a nightly install. */
+    @Test
+    fun `a beta alone is not offered to a nightly install`() = runTest {
+        val svc = createService(
+            MockResponse(
+                urlContains = "releases",
+                body = "[" + listOf(
+                    githubReleaseJson(tagName = "v2.4.0-beta4", name = "Nexira v2.4.0-beta4", prerelease = true),
+                    githubReleaseJson(tagName = "v2.4.0-nightly1475", name = "Nexira v2.4.0-nightly1475", prerelease = true),
+                ).joinToString(",") + "]",
+            ),
+            currentVersion = "2.4.0-nightly1475",
+        )
+
+        assertNull(svc.checkForUpdate(), "nightly outranks beta -- offering it would be a downgrade")
+    }
+
     // --- criticality is a property of the range, not of the newest release ----
 
     /** v2.0.0 installed, v2.1.0 critical, v2.2.0 ordinary and on top. */

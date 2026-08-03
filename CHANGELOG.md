@@ -26,6 +26,9 @@ lives in this English file.
 
 ## [Unreleased]
 
+### Fixed
+- The update check picks the highest version among the eligible releases instead of the first one GitHub returns. The list arrives newest-published first, and publication order is not version order: a beta cut after a nightly leads the page while ranking below it on the prerelease ladder, so a nightly install compared itself against the beta, concluded it was up to date, and never looked at the newer nightly one row down. The ladder itself is unchanged and still correct -- a beta is not an upgrade for a nightly install, and the point of the ladder is that nobody gets dragged backwards.
+
 ## [2.4.0-beta4] - 2026-08-03
 
 2.4.0-beta4 closes the ways code could reach a launch that the pack never named. An installed pack is now held to its own bytes rather than its own filenames, the check is asked again with the game about to start, and the launcher stops carrying into the process anything it was handed on the side: its environment, the arguments a pack's settings supply, the native libraries in the instance, and the interpreter it was told to run. The SmartyCraft server list is deprecated with this release.
