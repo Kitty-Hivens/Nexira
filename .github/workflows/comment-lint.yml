@@ -2,7 +2,7 @@ name: comment-lint
 
 on:
   pull_request:
-    branches: [stable, Project-Void]
+    branches: [stable, dev]
     paths:
       - "**/*.kt"
       - "**/*.kts"
