@@ -400,6 +400,7 @@ class LaunchDriver(
         is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
         is LaunchError.HelperUnavailable   -> s.stateHelperUnavailable(reason.mcVersion)
         is LaunchError.AuthlibUnavailable  -> s.stateAuthlibUnavailable(reason.mcVersion)
+        LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
         LaunchError.OfflineNoClient        -> s.notifReasonOfflineNoClient
         LaunchError.OfflineNoManifest      -> s.notifReasonOfflineNoManifest
         LaunchError.TwoFactorExpired       -> s.notifReasonTwoFactorExpired

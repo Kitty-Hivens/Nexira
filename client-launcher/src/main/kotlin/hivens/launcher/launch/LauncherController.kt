@@ -17,6 +17,7 @@ import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
+import hivens.core.data.flatten
 import hivens.core.diag.ActionRing
 import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.AuthRefreshFailure
@@ -130,6 +131,32 @@ class LauncherController(
         toggles: List<ContentToggle>,
     ) {
         appScope.launch { setOptionalMods(instance, manifest, toggles) }
+    }
+
+    /**
+     * The pack's own `mods/` baseline as filename -> sha1, from the installed
+     * manifest recorded at install and after every apply.
+     *
+     * An optional mod that is off sits beside its canonical name as `.disabled`;
+     * it is the same bytes under another name, so both map to the same digest and
+     * a toggle does not read as tampering.
+     *
+     * Null when the instance predates the baseline. The caller then falls back to
+     * the roster file, which is weaker -- see [hivens.core.api.interfaces.IPackSyncService.enforceRoster].
+     */
+    private fun modBaseline(instance: PackInstance): Map<String, String>? {
+        val flattened = instance.installedManifest?.flatten() ?: return null
+        val mods = flattened.entries
+            .filter { it.key.startsWith("mods/") && it.key.count { c -> c == '/' } == 1 }
+        if (mods.isEmpty()) return null
+        return buildMap {
+            for ((path, data) in mods) {
+                val name = path.removePrefix("mods/")
+                val sha1 = data.sha1
+                put(name, sha1)
+                put("$name.disabled", sha1)
+            }
+        }
     }
 
     private val _state = MutableStateFlow<LaunchState>(LaunchState.Idle)
@@ -376,25 +403,15 @@ class LauncherController(
             } catch (_: TwoFactorRequiredException) {
                 // The demand itself says the account is two-factor; the UI persists
                 // that so later launches stop logging in behind the user's back.
+                //
+                // And it stops here rather than continuing on the stored session: a
+                // cached manifest would let the sync run, but the game would still be
+                // handed a token nothing minted for this launch, which is exactly what
+                // the code prompt exists to prevent.
                 emit(LaunchLogEvent.TwoFactorDetected)
-                // 2FA account -- refusing to prompt the user for a code every
-                // time they click Play. The cached accessToken in `session` is
-                // from a previous successful 2FA flow and is what the game uses
-                // anyway. Augment it with a cached manifest (same path the
-                // offline branch takes) so processSession has something to walk.
-                val cached = manifestCache.loadManifest(targetServerId)
-                if (cached != null) {
-                    session = session.copy(fileManifest = cached)
-                    ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
-                } else {
-                    // No cached manifest and no fresh login -- bail with the
-                    // semantic TwoFactorExpired reason so the UI renders an
-                    // actionable "re-login from the form" message instead of a
-                    // generic internal-error path.
-                    ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId -- re-login required")
-                    fail(LaunchError.TwoFactorExpired)
-                    return Prepared.Bail
-                }
+                ActionRing.record("Launch: second factor required for $targetServerId")
+                fail(LaunchError.TwoFactorExpired)
+                return Prepared.Bail
             } catch (e: Exception) {
                 // No fresh session, so no session at all: same rule as the pack
                 // path. Carrying the previous token forward is what produced the
@@ -580,21 +597,6 @@ class LauncherController(
             return Prepared.Bail
         }
 
-        // 2b. The instance is what the pack says it is, or it does not launch with
-        // what was added to it. Sync already drops anything the manifest does not
-        // name, but it only runs on install / update / repair, and the window
-        // between two of those is wide enough to drop a jar into mods/ by hand --
-        // a cheat client among them. Held against the roster written on disk at
-        // sync time, so this works with no network and an offline launch is
-        // covered too.
-        val verdict = smrtSyncService.enforceRoster(clientDir)
-        if (verdict.removed.isNotEmpty()) {
-            ActionRing.record(
-                "Pack launch ${refreshedInstance.displayName}: removed ${verdict.removed.size} file(s) absent from the pack",
-            )
-            emit(LaunchLogEvent.ForeignContentRemoved(verdict.removed))
-        }
-
         // 3. Auth requirement: refresh the session right before spawn. Mirrors
         // the SC server path's pre-spawn re-auth.
         //
@@ -608,6 +610,37 @@ class LauncherController(
         //   mods/, and a token is exactly what an unvouched-for jar would want.
         // - A refresh that did not go through: covered in preparePackAuth.
         val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
+
+        // 2b. Hold the instance to the pack -- but only where a token is at stake.
+        // A server-bound pack is the case that matters: we are about to hand the
+        // game a session that logs into someone's server, and a jar the pack never
+        // named is what that session would be lent to. A pack with no binding has no
+        // server and gets no token, so what its owner puts in mods/ is their game and
+        // none of our business.
+        //
+        // Held against the roster written to the instance at sync time, so it answers
+        // with no network and an offline launch is covered too.
+        // The manifest's OWN declaration, not the router's answer: the router falls
+        // back to Microsoft for any mirror pack, so it is true of a solo pack as well
+        // and would put every instance under the strict rule again.
+        val serverBound = manifestSnapshot.authRequirement != null
+        val verdict = if (serverBound) {
+            smrtSyncService.enforceRoster(clientDir, modBaseline(refreshedInstance))
+        } else {
+            RosterVerdict(verified = true)
+        }
+        if (verdict.mismatched.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${refreshedInstance.displayName}: ${verdict.mismatched.size} file(s) do not match the pack's own bytes",
+            )
+        }
+        if (verdict.removed.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${refreshedInstance.displayName}: removed ${verdict.removed.size} file(s) absent from the pack",
+            )
+            emit(LaunchLogEvent.ForeignContentRemoved(verdict.removed))
+        }
+
         var session = currentSession
         if (settings.isOfflineMode || !verdict.verified) {
             if (verdict.verified) {
@@ -657,6 +690,29 @@ class LauncherController(
                     // Microsoft token to the SC host. Same test the service uses
                     // for its SC binding, so the two cannot disagree.
                     redirectAuthHost     = authRequirement?.scServerId != null,
+                    // Same partition the roster sweep uses, and for the same
+                    // reason: a bound launch is handed a token, so the loader
+                    // hooks it inherits are a way to run code beside it. Taken
+                    // from the manifest's own declaration rather than the
+                    // effective requirement -- the router answers Microsoft for
+                    // every mirror pack, which would seal a solo pack too and
+                    // cost its owner MangoHud for nothing.
+                    boundLaunch      = serverBound,
+                    // Agreement, not validity: a second sweep that had to remove
+                    // something would report itself verified afterwards, and the
+                    // thing it removed is precisely what arrived after the gate.
+                    seal = if (!serverBound || !verdict.verified) null else {
+                        {
+                            val again = smrtSyncService.enforceRoster(clientDir, modBaseline(refreshedInstance))
+                            val agrees = again.verified && again.removed.isEmpty() && again.blocked.isEmpty()
+                            if (!agrees) {
+                                ActionRing.record(
+                                    "Pack launch ${refreshedInstance.displayName}: contents changed between the check and the spawn",
+                                )
+                            }
+                            agrees
+                        }
+                    },
                     // Auth mechanism for an SC-bound join: the redirect agent
                     // (default on) and/or SC's patched authlib jar (default off,
                     // fallback). Both no-op on non-SC packs.
@@ -805,20 +861,15 @@ class LauncherController(
             emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
             fresh
         } catch (_: TwoFactorRequiredException) {
+            // First contact with the gate, before the account is flagged. Carrying the
+            // stored session forward here was the old plan and it is the failure the
+            // prompt exists to prevent: the launch would go on with a token nothing
+            // minted for it. Stop and let the gate ask for a code, same as the flagged
+            // path above.
             emit(LaunchLogEvent.TwoFactorDetected)
-            val cached = manifestCache.loadManifest(serverId)
-            if (cached != null) {
-                ActionRing.record(
-                    "Pack launch ${instance.displayName}: 2FA account, using cached manifest for '$serverId'",
-                )
-                currentSession.copy(fileManifest = cached)
-            } else {
-                ActionRing.record(
-                    "Pack launch ${instance.displayName}: 2FA + no cached manifest for '$serverId' -- re-login required",
-                )
-                fail(LaunchError.TwoFactorExpired)
-                null
-            }
+            ActionRing.record("Pack launch ${instance.displayName}: second factor required for '$serverId'")
+            fail(LaunchError.TwoFactorExpired)
+            null
         } catch (e: Exception) {
             // A refresh that did not go through means this launch has no session it
             // earned, so it gets none: the pack starts offline with the token

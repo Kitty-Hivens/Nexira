@@ -29,6 +29,10 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 
 
+@Deprecated(
+    "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). Do not build on it -- nothing new should reach clients/.",
+    level = DeprecationLevel.WARNING,
+)
 class FileDownloadService(
     private val transfers: TransferEngine,
     private val protectedPaths: ProtectedPaths,

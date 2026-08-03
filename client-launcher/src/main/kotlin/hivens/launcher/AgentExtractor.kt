@@ -41,7 +41,14 @@ class AgentExtractor(private val dataDir: Path) {
                 return null
             }
         val target = dataDir.resolve(Storage.RUNTIME_DIR).resolve("$namePrefix-${shortHash(bytes)}.jar")
-        if (Files.exists(target) && runCatching { Files.size(target) }.getOrNull() == bytes.size.toLong()) {
+        // Content, not length. The name carries a hash of the bundled bytes, but
+        // matching it against the file's SIZE let anything of the right length pass
+        // as the agent -- and a jar is a zip, so padding one to an exact byte count
+        // is a comment field. The launcher would then hand `-javaagent:` a stranger's
+        // code and the game a session token. Re-reading the file costs a few hundred
+        // KB per launch; the alternative is trusting an attacker-writable path.
+        val expected = digest(bytes)
+        if (Files.exists(target) && runCatching { digest(Files.readAllBytes(target)) }.getOrNull().contentEquals(expected)) {
             return target
         }
         return try {
@@ -53,8 +60,11 @@ class AgentExtractor(private val dataDir: Path) {
         }
     }
 
-    private fun shortHash(bytes: ByteArray): String =
+    private fun digest(bytes: ByteArray): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(bytes)
+
+    private fun shortHash(bytes: ByteArray): String =
+        digest(bytes)
             .joinToString("") { "%02x".format(it) }
             .substring(0, 12)
 

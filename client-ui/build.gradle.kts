@@ -767,4 +767,11 @@ tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
 // in CI for the shipped Linux build. A no-op on Windows/macOS allocators.
 tasks.withType<JavaExec>().configureEach {
     environment("MALLOC_ARENA_MAX", "2")
+
+    // `-PnexiraDataDir=...` puts the run on a data directory of its own
+    // (hivens.launcher.platform.PlatformPaths reads NEXIRA_DATA_DIR first).
+    // Set here rather than exported by the caller: a JavaExec inherits the
+    // Gradle daemon's environment, and the daemon outlives -- and predates --
+    // the shell that exports the variable.
+    providers.gradleProperty("nexiraDataDir").orNull?.let { environment("NEXIRA_DATA_DIR", it) }
 }

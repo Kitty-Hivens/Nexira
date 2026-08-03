@@ -207,12 +207,22 @@ class UpdateService(
                 return@withContext null
             }
 
+            val rangeReleases = releasesPage ?: fetchReleasesPage()
+            val criticalHit = criticalInRange(rangeReleases, currentVersion, latestVersion)
+            if (criticalHit != null && !isCriticalRelease(release)) {
+                logger.info(
+                    "Update {} -> {} is critical by way of {}, which sits between them",
+                    currentVersion, latestVersion, criticalHit.tagName,
+                )
+            }
+
             val update = buildUpdate(
                 release = release,
                 manifest = manifest,
-                changelog = fetchChangelogBetween(currentVersion, latestVersion, releasesPage),
+                changelog = fetchChangelogBetween(currentVersion, latestVersion, rangeReleases),
                 isMandatory = belowMandatoryFloor,
                 mandatoryReason = if (belowMandatoryFloor) channelMeta.reason else null,
+                criticalInRange = criticalHit != null,
             ) ?: return@withContext null
 
             logger.info(
@@ -367,6 +377,10 @@ class UpdateService(
         changelog: String,
         isMandatory: Boolean = false,
         mandatoryReason: String? = null,
+        // A release BETWEEN the installed version and this one was marked
+        // critical. The target carries that fix by virtue of being newer, so the
+        // urgency belongs to this update even though its own notes say nothing.
+        criticalInRange: Boolean = false,
     ): LauncherUpdate? {
         val asset = findAssetForCurrentOS(release.assets) ?: run {
             logger.warn("No compatible asset for current OS in release {}", release.tagName)
@@ -377,8 +391,7 @@ class UpdateService(
             logger.warn("Release {} manifest pins no SHA-256 for {}", release.tagName, asset.name)
             return null
         }
-        val isCritical = release.name?.contains("[CRITICAL]", ignoreCase = true) == true ||
-            release.body?.contains("CRITICAL", ignoreCase = true) == true
+        val isCritical = criticalInRange || isCriticalRelease(release)
         return LauncherUpdate(
             version = release.tagName,
             downloadUrl = asset.browserDownloadUrl,
@@ -685,6 +698,44 @@ class UpdateService(
      * fetched (the prerelease check); null means no list exists yet (the
      * stable path picks via `/releases/latest`) and one is fetched here.
      */
+    /**
+     * Whether a release declares itself critical.
+     *
+     * The marker is the bracketed token in the title or the body, not the bare
+     * word. Prose matched too until the range scan arrived: once every release
+     * between the installed version and the target is consulted, one changelog
+     * line reading "fixes a critical crash" would raise a dialog nobody can
+     * dismiss, for everyone.
+     */
+    internal fun isCriticalRelease(release: GitHubRelease): Boolean =
+        release.name?.contains("[CRITICAL]", ignoreCase = true) == true ||
+            release.body?.contains("[CRITICAL]", ignoreCase = true) == true
+
+    /**
+     * The first critical release strictly newer than [currentVersion] and no
+     * newer than [targetVersion], or null.
+     *
+     * Consulting only the target is what this replaces: a user two releases
+     * behind, with the critical one in the middle and an ordinary one on top,
+     * was never told. The mechanism was therefore weakest exactly when the
+     * marker is used sparingly, which is how it is meant to be used.
+     *
+     * The channel a release belongs to is deliberately not filtered. Criticality
+     * is a property of the fix rather than of the track it first appeared on,
+     * and the target the user is being offered contains that fix either way by
+     * being newer than it.
+     */
+    internal fun criticalInRange(
+        releases: List<GitHubRelease>,
+        currentVersion: String,
+        targetVersion: String,
+    ): GitHubRelease? = releases.firstOrNull { entry ->
+        val v = entry.tagName.removePrefix("v")
+        compareVersions(v, currentVersion) > 0 &&
+            compareVersions(v, targetVersion) <= 0 &&
+            isCriticalRelease(entry)
+    }
+
     private suspend fun fetchChangelogBetween(
         currentVersion: String,
         latestVersion: String,

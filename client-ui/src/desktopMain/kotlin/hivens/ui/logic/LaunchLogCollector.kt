@@ -107,6 +107,7 @@ fun LaunchLogCollector(
 private fun localizeError(error: LaunchError, s: AppStrings): String = when (error) {
     is LaunchError.ExitCode             -> s.stateExitCode(error.code)
     is LaunchError.Internal             -> s.stateError(error.message)
+    is LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
     is LaunchError.OfflineNoClient      -> s.stateOfflineNoClient
     is LaunchError.OfflineNoManifest    -> s.stateOfflineNoManifest
     is LaunchError.TwoFactorExpired     -> s.auth2faExpired

@@ -23,10 +23,26 @@ interface IPackSyncService {
      * made at all.
      *
      * Called before every spawn, not just on sync, because the gap between two syncs
-     * is where a jar gets added by hand. Answers from the roster written to the
-     * instance at sync time, so an offline launch is held to the same rule.
+     * is where a jar gets added by hand. Answers off disk, so an offline launch is
+     * held to the same rule.
+     *
+     * [expected] is the pack's own baseline as `mods/` filename -> sha1, taken from
+     * the instance's installed manifest in the registry. It is what makes the check
+     * mean anything: the roster file beside the mods answers by NAME and lives in a
+     * directory its subject can write, so overwriting a named jar, or adding a line
+     * to the roster, both pass it. A digest cannot be talked into agreeing.
+     *
+     * Null falls back to that roster file, for instances installed before a baseline
+     * was recorded. That is the weaker answer and it is deliberate: the alternative
+     * is refusing a token to every instance predating the field, which is a support
+     * problem rather than a defence.
+     *
+     * A file whose name is expected and whose content is not is NOT deleted -- the
+     * verdict simply fails. Removing it mid-launch would leave the pack incomplete
+     * and the game broken in a way that reads as the launcher eating an install; the
+     * repair path exists and says what to do.
      */
-    suspend fun enforceRoster(clientDir: Path): RosterVerdict
+    suspend fun enforceRoster(clientDir: Path, expected: Map<String, String>? = null): RosterVerdict
 }
 
 /**
@@ -50,4 +66,6 @@ data class RosterVerdict(
     val verified: Boolean,
     val removed: List<String> = emptyList(),
     val blocked: List<String> = emptyList(),
+    /** Named by the pack, present on disk, and not the bytes the pack named. */
+    val mismatched: List<String> = emptyList(),
 )

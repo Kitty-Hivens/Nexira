@@ -14,6 +14,10 @@ interface ILauncherService {
      * [SpawnResult] -- [SpawnResult.Started] with the process handle, or
      * [SpawnResult.Failed] carrying the semantic launch error.
      */
+    @Deprecated(
+        "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). New work belongs on launchPackClient.",
+        level = DeprecationLevel.WARNING,
+    )
     suspend fun launchClient(
         sessionData: SessionData,
         serverProfile: ServerProfile,
@@ -23,6 +27,10 @@ interface ILauncherService {
     ): SpawnResult
 
     /** Same as [launchClient], plus streams stdout / stderr through [onLog]. */
+    @Deprecated(
+        "Deprecated since 2.4.0; removed in 2.5.0 at the latest. The SmartyCraft server list is being retired: a pack is the unit of content, and the raw-server path duplicates install, sync and launch with an older, weaker set of guarantees (see #318). New work belongs on launchPackClient.",
+        level = DeprecationLevel.WARNING,
+    )
     suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
@@ -94,6 +102,22 @@ interface ILauncherService {
         // Swap SC's patched authlib jar onto the classpath instead (opt-in
         // fallback to the agent). No effect on non-SC packs.
         useSmartycraftAuthLib: Boolean = false,
+        // This launch will be handed a session token, so what runs beside the
+        // game is the launcher's business. Carries the caller's server-binding
+        // answer and decides three things at once, because they are one
+        // question: the environment loses its loader hooks, the user's own JVM
+        // arguments are held to tuning rather than ways to load code, and the
+        // natives are re-derived instead of trusted. Defaults to on for the
+        // same reason redirectAuthHost defaults to off -- a caller that forgets
+        // it errs toward the launch that carries less, not more.
+        boundLaunch: Boolean = true,
+        // Asked once more with the runtime provisioned and the command built,
+        // immediately before the process starts. The check that decided this
+        // launch's session had to run before the sign-in it authorises, and the
+        // provisioning that follows can take minutes, so the two moments are far
+        // apart and the gap is where a file gets added by hand. Returning false
+        // stops the launch. Null means nothing to re-assert.
+        seal: (suspend () -> Boolean)? = null,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,
     ): SpawnResult
