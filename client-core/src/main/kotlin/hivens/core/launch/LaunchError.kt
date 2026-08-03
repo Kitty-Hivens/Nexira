@@ -13,6 +13,17 @@ sealed class LaunchError {
     /** Catch-all: an unexpected throwable; the message is included for the user. */
     data class Internal(val message: String) : LaunchError()
 
+    /**
+     * The instance stopped agreeing with the pack between the check that
+     * decided this launch's session and the moment the game was to start.
+     *
+     * The two are necessarily apart -- the first has to precede the sign-in it
+     * authorises, and the game reads `mods/` only once the runtime is
+     * provisioned and the command built -- so the gap is where a file is added
+     * by hand. This is the second look reporting that the answer changed.
+     */
+    data object ContentChangedDuringLaunch : LaunchError()
+
     /** Offline mode launched without an installed client directory. */
     data object OfflineNoClient : LaunchError()
 

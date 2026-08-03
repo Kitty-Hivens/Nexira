@@ -771,6 +771,65 @@ class GameCommandBuilderTest {
         gameArgs = listOf("--launchTarget", "neoforgeclient", "--fml.neoForgeVersion", "21.1.66"),
     )
 
+    // --- what a bound launch is allowed to carry -------------------------------
+
+    private fun packCmd(jvmArgs: String?, bound: Boolean) = builder.buildPackCommand(
+        javaExec = "/usr/bin/java",
+        memoryMB = 4096,
+        gameDir = Path.of("/tmp/instances/NeoPack"),
+        sharedAssetsDir = Path.of("/tmp/shared/assets"),
+        sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+        nativesDirName = "bin/natives-1.21.1",
+        versionLabel = "NeoForge 1.21.1",
+        javaMajor = 21,
+        runtime = neoForgeRuntime(),
+        session = session(),
+        jvmArgsOverride = jvmArgs,
+        restrictJvmArgs = bound,
+    )
+
+    @Test
+    fun `a bound launch carries the user's tuning and not their agent`() {
+        val cmd = packCmd("-Xmx6G -XX:+UseZGC -Dmixin.debug=true -javaagent:/tmp/cheat.jar", bound = true)
+
+        assertTrue(cmd.contains("-Xmx6G"), "heap is the user's call")
+        assertTrue(cmd.contains("-XX:+UseZGC"), "collector choice is the user's call")
+        assertTrue(cmd.contains("-Dmixin.debug=true"), "mod properties pass")
+        assertFalse(
+            cmd.any { it == "-javaagent:/tmp/cheat.jar" },
+            "a user-supplied agent never reaches a launch that carries a token",
+        )
+    }
+
+    @Test
+    fun `an unbound launch is its owner's game`() {
+        val cmd = packCmd("-javaagent:/tmp/mine.jar -Xmx6G", bound = false)
+
+        assertTrue(cmd.contains("-javaagent:/tmp/mine.jar"), "no binding, no token, no policy")
+        assertTrue(cmd.contains("-Xmx6G"))
+    }
+
+    @Test
+    fun `the attach mechanism is closed for a bound launch and left alone otherwise`() {
+        assertTrue(packCmd(null, bound = true).contains("-XX:+DisableAttachMechanism"))
+        assertFalse(packCmd(null, bound = false).contains("-XX:+DisableAttachMechanism"))
+    }
+
+    /**
+     * Order matters as much as policy here: HotSpot takes the last occurrence of
+     * a flag, so the guard has to sit after anything the user contributed.
+     */
+    @Test
+    fun `the attach guard cannot be undone by ordering`() {
+        val cmd = packCmd("-XX:-DisableAttachMechanism", bound = true)
+
+        assertEquals(
+            listOf("-XX:+DisableAttachMechanism"),
+            cmd.filter { it.endsWith("DisableAttachMechanism") },
+            "the user's negation is refused outright, and ours is last regardless",
+        )
+    }
+
     @Test
     fun `buildPackCommand modern path substitutes placeholders and rebuilds cp`() {
         val cmd = builder.buildPackCommand(

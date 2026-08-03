@@ -24,6 +24,8 @@ import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
+import hivens.launcher.security.JavaBinary
+import hivens.launcher.security.LaunchEnvironment
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import kotlinx.coroutines.CancellationException
 import org.slf4j.LoggerFactory
@@ -107,7 +109,9 @@ internal class LauncherService(
             metricsOutPath = adaptive.metricsOut,
         )
 
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, onLog)))
+        // The SC server list is server-bound by construction -- every launch on it
+        // presents a session to someone's server.
+        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch = true, onLog = onLog)))
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -139,6 +143,8 @@ internal class LauncherService(
         redirectAuthHost: Boolean,
         useNetworkAgent: Boolean,
         useSmartycraftAuthLib: Boolean,
+        boundLaunch: Boolean,
+        seal: (suspend () -> Boolean)?,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): SpawnResult = try {
@@ -208,11 +214,20 @@ internal class LauncherService(
 
         log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
 
+        // A launch that will carry a token runs the interpreter it was given, and
+        // that interpreter decides everything the command line just decided. A
+        // wrapper script in its place makes all of it someone else's choice.
+        if (boundLaunch && !JavaBinary.isNativeExecutable(Path.of(javaExec))) {
+            log.error("Refusing a bound launch: {} is not a native executable", javaExec)
+            onLog("The Java runtime at $javaExec is not a program -- refusing to launch", LauncherLogType.ERROR)
+            throw PackPrepBlocked(LaunchError.Internal("java-not-executable"))
+        }
+
         // 4. Natives stay per-instance, but are now extracted from the jars the
         // provisioner resolved from the manifest -- so the LWJGL version matches
         // the classpath for ANY MC version, not just the few the SC path hardcodes.
         // Assets are the shared root the provisioner just populated.
-        envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives)
+        envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives, rebuild = boundLaunch)
 
         // 5. Profile-driven command: main class / classpath / args come from the
         // resolved runtime; assets point at the shared root.
@@ -229,6 +244,7 @@ internal class LauncherService(
             session = sessionData,
             jvmArgsOverride = runtime.jvmArgs,
             redirectAuthHost = redirectAuthHost,
+            restrictJvmArgs = boundLaunch,
             agentJarPath = adaptive.agentJar,
             metricsOutPath = adaptive.metricsOut,
             authlibAgentJarPath = authlibAgent,
@@ -237,7 +253,14 @@ internal class LauncherService(
             fullScreen = runtime.fullScreen,
         )
 
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, onLog)))
+        // Last statement before the process exists: everything is provisioned,
+        // the command is built, and nothing else stands between here and the
+        // game reading mods/.
+        if (seal != null && !seal()) {
+            log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
+            throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
+        }
+        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog)))
     } catch (e: PackPrepBlocked) {
         // SC-binding step could not complete; surface the carried reason.
         SpawnResult.Failed(e.error)
@@ -304,11 +327,19 @@ internal class LauncherService(
     private fun spawnProcess(
         command: List<String>,
         clientRootPath: Path,
+        boundLaunch: Boolean,
         onLog: (String, LauncherLogType) -> Unit,
     ): Process {
         val pb = ProcessBuilder(command)
         pb.directory(clientRootPath.toFile())
         pb.redirectErrorStream(false)
+        // The game inherits this process's environment, which inherited the
+        // session's, so a value in a shell profile reaches every launch. Named in
+        // the log rather than dropped quietly: a user who set one deliberately is
+        // owed the reason their tool stopped attaching.
+        LaunchEnvironment.seal(pb.environment(), boundLaunch).forEach {
+            onLog("Sealed $it out of the game environment", LauncherLogType.INFO)
+        }
         onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
         val process = pb.start()
         logHandler.attach(process, onLog)

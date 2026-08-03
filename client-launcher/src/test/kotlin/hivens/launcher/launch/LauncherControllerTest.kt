@@ -156,7 +156,7 @@ class LauncherControllerTest {
         // An installed pack carries a roster, so the default fixture is a verified
         // instance; the unverified case is its own test.
         packSyncService = mockk(relaxed = true)
-        coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = true)
+        coEvery { packSyncService.enforceRoster(any(), any()) } returns RosterVerdict(verified = true)
     }
 
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
@@ -419,7 +419,7 @@ class LauncherControllerTest {
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
-                displayName        = any(),
+                boundLaunch        = any(), seal        = any(), displayName        = any(),
                 onLog              = any(),
             )
         } returns SpawnResult.Started(handle)
@@ -550,7 +550,7 @@ class LauncherControllerTest {
                 allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
-                displayName        = any(),
+                boundLaunch        = any(), seal        = any(), displayName        = any(),
                 onLog              = any(),
             )
         } returns SpawnResult.Started(handle)
@@ -583,7 +583,7 @@ class LauncherControllerTest {
         // authlib; it returns SpawnResult.Failed carrying the semantic reason.
         coEvery {
             launcherService.launchPackClient(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
         } returns SpawnResult.Failed(LaunchError.AuthlibUnavailable("1.12.2"))
 
@@ -626,7 +626,7 @@ class LauncherControllerTest {
             state.reason,
         )
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
@@ -681,7 +681,7 @@ class LauncherControllerTest {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
                 clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
-                adaptiveEnabled = any(), redirectAuthHost = any(), displayName = any(), onLog = any(),
+                adaptiveEnabled = any(), redirectAuthHost = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -728,7 +728,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = capture(agentFlag),
-                useSmartycraftAuthLib = capture(swapFlag), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = capture(swapFlag), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -762,7 +762,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -795,7 +795,7 @@ class LauncherControllerTest {
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -811,13 +811,31 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `a pack with no server binding is neither swept nor stripped of a token`() = runTest {
+        // The strictness exists because a bound pack is handed a session that logs
+        // into someone's server. A pack with no binding gets no token and has no
+        // server, so what its owner keeps in mods/ is their own game.
+        coEvery { packSyncService.enforceRoster(any(), any()) } returns RosterVerdict(verified = false)
+
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+            packInstance = scBoundPackInstance(authRequirement = null),
+        )
+
+        coVerify(exactly = 0) { packSyncService.enforceRoster(any(), any()) }
+    }
+
+    @Test
     fun `an unverified instance launches with no token`() = runTest {
         // No roster on disk -- nothing vouched for what is in mods/, so the game
         // process gets a session that cannot join anything.
-        coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = false)
+        coEvery { packSyncService.enforceRoster(any(), any()) } returns RosterVerdict(verified = false)
 
         val session = capturePackSession(
             SessionData(playerName = "tester", uuid = "online-uuid", accessToken = "live-token"),
+            // The strict rule applies to a pack that declares a binding -- that is the
+            // launch which would otherwise be handed a session for someone's server.
+            packInstance = scBoundPackInstance(),
         )
 
         assertEquals("", session?.accessToken, "an unverified instance must not carry a token")
@@ -838,10 +856,14 @@ class LauncherControllerTest {
 
     @Test
     fun `an unverified instance says so rather than passing for an offline launch`() = runTest {
-        coEvery { packSyncService.enforceRoster(any()) } returns RosterVerdict(verified = false)
+        coEvery { packSyncService.enforceRoster(any(), any()) } returns RosterVerdict(verified = false)
         val events = mutableListOf<LaunchLogEvent>()
 
-        capturePackSession(SessionData(playerName = "tester", uuid = "u", accessToken = "live"), events = events)
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+            packInstance = scBoundPackInstance(),
+            events = events,
+        )
 
         assertTrue(
             events.any { it is LaunchLogEvent.InstanceUnverified },
@@ -882,7 +904,7 @@ class LauncherControllerTest {
                 sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
                 javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = any(),
-                useSmartycraftAuthLib = any(), displayName = any(), onLog = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
@@ -925,7 +947,7 @@ class LauncherControllerTest {
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.TwoFactorExpired, state.reason)
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -969,7 +991,7 @@ class LauncherControllerTest {
         val handle = mockk<LaunchHandle>()
         coEvery { handle.awaitExit() } returns 0
         coEvery {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
@@ -1002,7 +1024,7 @@ class LauncherControllerTest {
         assertEquals(LaunchState.Idle, controller.state.value)
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
         coVerify(exactly = 1) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 

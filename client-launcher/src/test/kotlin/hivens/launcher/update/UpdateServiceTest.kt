@@ -646,17 +646,100 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `checkForUpdate detects CRITICAL flag in release body`() = runTest {
+    fun `checkForUpdate detects the CRITICAL marker in a release body`() = runTest {
         val svc = createService(
             githubReleaseJson(
                 tagName = "v99.0.0",
-                body = "This update contains CRITICAL security patches."
+                body = "[CRITICAL] This update contains security patches."
             )
         )
         val update = svc.checkForUpdate()
 
         assertNotNull(update)
         assertTrue(update.isCritical)
+    }
+
+    /**
+     * The marker is bracketed on purpose. Every release between the installed
+     * version and the target is consulted now, so a changelog sentence using the
+     * word in passing would raise an undismissable dialog for everyone.
+     */
+    @Test
+    fun `the word critical in prose is not the marker`() = runTest {
+        val svc = createService(
+            githubReleaseJson(
+                tagName = "v99.0.0",
+                body = "Fixes a critical crash when opening the console."
+            )
+        )
+        val update = svc.checkForUpdate()
+
+        assertNotNull(update)
+        assertFalse(update.isCritical, "prose is not a declaration")
+    }
+
+    // --- criticality is a property of the range, not of the newest release ----
+
+    /** v2.0.0 installed, v2.1.0 critical, v2.2.0 ordinary and on top. */
+    private fun rangeService(middleName: String, topName: String) = createService(
+        MockResponse(urlContains = "releases/latest", body = githubReleaseJson(tagName = "v2.2.0", name = topName)),
+        MockResponse(
+            urlContains = "releases",
+            body = "[" + listOf(
+                githubReleaseJson(tagName = "v2.2.0", name = topName),
+                githubReleaseJson(tagName = "v2.1.0", name = middleName),
+                githubReleaseJson(tagName = "v2.0.0", name = "Nexira v2.0.0"),
+            ).joinToString(",") + "]",
+        ),
+        currentVersion = "2.0.0",
+    )
+
+    /**
+     * The defect this closes. Consulting only the newest release meant the
+     * mechanism was weakest exactly when the marker is used sparingly, which is
+     * how it is meant to be used.
+     */
+    @Test
+    fun `a critical release between installed and latest makes the update critical`() = runTest {
+        val update = rangeService(
+            middleName = "Nexira v2.1.0 [CRITICAL]",
+            topName = "Nexira v2.2.0",
+        ).checkForUpdate()
+
+        assertNotNull(update)
+        assertEquals("v2.2.0", update.version, "the offer is still the newest build")
+        assertTrue(update.isCritical, "the fix sits between the two, and the offer carries it")
+    }
+
+    @Test
+    fun `an ordinary range stays ordinary`() = runTest {
+        val update = rangeService(
+            middleName = "Nexira v2.1.0",
+            topName = "Nexira v2.2.0",
+        ).checkForUpdate()
+
+        assertNotNull(update)
+        assertFalse(update.isCritical, "nothing in the range declared itself")
+    }
+
+    @Test
+    fun `a release older than the installed one does not reach forward`() = runTest {
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest", body = githubReleaseJson(tagName = "v2.2.0", name = "Nexira v2.2.0")),
+            MockResponse(
+                urlContains = "releases",
+                body = "[" + listOf(
+                    githubReleaseJson(tagName = "v2.2.0", name = "Nexira v2.2.0"),
+                    githubReleaseJson(tagName = "v1.9.0", name = "Nexira v1.9.0 [CRITICAL]"),
+                ).joinToString(",") + "]",
+            ),
+            currentVersion = "2.0.0",
+        )
+
+        val update = svc.checkForUpdate()
+
+        assertNotNull(update)
+        assertFalse(update.isCritical, "already past it -- the installed build contains that fix")
     }
 
     @Test

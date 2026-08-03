@@ -255,6 +255,7 @@ interface AppStrings {
     val stateOfflineSkipSync: String
     /** Files dropped from mods/ before spawn because the pack does not name them. */
     fun stateForeignContentRemoved(count: Int, names: String): String
+    val stateContentChanged: String
     val stateOfflineNoClient: String
     val stateOfflineNoManifest: String
 

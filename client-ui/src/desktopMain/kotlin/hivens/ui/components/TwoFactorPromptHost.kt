@@ -119,5 +119,6 @@ fun TwoFactorPromptHost() {
         },
         errorMessage = error,
         isSubmitting = busy,
+        puppetPrefix = "launch.twoFactor",
     )
 }

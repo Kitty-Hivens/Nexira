@@ -9,10 +9,14 @@ scenarios.
 ## Enabling puppet mode
 
 ```sh
-./gradlew :client-ui:run \
-    -Pkotlin.jvm.target.validation.mode=ignore \
-    -Dnexira.puppet.port=58000
+./gradlew :client-ui:run -PnexiraPuppetPort=58000
 ```
+
+The port is a Gradle property, not a JVM one: `-Dnexira.puppet.port=...` on
+the command line lands on the Gradle daemon, not on the launcher. The build
+forwards `-PnexiraPuppetPort` into the application JVM. `-PnexiraDataDir=...`
+does the same for `NEXIRA_DATA_DIR`, which is how a driven run stays off the
+real data directory.
 
 Without the system property, the server never binds — release builds
 cannot accidentally expose this surface.
