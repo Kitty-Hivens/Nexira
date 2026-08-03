@@ -5,7 +5,7 @@ description: Modules, boot pipeline, dependency graph and the seams Nexira is bu
 
 ## Module map
 
-Sixteen Gradle modules. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
+Nineteen Gradle modules. The dependency direction is one-way and load-bearing: the engine never sees the UI, and the design system never sees the domain.
 
 | Module | Role |
 |---|---|
@@ -19,6 +19,9 @@ Sixteen Gradle modules. The dependency direction is one-way and load-bearing: th
 | `client-media` | Video cache and yt-dlp resolution for the media surfaces. |
 | `client-tray` | System tray behind one interface, backed by libtray (Panama bindings). |
 | `client-ui` | The Compose Desktop shell: screens, widgets, editor, console. |
+| `client-i18n` | The `AppStrings` interface, the English, Russian and German implementations, and the `LocalStrings` composition local. |
+| `client-render3d` | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them. |
+| `client-easter` | The April Fools engine, behind an SPI that resolves to a no-op unless a provider is registered. |
 | `nx-ui` | The design system: theme, tokens, surfaces, primitives. |
 | `widget-model` | Layout graph, slot and widget identity, service and command keys. Compose-free. |
 | `widget-api` | Widget runtime: the slot renderer, the registries, the composition locals. |
@@ -157,9 +160,9 @@ Adoption of the style tokens is uneven. Corner radius is read widely; motion and
 
 Roughly 1780 test methods. The engine and the widget model are covered densely. The UI is covered thinly, and its visual output has only a few assertions: most render tests assert that a non-empty image was produced, not what is in it.
 
-Continuous integration on a pull request runs three suites (`client-config`, `client-core`, `client-launcher`) across Linux, macOS and Windows. The UI, the design system, the widget modules and the auth modules are not run there.
+Continuous integration on a pull request runs seven suites -- `client-config`, `client-core`, `client-launcher`, `client-ui`, `client-i18n`, `client-render3d` and `widget-processor` -- across Linux, macOS and Windows. The design system, the widget model and runtime, the auth modules, the CLI, media, tray and the two agents are not run there.
 
-Two custom scanners do run strictly on every pull request: one fails on a user-facing string hardcoded outside the localisation layer, the other on process metadata in comments. Both scan the engine and `client-ui`; neither scans `nx-ui` or the widget modules.
+Two custom scanners do run strictly on every pull request: one fails on a user-facing string hardcoded outside the localisation layer, the other on process metadata in comments. Neither keeps a module list, because a list is how `nx-ui` went unscanned when it was split out: the comment scanner takes every top-level directory carrying sources, and the string scanner asks each build file whether Compose is applied. A new module is covered the day it lands.
 
 ## Packaging
 

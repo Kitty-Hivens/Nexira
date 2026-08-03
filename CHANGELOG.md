@@ -26,6 +26,9 @@ lives in this English file.
 
 ## [Unreleased]
 
+### Changed
+- Three packages leave `client-ui` for modules of their own, keeping their package names so no call site moves: `:client-i18n` (`AppStrings`, the three locale implementations, `AppLocale`, `LocalStrings`), `:client-render3d` (`hivens.ui.render3d` / `.scene3d` / `.skin3d` -- rasteriser, scene graph, skin rig) and `:client-easter` (the April Fools engine behind its SPI). Each was measured before the cut: localisation was the largest package in the module and imported nothing back from it, the 3D stack reached outside itself exactly once, and the seasonal engine three times. `client-ui` drops from 299 production files to 268 and from 53.7k lines to 44.4k; the 477 tests it carried split 387 / 84 / 6 with none lost. `AprilFoolsLoader` becomes public as the entry point of its module, and the nested-typealias language flag moves to the module holding the only declaration that needs it. `client-i18n` and `client-render3d` join the pull-request test matrix; both new UI modules are picked up by the string and comment scanners automatically, neither of which keeps a module list.
+
 ### Fixed
 - The update check picks the highest version among the eligible releases instead of the first one GitHub returns. The list arrives newest-published first, and publication order is not version order: a beta cut after a nightly leads the page while ranking below it on the prerelease ladder, so a nightly install compared itself against the beta, concluded it was up to date, and never looked at the newer nightly one row down. The ladder itself is unchanged and still correct -- a beta is not an upgrade for a nightly install, and the point of the ladder is that nobody gets dragged backwards.
 

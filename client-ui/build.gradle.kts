@@ -87,6 +87,12 @@ kotlin {
                 implementation(project(":client-tray"))
                 implementation(project(":widget-api"))
                 implementation(project(":nx-ui"))
+                // Packages carved out of this module and kept under their
+                // original names (hivens.ui.i18n / .scene3d / .render3d /
+                // .skin3d / .easter), so every call site here is unchanged.
+                implementation(project(":client-i18n"))
+                implementation(project(":client-render3d"))
+                implementation(project(":client-easter"))
 
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)
@@ -597,11 +603,6 @@ tasks.withType<KotlinJvmCompile>().configureEach {
         val buildDirAbsolute = layout.buildDirectory.get().asFile.absolutePath
 
         freeCompilerArgs.addAll(
-            // Language: nested typealiases are used in AprilFoolsEngine.kt
-            // for the floating-button Event signature. Without the flag the
-            // compiler restricts typealiases to top level only.
-            "-XXLanguage:+NestedTypeAliases",
-
             // Bytecode: emit default methods directly (legal on jvmTarget=26).
             // Smaller class files, removes the DefaultImpls indirection.
             "-jvm-default=no-compatibility",
