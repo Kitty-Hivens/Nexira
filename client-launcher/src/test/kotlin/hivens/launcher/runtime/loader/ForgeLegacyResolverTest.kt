@@ -1,6 +1,6 @@
 package hivens.launcher.runtime.loader
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine

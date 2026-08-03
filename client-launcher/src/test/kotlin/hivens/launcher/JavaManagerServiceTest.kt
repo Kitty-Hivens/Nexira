@@ -18,6 +18,7 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
 import org.junit.jupiter.api.condition.EnabledOnOs
 import hivens.core.platform.OS as PlatformOS
+import hivens.test.testTransferEngine
 import org.junit.jupiter.api.condition.OS
 import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream

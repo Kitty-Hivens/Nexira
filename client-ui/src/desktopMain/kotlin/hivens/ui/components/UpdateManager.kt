@@ -3,7 +3,7 @@ package hivens.ui.components
 import androidx.compose.runtime.*
 import hivens.config.Branding
 import hivens.core.data.LauncherUpdate
-import hivens.launcher.update.UpdateService
+import hivens.update.UpdateService
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction

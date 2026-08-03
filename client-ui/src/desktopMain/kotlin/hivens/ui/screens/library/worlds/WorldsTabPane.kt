@@ -41,9 +41,9 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxSectionHeader
-import hivens.ui.screens.CenteredProgress
-import hivens.ui.screens.RetryStateBlock
+import hivens.ui.nx.RetryStateBlock
 import hivens.ui.theme.NxTheme
 import java.io.File
 import java.nio.file.Path

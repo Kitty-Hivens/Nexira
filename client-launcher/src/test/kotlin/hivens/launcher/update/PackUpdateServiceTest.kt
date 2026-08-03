@@ -1,6 +1,6 @@
 package hivens.launcher.update
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.dto.smrt.toBaselineManifest
 import hivens.core.api.interfaces.IPackRepository

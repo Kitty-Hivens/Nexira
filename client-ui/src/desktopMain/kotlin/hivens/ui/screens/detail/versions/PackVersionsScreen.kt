@@ -70,11 +70,12 @@ import hivens.ui.components.ChannelChip
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
-import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxDiffRow
 import hivens.ui.nx.NxDiffRowKind
@@ -86,7 +87,6 @@ import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.screens.CenteredProgress
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle

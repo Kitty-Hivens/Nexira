@@ -62,8 +62,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
-import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.layout.LayoutReconcile
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
@@ -86,9 +84,12 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.layout.AdaptiveWidth
-import hivens.ui.theme.NxTheme
+import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.layout.LayoutReconcile
+import hivens.ui.nx.AdaptiveWidth
+import hivens.ui.nx.WidthClass
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext

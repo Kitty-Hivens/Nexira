@@ -1,6 +1,6 @@
 package hivens.launcher.catalogue
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.PackOrigin
 import hivens.launcher.modrinth.ModrinthClient

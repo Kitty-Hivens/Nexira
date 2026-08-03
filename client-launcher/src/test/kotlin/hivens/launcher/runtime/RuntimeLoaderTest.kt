@@ -1,6 +1,6 @@
 package hivens.launcher.runtime
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.loader.CleanroomResolver
 import hivens.launcher.runtime.loader.LibrarySpec

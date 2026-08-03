@@ -95,9 +95,9 @@ import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.PackUpdateService
-import hivens.launcher.update.DesktopIntegration
-import hivens.launcher.update.UpdateApplicators
-import hivens.launcher.update.UpdateService
+import hivens.update.DesktopIntegration
+import hivens.update.UpdateApplicators
+import hivens.update.UpdateService
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*

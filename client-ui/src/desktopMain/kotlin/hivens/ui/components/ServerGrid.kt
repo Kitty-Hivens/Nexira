@@ -12,8 +12,8 @@ import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.AutoSyncService
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.layout.AdaptiveWidth
-import hivens.ui.layout.WidthClass
+import hivens.ui.nx.AdaptiveWidth
+import hivens.ui.nx.WidthClass
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxTheme
 

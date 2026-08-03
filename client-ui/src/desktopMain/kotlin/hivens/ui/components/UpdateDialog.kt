@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
-import hivens.launcher.update.UpdateService
+import hivens.update.UpdateService
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol

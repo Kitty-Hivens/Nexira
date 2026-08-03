@@ -56,7 +56,7 @@ import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
 import hivens.launcher.AutoSyncService
-import hivens.launcher.update.UpdateService
+import hivens.update.UpdateService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.state.WidgetStateFlushHook
