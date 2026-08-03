@@ -17,11 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
-import hivens.ui.components.NavItemRowContent
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
@@ -73,7 +73,7 @@ fun ProfileNavWidget(instance: WidgetInstance) {
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                NavItemRowContent(
+                NxNavRowContent(
                     icon = category.icon,
                     label = label,
                     isSelected = isSelected,

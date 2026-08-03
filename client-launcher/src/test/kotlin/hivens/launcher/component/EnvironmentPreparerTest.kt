@@ -1,6 +1,6 @@
 package hivens.launcher.component
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.test.buildMockClient
 import io.ktor.client.HttpClient

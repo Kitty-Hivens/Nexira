@@ -2,7 +2,7 @@
 
 Every number here was measured, not estimated, and every claim carries the command that produced it. If a command now returns something else, this document is wrong and the command wins.
 
-Scope: the launcher repository at the time of writing. 717 production source files, ~98k lines, nineteen Gradle modules.
+Scope: the launcher repository at the time of writing. 717 production source files, ~98k lines, twenty Gradle modules.
 
 ```sh
 find . -name '*.kt' -o -name '*.java' | grep -v /build/ | grep -v /test | xargs wc -l | tail -1

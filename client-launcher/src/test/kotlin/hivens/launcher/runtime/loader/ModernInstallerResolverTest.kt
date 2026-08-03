@@ -1,6 +1,6 @@
 package hivens.launcher.runtime.loader
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IJavaManager
 import hivens.launcher.runtime.MojangArtifact

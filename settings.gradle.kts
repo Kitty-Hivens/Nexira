@@ -71,6 +71,10 @@ include(":client-auth")
 include(":client-auth-smartycraft")
 include(":client-auth-microsoft")
 include(":client-launcher")
+// The launcher's self-update: release check, delta bundle, binary patch and the
+// per-platform applicators. Split from pack update, which shared the package name
+// and nothing else and stays in :client-launcher next to the mirror client.
+include(":client-update")
 // Headless native-image entrypoint: a Compose-free CLI over the launch
 // pipeline (auth -> resolve -> download -> JRE -> runtime -> launch),
 // buildable to a GraalVM / Liberica-NIK native binary for Linux. The GUI

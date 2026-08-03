@@ -26,6 +26,7 @@ import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.test.buildMockClient
+import hivens.test.testTransferEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import kotlinx.coroutines.test.runTest

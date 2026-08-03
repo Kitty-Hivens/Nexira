@@ -49,12 +49,12 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
-import hivens.ui.components.NavItemRowContent
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
@@ -179,7 +179,7 @@ fun PackSettingsWindow(
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                NavItemRowContent(
+                                NxNavRowContent(
                                     icon = category.icon,
                                     label = category.label(s),
                                     isSelected = isSelected,
