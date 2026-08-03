@@ -14,12 +14,14 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalWindowInfo
 import hivens.ui.render3d.Texture
 import hivens.ui.scene3d.Node
 import hivens.ui.scene3d.OrthoCamera
 import hivens.ui.scene3d.Scene3DState
 import hivens.ui.scene3d.Scene3DView
 import hivens.ui.theme.LocalStyle
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 
 // Live 3D Minecraft-skin view. Builds the posable rig from [buildRig] and
@@ -36,6 +38,20 @@ private const val TWO_PI = (2.0 * PI).toFloat()
 
 // Radians of yaw per millisecond when auto-spinning (~one turn per 11s).
 private const val SPIN_RATE = 0.00055f
+
+// Floor on the interval between advances of the spin and the pose clock.
+//
+// Every advance of either invalidates the scene host's snapshot, and each
+// invalidation is a full CPU rasterize of the rig plus the SSAA resolve --
+// there is no GPU on this path. Driven straight off the frame clock that work
+// runs at whatever the panel refreshes at, so the same eleven-second turn
+// costs three and a half times more on a 210 Hz display than on a 60 Hz one,
+// for a rotation of a seventh of a degree per frame that no eye resolves.
+//
+// The elapsed time between advances is measured, not assumed, so the figure
+// still turns once every eleven seconds -- the same motion, sampled at a rate
+// the motion needs instead of the rate the hardware offers.
+private const val MIN_ADVANCE_MS = 33L
 
 /** How much of the figure to frame: the whole body, or a head-and-torso bust. */
 enum class SkinFraming { Full, Bust }
@@ -94,28 +110,44 @@ fun SkinView3D(
     val motion = LocalStyle.current.animationMultiplier
     SideEffect { state.motionMultiplier = motion }
 
+    // A spin nobody is looking at is a spin worth not drawing. The window
+    // losing focus does not hide the figure, so this trades a frozen model in
+    // a background window for the core the rasterizer would otherwise burn
+    // while the user is somewhere else entirely -- on a laptop, for as long as
+    // the launcher stays open behind the game.
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+
     // One frame loop drives both the auto-spin and the pose clock. It exits as
     // soon as nothing needs frames (static settled pose, no spin) and is
     // relaunched by the animationRevision bump of the next play()/setPose() --
     // so a Bust grid card or an idle static hero costs zero per-frame work.
     // The settled checks read state.timeMs inside the effect, not composition,
     // so advancing time never recomposes -- it only invalidates the draw.
-    if (motion > 0f) {
-        LaunchedEffect(skin, motion, autoSpin, state.animationRevision) {
+    //
+    // An auto-spinning view never reaches the settled break, by design: it is
+    // always moving. What bounds its cost is the delay below.
+    //
+    // The delay is what does the work, not a counter inside the frame callback.
+    // Asking for a frame is itself a request to draw one: a loop that awaits
+    // every frame keeps the compositor's swap cycle running at the panel's rate
+    // whether or not the awaited frame changed anything, so skipping the state
+    // write inside the callback saves the rasterize and leaves the swap. The
+    // loop therefore sleeps first and asks for a frame second -- between two
+    // advances Compose is asked for nothing and draws nothing.
+    if (motion > 0f && windowFocused) {
+        LaunchedEffect(skin, motion, autoSpin, windowFocused, state.animationRevision) {
             if (!autoSpin && state.animator.isSettled(state.timeMs)) return@LaunchedEffect
-            var last = 0L
+            var last = withFrameMillis { it }
             while (true) {
-                withFrameMillis { now ->
-                    if (last != 0L) {
-                        val delta = now - last
-                        if (autoSpin && !dragging) {
-                            state.yaw = (state.yaw + delta * SPIN_RATE * motion) % TWO_PI
-                        }
-                        if (!state.animator.isSettled(state.timeMs)) {
-                            state.timeMs += (delta * motion).toLong()
-                        }
-                    }
-                    last = now
+                delay(MIN_ADVANCE_MS)
+                val now = withFrameMillis { it }
+                val delta = now - last
+                last = now
+                if (autoSpin && !dragging) {
+                    state.yaw = (state.yaw + delta * SPIN_RATE * motion) % TWO_PI
+                }
+                if (!state.animator.isSettled(state.timeMs)) {
+                    state.timeMs += (delta * motion).toLong()
                 }
                 if (!autoSpin && state.animator.isSettled(state.timeMs)) break
             }

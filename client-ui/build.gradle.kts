@@ -473,6 +473,13 @@ packaging {
         "jdk.unsupported",
         "jdk.zipfs",
         "jdk.localedata",
+        // jdk.jfr: Flight Recorder. Without it the packaged build refuses to
+        // start under -XX:StartFlightRecording ("Module jdk.jfr not found"),
+        // so the one profiler that ships with the JDK cannot be pointed at the
+        // artifact users actually run -- a performance report against a
+        // distributable had to be reconstructed from jcmd stack sampling. The
+        // module is inert unless a recording is asked for.
+        "jdk.jfr",
     ))
 
     // jvmArgs baked into the jpackage launcher script via repeated
