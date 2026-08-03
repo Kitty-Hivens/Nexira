@@ -162,10 +162,21 @@ class UpdateService(
             val releasesPage = if (includePrereleases) fetchReleasesPage() else null
             val release = (
                 if (releasesPage != null) {
-                    releasesPage.firstOrNull { entry ->
-                        nightlyEnabled ||
-                            ReleaseChannel.classify(entry.tagName.removePrefix("v")) != ReleaseChannel.Nightly
-                    } ?: run {
+                    // Highest VERSION among the eligible entries, not the first
+                    // one GitHub hands back. The list arrives newest-published
+                    // first, and publication order is not version order: a beta
+                    // cut after a nightly leads the page while ranking below it
+                    // on the prerelease ladder, so taking the head answered "up
+                    // to date" to every nightly install and never looked at the
+                    // newer nightly further down.
+                    releasesPage
+                        .filter { entry ->
+                            nightlyEnabled ||
+                                ReleaseChannel.classify(entry.tagName.removePrefix("v")) != ReleaseChannel.Nightly
+                        }
+                        .maxWithOrNull { a, b ->
+                            compareVersions(a.tagName.removePrefix("v"), b.tagName.removePrefix("v"))
+                        } ?: run {
                         logger.warn("No eligible release found in /releases response")
                         null
                     }
