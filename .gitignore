@@ -93,3 +93,10 @@ GEMINI.md
 # Astro docs site generated cache + build output
 /docs/.astro/
 /docs/dist/
+
+# JVM crash artifacts. A fatal error drops these in the working directory of
+# whatever process died, which for a launcher run from the repo is the repo
+# root, where the next `git add -A` sweeps a 130 KB dump into a commit.
+hs_err_pid*.log
+replay_pid*.log
+core.[0-9]*
