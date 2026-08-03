@@ -2,7 +2,7 @@ name: i18n-lint
 
 on:
   pull_request:
-    branches: [stable, Project-Void]
+    branches: [stable, dev]
     paths:
       - "**/*.kt"
       - "scripts/check-i18n.py"
