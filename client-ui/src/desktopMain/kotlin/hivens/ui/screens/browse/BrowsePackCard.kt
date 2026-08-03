@@ -34,6 +34,7 @@ import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.theme.Dimens
@@ -153,26 +154,5 @@ private fun BrowseAvatar(pack: CataloguePack, hue: Color) {
         loading            = { Box(Modifier.fillMaxSize().background(hue)) },
         error              = { InitialsAvatar(pack.title, hue) },
     )
-}
-
-@Composable
-private fun InitialsAvatar(title: String, hue: Color) {
-    val initials = title
-        .split(' ', '-', '_')
-        .filter { it.isNotBlank() }
-        .take(2)
-        .joinToString("") { it.first().uppercaseChar().toString() }
-        .ifEmpty { "?" }
-    Box(
-        modifier         = Modifier.fillMaxSize().background(hue),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text       = initials,
-            color      = Color.White,
-            style      = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-    }
 }
 
