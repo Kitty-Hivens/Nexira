@@ -24,7 +24,7 @@ import java.util.ServiceLoader
  * no implementation exists to render it. Same pattern as
  * `PuppetServerLoader`.
  */
-internal object AprilFoolsLoader {
+object AprilFoolsLoader {
     val instance: AprilFoolsLifecycle by lazy {
         ServiceLoader.load(AprilFoolsLifecycle::class.java)
             .firstOrNull() ?: NoOpAprilFools

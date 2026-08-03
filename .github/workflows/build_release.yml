@@ -199,7 +199,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-ui:desktopTest --continue
+        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest --continue
 
       - name: Upload test reports
         if: always()   # we publish it even if it falls, so we can see what's broken
