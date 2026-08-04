@@ -292,6 +292,7 @@ object EnglishStrings : AppStrings {
     override val backgroundSectionImage   = "Image or video"
     override val backgroundPickFile       = "Choose a background image or video"
     override val backgroundPickButton     = "Choose file"
+    override val backgroundCancelOptimize = "Stop preparing the video"
     override val backgroundSectionScale   = "Scaling"
     override val backgroundScaleCover     = "Cover"
     override val backgroundScaleContain   = "Contain"

@@ -10,11 +10,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -35,7 +34,7 @@ import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,13 +49,15 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val settings by ctx.settings
     val scope = rememberCoroutineScope()
-    val dataDir = koinInject<Path>()
-    val appScope = koinInject<CoroutineScope>()
-    val optimizer = remember(dataDir) { BackgroundOptimizer(dataDir.resolve("background-cache"), appScope) }
+    // Process singleton: a transcode runs in the app scope and outlives this screen,
+    // so the handle to it has to outlive the screen as well.
+    val optimizer = koinInject<BackgroundOptimizer>()
     // Downscale target: the monitor's physical pixel height, so a 4K source becomes a
     // display-res wallpaper once and stays crisp at any window size up to the screen.
     val targetHeight = remember { physicalScreenHeight() }
-    var optimizing by remember { mutableStateOf(false) }
+    // Read off the optimizer, not off local state: leaving the screen mid-transcode and
+    // coming back used to show an idle picker over work that was still running.
+    val optimizing by optimizer.optimizing.collectAsState()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(s.backgroundSectionImage)
@@ -69,7 +70,7 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                 label    = s.backgroundPickButton,
                 icon     = NxIcon.Image,
                 style    = NxButtonStyle.Secondary,
-                enabled  = !optimizing,
+                enabled  = optimizing == null,
                 modifier = Modifier.weight(1f),
                 onClick  = {
                     scope.launch {
@@ -88,27 +89,40 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                             backgroundMediaKind(File(picked)) == BackgroundMediaKind.TimeBased
                         }
                         val resolved = if (timeBased && targetHeight > 0) {
-                            optimizing = true
                             try {
                                 optimizer.optimize(Path.of(picked), targetHeight).toString()
+                            } catch (e: CancellationException) {
+                                // The user stopped the transcode: leave the wallpaper as
+                                // it was rather than setting the oversized source they
+                                // just declined to pay for.
+                                return@launch
                             } catch (e: Exception) {
                                 picked
-                            } finally {
-                                optimizing = false
                             }
                         } else {
                             picked
                         }
                         ctx.update { copy(imagePath = resolved, enabled = true) }
+                        // The cache holds the wallpaper itself for video; everything else
+                        // in it is a transcode of a wallpaper that is no longer set.
+                        optimizer.evictUnused(keep = Path.of(resolved))
                     }
                 },
             )
-            if (optimizing) {
+            if (optimizing != null) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = NxTheme.colors.primary)
+                NxIconButton(
+                    NxIcon.Close, s.backgroundCancelOptimize,
+                    onClick = { optimizer.cancel() },
+                    tint    = NxTheme.colors.error,
+                )
             } else if (settings.imagePath != null) {
                 NxIconButton(
                     NxIcon.Delete, null,
-                    onClick = { ctx.update { copy(imagePath = null, enabled = false) } },
+                    onClick = {
+                        ctx.update { copy(imagePath = null, enabled = false) }
+                        optimizer.evictUnused(keep = null)
+                    },
                     tint    = NxTheme.colors.error,
                 )
             }

@@ -301,6 +301,7 @@ interface AppStrings {
     val backgroundSectionImage: String
     val backgroundPickFile: String
     val backgroundPickButton: String
+    val backgroundCancelOptimize: String
     val backgroundSectionScale: String
     val backgroundScaleCover: String
     val backgroundScaleContain: String

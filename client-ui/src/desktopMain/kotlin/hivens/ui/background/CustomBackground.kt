@@ -129,12 +129,13 @@ private fun AnimatedParallaxImage(
     val contentScale = bgContentScale(settings.scaleMode)
     val alignment = bgAlignment(settings.alignX, settings.alignY)
 
-    // Classify off the UI thread (png/webp need a frame-count probe); null
-    // until known, so the background draws nothing for a frame rather than
-    // blocking composition on file I/O.
-    val mediaKind by produceState<BackgroundMediaKind?>(null, file) {
-        value = withContext(Dispatchers.IO) { backgroundMediaKind(file) }
-    }
+    // Classify off the UI thread (png/webp need a frame-count probe); null until
+    // known, so the background draws nothing for a frame rather than blocking
+    // composition on file I/O. Kept in a state keyed on the file rather than in a
+    // produceState, which holds the PREVIOUS file's answer until the new one lands
+    // -- long enough to open the video player on a still image.
+    var mediaKind by remember(file) { mutableStateOf<BackgroundMediaKind?>(null) }
+    LaunchedEffect(file) { mediaKind = withContext(Dispatchers.IO) { backgroundMediaKind(file) } }
 
     // Still image decodes through Skia; video + animated images play through
     // Skinema. Only the active branch composes, so switching media kind tears
