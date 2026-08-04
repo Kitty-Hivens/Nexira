@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.hivens.skinema.compose.VideoScale
 import hivens.ui.components.FullscreenVideo
+import hivens.ui.components.VideoHandoff
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.i18n.LocalStrings
@@ -58,6 +59,9 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
 
     var playing by remember(url) { mutableStateOf(false) }
     var expanded by remember(url) { mutableStateOf(false) }
+    // Owned here, above the swap, so the inline player and the fullscreen one are
+    // two views of one viewing rather than two separate starts.
+    val handoff = remember(url) { VideoHandoff() }
 
     Box(
         modifier = Modifier
@@ -78,6 +82,7 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
                 audio               = true,
                 showControls        = true,
                 scale               = VideoScale.Fit,
+                handoff             = handoff,
                 onRequestFullscreen = { expanded = true },
                 // Stopping the download drops back to the poster, which is where
                 // pressing play again starts from.
@@ -88,7 +93,7 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
     }
 
     if (expanded) {
-        FullscreenVideo(url = url, onDismiss = { expanded = false })
+        FullscreenVideo(url = url, handoff = handoff, onDismiss = { expanded = false })
     }
 }
 

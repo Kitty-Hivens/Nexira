@@ -132,7 +132,9 @@ fun VideoMedia(
     startMuted: Boolean = false,
     showControls: Boolean = true,
     scale: VideoScale = VideoScale.Fit,
+    handoff: VideoHandoff? = null,
     onRequestFullscreen: (() -> Unit)? = null,
+    onExitFullscreen: (() -> Unit)? = null,
     onCancelled: (() -> Unit)? = null,
 ) {
     val s = LocalStrings.current
@@ -147,7 +149,9 @@ fun VideoMedia(
             startMuted          = startMuted,
             showControls        = showControls,
             scale               = scale,
+            handoff             = handoff,
             onRequestFullscreen = onRequestFullscreen,
+            onExitFullscreen    = onExitFullscreen,
         )
         // A caller that asked for no transport gets no fetch chrome either: an
         // ambient banner loops behind the page, and a progress readout with a

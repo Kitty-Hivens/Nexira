@@ -18,6 +18,7 @@ CheckCircle
 ChevronLeft
 ChevronRight
 Close
+CloseFullscreen
 CloudDownload
 Code
 Computer
