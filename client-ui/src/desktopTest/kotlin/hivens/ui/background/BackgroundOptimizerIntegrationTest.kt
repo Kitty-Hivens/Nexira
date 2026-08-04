@@ -3,7 +3,11 @@ package hivens.ui.background
 import dev.hivens.skinema.libav.VideoDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -39,5 +43,35 @@ class BackgroundOptimizerIntegrationTest {
 
         assertTrue(out != src, "an oversized source must be transcoded, not returned as-is")
         assertTrue((outSize?.second ?: Int.MAX_VALUE) <= 1440, "output must be no taller than 1440")
+    }
+
+    /**
+     * The transcode must end when it is cancelled, not when the file runs out.
+     * The target height is deliberately small so any source qualifies, and the
+     * join timeout is the assertion: an encode loop without a cancellation point
+     * ignores the cancel and keeps a core for the length of the video.
+     */
+    @Test
+    fun `a cancelled transcode stops within seconds and leaves nothing behind`() {
+        val path = System.getenv("NEXIRA_TEST_VIDEO") ?: return
+        val src = Path.of(path)
+        if (!Files.exists(src)) return
+
+        val cacheDir = Files.createTempDirectory("bgopt-cancel")
+        val optimizer = BackgroundOptimizer(cacheDir, CoroutineScope(Dispatchers.IO))
+
+        runBlocking {
+            val caller = launch { runCatching { optimizer.optimize(src, 480) } }
+            // Let the encoder actually get going before pulling the rug out.
+            withTimeout(30_000) { optimizer.optimizing.first { it != null } }
+            delay(2_000)
+
+            optimizer.cancel()
+            withTimeout(10_000) { caller.join() }
+            withTimeout(10_000) { optimizer.optimizing.first { it == null } }
+        }
+
+        val leftovers = cacheDir.toFile().listFiles()?.map { it.name }.orEmpty()
+        assertTrue(leftovers.isEmpty(), "a cancelled transcode publishes no output and keeps no .part: $leftovers")
     }
 }

@@ -290,6 +290,7 @@ object RussianStrings : AppStrings {
     override val backgroundSectionImage   = "Изображение или видео"
     override val backgroundPickFile       = "Выберите изображение или видео для фона"
     override val backgroundPickButton     = "Выбрать файл"
+    override val backgroundCancelOptimize = "Остановить подготовку видео"
     override val backgroundSectionScale   = "Масштабирование"
     override val backgroundScaleCover     = "Заполнить"
     override val backgroundScaleContain   = "Вписать"

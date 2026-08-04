@@ -2,8 +2,8 @@ package hivens.ui.background
 
 import androidx.compose.runtime.Composable
 import hivens.ui.diag.SkinemaGate
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +20,7 @@ import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.player.VideoPlayer
 import dev.hivens.skinema.skiko.VideoFrameImage
 import hivens.ui.theme.seedFromRgba
+import org.jetbrains.skia.Image
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
 import org.slf4j.LoggerFactory
@@ -38,7 +39,7 @@ private val log = LoggerFactory.getLogger("SkinemaBackground")
  * draw scope -- the same snapshot-read trick VideoSurface uses.
  */
 internal class VideoFramePainter(
-    private val frames: VideoFrameImage,
+    private val currentImage: () -> Image?,
     private val displaySize: Size,
     private val rotationDegrees: Int,
     private val frameStamp: () -> Int,
@@ -48,7 +49,7 @@ internal class VideoFramePainter(
 
     override fun DrawScope.onDraw() {
         frameStamp() // snapshot read -- a new frame invalidates this draw
-        val image = frames.image ?: return
+        val image = currentImage() ?: return
         val w = size.width
         val h = size.height
         drawIntoCanvas { canvas ->
@@ -76,13 +77,64 @@ internal class VideoFramePainter(
 }
 
 /**
+ * A silent Skinema player over one wallpaper file, plus the Skia image its
+ * frames land in. Both hold resources the JVM will not reclaim on its own -- a
+ * decode thread and a pacer thread, native FFmpeg state, one raster image --
+ * and both are released together in [release].
+ *
+ * A [RememberObserver] rather than a `DisposableEffect`, because the decode
+ * thread starts inside the constructor, i.e. during composition: a composition
+ * that is abandoned before it applies never runs its effects, and the player
+ * created for it would then be running with nothing left holding a reference to
+ * close it. [onAbandoned] is the only callback that covers that.
+ */
+private class BackgroundVideo(
+    file: File,
+    loop: Boolean,
+    hardware: HwAccel,
+) : RememberObserver {
+
+    val player = VideoPlayer(path = file.toPath(), loop = loop, audio = false, hardware = hardware)
+
+    private val frames = VideoFrameImage()
+
+    @Volatile
+    private var released = false
+
+    /** The frame on screen; null before the first one lands and after release. */
+    val image: Image? get() = frames.image
+
+    /**
+     * Copies a decoded frame into the Skia image. Ignored once released: the
+     * pump is cancelled asynchronously, and an update landing after the close
+     * would allocate a native image with nothing left to free it.
+     */
+    fun update(slot: VideoPlayer.FrameSlot) {
+        if (!released) frames.update(slot.width, slot.height, slot.rgba)
+    }
+
+    override fun onRemembered() = Unit
+
+    override fun onForgotten() = release()
+
+    override fun onAbandoned() = release()
+
+    private fun release() {
+        if (released) return
+        released = true
+        frames.close()
+        player.close()
+    }
+}
+
+/**
  * Opens [file] as a looping, silent Skinema player and pumps its frames on the
  * Compose frame clock, returning a [VideoFramePainter] once the first frame has
  * decoded (null before that, and on [VideoPlayer.State.Failed], so the caller
  * draws nothing -- the same gate the still path uses while it decodes).
  *
- * The player holds a decode thread and native memory; it is closed on dispose
- * (when [file] changes or the background leaves the composition).
+ * The player holds a decode thread and native memory; it is released when [file]
+ * or a playback setting changes, and when the background leaves the composition.
  */
 @Composable
 internal fun rememberSkinemaFrame(
@@ -95,37 +147,35 @@ internal fun rememberSkinemaFrame(
     // Skinema disabled by boot recovery -> no animated background (same draw-
     // nothing contract as the decode-failure gate below).
     if (!SkinemaGate.enabled) return null
-    // Keyed on hardwareDecode too: toggling the policy re-opens the player on
-    // the chosen backend rather than waiting for the file to change.
-    val player = remember(file, hardwareDecode) {
-        VideoPlayer(
-            path  = file.toPath(),
+    // Keyed on the decode policy and the loop mode as well as the file: both are
+    // constructor arguments, so neither takes effect until the player re-opens,
+    // and keying only on the file left the loop setting inert until the wallpaper
+    // itself changed.
+    val video = remember(file, hardwareDecode, loopMode) {
+        BackgroundVideo(
+            file = file,
             // The background loops unless the user pinned it to a single pass.
-            loop  = loopMode != BackgroundLoopMode.PlayOnce,
-            audio = false,
+            loop = loopMode != BackgroundLoopMode.PlayOnce,
             // 4K on the CPU is brutal; AUTO offloads to the GPU and falls back
             // to software per file when no device opens.
             hardware = if (hardwareDecode) HwAccel.AUTO else HwAccel.OFF,
         )
     }
-    DisposableEffect(player) { onDispose { player.close() } }
+    val player = video.player
 
-    val frames = remember(player) { VideoFrameImage() }
-    DisposableEffect(frames) { onDispose { frames.close() } }
-
-    var frameStamp by remember(player) { mutableIntStateOf(0) }
-    var displaySize by remember(player) { mutableStateOf<Size?>(null) }
+    var frameStamp by remember(video) { mutableIntStateOf(0) }
+    var displaySize by remember(video) { mutableStateOf<Size?>(null) }
 
     // The animation-speed slider maps to playback rate; Skinema clamps to
     // [0.5, 4]x internally.
     LaunchedEffect(player, speedMultiplier) { player.setRate(speedMultiplier) }
 
-    LaunchedEffect(player) {
+    LaunchedEffect(video) {
         var seedSent = false
         while (true) {
             withFrameNanos { }
             player.acquireFrame()?.let { slot ->
-                frames.update(slot.width, slot.height, slot.rgba)
+                video.update(slot)
                 if (displaySize == null) {
                     val rot = player.rotationDegrees
                     displaySize = if (rot % 180 == 0)
@@ -147,7 +197,12 @@ internal fun rememberSkinemaFrame(
     }
 
     val size = displaySize ?: return null
-    return remember(player, size) {
-        VideoFramePainter(frames, size, player.rotationDegrees) { frameStamp }
+    return remember(video, size) {
+        VideoFramePainter(
+            currentImage    = { video.image },
+            displaySize     = size,
+            rotationDegrees = player.rotationDegrees,
+            frameStamp      = { frameStamp },
+        )
     }
 }
