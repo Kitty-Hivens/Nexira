@@ -79,6 +79,9 @@ fun VideoPlayerWidget(instance: WidgetInstance) {
                 showControls        = true,
                 scale               = VideoScale.Fit,
                 onRequestFullscreen = { expanded = true },
+                // Stopping the download drops back to the poster, which is where
+                // pressing play again starts from.
+                onCancelled         = { playing = false },
             )
             else -> PlayPoster(onClick = { playing = true })
         }

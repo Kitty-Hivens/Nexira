@@ -1308,6 +1308,12 @@ interface AppStrings {
     val videoSkipBack: String
     val videoSkipForward: String
     val videoWidgetEmpty: String
+    val videoFetchingTool: String
+    val videoResolvingPage: String
+    val videoDownloading: String
+    val videoCancelDownload: String
+    val videoCancelled: String
+    val videoRetry: String
 
     // --- Library pack card ---
     val packCardPlay: String

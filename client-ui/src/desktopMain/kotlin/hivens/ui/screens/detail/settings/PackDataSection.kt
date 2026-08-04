@@ -11,6 +11,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.update.PackUpdateService
+import hivens.ui.utils.humanSize
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
@@ -153,16 +154,4 @@ private fun dirSizeBytes(dir: Path): Long {
             .mapToLong { runCatching { Files.size(it) }.getOrDefault(0L) }
             .sum()
     }
-}
-
-private fun humanSize(bytes: Long): String {
-    if (bytes < 1024) return "$bytes B"
-    val units = listOf("KB", "MB", "GB", "TB")
-    var value = bytes.toDouble() / 1024.0
-    var unit = 0
-    while (value >= 1024.0 && unit < units.lastIndex) {
-        value /= 1024.0
-        unit++
-    }
-    return "%.1f %s".format(value, units[unit])
 }
