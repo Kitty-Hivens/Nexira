@@ -19,6 +19,7 @@ object NxIcon {
     val ChevronLeft = IconKey(0xe408)
     val ChevronRight = IconKey(0xe409)
     val Close = IconKey(0xe14c)
+    val CloseFullscreen = IconKey(0xf1cf)
     val CloudDownload = IconKey(0xe2c0)
     val Code = IconKey(0xe86f)
     val Computer = IconKey(0xe30a)
