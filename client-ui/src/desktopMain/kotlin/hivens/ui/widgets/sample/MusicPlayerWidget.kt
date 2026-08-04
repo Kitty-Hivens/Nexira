@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.AudioError
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
+import hivens.ui.audio.TrackInfo
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -99,6 +103,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
     val player: AudioPlayer = koinInject()
     val state by player.state.collectAsState()
     val volume by player.volume.collectAsState()
+    val track by player.track.collectAsState()
     val scope = rememberCoroutineScope()
 
     // Expose this widget's AudioPlayer-backed playback through the
@@ -145,7 +150,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
     ) {
         // Header + album-art block + transport
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            AlbumArtBlock(state)
+            AlbumArtBlock(track)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -156,7 +161,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text       = currentTitle(state, s),
+                    text       = currentTitle(state, track, s),
                     style      = MaterialTheme.typography.titleMedium,
                     color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -171,7 +176,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                     )
                 } else {
                     Text(
-                        text     = subtitle(state, s),
+                        text     = subtitle(state, track, s),
                         style    = MaterialTheme.typography.bodySmall,
                         color    = NxTheme.colors.textSecondary,
                         maxLines = 1,
@@ -341,8 +346,13 @@ private fun volumeIcon(volume: Float): IconKey = when {
     else             -> NxIcon.VolumeUp
 }
 
+/**
+ * The track's own cover where the file carries one, and the note glyph on a
+ * tinted square where it does not -- which for a folder of game soundtracks is
+ * most of them, so the fallback is the normal case rather than an error state.
+ */
 @Composable
-private fun AlbumArtBlock(state: PlaybackState) {
+private fun AlbumArtBlock(track: TrackInfo?) {
     Box(
         modifier = Modifier
             .size(52.dp)
@@ -350,11 +360,21 @@ private fun AlbumArtBlock(state: PlaybackState) {
             .background(NxTheme.colors.primary.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center,
     ) {
-        Symbol(icon = NxIcon.MusicNote,
-            contentDescription = null,
-            tint               = NxTheme.colors.primary,
-            modifier           = Modifier.size(28.dp),
-        )
+        val artwork = track?.artwork
+        if (artwork != null) {
+            Image(
+                bitmap             = artwork,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        } else {
+            Symbol(icon = NxIcon.MusicNote,
+                contentDescription = null,
+                tint               = NxTheme.colors.primary,
+                modifier           = Modifier.size(28.dp),
+            )
+        }
     }
 }
 
@@ -399,20 +419,30 @@ private fun audioErrorText(reason: AudioError, s: AppStrings): String = when (re
     AudioError.PlaybackFailed    -> s.audioErrorPlaybackFailed
 }
 
-private fun currentTitle(state: PlaybackState, s: AppStrings): String = when (state) {
+/** The track's own title, falling back to the file name until metadata lands. */
+private fun currentTitle(state: PlaybackState, track: TrackInfo?, s: AppStrings): String = when (state) {
     is PlaybackState.Idle    -> s.audioPickTrack
-    is PlaybackState.Ready   -> state.file.name
-    is PlaybackState.Playing -> state.file.name
-    is PlaybackState.Paused  -> state.file.name
+    is PlaybackState.Ready   -> track?.title ?: state.file.name
+    is PlaybackState.Playing -> track?.title ?: state.file.name
+    is PlaybackState.Paused  -> track?.title ?: state.file.name
     is PlaybackState.Error   -> state.file.name
 }
 
-private fun subtitle(state: PlaybackState, s: AppStrings): String = when (state) {
-    PlaybackState.Idle       -> s.audioFormatHint
-    is PlaybackState.Ready   -> s.audioStatusReady
-    is PlaybackState.Playing -> s.audioStatusPlaying
-    is PlaybackState.Paused  -> s.audioStatusPaused
-    is PlaybackState.Error   -> ""
+/**
+ * Who made the track, or -- for a file that does not say -- what the transport
+ * is doing. The status text is the fallback rather than the subtitle: with a
+ * real artist to show, "Playing" is already on screen as the transport icon.
+ */
+private fun subtitle(state: PlaybackState, track: TrackInfo?, s: AppStrings): String {
+    if (state is PlaybackState.Idle) return s.audioFormatHint
+    val credit = listOfNotNull(track?.artist, track?.album).joinToString(" · ")
+    if (credit.isNotEmpty()) return credit
+    return when (state) {
+        is PlaybackState.Ready   -> s.audioStatusReady
+        is PlaybackState.Playing -> s.audioStatusPlaying
+        is PlaybackState.Paused  -> s.audioStatusPaused
+        else                     -> ""
+    }
 }
 
 private fun progressFraction(state: PlaybackState): Float = when (state) {

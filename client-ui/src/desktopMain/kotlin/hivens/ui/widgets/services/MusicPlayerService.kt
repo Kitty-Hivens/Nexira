@@ -1,6 +1,7 @@
 package hivens.ui.widgets.services
 
 import hivens.ui.audio.PlaybackState
+import hivens.ui.audio.TrackInfo
 import hivens.widget.model.WidgetService
 import kotlinx.coroutines.flow.StateFlow
 
@@ -20,6 +21,14 @@ import kotlinx.coroutines.flow.StateFlow
 interface MusicPlayerService : WidgetService {
     val state: StateFlow<PlaybackState>
     val volume: StateFlow<Float>
+
+    /**
+     * The loaded track's own name and picture, null when nothing is loaded. A
+     * consumer that renders "what is playing" needs this rather than the file
+     * path on [state], and it changes once a track instead of five times a
+     * second.
+     */
+    val track: StateFlow<TrackInfo?>
 
     fun setVolume(level: Float)
     fun play()

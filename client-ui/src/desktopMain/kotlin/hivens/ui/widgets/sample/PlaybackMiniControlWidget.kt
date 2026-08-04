@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
+import hivens.ui.audio.TrackInfo
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -82,6 +83,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
 
     val state by service.state.collectAsState()
     val volume by service.volume.collectAsState()
+    val track by service.track.collectAsState()
     val s = LocalStrings.current
 
     Row(
@@ -99,7 +101,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text       = currentTitleShort(state, s),
+            text       = currentTitleShort(state, track, s),
             style      = MaterialTheme.typography.bodyMedium,
             color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.Medium,
@@ -269,10 +271,11 @@ private fun MiniVolumeBar(
     }
 }
 
-private fun currentTitleShort(state: PlaybackState, s: AppStrings): String = when (state) {
+/** The track's own title, falling back to the file name until metadata lands. */
+private fun currentTitleShort(state: PlaybackState, track: TrackInfo?, s: AppStrings): String = when (state) {
     PlaybackState.Idle       -> s.audioNoFile
-    is PlaybackState.Ready   -> state.file.name
-    is PlaybackState.Playing -> state.file.name
-    is PlaybackState.Paused  -> state.file.name
+    is PlaybackState.Ready   -> track?.title ?: state.file.name
+    is PlaybackState.Playing -> track?.title ?: state.file.name
+    is PlaybackState.Paused  -> track?.title ?: state.file.name
     is PlaybackState.Error   -> state.file.name
 }
