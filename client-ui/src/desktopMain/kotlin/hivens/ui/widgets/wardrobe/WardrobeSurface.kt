@@ -645,4 +645,4 @@ private fun CapeThumbnail(cape: ImageBitmap, modifier: Modifier) {
 }
 
 private fun decodeSkin(bytes: ByteArray): ImageBitmap? =
-    runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+    runCatching { Image.makeFromEncoded(bytes).use { it.toComposeImageBitmap() } }.getOrNull()

@@ -247,14 +247,16 @@ internal fun scaleRgba(src: ByteArray, sw: Int, sh: Int, dw: Int, dh: Int): Byte
     val srcImage = Image.makeRaster(ImageInfo(sw, sh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL), src, sw * 4)
     val dst = Bitmap().apply { allocPixels(ImageInfo(dw, dh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL)) }
     try {
-        Canvas(dst).drawImageRect(
-            srcImage,
-            Rect.makeWH(sw.toFloat(), sh.toFloat()),
-            Rect.makeWH(dw.toFloat(), dh.toFloat()),
-            SamplingMode.LINEAR,
-            null,
-            true,
-        )
+        Canvas(dst).use { canvas ->
+            canvas.drawImageRect(
+                srcImage,
+                Rect.makeWH(sw.toFloat(), sh.toFloat()),
+                Rect.makeWH(dw.toFloat(), dh.toFloat()),
+                SamplingMode.LINEAR,
+                null,
+                true,
+            )
+        }
         return dst.readPixels() ?: ByteArray(dw * dh * 4)
     } finally {
         srcImage.close()

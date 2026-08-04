@@ -269,6 +269,9 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
     var selectedFile by remember(packId) { mutableStateOf<File?>(null) }
 
     val fileEntries by produceState<List<LogEntry>?>(null, selectedFile) {
+        // Cleared before the read: the previous file's lines would otherwise stay on
+        // screen under the new file's name for as long as the new one takes to load.
+        value = null
         val f = selectedFile
         value = if (f == null) null
                 else withContext(Dispatchers.IO) { gameConsole.readLogFile(f) }

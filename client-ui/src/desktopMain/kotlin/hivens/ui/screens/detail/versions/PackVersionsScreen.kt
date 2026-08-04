@@ -777,6 +777,12 @@ private class DiffLabels(
 @Composable
 private fun ModDiffIcon(entry: SmrtModEntry, icons: ModIconResolver) {
     val url by produceState<String?>(entry.display?.iconUrl, entry.filename) {
+        // The rows are emitted positionally, so one composition serves a different
+        // entry when the compared versions change -- and produceState does not
+        // re-apply its initial value on a key change. Without this reset the state
+        // still held the previous mod's resolved icon, and the guard below then
+        // skipped resolving, leaving that icon next to this mod's name for good.
+        value = entry.display?.iconUrl
         if (value == null) value = runCatching { icons.resolve(entry) }.getOrNull()
     }
     val box = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp))

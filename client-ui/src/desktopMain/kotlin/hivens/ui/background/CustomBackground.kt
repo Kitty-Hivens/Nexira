@@ -318,12 +318,14 @@ private fun decodeAndCacheDownscaled(file: File, cached: File, prefix: String, m
             val dst = Bitmap().apply { allocPixels(ImageInfo.makeN32Premul(dw, dh)) }
             dst.use {
                 Image.makeFromBitmap(src).use { srcImg ->
-                    Canvas(dst).drawImageRect(
-                        srcImg,
-                        Rect.makeWH(info.width.toFloat(), info.height.toFloat()),
-                        Rect.makeWH(dw.toFloat(), dh.toFloat()),
-                        SamplingMode.LINEAR, null, true,
-                    )
+                    Canvas(dst).use { canvas ->
+                        canvas.drawImageRect(
+                            srcImg,
+                            Rect.makeWH(info.width.toFloat(), info.height.toFloat()),
+                            Rect.makeWH(dw.toFloat(), dh.toFloat()),
+                            SamplingMode.LINEAR, null, true,
+                        )
+                    }
                 }
                 Image.makeFromBitmap(dst).use { dstImg ->
                     writePngCache(dstImg, cached, prefix)
