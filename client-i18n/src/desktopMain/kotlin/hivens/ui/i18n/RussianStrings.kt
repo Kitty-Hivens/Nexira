@@ -1369,6 +1369,12 @@ object RussianStrings : AppStrings {
     override val videoSkipBack        = "Назад 10 секунд"
     override val videoSkipForward     = "Вперёд 10 секунд"
     override val videoWidgetEmpty     = "Укажите ссылку на видео в настройках виджета"
+    override val videoFetchingTool    = "Скачиваем загрузчик"
+    override val videoResolvingPage   = "Читаем страницу"
+    override val videoDownloading     = "Скачивание"
+    override val videoCancelDownload  = "Остановить загрузку"
+    override val videoCancelled       = "Загрузка остановлена"
+    override val videoRetry           = "Попробовать снова"
 
     // --- Library pack card ---
     override val packCardPlay          = "Играть"

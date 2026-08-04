@@ -7,6 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
@@ -29,15 +32,39 @@ class VideoCacheService(
     private val transfers: TransferEngine,
     private val scope: CoroutineScope,
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
-) {
+) : MediaResolver {
     private val log = LoggerFactory.getLogger(VideoCacheService::class.java)
 
     // url -> in-flight download. Keyed by url so concurrent resolves of the same
     // video share one download; entry removed when it settles.
     private val inflight = java.util.concurrent.ConcurrentHashMap<String, Deferred<Path>>()
 
+    // url -> what that fetch is doing. Kept for the process lifetime rather than
+    // removed on completion: a viewer holds the flow it was handed, and swapping
+    // in a fresh one per attempt would leave it watching a dead object. One entry
+    // per distinct video URL a session touches is nothing.
+    private val fetches = java.util.concurrent.ConcurrentHashMap<String, MutableStateFlow<MediaFetch>>()
+
+    /**
+     * What the fetch for [url] is doing, for a viewer to render. [MediaFetch.Idle]
+     * for a URL nothing is fetching, including one already cached.
+     */
+    override fun fetchState(url: String): StateFlow<MediaFetch> = stateOf(url).asStateFlow()
+
+    /**
+     * Stops the download for [url]. The awaiting resolve sees a
+     * [kotlinx.coroutines.CancellationException]; a partial file is left on disk
+     * for the transfer engine to continue from on the next attempt.
+     */
+    override fun cancel(url: String) {
+        inflight[url]?.cancel()
+    }
+
+    private fun stateOf(url: String): MutableStateFlow<MediaFetch> =
+        fetches.computeIfAbsent(url) { MutableStateFlow(MediaFetch.Idle) }
+
     /** The local file for [url], downloading it first if absent. Throws on failure. */
-    suspend fun resolve(url: String): Path {
+    override suspend fun resolve(url: String): Path {
         val target = dir.resolve(cacheKey(url))
         if (isUsable(target)) {
             touch(target)
@@ -50,6 +77,7 @@ class VideoCacheService(
                     target
                 } finally {
                     inflight.remove(url)
+                    stateOf(url).value = MediaFetch.Idle
                 }
             }
         }
@@ -59,12 +87,16 @@ class VideoCacheService(
     private suspend fun download(url: String, target: Path) {
         if (isUsable(target)) return
         Files.createDirectories(dir)
+        val progress = stateOf(url)
+        progress.value = MediaFetch.Downloading(0L, 0L)
         try {
             // A video is the one thing here that is reliably large, and the cache key
             // is a hash of the url -- so the destination is stable, its partial can be
             // continued across attempts and across runs, and the transfer runs in
             // blocks rather than as one stream that a wobble has to restart.
-            transfers.fetch(Transfer(url = url, dest = target, skip = SkipIfPresent.Never))
+            transfers.fetch(Transfer(url = url, dest = target, skip = SkipIfPresent.Never)) { done, total ->
+                progress.value = MediaFetch.Downloading(done, total)
+            }
             if (runCatching { Files.size(target) }.getOrDefault(0L) <= 0L) {
                 Files.deleteIfExists(target)
                 throw IOException("Empty video body from $url")

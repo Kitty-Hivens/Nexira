@@ -259,6 +259,9 @@ fun FullscreenVideo(url: String, posterUrl: String? = null, onDismiss: () -> Uni
                 audio        = true,
                 showControls = true,
                 scale        = VideoScale.Fit,
+                // Nothing to fall back to inside a full-window overlay: stopping
+                // the download closes it.
+                onCancelled  = onDismiss,
             )
             VideoIconButton(
                 icon     = NxIcon.Close,

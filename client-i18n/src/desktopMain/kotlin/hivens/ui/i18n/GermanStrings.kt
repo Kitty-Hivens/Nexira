@@ -1355,6 +1355,12 @@ object GermanStrings : AppStrings {
     override val videoSkipBack        = "10 Sekunden zurück"
     override val videoSkipForward     = "10 Sekunden vor"
     override val videoWidgetEmpty     = "Video-URL in den Widget-Einstellungen festlegen"
+    override val videoFetchingTool    = "Downloader wird geholt"
+    override val videoResolvingPage   = "Seite wird gelesen"
+    override val videoDownloading     = "Wird heruntergeladen"
+    override val videoCancelDownload  = "Download stoppen"
+    override val videoCancelled       = "Download gestoppt"
+    override val videoRetry           = "Erneut versuchen"
 
     // --- Library pack card ---
     override val packCardPlay          = "Spielen"
