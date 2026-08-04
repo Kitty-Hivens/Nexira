@@ -49,6 +49,10 @@ fun rememberCrumbLabel(screen: Screen): String {
         is Screen.PackDetail -> {
             val repo: IPackRepository = koinInject()
             val label by produceState(initialValue = s.crumbLoading, screen.instanceId) {
+                // Back to loading first: produceState keeps the last value across a key
+                // change, so walking from one pack to another left the crumb naming the
+                // one just left until the lookup returned.
+                value = s.crumbLoading
                 value = runCatching { repo.get(screen.instanceId)?.displayName }.getOrNull() ?: screen.instanceId
             }
             label
@@ -64,6 +68,7 @@ fun rememberCrumbLabel(screen: Screen): String {
 private fun catalogueCrumb(origin: PackOrigin, id: String, loading: String): String {
     val registry: PackCatalogueRegistry = koinInject()
     val label by produceState(initialValue = loading, origin, id) {
+        value = loading
         value = runCatching { registry.forOrigin(origin)?.details(id)?.title }.getOrNull() ?: id
     }
     return label

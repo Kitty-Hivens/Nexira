@@ -15,7 +15,7 @@ import java.security.MessageDigest
  * what the library's dedup needs. Returns null when [bytes] cannot be decoded.
  */
 fun skinContentHash(bytes: ByteArray): String? = runCatching {
-    val pm = Image.makeFromEncoded(bytes).toComposeImageBitmap().toPixelMap()
+    val pm = Image.makeFromEncoded(bytes).use { it.toComposeImageBitmap() }.toPixelMap()
     val argb = IntArray(pm.width * pm.height)
     var i = 0
     for (y in 0 until pm.height) for (x in 0 until pm.width) argb[i++] = pm[x, y].toArgb()

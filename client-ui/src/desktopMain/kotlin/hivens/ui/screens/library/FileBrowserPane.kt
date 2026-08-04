@@ -316,6 +316,9 @@ private fun FilePreview(file: Path) {
 private fun TextPreview(file: Path) {
     val s = LocalStrings.current
     val state = produceState<TextLoadResult?>(initialValue = null, key1 = file) {
+        // Same reason the loading state exists: without this the preview shows the
+        // previously opened file's text under the newly selected file's name.
+        value = null
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val size = file.fileSize()
