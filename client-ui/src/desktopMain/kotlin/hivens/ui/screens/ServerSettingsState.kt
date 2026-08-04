@@ -62,9 +62,9 @@ internal sealed interface SpawnResetState {
  * snapshot of unrelated composition variables. IO runs on the injected [scope]
  * (a `rememberCoroutineScope`), not in click lambdas.
  */
-@Stable
 private val log = LoggerFactory.getLogger("ServerSettingsState")
 
+@Stable
 internal class ServerSettingsState(
     val server: ServerProfile,
     private val profileManager: ProfileManager,
