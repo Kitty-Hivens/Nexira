@@ -28,8 +28,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,7 +63,11 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import java.nio.file.Path
 
 /**
@@ -96,10 +100,8 @@ fun VideoPlayer(
         }
         return
     }
-    // Hardware decode where a device is available (AUTO falls back to software
-    // per file), so a 4K clip is not decoded on the CPU.
-    val player = remember(path, loop, audio) { SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO) }
-    DisposableEffect(player) { onDispose { player.close() } }
+    val video = rememberInlineVideo(path, loop, audio)
+    val player = video.player
 
     val state = rememberPlayerState(player)
     val isPlaying = state == SkinemaPlayer.State.Playing
@@ -175,6 +177,53 @@ fun VideoPlayer(
             )
         }
     }
+}
+
+/**
+ * One skinema player over one file, released when the composition that asked for
+ * it goes away.
+ *
+ * A [RememberObserver] rather than a `DisposableEffect`, because the decode
+ * thread starts inside the constructor, i.e. during composition: a composition
+ * abandoned before it applies never runs its effects, and the player made for it
+ * would be left running with nothing holding a reference to close it.
+ *
+ * The close itself is handed to the app scope. It joins the decode thread, which
+ * may be in the middle of a seek run, and the swap between the inline player and
+ * the fullscreen one disposes this player while the user is waiting for the
+ * other -- exactly where a five-second join would be felt as a frozen window.
+ */
+private class InlineVideo(
+    path: Path,
+    loop: Boolean,
+    audio: Boolean,
+    private val closeScope: CoroutineScope,
+) : RememberObserver {
+
+    // Hardware decode where a device is available (AUTO falls back to software
+    // per file), so a 4K clip is not decoded on the CPU.
+    val player = SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO)
+
+    @Volatile
+    private var released = false
+
+    override fun onRemembered() = Unit
+
+    override fun onForgotten() = release()
+
+    override fun onAbandoned() = release()
+
+    private fun release() {
+        if (released) return
+        released = true
+        closeScope.launch(Dispatchers.IO) { player.close() }
+    }
+}
+
+@Composable
+private fun rememberInlineVideo(path: Path, loop: Boolean, audio: Boolean): InlineVideo {
+    val closeScope = koinInject<CoroutineScope>()
+    return remember(path, loop, audio) { InlineVideo(path, loop, audio, closeScope) }
 }
 
 /**
