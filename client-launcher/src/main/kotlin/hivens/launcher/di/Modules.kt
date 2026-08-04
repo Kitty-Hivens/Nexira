@@ -907,11 +907,6 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
     }
 
 /**
- * Builds a trust-all SSL socket factory for the insecure client.
- * Allows connecting to servers with expired certificates
- * when the user explicitly accepts the risk.
- */
-/**
  * TLS for the bypass channel, scoped to the host the connection is actually
  * being made to.
  *

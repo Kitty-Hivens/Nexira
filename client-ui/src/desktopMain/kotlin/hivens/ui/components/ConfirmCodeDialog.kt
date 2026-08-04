@@ -196,11 +196,6 @@ fun ConfirmCodeDialog(
 }
 
 /**
- * One cell per digit. The cell taking the next character carries the accent border,
- * so the caret's position is legible even though the real caret is on the hidden
- * field above.
- */
-/**
  * Test seam for [CodeCells]: the cells are the part worth rendering on their own,
  * since a Dialog does not compose inside an offscreen scene.
  */
@@ -209,6 +204,11 @@ internal fun ConfirmCodeCellsForTest(code: String, hasError: Boolean = false, di
     CodeCells(code = code, hasError = hasError, dimmed = dimmed)
 
 @Composable
+/**
+ * One cell per digit. The cell taking the next character carries the accent border,
+ * so the caret's position is legible even though the real caret is on the hidden
+ * field above.
+ */
 private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
     val shape = RoundedCornerShape(LocalStyle.current.buttonCorner)
     val accent = if (hasError) NxTheme.colors.error else NxTheme.colors.primary

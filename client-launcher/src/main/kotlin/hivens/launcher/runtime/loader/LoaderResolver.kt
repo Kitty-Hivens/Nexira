@@ -43,13 +43,6 @@ data class ResolvedLibrary(
 )
 
 /**
- * What a loader contributes on top of the vanilla base: extra libraries plus
- * the launch metadata (main class and any loader-specific JVM / game args,
- * e.g. Forge's `--tweakClass`). This is the loader's "version json overlay" --
- * Fabric/Quilt return it from their meta API directly; Forge/NeoForge derive
- * it from the installer's `version.json`.
- */
-/**
  * A file to copy into the shared libraries root that is NOT a classpath entry.
  * Modern Forge/NeoForge install processors emit jars (the SRG/slim/extra client,
  * the neoforge universal/client) that the version json does NOT list as
@@ -62,6 +55,13 @@ data class PlaceOnlyFile(
     val source: Path,
 )
 
+/**
+ * What a loader contributes on top of the vanilla base: extra libraries plus
+ * the launch metadata (main class and any loader-specific JVM / game args,
+ * e.g. Forge's `--tweakClass`). This is the loader's "version json overlay" --
+ * Fabric/Quilt return it from their meta API directly; Forge/NeoForge derive
+ * it from the installer's `version.json`.
+ */
 data class LoaderProfile(
     val libraries: List<LibrarySpec>,
     val mainClass: String,
