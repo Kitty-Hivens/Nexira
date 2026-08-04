@@ -20,7 +20,11 @@ import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.player.VideoPlayer
 import dev.hivens.skinema.skiko.VideoFrameImage
 import hivens.ui.theme.seedFromRgba
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image
+import org.koin.compose.koinInject
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
 import org.slf4j.LoggerFactory
@@ -92,6 +96,7 @@ private class BackgroundVideo(
     file: File,
     loop: Boolean,
     hardware: HwAccel,
+    private val closeScope: CoroutineScope,
 ) : RememberObserver {
 
     val player = VideoPlayer(path = file.toPath(), loop = loop, audio = false, hardware = hardware)
@@ -122,8 +127,12 @@ private class BackgroundVideo(
     private fun release() {
         if (released) return
         released = true
+        // The Skia image belongs to the thread that draws it, so it goes here and
+        // now; the player's close joins a decode thread that may be mid-seek, and
+        // waiting for that on the thread painting the next wallpaper is a freeze
+        // over a change the user just made.
         frames.close()
-        player.close()
+        closeScope.launch(Dispatchers.IO) { player.close() }
     }
 }
 
@@ -151,6 +160,7 @@ internal fun rememberSkinemaFrame(
     // constructor arguments, so neither takes effect until the player re-opens,
     // and keying only on the file left the loop setting inert until the wallpaper
     // itself changed.
+    val closeScope = koinInject<CoroutineScope>()
     val video = remember(file, hardwareDecode, loopMode) {
         BackgroundVideo(
             file = file,
@@ -159,6 +169,7 @@ internal fun rememberSkinemaFrame(
             // 4K on the CPU is brutal; AUTO offloads to the GPU and falls back
             // to software per file when no device opens.
             hardware = if (hardwareDecode) HwAccel.AUTO else HwAccel.OFF,
+            closeScope = closeScope,
         )
     }
     val player = video.player
