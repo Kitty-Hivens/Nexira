@@ -704,12 +704,6 @@ class UpdateService(
     }
 
     /**
-     * Stitches the per-release "What's Changed" sections between the installed
-     * and the target version. [releases] is the page an earlier step already
-     * fetched (the prerelease check); null means no list exists yet (the
-     * stable path picks via `/releases/latest`) and one is fetched here.
-     */
-    /**
      * Whether a release declares itself critical.
      *
      * The marker is the bracketed token in the title or the body, not the bare
@@ -747,6 +741,12 @@ class UpdateService(
             isCriticalRelease(entry)
     }
 
+    /**
+     * Stitches the per-release "What's Changed" sections between the installed
+     * and the target version. [releases] is the page an earlier step already
+     * fetched (the prerelease check); null means no list exists yet (the
+     * stable path picks via `/releases/latest`) and one is fetched here.
+     */
     private suspend fun fetchChangelogBetween(
         currentVersion: String,
         latestVersion: String,
