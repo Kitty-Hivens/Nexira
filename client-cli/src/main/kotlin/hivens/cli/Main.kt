@@ -196,6 +196,8 @@ private fun renderEvent(event: LaunchLogEvent): String = when (event) {
 private fun renderError(reason: LaunchError): String = when (reason) {
     is LaunchError.ExitCode -> "game exited with code ${reason.code}"
     is LaunchError.Internal -> "internal error: ${reason.message}"
+    LaunchError.ContentChangedDuringLaunch ->
+        "pack content changed while the launch was being prepared; sync the pack and try again"
     LaunchError.OfflineNoClient -> "no installed client directory (install/sync the pack first)"
     LaunchError.OfflineNoManifest -> "no cached manifest from a prior online run"
     LaunchError.TwoFactorExpired -> "2FA session expired -- re-login via the GUI"
