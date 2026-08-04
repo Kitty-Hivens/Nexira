@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,12 +55,14 @@ import hivens.ui.audio.AudioError
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxProgressBar
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
@@ -132,115 +133,133 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         Unit
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        NxTheme.colors.surface,
-                        glassSurfaceAlpha(0.55f),
-                    ),
-                ),
-            )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        // Header + album-art block + transport
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            AlbumArtBlock(track)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text       = p.title.ifBlank { s.musicPlayerTitle },
-                    style      = MaterialTheme.typography.labelLarge,
-                    color      = NxTheme.colors.textSecondary,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text       = currentTitle(state, track, s),
-                    style      = MaterialTheme.typography.titleMedium,
-                    color      = NxTheme.colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis,
-                )
-                if (state is PlaybackState.Error) {
+    MusicPlayerCard(
+        heading     = p.title.ifBlank { s.musicPlayerTitle },
+        state       = state,
+        track       = track,
+        volume      = volume,
+        onPick      = { pickFile() },
+        onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
+        onStop      = { player.stop() },
+        onVolume    = { player.setVolume(it) },
+    )
+}
+
+/**
+ * The card itself, over plain data. Split from the widget so what is drawn can be
+ * rendered off-screen across styles and palettes without a Koin graph or a live
+ * decode thread behind it -- the same split the activity pill uses.
+ */
+@Composable
+internal fun MusicPlayerCard(
+    heading: String,
+    state: PlaybackState,
+    track: TrackInfo?,
+    volume: Float,
+    onPick: () -> Unit,
+    onPlayPause: () -> Unit,
+    onStop: () -> Unit,
+    onVolume: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val s = LocalStrings.current
+    // A plane from the library rather than a hand-mixed fill: the tonal body, the
+    // legibility floor over a wallpaper and the frost tier come with the level.
+    NxSurface(NxSurfaceLevel.Floating, modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // Header + album-art block + transport
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                AlbumArtBlock(track)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        text  = audioErrorText((state as PlaybackState.Error).reason, s),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = NxTheme.colors.error,
+                        text       = heading,
+                        style      = MaterialTheme.typography.labelLarge,
+                        color      = NxTheme.colors.textSecondary,
+                        fontWeight = FontWeight.Medium,
                     )
-                } else {
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        text     = subtitle(state, track, s),
-                        style    = MaterialTheme.typography.bodySmall,
-                        color    = NxTheme.colors.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        text       = currentTitle(state, track, s),
+                        style      = MaterialTheme.typography.titleMedium,
+                        color      = NxTheme.colors.textPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis,
                     )
+                    if (state is PlaybackState.Error) {
+                        Text(
+                            text  = audioErrorText((state as PlaybackState.Error).reason, s),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NxTheme.colors.error,
+                        )
+                    } else {
+                        Text(
+                            text     = subtitle(state, track, s),
+                            style    = MaterialTheme.typography.bodySmall,
+                            color    = NxTheme.colors.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
-        }
 
-        // Progress strip
-        val fraction = progressFraction(state)
-        LinearProgressIndicator(
-            progress   = { fraction },
-            modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-            color      = NxTheme.colors.primary,
-            trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
-        )
+            // The measure primitive, not Material's: no stop-indicator dot, and its
+            // corner follows the style axis. Its own accent role also keeps it from
+            // reading as a second volume bar.
+            NxProgressBar(progress = progressFraction(state), height = 3.dp)
 
-        // Controls row: transport on the left, volume + timecode on the right.
-        // The volume bar is a thin custom track (the Material slider's fat thumb
-        // reads as an out-of-place form control here).
-        Row(
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier              = Modifier.fillMaxWidth(),
-        ) {
-            ControlButton(
-                icon            = NxIcon.FolderOpen,
-                contentDesc     = s.audioOpenFile,
-                onClick         = { pickFile() },
-            )
-            ControlButton(
-                icon         = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                contentDesc  = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
-                enabled      = state !is PlaybackState.Idle && state !is PlaybackState.Error,
-                primary      = true,
-                onClick      = {
-                    if (state is PlaybackState.Playing) player.pause() else player.play()
-                },
-            )
-            ControlButton(
-                icon         = NxIcon.Stop,
-                contentDesc  = s.audioStop,
-                enabled      = state is PlaybackState.Playing || state is PlaybackState.Paused,
-                onClick      = { player.stop() },
-            )
-            Spacer(Modifier.weight(1f))
-            Symbol(icon = volumeIcon(volume),
-                contentDescription = s.audioVolume,
-                tint               = NxTheme.colors.textSecondary,
-                modifier           = Modifier.size(16.dp),
-            )
-            VolumeBar(
-                value         = volume,
-                onValueChange = { player.setVolume(it) },
-                modifier      = Modifier.width(96.dp),
-            )
-            val timeline = timelineLabel(state)
-            if (timeline.isNotEmpty()) {
-                Text(
-                    text  = timeline,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+            // Controls row: transport on the left, volume + timecode on the right.
+            // The volume bar is a thin custom track (the Material slider's fat thumb
+            // reads as an out-of-place form control here).
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier              = Modifier.fillMaxWidth(),
+            ) {
+                ControlButton(
+                    icon            = NxIcon.FolderOpen,
+                    contentDesc     = s.audioOpenFile,
+                    onClick         = onPick,
                 )
+                ControlButton(
+                    icon         = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
+                    contentDesc  = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                    enabled      = state !is PlaybackState.Idle && state !is PlaybackState.Error,
+                    primary      = true,
+                    onClick      = onPlayPause,
+                )
+                ControlButton(
+                    icon         = NxIcon.Stop,
+                    contentDesc  = s.audioStop,
+                    enabled      = state is PlaybackState.Playing || state is PlaybackState.Paused,
+                    onClick      = onStop,
+                )
+                Spacer(Modifier.weight(1f))
+                Symbol(icon = volumeIcon(volume),
+                    contentDescription = s.audioVolume,
+                    tint               = NxTheme.colors.textSecondary,
+                    modifier           = Modifier.size(16.dp),
+                )
+                VolumeBar(
+                    value         = volume,
+                    onValueChange = onVolume,
+                    modifier      = Modifier.width(96.dp),
+                )
+                val timeline = timelineLabel(state)
+                if (timeline.isNotEmpty()) {
+                    Text(
+                        text  = timeline,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NxTheme.colors.textSecondary,
+                    )
+                }
             }
         }
     }
@@ -445,30 +464,3 @@ private fun subtitle(state: PlaybackState, track: TrackInfo?, s: AppStrings): St
     }
 }
 
-private fun progressFraction(state: PlaybackState): Float = when (state) {
-    is PlaybackState.Playing -> safeFraction(state.positionMs, state.durationMs)
-    is PlaybackState.Paused  -> safeFraction(state.positionMs, state.durationMs)
-    is PlaybackState.Ready   -> safeFraction(state.positionMs, state.durationMs)
-    else                     -> 0f
-}
-
-private fun safeFraction(position: Long, duration: Long): Float =
-    if (duration <= 0L) 0f else (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-
-private fun timelineLabel(state: PlaybackState): String {
-    val (pos, dur) = when (state) {
-        is PlaybackState.Playing -> state.positionMs to state.durationMs
-        is PlaybackState.Paused  -> state.positionMs to state.durationMs
-        is PlaybackState.Ready   -> 0L to state.durationMs
-        else                     -> return ""
-    }
-    if (dur <= 0L) return ""
-    return "${formatMs(pos)} / ${formatMs(dur)}"
-}
-
-private fun formatMs(ms: Long): String {
-    val totalSeconds = ms / 1000
-    val m = totalSeconds / 60
-    val s = totalSeconds % 60
-    return "%d:%02d".format(m, s)
-}
