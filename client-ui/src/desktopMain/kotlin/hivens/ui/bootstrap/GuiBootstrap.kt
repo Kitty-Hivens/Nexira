@@ -69,6 +69,13 @@ object GuiBootstrap {
         val reporter = AtomicReference(CrashReporter(core.initialPaths))
         installGuiCrashHandler(reporter)
 
+        // A launcher that has never run has no settings file, and the two things
+        // the very first window shows -- its language and whether it is dark --
+        // would otherwise come from field defaults that know nothing about this
+        // machine. Seeded before the peek so the boot threshold itself opens in
+        // the user's language, not just the shell behind it.
+        FirstRunDefaults.seed(core.initialPaths.dataDir)
+
         val peek = SettingsPeek.read(core.initialPaths.dataDir)
 
         return PreBoot(core, peek, reporter)
