@@ -39,6 +39,20 @@ class ModernInstallerResolverTest {
         latestVersion = { "21.1.0" }, // unused by the harvest / place-only / locate tests
     ) { _, version -> "https://example/neoforge-$version-installer.jar" }
 
+    /** Same shape as [resolver], under the `forge` id -- its overlay dir name is `<mc>-forge-<build>`. */
+    private fun forgeResolver() = ModernInstallerResolver(
+        clientProvider = HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.NotFound) }) },
+        transfers = testTransferEngine(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.NotFound) }) }),
+        json = Json { ignoreUnknownKeys = true },
+        javaManager = object : IJavaManager {
+            override suspend fun getJavaPath(version: String): Path = Path.of("/bin/java")
+            override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path = Path.of("/bin/java")
+        },
+        cacheDir = Files.createTempDirectory("modern-cache-forge"),
+        loaderId = "forge",
+        latestVersion = { "47.4.10" },
+    ) { mc, version -> "https://example/forge-$mc-$version-installer.jar" }
+
     @Test
     fun `harvest maps a produced library to a localFile copy spec`() {
         val staging = Files.createTempDirectory("modern-harvest")
@@ -123,7 +137,57 @@ class ModernInstallerResolverTest {
             Files.createDirectories(versionJson.parent)
             Files.writeString(versionJson, "{}")
 
-            assertEquals(versionJson, resolver().locateVersionJson(staging))
+            assertEquals(versionJson, resolver().locateVersionJson(staging, "1.21.1"))
+        } finally {
+            staging.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `locateVersionJson skips the vanilla json the installer downloads beside the loader's`() {
+        val staging = Files.createTempDirectory("modern-locate-two")
+        try {
+            // What a real --installClient target holds. The vanilla dir sorts first
+            // by name, which is what a name-ordered filesystem enumerates first.
+            val vanilla = staging.resolve("versions/1.21.1/1.21.1.json")
+            val loader = staging.resolve("versions/neoforge-21.1.186/neoforge-21.1.186.json")
+            Files.createDirectories(vanilla.parent); Files.writeString(vanilla, "{}")
+            Files.createDirectories(loader.parent); Files.writeString(loader, "{}")
+
+            assertEquals(loader, resolver().locateVersionJson(staging, "1.21.1"))
+        } finally {
+            staging.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `locateVersionJson picks the loader entry for Forge's mc-prefixed dir name`() {
+        val staging = Files.createTempDirectory("modern-locate-forge")
+        try {
+            // Forge names its overlay `<mc>-forge-<build>`, so the vanilla dir is a
+            // prefix of it -- the choice cannot rest on "does not start with mc".
+            val vanilla = staging.resolve("versions/1.20.1/1.20.1.json")
+            val loader = staging.resolve("versions/1.20.1-forge-47.4.10/1.20.1-forge-47.4.10.json")
+            Files.createDirectories(vanilla.parent); Files.writeString(vanilla, "{}")
+            Files.createDirectories(loader.parent); Files.writeString(loader, "{}")
+
+            assertEquals(loader, forgeResolver().locateVersionJson(staging, "1.20.1"))
+        } finally {
+            staging.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `locateVersionJson is deterministic when nothing names the loader`() {
+        val staging = Files.createTempDirectory("modern-locate-odd")
+        try {
+            val vanilla = staging.resolve("versions/1.21.1/1.21.1.json")
+            val other = staging.resolve("versions/zzz-overlay/zzz-overlay.json")
+            Files.createDirectories(vanilla.parent); Files.writeString(vanilla, "{}")
+            Files.createDirectories(other.parent); Files.writeString(other, "{}")
+
+            // Falls through to "not the mc version", never to directory-stream order.
+            assertEquals(other, resolver().locateVersionJson(staging, "1.21.1"))
         } finally {
             staging.toFile().deleteRecursively()
         }
