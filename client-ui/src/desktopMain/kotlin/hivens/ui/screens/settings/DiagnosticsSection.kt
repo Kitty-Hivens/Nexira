@@ -64,9 +64,9 @@ internal fun DiagnosticsSection(
     val af = LocalAprilFools.current
 
     // April Fools debug panel -- secret unlock. Only wire the 5-tap gesture when the
-    // active impl actually renders a panel. Production builds without
-    // `-PauraAprilFools=true` ship NoOpAprilFools whose DebugPanel() is empty, so a
-    // 5-tap there would toggle a hidden state that renders to nothing.
+    // active impl actually renders a panel: a build that resolves the NoOp has an
+    // empty DebugPanel(), and a 5-tap there would toggle a hidden state that renders
+    // to nothing.
     var debugTapCount  by remember { mutableStateOf(0) }
     var showAprilDebug by remember { mutableStateOf(false) }
     val debugPanelBringIntoView = remember { BringIntoViewRequester() }
