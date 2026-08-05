@@ -5,11 +5,12 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * In-process registry of "puppet-controllable" UI elements. Composables
  * register themselves on entry (composition) and unregister on disposal
- * via the helpers in [PuppetModifiers]; the registry therefore always
+ * via the helpers beside it ([PuppetClick], [PuppetField],
+ * [PuppetToggle]); the registry therefore always
  * mirrors the LIVE UI surface -- no stale entries for screens that
  * aren't currently mounted.
  *
- * Read by [PuppetServer] when handling HTTP queries; mutated only via
+ * Read by the server behind [PuppetServerLifecycle] when handling HTTP queries; mutated only via
  * Composable side effects. Backed by [ConcurrentHashMap] so the HTTP
  * thread can read snapshots without blocking the UI thread, and
  * registration churn from rapid recomposition stays correct.
@@ -17,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  * **State mutation thread.** Calls into [click] / [setField] /
  * [setToggle] invoke caller-supplied lambdas that typically touch
  * `mutableStateOf` -- those MUST run on the AWT EDT, which is Compose
- * Desktop's UI thread. The HTTP layer in [PuppetServer] is responsible
+ * Desktop's UI thread. The HTTP layer behind [PuppetServerLifecycle] is responsible
  * for hopping onto the EDT before calling these methods; the registry
  * itself doesn't dispatch.
  */
