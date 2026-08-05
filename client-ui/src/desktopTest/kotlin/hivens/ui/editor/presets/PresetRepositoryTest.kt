@@ -45,6 +45,56 @@ class PresetRepositoryTest {
     )
 
     @Test
+    fun `a preset written before the digest suffix is still readable`() {
+        // Upgrade path: the file on disk is at the bare sanitised name.
+        Files.createDirectories(tmp.resolve("presets"))
+        Files.writeString(
+            tmp.resolve("presets/Legacy.json"),
+            json.encodeToString(PresetEnvelope.serializer(), envelope("Legacy")),
+        )
+        val repo = newRepo()
+
+        assertNotNull(repo.load("Legacy"), "an upgrade must not orphan what the user already saved")
+        assertEquals(listOf("Legacy"), repo.list().map { it.name })
+        assertTrue(repo.delete("Legacy"))
+    }
+
+    @Test
+    fun `two names that sanitise alike stay two presets`() {
+        val repo = newRepo()
+        // Every character outside [A-Za-z0-9_-] maps to an underscore, so any two
+        // Cyrillic names of equal length used to collapse to one file and the
+        // second save destroyed the first.
+        repo.save(envelope("Ночь"))
+        repo.save(envelope("День"))
+
+        val names = repo.list().map { it.name }.toSet()
+        assertEquals(setOf("Ночь", "День"), names, "one preset overwrote the other")
+        assertNotNull(repo.load("Ночь"))
+        assertNotNull(repo.load("День"))
+    }
+
+    @Test
+    fun `the typed name survives a round trip through the file`() {
+        val repo = newRepo()
+        repo.save(envelope("Тёмная тема"))
+        assertEquals(listOf("Тёмная тема"), repo.list().map { it.name })
+    }
+
+    @Test
+    fun `deleting one of two look-alike names leaves the other`() {
+        val repo = newRepo()
+        repo.save(envelope("Ночь"))
+        repo.save(envelope("День"))
+
+        assertTrue(repo.delete("Ночь"))
+
+        assertEquals(listOf("День"), repo.list().map { it.name })
+        assertNull(repo.load("Ночь"))
+        assertNotNull(repo.load("День"))
+    }
+
+    @Test
     fun `save round-trips through load`() {
         val repo = newRepo()
         repo.save(envelope("Music mode"))
@@ -68,9 +118,9 @@ class PresetRepositoryTest {
     fun `delete removes the file`() {
         val repo = newRepo()
         repo.save(envelope("Doomed"))
-        assertTrue(tmp.resolve("presets/Doomed.json").exists())
+        assertEquals(listOf("Doomed"), repo.list().map { it.name })
         assertTrue(repo.delete("Doomed"))
-        assertFalse(tmp.resolve("presets/Doomed.json").exists())
+        assertEquals(emptyList(), repo.list())
         assertNull(repo.load("Doomed"))
     }
 
