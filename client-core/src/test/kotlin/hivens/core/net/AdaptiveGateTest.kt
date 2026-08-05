@@ -24,34 +24,39 @@ class AdaptiveGateTest {
 
     @Test
     fun `permits survive cancellation racing the handover`() = runBlocking {
-        // fetchAll is a coroutineScope, so one transfer exhausting its sources
-        // cancels every sibling parked in acquire; a user cancelling an install
-        // does the same. A permit lost there is lost for the process: grow() only
-        // mints one on a successful probe, and advance() cannot probe while
-        // inFlight < target -- the state a drained pool sits in.
+        // The loss window needs a receiver actually PARKED on an empty channel and
+        // an element handed to it as it is cancelled. So drain the pool first, queue
+        // waiters behind it, then cancel and release at the same moment.
         val gate = AdaptiveGate(initial = 4, min = 1, max = 4, nowMs = { 0L })
 
-        repeat(400) {
-            coroutineScope {
-                val jobs = List(8) { launch { gate.withPermit { delay(50) } } }
-                yield()
-                jobs.forEach { it.cancel() }
+        repeat(300) {
+            val holdersIn = CountDownLatch(4)
+            val letHoldersGo = CompletableDeferred<Unit>()
+            val holders = List(4) {
+                launch(Dispatchers.IO) { gate.withPermit { holdersIn.countDown(); letHoldersGo.await() } }
             }
+            withContext(Dispatchers.IO) { holdersIn.await(5, TimeUnit.SECONDS) }
+
+            // Pool is empty; these park inside acquire().
+            val waiters = List(8) { launch(Dispatchers.IO) { gate.withPermit { } } }
+            withContext(Dispatchers.IO) { Thread.sleep(1) }
+
+            // Cancel the parked waiters while the holders hand their tokens back.
+            letHoldersGo.complete(Unit)
+            waiters.forEach { it.cancel() }
+            holders.forEach { it.join() }
+            waiters.forEach { it.join() }
         }
 
-        // If any permit leaked, fewer than four holders can be in flight at once
-        // and this times out instead of completing.
+        // If any permit leaked, fewer than four holders fit at once and this times out.
         val allFour = withTimeoutOrNull(5_000) {
-            coroutineScope {
-                val entered = CountDownLatch(4)
-                val release = CompletableDeferred<Unit>()
-                repeat(4) {
-                    launch { gate.withPermit { entered.countDown(); release.await() } }
-                }
-                val ok = withContext(Dispatchers.IO) { entered.await(4, TimeUnit.SECONDS) }
-                release.complete(Unit)
-                ok
-            }
+            val entered = CountDownLatch(4)
+            val release = CompletableDeferred<Unit>()
+            val jobs = List(4) { launch(Dispatchers.IO) { gate.withPermit { entered.countDown(); release.await() } } }
+            val ok = withContext(Dispatchers.IO) { entered.await(4, TimeUnit.SECONDS) }
+            release.complete(Unit)
+            jobs.forEach { it.join() }
+            ok
         }
         assertEquals(true, allFour, "the pool drained -- downloads would hang with no error")
     }
