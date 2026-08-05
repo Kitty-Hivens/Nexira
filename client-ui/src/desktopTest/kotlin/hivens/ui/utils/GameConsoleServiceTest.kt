@@ -92,6 +92,29 @@ class GameConsoleServiceTest {
     }
 
     @Test
+    fun `a progress line ageing out does not shift the history window`() = runBlocking {
+        // The window pages history back by FILE LINE index, and a slot line (a
+        // provisioning tick) is deliberately never mirrored to the file. One that
+        // ages out of the window must therefore not advance the offset.
+        val svc = service(maxLines = 4)
+        svc.startSession("Test")
+        svc.appendOrUpdate("prep", "preparing 1/2")
+        repeat(6) { svc.append("line-$it") }
+
+        val snap = svc.awaitSnapshot { it.entries.size == 4 && it.entries.last().text == "line-5" }
+        assertEquals(listOf("line-2", "line-3", "line-4", "line-5"), snap.entries.map { it.text })
+        assertEquals(3, snap.historyOffset, "three MIRRORED lines aged out: the divider, line-0 and line-1")
+
+        val paged = svc.loadHistoryBefore(3)
+        assertEquals(3, paged.size)
+        assertEquals(
+            listOf("line-0", "line-1"), paged.drop(1).map { it.text },
+            "history pages in the lines immediately before the window, not a shifted slice of the file",
+        )
+        assertTrue(paged.first().text.contains("Session started"), "and reaches back to the session divider")
+    }
+
+    @Test
     fun `session file persists every appended line`() = runBlocking {
         val svc = service()
         svc.startSession("Test")

@@ -174,7 +174,11 @@ class GameConsoleService(
                 // the file and break the disk/line-index alignment).
                 val entry = entryOf(msg.text, msg.type)
                 val prev = slotEntries[msg.slotId]
-                val idx = if (prev != null) buffer.indexOf(prev) else -1
+                // From the tail: a slot's line is the one being updated right now,
+                // so it sits at or near the end. Scanning from the front cost a
+                // walk of the whole window per tick, and a provisioning run is
+                // thousands of ticks.
+                val idx = if (prev != null) buffer.lastIndexOf(prev) else -1
                 if (idx >= 0) {
                     buffer[idx] = entry
                 } else {
@@ -200,9 +204,28 @@ class GameConsoleService(
 
     private fun trim() {
         while (buffer.size > maxLines) {
-            buffer.removeFirst()
-            historyOffset += 1
+            val aged = buffer.removeFirst()
+            // historyOffset is read as a FILE LINE index when the window pages
+            // history back, and a slot line is never mirrored to the file. Counting
+            // one as it ages out sends every later page-in that many lines deeper
+            // into the file than the window actually begins.
+            if (!forgetSlot(aged)) historyOffset += 1
         }
+    }
+
+    /**
+     * Drops [aged] from the slot map when it is a slot's current line; true when it
+     * was. By identity, not equality: two ticks can carry the same text.
+     */
+    private fun forgetSlot(aged: LogEntry): Boolean {
+        val entries = slotEntries.entries.iterator()
+        while (entries.hasNext()) {
+            if (entries.next().value === aged) {
+                entries.remove()
+                return true
+            }
+        }
+        return false
     }
 
     private fun publish() {
