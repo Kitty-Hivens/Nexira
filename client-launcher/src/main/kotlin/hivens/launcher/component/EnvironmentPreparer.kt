@@ -6,6 +6,7 @@ import hivens.core.net.TransferEngine
 import hivens.core.platform.OS
 import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -240,6 +241,12 @@ class EnvironmentPreparer(private val transfers: TransferEngine) {
             transfers.fetch(Transfer(url = urlStr, dest = jar, skip = SkipIfPresent.Never))
             ZipUtils.unzip(jar.toFile(), destDir.toFile())
             true
+        } catch (e: CancellationException) {
+            // A cancelled download is not a miss. Read as one, it sent the caller
+            // on to the next mirror -- and the one after that -- on a coroutine
+            // nobody was waiting for, ending in an "all mirrors exhausted" error
+            // that never happened.
+            throw e
         } catch (e: Exception) {
             log.warn("Mirror miss: $urlStr ({})", e.message)
             false

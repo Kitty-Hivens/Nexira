@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
 
 /**
  * Caches the MD5 of the official `smartycraft.jar` that the server
@@ -89,6 +90,8 @@ class LauncherHashCache(
             saveCache(newHash)
             logger.info("Launcher hash refreshed to {} ({} bytes)", newHash, bytes.size)
             newHash
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logger.error("Failed to refresh launcher hash", e)
             null
