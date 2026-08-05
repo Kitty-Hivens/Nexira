@@ -956,6 +956,10 @@ object RussianStrings : AppStrings {
     override val packSettingsRepair             = "Проверить и восстановить файлы"
     override val packSettingsRepairDesc         = "Проверить все файлы и восстановить только повреждённые"
     override val packSettingsRepairAction       = "Восстановить"
+
+    override val packBusyRunningTitle           = "Этот пак сейчас запущен"
+    override val packBusyRunningBody            = "Изменение файлов перезапишет моды и конфиги, которые игра уже держит открытыми. Сессия почти наверняка кончится плохо: вылет или мир, сохранённый наполовину. Лучше сначала закрыть игру."
+    override val packBusyRunningConfirm         = "Всё равно продолжить"
     override fun packSettingsRepairDone(checked: Int, repaired: Int) =
         if (repaired == 0) "Проверено файлов: $checked, все целы" else "Проверено файлов: $checked, восстановлено: $repaired"
     override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "Проверка $current/$total: $name"

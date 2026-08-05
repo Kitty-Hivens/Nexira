@@ -174,6 +174,20 @@ class LauncherController(
      * itself capped at 2000 lines, so lossy-under-pressure semantics
      * stay consistent across the two layers.
      */
+    private val _runningPackInstanceId = MutableStateFlow<String?>(null)
+
+    /**
+     * The pack instance whose game is live, or null when nothing is running or the
+     * live session came from the SC server list (which lays its files out under
+     * `clients/`, so no pack instance is at stake).
+     *
+     * [LaunchState] deliberately carries no target identity -- it is the shared
+     * Compose-free contract and a frontend renders it without caring what was
+     * launched. This is the separate question "whose files are in use right now",
+     * which the settings surfaces need in order to warn about rewriting them.
+     */
+    val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
+
     private val _events = MutableSharedFlow<LaunchLogEvent>(
         extraBufferCapacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -323,6 +337,10 @@ class LauncherController(
                         // abort-A-then-launch-B race a shared flag would reopen.
                         val exitCode = handle.awaitExit()
                         runningHandle = null
+                        // Cleared here rather than in the pack path's own exit hook:
+                        // that hook is guarded and may be skipped, and "no files are
+                        // in use" has to be true the moment the process is gone.
+                        _runningPackInstanceId.value = null
                         ActionRing.record("Game exited: $label (code $exitCode)")
                         prepared.onExit?.let { hook ->
                             val secs = (Instant.now().epochSecond - sessionStart).coerceAtLeast(0)
@@ -338,6 +356,7 @@ class LauncherController(
                 }
             } catch (e: Exception) {
                 runningHandle = null
+                _runningPackInstanceId.value = null
                 if (e !is CancellationException) {
                     logger.error("Launch flow failed for {}", label, e)
                     fail(LaunchError.Internal(e.message ?: ""), e)
@@ -728,6 +747,7 @@ class LauncherController(
                 )
             },
             onSpawned = {
+                _runningPackInstanceId.value = refreshedInstance.id
                 packRepository.put(
                     refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
                 )

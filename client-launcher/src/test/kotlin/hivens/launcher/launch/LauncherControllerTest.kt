@@ -57,6 +57,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -473,6 +474,73 @@ class LauncherControllerTest {
         coVerify(exactly = 2) { packRepository.put(any()) }
         assertTrue(puts.first().lastPlayedEpochOrZero > 0, "spawn bumps lastPlayed")
         assertTrue(puts.last().lastPlayedEpochOrZero > 0, "exit preserves lastPlayed (re-read, not clobbered)")
+    }
+
+    /**
+     * The settings surfaces warn before rewriting the files of a pack that is
+     * playing, so they need to know which pack that is. [LaunchState] does not say
+     * -- it is the frontend-agnostic contract and carries no target identity.
+     */
+    @Test
+    fun `the running pack is named while it plays and forgotten once it exits`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath("1.12.2") } returns Path.of("/opt/jdk8/bin/java")
+
+        lateinit var controller: LauncherController
+        var namedDuringSession: String? = null
+        val handle = mockk<LaunchHandle>()
+        // The one moment the process is live: the flow is parked in the wait.
+        coEvery { handle.awaitExit() } answers {
+            namedDuringSession = controller.runningPackInstanceId.value
+            0
+        }
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = any(),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaPathOverride   = any(),
+                allocatedMemoryMB  = any(),
+                adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
+                boundLaunch        = any(), seal        = any(), displayName        = any(),
+                onLog              = any(),
+            )
+        } returns SpawnResult.Started(handle)
+
+        val instance = hivens.core.data.PackInstance(
+            id                    = "i-running",
+            packRef               = hivens.core.data.PackReference(
+                origin  = hivens.core.data.PackOrigin.Mirror,
+                id      = "modern-explorer",
+                version = "2026.05.26.1",
+            ),
+            displayName           = "Modern Explorer",
+            instanceDirName       = "modern-explorer-i-running",
+            createdAtEpoch        = 0L,
+            pinnedPackVersion     = "2026.05.26.1",
+            cachedManifest        = hivens.core.data.CachedManifestSnapshot(
+                minecraftVersion = "1.12.2",
+                loaderName       = "forge",
+                loaderVersion    = "14.23.5.2922",
+                javaMajor        = 8,
+            ),
+        )
+        Files.createDirectories(sandbox.resolve("instances").resolve(instance.instanceDirName))
+        coEvery { packRepository.get(any()) } returns instance
+
+        controller = newController(this)
+        assertNull(controller.runningPackInstanceId.value, "nothing is playing before the launch")
+
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        assertEquals("i-running", namedDuringSession)
+        assertNull(controller.runningPackInstanceId.value, "and nothing is playing once the process is gone")
     }
 
     /**

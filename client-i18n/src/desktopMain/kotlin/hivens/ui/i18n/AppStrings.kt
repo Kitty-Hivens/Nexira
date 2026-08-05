@@ -996,6 +996,11 @@ interface AppStrings {
     val packSettingsRepair: String
     val packSettingsRepairDesc: String
     val packSettingsRepairAction: String
+
+    /** Shown before an operation that rewrites the files of a pack whose game is live. */
+    val packBusyRunningTitle: String
+    val packBusyRunningBody: String
+    val packBusyRunningConfirm: String
     /** Outcome line: how much was looked at, and how much had to be put back. */
     fun packSettingsRepairDone(checked: Int, repaired: Int): String
     fun packSettingsRepairProgress(current: Int, total: Int, name: String): String
