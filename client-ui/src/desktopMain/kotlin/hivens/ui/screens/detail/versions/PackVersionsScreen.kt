@@ -86,6 +86,7 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxVerticalScrollbar
+import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
@@ -159,6 +160,21 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
         scope.launch { repo.get(pack.id)?.let { instance = it } }
     }
 
+    // A switch and a rollback both rewrite the instance on disk. Warned about,
+    // not blocked, when that instance is the one currently playing.
+    val runningGuard = rememberRunningPackGuard(pack.id)
+
+    fun afterApply() {
+        refreshInstance()
+        snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
+    }
+
+    fun doSwitch(targetVersion: String) =
+        runSwitch(scope, updater, repo, hub, pack, targetVersion, onState = { applyState = it }, onDone = ::afterApply)
+
+    fun doRestore(snapshotId: String) =
+        runRestore(scope, updater, repo, hub, pack, snapshotId, onState = { applyState = it }, onDone = ::afterApply)
+
     // Stale-then-fresh: a cached listing paints at once, the reloaded one replaces
     // it in place. Reading it once instead left the screen showing whatever the
     // cache held while the refresh it kicked off landed nowhere -- which is why
@@ -218,11 +234,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                             busy             = applyState is ApplyState.Running,
                             onSwitch         = { preview ->
                                 if (preview.compat.isSafe) {
-                                    runSwitch(scope, updater, repo, hub, pack, sel.versionNumber,
-                                        onState = { applyState = it }, onDone = {
-                                            refreshInstance()
-                                            snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
-                                        })
+                                    runningGuard.run { doSwitch(sel.versionNumber) }
                                 } else {
                                     confirmTarget = preview
                                 }
@@ -232,13 +244,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                             SnapshotsSection(
                                 snapshots = snapshots,
                                 busy      = applyState is ApplyState.Running,
-                                onRestore = { snap ->
-                                    runRestore(scope, updater, repo, hub, pack, snap.id,
-                                        onState = { applyState = it }, onDone = {
-                                            refreshInstance()
-                                            snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
-                                        })
-                                },
+                                onRestore = { snap -> runningGuard.run { doRestore(snap.id) } },
                             )
                         }
                     } else if (builds != null && builds!!.isEmpty() && !loadFailed) {
@@ -271,15 +277,16 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
             onConfirm    = {
                 val target = preview.toVersion
                 confirmTarget = null
-                runSwitch(scope, updater, repo, hub, pack, target,
-                    onState = { applyState = it }, onDone = {
-                        refreshInstance()
-                        snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
-                    })
+                // Two gates in sequence, because they answer different questions:
+                // this one asked whether a structural change is wanted at all, the
+                // next asks whether it is wanted right now, mid-session.
+                runningGuard.run { doSwitch(target) }
             },
             onDismiss    = { confirmTarget = null },
         )
     }
+
+    runningGuard.Dialog()
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────

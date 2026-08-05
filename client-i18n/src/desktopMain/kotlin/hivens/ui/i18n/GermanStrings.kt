@@ -952,6 +952,10 @@ object GermanStrings : AppStrings {
     override val packSettingsRepair             = "Dateien prüfen und reparieren"
     override val packSettingsRepairDesc         = "Alle Dateien prüfen und nur die beschädigten wiederherstellen"
     override val packSettingsRepairAction       = "Reparieren"
+
+    override val packBusyRunningTitle           = "Dieses Pack läuft gerade"
+    override val packBusyRunningBody            = "Die Dateien jetzt zu ändern überschreibt Mods und Konfigurationen, die das Spiel bereits geöffnet hat. Die Sitzung endet mit hoher Wahrscheinlichkeit schlecht -- ein Absturz oder eine halb gespeicherte Welt. Schließe das Spiel besser zuerst."
+    override val packBusyRunningConfirm         = "Trotzdem fortfahren"
     override fun packSettingsRepairDone(checked: Int, repaired: Int) =
         if (repaired == 0) "$checked Dateien geprüft, alle in Ordnung" else "$checked Dateien geprüft, $repaired wiederhergestellt"
     override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "Prüfung $current/$total: $name"

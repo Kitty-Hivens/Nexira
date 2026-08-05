@@ -13,6 +13,7 @@ import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.update.PackUpdateService
 import hivens.ui.utils.humanSize
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -57,6 +58,10 @@ internal fun PackDataSection(
     // update apply -- see the note on PackVersionSection.applyLatest.
     val appScope: CoroutineScope = koinInject()
 
+    // A repair rewrites whatever does not match, so it is one of the operations
+    // that must not surprise a live session.
+    val runningGuard = rememberRunningPackGuard(pack.id)
+
     var sizeText by remember(pack.id) { mutableStateOf<String?>(null) }
     var pendingDelete by remember(pack.id) { mutableStateOf(false) }
     var repairing by remember(pack.id) { mutableStateOf(false) }
@@ -100,10 +105,10 @@ internal fun PackDataSection(
         // and a local or imported pack has none to measure against.
         if (pack.packRef.origin == PackOrigin.Mirror) {
             NxRow(title = s.packSettingsRepair, subtitle = s.packSettingsRepairDesc) {
-                PuppetClick("packSettings.data.repair") { runRepair() }
+                PuppetClick("packSettings.data.repair") { runningGuard.run(::runRepair) }
                 NxButton(
                     s.packSettingsRepairAction,
-                    onClick = { runRepair() },
+                    onClick = { runningGuard.run(::runRepair) },
                     style = NxButtonStyle.Secondary,
                     enabled = !repairing,
                     compact = true,
@@ -132,6 +137,8 @@ internal fun PackDataSection(
             )
         }
     }
+
+    runningGuard.Dialog()
 
     if (pendingDelete) {
         DestructiveConfirmDialog(

@@ -30,6 +30,7 @@ import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.formatBuildTimestamp
+import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
@@ -108,6 +109,10 @@ internal fun PackVersionSection(
             busy = false
         }
     }
+
+    // An apply rewrites the instance's files, so it is warned about when that
+    // instance is the one currently playing.
+    val runningGuard = rememberRunningPackGuard(pack.id)
 
     fun applyLatest() {
         if (busy) return
@@ -208,10 +213,10 @@ internal fun PackVersionSection(
             }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (c.compat.isSafe) {
-                    PuppetClick("packSettings.version.updateNow") { applyLatest() }
+                    PuppetClick("packSettings.version.updateNow") { runningGuard.run(::applyLatest) }
                     NxButton(
                         label   = if (isRollback) s.packVersionSwitchNow else s.packVersionUpdateNow,
-                        onClick = { applyLatest() },
+                        onClick = { runningGuard.run(::applyLatest) },
                         enabled = !busy,
                         compact = true,
                     )
@@ -221,4 +226,6 @@ internal fun PackVersionSection(
             }
         }
     }
+
+    runningGuard.Dialog()
 }
