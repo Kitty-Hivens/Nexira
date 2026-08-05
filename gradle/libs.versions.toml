@@ -36,7 +36,7 @@ markdownRenderer  = "0.43.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
 markdown          = "0.7.8"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
-jsoup             = "1.22.2"
+jsoup             = "1.23.1"
 # Coil 3 -- async image loading (pack + mod icons, Browse cards). Deliberately no
 # library aliases: the KMP source-set block has to exclude Coil's skiko copy, and
 # implementation(<catalog accessor>) { ... } is rejected there (Provider vs String),
