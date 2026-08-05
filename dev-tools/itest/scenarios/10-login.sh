@@ -21,7 +21,7 @@ run() {
     fi
 
     set_field login.username "$ITEST_USER"
-    set_field login.password "$ITEST_PASS"
+    set_field login.password "$ITEST_PASSWORD"
     click login.submit
 
     local reached

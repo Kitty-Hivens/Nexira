@@ -532,9 +532,16 @@ jobs:
           merge-multiple: true
           path: dist/
 
+      # The redirection creates SHA256SUMS.txt before find enumerates the
+      # directory, so without the exclusion find hashed the file while it was
+      # still empty and shipped a self-entry of e3b0c442... -- the digest of no
+      # bytes. Anyone running `sha256sum -c SHA256SUMS.txt` on a good release got
+      # a FAILED line, and compose-release-body.sh rendered that row into the
+      # release page's checksum table. The release-manifest step below already
+      # skips the file; these two now agree.
       - name: Generate SHA256 checksums
         working-directory: dist
-        run: find . -maxdepth 1 -type f -exec sha256sum {} + > SHA256SUMS.txt
+        run: find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec sha256sum {} + > SHA256SUMS.txt
 
       - name: Generate release-manifest.json
         working-directory: dist
