@@ -38,6 +38,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private val log = LoggerFactory.getLogger("CompactNewsFeed")
 
@@ -314,9 +317,20 @@ private fun SkeletonNewsItem(brush: Brush) {
 @Composable
 private fun CompactNewsItem(item: NewsItem) {
     val protocolConfig: ServerProtocolConfig = koinInject()
-    // Try to open a URL if the NewsItem has one (currently description holds "Views: N",
-    // but we keep the click hook ready for when the backend sends real URLs)
+    // Try to open a URL if the NewsItem has one; the click hook is ready for
+    // when the backend sends real ones.
     val canOpenUrl = item.imageUrl != null  // reuse as proxy; swap for item.url when available
+    val locale = LocalStrings.current.locale
+    // Upstream dates were formatted in the fetch layer, in Russian, whatever the
+    // launcher was set to. They arrive as an epoch second now and are read here.
+    val date = remember(item.dateEpochSeconds, locale) {
+        if (item.dateEpochSeconds <= 0L) null
+        else runCatching {
+            DateTimeFormatter.ofPattern("d MMM yyyy", locale)
+                .withZone(ZoneId.systemDefault())
+                .format(Instant.ofEpochSecond(item.dateEpochSeconds))
+        }.getOrNull()
+    }
 
     Row(
         modifier = Modifier
@@ -359,12 +373,14 @@ private fun CompactNewsItem(item: NewsItem) {
                 maxLines   = 2,
                 overflow   = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text  = item.date,
-                style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.primary.copy(alpha = 0.7f)
-            )
+            if (date != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text  = date,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxTheme.colors.primary.copy(alpha = 0.7f)
+                )
+            }
         }
 
         // Subtle arrow hint that item is clickable

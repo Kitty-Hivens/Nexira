@@ -147,7 +147,7 @@ interface AppStrings {
     val serverDetailNoImage: String
     val serverDetailNoImageHint: String
     val serverDetailMissingTitle: String
-    fun serverDetailMissingPath(path: String, file: String): String
+    fun serverDetailMissingPath(file: String): String
 
     // --- Server Settings ---
     val serverSettingsSubtitle: String
