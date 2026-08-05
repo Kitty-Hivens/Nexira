@@ -3,6 +3,17 @@
 Changelog von Nexira auf Deutsch. Gepflegt ab Version 2.3.4-beta4; die
 vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
 
+## [2.4.0-beta5] - 2026-08-05
+
+2.4.0-beta5 ist ein kritisches Release. Es behebt Pruefungen, die nicht liefen, und Reparaturen, die nicht stattfanden. Der Schutz fuer die Einstellungen eines Mods traf auf die JAR-Datei des Mods selbst, weshalb die am haeufigsten installierten Mods nie aktualisiert, beim Versionswechsel eines Packs nie entfernt und bei beschaedigtem Archiv nie repariert wurden. Ein Pack mit modernem Loader waehlte die zu lesende Versionsdatei nach der Reihenfolge des Verzeichnisses. Der Launcher-Hash liess sich von einer einzigen Fehlerseite vergiften und blieb es ueber Neustarts hinweg. Der JVM-Argument-Baukasten konnte einen Satz erzeugen, mit dem die JVM nicht startet. Das Beenden gab nach einem Signal auf, das ein haengendes Spiel ignoriert.
+
+### Highlights
+- **Geschuetzte Mods werden wieder aktualisiert.** JEI, JourneyMap, VoxelMap und die Xaero-Karten galten als unantastbare Konfiguration, sodass ein Pack-Update sie nie ersetzte und eine beschaedigte JAR nie repariert wurde. Sie sind wieder gewoehnlicher Pack-Inhalt; die Konfigurationsverzeichnisse, fuer die der Schutz gedacht war, bleiben geschuetzt.
+- **Packs mit modernen Loadern starten zuverlaessig.** Forge und NeoForge waehlten eine von zwei Versionsdateien nach der Reihenfolge des Dateisystems, und die falsche Wahl liess den Start mit einer Meldung ueber eine nie angeforderte Bibliothek scheitern.
+- **Der JVM-Argument-Baukasten erzeugt einen startbaren Satz.** Ein Wechsel des Garbage Collectors und zweimal Anwenden konnte Argumente erzeugen, die die JVM rundweg ablehnt; sichtbar wurde davon nur ein Exit-Code.
+- **Beenden beendet.** Bisher ging ein hoefliches Signal hinaus und mehr nicht; ein Spiel, das es ignoriert, wird nun samt seiner Kindprozesse hart beendet.
+- **Nichts geht verloren.** Ein abgebrochener Schreibvorgang konnte die gesamte Skin-Bibliothek loeschen, und ein kyrillisch benanntes Preset ueberschrieb das zuvor gespeicherte.
+
 ## [2.4.0-beta] - 2026-07-30
 
 2.4.0-beta setzt die Vorschau fort und baut neu, was der Launcher mit dem Netzwerk tut. Jede Datei, die er auf die Platte holt -- eine Laufzeitumgebung, ein JDK, ein Pack, eine Mod, ein Loader-Installer, sein eigenes Update -- läuft jetzt über eine einzige Transfer-Engine, die erneut versucht, dort weitermacht, wo die Verbindung abriss, und auf einen Mirror ausweicht; eine geprüfte Datei behält eine Blockkarte, sodass ein beschädigtes Pack über seine beschädigten Blöcke repariert statt neu geladen wird. Die Builds eines Packs bekommen einen eigenen Bildschirm mit Änderungen je Build, Wechsel und Rückrollen, und Pack-Updates melden sich selbst im Benachrichtigungszentrum. Nightly-Builds und ein Vorabversionen-Schalter ersetzen das Update-Manager-Fenster. Ein Härtungs-Durchgang hält Sitzungs-Tokens aus Logs und Diagnosepaketen heraus, begrenzt eine akzeptierte Zertifikatsausnahme auf den Host, für den sie erteilt wurde, und beschränkt jeden Pfad und jedes Archiv, das ein Server-Dokument wählen darf. ProGuard ist weg, und das Linux-AppImage sinkt auf ~74 MB.
