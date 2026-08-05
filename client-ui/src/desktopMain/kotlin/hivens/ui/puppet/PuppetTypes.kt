@@ -10,6 +10,11 @@ import kotlinx.serialization.Serializable
  * [kind] is the discriminator: "click" | "field" | "toggle". Depending
  * on [kind], either [value] (field) or [boolValue] (toggle) carries the
  * current widget state; for "click" both are null.
+ *
+ * The request/response types below are read only by `RealPuppetServer`, which
+ * lives in `desktopPuppetMain` and joins the compilation only under
+ * `-PauraPuppetPort=N` -- so an IDE indexing the default source set alone
+ * reports every one of them as unused. They are not.
  */
 @Serializable
 internal data class PuppetElement(
@@ -27,19 +32,19 @@ internal data class PuppetSnapshot(
 )
 
 @Serializable
-internal data class ScreenResponse(val screen: String) // TODO: Class "ScreenResponse" is never used
+internal data class ScreenResponse(val screen: String)
 
 @Serializable
-internal data class PuppetOk(val ok: Boolean = true) // TODO: Class "PuppetOk" is never used
+internal data class PuppetOk(val ok: Boolean = true)
 
 @Serializable
-internal data class PuppetError(val error: String) // TODO: Class "PuppetError" is never used
+internal data class PuppetError(val error: String)
 
 @Serializable
-internal data class ClickRequest(val id: String) // TODO: Class "ClickRequest" is never used
+internal data class ClickRequest(val id: String)
 
 @Serializable
-internal data class SetFieldRequest(val id: String, val value: String) // TODO: Class "SetFieldRequest" is never used
+internal data class SetFieldRequest(val id: String, val value: String)
 
 @Serializable
-internal data class SetToggleRequest(val id: String, val value: Boolean) // TODO: Class "SetToggleRequest" is never used
+internal data class SetToggleRequest(val id: String, val value: Boolean)
