@@ -72,6 +72,33 @@ class ProtectedPathsTest {
     }
 
     @Test
+    fun `a mod's own jar is not protected by the entry that guards its config`() {
+        val pp = ProtectedPaths(configFile, json)
+        // Every default `contains` entry is a substring of its own mod's filename.
+        // Protecting the jar means it is never updated, never retired on a pack
+        // version bump, and never repaired when the archive is corrupt -- while
+        // the config directory the entry exists for must stay protected.
+        assertFalse(pp.isProtected("mods/jei-1.20.1-forge-15.2.0.27.jar"))
+        assertFalse(pp.isProtected("mods/journeymap-1.20.1-5.9.18-forge.jar"))
+        assertFalse(pp.isProtected("mods/voxelmap-1.20.1.jar"))
+        assertFalse(pp.isProtected("mods/xaerominimap_24.2.0_Forge_1.20.1.jar"))
+        assertFalse(pp.isProtected("Industrial/mods/JourneyMap-1.12.2.jar"))
+
+        assertTrue(pp.isProtected("config/jei/recipe-history.json"))
+        assertTrue(pp.isProtected("journeymap/data/waypoints.json"))
+        assertTrue(pp.isProtected("mods/VoxelMods/voxelmap/cache.dat"))
+        assertTrue(pp.isProtected("XaeroMinimap/Multiplayer_srv/dim0.png"))
+    }
+
+    @Test
+    fun `a contains entry never matches a bare filename at the client root`() {
+        val pp = ProtectedPaths(configFile, json)
+        // No directory portion at all -- only `endsWith` may claim these.
+        assertFalse(pp.isProtected("jei.jar"))
+        assertTrue(pp.isProtected("options.txt"))
+    }
+
+    @Test
     fun `user-extended config is honoured`() {
         Files.writeString(
             configFile,
