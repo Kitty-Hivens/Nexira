@@ -12,6 +12,7 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -175,6 +176,41 @@ class AutoSyncServiceTest {
         assertEquals(AutoSyncService.ServerState.FAILED, states["Industrial"])
         assertEquals(AutoSyncService.ServerState.SYNCED, states["Galaxy"])
         assertEquals(AutoSyncService.ServerState.SYNCED, states["Create"])
+    }
+
+    @Test
+    fun `a pass cut short stops instead of failing the servers behind it`() = runTest {
+        stubCredentials = fakeCreds()
+        installPack("Industrial")
+        installPack("Galaxy")
+        installPack("Create")
+
+        // The shutdown lands on the second server's sync; the first is already done.
+        coEvery { authService.login(any(), any(), any()) } returns SessionData()
+        coEvery {
+            downloadService.processSession(any(), any(), any(), any(), any(), any(), any())
+        } returns Unit andThenThrows CancellationException("shutting down")
+
+        val outcome = runCatching {
+            service.syncAll(listOf(makeServer("Industrial"), makeServer("Galaxy"), makeServer("Create")))
+        }
+
+        assertTrue(outcome.exceptionOrNull() is CancellationException, "the cancellation must leave the pass")
+        val states = service.snapshot.value.perServer
+        assertEquals(AutoSyncService.ServerState.SYNCED, states["Industrial"])
+        assertEquals(
+            AutoSyncService.ServerState.SYNCING, states["Galaxy"],
+            "the server the shutdown landed on stays as it was, not judged FAILED",
+        )
+        assertEquals(
+            AutoSyncService.ServerState.QUEUED, states["Create"],
+            "and the queue behind it is left waiting rather than marked failed",
+        )
+        coVerify(exactly = 0) { authService.login(any(), any(), "Create") }
+        assertTrue(
+            service.snapshot.value.overall !is AutoSyncService.OverallState.Done,
+            "a pass that was cut short has no summary to report",
+        )
     }
 
     @Test

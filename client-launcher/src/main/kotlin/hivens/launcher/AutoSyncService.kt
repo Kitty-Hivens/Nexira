@@ -12,6 +12,7 @@ import hivens.launcher.platform.ServerNameValidator
 import hivens.launcher.smrt.ClientSyncCoordinator
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -194,6 +195,11 @@ class AutoSyncService(
                     // deliberately holds a read-only view of the credentials.
                     creds.copy(fileManifest = cached, serverId = server.assetDir, twoFactor = true)
                 }
+            } catch (e: CancellationException) {
+                // The pass being cut short says nothing about this server. Marking it
+                // red and walking on to the next one is a lie plus work nobody is
+                // waiting for -- a login, a plan and a download per remaining server.
+                throw e
             } catch (e: Exception) {
                 log.warn("Auto-sync login failed for {}: {}", server.assetDir, e.message)
                 sessionFailed = true
@@ -215,6 +221,7 @@ class AutoSyncService(
             val clientDir = dataDirectory.resolve("clients").resolve(ServerNameValidator.require(server.assetDir))
             val smartyPlan = runCatching { smartyPlanner.plan(server, session.fileManifest, settings) }
                 .getOrElse {
+                    if (it is CancellationException) throw it
                     log.warn("Auto-sync: Smarty planning failed for {}: {}", server.assetDir, it.message)
                     updateServerState(server.assetDir, ServerState.FAILED)
                     failed++
@@ -257,6 +264,7 @@ class AutoSyncService(
                 }
             }
 
+            (ok.exceptionOrNull() as? CancellationException)?.let { throw it }
             if (ok.isSuccess) {
                 updateServerState(server.assetDir, ServerState.SYNCED)
                 succeeded++
