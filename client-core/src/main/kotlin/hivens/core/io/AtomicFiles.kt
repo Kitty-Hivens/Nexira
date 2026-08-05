@@ -31,6 +31,23 @@ import java.nio.file.StandardOpenOption
 object AtomicFiles {
     private val log = LoggerFactory.getLogger(AtomicFiles::class.java)
 
+    /**
+     * Serialises writers of the same file within this process.
+     *
+     * The temp file is named after its destination, so two threads publishing one
+     * file share it: both write, one renames the other's bytes, and the loser
+     * renames a path that is no longer there. Nothing is torn -- each write is
+     * whole -- but one caller's write is lost and the other throws.
+     *
+     * Striped rather than a lock per path: a map would otherwise hold an entry per
+     * file the process ever writes, and a download journal writes one per block.
+     * Two unrelated files sharing a stripe wait on a rename, which is microseconds.
+     */
+    private val stripes = Array(64) { Any() }
+
+    private fun stripeFor(file: Path): Any =
+        stripes[(file.normalize().hashCode() and 0x7fffffff) % stripes.size]
+
     fun writeString(file: Path, content: String) {
         write(file) { tmp -> Files.writeString(tmp, content) }
     }
@@ -39,7 +56,7 @@ object AtomicFiles {
         write(file) { tmp -> Files.write(tmp, content) }
     }
 
-    private inline fun write(file: Path, writeTmp: (Path) -> Unit) {
+    private inline fun write(file: Path, writeTmp: (Path) -> Unit) = synchronized(stripeFor(file)) {
         val dir = file.parent
         dir?.let { Files.createDirectories(it) }
         val tmp = file.resolveSibling("${file.fileName}.tmp")
