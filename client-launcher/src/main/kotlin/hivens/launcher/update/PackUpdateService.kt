@@ -25,7 +25,6 @@ import hivens.core.update.UpdateReconciler
 import hivens.core.update.classifyCompat
 import hivens.core.update.mergedWith
 import hivens.core.update.reconcileMods
-import hivens.launcher.ProtectedPaths
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +57,6 @@ class PackUpdateService(
     private val client: SmrtPackClient,
     private val syncService: SmrtSyncService,
     private val repository: IPackRepository,
-    private val protectedPaths: ProtectedPaths,
     private val snapshotService: PackSnapshotService,
     private val journal: ApplyJournal,
     private val dataDir: Path,
@@ -269,6 +267,12 @@ class PackUpdateService(
      * in the installed version's manifest, fetched via [fetchBaselineMods]; when
      * that is unavailable the plan falls back to the path-keyed whole-manifest
      * diff, i.e. the prior behaviour.
+     *
+     * No protected-path list takes part. Here the reconcile has a baseline, so it
+     * can tell an edit from a stale file by content and answer each path on the
+     * evidence -- which is the thing a list of names was standing in for, and it
+     * stands in badly: a name is not evidence, protection by name is lifted by a
+     * rename, and the list is a file the instance's own owner can extend.
      */
     private suspend fun computePlan(
         instance: PackInstance,
@@ -281,14 +285,12 @@ class PackUpdateService(
                 baseline = instance.installedManifest,
                 target = targetManifest,
                 current = current,
-                isProtected = protectedPaths::isProtected,
             )
-        val modPlan = reconcileMods(baselineMods, target.mods, current, protectedPaths::isProtected)
+        val modPlan = reconcileMods(baselineMods, target.mods, current)
         val assetPlan = UpdateReconciler.reconcile(
             baseline = instance.installedManifest?.let(::assetsOnly),
             target = assetsOnly(targetManifest),
             current = current,
-            isProtected = protectedPaths::isProtected,
         )
         return modPlan.mergedWith(assetPlan)
     }

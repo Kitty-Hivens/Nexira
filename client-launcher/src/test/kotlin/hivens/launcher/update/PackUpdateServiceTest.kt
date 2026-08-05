@@ -98,7 +98,10 @@ class PackUpdateServiceTest {
                 mod("optB.jar", OPTB_V1, OPTB_V1_URL, required = false, defaultEnabled = true),
                 mod("drop.jar", DROP, DROP_URL, required = true, defaultEnabled = true),
             ),
-            listOf(asset("config/x.cfg", CFG, CFG_URL)),
+            // servers.dat is the one default-protected path the mirror actually
+            // ships, and the game rewrites it whenever the player edits their
+            // server list -- the case the name-keyed list used to answer.
+            listOf(asset("config/x.cfg", CFG, CFG_URL), asset("servers.dat", SERVERS_V1, SERVERS_V1_URL)),
         )
         var manifestBody = v1Body
         var summaryBody = summary(V1)
@@ -116,6 +119,7 @@ class PackUpdateServiceTest {
             listOf(
                 asset("config/x.cfg", CFG, CFG_URL),
                 asset("config/new.cfg", NEWCFG, NEWCFG_URL),
+                asset("servers.dat", SERVERS_V2, SERVERS_V2_URL),
             ),
         )
 
@@ -133,6 +137,8 @@ class PackUpdateServiceTest {
                 DROP_URL -> respond(ByteReadChannel(DROP), HttpStatusCode.OK)
                 CFG_URL -> respond(ByteReadChannel(CFG), HttpStatusCode.OK)
                 NEWCFG_URL -> respond(ByteReadChannel(NEWCFG), HttpStatusCode.OK)
+                SERVERS_V1_URL -> respond(ByteReadChannel(SERVERS_V1), HttpStatusCode.OK)
+                SERVERS_V2_URL -> respond(ByteReadChannel(SERVERS_V2), HttpStatusCode.OK)
                 else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
             }
         }
@@ -141,7 +147,7 @@ class PackUpdateServiceTest {
         val sync = SmrtSyncService(client, ModrinthClient(provider, testTransferEngine(provider), json), protectedPaths, testTransferEngine(provider))
         private val snapshots = PackSnapshotService(dataDir, json)
         val journal = ApplyJournal(dataDir, json)
-        val service = PackUpdateService(client, sync, repo, protectedPaths, snapshots, journal, dataDir)
+        val service = PackUpdateService(client, sync, repo, snapshots, journal, dataDir)
 
         fun serveV2() { manifestBody = v2Body }
 
@@ -154,7 +160,11 @@ class PackUpdateServiceTest {
                 mod("req.jar", reqShaBytes, REQ_V2_URL, required = true, defaultEnabled = true),
                 mod("optB.jar", OPTB_V2, OPTB_V2_URL, required = false, defaultEnabled = true),
             ),
-            listOf(asset("config/x.cfg", CFG, CFG_URL), asset("config/new.cfg", NEWCFG, NEWCFG_URL)),
+            listOf(
+                asset("config/x.cfg", CFG, CFG_URL),
+                asset("config/new.cfg", NEWCFG, NEWCFG_URL),
+                asset("servers.dat", SERVERS_V1, SERVERS_V1_URL),
+            ),
             mc = "1.20.2",
         )
         fun serveAmberV2() { manifestBody = amberV2(REQ_V2) }
@@ -168,7 +178,8 @@ class PackUpdateServiceTest {
                 mod("req.jar", REQ_V2, REQ_V2_URL, required = true, defaultEnabled = true),
                 mod("optB.jar", OPTB_V1, OPTB_V1_URL, required = true, defaultEnabled = true),
             ),
-            listOf(asset("config/x.cfg", CFG, CFG_URL)),
+            // servers.dat carried forward unchanged: the build moves, this file does not.
+            listOf(asset("config/x.cfg", CFG, CFG_URL), asset("servers.dat", SERVERS_V1, SERVERS_V1_URL)),
         )
         fun serveV2OptRequired() { manifestBody = v2OptRequired() }
 
@@ -448,6 +459,40 @@ class PackUpdateServiceTest {
     }
 
     @Test
+    fun `a protected-by-name path the pack changed is now delivered`() = runTest {
+        // servers.dat is on the default protected list, so the update used to drop
+        // it into skippedProtected and never write it. A pack that moves its server
+        // to another address could not reach anyone who already had the file.
+        val h = Harness()
+        val instance = h.installV1()
+        assertEquals("SERVERS-V1", readText(h.clientDir.resolve("servers.dat")))
+
+        h.serveV2()
+        assertTrue(h.service.applyUpdate(instance, null, null) is UpdateOutcome.Applied)
+
+        assertEquals("SERVERS-V2", readText(h.clientDir.resolve("servers.dat")))
+    }
+
+    @Test
+    fun `an edit to a path the pack left alone survives the update`() = runTest {
+        // What the protected list was standing in for, now answered by content: the
+        // build moves, this file does not, so the only difference on disk is the
+        // player's own.
+        val h = Harness()
+        val instance = h.installV1()
+        Files.writeString(h.clientDir.resolve("servers.dat"), "PLAYER-ADDED-A-SERVER")
+
+        h.serveV2OptRequired()
+        assertTrue(h.service.applyUpdate(instance, null, null) is UpdateOutcome.Applied)
+
+        assertEquals("PLAYER-ADDED-A-SERVER", readText(h.clientDir.resolve("servers.dat")))
+        // Not parked as a conflict either -- one side moving is not a merge.
+        assertFalse(Files.exists(h.clientDir.resolve("servers.dat.new")))
+        // The rest of the update still landed.
+        assertEquals("REQ-V2", readText(h.clientDir.resolve("mods/req.jar")))
+    }
+
+    @Test
     fun `an explicit version switch stops following latest`() = runTest {
         val h = Harness()
         val instance = h.installV1()
@@ -469,6 +514,8 @@ class PackUpdateServiceTest {
         const val DROP_URL = "https://mirror.test/dl/drop"
         const val CFG_URL = "https://mirror.test/dl/cfg"
         const val NEWCFG_URL = "https://mirror.test/dl/newcfg"
+        const val SERVERS_V1_URL = "https://mirror.test/dl/servers-v1"
+        const val SERVERS_V2_URL = "https://mirror.test/dl/servers-v2"
         const val V1 = "2026.01.01"
         const val V2 = "2026.02.02"
 
@@ -479,6 +526,8 @@ class PackUpdateServiceTest {
         val DROP = "DROP".toByteArray()
         val CFG = "CFG".toByteArray()
         val NEWCFG = "NEWCFG".toByteArray()
+        val SERVERS_V1 = "SERVERS-V1".toByteArray()
+        val SERVERS_V2 = "SERVERS-V2".toByteArray()
 
         val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
     }
