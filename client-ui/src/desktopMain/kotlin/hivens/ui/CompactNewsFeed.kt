@@ -27,7 +27,6 @@ import coil3.request.crossfade
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
 import hivens.launcher.network.ServerProtocolConfig
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -110,14 +109,14 @@ fun CompactNewsFeed(
                 color      = NxTheme.colors.textSecondary,
                 modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
             )
-            HorizontalDivider(color = glassSurfaceAlpha(0.6f))
+            HorizontalDivider(color = NxTheme.colors.outline)
         }
 
         // Filter field -- only once a loaded, non-empty feed gives something to
         // filter; the search narrows by title.
         if (!loading && news.isNotEmpty()) {
             NewsFilterField(query = query, onQueryChange = { query = it })
-            HorizontalDivider(color = glassSurfaceAlpha(0.4f))
+            HorizontalDivider(color = NxTheme.colors.outline)
         }
 
         // Weighted so the list owns the remaining height and scrolls within it,
@@ -166,7 +165,7 @@ fun CompactNewsFeed(
                     items(shown) { item ->
                         CompactNewsItem(item = item)
                         HorizontalDivider(
-                            color    = glassSurfaceAlpha(0.4f),
+                            color    = NxTheme.colors.outline,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                     }
@@ -187,7 +186,7 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.4f))
+            .background(NxTheme.colors.surfaceContainerHigh)
             .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
     ) {
         Symbol(icon = NxIcon.Search,
@@ -229,10 +228,14 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
 
 @Composable
 private fun NewsSkeleton() {
+    // Two distinct tonal roles rather than one surface at two alphas: on a light
+    // palette glassSurfaceAlpha returns the same opaque colour for every alpha, so
+    // all three stops were identical and the skeleton did not shimmer at all.
+    val colors = NxTheme.colors
     val shimmerColors = listOf(
-        glassSurfaceAlpha(0.6f),
-        glassSurfaceAlpha(0.25f),
-        glassSurfaceAlpha(0.6f),
+        colors.surfaceContainer,
+        colors.surfaceContainerHigh,
+        colors.surfaceContainer,
     )
 
     val transition = rememberInfiniteTransition(label = "skeleton")
@@ -256,7 +259,7 @@ private fun NewsSkeleton() {
         repeat(4) {
             SkeletonNewsItem(brush)
             HorizontalDivider(
-                color    = glassSurfaceAlpha(0.4f),
+                color    = NxTheme.colors.outline,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
