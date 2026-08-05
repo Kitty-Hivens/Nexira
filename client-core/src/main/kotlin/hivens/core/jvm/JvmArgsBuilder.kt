@@ -34,11 +34,16 @@ data class JvmConfig(
     /** Power-user passthrough -- extra flags appended verbatim. */
     val custom: List<String> = emptyList(),
 ) {
-    fun toArgs(): List<String> = buildList {
+    /**
+     * [javaMajor] is the runtime the composed args will be handed to, where a flag's
+     * availability depends on it (see [ZgcTuning.toArgs]). Null when the caller does
+     * not know the target -- the SmartyCraft server path has no declared Java major.
+     */
+    fun toArgs(javaMajor: Int? = null): List<String> = buildList {
         addAll(gc.toArgs())
         when (gc) {
             GcChoice.G1 -> addAll(g1.toArgs())
-            GcChoice.Z -> addAll(zgc.toArgs())
+            GcChoice.Z -> addAll(zgc.toArgs(javaMajor))
             GcChoice.Shenandoah -> addAll(shenandoah.toArgs())
             GcChoice.Parallel, GcChoice.Serial -> Unit
         }
@@ -49,7 +54,7 @@ data class JvmConfig(
         addAll(custom)
     }
 
-    fun toArgString(): String = toArgs().joinToString(" ")
+    fun toArgString(javaMajor: Int? = null): String = toArgs(javaMajor).joinToString(" ")
 
     companion object {
         // Flags the builder emits regardless of GC -- recognized under any choice.
@@ -318,13 +323,26 @@ data class ZgcTuning(
      */
     val generational: Boolean = true,
 ) {
-    fun toArgs(): List<String> = buildList {
+    /**
+     * [javaMajor] is the runtime these args are composed for. `-XX:+ZGenerational`
+     * was REMOVED in JDK 24 -- generational is the only ZGC mode from there on, and
+     * the flag is not ignored but rejected: `Unrecognized VM option 'ZGenerational'`,
+     * then `Could not create the Java Virtual Machine`. A null major means the target
+     * is unknown, where omitting costs a throughput mode on 21-23 and emitting costs
+     * the launch outright, so it is omitted.
+     */
+    fun toArgs(javaMajor: Int? = null): List<String> = buildList {
         if (unlockExperimentalVMOptions) add("-XX:+UnlockExperimentalVMOptions")
-        if (generational) add("-XX:+ZGenerational")
+        if (generational && javaMajor != null && javaMajor < ZGENERATIONAL_REMOVED_IN) {
+            add("-XX:+ZGenerational")
+        }
     }
 
     companion object {
         val Defaults = ZgcTuning()
+
+        /** First JDK that no longer recognises `-XX:+ZGenerational`. */
+        const val ZGENERATIONAL_REMOVED_IN = 24
     }
 }
 

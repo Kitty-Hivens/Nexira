@@ -192,6 +192,9 @@ internal fun PackRuntimeSection(
             // only when the instance has none yet.
             initial = runtime.jvmArgs?.takeIf { it.isNotBlank() }?.let { JvmConfig.fromArgs(it) }
                 ?: JvmArgsPresets.default.config,
+            // The runtime the args will be handed to, so the builder does not
+            // compose a flag this pack's JDK no longer recognises.
+            javaMajor = pack.cachedManifest?.javaMajor,
             onDismiss = { showJvmBuilder = false },
             onApply = { newArgs ->
                 commit(runtime.copy(jvmArgs = newArgs.ifBlank { null }))
