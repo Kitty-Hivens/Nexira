@@ -132,10 +132,17 @@ internal val LightColorPalette = NxColors(
     textSecondary = Color(0xFF4F626B),
     glassBackground = Color(0xFFFFFFFF),
     glassAlpha = 0.65f,                // Slightly more opacity for readability
-    success = Color(0xFF66BB6A),
+    // Darker than the dark theme's #4CAF50, like every other severity accent
+    // here. Lightening it for a light ground put it at 1.9:1 against the
+    // container plane -- under even the large-text floor -- while the same token
+    // measured 5.2:1 on dark. Weighted to match criticalAccent's 6.1 / 5.2.
+    success = Color(0xFF256B2B),
     outline = Color(0xFFCCCCCC),
     progressAccent = Color(0xFF3C5BD9),
-    warnAccent     = Color(0xFFB37A0E),
+    // 2.9:1 against surfaceContainerHigh before, i.e. below the large-text floor
+    // on the plane the meta chips and callouts actually sit on. Weighted to match
+    // progressAccent's 5.3 / 4.5.
+    warnAccent     = Color(0xFF8A5E08),
     criticalAccent = Color(0xFFB3262A),
     originSmartycraft = Color(0xFF6D28D9), // deeper violet for light bg
     originMirror      = Color(0xFF2563EB), // deeper blue

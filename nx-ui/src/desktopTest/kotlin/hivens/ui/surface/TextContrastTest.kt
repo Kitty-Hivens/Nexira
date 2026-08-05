@@ -56,6 +56,51 @@ class TextContrastTest {
         }
     }
 
+    @Test
+    fun `every severity accent clears the large-text floor on every plane of both palettes`() {
+        // The accents were unmeasured, and one had drifted the wrong way: the light
+        // palette lightened `success` while darkening the other three, leaving it at
+        // 1.9 to 2.2 against the planes where the dark palette's own measures 5.2 to
+        // 6.7. `warnAccent` sat at 2.9 on the plane the meta chips and callouts
+        // actually sit on. Both are text-sized roles, so the floor is only a floor --
+        // what this catches is a token going the wrong direction, not a palette that
+        // wants retuning.
+        for ((name, palette) in palettes()) {
+            for ((role, accent) in severities(palette)) {
+                for ((level, bg) in ladder(palette)) {
+                    val r = ratio(accent, bg)
+                    assertTrue(r >= LARGE_FLOOR, "$name/$level: $role at $r is under $LARGE_FLOOR")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a light severity accent is never lighter than its dark counterpart`() {
+        // The pattern the palette already follows for three of the four: a light
+        // ground needs a darker ink, not a brighter one. `success` was the exception
+        // and it is what made it unreadable.
+        for ((role, light) in severities(LightColorPalette)) {
+            val dark = severities(DarkColorPalette).first { it.first == role }.second
+            assertTrue(
+                luminance(light) <= luminance(dark),
+                "$role is lighter on the light palette than on the dark one",
+            )
+        }
+    }
+
+    private fun severities(p: NxColors): List<Pair<String, Color>> = listOf(
+        "success" to p.success,
+        "warnAccent" to p.warnAccent,
+        "criticalAccent" to p.criticalAccent,
+        "progressAccent" to p.progressAccent,
+    )
+
+    private fun luminance(c: Color): Double {
+        fun lin(v: Float) = if (v <= 0.04045f) v / 12.92 else Math.pow(((v + 0.055) / 1.055), 2.4)
+        return 0.2126 * lin(c.red) + 0.7152 * lin(c.green) + 0.0722 * lin(c.blue)
+    }
+
     private fun palettes(): List<Pair<String, NxColors>> =
         listOf("dark" to DarkColorPalette, "light" to LightColorPalette)
 
