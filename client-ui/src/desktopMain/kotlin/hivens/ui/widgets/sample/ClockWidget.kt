@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
@@ -75,15 +76,21 @@ data class ClockProps(
 fun ClockWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ClockProps>()
     val accent = p.accent.toWidgetColorOrNull()
-    val timeFormatter = remember(p.format24h, p.showSeconds) {
+    // Formatted in the launcher's language, not the machine's: the weekday and
+    // month names below sit inside a Russian shell on an English Windows unless
+    // the locale is passed, and the AM/PM marker has the same problem.
+    val locale = LocalStrings.current.locale
+    val timeFormatter = remember(p.format24h, p.showSeconds, locale) {
         DateTimeFormatter.ofPattern(
             buildString {
                 append(if (p.format24h) "HH:mm" else "hh:mm")
                 if (p.showSeconds) append(":ss")
                 if (!p.format24h) append(" a")
             },
+            locale,
         )
     }
+    val dateFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEE, d MMM", locale) }
 
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
@@ -137,7 +144,7 @@ fun ClockWidget(instance: WidgetInstance) {
                     fontWeight = FontWeight.Light,
                 )
                 Text(
-                    text  = DATE_FORMATTER.format(now),
+                    text  = dateFormatter.format(now),
                     style = MaterialTheme.typography.bodySmall.scaled(scale),
                     color = NxTheme.colors.textSecondary,
                 )
@@ -240,5 +247,3 @@ private fun ClockFace(
         }
     }
 }
-
-private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE, d MMM")
