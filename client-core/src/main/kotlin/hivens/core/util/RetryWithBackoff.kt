@@ -1,15 +1,20 @@
 package hivens.core.util
 
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("RetryWithBackoff")
 
 /**
- * Retries [block] up to [attempts] times with hard-coded 1s / 3s / 9s
- * backoff, retrying only when [shouldRetry] matches. Last exception
- * bubbles up unmodified.
+ * Retries [block] up to [attempts] times, waiting 1s / 3s / 9s between
+ * them, and only when [shouldRetry] matches. A cancellation is never a
+ * retry and never reaches [shouldRetry]. Last exception bubbles up
+ * unmodified.
+ *
+ * The wait runs between attempts, not after the last one, so the default
+ * `attempts = 3` spends two of the three delays.
  *
  * Designed narrowly for transfers that die mid-stream on a flaky route
  * (auth calls and file downloads both do; one retry almost always
@@ -32,6 +37,12 @@ suspend fun <T> retryWithBackoff(
     repeat(attempts) { i ->
         try {
             return block()
+        } catch (e: CancellationException) {
+            // Never consult [shouldRetry] for a cancellation: a predicate written
+            // for network shapes could match one by accident, and re-running the
+            // block would resurrect work the caller already stopped -- for an auth
+            // call, a second login that invalidates the session the first won.
+            throw e
         } catch (e: Throwable) {
             if (!shouldRetry(e)) throw e
             lastError = e

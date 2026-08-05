@@ -1,5 +1,6 @@
 package hivens.core.util
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import java.net.SocketException
@@ -9,6 +10,21 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class RetryWithBackoffTest {
+
+    @Test
+    fun `a cancellation is never retried, even under a predicate that accepts everything`() = runTest {
+        // shouldRetry = { true } is a real shape (the auth funnel's sibling call
+        // sites use broad predicates). Re-running a cancelled auth call would send
+        // a second login and invalidate the session the first one won.
+        var calls = 0
+        assertFailsWith<CancellationException> {
+            retryWithBackoff(operation = "test", shouldRetry = { true }) {
+                calls++
+                throw CancellationException("caller went away")
+            }
+        }
+        assertEquals(1, calls, "the block must run exactly once")
+    }
 
     @Test
     fun `succeeds on first attempt without delay`() = runTest {
