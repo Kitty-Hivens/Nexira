@@ -35,6 +35,7 @@ fun reconcileMods(
     val cur = current.flatten()
     val base = baselineMods.associateBy { it.stableKey }
     val targetKeys = targetMods.mapTo(HashSet()) { it.stableKey }
+    val targetPaths = targetMods.mapTo(HashSet()) { "mods/${it.filename}" }
 
     val toAdd = ArrayList<String>()
     val toUpdate = ArrayList<String>()
@@ -87,6 +88,15 @@ fun reconcileMods(
     for (b in baselineMods) {
         if (b.stableKey in targetKeys) continue
         val bPath = pathOf(b)
+        // An identity can be re-keyed without the file changing: stableKey falls
+        // back to the filename, so the mirror adding a slug (or a Modrinth source)
+        // to an existing entry gives the same jar a new key between builds. The
+        // forward pass then sees an unknown key over an already-correct jar and
+        // emits nothing, and without this guard the reverse pass would delete a
+        // mod the target still ships -- an FML mismatch and a rejected join, with
+        // nothing left to re-add it. UpdateReconciler's reverse pass has always
+        // had the equivalent check.
+        if (bPath in targetPaths) continue
         if (isProtected(bPath)) { skipped += bPath; continue }
         val onDisk = cur[bPath]?.sha1 ?: continue // already gone
         if (hashEq(onDisk, b.sha1)) toDelete += bPath

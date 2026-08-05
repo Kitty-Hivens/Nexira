@@ -23,6 +23,64 @@ class ModReconcilerTest {
     private fun disk(vararg files: Pair<String, String>) =
         FileManifest(files = files.associate { (p, h) -> p to FileData(sha1 = h) })
 
+    /** A curator-slugged entry: stableKey is the slug, not the filename. */
+    private fun slugged(filename: String, sha1: String, slug: String) =
+        SmrtModEntry(
+            filename = filename,
+            sha1 = sha1,
+            sizeBytes = 1,
+            slug = slug,
+            source = SmrtSource.SmrtStatic(url = "https://example/$filename"),
+        )
+
+    /** No slug, no Modrinth source -- stableKey falls back to the filename. */
+    private fun unkeyed(filename: String, sha1: String) =
+        SmrtModEntry(
+            filename = filename,
+            sha1 = sha1,
+            sizeBytes = 1,
+            source = SmrtSource.SmrtStatic(url = "https://example/$filename"),
+        )
+
+    @Test
+    fun reKeyingAnEntryDoesNotDeleteTheJarTheTargetStillShips() {
+        // The mirror adds a slug to an entry that had none, exactly as SmrtModEntry's
+        // own KDoc asks it to. Same filename, same bytes -- only the identity key
+        // moved, from the filename to the slug.
+        val plan = reconcileMods(
+            baselineMods = listOf(unkeyed("industrialcraft-2.8.jar", "h1")),
+            targetMods = listOf(slugged("industrialcraft-2.8.jar", "h1", slug = "ic2")),
+            current = disk("mods/industrialcraft-2.8.jar" to "h1"),
+        )
+        // The forward pass has nothing to do (the jar is already correct); the
+        // reverse pass must not read the re-key as a removal.
+        assertTrue(plan.toDelete.isEmpty(), "deleted a mod the target ships: ${plan.toDelete}")
+        assertTrue(plan.toAdd.isEmpty() && plan.toUpdate.isEmpty() && plan.conflicts.isEmpty())
+    }
+
+    @Test
+    fun reKeyingStillUpdatesWhenTheBytesChanged() {
+        val plan = reconcileMods(
+            baselineMods = listOf(unkeyed("industrialcraft-2.8.jar", "h1")),
+            targetMods = listOf(slugged("industrialcraft-2.8.jar", "h2", slug = "ic2")),
+            current = disk("mods/industrialcraft-2.8.jar" to "h1"),
+        )
+        assertEquals(listOf("mods/industrialcraft-2.8.jar"), plan.toUpdate)
+        assertTrue(plan.toDelete.isEmpty())
+    }
+
+    @Test
+    fun aGenuinelyDroppedModIsStillDeleted() {
+        // The guard keys on the path the target ships, so a mod the target really
+        // dropped must still be retired.
+        val plan = reconcileMods(
+            baselineMods = listOf(unkeyed("oldmod-1.0.jar", "h1"), unkeyed("keep-1.0.jar", "h2")),
+            targetMods = listOf(unkeyed("keep-1.0.jar", "h2")),
+            current = disk("mods/oldmod-1.0.jar" to "h1", "mods/keep-1.0.jar" to "h2"),
+        )
+        assertEquals(listOf("mods/oldmod-1.0.jar"), plan.toDelete)
+    }
+
     @Test
     fun sameNameBumpIsAnUpdate() {
         val plan = reconcileMods(
