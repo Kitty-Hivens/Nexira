@@ -5,6 +5,7 @@ import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
+import hivens.core.api.interfaces.RosterInspection
 import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
@@ -321,6 +322,28 @@ class SmrtSyncService(
         )
     }
 
+    /**
+     * See [IPackSyncService.inspectRoster]. Same roster resolution and the same rule
+     * for what counts as foreign as [enforceRoster] -- shared through
+     * [foreignEntries] and [digestScan] rather than restated, so the two can only
+     * ever agree.
+     */
+    override suspend fun inspectRoster(clientDir: Path, expected: Map<String, String>?): RosterInspection =
+        withContext(Dispatchers.IO) {
+            val roster = expected?.keys ?: readRoster(clientDir)
+            if (roster.isEmpty()) {
+                log.warn("mods inspect: no roster for {}, nothing to hold it to", clientDir.fileName)
+                return@withContext RosterInspection(checkable = false)
+            }
+            val foreign = foreignEntries(clientDir, roster).map { (_, relText) -> relText }.sorted()
+            val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
+            RosterInspection(
+                foreign = foreign,
+                mismatched = digests.mismatched,
+                unreadable = digests.unreadable,
+            )
+        }
+
     /** What comparing the pack's declared digests against disk could establish. */
     private data class DigestScan(
         val mismatched: List<String> = emptyList(),
@@ -423,19 +446,18 @@ class SmrtSyncService(
 
 
     /**
-     * Removes everything under `mods/` that the manifest does not name, keeping the
-     * files just downloaded. Replaces the old wipe-then-download order: the same end
-     * state, reached without a window in which the instance holds neither the old
-     * content nor the new one.
+     * Every loadable archive under `mods/` that [expected] does not name, deepest
+     * first, paired with the '/'-joined relative path a person reads in a report.
      *
-     * Walked deepest-first so a directory is considered after its children; one that
-     * still holds a kept file refuses to delete and is left alone.
+     * Pure: it walks and decides, and touches nothing. [pruneForeignEntries] is this
+     * plus a delete, [inspectRoster] is this without one -- the rule for what counts
+     * as foreign has to be the same in both, or a launch would be held to one
+     * standard and the session that follows it to another.
      */
-    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): Sweep {
+    private fun foreignEntries(clientDir: Path, expected: Set<String>): List<Pair<Path, String>> {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return Sweep(emptyList(), emptyList())
-        val removed = mutableListOf<String>()
-        val blocked = mutableListOf<String>()
+        if (!Files.isDirectory(modsDir)) return emptyList()
+        val found = mutableListOf<Pair<Path, String>>()
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
@@ -459,13 +481,30 @@ class SmrtSyncService(
                 // Joined over the path's own segments rather than toString(): the
                 // report is read by a person and matched against manifest paths, both
                 // of which use '/' whatever the host separator is.
-                val relText = rel.joinToString("/")
-                runCatching { fileOpRetry("smrt drop foreign $p") { Files.delete(p) } }
-                    .onSuccess { removed += relText }
-                    // Only regular files reach this point, so a refusal is always an
-                    // obstruction: something is holding the file or denying the delete.
-                    .onFailure { blocked += relText }
+                found += p to rel.joinToString("/")
             }
+        }
+        return found
+    }
+
+    /**
+     * Removes everything under `mods/` that the manifest does not name, keeping the
+     * files just downloaded. Replaces the old wipe-then-download order: the same end
+     * state, reached without a window in which the instance holds neither the old
+     * content nor the new one.
+     *
+     * Walked deepest-first so a directory is considered after its children; one that
+     * still holds a kept file refuses to delete and is left alone.
+     */
+    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): Sweep {
+        val removed = mutableListOf<String>()
+        val blocked = mutableListOf<String>()
+        for ((path, relText) in foreignEntries(clientDir, expected)) {
+            runCatching { fileOpRetry("smrt drop foreign $path") { Files.delete(path) } }
+                .onSuccess { removed += relText }
+                // Only regular files reach this point, so a refusal is always an
+                // obstruction: something is holding the file or denying the delete.
+                .onFailure { blocked += relText }
         }
         if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)
         return Sweep(removed, blocked)
