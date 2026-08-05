@@ -9,6 +9,7 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateOutcome
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -53,6 +54,12 @@ class PackAutoUpdateService(
                     UpdateCheck.UpToDate -> setStatus(instance.id, PackUpdateStatus.UpToDate)
                     is UpdateCheck.Available -> applyOrHold(instance.id, check, settings.amberUpdatePolicy)
                 }
+            } catch (e: CancellationException) {
+                // The pass being cancelled is not a per-pack failure: badging every
+                // instance Failed and carrying on to the next one is how a shutdown
+                // turned into a screen of red packs and a round of network work
+                // nobody asked for.
+                throw e
             } catch (e: Exception) {
                 log.warn("auto-update: failed for {}", instance.id, e)
                 setStatus(instance.id, PackUpdateStatus.Failed(e.message ?: e.toString()))
