@@ -18,8 +18,18 @@ import hivens.ui.theme.bevelHairline
  */
 enum class NxSurfaceLevel { Sunken, Base, Raised, Floating }
 
-/** Tonal-ladder role per level. Monotonic, so adjacent levels carry a tone step; the
- *  bevel hairline supplies the second separation signal regardless of the step size. */
+/**
+ * Tonal-ladder role per level. Adjacent levels always carry a tone step; the bevel
+ * hairline supplies the second separation signal regardless of its size.
+ *
+ * Monotonic on dark only (L* 8.3 / 11.3 / 13.2 / 17.1 -- deeper reads darker all the
+ * way up). The light ladder cannot be: its page IS the lightest surface there is
+ * (Base is white, L* 100), so every other level descends from it and depth runs the
+ * same direction on both sides -- Sunken 95.5, Raised 93.4, Floating 90.9. A recessed
+ * plane and a lifted one therefore land within 2 L* of each other and are told apart
+ * by the hairline rather than by tone. Nesting still steps correctly, which is what
+ * the ladder is mostly asked for; two sibling planes at different depths do not.
+ */
 fun NxSurfaceLevel.role(): FrostRole = when (this) {
     NxSurfaceLevel.Sunken   -> FrostRole.SurfaceContainerLow
     NxSurfaceLevel.Base     -> FrostRole.Surface
