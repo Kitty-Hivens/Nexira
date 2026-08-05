@@ -47,20 +47,13 @@ class TextContrastTest {
     }
 
     @Test
-    fun `secondary text clears the body floor on the dark palette`() {
-        for ((level, bg) in ladder(DarkColorPalette)) {
-            val r = ratio(DarkColorPalette.textSecondary, bg)
-            assertTrue(r >= BODY_FLOOR, "dark/$level: secondary text at $r is under $BODY_FLOOR")
+    fun `secondary text clears the body floor on every plane of both palettes`() {
+        for ((name, palette) in palettes()) {
+            for ((level, bg) in ladder(palette)) {
+                val r = ratio(palette.textSecondary, bg)
+                assertTrue(r >= BODY_FLOOR, "$name/$level: secondary text at $r is under $BODY_FLOOR")
+            }
         }
-    }
-
-    @Test
-    fun `the light palette's secondary text is where it was measured, no worse`() {
-        val worst = ladder(LightColorPalette).minOf { (_, bg) -> ratio(LightColorPalette.textSecondary, bg) }
-        assertTrue(
-            worst >= SECONDARY_LIGHT_TODAY,
-            "light secondary text fell to $worst, under the $SECONDARY_LIGHT_TODAY it measured when this was written",
-        )
     }
 
     private fun palettes(): List<Pair<String, NxColors>> =
@@ -87,8 +80,5 @@ class TextContrastTest {
 
         /** WCAG AA, large or bold text and UI components. */
         const val LARGE_FLOOR = 3.0
-
-        /** Worst measured ratio for light secondary text across the ladder. */
-        const val SECONDARY_LIGHT_TODAY = 2.6
     }
 }
