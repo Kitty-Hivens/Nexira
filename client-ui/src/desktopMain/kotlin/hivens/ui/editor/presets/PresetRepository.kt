@@ -5,14 +5,23 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import kotlin.io.path.copyTo
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 
-// File-per-preset under <dataDir>/presets/<safe-name>.json. Per-file
-// scheme makes share / import dead simple (just hand someone the
-// file). Atomic write via .tmp + ATOMIC_MOVE mirrors
-// LayoutGraphRepository.persist.
+// File-per-preset under <dataDir>/presets/<safe-name>-<digest>.json. Per-file
+// scheme makes share / import dead simple (just hand someone the file). Atomic
+// write via .tmp + ATOMIC_MOVE mirrors LayoutGraphRepository.persist.
+//
+// The filename is derived from the preset name but is NOT the preset name: the
+// sanitiser maps everything outside [A-Za-z0-9_-] to an underscore, so any two
+// Cyrillic names of equal length collapse to the same string. "Ночь" and "День"
+// both became "____.json", the second save replaced the first, and the list --
+// which used to read its display names back off the filenames -- showed one row
+// called "____" with the typed name unrecoverable. The digest of the original
+// name keeps the paths apart, and the display name is read from the envelope,
+// which has carried it all along.
 class PresetRepository(
     private val presetsDir: Path,
     private val json: Json,
@@ -25,9 +34,14 @@ class PresetRepository(
             stream
                 .filter { it.isRegularFile() && it.name.endsWith(".json") }
                 .map { path ->
-                    val name = path.name.removeSuffix(".json")
+                    val stored = runCatching {
+                        json.decodeFromString<PresetEnvelope>(Files.readString(path)).name
+                    }.getOrNull()
                     val mtime = runCatching { Files.getLastModifiedTime(path).toMillis() }
                         .getOrDefault(0L)
+                    // Fall back to the file stem only when the envelope will not
+                    // parse -- a name is better than an empty row.
+                    val name = stored?.takeIf { it.isNotBlank() } ?: path.name.removeSuffix(".json")
                     PresetMeta(name = name, createdAt = mtime, sourcePath = path)
                 }
                 .sorted(compareByDescending { it.createdAt })
@@ -36,7 +50,7 @@ class PresetRepository(
     }
 
     fun load(name: String): PresetEnvelope? {
-        val path = presetsDir.resolve("${sanitize(name)}.json")
+        val path = resolveExisting(name)
         if (!Files.exists(path)) return null
         return try {
             json.decodeFromString<PresetEnvelope>(Files.readString(path))
@@ -48,7 +62,7 @@ class PresetRepository(
 
     fun save(envelope: PresetEnvelope) {
         Files.createDirectories(presetsDir)
-        val target = presetsDir.resolve("${sanitize(envelope.name)}.json")
+        val target = pathFor(envelope.name)
         val tmp = target.resolveSibling("${target.fileName}.tmp")
         Files.writeString(tmp, json.encodeToString(envelope))
         try {
@@ -63,12 +77,11 @@ class PresetRepository(
     }
 
     fun delete(name: String): Boolean {
-        val path = presetsDir.resolve("${sanitize(name)}.json")
-        return Files.deleteIfExists(path)
+        return Files.deleteIfExists(resolveExisting(name))
     }
 
     fun export(name: String, destination: Path): Boolean {
-        val source = presetsDir.resolve("${sanitize(name)}.json")
+        val source = resolveExisting(name)
         if (!Files.exists(source)) return false
         source.copyTo(destination, overwrite = true)
         return true
@@ -85,11 +98,39 @@ class PresetRepository(
         }
     }
 
-    // Filename sanitization. [A-Za-z0-9_-] passes; everything else
-    // becomes underscore. Empty result coerces to "preset". Prevents
-    // path traversal + filesystem-illegal chars (slash, colon, etc.).
-    private fun sanitize(name: String): String {
-        val cleaned = name.trim().replace(Regex("[^A-Za-z0-9_\\-]"), "_")
-        return cleaned.ifBlank { "preset" }
+    /**
+     * Filename for [name]. The readable half keeps [A-Za-z0-9_-] and maps the rest
+     * to an underscore -- that is what stops path traversal and filesystem-illegal
+     * characters -- and the digest half distinguishes names the readable half
+     * cannot. Derived from the trimmed original, so it is stable across calls and
+     * the same name always resolves to the same file.
+     */
+    private fun fileNameFor(name: String): String {
+        val trimmed = name.trim()
+        val cleaned = trimmed.replace(Regex("[^A-Za-z0-9_\\-]"), "_").ifBlank { "preset" }
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(trimmed.toByteArray(Charsets.UTF_8))
+            .take(4)
+            .joinToString("") { "%02x".format(it) }
+        return "$cleaned-$digest.json"
+    }
+
+    /** Where a save for [name] goes. */
+    private fun pathFor(name: String): Path = presetsDir.resolve(fileNameFor(name))
+
+    /**
+     * Where [name] can be READ from: the current path, else the pre-digest one.
+     * Presets saved before the suffix existed sit at the bare sanitised name, and
+     * an upgrade must not orphan them. A later save republishes under the current
+     * path -- collisions among legacy files stay as they were, because their
+     * distinguishing information was already lost when they were written.
+     */
+    private fun resolveExisting(name: String): Path {
+        val current = pathFor(name)
+        if (Files.exists(current)) return current
+        val legacy = presetsDir.resolve(
+            "${name.trim().replace(Regex("[^A-Za-z0-9_\\-]"), "_").ifBlank { "preset" }}.json"
+        )
+        return if (Files.exists(legacy)) legacy else current
     }
 }
