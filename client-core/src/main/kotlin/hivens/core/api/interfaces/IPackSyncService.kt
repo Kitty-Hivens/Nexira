@@ -43,6 +43,44 @@ interface IPackSyncService {
      * repair path exists and says what to do.
      */
     suspend fun enforceRoster(clientDir: Path, expected: Map<String, String>? = null): RosterVerdict
+
+    /**
+     * The same question [enforceRoster] asks, answered without touching anything.
+     *
+     * It exists because the only caller that needs the answer DURING a session must
+     * not act on it by deleting: the game holds its jars open, and pulling one out
+     * from under a running loader breaks the install in a way that reads as the
+     * launcher eating it. So the finding is reported and the decision is the
+     * caller's.
+     *
+     * Takes no mutation lock, per that lock's own rule for reads. A relabel landing
+     * mid-scan can only rename a jar between its two roster names, and both are in
+     * [expected], so it cannot manufacture a finding.
+     */
+    suspend fun inspectRoster(clientDir: Path, expected: Map<String, String>? = null): RosterInspection
+}
+
+/**
+ * A read-only reading of `mods/` against what the pack declared.
+ *
+ * [foreign] is what [RosterVerdict.removed] would have been -- loadable archives the
+ * pack does not name -- except that nothing was removed. Separate from that verdict
+ * on purpose: "I removed these" and "these are here" are different claims, and a
+ * type that can express only the first would have to lie to express the second.
+ */
+data class RosterInspection(
+    val foreign: List<String> = emptyList(),
+    /** Named by the pack, present on disk, and not the bytes the pack named. */
+    val mismatched: List<String> = emptyList(),
+    /** Named by the pack, present on disk, and not readable -- checked, not judged. */
+    val unreadable: List<String> = emptyList(),
+    /** False when there was no roster to check against, which is not the same as a clean one. */
+    val checkable: Boolean = true,
+) {
+    val isClean: Boolean get() = foreign.isEmpty() && mismatched.isEmpty() && unreadable.isEmpty()
+
+    /** Everything worth naming in a message, foreign content first. */
+    val findings: List<String> get() = foreign + mismatched + unreadable
 }
 
 /**

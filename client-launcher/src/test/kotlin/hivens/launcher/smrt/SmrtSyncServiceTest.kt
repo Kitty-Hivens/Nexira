@@ -316,6 +316,75 @@ class SmrtSyncServiceTest {
         }
     }
 
+    /**
+     * The whole reason the read-only variant exists: it runs against a live game,
+     * where deleting a jar the loader has open breaks the install.
+     */
+    @Test
+    fun `inspectRoster finds what enforceRoster would remove and removes nothing`() = runTest {
+        val dir = tempDir("inspect-readonly")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+        Files.write(dir.resolve("mods/freecam.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val inspection = syncService().inspectRoster(dir, baseline)
+
+        assertEquals(listOf("freecam.jar"), inspection.foreign)
+        assertFalse(inspection.isClean)
+        assertTrue(Files.exists(dir.resolve("mods/freecam.jar")), "reported, not removed")
+        assertTrue(Files.exists(dir.resolve("mods/req.jar")))
+    }
+
+    @Test
+    fun `inspectRoster sees a jar swapped under a name the pack declared`() = runTest {
+        val dir = tempDir("inspect-swap")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val inspection = syncService().inspectRoster(dir, baseline)
+
+        assertEquals(listOf("req.jar"), inspection.mismatched)
+        assertTrue(inspection.foreign.isEmpty(), "the name is one the pack declared")
+        assertFalse(inspection.isClean)
+    }
+
+    @Test
+    fun `inspectRoster is clean on an untouched instance and reports an absent roster`() = runTest {
+        val dir = tempDir("inspect-clean")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val clean = syncService().inspectRoster(dir, baseline)
+        assertTrue(clean.isClean)
+        assertTrue(clean.checkable)
+
+        // No baseline and no roster file: nothing to hold it to, which must not
+        // arrive as a clean bill of health.
+        val blind = syncService().inspectRoster(tempDir("inspect-blind"), expected = null)
+        assertFalse(blind.checkable)
+    }
+
+    /**
+     * A toggle flip during a session renames a jar between its two roster names.
+     * Both are declared, so the scan has nothing to report -- otherwise turning an
+     * optional mod off mid-game would look like tampering.
+     */
+    @Test
+    fun `inspectRoster does not read a toggled optional as foreign`() = runTest {
+        val dir = tempDir("inspect-toggle")
+        Files.createDirectories(dir.resolve("mods"))
+        Files.write(dir.resolve("mods/opt.jar.disabled"), "GENUINE".toByteArray())
+        val sha = sha1Hex("GENUINE".toByteArray())
+        val baseline = mapOf("opt.jar" to sha, "opt.jar.disabled" to sha)
+
+        val inspection = syncService().inspectRoster(dir, baseline)
+
+        assertTrue(inspection.isClean, "a disabled optional is the same bytes under the other declared name")
+    }
+
     @Test
     fun `matching bytes verify, and a foreign jar still goes`() = runTest {
         val dir = tempDir("baseline-ok")
