@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -83,28 +84,39 @@ class LaunchContentWatchdogTest {
     }
 
     /**
+     * Answers from what is on disk at the moment it is asked, which is what a real
+     * walk does. A finding therefore only comes back if the watchdog looked WHILE
+     * the file was there -- the discriminator between reacting to an event and
+     * waiting for the deadline.
+     */
+    private class DiskSensingSync(private val watched: Path) : IPackSyncService {
+        override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String> = emptyList()
+        override suspend fun enforceRoster(clientDir: Path, expected: Map<String, String>?): RosterVerdict =
+            RosterVerdict(verified = true)
+        override suspend fun inspectRoster(clientDir: Path, expected: Map<String, String>?): RosterInspection =
+            if (Files.exists(watched)) RosterInspection(foreign = listOf(watched.fileName.toString()))
+            else RosterInspection()
+    }
+
+    /**
      * The case the settle pass cannot see: a jar that is planted, picked up by the
-     * loader, and unlinked again. Nothing is on disk by the time anything walks the
-     * directory -- only the event says it was ever there.
+     * loader, and unlinked again. Nothing is on disk by the time the deadline pass
+     * walks the directory -- only the event says it was ever there.
      */
     @Test
     fun `a jar that appears and is removed again is still caught`() = runTest {
         val dir = instanceDir()
         val planted = dir.resolve("mods/freecam.jar")
-        // Clean at first look; dirty once the file lands; clean again afterwards --
-        // exactly what a walk would report before, during and after the plant.
-        val sync = ScriptedSync(
-            RosterInspection(foreign = listOf("freecam.jar")),
-            RosterInspection(),
-        )
+        val sync = DiskSensingSync(planted)
 
-        // A long settle, so a pass at the deadline cannot be what finds this.
-        val watchdog = LaunchContentWatchdog(sync, dir, expected = null, settleMillis = 30_000, pollMillis = 20)
+        // Long enough that the deadline pass runs well after the file is gone: if
+        // the event were not acted on, this returns clean.
+        val watchdog = LaunchContentWatchdog(sync, dir, expected = null, settleMillis = 5_000, pollMillis = 20)
         val running = async(Dispatchers.IO) { watchdog.run() }
         withContext(Dispatchers.IO) {
             delay(100)
             Files.write(planted, "CHEAT".toByteArray())
-            delay(200)
+            delay(300)
             Files.deleteIfExists(planted)
         }
 
@@ -116,13 +128,16 @@ class LaunchContentWatchdogTest {
         val dir = instanceDir()
         val sync = ScriptedSync(RosterInspection())
 
-        // Production settle: if cancellation were not observed this would sit here
-        // for a minute and a half.
+        // Production settle: if cancellation were not observed, the join below
+        // would sit here for a minute and a half.
         val watchdog = LaunchContentWatchdog(sync, dir, expected = null, pollMillis = 20)
         val running = async(Dispatchers.IO) { watchdog.run() }
         withContext(Dispatchers.IO) { delay(100) }
         running.cancel()
 
+        // Real time, not runTest's virtual clock -- the point is that the blocking
+        // poll actually lets go, which a scheduler that skips ahead cannot show.
+        withContext(Dispatchers.IO) { withTimeout(5_000) { running.join() } }
         assertTrue(running.isCancelled)
     }
 
