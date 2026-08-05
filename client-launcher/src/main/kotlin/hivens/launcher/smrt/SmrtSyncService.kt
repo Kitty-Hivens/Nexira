@@ -296,41 +296,68 @@ class SmrtSyncService(
         // The sweep answers by name. With a baseline there is a second question --
         // whether what kept its name kept its bytes -- and that is where a jar
         // overwritten in place gets caught, which no name comparison can see.
-        val mismatched = if (expected == null) emptyList() else digestMismatches(clientDir, expected)
-        if (mismatched.isNotEmpty()) {
+        val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
+        if (digests.mismatched.isNotEmpty()) {
             log.warn(
                 "mods enforce: {} file(s) in {} do not match the pack's baseline: {}",
-                mismatched.size, clientDir.fileName, mismatched,
+                digests.mismatched.size, clientDir.fileName, digests.mismatched,
+            )
+        }
+        if (digests.unreadable.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} file(s) in {} could not be read to check them: {}",
+                digests.unreadable.size, clientDir.fileName, digests.unreadable,
             )
         }
         RosterVerdict(
             // Anything left behind means the instance was not brought in line, and a
             // file that resists deletion is the likeliest thing to have been left on
             // purpose.
-            verified = sweep.blocked.isEmpty() && mismatched.isEmpty(),
+            verified = sweep.blocked.isEmpty() && digests.mismatched.isEmpty() && digests.unreadable.isEmpty(),
             removed = sweep.removed,
             blocked = sweep.blocked,
-            mismatched = mismatched,
+            mismatched = digests.mismatched,
+            unreadable = digests.unreadable,
         )
     }
 
+    /** What comparing the pack's declared digests against disk could establish. */
+    private data class DigestScan(
+        val mismatched: List<String> = emptyList(),
+        val unreadable: List<String> = emptyList(),
+    )
+
     /**
-     * Names the pack declares whose bytes on disk are not the bytes it declared.
-     * A missing file is not a mismatch -- that is an incomplete install, which the
-     * sync and repair paths own; this asks only about what is there.
+     * Compares the bytes on disk against the digests the pack declared. A missing
+     * file is neither answer -- that is an incomplete install, which the sync and
+     * repair paths own; this asks only about what is there.
+     *
+     * "Could not read it" is kept apart from "it does not match". They are not the
+     * same claim and the difference is not cosmetic: a read failure is what an
+     * antivirus scanning a jar, or a handle the previous session has not dropped
+     * yet, looks like from here, and folding it into the mismatch list accuses the
+     * player of swapping a mod on the strength of a locked file. The read is
+     * retried on the transient shapes first ([fileOpRetry]), so only a lock that
+     * outlives the backoff is reported at all.
      */
-    private fun digestMismatches(clientDir: Path, expected: Map<String, String>): List<String> {
+    private fun digestScan(clientDir: Path, expected: Map<String, String>): DigestScan {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return emptyList()
-        val bad = mutableListOf<String>()
+        if (!Files.isDirectory(modsDir)) return DigestScan()
+        val mismatched = mutableListOf<String>()
+        val unreadable = mutableListOf<String>()
         for ((name, sha1) in expected) {
             if (sha1.isBlank()) continue
             val file = modsDir.resolve(name)
             if (!Files.isRegularFile(file)) continue
-            val actual = runCatching { sha1Of(file) }.getOrNull()
-            if (actual == null || !actual.equals(sha1, ignoreCase = true)) bad += name
+            val actual = runCatching { fileOpRetry("roster digest $name") { sha1Of(file) } }
+                .onFailure { log.warn("mods enforce: cannot read {}: {}", name, it.toString()) }
+                .getOrNull()
+            when {
+                actual == null -> unreadable += name
+                !actual.equals(sha1, ignoreCase = true) -> mismatched += name
+            }
         }
-        return bad.sorted()
+        return DigestScan(mismatched.sorted(), unreadable.sorted())
     }
 
     private fun sha1Of(file: Path): String {

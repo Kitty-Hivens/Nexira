@@ -61,6 +61,11 @@ interface IPackSyncService {
  * the file undeletable is precisely how one keeps something in `mods/` across a launch,
  * so a failed delete has to read as "this instance is not what the pack says it is",
  * never as "nothing to remove".
+ *
+ * [mismatched] and [unreadable] both also deny the token, and they are still kept
+ * apart, because only one of them is a finding about the player. A file that would
+ * not open says nothing about its contents, and the launcher has no business saying
+ * otherwise in a log the player reads.
  */
 data class RosterVerdict(
     val verified: Boolean,
@@ -68,4 +73,6 @@ data class RosterVerdict(
     val blocked: List<String> = emptyList(),
     /** Named by the pack, present on disk, and not the bytes the pack named. */
     val mismatched: List<String> = emptyList(),
+    /** Named by the pack, present on disk, and not readable -- checked, not judged. */
+    val unreadable: List<String> = emptyList(),
 )

@@ -283,6 +283,39 @@ class SmrtSyncServiceTest {
         )
     }
 
+    /**
+     * A jar an antivirus is holding open, or one the previous session has not let
+     * go of yet, reads exactly like this. Calling that a mismatch tells the player
+     * they swapped a mod, on evidence that is only a failed open.
+     */
+    @Test
+    fun `a jar that cannot be read is reported apart from one that does not match`() = runTest {
+        val dir = tempDir("baseline-unreadable")
+        Files.createDirectories(dir.resolve("mods"))
+        val locked = dir.resolve("mods/req.jar")
+        Files.write(locked, "GENUINE".toByteArray())
+        Files.write(dir.resolve("mods/opt.jar"), "SWAPPED".toByteArray())
+        val genuine = sha1Hex("GENUINE".toByteArray())
+        val baseline = mapOf("req.jar" to genuine, "opt.jar" to genuine)
+
+        // Same POSIX caveat as the blocked-delete test above: what varies by
+        // platform is only how one arranges for a read to fail.
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return@runTest
+        val perms = Files.getPosixFilePermissions(locked)
+        Files.setPosixFilePermissions(locked, emptySet())
+        // Root is not bound by the mode bits, so there would be nothing to observe.
+        if (Files.isReadable(locked)) return@runTest
+        try {
+            val verdict = syncService().enforceRoster(dir, baseline)
+
+            assertEquals(listOf("req.jar"), verdict.unreadable)
+            assertEquals(listOf("opt.jar"), verdict.mismatched, "only the one actually compared is accused")
+            assertFalse(verdict.verified, "unchecked is not cleared -- it still denies the token")
+        } finally {
+            Files.setPosixFilePermissions(locked, perms)
+        }
+    }
+
     @Test
     fun `matching bytes verify, and a foreign jar still goes`() = runTest {
         val dir = tempDir("baseline-ok")
