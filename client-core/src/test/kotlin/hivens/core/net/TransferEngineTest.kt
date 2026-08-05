@@ -51,6 +51,8 @@ class TransferEngineTest {
         var failNext = 0
         var truncateNext = 0
         var cutRangeAt: Long? = null
+        /** Response validator, as a static host sends for a file it may republish. */
+        var etag: String? = null
         val ranges = mutableListOf<String?>()
         var bodies = 0
     }
@@ -124,6 +126,7 @@ class TransferEngineTest {
         val headers = buildList {
             add(HttpHeaders.ContentLength to listOf(bytes.size.toString()))
             contentRange?.let { add(HttpHeaders.ContentRange to listOf(it)) }
+            host.etag?.let { add(HttpHeaders.ETag to listOf(it)) }
         }
         return respond(ByteReadChannel(sent), status, headersOf(*headers.toTypedArray()))
     }
@@ -333,6 +336,52 @@ class TransferEngineTest {
             .fetch(Transfer(URL, dest, payloadSha1, payload.size.toLong()))
 
         assertContentEquals(payload, Files.readAllBytes(dest), "bytes from two versions were mixed")
+    }
+
+    @Test
+    fun `an unpinned object republished under the same name is not resumed into`() = runTest {
+        val dir = tempDir("xfer-revalidate")
+        val dest = dir.resolve("tool.bin")
+        // No digest, which is what a rolling release URL gets fetched with: there is
+        // no published hash to pin, so nothing downstream can catch a mixture.
+        val transfer = Transfer(URL, dest, expect = null, size = payload.size.toLong())
+
+        val first = Host(payload).apply { etag = "v1"; cutRangeAt = 48L }
+        val died = runCatching { engine(mapOf(URL to first), blocksInFlight = 1).fetch(transfer) }
+        assertTrue(died.isFailure, "the transfer was expected to fail")
+        assertTrue(Files.exists(journalOf(dest)), "nothing was written down to resume from")
+
+        // The host republished: same name, same length, different bytes, new validator.
+        val republished = ByteArray(payload.size) { (it * 11 % 251 + 3).toByte() }
+        val second = Host(republished).apply { etag = "v2" }
+        engine(mapOf(URL to second), blocksInFlight = 1).fetch(transfer)
+
+        assertContentEquals(
+            republished, Files.readAllBytes(dest),
+            "blocks from the old object were kept, so the file is a mixture of two versions",
+        )
+        assertTrue(second.ranges.contains("bytes=0-0"), "the second run should have revalidated before resuming")
+    }
+
+    @Test
+    fun `an unpinned object that has not changed is still resumed`() = runTest {
+        val dir = tempDir("xfer-revalidate-ok")
+        val dest = dir.resolve("tool.bin")
+        val transfer = Transfer(URL, dest, expect = null, size = payload.size.toLong())
+
+        val first = Host(payload).apply { etag = "v1"; cutRangeAt = 48L }
+        runCatching { engine(mapOf(URL to first), blocksInFlight = 1).fetch(transfer) }
+        assertTrue(Files.exists(journalOf(dest)), "the fixture did not leave a journal")
+
+        val same = Host(payload).apply { etag = "v1" }
+        engine(mapOf(URL to same), blocksInFlight = 1).fetch(transfer)
+
+        assertContentEquals(payload, Files.readAllBytes(dest))
+        val blockRanges = same.ranges.filterNotNull().filter { it != "bytes=0-0" }
+        assertEquals(
+            4, blockRanges.size,
+            "an unchanged object should still cost only its missing blocks, asked for ${same.ranges}",
+        )
     }
 
     // ── failure handling ──────────────────────────────────────────────────────
