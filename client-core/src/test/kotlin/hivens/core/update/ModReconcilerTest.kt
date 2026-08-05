@@ -153,6 +153,21 @@ class ModReconcilerTest {
     }
 
     @Test
+    fun aSwappedJarIsWrittenBackEvenWhenThePackDidNotChangeIt() {
+        // The deliberate counterpart to UpdateReconciler, which keeps the on-disk
+        // file in this same triple. `mods/` is the manifest's to describe: a jar is
+        // what the loader executes, so the pack's bytes win over whatever replaced
+        // them under the pack's own filename.
+        val plan = reconcileMods(
+            baselineMods = listOf(mod("jei.jar", "shipped", "u6dRKJwZ")),
+            targetMods = listOf(mod("jei.jar", "shipped", "u6dRKJwZ")),
+            current = disk("mods/jei.jar" to "swapped"),
+        )
+        assertEquals(listOf("mods/jei.jar"), plan.toUpdate)
+        assertTrue(plan.conflicts.isEmpty(), "not a merge to arbitrate -- the pack's jar simply wins")
+    }
+
+    @Test
     fun mergedWithConcatenatesDisjointPlans() {
         val mods = UpdatePlan(toAdd = listOf("mods/a.jar"), toDelete = listOf("mods/b.jar"))
         val assets = UpdatePlan(toUpdate = listOf("config/x.cfg"))

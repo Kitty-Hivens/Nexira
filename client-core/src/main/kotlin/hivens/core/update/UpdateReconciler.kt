@@ -33,9 +33,15 @@ data class UpdatePlan(
  * MINE = [current]) decides each path:
  *  - target-only            -> add
  *  - target != disk, mine==base (or no base) -> update (safe overwrite)
+ *  - target != disk, mine!=base AND theirs==base -> keep mine, in no list
  *  - target != disk, mine!=base AND theirs!=base -> conflict (keep mine, pack's as .new)
  *  - baseline-only, mine==base -> delete (safe); mine!=base -> keep (user edit survives)
  *  - protected path -> skipped, never written or deleted
+ *
+ * This reconciles ASSETS -- configs, resource packs, the server list. Mod jars go
+ * through [reconcileMods], which deliberately answers the mine!=base/theirs==base
+ * case the other way: a jar is what the loader executes, so it belongs to the
+ * manifest rather than to whoever last wrote to `mods/`.
  */
 object UpdateReconciler {
     fun reconcile(
@@ -65,7 +71,17 @@ object UpdateReconciler {
                     val baseHash = base[path]?.sha1
                     val userEdited = !baseHash.isNullOrEmpty() && !hashEq(onDisk.sha1, baseHash)
                     val packChanged = baseHash.isNullOrEmpty() || !hashEq(want.sha1, baseHash)
-                    if (userEdited && packChanged) conflicts += path else toUpdate += path
+                    when {
+                        // THEIRS == BASE: the pack is shipping the same bytes it always
+                        // did, so the difference on disk is entirely the user's. There
+                        // is nothing to merge and nothing to warn about -- writing the
+                        // target here would revert an edit the update never asked to
+                        // touch, which is what made the protected-path list look load
+                        // bearing.
+                        userEdited && !packChanged -> Unit
+                        userEdited -> conflicts += path
+                        else -> toUpdate += path
+                    }
                 }
             }
         }
