@@ -232,6 +232,13 @@ class LauncherController(
     @Volatile private var currentAbortToken: AtomicBoolean? = null
 
     /**
+     * The post-spawn content guard for the live session, cancelled the moment the
+     * process is gone. Held here rather than scoped to the launch coroutine because
+     * that coroutine spends the session parked in a blocking `awaitExit`.
+     */
+    @Volatile private var watchdogJob: Job? = null
+
+    /**
      * SC server-list launch. Delegates the gate/token/MDC/spawn/wait/exit
      * machinery to [launchInternal]; [prepareServerLaunch] supplies the
      * SC-specific auth + sync + java steps and the spawn binding.
@@ -259,9 +266,20 @@ class LauncherController(
         class Ready(
             val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> SpawnResult,
             /** Runs once after the process spawns. [launchInternal] guards it, so it never fails the launch. */
-            val onSpawned: (suspend () -> Unit)? = null,
+            val onSpawned: (suspend (handle: LaunchHandle) -> Unit)? = null,
             /** Runs once after the game process exits, with the session length in seconds. Guarded like [onSpawned]. */
             val onExit: (suspend (sessionSeconds: Long) -> Unit)? = null,
+            /**
+             * Raised by a post-spawn guard that has already called [fail] and ended the
+             * process itself. The exit verdict reads it FIRST, because the exit code it
+             * would otherwise judge is the one that guard produced.
+             *
+             * Deliberately not the abort token. With that one set, a non-zero exit is
+             * read as a user-requested stop and the state goes to Idle -- which would
+             * quietly erase the very error the guard raised. Per-launch by
+             * construction: it lives on the value the launch coroutine holds.
+             */
+            val contentFailed: AtomicBoolean = AtomicBoolean(false),
         ) : Prepared
 
         data object Bail : Prepared
@@ -328,7 +346,7 @@ class LauncherController(
                         // Post-spawn hook guarded centrally: a throwing hook must
                         // not flip the running game into an Error state.
                         prepared.onSpawned?.let { hook ->
-                            runCatching { hook() }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+                            runCatching { hook(handle) }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
                         }
                         val sessionStart = Instant.now().epochSecond
 
@@ -336,6 +354,10 @@ class LauncherController(
                         // currentAbortToken field -- see that field's KDoc for the
                         // abort-A-then-launch-B race a shared flag would reopen.
                         val exitCode = handle.awaitExit()
+                        // Whatever the post-spawn guard was still watching for, the
+                        // process is gone and there is nothing left to watch it on.
+                        watchdogJob?.cancel()
+                        watchdogJob = null
                         runningHandle = null
                         // Cleared here rather than in the pack path's own exit hook:
                         // that hook is guarded and may be skipped, and "no files are
@@ -347,14 +369,18 @@ class LauncherController(
                             runCatching { hook(secs) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
                         }
 
-                        if (exitCode != 0 && !abortToken.get()) {
-                            fail(LaunchError.ExitCode(exitCode))
-                        } else {
-                            _state.value = LaunchState.Idle
+                        when {
+                            // Read first: this exit code IS the guard's doing, and
+                            // judging it would overwrite the reason it gave.
+                            prepared.contentFailed.get() -> Unit
+                            exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
+                            else -> _state.value = LaunchState.Idle
                         }
                     }
                 }
             } catch (e: Exception) {
+                watchdogJob?.cancel()
+                watchdogJob = null
                 runningHandle = null
                 _runningPackInstanceId.value = null
                 if (e !is CancellationException) {
@@ -692,7 +718,9 @@ class LauncherController(
             ?.let { Path.of(it) }
 
         // 5. Spawn binding handed back to launchInternal.
+        val contentFailed = AtomicBoolean(false)
         return Prepared.Ready(
+            contentFailed = contentFailed,
             spawn = { onLog ->
                 launcherService.launchPackClient(
                     sessionData          = session,
@@ -746,11 +774,17 @@ class LauncherController(
                     onLog                = onLog,
                 )
             },
-            onSpawned = {
+            onSpawned = { handle ->
                 _runningPackInstanceId.value = refreshedInstance.id
                 packRepository.put(
                     refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
                 )
+                // Armed for exactly the launches the seal covers. A launch that got
+                // no token has nothing to lend to a jar that arrives late, and its
+                // owner's `mods/` is their own business.
+                if (serverBound && verdict.verified) {
+                    watchdogJob = watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
+                }
             },
             onExit = { secs ->
                 // Re-read the persisted instance (onSpawned wrote lastPlayed; the
@@ -762,6 +796,47 @@ class LauncherController(
                 }
             },
         )
+    }
+
+    /**
+     * Holds the instance to the pack for as long as anything added to `mods/` could
+     * still be picked up, and ends the session if it stops matching.
+     *
+     * The pre-spawn seal can only speak for the instant before the process existed;
+     * the loader reads `mods/` seconds later, and that gap was unwatched. See
+     * [LaunchContentWatchdog] for how the window is covered and why late is safe
+     * there and early is not.
+     *
+     * Ends the session rather than deleting what it found. The jar is open in a
+     * running JVM by then, so removing it neither stops the code nor leaves a
+     * working install -- what is left to do is take the session away. The instance
+     * is reported as it stands, and the repair path is what puts it right.
+     */
+    private fun watchSessionContent(
+        handle: LaunchHandle,
+        clientDir: Path,
+        instance: PackInstance,
+        contentFailed: AtomicBoolean,
+    ): Job = appScope.launch {
+        val findings = LaunchContentWatchdog(
+            sync = smrtSyncService,
+            clientDir = clientDir,
+            expected = modBaseline(instance),
+        ).run()
+        if (findings.isEmpty()) return@launch
+
+        // Raised BEFORE the process is ended, so the exit verdict already sees it
+        // when the wait returns and does not overwrite the reason with an exit code.
+        contentFailed.set(true)
+        logger.warn("Content changed after the spawn for {}: {}", instance.displayName, findings)
+        ActionRing.record(
+            "Pack launch ${instance.displayName}: content changed after the spawn, ending the session (${findings.size})",
+        )
+        // No ForeignContentRemoved here: nothing was removed, and the console line
+        // for that event says otherwise. fail() emits the error the UI already
+        // renders for this reason.
+        fail(LaunchError.ContentChangedDuringLaunch)
+        runCatching { handle.terminate() }
     }
 
     /**
