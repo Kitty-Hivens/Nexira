@@ -6,12 +6,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 
 /**
- * Default no-op implementation of [AprilFoolsLifecycle]. Returned by
- * [AprilFoolsLoader] when the SPI scan finds no provider on the classpath --
- * which is the production-build state. Every method either returns a
- * sensible identity value or passes the content through unchanged, so a
- * caller written against [LocalAprilFools] behaves identically to the
- * old "chaos inactive" code paths.
+ * Fallback implementation of [AprilFoolsLifecycle], returned by
+ * [AprilFoolsLoader] when the SPI scan finds no provider -- a build that
+ * deliberately drops the registration, or one where the resource did not
+ * survive packaging. Every method either returns a sensible identity value or
+ * passes the content through unchanged, so a caller written against
+ * [LocalAprilFools] behaves identically to the "chaos inactive" path the
+ * calendar produces for fifty-one weeks of the year.
  */
 object NoOpAprilFools : AprilFoolsLifecycle {
 

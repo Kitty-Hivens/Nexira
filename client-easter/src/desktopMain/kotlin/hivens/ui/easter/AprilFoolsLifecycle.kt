@@ -9,13 +9,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 
 /**
- * UI-side surface to the April Fools easter-egg subsystem. Always present in
- * every build; the real chaos implementation (`RealAprilFools`) lives in the
- * `desktopAprilFoolsMain/` source dir which is only added to the desktop
- * compilation when `-PauraAprilFools=true` is on the Gradle command line.
- * Default production builds resolve to [NoOpAprilFools] via SPI --
- * `ServiceLoader.firstOrNull()` returns null and the loader falls back --
- * so no chaos code lands on the classpath.
+ * UI-side surface to the April Fools easter-egg subsystem. The real chaos
+ * implementation (`RealAprilFools`) is resolved through SPI by
+ * [AprilFoolsLoader]; [NoOpAprilFools] answers for any build whose classpath
+ * carries no provider.
  *
  * UI code consumes the easter-egg surface exclusively through
  * [LocalAprilFools].current; the chaos singletons (`AprilFools`,
@@ -109,11 +106,10 @@ interface AprilFoolsLifecycle {
     fun DebugPanel()
 
     /**
-     * Whether [DebugPanel] renders real content in this build. False for
-     * NoOpAprilFools (production builds without `-PauraAprilFools=true`),
-     * true for RealAprilFools. Used by Diagnostics to conditionally
-     * attach the 5-tap unlock gesture so users on production builds do
-     * not see the title twitch on tap with nothing to show for it.
+     * Whether [DebugPanel] renders real content in this build: true for
+     * RealAprilFools, false for the NoOp fallback. Used by Diagnostics to
+     * conditionally attach the 5-tap unlock gesture, so a build without the
+     * engine does not answer taps with nothing to show for it.
      */
     val providesDebugPanel: Boolean
 }

@@ -14,15 +14,18 @@ import java.util.ServiceLoader
  * concurrent first-access from multiple threads returns the same
  * instance without racing the ServiceLoader scan.
  *
- * Why SPI rather than a direct singleton: keeps the chaos-engine code
- * (animations, coroutine event loop, overlay rendering, text corruption
- * tables) out of the default classpath. `RealAprilFools` + its
- * supporting files land in `desktopAprilFoolsMain/` and are added to
- * the compilation only when `-PauraAprilFools=true` is on the Gradle
- * command line. Production builds therefore cannot accidentally
- * activate chaos behaviour even if the calendar date hits April 1 --
- * no implementation exists to render it. Same pattern as
- * `PuppetServerLoader`.
+ * Why SPI rather than a direct singleton: the shell mounts the seasonal
+ * surface through one interface and never names the engine, so the module
+ * boundary holds in both directions -- `client-ui` compiles without knowing
+ * `RealAprilFools` exists, and the engine is replaceable by the NoOp for any
+ * build that wants it gone.
+ *
+ * `RealAprilFools` is registered from this module's `desktopMain` resources,
+ * so an ordinary build resolves it and the calendar (April 1-14) is the only
+ * thing deciding whether anything happens. Dropping that registration file is
+ * all it takes to ship a launcher with no seasonal behaviour at all -- which
+ * is exactly the state this loader spent its first releases in by accident,
+ * hence `AprilFoolsLoaderTest`.
  */
 object AprilFoolsLoader {
     val instance: AprilFoolsLifecycle by lazy {
