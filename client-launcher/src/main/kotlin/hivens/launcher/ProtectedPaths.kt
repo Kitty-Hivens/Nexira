@@ -23,8 +23,13 @@ import java.nio.file.Path
  * what's already covered before adding their own.
  *
  * `endsWith` matches exact filenames (case-insensitive, after path
- * normalization); `contains` matches anywhere in the relative path
- * (typically a mod directory name).
+ * normalization); `contains` names a mod's state DIRECTORY and is matched
+ * against the directory portion of the path only, never the filename. A mod
+ * jar lives at `mods/<name>-<version>.jar`, so matching the whole path made
+ * every entry here protect its own mod's jar as well as its config -- and a
+ * protected jar is skipped before the hash compare, before the corrupt-archive
+ * check, and by both update reconcilers, so it never updates, never retires on
+ * a version bump, and never repairs.
  */
 @Serializable
 data class ProtectedPathsConfig(
@@ -51,8 +56,10 @@ class ProtectedPaths(
 
     fun isProtected(relativePath: String): Boolean {
         val lower = relativePath.lowercase().replace("\\", "/")
-        return config.endsWith.any { lower.endsWith(it.lowercase()) } ||
-                config.contains.any { lower.contains(it.lowercase()) }
+        if (config.endsWith.any { lower.endsWith(it.lowercase()) }) return true
+        val dir = lower.substringBeforeLast('/', missingDelimiterValue = "")
+        if (dir.isEmpty()) return false
+        return config.contains.any { dir.contains(it.lowercase()) }
     }
 
     private fun loadOrCreate(): ProtectedPathsConfig {
