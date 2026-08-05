@@ -29,6 +29,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.io.AtomicFiles
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -207,6 +209,7 @@ class LayoutGraphRepository(
             val envelope = json.decodeFromString<Envelope>(Files.readString(file))
             if (envelope.schemaVersion > SCHEMA_VERSION) {
                 readOnly = true
+                NewerBuildData.record(ReadOnlyStore.Layout)
                 log.warn(
                     "Layout graph at {} is schema_version {} > supported {} -- written by a newer build. " +
                         "Loading read-only; this session will not write it back to avoid clobbering newer data.",

@@ -1355,6 +1355,12 @@ object GermanStrings : AppStrings {
     override val videoSkipBack        = "10 Sekunden zurück"
     override val videoSkipForward     = "10 Sekunden vor"
     override val videoWidgetEmpty     = "Video-URL in den Widget-Einstellungen festlegen"
+    override val readOnlyDataTitle    = "Änderungen werden jetzt nicht behalten"
+    override fun readOnlyDataBody(stores: String) =
+        "Von einem neueren Build des Launchers geschrieben: $stores. Schreibgeschützt geöffnet — diese Sitzung kann " +
+            "nichts zurückschreiben, alle Änderungen gehen beim Beenden verloren. Aktualisieren Sie, um wieder zu bearbeiten."
+    override val readOnlyDataLibrary  = "die Pack-Sammlung"
+    override val readOnlyDataLayout   = "das Layout"
     override val videoFetchingTool    = "Downloader wird geholt"
     override val videoResolvingPage   = "Seite wird gelesen"
     override val videoDownloading     = "Wird heruntergeladen"
