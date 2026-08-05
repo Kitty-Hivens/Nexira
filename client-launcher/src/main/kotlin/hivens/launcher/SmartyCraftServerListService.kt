@@ -17,10 +17,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.*
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -41,9 +37,6 @@ class SmartyCraftServerListService(
 
     private val logger = LoggerFactory.getLogger(SmartyCraftServerListService::class.java)
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val dateFormatter = DateTimeFormatter
-        .ofPattern("dd MMM yyyy", Locale.of("ru"))
-        .withZone(ZoneId.systemDefault())
 
     override fun refresh(): CompletableFuture<DashboardData> = serviceScope.future {
         dashboardCache.invalidate(CACHE_KEY)
@@ -75,9 +68,9 @@ class SmartyCraftServerListService(
                 NewsItem(
                     id = newsDto.id,
                     title = newsDto.name,
-                    description = "Views: ${newsDto.views}",
-                    date = formatTimestamp(newsDto.date),
-                    imageUrl = imageUrl
+                    views = newsDto.views,
+                    dateEpochSeconds = newsDto.date,
+                    imageUrl = imageUrl,
                 )
             }
             // Persist only on success so a transient outage cannot overwrite the
@@ -102,14 +95,6 @@ class SmartyCraftServerListService(
             optionalModsData = (srv.optionalMods as? JsonObject) ?: emptyMap(),
             source           = ServerSource.Smartycraft,
         )
-
-    private fun formatTimestamp(ts: Long): String {
-        return try {
-            dateFormatter.format(Instant.ofEpochSecond(ts))
-        } catch (_: Exception) {
-            "Unknown Date"
-        }
-    }
 
     private companion object {
         // One dashboard per session; a fixed key is enough.

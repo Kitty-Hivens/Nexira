@@ -140,7 +140,7 @@ object RussianStrings : AppStrings {
     override val serverDetailNoImage       = "Нет изображения"
     override val serverDetailNoImageHint   = "banner.png"
     override val serverDetailMissingTitle  = "Информация отсутствует"
-    override fun serverDetailMissingPath(path: String, file: String) = "Создайте файл $file в папке:"
+    override fun serverDetailMissingPath(file: String) = "Создайте файл $file в папке:"
 
     // Server Settings
     override val serverSettingsSubtitle        = "Настройки запуска"

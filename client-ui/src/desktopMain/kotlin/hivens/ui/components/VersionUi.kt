@@ -27,7 +27,11 @@ fun ChannelChip(channel: VersionChannel) {
     NxMetaChip(label, tone = tone)
 }
 
+/** An instant as every build time in the launcher reads: local `yyyy-MM-dd HH:mm`. */
+fun formatBuildTime(instant: Instant): String =
+    instant.atZone(ZoneId.systemDefault()).format(BUILD_TIME)
+
 /** RFC 3339 -> local `yyyy-MM-dd HH:mm`; the raw string when it does not parse. */
 fun formatBuildTimestamp(raw: String?): String? = raw?.let {
-    runCatching { Instant.parse(it).atZone(ZoneId.systemDefault()).format(BUILD_TIME) }.getOrDefault(it)
+    runCatching { formatBuildTime(Instant.parse(it)) }.getOrDefault(it)
 }

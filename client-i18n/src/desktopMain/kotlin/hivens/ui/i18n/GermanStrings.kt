@@ -140,7 +140,7 @@ object GermanStrings : AppStrings {
     override val serverDetailNoImage       = "Kein Bild"
     override val serverDetailNoImageHint   = "banner.png"
     override val serverDetailMissingTitle  = "Informationen fehlen"
-    override fun serverDetailMissingPath(path: String, file: String) = "Erstelle $file in:"
+    override fun serverDetailMissingPath(file: String) = "Erstelle $file in:"
 
     // Server Settings
     override val serverSettingsSubtitle        = "Starteinstellungen"

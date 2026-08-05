@@ -40,7 +40,7 @@ fun ServerDetailsDescriptionWidget(instance: WidgetInstance) {
             NxCalloutBanner(
                 tone  = NxCalloutTone.Warning,
                 title = s.serverDetailMissingTitle,
-                body  = s.serverDetailMissingPath(ctx.assetsPath.absolutePath, "description.txt"),
+                body  = s.serverDetailMissingPath("description.txt"),
             ) {
                 Text(
                     text       = ctx.assetsPath.absolutePath,

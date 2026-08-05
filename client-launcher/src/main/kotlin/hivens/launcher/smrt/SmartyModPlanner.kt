@@ -103,7 +103,7 @@ class SmartyModPlanner(
 
     /** Manifest jar basenames matching any of the [smartyNames] globs. */
     private fun matchingSmartyNames(manifest: FileManifest, smartyNames: List<String>): Set<String> {
-        val patterns = smartyNames.map { globToRegex(it) }
+        val patterns = smartyNames.map { ModInjector.globToRegex(it) }
         return manifestProcessor.flattenManifest(manifest).keys
             .map { it.substringAfterLast('/') }
             .filter { name -> patterns.any { it.matches(name) } }
@@ -117,23 +117,11 @@ class SmartyModPlanner(
      * longer fits). Empty when there is genuinely no Smarty to swap.
      */
     private fun smartyLikeUnmatched(manifest: FileManifest, activeGlobs: List<String>): Set<String> {
-        val patterns = activeGlobs.map { globToRegex(it) }
+        val patterns = activeGlobs.map { ModInjector.globToRegex(it) }
         return manifestProcessor.flattenManifest(manifest).keys
             .map { it.substringAfterLast('/') }
             .filter { name -> name.contains("smarty", ignoreCase = true) && patterns.none { it.matches(name) } }
             .toSet()
-    }
-
-    private fun globToRegex(glob: String): Regex {
-        val sb = StringBuilder()
-        for (c in glob) {
-            when (c) {
-                '*' -> sb.append(".*")
-                '?' -> sb.append('.')
-                else -> sb.append(Regex.escape(c.toString()))
-            }
-        }
-        return Regex(sb.toString(), RegexOption.IGNORE_CASE)
     }
 
     companion object {

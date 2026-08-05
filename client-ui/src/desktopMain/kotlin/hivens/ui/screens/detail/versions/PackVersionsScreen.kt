@@ -68,6 +68,7 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.formatBuildTime
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -91,6 +92,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.humanSize
 import hivens.ui.theme.decorativeColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
@@ -99,10 +101,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-private val BUILD_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
 /** Which base the changelog diff compares the selected build against. */
 private enum class DiffBase { Previous, Installed }
@@ -813,7 +811,7 @@ private fun SnapshotsSection(
     NxSection(s.packVersionSnapshots) {
         snapshots.forEach { snap ->
             val whenLabel = runCatching {
-                Instant.ofEpochMilli(snap.createdAtEpoch).atZone(ZoneId.systemDefault()).format(BUILD_TIME)
+                formatBuildTime(Instant.ofEpochMilli(snap.createdAtEpoch))
             }.getOrDefault(snap.id)
             NxRow(title = whenLabel, subtitle = snap.fromVersion) {
                 NxButton(
@@ -889,10 +887,4 @@ private fun sizeLabel(fromBytes: Long?, toBytes: Long?): String? = when {
     toBytes != null -> humanSize(toBytes)
     fromBytes != null -> humanSize(fromBytes)
     else -> null
-}
-
-private fun humanSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
-    bytes >= 1024      -> "${bytes / 1024} KB"
-    else               -> "$bytes B"
 }
