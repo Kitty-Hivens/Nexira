@@ -131,9 +131,12 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import org.slf4j.LoggerFactory
 
 /**
  * Concurrent requests OkHttp will run against one host on the direct channel.
@@ -765,10 +768,23 @@ val appModule = module {
      * rest. Single shared scope across the whole launcher so the JVM
      * shutdown hook installed by [AppCoroutineScopeHook] cancels every
      * coroutine on process exit.
+     *
+     * The handler is not optional. SupervisorJob isolates siblings from a
+     * failed child; it does not consume the throwable. Without a handler the
+     * failure reaches `Thread.getDefaultUncaughtExceptionHandler`, which this
+     * launcher wires to the crash reporter plus a modal "Nexira quit
+     * unexpectedly" dialog -- shown on the EDT, i.e. the one thread Compose
+     * draws on. A background pack-update push that throws would freeze the
+     * window behind a report of a crash that did not happen, and invite the
+     * user to file it. Fire-and-forget work failing is a log line.
      */
     single<CoroutineScope>(createdAtStart = true) {
+        val log = LoggerFactory.getLogger("AppScope")
         CoroutineScope(
-            SupervisorJob() + Dispatchers.IO
+            SupervisorJob() + Dispatchers.IO +
+                CoroutineExceptionHandler { context, throwable ->
+                    log.error("background job failed in {}", context[CoroutineName]?.name ?: "app scope", throwable)
+                }
         )
     }
 
