@@ -21,6 +21,14 @@ import hivens.core.data.flatten
  * The on/off choice is a separate, already stable-keyed concern (see
  * `OptionalContentRules`); this only fixes the file operations.
  *
+ * One case is answered differently from [UpdateReconciler] on purpose. When the
+ * jar on disk is not the baseline's but the target still names the baseline's
+ * bytes, the asset reconciler keeps what is on disk; here the pack's jar is
+ * written back. `mods/` is the manifest's to describe -- a jar is what the loader
+ * executes, and an edit to one is not a preference to preserve the way a config
+ * is. The name a jar carries is no evidence of what is inside it, which is why
+ * the launch-time check compares digests rather than trusting this pass.
+ *
  * Baseline identity is not in [hivens.core.data.PackInstance.installedManifest]
  * (it stores paths + hashes only), so the caller supplies the installed
  * version's manifest mods, fetched from the mirror. When that is unavailable the

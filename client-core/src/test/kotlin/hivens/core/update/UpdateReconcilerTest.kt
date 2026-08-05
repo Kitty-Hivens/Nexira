@@ -57,6 +57,59 @@ class UpdateReconcilerTest {
     }
 
     @Test
+    fun keepsTheUserEditWhenThePackShipsTheSameFileItAlwaysDid() {
+        // THEIRS == BASE: the update names this file only because it is part of the
+        // build, not because anything about it changed. Writing the target here is
+        // the whole reason a name-keyed protected-path list looked necessary.
+        val plan = UpdateReconciler.reconcile(
+            baseline = mf("config/x.cfg" to "base"),
+            target = mf("config/x.cfg" to "base"),
+            current = mf("config/x.cfg" to "mine"),
+        )
+        assertTrue(plan.toUpdate.isEmpty(), "reverted an edit the pack never touched: ${plan.toUpdate}")
+        assertTrue(plan.conflicts.isEmpty(), "nothing to merge, so nothing to report: ${plan.conflicts}")
+        assertTrue(plan.isEmpty)
+    }
+
+    @Test
+    fun theServerListSurvivesAnUpdateThatDoesNotChangeIt() {
+        // The mirror ships servers.dat as a pack asset, and the game rewrites it
+        // whenever the player edits their server list. Every update that left it
+        // alone used to hand back the pack's copy.
+        val plan = UpdateReconciler.reconcile(
+            baseline = mf("servers.dat" to "shipped", "mods/a.jar" to "h1"),
+            target = mf("servers.dat" to "shipped", "mods/a.jar" to "h2"),
+            current = mf("servers.dat" to "player-added-a-server", "mods/a.jar" to "h1"),
+        )
+        assertEquals(listOf("mods/a.jar"), plan.toUpdate)
+        assertTrue(plan.conflicts.isEmpty())
+    }
+
+    @Test
+    fun aPackChangeOverAnUntouchedFileStillLands() {
+        // The keep must be keyed on THEIRS == BASE, not on "the disk differs".
+        val plan = UpdateReconciler.reconcile(
+            baseline = mf("config/x.cfg" to "base"),
+            target = mf("config/x.cfg" to "theirs"),
+            current = mf("config/x.cfg" to "base"),
+        )
+        assertEquals(listOf("config/x.cfg"), plan.toUpdate)
+    }
+
+    @Test
+    fun noBaselineStillOverwrites() {
+        // Without a baseline nothing can tell an edit from a stale file, so the
+        // target wins -- unchanged, and the caller grades that amber.
+        val plan = UpdateReconciler.reconcile(
+            baseline = null,
+            target = mf("config/x.cfg" to "theirs"),
+            current = mf("config/x.cfg" to "mine"),
+        )
+        assertEquals(listOf("config/x.cfg"), plan.toUpdate)
+        assertTrue(plan.conflicts.isEmpty())
+    }
+
+    @Test
     fun deletesDroppedFileOnlyWhenUntouched() {
         val plan = UpdateReconciler.reconcile(
             baseline = mf("mods/old.jar" to "h1"),
