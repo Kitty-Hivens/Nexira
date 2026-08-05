@@ -4,6 +4,7 @@ import hivens.core.api.AuthException
 import hivens.core.data.AuthStatus
 import hivens.core.data.SessionData
 import hivens.core.util.retryWithBackoff
+import kotlinx.coroutines.CancellationException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
@@ -65,6 +66,14 @@ abstract class AbstractCachingAuthProvider : AuthProvider {
     protected suspend fun <T> withRetry(operation: String, block: suspend () -> T): T =
         try {
             retryWithBackoff(operation = operation, shouldRetry = ::isTransientNetworkError) { block() }
+        } catch (e: CancellationException) {
+            // On the JVM this is an ordinary Exception, so the funnel below would
+            // swallow it and hand the caller a Network Error for a login the user
+            // simply cancelled -- closing the dialog, or navigating away while the
+            // request is in flight. AutoLoginCoordinator reads that as the server
+            // being unreachable and enters its retry ladder, and the parent job
+            // never learns it was cancelled at all.
+            throw e
         } catch (e: Exception) {
             if (e is AuthException) throw e
             logger.error("{} error", operation, e)
