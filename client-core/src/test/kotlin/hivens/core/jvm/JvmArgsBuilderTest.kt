@@ -71,15 +71,39 @@ class JvmArgsBuilderTest {
 
     @Test
     fun `ZGC defaults emit generational mode and unlock options`() {
-        val args = ZgcTuning.Defaults.toArgs()
+        val args = ZgcTuning.Defaults.toArgs(javaMajor = 21)
         assertTrue("-XX:+UnlockExperimentalVMOptions" in args)
         assertTrue("-XX:+ZGenerational" in args)
     }
 
     @Test
     fun `ZGC without generational omits the flag`() {
-        val args = ZgcTuning(generational = false).toArgs()
+        val args = ZgcTuning(generational = false).toArgs(javaMajor = 21)
         assertFalse("-XX:+ZGenerational" in args)
+    }
+
+    @Test
+    fun `ZGenerational is not emitted for a runtime that removed it`() {
+        // JDK 24 dropped the flag: generational became the only ZGC mode and the
+        // option is rejected outright ("Unrecognized VM option"), so a pack on 24+
+        // would not start at all.
+        for (major in listOf(ZgcTuning.ZGENERATIONAL_REMOVED_IN, 25, 26)) {
+            val args = ZgcTuning.Defaults.toArgs(javaMajor = major)
+            assertFalse("-XX:+ZGenerational" in args, "emitted for Java $major: $args")
+            assertTrue("-XX:+UnlockExperimentalVMOptions" in args, "the unlock still belongs")
+        }
+        for (major in listOf(21, 22, 23)) {
+            assertTrue("-XX:+ZGenerational" in ZgcTuning.Defaults.toArgs(javaMajor = major),
+                "the flag still selects generational mode on Java $major")
+        }
+    }
+
+    @Test
+    fun `an unknown runtime omits ZGenerational rather than risk the launch`() {
+        // Omitting costs a throughput mode on 21-23; emitting costs the launch on
+        // 24+. With no declared major -- the SmartyCraft server path -- take the
+        // side that still starts.
+        assertFalse("-XX:+ZGenerational" in ZgcTuning.Defaults.toArgs(javaMajor = null))
     }
 
     // ─── Shenandoah ───────────────────────────────────────────────────────
@@ -230,7 +254,7 @@ class JvmArgsBuilderTest {
             gc = GcChoice.Z,
             g1 = G1Tuning.AikarDefaults,  // present but should be ignored
         )
-        val args = cfg.toArgs()
+        val args = cfg.toArgs(javaMajor = 21)
         assertFalse("-XX:G1HeapRegionSize=8M" in args)
         assertFalse("-XX:MaxGCPauseMillis=200" in args)
         assertTrue("-XX:+UseZGC" in args)
@@ -362,7 +386,7 @@ class JvmArgsBuilderTest {
         assertEquals(GcChoice.Z, rebuilt.gc)
         assertTrue("-XX:MaxGCPauseMillis=999" in rebuilt.custom)
         assertTrue("-Dx=1" in rebuilt.custom)
-        val out = rebuilt.toArgs()
+        val out = rebuilt.toArgs(javaMajor = 21)
         assertTrue("-XX:MaxGCPauseMillis=999" in out)
         assertTrue("-XX:+ZGenerational" in out)
     }
