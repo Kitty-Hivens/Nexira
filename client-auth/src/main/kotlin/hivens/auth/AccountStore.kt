@@ -27,6 +27,20 @@ interface AccountStore : ICredentialStore {
      */
     fun saveAccount(session: SessionData, providerId: String)
 
+    /**
+     * Records that [providerId]'s account completed a sign-in without being asked
+     * for a second factor, releasing the gate [saveAccount] otherwise keeps set.
+     *
+     * The gate is deliberately sticky across ordinary saves: a re-login that simply
+     * arrives without the flag must not clear what a real second factor established.
+     * That leaves no way back for an account whose provider later turns 2FA off, and
+     * a stuck gate is not cosmetic -- it fails every launch with TwoFactorExpired and
+     * throws on every background sync pass. So the release is a separate, explicit
+     * call, made only where the launcher has evidence rather than an absence: a login
+     * that returned a session instead of a 2FA challenge.
+     */
+    fun clearTwoFactor(providerId: String)
+
     /** Active-account shim for [ICredentialStore] writers; infers the provider from the session shape. */
     fun save(session: SessionData)
 

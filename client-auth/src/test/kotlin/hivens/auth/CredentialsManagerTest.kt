@@ -380,4 +380,44 @@ class CredentialsManagerTest {
         )
         assertTrue(mgr.accountFor("smartycraft")?.twoFactor == true, "an ordinary re-save must not unset it")
     }
+
+    @Test
+    fun `clearTwoFactor releases the gate that an ordinary save cannot`() {
+        val mgr = newManager()
+        mgr.saveAccount(
+            SessionData(playerName = "tester", uuid = "u1", uid = "uid1", accessToken = "tok", twoFactor = true),
+            "smartycraft",
+        )
+        // Passing the flag as false is exactly what the prompt host used to do, and
+        // it cannot work: saveAccount ORs the stored value back in on purpose.
+        mgr.saveAccount(
+            SessionData(playerName = "tester", uuid = "u1", uid = "uid1", accessToken = "tok", twoFactor = false),
+            "smartycraft",
+        )
+        assertTrue(mgr.accountFor("smartycraft")?.twoFactor == true, "stickiness is deliberate")
+
+        // Left stuck, the account fails every launch with TwoFactorExpired and
+        // throws on every background sync pass, with no way back but removing and
+        // re-adding it. The explicit release is the way out.
+        mgr.clearTwoFactor("smartycraft")
+        assertFalse(mgr.accountFor("smartycraft")?.twoFactor == true, "the explicit release must land")
+    }
+
+    @Test
+    fun `clearTwoFactor leaves other providers alone`() {
+        val mgr = newManager()
+        mgr.saveAccount(
+            SessionData(playerName = "tester", uuid = "u1", uid = "uid1", accessToken = "tok", twoFactor = true),
+            "smartycraft",
+        )
+        mgr.saveAccount(
+            SessionData(playerName = "msa", uuid = "u2", accessToken = "tok2", refreshToken = "r", twoFactor = true),
+            "microsoft",
+        )
+
+        mgr.clearTwoFactor("smartycraft")
+
+        assertFalse(mgr.accountFor("smartycraft")?.twoFactor == true)
+        assertTrue(mgr.accountFor("microsoft")?.twoFactor == true, "another provider's gate is untouched")
+    }
 }

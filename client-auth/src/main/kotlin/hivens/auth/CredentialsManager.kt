@@ -74,7 +74,8 @@ class CredentialsManager(
             uid = session.uid.ifBlank { null },
             displayName = session.playerName,
             // Sticky: a re-login that happens to arrive without the flag must not
-            // clear what an earlier second factor established.
+            // clear what an earlier second factor established. Releasing it takes
+            // the explicit [clearTwoFactor] instead.
             twoFactor = session.twoFactor ||
                 readAccountsFile()?.accounts?.firstOrNull {
                     it.accountId == accountId && it.providerId == providerId
@@ -88,6 +89,16 @@ class CredentialsManager(
     }
 
     override fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
+
+    override fun clearTwoFactor(providerId: String) {
+        val file = readAccountsFile() ?: return
+        val updated = file.accounts.map {
+            if (it.providerId == providerId && it.twoFactor) it.copy(twoFactor = false) else it
+        }
+        if (updated == file.accounts) return
+        writeAccountsFile(file.copy(accounts = updated))
+        log.info("released the two-factor gate on {} -- the provider asked for no second factor", providerId)
+    }
 
     /**
      * The stored session for [providerId]'s account, or null when not signed in
