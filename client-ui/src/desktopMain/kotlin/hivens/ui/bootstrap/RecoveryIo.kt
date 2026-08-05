@@ -55,12 +55,18 @@ object RecoveryIo {
      * re-enables the very module the user disabled to recover, re-breaking the next
      * boot. Missing keys decode to their defaults, so an all-but-modules object is
      * a full reset.
+     *
+     * "Defaults" means what a fresh install gets, [FirstRunDefaults] included: a
+     * reset is someone starting over, and dropping them into English on a light
+     * desktop is not where a first launch would have put them either.
      */
     fun resetSettings(dataDir: Path) {
         val keep = readDisabledModules(dataDir)
-        val root = if (keep.isEmpty()) JsonObject(emptyMap())
-        else JsonObject(mapOf("disabledModules" to modulesArray(keep)))
-        writeSettings(dataDir, root)
+        val root = FirstRunDefaults.firstRunOverrides()
+        writeSettings(
+            dataDir,
+            if (keep.isEmpty()) root else JsonObject(root + ("disabledModules" to modulesArray(keep))),
+        )
     }
 
     // -- helpers ----------------------------------------------------------
