@@ -29,7 +29,9 @@ class PresetRepositoryTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(tmp).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(tmp).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun newRepo() = PresetRepository(tmp.resolve("presets"), json)

@@ -78,7 +78,9 @@ class BypassScopedTlsTest {
         server.stop(0)
         NetworkState.clearForTests()
         stopKoin()
-        Files.walk(dataDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(dataDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun bypassClient(): OkHttpClient = GlobalContext.get().get(named("insecure"))

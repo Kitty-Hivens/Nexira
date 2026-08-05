@@ -26,7 +26,9 @@ class MsaConfigLoaderTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(dataDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(dataDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
         System.clearProperty(SYSTEM_PROP_CLIENT_ID)
     }
 
