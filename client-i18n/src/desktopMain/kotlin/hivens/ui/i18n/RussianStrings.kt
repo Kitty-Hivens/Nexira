@@ -1369,6 +1369,12 @@ object RussianStrings : AppStrings {
     override val videoSkipBack        = "Назад 10 секунд"
     override val videoSkipForward     = "Вперёд 10 секунд"
     override val videoWidgetEmpty     = "Укажите ссылку на видео в настройках виджета"
+    override val readOnlyDataTitle    = "Изменения сейчас не сохранятся"
+    override fun readOnlyDataBody(stores: String) =
+        "Записано более новой сборкой лаунчера: $stores. Открыто только для чтения — эта сессия не может записать " +
+            "данные обратно, и всё изменённое пропадёт при выходе. Обновитесь, чтобы снова редактировать."
+    override val readOnlyDataLibrary  = "библиотека сборок"
+    override val readOnlyDataLayout   = "раскладка"
     override val videoFetchingTool    = "Скачиваем загрузчик"
     override val videoResolvingPage   = "Читаем страницу"
     override val videoDownloading     = "Скачивание"

@@ -1308,6 +1308,12 @@ interface AppStrings {
     val videoSkipBack: String
     val videoSkipForward: String
     val videoWidgetEmpty: String
+
+    // --- Data written by a newer build (read-only for this session) ---
+    val readOnlyDataTitle: String
+    fun readOnlyDataBody(stores: String): String
+    val readOnlyDataLibrary: String
+    val readOnlyDataLayout: String
     val videoFetchingTool: String
     val videoResolvingPage: String
     val videoDownloading: String
