@@ -131,6 +131,7 @@ import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.walkInstances
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -589,7 +590,7 @@ fun FrameWindowScope.AppShellContent(
             // heuristic leans toward preserving the cache.
             val seedFromCache = withContext(Dispatchers.IO) { serverListCache.load() }
             val dashboardServers = try {
-                val data = withContext(Dispatchers.IO) {
+                val data = runInterruptible(Dispatchers.IO) {
                     serverListService.fetchDashboardData().get()
                 }
                 when {

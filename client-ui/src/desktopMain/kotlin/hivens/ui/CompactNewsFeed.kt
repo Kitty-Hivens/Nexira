@@ -33,6 +33,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.theme.NxTheme
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -62,7 +63,10 @@ fun CompactNewsFeed(
     suspend fun fetch(forceRefresh: Boolean) {
         loading = true
         try {
-            val data = withContext(Dispatchers.IO) {
+            // Interruptible: the fetch is a blocking Future.get(), and a plain
+            // withContext leaves the thread sitting in it after the strip has gone
+            // away. Cancelling now interrupts the wait instead of outliving it.
+            val data = runInterruptible(Dispatchers.IO) {
                 if (forceRefresh) serverListService.refresh().get()
                 else              serverListService.fetchDashboardData().get()
             }
