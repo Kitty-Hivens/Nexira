@@ -634,6 +634,11 @@ class LauncherController(
                 "Pack launch ${refreshedInstance.displayName}: ${verdict.mismatched.size} file(s) do not match the pack's own bytes",
             )
         }
+        if (verdict.unreadable.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${refreshedInstance.displayName}: ${verdict.unreadable.size} file(s) could not be read to check them",
+            )
+        }
         if (verdict.removed.isNotEmpty()) {
             ActionRing.record(
                 "Pack launch ${refreshedInstance.displayName}: removed ${verdict.removed.size} file(s) absent from the pack",
