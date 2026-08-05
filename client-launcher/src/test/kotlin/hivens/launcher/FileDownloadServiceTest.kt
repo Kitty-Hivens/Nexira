@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.test.buildMockClient
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -46,7 +46,9 @@ class FileDownloadServiceTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // ── normalizePath: strip server-prefix, keep canonical mod/config dirs ──

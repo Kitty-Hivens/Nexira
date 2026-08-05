@@ -63,10 +63,14 @@ fun TwoFactorPromptHost() {
         runCatching { withContext(Dispatchers.IO) { auth.login(stored.playerName, pass, request.serverId) } }
             .onSuccess { fresh ->
                 withContext(Dispatchers.IO) {
-                    accounts.saveAccount(
-                        fresh.copy(twoFactor = false),
-                        PackAuthRequirement.SmartyCraft.PROVIDER_KEY,
-                    )
+                    accounts.saveAccount(fresh, PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                    // login() returned a session instead of raising
+                    // TwoFactorRequiredException, so the provider is no longer
+                    // asking this account for a second factor. That is the evidence
+                    // the sticky gate needs; passing twoFactor = false through
+                    // saveAccount never cleared it, because saveAccount ORs the
+                    // stored value back in by design.
+                    accounts.clearTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
                 }
                 gate.resume(fresh.copy(mintedNow = true))
             }

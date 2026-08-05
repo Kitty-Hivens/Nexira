@@ -42,6 +42,7 @@ import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
+import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
 import hivens.media.VideoCacheService
@@ -56,7 +57,7 @@ import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
 import hivens.launcher.AutoSyncService
-import hivens.launcher.update.UpdateService
+import hivens.update.UpdateService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.state.WidgetStateFlushHook
@@ -196,6 +197,16 @@ val uiModule = module {
             videoCacheDir = get<Path>().resolve("video-cache"),
             transfers     = get(),
             scope         = get(),
+        )
+    }
+
+    // Wallpaper transcode. A singleton because the work runs in the app scope and
+    // outlives the settings screen: the picker has to find the transcode it started
+    // still there (and still cancellable) after a trip through another screen.
+    single {
+        BackgroundOptimizer(
+            cacheDir = get<Path>().resolve("background-cache"),
+            scope    = get(),
         )
     }
 

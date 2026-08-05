@@ -7,6 +7,10 @@
 # survived AND the launch still got a token" is a different bug from either
 # half alone).
 
+# Assertion counters. ITEST_PASS is this file's, and nothing else may take it:
+# run.sh once stored the operator's password here, which made the first passing
+# assertion do arithmetic on a string and abort the run under `set -u` -- with
+# the scenario teardowns unrun, so a chmod-ed mods/ stayed read-only.
 ITEST_PASS=0
 ITEST_FAIL=0
 ITEST_LINES=()

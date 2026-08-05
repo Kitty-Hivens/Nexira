@@ -1,7 +1,15 @@
 package hivens.core.net
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
@@ -13,6 +21,45 @@ class AdaptiveGateTest {
 
     private fun gate(initial: Int, max: Int) =
         AdaptiveGate(initial = initial, min = 1, max = max, nowMs = { now })
+
+    @Test
+    fun `permits survive cancellation racing the handover`() = runBlocking {
+        // The loss window needs a receiver actually PARKED on an empty channel and
+        // an element handed to it as it is cancelled. So drain the pool first, queue
+        // waiters behind it, then cancel and release at the same moment.
+        val gate = AdaptiveGate(initial = 4, min = 1, max = 4, nowMs = { 0L })
+
+        repeat(300) {
+            val holdersIn = CountDownLatch(4)
+            val letHoldersGo = CompletableDeferred<Unit>()
+            val holders = List(4) {
+                launch(Dispatchers.IO) { gate.withPermit { holdersIn.countDown(); letHoldersGo.await() } }
+            }
+            withContext(Dispatchers.IO) { holdersIn.await(5, TimeUnit.SECONDS) }
+
+            // Pool is empty; these park inside acquire().
+            val waiters = List(8) { launch(Dispatchers.IO) { gate.withPermit { } } }
+            withContext(Dispatchers.IO) { Thread.sleep(1) }
+
+            // Cancel the parked waiters while the holders hand their tokens back.
+            letHoldersGo.complete(Unit)
+            waiters.forEach { it.cancel() }
+            holders.forEach { it.join() }
+            waiters.forEach { it.join() }
+        }
+
+        // If any permit leaked, fewer than four holders fit at once and this times out.
+        val allFour = withTimeoutOrNull(5_000) {
+            val entered = CountDownLatch(4)
+            val release = CompletableDeferred<Unit>()
+            val jobs = List(4) { launch(Dispatchers.IO) { gate.withPermit { entered.countDown(); release.await() } } }
+            val ok = withContext(Dispatchers.IO) { entered.await(4, TimeUnit.SECONDS) }
+            release.complete(Unit)
+            jobs.forEach { it.join() }
+            ok
+        }
+        assertEquals(true, allFour, "the pool drained -- downloads would hang with no error")
+    }
 
     @Test
     fun `an error halves the pool and keeps halving it down to one`() {

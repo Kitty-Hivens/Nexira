@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URLEncoder
+import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 
 /**
@@ -134,9 +135,8 @@ class SkinManager(
         // Save raw to disk
         try {
             // Re-encode as PNG for caching
-            val data = image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
-            if (data != null) {
-                AtomicFiles.writeBytes(rawFile.toPath(), data.bytes)
+            image.encodeToData(EncodedImageFormat.PNG)?.use { encoded ->
+                AtomicFiles.writeBytes(rawFile.toPath(), encoded.bytes)
             }
         } catch (e: Exception) {
             logger.warn("Failed to save raw skin to disk: {}", e.message)

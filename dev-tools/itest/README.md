@@ -54,7 +54,7 @@ A scenario is a file in `scenarios/` that sets `NAME` and defines `run`. It
 gets `lib/common.sh` (control surface, waits, process probes) and
 `lib/assert.sh` (checks and the tally) already sourced, plus the run config in
 the environment: `ITEST_DATA_DIR`, `ITEST_ACCOUNT`, `ITEST_USER`,
-`ITEST_PASS`, and for pack scenarios `ITEST_BOUND_PACK` / `ITEST_BOUND_DIR`.
+`ITEST_PASSWORD`, and for pack scenarios `ITEST_BOUND_PACK` / `ITEST_BOUND_DIR`.
 
 Report through `ok` / `fail` (or the `assert_*` helpers) rather than exiting:
 a scenario's checks explain each other, and one failure should not hide the

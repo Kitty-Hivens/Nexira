@@ -6,10 +6,12 @@ import hivens.core.api.HttpClientProvider
 import hivens.launcher.network.ServerProtocolConfig
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.http.isSuccess
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
 
 /**
  * Caches the MD5 of the official `smartycraft.jar` that the server
@@ -79,9 +81,14 @@ class LauncherHashCache(
         }
         return try {
             logger.info("Refreshing launcher hash from {}", config.officialJarUrl)
-            val bytes = clientProvider.current.get(config.officialJarUrl).body<ByteArray>()
-            if (bytes.isEmpty()) {
-                logger.error("Official jar download returned empty bytes")
+            val response = clientProvider.current.get(config.officialJarUrl)
+            if (!response.status.isSuccess()) {
+                logger.error("Official jar download returned HTTP {}", response.status)
+                return null
+            }
+            val bytes = response.body<ByteArray>()
+            if (!looksLikeArchive(bytes)) {
+                logger.error("Official jar download returned {} bytes that are not an archive", bytes.size)
                 return null
             }
             val newHash = computeMd5Hex(bytes)
@@ -89,6 +96,8 @@ class LauncherHashCache(
             saveCache(newHash)
             logger.info("Launcher hash refreshed to {} ({} bytes)", newHash, bytes.size)
             newHash
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logger.error("Failed to refresh launcher hash", e)
             null
@@ -109,6 +118,20 @@ class LauncherHashCache(
             cacheFile.writeText(hash)
         }.onFailure { logger.warn("Could not persist launcher hash cache to {}", cacheFile, it) }
     }
+
+    /**
+     * A jar is a zip, so a real download opens with the local-file-header magic.
+     * The status check alone is not enough: a captive portal or a CDN error page
+     * answers 200 with an HTML body, which is non-empty and would hash to a value
+     * the server can never accept. Because that value is then persisted and
+     * [readCachedOrDefault] accepts any 32-character string, one such response
+     * would break SmartyCraft login on every later session too -- past the
+     * refresh cap, with no path back but deleting the cache file by hand.
+     */
+    private fun looksLikeArchive(bytes: ByteArray): Boolean =
+        bytes.size >= 4 &&
+            bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&
+            bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
 
     private fun computeMd5Hex(bytes: ByteArray): String {
         val md = MessageDigest.getInstance("MD5")

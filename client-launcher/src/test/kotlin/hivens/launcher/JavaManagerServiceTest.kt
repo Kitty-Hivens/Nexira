@@ -18,6 +18,7 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
 import org.junit.jupiter.api.condition.EnabledOnOs
 import hivens.core.platform.OS as PlatformOS
+import hivens.test.testTransferEngine
 import org.junit.jupiter.api.condition.OS
 import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
@@ -51,7 +52,9 @@ class JavaManagerServiceTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // ── detectJavaVersion: MC version -> Java major ───────────────────────

@@ -1,5 +1,7 @@
 package hivens.launcher
 
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import jetbrains.exodus.ArrayByteIterable
@@ -129,6 +131,7 @@ class XodusPackRepository(
         val stored = metaGet(SCHEMA_KEY)?.toIntOrNull() ?: return
         if (stored > SCHEMA_VERSION) {
             readOnly = true
+            NewerBuildData.record(ReadOnlyStore.PackLibrary)
             log.warn(
                 "Pack registry schema {} > supported {} -- written by a newer build; loading read-only.",
                 stored, SCHEMA_VERSION,

@@ -42,6 +42,11 @@ import hivens.ui.theme.LocalMonoFamily
 @Composable
 fun JvmArgsBuilderDialog(
     initial: JvmConfig = JvmArgsPresets.default.config,
+    /**
+     * Java major the composed args will run under, when the caller knows it.
+     * Some flags exist only on a range of runtimes -- see [JvmConfig.toArgs].
+     */
+    javaMajor: Int? = null,
     onDismiss: () -> Unit,
     onApply: (String) -> Unit,
 ) {
@@ -155,7 +160,7 @@ fun JvmArgsBuilderDialog(
                 }
 
                 // ── Live preview ───────────────────────────────────────
-                ArgsPreviewBox(config)
+                ArgsPreviewBox(config, javaMajor)
 
                 // ── Footer ─────────────────────────────────────────────
                 Row(
@@ -170,7 +175,7 @@ fun JvmArgsBuilderDialog(
                     Spacer(Modifier.width(8.dp))
                     NxButton(
                         label   = s.jvmApply,
-                        onClick = { onApply(config.toArgString()) },
+                        onClick = { onApply(config.toArgString(javaMajor)) },
                         icon    = NxIcon.Check,
                     )
                 }
@@ -565,9 +570,9 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 // ─── Live preview ─────────────────────────────────────────────────────────
 
 @Composable
-private fun ArgsPreviewBox(config: JvmConfig) {
+private fun ArgsPreviewBox(config: JvmConfig, javaMajor: Int?) {
     val s = LocalStrings.current
-    val args = remember(config) { config.toArgs() }
+    val args = remember(config, javaMajor) { config.toArgs(javaMajor) }
     Column(
         Modifier
             .fillMaxWidth()

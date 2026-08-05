@@ -577,14 +577,31 @@ class TransferEngine(
      * A journal that does not apply takes the partial with it. Keeping bytes whose
      * provenance we cannot state is how a file ends up committed as a mixture of
      * two versions at exactly the right length.
+     *
+     * With a digest pinned, [appliesTo] is the whole test: a mixture fails
+     * verification at the end and the transfer starts over, so the journal is
+     * trusted without asking the host anything. With no digest, nothing downstream
+     * would notice -- same name, same length, different bytes, which is exactly
+     * what a rolling release URL serves after a release -- so the validator
+     * recorded when the journal was written is checked against the host, and that
+     * costs the one probe request this path otherwise saves.
      */
     private suspend fun openJournal(t: Transfer, url: String, partial: Path): TransferJournal {
         val stored = journals.read(partial)
-        if (stored != null && appliesTo(stored, t)) return stored
-        if (stored != null) log.info("transfer: the journal for {} is stale, starting over", t.dest.fileName)
+        val applies = stored != null && appliesTo(stored, t)
+        if (applies && t.expect != null) return stored!!
+
+        val probe = probe(t, url)
+        if (applies && stored!!.size == probe.size && validatorHolds(stored.etag, probe.etag)) return stored
+
+        if (stored != null) {
+            log.info(
+                "transfer: the journal for {} no longer describes what {} serves, starting over",
+                t.dest.fileName, url,
+            )
+        }
         dropPartial(partial)
         journals.delete(partial)
-        val probe = probe(t, url)
         return TransferJournal(
             url = url,
             size = probe.size,
@@ -593,6 +610,15 @@ class TransferEngine(
             etag = probe.etag,
         ).also { journals.write(partial, it) }
     }
+
+    /**
+     * Whether the host's validator still matches the one recorded beside the
+     * partial. A host that sent none either time leaves nothing to compare and the
+     * length is all there is -- accepting that is the same bet the journal made
+     * when it was written, not a new one.
+     */
+    private fun validatorHolds(recorded: String?, current: String?): Boolean =
+        recorded == null || current == null || recorded == current
 
     private fun appliesTo(journal: TransferJournal, t: Transfer): Boolean {
         if (journal.blockSize != blockSize) return false

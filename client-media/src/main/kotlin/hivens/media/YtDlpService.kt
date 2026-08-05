@@ -6,10 +6,15 @@ import hivens.core.net.TransferEngine
 import hivens.core.platform.Arch
 import hivens.core.platform.OS
 import hivens.core.platform.Platform
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
@@ -21,6 +26,7 @@ import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 
 /**
  * Plays video from a service page (YouTube, Vimeo, ...) by running yt-dlp to
@@ -40,24 +46,48 @@ class YtDlpService(
     private val transfers: TransferEngine,
     private val scope: CoroutineScope,
     private val maxCacheBytes: Long = DEFAULT_MAX_CACHE_BYTES,
-) {
+) : MediaResolver {
     private val log = LoggerFactory.getLogger(YtDlpService::class.java)
     private val inflight = ConcurrentHashMap<String, Deferred<Path>>()
     private val binaryMutex = Mutex()
 
+    // url -> what that fetch is doing. Kept for the process lifetime, like the
+    // cache service's: a viewer holds the flow it was handed.
+    private val fetches = ConcurrentHashMap<String, MutableStateFlow<MediaFetch>>()
+
     @Volatile
     private var binaryCmd: String? = null
 
-    /** The local file for [pageUrl], downloading via yt-dlp first if absent. Throws on failure. */
-    suspend fun resolve(pageUrl: String): Path {
-        val hash = hash(pageUrl)
+    /**
+     * What the fetch for [url] is doing, for a viewer to render. Reports the
+     * tool install and the page resolve as themselves rather than as one long
+     * unexplained wait.
+     */
+    override fun fetchState(url: String): StateFlow<MediaFetch> = stateOf(url).asStateFlow()
+
+    /**
+     * Stops the download for [url], killing the yt-dlp process with it -- a
+     * cancelled coroutine leaves a subprocess running otherwise, which is the
+     * whole cost the user asked to stop paying.
+     */
+    override fun cancel(url: String) {
+        inflight[url]?.cancel()
+    }
+
+    private fun stateOf(url: String): MutableStateFlow<MediaFetch> =
+        fetches.computeIfAbsent(url) { MutableStateFlow(MediaFetch.Idle) }
+
+    /** The local file for [url], downloading via yt-dlp first if absent. Throws on failure. */
+    override suspend fun resolve(url: String): Path {
+        val hash = hash(url)
         existingCached(hash)?.let { return it }
-        val deferred = inflight.computeIfAbsent(pageUrl) {
+        val deferred = inflight.computeIfAbsent(url) {
             scope.async(Dispatchers.IO) {
                 try {
-                    download(pageUrl, hash)
+                    download(url, hash)
                 } finally {
-                    inflight.remove(pageUrl)
+                    inflight.remove(url)
+                    stateOf(url).value = MediaFetch.Idle
                 }
             }
         }
@@ -66,7 +96,9 @@ class YtDlpService(
 
     private suspend fun download(pageUrl: String, hash: String): Path {
         existingCached(hash)?.let { return it }
-        val ytdlp = ensureBinary()
+        val progress = stateOf(pageUrl)
+        progress.value = MediaFetch.InstallingTool()
+        val ytdlp = ensureBinary(progress)
         Files.createDirectories(videoCacheDir)
         // %(ext)s lets yt-dlp pick the container; we find the result by the hash prefix.
         val outTemplate = videoCacheDir.resolve("$hash.%(ext)s").toString()
@@ -75,11 +107,20 @@ class YtDlpService(
             "-f", FORMAT,
             "--no-playlist",
             "--no-part",
-            "--no-progress",
+            // Counters rather than silence: --no-progress left the caller with
+            // nothing to show for a download that runs for minutes. One line per
+            // update (the default rewrites a single line with a carriage return,
+            // which never reaches a line reader) in a template we can parse.
+            "--newline",
+            "--progress-template", "download:$YT_DLP_PROGRESS_MARKER " +
+                "%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s",
             "-o", outTemplate,
             pageUrl,
         )
-        runProcess(cmd, DOWNLOAD_TIMEOUT_SECONDS)
+        progress.value = MediaFetch.Resolving
+        runProcess(cmd, DOWNLOAD_TIMEOUT_SECONDS) { line ->
+            parseYtDlpProgress(line)?.let { progress.value = it }
+        }
         val file = existingCached(hash) ?: throw IOException("yt-dlp produced no playable file for $pageUrl")
         evictOverCap()
         return file
@@ -99,23 +140,23 @@ class YtDlpService(
 
     // -- yt-dlp binary -------------------------------------------------------
 
-    private suspend fun ensureBinary(): String {
+    private suspend fun ensureBinary(progress: MutableStateFlow<MediaFetch>): String {
         binaryCmd?.let { return it }
         return binaryMutex.withLock {
             binaryCmd?.let { return@withLock it }
-            val resolved = locateOrInstall()
+            val resolved = locateOrInstall(progress)
             binaryCmd = resolved
             resolved
         }
     }
 
-    private suspend fun locateOrInstall(): String {
+    private suspend fun locateOrInstall(progress: MutableStateFlow<MediaFetch>): String {
         if (probeVersion("yt-dlp")) return "yt-dlp"
         val asset = ytDlpAsset(OS.platform, OS.arch)
             ?: throw IOException("No yt-dlp build for ${OS.platform}/${OS.arch}")
         val local = toolsDir.resolve(asset)
         if (Files.isRegularFile(local) && probeVersion(local.toString())) return local.toString()
-        downloadBinary(asset, local)
+        downloadBinary(asset, local, progress)
         if (!OS.isWindows) setExecutable(local)
         if (!probeVersion(local.toString())) {
             throw IOException("Downloaded yt-dlp failed --version; archive may be corrupt")
@@ -129,8 +170,10 @@ class YtDlpService(
      * read, so the check is the same one the install path already makes: the binary
      * has to answer `--version` before it is used.
      */
-    private suspend fun downloadBinary(asset: String, target: Path) {
-        transfers.fetch(Transfer(url = "$RELEASE_BASE/$asset", dest = target, skip = SkipIfPresent.Never))
+    private suspend fun downloadBinary(asset: String, target: Path, progress: MutableStateFlow<MediaFetch>) {
+        transfers.fetch(Transfer(url = "$RELEASE_BASE/$asset", dest = target, skip = SkipIfPresent.Never)) { done, total ->
+            progress.value = MediaFetch.InstallingTool(done, total)
+        }
         if (runCatching { Files.size(target) }.getOrDefault(0L) <= 0L) {
             Files.deleteIfExists(target)
             throw IOException("Empty yt-dlp download")
@@ -162,7 +205,16 @@ class YtDlpService(
 
     // -- process -------------------------------------------------------------
 
-    private fun runProcess(cmd: List<String>, timeoutSeconds: Long) {
+    /**
+     * Runs [cmd] to completion, feeding every output line to [onLine].
+     *
+     * Cancellable, and killing the process is the point of that: a cancelled
+     * coroutine used to return while yt-dlp carried on downloading, which is the
+     * exact cost the user asked to stop paying. The wait is therefore a poll --
+     * a bare blocking waitFor cannot notice a cancellation at all -- at a period
+     * short enough to feel immediate and long enough to cost nothing.
+     */
+    private suspend fun runProcess(cmd: List<String>, timeoutSeconds: Long, onLine: (String) -> Unit) {
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val tail = StringBuilder()
         // Drain stdout in a daemon thread so a full pipe buffer cannot wedge the
@@ -170,6 +222,7 @@ class YtDlpService(
         val reader = Thread {
             runCatching {
                 proc.inputStream.bufferedReader().forEachLine { line ->
+                    onLine(line)
                     synchronized(tail) {
                         tail.appendLine(line)
                         if (tail.length > MAX_TAIL) tail.delete(0, tail.length - MAX_TAIL)
@@ -178,10 +231,19 @@ class YtDlpService(
             }
         }.apply { isDaemon = true; start() }
 
-        if (!proc.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
-            proc.destroyForcibly()
-            proc.waitFor(5, TimeUnit.SECONDS)
-            throw IOException("yt-dlp timed out after ${timeoutSeconds}s")
+        val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
+        try {
+            while (proc.isAlive) {
+                coroutineContext.ensureActive()
+                if (System.nanoTime() >= deadlineNanos) {
+                    kill(proc)
+                    throw IOException("yt-dlp timed out after ${timeoutSeconds}s")
+                }
+                proc.waitFor(POLL_MILLIS, TimeUnit.MILLISECONDS)
+            }
+        } catch (e: CancellationException) {
+            kill(proc)
+            throw e
         }
         reader.join(2_000)
         val code = proc.exitValue()
@@ -189,6 +251,11 @@ class YtDlpService(
             val msg = synchronized(tail) { tail.toString().trim() }
             throw IOException("yt-dlp exited $code: ${msg.takeLast(400)}")
         }
+    }
+
+    private fun kill(proc: Process) {
+        proc.destroyForcibly()
+        proc.waitFor(5, TimeUnit.SECONDS)
     }
 
     // -- cache eviction (shared video-cache dir) -----------------------------
@@ -219,6 +286,9 @@ class YtDlpService(
         const val FORMAT = "best[height<=720][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]"
         const val DOWNLOAD_TIMEOUT_SECONDS = 600L
         const val VERSION_TIMEOUT_SECONDS = 5L
+        // How often the run loop looks up from the process: the delay a cancel
+        // takes to land, and 300 wakeups over a ten-minute download.
+        const val POLL_MILLIS = 200L
         const val MAX_TAIL = 4_000
         const val DEFAULT_MAX_CACHE_BYTES = 600L * 1024 * 1024
     }

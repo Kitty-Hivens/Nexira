@@ -95,9 +95,9 @@ import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.PackUpdateService
-import hivens.launcher.update.DesktopIntegration
-import hivens.launcher.update.UpdateApplicators
-import hivens.launcher.update.UpdateService
+import hivens.update.DesktopIntegration
+import hivens.update.UpdateApplicators
+import hivens.update.UpdateService
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -131,9 +131,12 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import org.slf4j.LoggerFactory
 
 /**
  * Concurrent requests OkHttp will run against one host on the direct channel.
@@ -765,10 +768,23 @@ val appModule = module {
      * rest. Single shared scope across the whole launcher so the JVM
      * shutdown hook installed by [AppCoroutineScopeHook] cancels every
      * coroutine on process exit.
+     *
+     * The handler is not optional. SupervisorJob isolates siblings from a
+     * failed child; it does not consume the throwable. Without a handler the
+     * failure reaches `Thread.getDefaultUncaughtExceptionHandler`, which this
+     * launcher wires to the crash reporter plus a modal "Nexira quit
+     * unexpectedly" dialog -- shown on the EDT, i.e. the one thread Compose
+     * draws on. A background pack-update push that throws would freeze the
+     * window behind a report of a crash that did not happen, and invite the
+     * user to file it. Fire-and-forget work failing is a log line.
      */
     single<CoroutineScope>(createdAtStart = true) {
+        val log = LoggerFactory.getLogger("AppScope")
         CoroutineScope(
-            SupervisorJob() + Dispatchers.IO
+            SupervisorJob() + Dispatchers.IO +
+                CoroutineExceptionHandler { context, throwable ->
+                    log.error("background job failed in {}", context[CoroutineName]?.name ?: "app scope", throwable)
+                }
         )
     }
 
@@ -906,11 +922,6 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
         }
     }
 
-/**
- * Builds a trust-all SSL socket factory for the insecure client.
- * Allows connecting to servers with expired certificates
- * when the user explicitly accepts the risk.
- */
 /**
  * TLS for the bypass channel, scoped to the host the connection is actually
  * being made to.

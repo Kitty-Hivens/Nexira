@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
@@ -59,7 +59,9 @@ class FileDownloadDiskIntegrationTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // ── Happy path ────────────────────────────────────────────────────────
@@ -205,7 +207,9 @@ class FileDownloadDiskIntegrationTest {
 
         // Wipe the client dir. The manifest-cache file at
         // <workDir>/manifest-cache/Industrial.json stays untouched.
-        Files.walk(clientDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(clientDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
         Files.createDirectories(clientDir)
 
         svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)

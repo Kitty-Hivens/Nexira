@@ -26,10 +26,53 @@ class SkinLibraryTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(root).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(root).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 1, 2, 3)
+
+    @Test
+    fun `a truncated index does not wipe the library on the next mutation`() {
+        val a = lib.add(png, "Alpha", slim = false, now = 100)
+        val b = lib.add(png, "Beta", slim = false, now = 200)
+        assertEquals(2, lib.list().size)
+
+        // What an interrupted write leaves behind. Read as "empty", the very next
+        // read-modify-write would persist that emptiness over the real index and
+        // strand both pngs on disk forever.
+        Files.writeString(root / "skins" / "library.json", "{\"skins\":[{\"id\":\"a")
+
+        val recovered = lib.list()
+        assertEquals(2, recovered.size, "both pngs are still on disk and must stay reachable")
+        assertEquals(setOf(a.id, b.id), recovered.map { it.id }.toSet())
+
+        // The unreadable file is kept rather than overwritten, so it can be looked at.
+        assertTrue(Files.exists(root / "skins" / "library.json.corrupt"))
+
+        // And a mutation after the recovery does not lose the other entry.
+        lib.delete(a.id)
+        assertEquals(listOf(b.id), lib.list().map { it.id })
+    }
+
+    @Test
+    fun `a missing index is simply an empty library`() {
+        assertEquals(emptyList(), lib.list())
+        assertFalse(Files.exists(root / "skins" / "library.json.corrupt"), "nothing to quarantine")
+    }
+
+    @Test
+    fun `concurrent imports do not drop an entry`() {
+        // The wardrobe re-imports the server skin on every open, which can overlap
+        // a user import. Two read-modify-writes racing would lose one.
+        val threads = (1..8).map { i ->
+            Thread { lib.add(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, i.toByte()), "s$i", false, i.toLong()) }
+        }
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+        assertEquals(8, lib.list().size, "an entry was lost to a concurrent write")
+    }
 
     @Test
     fun `add stores the png and lists the entry`() {

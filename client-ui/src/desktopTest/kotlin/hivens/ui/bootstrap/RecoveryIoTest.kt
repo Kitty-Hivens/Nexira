@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Locale
 import kotlin.io.path.div
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -27,7 +28,9 @@ class RecoveryIoTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(dataDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(dataDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun settings() = dataDir / Storage.SETTINGS_FILE
@@ -60,6 +63,22 @@ class RecoveryIoTest {
         Files.writeString(layout, "{}")
         RecoveryIo.resetLayout(dataDir)
         assertFalse(Files.exists(layout))
+    }
+
+    @Test
+    fun `resetSettings restores the first-run defaults, not the bare field defaults`() {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("ru-RU"))
+        try {
+            Files.writeString(settings(), """{ "locale": "de", "memoryMB": 8192 }""")
+            RecoveryIo.resetSettings(dataDir)
+
+            // A reset is someone starting over: the same launcher a fresh install
+            // would have given them, in their own language.
+            assertEquals("ru", readJson()["locale"]?.jsonPrimitive?.contentOrNull)
+        } finally {
+            Locale.setDefault(previous)
+        }
     }
 
     @Test

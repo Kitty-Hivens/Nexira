@@ -29,6 +29,7 @@ import hivens.launcher.security.LaunchEnvironment
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import kotlinx.coroutines.CancellationException
 import org.slf4j.LoggerFactory
+import java.util.concurrent.TimeUnit
 import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -488,6 +489,44 @@ internal class LauncherService(
  */
 private class ProcessLaunchHandle(private val process: Process) : LaunchHandle {
     override suspend fun awaitExit(): Int = process.waitFor()
-    override fun terminate() { runCatching { process.destroy() } }
+
+    /**
+     * SIGTERM, then SIGKILL if the game did not take the hint.
+     *
+     * SIGTERM is handled by a JVM shutdown hook, so a healthy game runs it, saves
+     * and exits -- which is why the polite signal goes first. A wedged JVM never
+     * reaches the hook, and re-sending the signal changes nothing there: it is
+     * already pending, and the kernel does not make a delivered signal more
+     * insistent by repetition. Only [Process.destroyForcibly] ends that, because
+     * nothing in user space gets a say in it.
+     *
+     * The escalation runs on its own thread. [terminate] is called from
+     * `LauncherController.abort`, which is a plain function invoked from a Compose
+     * click handler -- blocking there would freeze the window on exactly the
+     * process that is refusing to die.
+     *
+     * Descendants are taken first: killing the parent orphans them, and on Windows
+     * `destroyForcibly` does not reach them at all.
+     */
+    override fun terminate() {
+        runCatching { process.destroy() }
+        Thread {
+            val exited = runCatching { process.waitFor(TERMINATE_GRACE_SECONDS, TimeUnit.SECONDS) }
+                .getOrDefault(false)
+            if (!exited) {
+                runCatching { process.descendants().forEach { child -> child.destroyForcibly() } }
+                runCatching { process.destroyForcibly() }
+            }
+        }.apply {
+            isDaemon = true
+            name = "game-terminate-escalation"
+        }.start()
+    }
+
     override val stdin: OutputStream get() = process.outputStream
+
+    private companion object {
+        /** Long enough for a modded client to run its shutdown hook and save. */
+        const val TERMINATE_GRACE_SECONDS = 8L
+    }
 }

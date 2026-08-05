@@ -7,7 +7,7 @@
 kotlin            = "2.4.10"
 compose           = "1.11.1"
 buildconfigPlugin = "6.0.10"
-versionsPlugin    = "0.56.0"
+versionsPlugin    = "0.58.0"
 # ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
 # the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
 # against the Kotlin 2.4.10 toolchain here (:widget-processor / :client-ui
@@ -16,7 +16,7 @@ versionsPlugin    = "0.56.0"
 ksp               = "2.3.10"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.5.1"
+ktor              = "3.5.2"
 # Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
 # certificate helper matches the TLS stack under test.
 okhttp            = "5.4.0"
@@ -36,7 +36,7 @@ markdownRenderer  = "0.43.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
 markdown          = "0.7.8"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
-jsoup             = "1.22.2"
+jsoup             = "1.23.1"
 # Coil 3 -- async image loading (pack + mod icons, Browse cards). Deliberately no
 # library aliases: the KMP source-set block has to exclude Coil's skiko copy, and
 # implementation(<catalog accessor>) { ... } is rejected there (Provider vs String),

@@ -1,6 +1,6 @@
 package hivens.launcher.smrt
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest

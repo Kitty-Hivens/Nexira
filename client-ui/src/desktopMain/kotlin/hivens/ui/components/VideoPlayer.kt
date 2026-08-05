@@ -28,8 +28,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.RememberObserver
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -63,17 +66,28 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import java.nio.file.Path
 
 /**
  * Interactive video player over a LOCAL file (Skinema is local-only -- a URL goes
- * through [VideoMedia]/[rememberCachedVideo] first). Draws frames via Skinema's
+ * through [VideoMedia]/[rememberVideoResolution] first). Draws frames via Skinema's
  * [VideoSurface] and overlays transport chrome -- play/pause, a seek scrubber on
  * the real seek, a timecode, a volume control and a fullscreen affordance.
- * Controls reveal on hover and stay up while paused.
+ * Clicking the picture toggles playback; the controls reveal on hover, hide
+ * after a moment of stillness and stay up whenever playback is not running.
  *
+ * @param handoff carries the position, volume and play state between two players
+ *   over the same file -- what makes the swap into and out of fullscreen a
+ *   continuation rather than a restart.
  * @param onRequestFullscreen when set, shows a fullscreen button calling it.
+ * @param onExitFullscreen when set, shows the same control inverted -- the way
+ *   back belongs next to the way in, not only in a corner cross that reads as
+ *   "stop watching".
  */
 @Composable
 fun VideoPlayer(
@@ -85,7 +99,9 @@ fun VideoPlayer(
     startMuted: Boolean = false,
     showControls: Boolean = true,
     scale: VideoScale = VideoScale.Fit,
+    handoff: VideoHandoff? = null,
     onRequestFullscreen: (() -> Unit)? = null,
+    onExitFullscreen: (() -> Unit)? = null,
 ) {
     val s = LocalStrings.current
     // Skinema disabled by boot recovery -> render the same unavailable chrome the
@@ -96,38 +112,93 @@ fun VideoPlayer(
         }
         return
     }
-    // Hardware decode where a device is available (AUTO falls back to software
-    // per file), so a 4K clip is not decoded on the CPU.
-    val player = remember(path, loop, audio) { SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO) }
-    DisposableEffect(player) { onDispose { player.close() } }
+    val video = rememberInlineVideo(path, loop, audio)
+    val player = video.player
 
     val state = rememberPlayerState(player)
     val isPlaying = state == SkinemaPlayer.State.Playing
     val ended = state == SkinemaPlayer.State.Ended
 
-    var muted by remember(player) { mutableStateOf(startMuted) }
-    var volume by remember(player) { mutableStateOf(1f) }
-    LaunchedEffect(player, muted, volume) { player.setVolume(if (muted) 0f else volume) }
+    var muted by remember(player) { mutableStateOf(handoff?.muted ?: startMuted) }
+    var volume by remember(player) { mutableStateOf(handoff?.volume ?: 1f) }
+    LaunchedEffect(player, muted, volume) {
+        player.setVolume(if (muted) 0f else volume)
+        handoff?.let { it.volume = volume; it.muted = muted }
+    }
 
-    // Skinema starts playing on open; honor autoPlay=false with one pause.
-    LaunchedEffect(player) { if (!autoPlay) player.pause() }
+    // Land where the previous player stood before anything is heard: skinema
+    // opens playing, and the seek is queued behind the open on its own thread.
+    LaunchedEffect(player) {
+        handoff?.positionNanos?.takeIf { it > 0L }?.let { player.seek(it, exact = false) }
+        if (!(handoff?.playing ?: autoPlay)) player.pause()
+    }
 
-    var positionNanos by remember(player) { mutableStateOf(0L) }
+    var positionNanos by remember(player) { mutableStateOf(handoff?.positionNanos ?: 0L) }
     var scrubbing by remember(player) { mutableStateOf(false) }
     LaunchedEffect(player) {
         while (true) {
-            if (!scrubbing) positionNanos = player.positionNanos()
+            if (!scrubbing) {
+                positionNanos = player.positionNanos()
+                handoff?.positionNanos = positionNanos
+            }
+            // Only settled states are worth carrying: an Opening player is not
+            // paused, it has not started, and recording that would hand the next
+            // player a false "was stopped".
+            when (player.state) {
+                SkinemaPlayer.State.Playing -> handoff?.playing = true
+                SkinemaPlayer.State.Paused  -> handoff?.playing = false
+                else                        -> Unit
+            }
             delay(200)
         }
     }
     val durationNanos = player.durationNanos ?: 0L
 
-    // Reveal controls on hover; keep them up whenever not actively playing.
+    val togglePlayback = {
+        when {
+            isPlaying -> player.pause()
+            ended     -> player.seek(0L)
+            else      -> player.resume()
+        }
+    }
+
+    // Reveal on hover, hide after a beat of stillness, and stay up whenever
+    // playback is not running -- controls parked over the picture for the whole
+    // runtime were the complaint, and a pointer resting on the frame is not a
+    // request to keep them.
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
-    val controlsShown = showControls && (hovered || !isPlaying)
+    var lastPointerNanos by remember(player) { mutableStateOf(0L) }
+    var pointerIdle by remember(player) { mutableStateOf(false) }
+    LaunchedEffect(player, lastPointerNanos, isPlaying) {
+        pointerIdle = false
+        if (isPlaying) {
+            delay(CONTROLS_IDLE_MS)
+            pointerIdle = true
+        }
+    }
+    val controlsShown = showControls && (!isPlaying || (hovered && !pointerIdle))
 
-    Box(modifier.hoverable(hover)) {
+    Box(
+        modifier
+            .hoverable(hover)
+            // Play/pause by clicking the frame is the first thing anyone tries.
+            // No indication: a ripple over a moving picture is noise, and the
+            // transport buttons consume their own clicks before this sees them.
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication        = null,
+                onClick           = togglePlayback,
+            )
+            .pointerInput(player) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Move) lastPointerNanos = System.nanoTime()
+                    }
+                }
+            },
+    ) {
         VideoSurface(player, Modifier.fillMaxSize(), scale = scale)
 
         when (state) {
@@ -149,14 +220,12 @@ fun VideoPlayer(
                 muted         = muted,
                 volume        = volume,
                 showVolume    = audio,
-                showFullscreen = onRequestFullscreen != null,
-                onPlayPause   = {
-                    when {
-                        isPlaying -> player.pause()
-                        ended     -> player.seek(0L)
-                        else      -> player.resume()
-                    }
+                fullscreen    = when {
+                    onExitFullscreen != null    -> FullscreenControl.Exit
+                    onRequestFullscreen != null -> FullscreenControl.Enter
+                    else                        -> FullscreenControl.None
                 },
+                onPlayPause   = togglePlayback,
                 onSkipBack    = { player.seekBy(-SKIP_NANOS, exact = false) },
                 onSkipForward = { player.seekBy(SKIP_NANOS, exact = false) },
                 onScrubStart  = { scrubbing = true },
@@ -170,11 +239,58 @@ fun VideoPlayer(
                 },
                 onToggleMute  = { muted = !muted },
                 onVolume      = { v -> volume = v; if (v > 0f) muted = false },
-                onFullscreen  = { onRequestFullscreen?.invoke() },
+                onFullscreen  = { (onExitFullscreen ?: onRequestFullscreen)?.invoke() },
                 modifier      = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
+}
+
+/**
+ * One skinema player over one file, released when the composition that asked for
+ * it goes away.
+ *
+ * A [RememberObserver] rather than a `DisposableEffect`, because the decode
+ * thread starts inside the constructor, i.e. during composition: a composition
+ * abandoned before it applies never runs its effects, and the player made for it
+ * would be left running with nothing holding a reference to close it.
+ *
+ * The close itself is handed to the app scope. It joins the decode thread, which
+ * may be in the middle of a seek run, and the swap between the inline player and
+ * the fullscreen one disposes this player while the user is waiting for the
+ * other -- exactly where a five-second join would be felt as a frozen window.
+ */
+private class InlineVideo(
+    path: Path,
+    loop: Boolean,
+    audio: Boolean,
+    private val closeScope: CoroutineScope,
+) : RememberObserver {
+
+    // Hardware decode where a device is available (AUTO falls back to software
+    // per file), so a 4K clip is not decoded on the CPU.
+    val player = SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO)
+
+    @Volatile
+    private var released = false
+
+    override fun onRemembered() = Unit
+
+    override fun onForgotten() = release()
+
+    override fun onAbandoned() = release()
+
+    private fun release() {
+        if (released) return
+        released = true
+        closeScope.launch(Dispatchers.IO) { player.close() }
+    }
+}
+
+@Composable
+private fun rememberInlineVideo(path: Path, loop: Boolean, audio: Boolean): InlineVideo {
+    val closeScope = koinInject<CoroutineScope>()
+    return remember(path, loop, audio) { InlineVideo(path, loop, audio, closeScope) }
 }
 
 /**
@@ -183,7 +299,12 @@ fun VideoPlayer(
  * after the inline view) and always plays with sound + controls.
  */
 @Composable
-fun FullscreenVideo(url: String, posterUrl: String? = null, onDismiss: () -> Unit) {
+fun FullscreenVideo(
+    url: String,
+    posterUrl: String? = null,
+    handoff: VideoHandoff? = null,
+    onDismiss: () -> Unit,
+) {
     val s = LocalStrings.current
     Popup(
         alignment        = Alignment.Center,
@@ -210,6 +331,13 @@ fun FullscreenVideo(url: String, posterUrl: String? = null, onDismiss: () -> Uni
                 audio        = true,
                 showControls = true,
                 scale        = VideoScale.Fit,
+                handoff      = handoff,
+                // The way back sits next to the way in, on the transport itself;
+                // the corner cross stays for "I am done watching".
+                onExitFullscreen = onDismiss,
+                // Nothing to fall back to inside a full-window overlay: stopping
+                // the download closes it.
+                onCancelled  = onDismiss,
             )
             VideoIconButton(
                 icon     = NxIcon.Close,
@@ -232,7 +360,7 @@ private fun VideoControls(
     muted: Boolean,
     volume: Float,
     showVolume: Boolean,
-    showFullscreen: Boolean,
+    fullscreen: FullscreenControl,
     onPlayPause: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
@@ -281,8 +409,12 @@ private fun VideoControls(
                 )
                 MediaSlider(fraction = if (muted) 0f else volume, onChange = onVolume, modifier = Modifier.width(72.dp))
             }
-            if (showFullscreen) {
-                VideoIconButton(icon = NxIcon.OpenInFull, desc = s.videoFullscreen, onClick = onFullscreen, size = 30.dp)
+            when (fullscreen) {
+                FullscreenControl.Enter ->
+                    VideoIconButton(icon = NxIcon.OpenInFull, desc = s.videoFullscreen, onClick = onFullscreen, size = 30.dp)
+                FullscreenControl.Exit ->
+                    VideoIconButton(icon = NxIcon.CloseFullscreen, desc = s.videoExitFullscreen, onClick = onFullscreen, size = 30.dp)
+                FullscreenControl.None -> Unit
             }
         }
     }
@@ -309,6 +441,9 @@ private fun MediaSlider(
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    // Consumed so the picture's play/pause click does not also
+                    // fire: a tap on the scrubber is a seek, not a pause.
+                    down.consume()
                     onStart()
                     var frac = (down.position.x / widthPx).coerceIn(0f, 1f)
                     onChange(frac)
@@ -359,8 +494,36 @@ private fun VideoIconButton(
     }
 }
 
+/** Which way the transport's fullscreen control points, if it is there at all. */
+private enum class FullscreenControl { None, Enter, Exit }
+
+/**
+ * What survives one player being replaced by another over the same file: the
+ * position on screen, the volume, and whether it was running. Held by whoever
+ * owns the swap (a widget going fullscreen and back), so both players see the
+ * same one.
+ *
+ * Deliberately not observable state -- the fields are read when a player opens
+ * and written as it runs, and nothing composes off them. Making them snapshot
+ * state would recompose the transport at the write rate for no gain.
+ */
+@Stable
+class VideoHandoff {
+    var positionNanos: Long = 0L
+        internal set
+    var volume: Float = 1f
+        internal set
+    var muted: Boolean = false
+        internal set
+    var playing: Boolean = true
+        internal set
+}
+
 // Skip step for the +/-10s controls.
 private const val SKIP_NANOS = 10_000_000_000L
+
+// How long a still pointer keeps the transport up over a running picture.
+private const val CONTROLS_IDLE_MS = 2_500L
 
 private fun volumeIconFor(muted: Boolean, volume: Float): IconKey = when {
     muted || volume <= 0.001f -> NxIcon.VolumeOff

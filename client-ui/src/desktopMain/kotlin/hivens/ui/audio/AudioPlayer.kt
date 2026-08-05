@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
@@ -34,6 +35,19 @@ class AudioPlayer(private val scope: CoroutineScope) {
     private val _volume = MutableStateFlow(1.0f)
     val volume: StateFlow<Float> = _volume.asStateFlow()
 
+    private val _track = MutableStateFlow<TrackInfo?>(null)
+
+    /**
+     * What the loaded file says it is -- tags and cover art, read once per open.
+     * Separate from [state] on purpose: the transport ticks five times a second
+     * and this changes once a track, so a renderer that only draws the name and
+     * the picture is not woken by the position.
+     *
+     * Null means nothing is loaded, never "this track has no metadata" -- a file
+     * without tags still resolves to a title from its name.
+     */
+    val track: StateFlow<TrackInfo?> = _track.asStateFlow()
+
     // Serializes engine ops + the poll loop onto one IO thread. limitedParallelism(1)
     // gives a confinement queue without owning a dedicated thread.
     private val engine = Dispatchers.IO.limitedParallelism(1)
@@ -50,23 +64,18 @@ class AudioPlayer(private val scope: CoroutineScope) {
 
     fun open(file: Path) {
         scope.launch(engine) {
+            log.info("Audio open requested: {}", file)
             closeCurrent()
             currentFile = file
             started = false
-            if (!SkinemaGate.enabled) {
-                _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
-                return@launch
-            }
-            val p = try {
-                VideoPlayer(path = file, loop = false, audio = true)
-            } catch (e: Exception) {
-                log.error("Failed to open audio file {}", file, e)
-                _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
-                return@launch
-            }
+            // Metadata belongs to the file, so this is the only place it is
+            // dropped: a track that ended, or was stopped, is still the track
+            // that is loaded.
+            _track.value = null
             // Assign before touching the player so a failure past this point
             // still closes it (closeCurrent on the next open/stop) -- never an
             // orphaned decode thread.
+            val p = openPlayer(file) ?: return@launch
             player = p
             // Skinema opens and starts playing on its own thread. Hold it
             // silent until the user hits play: volume 0 + pause are queued
@@ -81,12 +90,36 @@ class AudioPlayer(private val scope: CoroutineScope) {
 
     fun play() {
         scope.launch(engine) {
-            val p = player ?: return@launch
+            val file = currentFile ?: return@launch
+            // A track that ran to its end was released (see the poll loop), so
+            // playing it again means opening it again -- from the user's side
+            // this is still "press play on the track that is loaded".
+            val p = player ?: openPlayer(file)?.also { player = it; startPolling() } ?: return@launch
             started = true
             p.setVolume(_volume.value)
             // A finished track is revived by a seek (resume only un-pauses); a
-            // paused/opened one just resumes from where it stands.
+            // paused/opened one just resumes from where it stands, and one just
+            // re-opened is already playing and ignores both.
             if (p.state == VideoPlayer.State.Ended) p.seek(0L) else p.resume()
+        }
+    }
+
+    /**
+     * Constructs the engine for [file], reporting a refusal or a failed open on
+     * [state]. Confined to [engine] like every other player touch.
+     */
+    private fun openPlayer(file: Path): VideoPlayer? {
+        if (!SkinemaGate.enabled) {
+            log.warn("Audio open refused: the skinema module is disabled")
+            _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+            return null
+        }
+        return try {
+            VideoPlayer(path = file, loop = false, audio = true)
+        } catch (e: Exception) {
+            log.error("Failed to open audio file {}", file, e)
+            _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+            null
         }
     }
 
@@ -139,12 +172,53 @@ class AudioPlayer(private val scope: CoroutineScope) {
                     posMs   = p.positionNanos() / 1_000_000L,
                     durMs   = (p.durationNanos ?: 0L) / 1_000_000L,
                 )
+                // Once per file: null is cleared only by open(), and a file with
+                // no tags still resolves to a title, so this cannot re-fire.
+                if (_track.value == null && st != VideoPlayer.State.Opening) readMetadata(p, file)
                 // A failed track is terminal until the next open(); stop
-                // spinning the loop on it.
-                if (st is VideoPlayer.State.Failed) break
+                // spinning the loop on it. Skinema opens on its own decode
+                // thread, so the failure arrives here rather than out of the
+                // constructor -- this is the only place the cause exists, and
+                // every route to it collapses into one user-visible error.
+                if (st is VideoPlayer.State.Failed) {
+                    log.error("Audio playback failed for {}", file, st.cause)
+                    break
+                }
+                // A track that ran out holds a decode thread and the audio
+                // device open for nothing. Drop them and keep the file, so
+                // play() opens it again -- and not through closeCurrent(),
+                // which joins the very job this runs on.
+                if (st == VideoPlayer.State.Ended) {
+                    releaseEngine()
+                    break
+                }
                 delay(POLL_INTERVAL_MS)
             }
         }
+    }
+
+    /**
+     * Reads the track's tags and cover art, once, as soon as the player is past
+     * Opening: skinema fills both on its own decode thread while the open
+     * completes, so they cannot be read from [open]. The picture is decoded off
+     * [engine] -- a several-megapixel cover would otherwise sit in front of
+     * every transport command queued behind it.
+     */
+    private suspend fun readMetadata(p: VideoPlayer, file: Path) {
+        val artwork = p.coverArt?.let { withContext(Dispatchers.Default) { decodeArtwork(it) } }
+        _track.value = trackInfoFrom(p.tags, file, artwork)
+    }
+
+    /**
+     * Drops the engine but keeps the loaded track. Called from the poll loop, so
+     * unlike [closeCurrent] it must not join the job it is running on; the loop
+     * breaks immediately after.
+     */
+    private fun releaseEngine() {
+        pollJob = null
+        player?.close()
+        player = null
+        started = false
     }
 
     private companion object {

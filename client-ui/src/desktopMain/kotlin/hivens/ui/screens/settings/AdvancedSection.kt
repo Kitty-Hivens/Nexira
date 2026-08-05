@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
-import hivens.launcher.update.DesktopIntegration
+import hivens.update.DesktopIntegration
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle

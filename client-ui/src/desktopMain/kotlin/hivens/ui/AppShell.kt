@@ -27,6 +27,8 @@ import hivens.config.Branding
 import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.RefreshableAuthProvider
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyStore
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
@@ -131,6 +133,7 @@ import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.walkInstances
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -499,6 +502,32 @@ fun FrameWindowScope.AppShellContent(
             }
         }
 
+        // A store written by a newer build opens read-only, which is right -- this
+        // build cannot represent everything in it and must not write it back. The
+        // session goes on accepting edits regardless, so say once that they will
+        // not survive it. Sticky, not one-shot: a notice about work being lost
+        // must not age out before the work is done. Keyed, so a shell reload after
+        // a crash updates the same entry instead of stacking another.
+        LaunchedEffect(Unit) {
+            val stores = NewerBuildData.affected()
+            if (stores.isEmpty()) return@LaunchedEffect
+            val named = stores.joinToString(", ") { store ->
+                when (store) {
+                    ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
+                    ReadOnlyStore.Layout      -> s.readOnlyDataLayout
+                }
+            }
+            notificationCenter.push(
+                sourceKey = "storage-read-only",
+                sender    = Branding.TITLE,
+                iconUrl   = null,
+                severity  = Severity.Warn,
+                kind      = Kind.Sticky,
+                title     = s.readOnlyDataTitle,
+                body      = s.readOnlyDataBody(named),
+            )
+        }
+
         val dataDirectory: java.nio.file.Path = koinInject()
         val autoSyncService: AutoSyncService = koinInject()
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
@@ -589,7 +618,7 @@ fun FrameWindowScope.AppShellContent(
             // heuristic leans toward preserving the cache.
             val seedFromCache = withContext(Dispatchers.IO) { serverListCache.load() }
             val dashboardServers = try {
-                val data = withContext(Dispatchers.IO) {
+                val data = runInterruptible(Dispatchers.IO) {
                     serverListService.fetchDashboardData().get()
                 }
                 when {

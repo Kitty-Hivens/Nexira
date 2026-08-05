@@ -18,6 +18,7 @@ class MusicPlayerServiceImpl(
 ) : MusicPlayerService {
     override val state get() = player.state
     override val volume get() = player.volume
+    override val track get() = player.track
 
     override fun setVolume(level: Float) = player.setVolume(level)
     override fun play() = player.play()

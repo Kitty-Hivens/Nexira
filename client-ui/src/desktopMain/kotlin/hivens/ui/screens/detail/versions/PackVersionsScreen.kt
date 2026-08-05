@@ -68,13 +68,15 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.formatBuildTime
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxCalloutBanner
 import hivens.ui.nx.NxCalloutTone
-import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxDiffRow
 import hivens.ui.nx.NxDiffRowKind
@@ -86,11 +88,11 @@ import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.screens.CenteredProgress
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.humanSize
 import hivens.ui.theme.decorativeColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
@@ -99,10 +101,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-private val BUILD_TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
 /** Which base the changelog diff compares the selected build against. */
 private enum class DiffBase { Previous, Installed }
@@ -777,6 +775,12 @@ private class DiffLabels(
 @Composable
 private fun ModDiffIcon(entry: SmrtModEntry, icons: ModIconResolver) {
     val url by produceState<String?>(entry.display?.iconUrl, entry.filename) {
+        // The rows are emitted positionally, so one composition serves a different
+        // entry when the compared versions change -- and produceState does not
+        // re-apply its initial value on a key change. Without this reset the state
+        // still held the previous mod's resolved icon, and the guard below then
+        // skipped resolving, leaving that icon next to this mod's name for good.
+        value = entry.display?.iconUrl
         if (value == null) value = runCatching { icons.resolve(entry) }.getOrNull()
     }
     val box = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp))
@@ -807,7 +811,7 @@ private fun SnapshotsSection(
     NxSection(s.packVersionSnapshots) {
         snapshots.forEach { snap ->
             val whenLabel = runCatching {
-                Instant.ofEpochMilli(snap.createdAtEpoch).atZone(ZoneId.systemDefault()).format(BUILD_TIME)
+                formatBuildTime(Instant.ofEpochMilli(snap.createdAtEpoch))
             }.getOrDefault(snap.id)
             NxRow(title = whenLabel, subtitle = snap.fromVersion) {
                 NxButton(
@@ -883,10 +887,4 @@ private fun sizeLabel(fromBytes: Long?, toBytes: Long?): String? = when {
     toBytes != null -> humanSize(toBytes)
     fromBytes != null -> humanSize(fromBytes)
     else -> null
-}
-
-private fun humanSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
-    bytes >= 1024      -> "${bytes / 1024} KB"
-    else               -> "$bytes B"
 }

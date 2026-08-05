@@ -42,9 +42,9 @@ ITEST_ACCOUNT="$(gum choose --header "account under test" \
 [[ -z "$ITEST_ACCOUNT" ]] && exit 1
 
 ITEST_USER="$(gum input --prompt "username > ")"
-ITEST_PASS=""
+ITEST_PASSWORD=""
 if [[ "$ITEST_ACCOUNT" != "offline" ]]; then
-    ITEST_PASS="$(gum input --password --prompt "password > ")"
+    ITEST_PASSWORD="$(gum input --password --prompt "password > ")"
     gum style --foreground 3 \
         "A real sign-in follows. It overwrites the saved account in the system keyring" \
         "and invalidates whatever SmartyCraft session is currently live."
@@ -105,7 +105,7 @@ log "control surface up on port $ITEST_PORT"
 
 # -- run --------------------------------------------------------------------
 
-export ITEST_DATA_DIR ITEST_ACCOUNT ITEST_USER ITEST_PASS
+export ITEST_DATA_DIR ITEST_ACCOUNT ITEST_USER ITEST_PASSWORD
 
 needs_pack=false
 for s in "${CHOSEN[@]}"; do

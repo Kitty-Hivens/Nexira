@@ -4,6 +4,7 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -25,6 +26,16 @@ class ApplyRecoveryTest {
         override suspend fun get(id: String): PackInstance? = map[id]
         override suspend fun put(instance: PackInstance) { map[instance.id] = instance; flow.value = map.values.toList() }
         override suspend fun delete(id: String) { map.remove(id) }
+    }
+
+    /** A repository whose write is interrupted, as a shutdown mid-rollback interrupts it. */
+    private class CancellingRepo : IPackRepository {
+        private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
+        override fun observe(): Flow<List<PackInstance>> = flow
+        override suspend fun list(): List<PackInstance> = emptyList()
+        override suspend fun get(id: String): PackInstance? = null
+        override suspend fun put(instance: PackInstance): Unit = throw CancellationException("shutting down")
+        override suspend fun delete(id: String) = Unit
     }
 
     private fun instance(id: String, dir: String, followLatest: Boolean = true) = PackInstance(
@@ -80,6 +91,33 @@ class ApplyRecoveryTest {
         assertEquals(false, repo.get("1")?.followLatest, "recovered instance is pinned")
         assertTrue(journal.listPending().isEmpty(), "marker cleared")
         assertTrue(snapshots.list(dir).isEmpty(), "snapshot consumed")
+    }
+
+    @Test
+    fun `a rollback interrupted by shutdown keeps its marker for the next start`() = runTest {
+        val dataDir = Files.createTempDirectory("rec3")
+        val dir = "industrial"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        val modsDir = clientDir.resolve("mods")
+        Files.createDirectories(modsDir)
+        Files.writeString(modsDir.resolve("a.jar"), "old-a")
+
+        val snapshots = PackSnapshotService(dataDir, json)
+        val journal = ApplyJournal(dataDir, json)
+        val managed = setOf("mods/a.jar")
+        val snap = snapshots.capture(clientDir, instance("1", dir), managed, "snap-1", 100L)
+        Files.writeString(modsDir.resolve("a.jar"), "new-a")
+        val entry = PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L)
+        journal.begin(entry)
+
+        val recovery = ApplyRecovery(snapshots, CancellingRepo(), journal, dataDir)
+        val outcome = runCatching { recovery.recoverInterrupted() }
+
+        assertTrue(outcome.exceptionOrNull() is CancellationException, "the cancellation must propagate, not be logged as a failure")
+        assertEquals(
+            listOf(entry), journal.listPending(),
+            "the marker is the only thing that brings the next start back to this instance",
+        )
     }
 
     @Test

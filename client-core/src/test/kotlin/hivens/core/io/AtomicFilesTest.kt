@@ -2,6 +2,10 @@ package hivens.core.io
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.io.path.deleteRecursively
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -55,5 +59,37 @@ class AtomicFilesTest {
         val file = dir.resolve("data.json")
         AtomicFiles.writeString(file, "x")
         assertFalse(Files.exists(file.resolveSibling("data.json.tmp")), "tmp must be moved into place, not left behind")
+    }
+
+    /**
+     * Two callers publishing one file share a temp path named after it, so without
+     * serialisation one renames the other's bytes and the loser renames a path that
+     * is no longer there. Nothing is torn either way -- each write is whole -- what
+     * breaks is that one of them fails outright.
+     */
+    @Test
+    fun `concurrent writers of one file all publish`() {
+        val file = dir.resolve("settings.json")
+        val writers = 8
+        val rounds = 40
+        val pool = Executors.newFixedThreadPool(writers)
+        val start = CountDownLatch(1)
+        val failures = ConcurrentLinkedQueue<String>()
+
+        repeat(writers) { w ->
+            pool.execute {
+                start.await()
+                repeat(rounds) { r ->
+                    runCatching { AtomicFiles.writeString(file, "writer-$w-round-$r") }
+                        .onFailure { failures += it.toString() }
+                }
+            }
+        }
+        start.countDown()
+        pool.shutdown()
+        assertTrue(pool.awaitTermination(30, TimeUnit.SECONDS), "writers did not finish")
+
+        assertEquals(emptyList(), failures.toList(), "a write of a file someone else is publishing must not fail")
+        assertTrue(Files.readString(file).startsWith("writer-"), "the published file is one writer's whole content")
     }
 }

@@ -34,7 +34,9 @@ class DataDirMoverTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // ── schedule() ────────────────────────────────────────────────────────
@@ -103,7 +105,9 @@ class DataDirMoverTest {
         DataDirMover.schedule(source, target, confFile)
         Files.createDirectories(target)
         Files.writeString(target / "credentials.json", """{"username":"test"}""")
-        Files.walk(source).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(source).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
 
         DataDirMover.applyPending(confFile)
 

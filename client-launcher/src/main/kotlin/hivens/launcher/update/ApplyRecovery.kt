@@ -2,6 +2,7 @@ package hivens.launcher.update
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.io.InstanceMutationLock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -31,7 +32,7 @@ class ApplyRecovery(
         for (entry in journal.listPending()) {
             val clientDir = dataDir.resolve("instances").resolve(entry.instanceDirName)
             InstanceMutationLock.withLock(clientDir) {
-                runCatching {
+                try {
                     val restored = snapshotService.restore(clientDir, entry.instanceDirName, entry.snapshotId, entry.managedPaths.toSet())
                     // Pin: a recovered instance stops following latest so a reproducible
                     // bad build is not re-applied (and re-crashed) on the next pass.
@@ -42,11 +43,18 @@ class ApplyRecovery(
                         entry.instanceDirName, entry.toVersion, entry.fromVersion,
                     )
                     recovered += entry.instanceDirName
-                }.onFailure {
+                } catch (e: CancellationException) {
+                    // Quitting mid-rollback says nothing about whether this apply can be
+                    // recovered, so it must not spend the marker. The marker is the only
+                    // thing that brings us back here; clearing it on the way out would
+                    // leave the instance half-updated with the registry still on the old
+                    // version, and nothing would ever look at it again.
+                    throw e
+                } catch (e: Throwable) {
                     // Keep the snapshot for the Version screen's manual restore, but the
                     // marker is cleared below so a corrupt / unrecoverable apply does not
                     // re-run every boot.
-                    log.error("apply-recovery: could not roll back {}; snapshot left for a manual restore", entry.instanceDirName, it)
+                    log.error("apply-recovery: could not roll back {}; snapshot left for a manual restore", entry.instanceDirName, e)
                 }
                 journal.complete(entry.instanceDirName)
             }

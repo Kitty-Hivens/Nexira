@@ -16,11 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import hivens.ui.components.NavItemRowContent
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.NxTheme
 
 /**
  * Vertical category nav for the two-column Settings layout. Renders
@@ -61,7 +61,7 @@ internal fun SettingsCategoryNav(
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                NavItemRowContent(
+                NxNavRowContent(
                     icon = category.icon,
                     label = category.label(s),
                     isSelected = isSelected,

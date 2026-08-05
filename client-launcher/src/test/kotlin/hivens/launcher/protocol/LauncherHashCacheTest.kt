@@ -20,6 +20,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -47,7 +48,7 @@ class LauncherHashCacheTest {
         val downloads = AtomicInteger(0)
         val cache = LauncherHashCache(
             dataDir = dataDir,
-            clientProvider = countingProvider(downloads, body = "fake-jar-bytes".toByteArray()),
+            clientProvider = countingProvider(downloads, body = fakeJar()),
             config = ServerProtocolConfig(),
         )
 
@@ -70,7 +71,7 @@ class LauncherHashCacheTest {
     fun `successful refresh updates get() and persists to cache file`() = runBlocking {
         val cache = LauncherHashCache(
             dataDir = dataDir,
-            clientProvider = countingProvider(AtomicInteger(0), body = "fake-jar-bytes".toByteArray()),
+            clientProvider = countingProvider(AtomicInteger(0), body = fakeJar()),
             config = ServerProtocolConfig(),
         )
 
@@ -96,14 +97,61 @@ class LauncherHashCacheTest {
         assertEquals(1, downloads.get(), "the network attempt did happen -- slot is consumed")
     }
 
-    private fun countingProvider(counter: AtomicInteger, body: ByteArray): HttpClientProvider {
+    @Test
+    fun `an error status is not hashed`() = runBlocking {
+        // The endpoint answering 404/503 still carries a body -- an error page.
+        // Hashing it would persist a hash the server can never accept, and
+        // readCachedOrDefault takes any 32-char string, so the bad hash would
+        // outlive the session and break login on every later start.
+        val downloads = AtomicInteger(0)
+        val cache = LauncherHashCache(
+            dataDir = dataDir,
+            clientProvider = countingProvider(
+                downloads,
+                body = "<html>Not Found</html>".toByteArray(),
+                status = HttpStatusCode.NotFound,
+            ),
+            config = ServerProtocolConfig(),
+        )
+
+        assertNull(cache.refresh())
+        assertEquals(1, downloads.get(), "the network attempt did happen -- slot is consumed")
+        assertFalse(dataDir.resolve(Storage.HASH_CACHE_FILE).exists(), "nothing may be persisted")
+    }
+
+    @Test
+    fun `a 200 that is not an archive is not hashed`() = runBlocking {
+        // A captive portal or a CDN interstitial answers 200 with HTML, so the
+        // status check alone does not cover this.
+        val cache = LauncherHashCache(
+            dataDir = dataDir,
+            clientProvider = countingProvider(
+                AtomicInteger(0),
+                body = "<html>Sign in to the network</html>".toByteArray(),
+            ),
+            config = ServerProtocolConfig(),
+        )
+
+        assertNull(cache.refresh())
+        assertFalse(dataDir.resolve(Storage.HASH_CACHE_FILE).exists(), "nothing may be persisted")
+    }
+
+    /** Zip local-file-header magic plus filler -- what a real jar download opens with. */
+    private fun fakeJar(): ByteArray =
+        byteArrayOf(0x50, 0x4B, 0x03, 0x04) + "fake-jar-bytes".toByteArray()
+
+    private fun countingProvider(
+        counter: AtomicInteger,
+        body: ByteArray,
+        status: HttpStatusCode = HttpStatusCode.OK,
+    ): HttpClientProvider {
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler {
                     counter.incrementAndGet()
                     respond(
                         content = ByteReadChannel(body),
-                        status = HttpStatusCode.OK,
+                        status = status,
                         headers = headersOf("Content-Type", "application/octet-stream"),
                     )
                 }

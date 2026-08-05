@@ -50,6 +50,7 @@ import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -95,8 +96,10 @@ fun HomeClassicContent(instance: WidgetInstance) {
         isLoadingServers = true
         scope.launch(Dispatchers.IO) {
             try {
-                val data = if (forceRefresh) serverListService.refresh().get()
-                           else              serverListService.fetchDashboardData().get()
+                val data = runInterruptible {
+                    if (forceRefresh) serverListService.refresh().get()
+                    else              serverListService.fetchDashboardData().get()
+                }
                 withContext(Dispatchers.Main) {
                     servers = data.servers
                     if (selectedServerState == null && servers.isNotEmpty()) {

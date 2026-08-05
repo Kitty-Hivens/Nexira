@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,12 +45,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
-import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxProgressBar
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
@@ -82,83 +86,114 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
 
     val state by service.state.collectAsState()
     val volume by service.volume.collectAsState()
+    val track by service.track.collectAsState()
+
+    PlaybackMiniControl(
+        state       = state,
+        track       = track,
+        volume      = volume,
+        onPlayPause = { if (state is PlaybackState.Playing) service.pause() else service.play() },
+        onVolume    = { service.setVolume(it) },
+    )
+}
+
+/**
+ * The strip itself, over plain data -- split from the widget for the same reason
+ * as [MusicPlayerCard]: it can then be rendered off-screen without the service
+ * registry, a Koin graph or an audio device.
+ */
+@Composable
+internal fun PlaybackMiniControl(
+    state: PlaybackState,
+    track: TrackInfo?,
+    volume: Float,
+    onPlayPause: () -> Unit,
+    onVolume: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val s = LocalStrings.current
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.55f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Symbol(icon = NxIcon.MusicNote,
-            contentDescription = null,
-            tint               = NxTheme.colors.primary,
-            modifier           = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text       = currentTitleShort(state, s),
-            style      = MaterialTheme.typography.bodyMedium,
-            color      = NxTheme.colors.textPrimary,
-            fontWeight = FontWeight.Medium,
-            maxLines   = 1,
-            overflow   = TextOverflow.Ellipsis,
-            modifier   = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(10.dp))
+    NxSurface(NxSurfaceLevel.Floating, modifier.fillMaxWidth()) {
+        Column(
+            modifier            = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Symbol(icon = NxIcon.MusicNote,
+                    contentDescription = null,
+                    tint               = NxTheme.colors.primary,
+                    modifier           = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text       = currentTitleShort(state, track, s),
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = NxTheme.colors.textPrimary,
+                    fontWeight = FontWeight.Medium,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    modifier   = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(10.dp))
 
-        val isPlaying = state is PlaybackState.Playing
-        // Idle (no file ever loaded) intentionally disables play here:
-        // the file-picker lives on the main MusicPlayer widget. The
-        // mini-control drives existing playback, it does not bootstrap
-        // it. Open the main widget once, pick a track, then the mini
-        // can transport it from anywhere on the surface.
-        val canTransport = state is PlaybackState.Playing || state is PlaybackState.Paused || state is PlaybackState.Ready
-        TransportButton(
-            icon        = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
-            enabled     = canTransport,
-            onClick     = { if (isPlaying) service.pause() else service.play() },
-            description = if (isPlaying) s.audioPause else s.audioPlay,
-        )
-        Spacer(Modifier.width(10.dp))
-        MiniVolumeBar(
-            value         = volume,
-            onValueChange = { service.setVolume(it) },
-            modifier      = Modifier.width(110.dp),
-        )
+                val isPlaying = state is PlaybackState.Playing
+                // Idle (no file ever loaded) intentionally disables play here:
+                // the file-picker lives on the main MusicPlayer widget. The
+                // mini-control drives existing playback, it does not bootstrap
+                // it. Open the main widget once, pick a track, then the mini
+                // can transport it from anywhere on the surface.
+                val canTransport = state is PlaybackState.Playing || state is PlaybackState.Paused || state is PlaybackState.Ready
+                TransportButton(
+                    icon        = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
+                    enabled     = canTransport,
+                    onClick     = onPlayPause,
+                    description = if (isPlaying) s.audioPause else s.audioPlay,
+                )
+                Spacer(Modifier.width(10.dp))
+                MiniVolumeBar(
+                    value         = volume,
+                    onValueChange = onVolume,
+                    modifier      = Modifier.width(110.dp),
+                )
+            }
+
+            // Where the track is, under the row rather than inside it. Without a
+            // measure of its own the widget's only bar was the volume, which idles
+            // at full and read as a track played to the end -- and the two are told
+            // apart by more than position: this one is the library's progress
+            // primitive, in the progress accent, with no handle to grab.
+            NxProgressBar(progress = progressFraction(state), height = 3.dp)
+        }
     }
 }
 
+/** Nothing provides playback here. A sunken plane, so an inert slot reads as one. */
 @Composable
 private fun DisabledPlaceholder() {
     val s = LocalStrings.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.4f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Symbol(icon = NxIcon.VolumeOff,
-            contentDescription = null,
-            tint               = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
-            modifier           = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text  = s.audioNoPlayerHere,
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
-        )
-        Spacer(Modifier.weight(1f))
-        Text(
-            text  = s.audioAddMusicPlayer,
-            style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
-        )
+    NxSurface(NxSurfaceLevel.Sunken, Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier          = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Symbol(icon = NxIcon.VolumeOff,
+                contentDescription = null,
+                tint               = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
+                modifier           = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text  = s.audioNoPlayerHere,
+                style = MaterialTheme.typography.bodySmall,
+                color = NxTheme.colors.textSecondary,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text  = s.audioAddMusicPlayer,
+                style = MaterialTheme.typography.labelSmall,
+                color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+            )
+        }
     }
 }
 
@@ -269,10 +304,11 @@ private fun MiniVolumeBar(
     }
 }
 
-private fun currentTitleShort(state: PlaybackState, s: AppStrings): String = when (state) {
+/** The track's own title, falling back to the file name until metadata lands. */
+private fun currentTitleShort(state: PlaybackState, track: TrackInfo?, s: AppStrings): String = when (state) {
     PlaybackState.Idle       -> s.audioNoFile
-    is PlaybackState.Ready   -> state.file.name
-    is PlaybackState.Playing -> state.file.name
-    is PlaybackState.Paused  -> state.file.name
+    is PlaybackState.Ready   -> track?.title ?: state.file.name
+    is PlaybackState.Playing -> track?.title ?: state.file.name
+    is PlaybackState.Paused  -> track?.title ?: state.file.name
     is PlaybackState.Error   -> state.file.name
 }

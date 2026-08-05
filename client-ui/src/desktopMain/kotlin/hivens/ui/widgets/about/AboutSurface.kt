@@ -17,13 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.jvm.SystemHardware
 import hivens.core.jvm.SystemMemory
-import hivens.launcher.update.UpdateService
 import hivens.ui.components.UpdateDialog
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.layout.AdaptiveWidth
-import hivens.ui.layout.WidthClass
+import hivens.ui.nx.AdaptiveWidth
+import hivens.ui.nx.WidthClass
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.update.UpdateService
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId

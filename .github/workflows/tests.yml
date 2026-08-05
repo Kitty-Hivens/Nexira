@@ -64,8 +64,24 @@ jobs:
       # and WAYLAND_DISPLAY unset -- and its one wall-clock assertion holds on a
       # single starved core. The video-transcode test opts in through
       # NEXIRA_TEST_VIDEO and no-ops without it, so no media natives are needed.
+      #
+      # Every module that has tests is listed. A suite left out of this line is a
+      # suite nobody runs: the widget kernel's default-layout drift guard sat red
+      # on both branches through several releases because :widget-model:test was
+      # absent here. The rest are pure JVM -- no display, no native tray, no
+      # network, no spawned yt-dlp -- so they cost seconds and cover the design
+      # system, the widget kernel, all three auth providers and both java agents.
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-ui:desktopTest :widget-processor:test --continue
+        run: >-
+          ./gradlew
+          :client-config:test :client-core:test :client-launcher:test :client-update:test
+          :client-auth:test :client-auth-smartycraft:test :client-auth-microsoft:test
+          :client-cli:test :client-media:test :client-tray:test
+          :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
+          :client-easter:desktopTest :nx-ui:desktopTest
+          :widget-api:test :widget-model:test :widget-processor:test
+          :authlib-agent:test :profiler-agent:test
+          --continue
 
       # The runtime-module guard is a config-time read with no compilation behind
       # it, so it costs nothing here and fails a bad module list at PR time rather
@@ -82,4 +98,7 @@ jobs:
             client-config/build/reports/tests/
             client-core/build/reports/tests/
             client-launcher/build/reports/tests/
+            client-update/build/reports/tests/
             client-ui/build/reports/tests/
+            client-i18n/build/reports/tests/
+            client-render3d/build/reports/tests/

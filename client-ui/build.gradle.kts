@@ -83,10 +83,17 @@ kotlin {
                 implementation(project(":client-core"))
                 implementation(project(":client-auth"))
                 implementation(project(":client-launcher"))
+                implementation(project(":client-update"))
                 implementation(project(":client-media"))
                 implementation(project(":client-tray"))
                 implementation(project(":widget-api"))
                 implementation(project(":nx-ui"))
+                // Packages carved out of this module and kept under their
+                // original names (hivens.ui.i18n / .scene3d / .render3d /
+                // .skin3d / .easter), so every call site here is unchanged.
+                implementation(project(":client-i18n"))
+                implementation(project(":client-render3d"))
+                implementation(project(":client-easter"))
 
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)
@@ -466,6 +473,13 @@ packaging {
         "jdk.unsupported",
         "jdk.zipfs",
         "jdk.localedata",
+        // jdk.jfr: Flight Recorder. Without it the packaged build refuses to
+        // start under -XX:StartFlightRecording ("Module jdk.jfr not found"),
+        // so the one profiler that ships with the JDK cannot be pointed at the
+        // artifact users actually run -- a performance report against a
+        // distributable had to be reconstructed from jcmd stack sampling. The
+        // module is inert unless a recording is asked for.
+        "jdk.jfr",
     ))
 
     // jvmArgs baked into the jpackage launcher script via repeated
@@ -597,11 +611,6 @@ tasks.withType<KotlinJvmCompile>().configureEach {
         val buildDirAbsolute = layout.buildDirectory.get().asFile.absolutePath
 
         freeCompilerArgs.addAll(
-            // Language: nested typealiases are used in AprilFoolsEngine.kt
-            // for the floating-button Event signature. Without the flag the
-            // compiler restricts typealiases to top level only.
-            "-XXLanguage:+NestedTypeAliases",
-
             // Bytecode: emit default methods directly (legal on jvmTarget=26).
             // Smaller class files, removes the DefaultImpls indirection.
             "-jvm-default=no-compatibility",

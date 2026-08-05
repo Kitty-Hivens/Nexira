@@ -124,13 +124,25 @@ internal val LightColorPalette = NxColors(
     onBackground = Color(0xFF212121),
     onSurface = Color(0xFF212121),
     textPrimary = Color(0xFF263238),   // Dark blue-gray (softer than black)
-    textSecondary = Color(0xFF78909C), // Gray-blue text
+    // Dark enough to be read on every plane of the light ladder: 6.4 against a
+    // white Base, 5.1 against Floating, the darkest of them. The tone it replaced
+    // was picked to sit quietly and did -- 3.35 and 2.66, under the body floor
+    // everywhere and under the large-text one on half the ladder. Same hue and
+    // saturation, lower lightness.
+    textSecondary = Color(0xFF4F626B),
     glassBackground = Color(0xFFFFFFFF),
     glassAlpha = 0.65f,                // Slightly more opacity for readability
-    success = Color(0xFF66BB6A),
+    // Darker than the dark theme's #4CAF50, like every other severity accent
+    // here. Lightening it for a light ground put it at 1.9:1 against the
+    // container plane -- under even the large-text floor -- while the same token
+    // measured 5.2:1 on dark. Weighted to match criticalAccent's 6.1 / 5.2.
+    success = Color(0xFF256B2B),
     outline = Color(0xFFCCCCCC),
     progressAccent = Color(0xFF3C5BD9),
-    warnAccent     = Color(0xFFB37A0E),
+    // 2.9:1 against surfaceContainerHigh before, i.e. below the large-text floor
+    // on the plane the meta chips and callouts actually sit on. Weighted to match
+    // progressAccent's 5.3 / 4.5.
+    warnAccent     = Color(0xFF8A5E08),
     criticalAccent = Color(0xFFB3262A),
     originSmartycraft = Color(0xFF6D28D9), // deeper violet for light bg
     originMirror      = Color(0xFF2563EB), // deeper blue

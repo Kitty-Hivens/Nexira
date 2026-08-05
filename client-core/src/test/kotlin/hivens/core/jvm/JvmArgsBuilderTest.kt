@@ -71,15 +71,39 @@ class JvmArgsBuilderTest {
 
     @Test
     fun `ZGC defaults emit generational mode and unlock options`() {
-        val args = ZgcTuning.Defaults.toArgs()
+        val args = ZgcTuning.Defaults.toArgs(javaMajor = 21)
         assertTrue("-XX:+UnlockExperimentalVMOptions" in args)
         assertTrue("-XX:+ZGenerational" in args)
     }
 
     @Test
     fun `ZGC without generational omits the flag`() {
-        val args = ZgcTuning(generational = false).toArgs()
+        val args = ZgcTuning(generational = false).toArgs(javaMajor = 21)
         assertFalse("-XX:+ZGenerational" in args)
+    }
+
+    @Test
+    fun `ZGenerational is not emitted for a runtime that removed it`() {
+        // JDK 24 dropped the flag: generational became the only ZGC mode and the
+        // option is rejected outright ("Unrecognized VM option"), so a pack on 24+
+        // would not start at all.
+        for (major in listOf(ZgcTuning.ZGENERATIONAL_REMOVED_IN, 25, 26)) {
+            val args = ZgcTuning.Defaults.toArgs(javaMajor = major)
+            assertFalse("-XX:+ZGenerational" in args, "emitted for Java $major: $args")
+            assertTrue("-XX:+UnlockExperimentalVMOptions" in args, "the unlock still belongs")
+        }
+        for (major in listOf(21, 22, 23)) {
+            assertTrue("-XX:+ZGenerational" in ZgcTuning.Defaults.toArgs(javaMajor = major),
+                "the flag still selects generational mode on Java $major")
+        }
+    }
+
+    @Test
+    fun `an unknown runtime omits ZGenerational rather than risk the launch`() {
+        // Omitting costs a throughput mode on 21-23; emitting costs the launch on
+        // 24+. With no declared major -- the SmartyCraft server path -- take the
+        // side that still starts.
+        assertFalse("-XX:+ZGenerational" in ZgcTuning.Defaults.toArgs(javaMajor = null))
     }
 
     // ─── Shenandoah ───────────────────────────────────────────────────────
@@ -230,7 +254,7 @@ class JvmArgsBuilderTest {
             gc = GcChoice.Z,
             g1 = G1Tuning.AikarDefaults,  // present but should be ignored
         )
-        val args = cfg.toArgs()
+        val args = cfg.toArgs(javaMajor = 21)
         assertFalse("-XX:G1HeapRegionSize=8M" in args)
         assertFalse("-XX:MaxGCPauseMillis=200" in args)
         assertTrue("-XX:+UseZGC" in args)
@@ -284,6 +308,39 @@ class JvmArgsBuilderTest {
     }
 
     @Test
+    fun `no experimental G1 flag is emitted without the unlock that admits it`() {
+        // Measured on JDK 25 and 26: these three are the experimental ones in the
+        // Aikar set. Emitting any of them without -XX:+UnlockExperimentalVMOptions
+        // makes the JVM refuse to start, and the launcher can only report exit 1.
+        val experimental = listOf(
+            "-XX:G1NewSizePercent=",
+            "-XX:G1MaxNewSizePercent=",
+            "-XX:G1MixedGCLiveThresholdPercent=",
+        )
+        val args = G1Tuning.AikarDefaults.copy(unlockExperimentalVMOptions = false).toArgs()
+
+        for (flag in experimental) {
+            assertTrue(args.none { it.startsWith(flag) }, "$flag survived without the unlock: $args")
+        }
+        // The rest of the tuning is not experimental and must still apply.
+        assertTrue(args.any { it.startsWith("-XX:MaxGCPauseMillis=") })
+        assertTrue(args.any { it.startsWith("-XX:G1ReservePercent=") })
+        assertTrue(args.any { it.startsWith("-XX:MaxTenuringThreshold=") })
+    }
+
+    @Test
+    fun `a config that reaches the builder without the unlock still round-trips`() {
+        // The path that produced the unstartable set: pick a non-G1 GC, apply (the
+        // stored args now carry no unlock token), reopen, pick G1, apply.
+        val noUnlock = JvmConfig.fromArgs("-XX:+UseParallelGC -Xmx4G")
+        val backToG1 = noUnlock.copy(gc = GcChoice.G1)
+
+        val args = backToG1.toArgs()
+        assertTrue(args.none { it.startsWith("-XX:G1NewSizePercent=") }, "unstartable arg set: $args")
+        assertEquals(args, JvmConfig.fromArgs(args.joinToString(" ")).toArgs())
+    }
+
+    @Test
     fun `preset ids are unique`() {
         val ids = JvmArgsPresets.all.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "Duplicate preset ids: $ids")
@@ -329,7 +386,7 @@ class JvmArgsBuilderTest {
         assertEquals(GcChoice.Z, rebuilt.gc)
         assertTrue("-XX:MaxGCPauseMillis=999" in rebuilt.custom)
         assertTrue("-Dx=1" in rebuilt.custom)
-        val out = rebuilt.toArgs()
+        val out = rebuilt.toArgs(javaMajor = 21)
         assertTrue("-XX:MaxGCPauseMillis=999" in out)
         assertTrue("-XX:+ZGenerational" in out)
     }

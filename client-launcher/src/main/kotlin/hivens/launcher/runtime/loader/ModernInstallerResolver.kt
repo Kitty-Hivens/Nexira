@@ -82,7 +82,7 @@ class ModernInstallerResolver(
             val dotMinecraft = cacheDir.resolve("$loaderId-$mcVersion-$resolvedVersion".replace(Regex("[^A-Za-z0-9._-]"), "_"))
             ensureInstalled(mcVersion, resolvedVersion, dotMinecraft)
 
-            val versionJsonPath = locateVersionJson(dotMinecraft)
+            val versionJsonPath = locateVersionJson(dotMinecraft, mcVersion)
             val version = json.decodeFromString(
                 LoaderVersionJson.serializer(),
                 Files.readString(versionJsonPath),
@@ -177,10 +177,18 @@ class ModernInstallerResolver(
     }
 
     /**
-     * The loader version json the installer generated. A fresh `--installClient`
-     * target holds exactly one `versions/<id>/` dir; pick its `<id>.json`.
+     * The loader version json the installer generated.
+     *
+     * An `--installClient` target holds TWO `versions/<id>/` dirs, not one: the
+     * loader's own overlay and the vanilla json the installer downloaded for the
+     * client-jar step (`versions/1.21.1/` beside `versions/neoforge-21.1.186/`).
+     * `Files.newDirectoryStream` has no defined order, so taking whichever came
+     * first was a coin flip -- and on a filesystem that enumerates by name the
+     * vanilla entry wins every time, after which [harvest] demands vanilla
+     * libraries the installer never produced and the launch fails. Name the
+     * loader's entry instead of counting entries.
      */
-    internal fun locateVersionJson(dotMinecraft: Path): Path {
+    internal fun locateVersionJson(dotMinecraft: Path, mcVersion: String): Path {
         val versions = dotMinecraft.resolve("versions")
         if (!Files.isDirectory(versions)) {
             throw IOException("$loaderId installer produced no versions/ dir under $dotMinecraft")
@@ -193,9 +201,17 @@ class ModernInstallerResolver(
                 if (Files.isRegularFile(versionJson)) candidates.add(versionJson)
             }
         }
-        return candidates.singleOrNull()
-            ?: candidates.firstOrNull()
-            ?: throw IOException("$loaderId installer produced no versions/<id>/<id>.json under $versions")
+        if (candidates.isEmpty()) {
+            throw IOException("$loaderId installer produced no versions/<id>/<id>.json under $versions")
+        }
+        // Sorted first so every fallback below is deterministic rather than
+        // inheriting the directory stream's order.
+        val byName = candidates.sortedBy { it.parent.fileName.toString() }
+        val chosen = byName.firstOrNull { it.parent.fileName.toString().contains(loaderId, ignoreCase = true) }
+            ?: byName.firstOrNull { it.parent.fileName.toString() != mcVersion }
+            ?: byName.first()
+        log.debug("{}: picked version json {} of {} candidates", loaderId, chosen.parent.fileName, candidates.size)
+        return chosen
     }
 
     private fun runInstaller(java: Path, installer: Path, dotMinecraft: Path) {

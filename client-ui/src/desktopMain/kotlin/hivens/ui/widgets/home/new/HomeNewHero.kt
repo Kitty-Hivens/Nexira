@@ -27,11 +27,11 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.Screen
-import hivens.ui.components.InitialsAvatar
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.InitialsAvatar
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.NxTheme

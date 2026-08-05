@@ -1,6 +1,6 @@
 package hivens.launcher.component
 
-import hivens.launcher.testTransferEngine
+import hivens.test.testTransferEngine
 import hivens.core.api.HttpClientProvider
 import hivens.test.buildMockClient
 import io.ktor.client.HttpClient
@@ -37,7 +37,9 @@ class EnvironmentPreparerTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // os.name -> LWJGL classifier suffix now lives on Platform.lwjgl; see

@@ -71,6 +71,10 @@ include(":client-auth")
 include(":client-auth-smartycraft")
 include(":client-auth-microsoft")
 include(":client-launcher")
+// The launcher's self-update: release check, delta bundle, binary patch and the
+// per-platform applicators. Split from pack update, which shared the package name
+// and nothing else and stays in :client-launcher next to the mirror client.
+include(":client-update")
 // Headless native-image entrypoint: a Compose-free CLI over the launch
 // pipeline (auth -> resolve -> download -> JRE -> runtime -> launch),
 // buildable to a GraalVM / Liberica-NIK native binary for Linux. The GUI
@@ -89,6 +93,21 @@ include(":client-ui")
 // Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
 // client-ui depends on it one-way; it depends on nothing in-tree.
 include(":nx-ui")
+// Localisation layer: the AppStrings interface, the three locale
+// implementations and the LocalStrings CompositionLocal. Carved out of
+// client-ui, where it was the single largest package and imported by 150
+// files while importing nothing back. A string edit no longer recompiles
+// the UI.
+include(":client-i18n")
+// Software 3D: the scene graph and rasteriser (scene3d, render3d) plus the
+// Minecraft skin rig on top of them (skin3d). Consumed by the wardrobe and
+// the profile; kept out of client-ui so the renderer can be exercised on
+// its own.
+include(":client-render3d")
+// The April Fools engine and its companions. A self-contained seasonal
+// surface with three imports into the rest of the tree; separate so it
+// cannot be disturbed by, and cannot disturb, ordinary UI work.
+include(":client-easter")
 include(":widget-model")
 include(":widget-api")
 include(":widget-processor")
