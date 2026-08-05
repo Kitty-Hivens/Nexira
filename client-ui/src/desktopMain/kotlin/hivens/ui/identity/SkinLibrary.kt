@@ -1,10 +1,12 @@
 package hivens.ui.identity
 
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 /**
@@ -14,12 +16,24 @@ import java.util.UUID
  * account is targeted (SmartyCraft or Mojang upload) from the stored file, so the
  * library never talks to a server itself.
  *
- * Tolerant of a missing or corrupt index (treated as empty), and of a deleted png
- * behind a live index entry ([bytes] returns null). The caller supplies the
- * timestamp to [add] so the ordering is testable.
+ * Tolerant of a deleted png behind a live index entry ([bytes] returns null).
+ * The caller supplies the timestamp to [add] so the ordering is testable.
+ *
+ * A missing index is an empty library. An UNREADABLE one is not: every mutator
+ * here is a read-modify-write, so reading a truncated index as empty and then
+ * saving would persist that emptiness over the real thing and orphan every png.
+ * [readIndex] therefore quarantines a corrupt index and rebuilds what it can from
+ * the files on disk -- the pixels are the durable part; only the names, kinds and
+ * timestamps are lost. Writes go through [AtomicFiles], so the truncation that
+ * starts this story cannot happen from our own side in the first place.
+ *
+ * Mutations are serialised on [lock]: the wardrobe re-imports the server skin on
+ * every open, which can overlap a user import, and two read-modify-writes racing
+ * would drop one of the entries.
  */
 class SkinLibrary(private val dir: Path, private val json: Json) {
     private val log = LoggerFactory.getLogger(SkinLibrary::class.java)
+    private val lock = Any()
 
     /** A library entry is either a player skin or a cape (cloak). */
     enum class Kind { Skin, Cape }
@@ -55,15 +69,16 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         file(id).takeIf { Files.exists(it) }?.let { runCatching { Files.readAllBytes(it) }.getOrNull() }
 
     /** Imports [png] under [name] as a skin or cape; returns the new entry. */
-    fun add(png: ByteArray, name: String, slim: Boolean, now: Long, kind: Kind = Kind.Skin, sha: String? = null): Entry {
-        Files.createDirectories(dir)
-        val id = UUID.randomUUID().toString().take(12)
-        Files.write(file(id), png)
-        val entry = Entry(id, name.ifBlank { kind.name.lowercase() }, slim, now, kind = kind, sha = sha)
-        writeIndex(Index(readIndex().skins + entry))
-        log.info("Imported {} {} ({} bytes)", kind.name.lowercase(), id, png.size)
-        return entry
-    }
+    fun add(png: ByteArray, name: String, slim: Boolean, now: Long, kind: Kind = Kind.Skin, sha: String? = null): Entry =
+        synchronized(lock) {
+            Files.createDirectories(dir)
+            val id = UUID.randomUUID().toString().take(12)
+            AtomicFiles.writeBytes(file(id), png)
+            val entry = Entry(id, name.ifBlank { kind.name.lowercase() }, slim, now, kind = kind, sha = sha)
+            writeIndex(Index(readIndex().skins + entry))
+            log.info("Imported {} {} ({} bytes)", kind.name.lowercase(), id, png.size)
+            entry
+        }
 
     /**
      * Adds [png] unless an entry of [kind] already carries the same content [sha]
@@ -77,13 +92,18 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         return add(png, name, slim, now, kind, sha)
     }
 
-    fun rename(id: String, name: String) {
-        writeIndex(Index(readIndex().skins.map { if (it.id == id) it.copy(name = name.ifBlank { it.name }) else it }))
+    /** Rewrites the index under [lock]; [transform] sees the entries as they are on disk. */
+    private fun mutate(transform: (List<Entry>) -> List<Entry>) = synchronized(lock) {
+        writeIndex(Index(transform(readIndex().skins)))
+    }
+
+    fun rename(id: String, name: String) = mutate { skins ->
+        skins.map { if (it.id == id) it.copy(name = name.ifBlank { it.name }) else it }
     }
 
     /** Records that [id]'s skin was applied (to a provider) at [now]. */
-    fun markApplied(id: String, now: Long) {
-        writeIndex(Index(readIndex().skins.map { if (it.id == id) it.copy(lastAppliedAt = now) else it }))
+    fun markApplied(id: String, now: Long) = mutate { skins ->
+        skins.map { if (it.id == id) it.copy(lastAppliedAt = now) else it }
     }
 
     /** The id of the most-recently-applied entry of [kind] -- the active one. */
@@ -91,7 +111,7 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         .filter { it.kind == kind && it.lastAppliedAt != null }
         .maxByOrNull { it.lastAppliedAt!! }?.id
 
-    fun delete(id: String) {
+    fun delete(id: String) = synchronized(lock) {
         runCatching { Files.deleteIfExists(file(id)) }
         writeIndex(Index(readIndex().skins.filterNot { it.id == id }))
     }
@@ -99,14 +119,36 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
     private fun readIndex(): Index {
         if (!Files.exists(indexFile)) return Index()
         return runCatching { json.decodeFromString(Index.serializer(), Files.readString(indexFile)) }
-            .getOrElse {
-                log.warn("skin library index unreadable -- treating as empty")
-                Index()
+            .getOrElse { recoverIndex() }
+    }
+
+    /**
+     * Salvages a library whose index will not parse. Reading it as empty would be
+     * fine on its own, but the next mutation writes that emptiness back and the
+     * pngs become unreachable forever. Move the bad file aside so it can still be
+     * inspected, and readmit every png on disk under its own id -- the names,
+     * kinds and timestamps are gone, the pictures are not.
+     */
+    private fun recoverIndex(): Index = synchronized(lock) {
+        val quarantined = indexFile.resolveSibling("${indexFile.fileName}.corrupt")
+        runCatching { Files.move(indexFile, quarantined, StandardCopyOption.REPLACE_EXISTING) }
+            .onFailure { log.warn("could not set the unreadable skin index aside", it) }
+        val recovered = runCatching {
+            Files.list(dir).use { stream ->
+                stream.filter { it.fileName.toString().endsWith(".png") }
+                    .map { Entry(id = it.fileName.toString().removeSuffix(".png"), name = "") }
+                    .toList()
             }
+        }.getOrElse { emptyList() }
+        log.warn(
+            "skin library index unreadable -- kept it at {} and rebuilt {} entries from the files on disk",
+            quarantined, recovered.size,
+        )
+        if (recovered.isNotEmpty()) writeIndex(Index(recovered))
+        Index(recovered)
     }
 
     private fun writeIndex(index: Index) {
-        Files.createDirectories(dir)
-        Files.writeString(indexFile, json.encodeToString(Index.serializer(), index))
+        AtomicFiles.writeString(indexFile, json.encodeToString(Index.serializer(), index))
     }
 }
