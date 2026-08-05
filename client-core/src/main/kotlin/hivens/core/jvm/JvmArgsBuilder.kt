@@ -261,13 +261,23 @@ data class G1Tuning(
         if (parallelRefProcEnabled) add("-XX:+ParallelRefProcEnabled")
         add("-XX:MaxGCPauseMillis=$maxPauseMs")
         add("-XX:G1HeapRegionSize=${regionSizeMb}M")
-        add("-XX:G1NewSizePercent=$newSizePercent")
-        add("-XX:G1MaxNewSizePercent=$maxNewSizePercent")
+        // G1NewSizePercent, G1MaxNewSizePercent and G1MixedGCLiveThresholdPercent
+        // are experimental options (measured on JDK 25 and 26; the rest of this
+        // set is not). Emitting one without the unlock above does not degrade --
+        // the JVM refuses to start at all, and the launcher can only report exit
+        // code 1. Skipping them leaves the JVM's own defaults for three knobs
+        // while every other flag here still applies.
+        if (unlockExperimentalVMOptions) {
+            add("-XX:G1NewSizePercent=$newSizePercent")
+            add("-XX:G1MaxNewSizePercent=$maxNewSizePercent")
+        }
         add("-XX:G1ReservePercent=$reservePercent")
         add("-XX:G1HeapWastePercent=$heapWastePercent")
         add("-XX:G1MixedGCCountTarget=$mixedGCCountTarget")
         add("-XX:InitiatingHeapOccupancyPercent=$initiatingHeapOccupancyPercent")
-        add("-XX:G1MixedGCLiveThresholdPercent=$mixedGCLiveThresholdPercent")
+        if (unlockExperimentalVMOptions) {
+            add("-XX:G1MixedGCLiveThresholdPercent=$mixedGCLiveThresholdPercent")
+        }
         add("-XX:G1RSetUpdatingPauseTimePercent=$rsetUpdatingPauseTimePercent")
         add("-XX:SurvivorRatio=$survivorRatio")
         add("-XX:MaxTenuringThreshold=$maxTenuringThreshold")

@@ -284,6 +284,39 @@ class JvmArgsBuilderTest {
     }
 
     @Test
+    fun `no experimental G1 flag is emitted without the unlock that admits it`() {
+        // Measured on JDK 25 and 26: these three are the experimental ones in the
+        // Aikar set. Emitting any of them without -XX:+UnlockExperimentalVMOptions
+        // makes the JVM refuse to start, and the launcher can only report exit 1.
+        val experimental = listOf(
+            "-XX:G1NewSizePercent=",
+            "-XX:G1MaxNewSizePercent=",
+            "-XX:G1MixedGCLiveThresholdPercent=",
+        )
+        val args = G1Tuning.AikarDefaults.copy(unlockExperimentalVMOptions = false).toArgs()
+
+        for (flag in experimental) {
+            assertTrue(args.none { it.startsWith(flag) }, "$flag survived without the unlock: $args")
+        }
+        // The rest of the tuning is not experimental and must still apply.
+        assertTrue(args.any { it.startsWith("-XX:MaxGCPauseMillis=") })
+        assertTrue(args.any { it.startsWith("-XX:G1ReservePercent=") })
+        assertTrue(args.any { it.startsWith("-XX:MaxTenuringThreshold=") })
+    }
+
+    @Test
+    fun `a config that reaches the builder without the unlock still round-trips`() {
+        // The path that produced the unstartable set: pick a non-G1 GC, apply (the
+        // stored args now carry no unlock token), reopen, pick G1, apply.
+        val noUnlock = JvmConfig.fromArgs("-XX:+UseParallelGC -Xmx4G")
+        val backToG1 = noUnlock.copy(gc = GcChoice.G1)
+
+        val args = backToG1.toArgs()
+        assertTrue(args.none { it.startsWith("-XX:G1NewSizePercent=") }, "unstartable arg set: $args")
+        assertEquals(args, JvmConfig.fromArgs(args.joinToString(" ")).toArgs())
+    }
+
+    @Test
     fun `preset ids are unique`() {
         val ids = JvmArgsPresets.all.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "Duplicate preset ids: $ids")
