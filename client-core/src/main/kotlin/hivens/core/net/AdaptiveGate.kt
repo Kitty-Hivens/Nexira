@@ -35,8 +35,26 @@ class AdaptiveGate(
      * One element per allowed slot. UNLIMITED because the channel is only ever a
      * counter here: sends come from [release] and [grow], and there are never
      * more tokens outstanding than [max].
+     *
+     * [onUndeliveredElement] is what keeps the pool from draining. `receive()`
+     * gives a prompt-cancellation guarantee, and its own contract says the
+     * element already removed from the channel may be lost when the receiving
+     * coroutine is cancelled. A lost token is a permit gone for the process --
+     * [grow] only mints one on a successful probe, and [advance] cannot even
+     * probe while `inFlight < target`, which is exactly the state a drained pool
+     * sits in. Cancellation here is routine, not exotic: `fetchAll` is a
+     * `coroutineScope`, so one transfer exhausting its sources cancels every
+     * sibling parked in `acquire`, and a user cancelling an install does the
+     * same. Handing the token back closes that leak.
      */
-    private val tokens = Channel<Unit>(Channel.UNLIMITED)
+    private val tokens: Channel<Unit> = Channel(
+        capacity = Channel.UNLIMITED,
+        onUndeliveredElement = { returnLostPermit() },
+    )
+
+    private fun returnLostPermit() {
+        tokens.trySend(Unit)
+    }
 
     private val lock = Any()
     private var target: Int = initial.coerceIn(min, max)

@@ -1,7 +1,15 @@
 package hivens.core.net
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlin.test.Test
@@ -13,6 +21,40 @@ class AdaptiveGateTest {
 
     private fun gate(initial: Int, max: Int) =
         AdaptiveGate(initial = initial, min = 1, max = max, nowMs = { now })
+
+    @Test
+    fun `permits survive cancellation racing the handover`() = runBlocking {
+        // fetchAll is a coroutineScope, so one transfer exhausting its sources
+        // cancels every sibling parked in acquire; a user cancelling an install
+        // does the same. A permit lost there is lost for the process: grow() only
+        // mints one on a successful probe, and advance() cannot probe while
+        // inFlight < target -- the state a drained pool sits in.
+        val gate = AdaptiveGate(initial = 4, min = 1, max = 4, nowMs = { 0L })
+
+        repeat(400) {
+            coroutineScope {
+                val jobs = List(8) { launch { gate.withPermit { delay(50) } } }
+                yield()
+                jobs.forEach { it.cancel() }
+            }
+        }
+
+        // If any permit leaked, fewer than four holders can be in flight at once
+        // and this times out instead of completing.
+        val allFour = withTimeoutOrNull(5_000) {
+            coroutineScope {
+                val entered = CountDownLatch(4)
+                val release = CompletableDeferred<Unit>()
+                repeat(4) {
+                    launch { gate.withPermit { entered.countDown(); release.await() } }
+                }
+                val ok = withContext(Dispatchers.IO) { entered.await(4, TimeUnit.SECONDS) }
+                release.complete(Unit)
+                ok
+            }
+        }
+        assertEquals(true, allFour, "the pool drained -- downloads would hang with no error")
+    }
 
     @Test
     fun `an error halves the pool and keeps halving it down to one`() {
