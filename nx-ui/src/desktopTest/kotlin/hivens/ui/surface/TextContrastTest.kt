@@ -101,6 +101,47 @@ class TextContrastTest {
         return 0.2126 * lin(c.red) + 0.7152 * lin(c.green) + 0.0722 * lin(c.blue)
     }
 
+    @Test
+    fun `the surface roles a plane can take are all distinguishable from each other`() {
+        // The failure this catches is not a contrast one: `glassSurfaceAlpha` returned
+        // the SAME opaque colour for every requested depth on a light palette, so all
+        // ninety of its call sites drew one flat white and a card, its page and a
+        // nested panel were literally the same colour. A ladder whose rungs collapse
+        // has the same effect, so measure that the rungs are apart -- in perceptual
+        // lightness, which is what "can I see the difference" actually asks.
+        for ((name, palette) in palettes()) {
+            val rungs = listOf("background" to palette.background) + ladder(palette)
+            for (i in rungs.indices) {
+                for (j in i + 1 until rungs.size) {
+                    val d = kotlin.math.abs(lstar(rungs[i].second) - lstar(rungs[j].second))
+                    assertTrue(
+                        d >= LADDER_STEP,
+                        "$name: ${rungs[i].first} and ${rungs[j].first} are ${"%.2f".format(d)} L* apart, " +
+                            "under $LADDER_STEP -- they will read as one surface",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a divider is visible against every plane it can sit on`() {
+        // The news rail drew its dividers with the surface helper, so on light they
+        // were white lines on white. A divider is a line role, not a body one.
+        for ((name, palette) in palettes()) {
+            for ((level, bg) in ladder(palette)) {
+                val d = kotlin.math.abs(lstar(palette.outline) - lstar(bg))
+                assertTrue(d >= LADDER_STEP, "$name/$level: the outline is only ${"%.2f".format(d)} L* from the plane")
+            }
+        }
+    }
+
+    private fun lstar(c: Color): Double {
+        fun lin(v: Float) = if (v <= 0.04045f) v / 12.92 else Math.pow(((v + 0.055) / 1.055), 2.4)
+        val y = 0.2126 * lin(c.red) + 0.7152 * lin(c.green) + 0.0722 * lin(c.blue)
+        return if (y > 0.008856) 116 * Math.cbrt(y) - 16 else 903.3 * y
+    }
+
     private fun palettes(): List<Pair<String, NxColors>> =
         listOf("dark" to DarkColorPalette, "light" to LightColorPalette)
 
@@ -125,5 +166,11 @@ class TextContrastTest {
 
         /** WCAG AA, large or bold text and UI components. */
         const val LARGE_FLOOR = 3.0
+
+        /**
+         * Perceptual-lightness gap below which two planes read as one surface.
+         * Deliberately modest: this is a collapse detector, not a spacing opinion.
+         */
+        const val LADDER_STEP = 1.5
     }
 }
