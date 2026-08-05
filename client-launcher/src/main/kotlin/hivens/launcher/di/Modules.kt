@@ -552,7 +552,6 @@ val mirrorModule = module {
             client = get<SmrtPackClient>(),
             syncService = get(),
             repository = get(),
-            protectedPaths = get(),
             snapshotService = get(),
             journal = get(),
             dataDir = get(),
