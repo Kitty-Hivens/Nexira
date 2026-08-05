@@ -19,6 +19,9 @@ class DefaultLayoutTest {
                 "appshell.root",
                 "appshell.body",
                 "appshell.topbar",
+                // Floats over the content column rather than taking space in it;
+                // carries the activity pill.
+                "appshell.overlay",
                 // kernel-3 originals
                 "home.classic", "home.new", "library",
                 "appshell.leftrail", "appshell.rightrail",
