@@ -40,7 +40,9 @@ class NetworkModuleGraphTest {
     fun teardown() {
         NetworkState.clearForTests()
         stopKoin()
-        Files.walk(dataDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(dataDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     @Test

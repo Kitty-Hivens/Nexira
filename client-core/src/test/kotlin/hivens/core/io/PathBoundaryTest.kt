@@ -20,7 +20,9 @@ class PathBoundaryTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(root).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(root).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     @Test

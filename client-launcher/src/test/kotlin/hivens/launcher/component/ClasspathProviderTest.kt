@@ -34,7 +34,9 @@ class ClasspathProviderTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(clientRoot).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(clientRoot).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun touch(rel: String) {

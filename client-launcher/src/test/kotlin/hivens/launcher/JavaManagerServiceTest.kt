@@ -52,7 +52,9 @@ class JavaManagerServiceTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // ── detectJavaVersion: MC version -> Java major ───────────────────────

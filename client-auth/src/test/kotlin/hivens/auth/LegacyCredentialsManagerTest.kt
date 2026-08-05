@@ -42,7 +42,9 @@ class LegacyCredentialsManagerTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun session(password: String? = "secret-pw", accessToken: String = "fake-game-token") = SessionData(

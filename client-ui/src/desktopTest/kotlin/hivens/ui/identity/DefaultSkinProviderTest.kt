@@ -28,7 +28,9 @@ class DefaultSkinProviderTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(root).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(root).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun writeJar(pack: String, name: String, entries: Map<String, ByteArray>) {
@@ -83,7 +85,9 @@ class DefaultSkinProviderTest {
         writeJar("Create", "neoforge-1.21.1.jar", modernEntries())
         val p = DefaultSkinProvider(clients, cache)
         assertEquals(9, p.list().size)
-        Files.walk(clients / "Create").sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(clients / "Create").use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
         assertEquals(9, p.list().size, "cached defaults survive the source jar going away")
     }
 }

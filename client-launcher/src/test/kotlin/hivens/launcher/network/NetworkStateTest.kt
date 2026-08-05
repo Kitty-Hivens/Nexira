@@ -28,7 +28,9 @@ class NetworkStateTest {
     @AfterTest
     fun teardown() {
         NetworkState.clearForTests()
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // ── bypass semantics ───────────────────────────────────────────────────

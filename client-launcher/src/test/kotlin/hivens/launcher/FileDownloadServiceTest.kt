@@ -46,7 +46,9 @@ class FileDownloadServiceTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(workDir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     // ── normalizePath: strip server-prefix, keep canonical mod/config dirs ──

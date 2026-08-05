@@ -30,7 +30,9 @@ class LinuxUpdateApplicatorTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(dir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(dir).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun file(name: String, content: String): Path =

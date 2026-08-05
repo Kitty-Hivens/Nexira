@@ -30,7 +30,9 @@ class DiagnosticBundleTest {
 
     @AfterTest
     fun teardown() {
-        Files.walk(home).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.walk(home).use { walk ->
+            walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
+        }
     }
 
     private fun entries(zip: Path): Map<String, String> {
