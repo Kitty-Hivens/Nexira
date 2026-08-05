@@ -33,9 +33,13 @@ pass=0
 fail=0
 warn=0
 
-ok()   { ((pass++)); echo -e "  ${GREEN}✓${NC} $1"; }
-fail() { ((fail++)); echo -e "  ${RED}✗${NC} $1"; }
-warn() { ((warn++)); echo -e "  ${YELLOW}⚠${NC} $1"; }
+# Arithmetic ASSIGNMENT, not ((...)). `((pass++))` evaluates to the value BEFORE
+# the increment, so at pass=0 the command's exit status is 1 -- and under the
+# `set -e` above, in an untested context, that aborted the whole script on its
+# first PASSING check. The gate has never run to completion.
+ok()   { pass=$((pass + 1)); echo -e "  ${GREEN}✓${NC} $1"; }
+fail() { fail=$((fail + 1)); echo -e "  ${RED}✗${NC} $1"; }
+warn() { warn=$((warn + 1)); echo -e "  ${YELLOW}⚠${NC} $1"; }
 info() { echo -e "  ${CYAN}ℹ${NC} $1"; }
 
 # ── Resolve SHA256 command ─────────────────────────────────────────────────
@@ -232,8 +236,10 @@ else
     echo "── Download & SHA256 verification ────────────────────────"
 
     TMPDIR=$(mktemp -d)
-    # shellcheck disable=SC2064
-    trap "rm -rf $TMPDIR" EXIT
+    # Single-quoted so the path expands at trap time, inside quotes. Double-quoting
+    # baked the path in unquoted, so a TMPDIR holding a space became
+    # `rm -rf /mnt/My Disk/tmp.X` -- two arguments, the first of them a real path.
+    trap 'rm -rf "$TMPDIR"' EXIT
 
     # Download SHA256SUMS.txt first
     SUMS_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "SHA256SUMS.txt") | .browser_download_url // ""')
@@ -245,7 +251,10 @@ else
     fi
 
     # Download and verify each installer
-    echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | test("\\.(exe|dmg|AppImage)$")) | "\(.name)\t\(.browser_download_url)\t\(.size)"' | \
+    # Redirect rather than pipe: a piped `while` runs in a subshell, so every
+    # fail() inside it incremented a copy and the summary below still read zero.
+    # A SHA256 mismatch -- the one check that looks at the shipped bytes -- could
+    # not fail the run.
     while IFS=$'\t' read -r NAME URL SIZE; do
         SIZE_MB=$((SIZE / 1024 / 1024))
         info "Downloading $NAME (${SIZE_MB} MB)..."
@@ -272,7 +281,7 @@ else
         else
             fail "Download failed: $NAME"
         fi
-    done
+    done < <(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | test("\\.(exe|dmg|AppImage)$")) | "\(.name)\t\(.browser_download_url)\t\(.size)"')
 fi
 
 echo ""
