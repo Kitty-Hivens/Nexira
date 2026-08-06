@@ -312,6 +312,10 @@ fun FrameWindowScope.AppShellContent(
     // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
     // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
     // the palette from it. Default-on; the seed is null until a bitmap is decoded.
+    // Switching seeding off is how a theme preset is seen in its own colours, so the
+    // flag is state here rather than a read of the startup snapshot.
+    var paletteFromWallpaper by remember { mutableStateOf(settings.paletteFromWallpaper) }
+    var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
     // Which source drives dark/light: the manual toggle, the OS scheme, or the
     // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
     // persist it), so everything downstream keeps reading one boolean.
@@ -948,6 +952,8 @@ fun FrameWindowScope.AppShellContent(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
                 style        = effectiveStyle,
+                paletteSeed  = wallpaperSeed,
+                paletteFromWallpaper = paletteFromWallpaper,
             ) {
                 ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
@@ -979,6 +985,7 @@ fun FrameWindowScope.AppShellContent(
                                 exitApp()
                             }
                         },
+                        onWallpaperSeed = { wallpaperSeed = it },
                         onWallpaperLuminance = { wallpaperLuminance = it },
                         onRealExit   = exitApp,
                         onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
@@ -1007,6 +1014,13 @@ fun FrameWindowScope.AppShellContent(
                             ))
                         },
                         systemThemeAvailable = systemThemeAvailable,
+                        paletteFromWallpaper = paletteFromWallpaper,
+                        onPaletteFromWallpaperChanged = { seeded ->
+                            paletteFromWallpaper = seeded
+                            settingsService.saveSettings(
+                                settingsService.getSettings().copy(paletteFromWallpaper = seeded),
+                            )
+                        },
                         customTheme          = customTheme,
                         onCustomThemeChanged = { newTheme ->
                             customTheme = newTheme
@@ -1047,6 +1061,8 @@ fun FrameWindowScope.AppShellContent(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
                 style        = effectiveStyle,
+                paletteSeed  = wallpaperSeed,
+                paletteFromWallpaper = paletteFromWallpaper,
             ) {
                 DebugOverlay(debugOverlay)
                 // Inside the theme on purpose: the prompt is a Dialog with its own
@@ -1076,6 +1092,7 @@ fun FrameWindowScope.AppShellContent(
 @Composable
 fun AppRoot(
     onCloseApp: () -> Unit,
+    onWallpaperSeed: (Int?) -> Unit,
     onWallpaperLuminance: (Float?) -> Unit,
     isDarkTheme: Boolean,
     onRealExit: () -> Unit,
@@ -1084,6 +1101,8 @@ fun AppRoot(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
+    paletteFromWallpaper: Boolean,
+    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -1256,6 +1275,9 @@ fun AppRoot(
     // redraw a blurred slice of it. EMPTY until an image is set.
     var backdrop   by remember { mutableStateOf(BackdropState.EMPTY) }
 
+    // Material You: forward the wallpaper palette seed (computed in CustomBackground
+    // from the static bitmap or the first video frame) up to NxTheme.
+    LaunchedEffect(backdrop.seedArgb) { onWallpaperSeed(backdrop.seedArgb) }
     LaunchedEffect(backdrop.avgLuminance) { onWallpaperLuminance(backdrop.avgLuminance) }
 
     Box(
@@ -1317,6 +1339,8 @@ fun AppRoot(
                 themeMode = themeMode,
                 onThemeModeChanged = onThemeModeChanged,
                 systemThemeAvailable = systemThemeAvailable,
+                paletteFromWallpaper = paletteFromWallpaper,
+                onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
                 customTheme = customTheme,
                 onCustomThemeChanged = onCustomThemeChanged,
                 currentLocale = currentLocale,
