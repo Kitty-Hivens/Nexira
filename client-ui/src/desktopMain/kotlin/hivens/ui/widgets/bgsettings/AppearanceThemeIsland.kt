@@ -40,6 +40,8 @@ internal fun AppearanceThemeIsland(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
+    paletteFromWallpaper: Boolean,
+    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
@@ -82,6 +84,18 @@ internal fun AppearanceThemeIsland(
                 }
             }
 
+            // Palette source, the axis under the theme source: on, the wallpaper seeds
+            // the base palette and a preset lands tinted on top of it; off, the preset
+            // is the palette. Sits above the picker row so the choice is made before
+            // walking into it.
+            NxToggle(
+                label           = s.settingsPaletteFromWallpaper,
+                checked         = paletteFromWallpaper,
+                description     = s.settingsPaletteFromWallpaperDesc,
+                icon            = NxIcon.Palette,
+                accent          = NxTheme.colors.primary,
+                onCheckedChange = onPaletteFromWallpaperChanged,
+            )
 
             BgPicker(s.settingsUiStyleTitle) {
                 NxChoiceChip(s.settingsUiStyleCelestia, uiStyle == UiStyle.Celestia) { onUiStyleChanged(UiStyle.Celestia) }
