@@ -81,6 +81,7 @@ import hivens.ui.chrome.WindowMaximizer
 import hivens.ui.chrome.WindowResizeHandles
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.UpdateManager
+import hivens.core.io.AtomicFiles
 import hivens.ui.customization.CustomizationManager
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.LocalCustomization
@@ -532,7 +533,7 @@ fun FrameWindowScope.AppShellContent(
         val autoSyncService: AutoSyncService = koinInject()
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
-        val themeManager  = remember { ThemeManager(dataDirectory) }
+        val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
         var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
         // Customization extension: persisted overrides for accent /
@@ -540,7 +541,7 @@ fun FrameWindowScope.AppShellContent(
         // via [LocalCustomization] so NxTheme and the glass surfaces
         // can read without prop-drilling.
         val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
-        val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson) }
+        val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }
 
         // Per-domain console preferences -- the same JSON-file-per-manager
