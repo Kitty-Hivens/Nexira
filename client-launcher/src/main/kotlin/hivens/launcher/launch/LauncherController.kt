@@ -232,11 +232,19 @@ class LauncherController(
     @Volatile private var currentAbortToken: AtomicBoolean? = null
 
     /**
-     * The post-spawn content guard for the live session, cancelled the moment the
-     * process is gone. Held here rather than scoped to the launch coroutine because
-     * that coroutine spends the session parked in a blocking `awaitExit`.
+     * Identity of the launch that currently owns the controller's shared state --
+     * [runningHandle], [_runningPackInstanceId] and [_state].
+     *
+     * Aborting A and immediately launching B is allowed: abort sets Idle
+     * synchronously while A's coroutine is still parked in a blocking `awaitExit`
+     * that cancellation cannot interrupt. A then wakes up, potentially long after B
+     * spawned, and everything its tail clears would be B's. Each launch checks that
+     * it is still the current one before touching anything shared, and otherwise
+     * unwinds silently.
      */
-    @Volatile private var watchdogJob: Job? = null
+    @Volatile private var currentLaunchTag: Any? = null
+
+    private fun ownsController(tag: Any): Boolean = currentLaunchTag === tag
 
     /**
      * SC server-list launch. Delegates the gate/token/MDC/spawn/wait/exit
@@ -265,8 +273,12 @@ class LauncherController(
     private sealed interface Prepared {
         class Ready(
             val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> SpawnResult,
-            /** Runs once after the process spawns. [launchInternal] guards it, so it never fails the launch. */
-            val onSpawned: (suspend (handle: LaunchHandle) -> Unit)? = null,
+            /**
+             * Runs once after the process spawns. [launchInternal] guards it, so it
+             * never fails the launch. Returns a job to cancel when the process is
+             * gone (a session-long guard), or null when it has nothing to keep.
+             */
+            val onSpawned: (suspend (handle: LaunchHandle) -> Job?)? = null,
             /** Runs once after the game process exits, with the session length in seconds. Guarded like [onSpawned]. */
             val onExit: (suspend (sessionSeconds: Long) -> Unit)? = null,
             /**
@@ -318,8 +330,14 @@ class LauncherController(
         val launchId = UUID.randomUUID().toString().take(8)
         val abortToken = AtomicBoolean(false)
         currentAbortToken = abortToken
+        val launchTag = Any()
+        currentLaunchTag = launchTag
 
         launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
+            // Local, not a field: a field would let an aborted launch's tail cancel
+            // the guard of the launch that started after it -- the same shape of
+            // race currentAbortToken's KDoc describes.
+            var sessionGuard: Job? = null
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
                 onStart()
@@ -346,7 +364,8 @@ class LauncherController(
                         // Post-spawn hook guarded centrally: a throwing hook must
                         // not flip the running game into an Error state.
                         prepared.onSpawned?.let { hook ->
-                            runCatching { hook(handle) }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+                            runCatching { sessionGuard = hook(handle) }
+                                .onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
                         }
                         val sessionStart = Instant.now().epochSecond
 
@@ -356,13 +375,16 @@ class LauncherController(
                         val exitCode = handle.awaitExit()
                         // Whatever the post-spawn guard was still watching for, the
                         // process is gone and there is nothing left to watch it on.
-                        watchdogJob?.cancel()
-                        watchdogJob = null
-                        runningHandle = null
-                        // Cleared here rather than in the pack path's own exit hook:
-                        // that hook is guarded and may be skipped, and "no files are
-                        // in use" has to be true the moment the process is gone.
-                        _runningPackInstanceId.value = null
+                        // Unconditional: this one is this launch's own.
+                        sessionGuard?.cancel()
+                        if (ownsController(launchTag)) {
+                            runningHandle = null
+                            // Cleared here rather than in the pack path's own exit
+                            // hook: that hook is guarded and may be skipped, and "no
+                            // files are in use" has to be true the moment the
+                            // process is gone.
+                            _runningPackInstanceId.value = null
+                        }
                         ActionRing.record("Game exited: $label (code $exitCode)")
                         prepared.onExit?.let { hook ->
                             val secs = (Instant.now().epochSecond - sessionStart).coerceAtLeast(0)
@@ -370,8 +392,11 @@ class LauncherController(
                         }
 
                         when {
-                            // Read first: this exit code IS the guard's doing, and
-                            // judging it would overwrite the reason it gave.
+                            // A newer launch owns the state now: this one exited
+                            // into a world that has moved on and says nothing.
+                            !ownsController(launchTag) -> Unit
+                            // Read before the exit code: that code IS the guard's
+                            // doing, and judging it would overwrite the reason.
                             prepared.contentFailed.get() -> Unit
                             exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
                             else -> _state.value = LaunchState.Idle
@@ -379,14 +404,16 @@ class LauncherController(
                     }
                 }
             } catch (e: Exception) {
-                watchdogJob?.cancel()
-                watchdogJob = null
-                runningHandle = null
-                _runningPackInstanceId.value = null
+                sessionGuard?.cancel()
+                val mine = ownsController(launchTag)
+                if (mine) {
+                    runningHandle = null
+                    _runningPackInstanceId.value = null
+                }
                 if (e !is CancellationException) {
                     logger.error("Launch flow failed for {}", label, e)
-                    fail(LaunchError.Internal(e.message ?: ""), e)
-                } else {
+                    if (mine) fail(LaunchError.Internal(e.message ?: ""), e)
+                } else if (mine) {
                     _state.value = LaunchState.Idle
                 }
             }
@@ -783,7 +810,9 @@ class LauncherController(
                 // no token has nothing to lend to a jar that arrives late, and its
                 // owner's `mods/` is their own business.
                 if (serverBound && verdict.verified) {
-                    watchdogJob = watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
+                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
+                } else {
+                    null
                 }
             },
             onExit = { secs ->
@@ -824,6 +853,14 @@ class LauncherController(
             expected = modBaseline(instance),
         ).run()
         if (findings.isEmpty()) return@launch
+        // The process this was armed for must still be the controller's live one.
+        // An aborted launch stays parked in its blocking wait, so its guard can
+        // outlive it and reach a session that started afterwards -- and end that
+        // one instead, over findings about an instance nobody is playing.
+        if (runningHandle !== handle) {
+            logger.info("Content changed on {} after its session ended; nothing to act on", instance.displayName)
+            return@launch
+        }
 
         // Raised BEFORE the process is ended, so the exit verdict already sees it
         // when the wait returns and does not overwrite the reason with an exit code.
