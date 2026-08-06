@@ -64,8 +64,8 @@ class MenuOpacityRenderTest {
         val image = scene.render()
         scene.close()
 
-        // Save the frame for eyeballing too.
-        val outDir = File("/tmp/claude-1000/-home-haru-Nexira/e55b3682-bae2-4e22-8d3c-218a4d20187f/scratchpad")
+        // Save the frame for eyeballing too, beside every other render sheet.
+        val outDir = File("build/render")
         outDir.mkdirs()
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(outDir, "menu-opacity.png").writeBytes(it) }
 
