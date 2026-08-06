@@ -94,8 +94,6 @@ object RussianStrings : AppStrings {
     override val settingsThemeModeSystem            = "Система"
     override val settingsThemeModeWallpaper         = "Обои"
     override val settingsThemeModeSystemUnavailable = "Системная схема недоступна в этой среде"
-    override val settingsPaletteFromWallpaper       = "Цвета из обоев"
-    override val settingsPaletteFromWallpaperDesc   = "Выключено: тема сохраняет свои цвета"
     override val settingsCustomChrome               = "Своя строка заголовка"
     override val settingsCustomChromeDesc           = "Заменяет заголовок окна собственной верхней панелью. Применится при следующем запуске."
     override val settingsCustomChromeTiling         = "Твой оконный менеджер не рисует заголовок, так что здесь это ничего не меняет."

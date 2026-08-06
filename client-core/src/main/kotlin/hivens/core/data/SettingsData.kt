@@ -86,7 +86,6 @@ data class SettingsData(
      * differ by colour, not just lightness. On by default. Off -> the fixed
      * Celestia palette (and manual theme overrides) apply as before.
      */
-    val paletteFromWallpaper: Boolean = true,
     /**
      * Legacy mirror of `themeMode == Wallpaper`, kept so a downgrade to a build
      * that predates [themeMode] still honours the wallpaper opt-in. New code
