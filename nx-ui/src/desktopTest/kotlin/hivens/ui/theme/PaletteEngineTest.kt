@@ -40,24 +40,8 @@ class PaletteEngineTest {
 
     private val seed = 0xFF3B82F6.toInt()
 
-    @Test
-    fun seedingOffKeepsTheFixedPalette() {
-        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = seed, fromWallpaper = false))
-        assertEquals(LightColorPalette, resolveBasePalette(dark = false, seed = seed, fromWallpaper = false))
-    }
 
-    @Test
-    fun seedingOnDerivesFromTheSeed() {
-        assertEquals(
-            seededNxColors(DarkColorPalette, seed, dark = true),
-            resolveBasePalette(dark = true, seed = seed, fromWallpaper = true),
-        )
-    }
 
-    @Test
-    fun seedingOnWithoutASeedKeepsTheFixedPalette() {
-        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = null, fromWallpaper = true))
-    }
 
     @Test
     fun brandTokensPreserved() {
@@ -70,5 +54,15 @@ class PaletteEngineTest {
         assertEquals(base.originSmartycraft, p.originSmartycraft)
         assertEquals(base.decorativeRamp, p.decorativeRamp)
         assertNotEquals(base.warnAccent, p.warnAccent)
+    }
+
+    @Test
+    fun theOnlyBasePalettesAreTheFixedPair() {
+        // The seeding switch is gone: a generated palette used to replace the
+        // surface ladder whenever a wallpaper was set, so the app had two light
+        // themes and which one rendered depended on a setting. There is one per
+        // side now, and this is what says so.
+        assertEquals(DarkColorPalette, resolveBasePalette(dark = true))
+        assertEquals(LightColorPalette, resolveBasePalette(dark = false))
     }
 }
