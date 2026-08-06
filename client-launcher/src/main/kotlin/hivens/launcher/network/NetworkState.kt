@@ -1,5 +1,6 @@
 package hivens.launcher.network
 
+import hivens.core.io.AtomicFiles
 import hivens.core.security.SslBypassEntry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -145,8 +146,7 @@ object NetworkState {
     private fun save() {
         val file = persistenceFile ?: return
         try {
-            if (file.parent != null) Files.createDirectories(file.parent)
-            Files.writeString(file, json.encodeToString(bypasses))
+            AtomicFiles.writeString(file, json.encodeToString(bypasses))
         } catch (e: Exception) {
             log.warn("Failed to write ssl-bypasses.json: {}", e.message)
         }

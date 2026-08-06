@@ -1,5 +1,6 @@
 package hivens.ui.utils
 
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -126,8 +127,7 @@ class ConsoleSettingsManager(
 
     fun save(settings: ConsoleSettings) {
         try {
-            Files.createDirectories(settingsFile.parent)
-            Files.writeString(settingsFile, json.encodeToString(settings.coerced()))
+            AtomicFiles.writeString(settingsFile, json.encodeToString(settings.coerced()))
         } catch (e: Exception) {
             log.error("Failed to save console settings", e)
         }

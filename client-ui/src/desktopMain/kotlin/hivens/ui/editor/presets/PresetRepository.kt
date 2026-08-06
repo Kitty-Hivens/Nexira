@@ -1,10 +1,10 @@
 package hivens.ui.editor.presets
 
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import kotlin.io.path.copyTo
 import kotlin.io.path.isRegularFile
@@ -61,19 +61,10 @@ class PresetRepository(
     }
 
     fun save(envelope: PresetEnvelope) {
-        Files.createDirectories(presetsDir)
-        val target = pathFor(envelope.name)
-        val tmp = target.resolveSibling("${target.fileName}.tmp")
-        Files.writeString(tmp, json.encodeToString(envelope))
-        try {
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-            log.warn(
-                "Filesystem at {} does not support ATOMIC_MOVE; falling back to non-atomic rename for preset {}",
-                presetsDir, envelope.name,
-            )
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
-        }
+        // The hand-rolled tmp-then-rename this replaces published whole files but
+        // never flushed them, so a power loss could persist the rename over bytes
+        // still in the page cache. AtomicFiles is the same sequence with the fsyncs.
+        AtomicFiles.writeString(pathFor(envelope.name), json.encodeToString(envelope))
     }
 
     fun delete(name: String): Boolean {
