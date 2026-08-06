@@ -44,15 +44,20 @@ fun glassSurfaceAlpha(baseAlpha: Float): Color {
  * and a continuous blend would put shades between them that nothing else in the
  * system knows about and no test can hold to a separation rule.
  *
+ * The shallow end has to land on `surface`, not a rung above it. `FrostTier.Clear`
+ * tints from its own Surface role at 0.35 and the shell's corner wedge is drawn
+ * with `glassSurfaceAlpha(0.35)` precisely so the two agree -- the wedge exists to
+ * carry the content's corner into the chrome, and it can only do that while it is
+ * the same colour. Splitting them put a visible patch where the join had been.
+ *
  * This used to return `surface` for every value. Eight distinct depths across
  * forty-odd call sites all came out as one pixel, which is why a card, the page it
  * sat on and a panel nested inside it were literally the same colour.
  */
 private fun lightPlaneFor(baseAlpha: Float, colors: NxColors): Color = when {
-    baseAlpha < 0.40f -> colors.surfaceContainerLow
-    baseAlpha < 0.52f -> colors.surface
-    baseAlpha < 0.70f -> colors.surfaceContainer
-    else              -> colors.surfaceContainerHigh
+    baseAlpha <= 0.50f -> colors.surface
+    baseAlpha < 0.70f  -> colors.surfaceContainer
+    else               -> colors.surfaceContainerHigh
 }
 
 /**

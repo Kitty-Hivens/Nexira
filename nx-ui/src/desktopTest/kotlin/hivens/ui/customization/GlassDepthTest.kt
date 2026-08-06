@@ -63,6 +63,20 @@ class GlassDepthTest {
     }
 
     @Test
+    fun `the shallow end matches what the Clear tier paints`() {
+        // The shell draws a wedge that carries the content's corner into the chrome,
+        // and it does that by painting `glassSurfaceAlpha(0.35)` next to a Clear
+        // surface, which tints from its own Surface role. They only join while the
+        // two are the same colour; when they parted, the wedge read as a patch stuck
+        // on the corner instead of a transition.
+        assertEquals(
+            LightColorPalette.surface,
+            resolve(0.35f, LightColorPalette),
+            "the wedge and the chrome it joins must resolve to one colour",
+        )
+    }
+
+    @Test
     fun `dark still composites and still honours the glass knob`() {
         // The light branch must not have taken the dark one with it: there the
         // number is an alpha over the page, and that is what the intensity scales.
