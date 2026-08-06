@@ -90,6 +90,11 @@ public final class AuthlibRedirectAgent {
         // SC's own patch collapses this to a single ".smartycraft.ru"; two equal
         // entries are behaviourally identical (the array length is bytecode, not a
         // constant we can resize).
+        //
+        // Both entries are authlib <= 7.0.61. From 7.0.63 the checker holds
+        // "textures.minecraft.net" alone and compares the whole host for equality,
+        // so neither of these is present and nothing is repointed --
+        // redirectTextureDomains says so out loud rather than leaving it silent.
         m.put(".minecraft.net", "." + baseDomain);
         m.put(".mojang.com", "." + baseDomain);
         Map<String, byte[]> out = new HashMap<String, byte[]>();
@@ -111,7 +116,9 @@ public final class AuthlibRedirectAgent {
             boolean session = className.equals(LEGACY_SESSION);
             if (!session && !className.equals(MODERN_TEXTURES)) return null;
             try {
-                byte[] out = rewriteConstants(classfileBuffer, replacements);
+                byte[] out = session
+                    ? rewriteConstants(classfileBuffer, replacements)
+                    : redirectTextureDomains(classfileBuffer, replacements);
                 // The legacy session service also rejects any texture whose property
                 // is not signed by Mojang -- a signature SC cannot produce. Drop that
                 // gate (force requireSecure=false in getTextures) so SC's unsigned
@@ -126,6 +133,34 @@ public final class AuthlibRedirectAgent {
                 return null; // leave the original class on any trouble
             }
         }
+    }
+
+    /**
+     * The texture-domain whitelist is repointed by constant swap alone -- there is no
+     * bytecode patch to fall back on -- so a class that matched nothing was rewritten
+     * in name only, and nothing says so.
+     *
+     * That is not hypothetical. Up to authlib 7.0.61 {@code TextureUrlChecker} held
+     * {@code ".minecraft.net"} and {@code ".mojang.com"} and tested a URL's host by
+     * suffix. From 7.0.63 (Minecraft 26.1.2) it holds one entry,
+     * {@code "textures.minecraft.net"}, and tests the whole host for equality against
+     * a {@code Set}. Neither constant this agent moves is in that class any more, so
+     * on those versions the whitelist keeps pointing at Mojang, every SmartyCraft skin
+     * URL is refused, and all players render as the default skin while the join --
+     * redirected by its own full-URL constants -- goes on working. Exactly the shape
+     * of failure that is impossible to diagnose from the game.
+     *
+     * This does not fix that; repointing the new form needs SmartyCraft's exact skin
+     * host, since equality leaves no room for a suffix. It makes the silence stop.
+     */
+    static byte[] redirectTextureDomains(byte[] classBytes, Map<String, byte[]> replacements) {
+        byte[] out = rewriteConstants(classBytes, replacements);
+        if (out == classBytes) {
+            System.err.println("[authlib-agent] TextureUrlChecker carries none of the domain constants this "
+                + "agent redirects (authlib 7.0.63+ replaced them with one exact-match host); SmartyCraft "
+                + "skin URLs will be refused and every player renders as the default skin");
+        }
+        return out;
     }
 
     /**

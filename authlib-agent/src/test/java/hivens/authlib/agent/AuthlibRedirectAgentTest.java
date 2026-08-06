@@ -59,6 +59,34 @@ class AuthlibRedirectAgentTest {
     }
 
     @Test
+    void textureDomainsWarnWhenTheCheckerHoldsNoneOfThem() throws Exception {
+        // authlib 7.0.63 replaced the two suffix constants with a single host compared
+        // for equality, so the swap finds nothing and the whitelist keeps pointing at
+        // Mojang. Skins then fail while the join keeps working -- undiagnosable from
+        // inside the game unless the agent says so.
+        Map<String, byte[]> map = AuthlibRedirectAgent.buildReplacements("www.smartycraft.ru");
+        byte[] modern = readClassBytes(TextureCheckerModernSample.class);
+        byte[][] out = new byte[1][];
+        String warned = captureErr(() -> out[0] = AuthlibRedirectAgent.redirectTextureDomains(modern, map));
+
+        assertSame(modern, out[0], "nothing matched, so the class must come back untouched");
+        assertTrue(warned.contains("[authlib-agent]") && warned.contains("default skin"),
+                "a checker the agent cannot repoint must leave a breadcrumb: " + warned);
+    }
+
+    @Test
+    void textureDomainsStaySilentWhenTheSwapLands() throws Exception {
+        // The legacy shape still carries both constants: repointed, and nothing to say.
+        Map<String, byte[]> map = AuthlibRedirectAgent.buildReplacements("www.smartycraft.ru");
+        byte[] legacy = readClassBytes(Sample.class);
+        byte[][] out = new byte[1][];
+        String quiet = captureErr(() -> out[0] = AuthlibRedirectAgent.redirectTextureDomains(legacy, map));
+
+        assertNotSame(legacy, out[0], "the legacy constants must still be swapped");
+        assertEquals("", quiet, "a successful repoint must not warn");
+    }
+
+    @Test
     void acceptUnsignedTexturesDropsTheSecureGate() throws Exception {
         byte[] original = readClassBytes(TextureSample.class);
         byte[] patched = AuthlibRedirectAgent.acceptUnsignedTextures(original);
