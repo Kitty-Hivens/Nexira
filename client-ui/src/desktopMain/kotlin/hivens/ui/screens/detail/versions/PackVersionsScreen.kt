@@ -166,7 +166,14 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
 
     fun afterApply() {
         refreshInstance()
-        snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
+        // listSnapshots walks the snapshot root and reads a record per entry. Both
+        // callers here run on the composition's dispatcher, which is the UI thread,
+        // so the walk has to be handed to IO or it stalls the window.
+        scope.launch {
+            snapshots = withContext(Dispatchers.IO) {
+                runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
+            }
+        }
     }
 
     fun doSwitch(targetVersion: String) =
@@ -182,7 +189,9 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     LaunchedEffect(pack.id, loadTick) {
         loadFailed = false
         builds = null
-        snapshots = runCatching { updater.listSnapshots(pack) }.getOrDefault(emptyList())
+        snapshots = withContext(Dispatchers.IO) {
+            runCatching { updater.listSnapshots(pack) }.getOrDefault(emptyList())
+        }
         updater.availableBuildsStream(pack)
             .catch { loadFailed = true }
             .collect { list ->
