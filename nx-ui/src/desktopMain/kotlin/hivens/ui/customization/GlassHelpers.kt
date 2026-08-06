@@ -3,6 +3,7 @@ package hivens.ui.customization
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import hivens.ui.theme.NxColors
 import hivens.ui.theme.NxTheme
 
 /**
@@ -10,20 +11,48 @@ import hivens.ui.theme.NxTheme
  * preference. Applies under every style, not just Celestia -- default value 1.0 preserves
  * each style's natural opacity, lower values let the user opt into translucency.
  *
- * Light theme is the exception: an alpha-light surface over a wallpaper lands in mid-mud
- * and the wallpaper's high frequencies ride through as noise -- there is no good alpha
- * (Rule 4 / D29). So a light surface returns OPAQUE, reading as a body rather than a tint;
- * dark glass (src <= backdrop everywhere, a safe floor) keeps its translucency and the
- * glass-intensity knob. This is a stopgap -- the real fix is the body-carrying NxSurface.
+ * Light theme spends that request differently. An alpha-light surface over a wallpaper
+ * lands in mid-mud and the wallpaper's high frequencies ride through as noise, so there
+ * is no good alpha there (Rule 4 / D29) and a light plane is always opaque. The depth
+ * being asked for is real all the same, so it picks a rung of the tonal ladder instead
+ * of an alpha -- see [lightPlaneFor]. Dark glass (src <= backdrop everywhere, a safe
+ * floor) keeps its translucency and the glass-intensity knob.
+ *
+ * Still a stopgap: a call site that says `0.45` is guessing at a depth it could simply
+ * name, and the ladder is what `NxSurface(level = ...)` already takes by name. What this
+ * fixes is that the guess used to be discarded entirely on light.
  *
  * Use this anywhere that currently does `NxTheme.colors.surface.copy(alpha = X)`.
  */
 @Composable
 fun glassSurfaceAlpha(baseAlpha: Float): Color {
-    val surface = NxTheme.colors.surface
-    if (surface.luminance() > 0.5f) return surface
+    val colors = NxTheme.colors
+    if (colors.surface.luminance() > 0.5f) return lightPlaneFor(baseAlpha, colors)
     val multiplier = LocalCustomization.current.glassIntensity
-    return surface.copy(alpha = (baseAlpha * multiplier).coerceIn(0f, 1f))
+    return colors.surface.copy(alpha = (baseAlpha * multiplier).coerceIn(0f, 1f))
+}
+
+/**
+ * The light answer to a requested depth.
+ *
+ * On dark, [baseAlpha] decides how much of the surface tint sits over the page, so
+ * a larger number is a plane that stands further off it. There is no alpha to spend
+ * on light -- a body is opaque there -- so the same number picks a rung of the tonal
+ * ladder instead, in the same direction: more depth, further from the page.
+ *
+ * It snaps to a rung rather than interpolating. Only five colours may back a plane,
+ * and a continuous blend would put shades between them that nothing else in the
+ * system knows about and no test can hold to a separation rule.
+ *
+ * This used to return `surface` for every value. Eight distinct depths across
+ * forty-odd call sites all came out as one pixel, which is why a card, the page it
+ * sat on and a panel nested inside it were literally the same colour.
+ */
+private fun lightPlaneFor(baseAlpha: Float, colors: NxColors): Color = when {
+    baseAlpha < 0.40f -> colors.surfaceContainerLow
+    baseAlpha < 0.52f -> colors.surface
+    baseAlpha < 0.70f -> colors.surfaceContainer
+    else              -> colors.surfaceContainerHigh
 }
 
 /**

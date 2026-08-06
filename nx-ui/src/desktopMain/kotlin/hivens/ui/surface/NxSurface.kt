@@ -97,6 +97,13 @@ fun NxSurface(
         val bare = buildList {
             if (glass) addAll(tier.toLayers())
             if (elevated) add(DropShadow())
+            // The edge belongs here too. On light the Fill above is floored to
+            // opaque, so this branch draws a solid plane -- and it was the only one
+            // that drew a solid plane with nothing on its boundary. That covers the
+            // left rail and the top bar, which both default to Clear: the whole
+            // chrome met the page on a tone step alone. Derived from the Fill's own
+            // Surface role, since [level] is inert on this branch.
+            if (hairline && glass) add(EdgeBorder(explicitColor = bevelHairline(frostColor(FrostRole.Surface))))
         }
         FrostSurface(bare, modifier, shape, interactionSource, content)
         return
