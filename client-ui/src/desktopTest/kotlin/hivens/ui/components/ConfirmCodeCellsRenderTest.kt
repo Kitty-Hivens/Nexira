@@ -39,14 +39,14 @@ class ConfirmCodeCellsRenderTest {
     @Test
     fun `typed digits stand off their cells under every style and palette`() {
         val cases = listOf(
-            Triple("celestia-dark", CelestiaStyle to true, Color(0xFF121212)),
-            Triple("celestia-light", CelestiaStyle to false, Color(0xFFF5F7FA)),
-            Triple("brut-dark", BrutStyle to true, Color(0xFF121212)),
-            Triple("brut-light", BrutStyle to false, Color(0xFFF5F7FA)),
+            "celestia-dark" to (CelestiaStyle to true),
+            "celestia-light" to (CelestiaStyle to false),
+            "brut-dark" to (BrutStyle to true),
+            "brut-light" to (BrutStyle to false),
         )
-        for ((name, styleAndDark, ground) in cases) {
+        for ((name, styleAndDark) in cases) {
             val (style, dark) = styleAndDark
-            val bmp = render(style, dark, ground, name)
+            val bmp = render(style, dark, name)
             assertTrue(
                 contrastSpread(bmp) > MIN_SPREAD,
                 "$name: the cells and their digits are indistinguishable (spread ${contrastSpread(bmp)})",
@@ -72,7 +72,7 @@ class ConfirmCodeCellsRenderTest {
         return max - min
     }
 
-    private fun render(style: StyleSpec, dark: Boolean, ground: Color, name: String): Bitmap {
+    private fun render(style: StyleSpec, dark: Boolean, name: String): Bitmap {
         val scene = ImageComposeScene(width = width, height = height, density = Density(1f)) {
             // The real theme entry point rather than a hand-provided palette, so the
             // sheet shows what the app resolves, tonal ladder included.
@@ -82,7 +82,7 @@ class ConfirmCodeCellsRenderTest {
                     LocalStrings provides EnglishStrings,
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxSize().background(ground).padding(16.dp),
+                        modifier = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
                     ) { Cells() }
                 }
             }

@@ -110,19 +110,36 @@ class TextContrastTest {
         // has the same effect, so measure that the rungs are apart -- in perceptual
         // lightness, which is what "can I see the difference" actually asks.
         for ((name, palette) in palettes()) {
+            val floor = ladderStep(dark = name == "dark")
             val rungs = listOf("background" to palette.background) + ladder(palette)
             for (i in rungs.indices) {
                 for (j in i + 1 until rungs.size) {
                     val d = kotlin.math.abs(lstar(rungs[i].second) - lstar(rungs[j].second))
                     assertTrue(
-                        d >= LADDER_STEP,
+                        d >= floor,
                         "$name: ${rungs[i].first} and ${rungs[j].first} are ${"%.2f".format(d)} L* apart, " +
-                            "under $LADDER_STEP -- they will read as one surface",
+                            "under $floor -- they will read as one surface",
                     )
                 }
             }
         }
     }
+
+    /**
+     * How far apart two rungs must sit, which is not the same question on the two
+     * palettes.
+     *
+     * On light every body is opaque ([hivens.ui.surface.bodyFloor] is 1.0 there),
+     * so the token IS the pixel and the gap between two tokens is the gap a person
+     * sees. That earns the perceptual threshold.
+     *
+     * On dark a body is drawn at 0.92 over the page and the surface helper
+     * composites between 0.35 and 0.65, so what lands on screen is spread wider
+     * than the tokens are. Holding dark to the same number would be measuring one
+     * thing and asserting about another; it stays a collapse detector until the
+     * check renders instead of computing.
+     */
+    private fun ladderStep(dark: Boolean): Double = if (dark) DARK_LADDER_STEP else LIGHT_LADDER_STEP
 
     @Test
     fun `a divider is visible against every plane it can sit on`() {
@@ -131,7 +148,7 @@ class TextContrastTest {
         for ((name, palette) in palettes()) {
             for ((level, bg) in ladder(palette)) {
                 val d = kotlin.math.abs(lstar(palette.outline) - lstar(bg))
-                assertTrue(d >= LADDER_STEP, "$name/$level: the outline is only ${"%.2f".format(d)} L* from the plane")
+                assertTrue(d >= ladderStep(dark = name == "dark"), "$name/$level: the outline is only ${"%.2f".format(d)} L* from the plane")
             }
         }
     }
@@ -168,9 +185,19 @@ class TextContrastTest {
         const val LARGE_FLOOR = 3.0
 
         /**
-         * Perceptual-lightness gap below which two planes read as one surface.
-         * Deliberately modest: this is a collapse detector, not a spacing opinion.
+         * Two large flat fields need roughly 3 L* to be told apart by fill alone;
+         * below that the boundary rests entirely on the bevel, which is one pixel
+         * wide. This sits just under that, so it fails on a real collapse rather
+         * than on a rounding difference. The light ladder's tightest pair is 2.75.
+         *
+         * It used to be 1.5 for both palettes while light's tightest pair was 1.71
+         * -- a threshold fitted to whatever happened to be drawn, which could not
+         * have caught the light theme reading as one flat sheet, since that sheet
+         * was what set the number.
          */
-        const val LADDER_STEP = 1.5
+        const val LIGHT_LADDER_STEP = 2.5
+
+        /** See [ladderStep]: dark's tokens are composited, so they are not the pixels. */
+        const val DARK_LADDER_STEP = 1.5
     }
 }
