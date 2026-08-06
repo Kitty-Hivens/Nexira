@@ -60,7 +60,6 @@ class PlaybackWidgetsRenderTest {
     private fun render(
         style: StyleSpec,
         dark: Boolean,
-        ground: Color,
         name: String,
         scale: Float = 1f,
         content: @Composable () -> Unit,
@@ -77,7 +76,7 @@ class PlaybackWidgetsRenderTest {
                 ) {
                     progressAccent = NxTheme.colors.progressAccent
                     Column(
-                        modifier            = Modifier.fillMaxSize().background(ground).padding(16.dp),
+                        modifier            = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { content() }
                 }
@@ -118,15 +117,15 @@ class PlaybackWidgetsRenderTest {
         // wallpaper with no plane under them. A near-black ground is the hardest
         // case: it is what the app shows with no wallpaper set.
         val cases = listOf(
-            Triple("celestia-dark", CelestiaStyle to true, Color(0xFF121212)),
-            Triple("brut-dark", BrutStyle to true, Color(0xFF121212)),
-            Triple("celestia-light", CelestiaStyle to false, Color(0xFFF5F7FA)),
-            Triple("brut-light", BrutStyle to false, Color(0xFFF5F7FA)),
+            "celestia-dark" to (CelestiaStyle to true),
+            "brut-dark" to (BrutStyle to true),
+            "celestia-light" to (CelestiaStyle to false),
+            "brut-light" to (BrutStyle to false),
         )
-        for ((name, styling, ground) in cases) {
+        for ((name, styling) in cases) {
             val (style, dark) = styling
-            render(style, dark, ground, name, scale = 2f) { Sheet() }
-            val bmp = render(style, dark, ground, name) { Sheet() }
+            render(style, dark, name, scale = 2f) { Sheet() }
+            val bmp = render(style, dark, name) { Sheet() }
 
             val card = bmp.getColor(bmp.width / 2, (bmp.height * 0.14f).toInt())
             val mini = bmp.getColor(bmp.width / 2, (bmp.height * 0.66f).toInt())
@@ -141,7 +140,7 @@ class PlaybackWidgetsRenderTest {
         // Volume held at zero so the only thing that can ink the progress accent
         // is the measure itself.
         fun accentPixels(fraction: Float, volume: Float, name: String): Int {
-            val bmp = render(CelestiaStyle, true, Color(0xFF121212), name) {
+            val bmp = render(CelestiaStyle, true, name) {
                 PlaybackMiniControl(
                     state       = playing(fraction),
                     track       = track,

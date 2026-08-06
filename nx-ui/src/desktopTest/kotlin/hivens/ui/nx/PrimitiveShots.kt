@@ -1,5 +1,7 @@
 package hivens.ui.nx
 
+import hivens.ui.theme.LightColorPalette
+import hivens.ui.theme.DarkColorPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -113,9 +115,9 @@ class PrimitiveShots {
 
     @Test
     fun `every primitive composes in every style and palette`() {
-        sheet("celestia-dark", CelestiaStyle, dark = true, ground = Color(0xFF121212))
-        sheet("celestia-light", CelestiaStyle, dark = false, ground = Color(0xFFF5F7FA))
-        sheet("brut-dark", BrutStyle, dark = true, ground = Color(0xFF121212))
-        sheet("brut-light", BrutStyle, dark = false, ground = Color(0xFFF5F7FA))
+        sheet("celestia-dark", CelestiaStyle, dark = true, ground = DarkColorPalette.background)
+        sheet("celestia-light", CelestiaStyle, dark = false, ground = LightColorPalette.background)
+        sheet("brut-dark", BrutStyle, dark = true, ground = DarkColorPalette.background)
+        sheet("brut-light", BrutStyle, dark = false, ground = LightColorPalette.background)
     }
 }

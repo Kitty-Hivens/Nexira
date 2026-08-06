@@ -115,8 +115,14 @@ internal val LightColorPalette = NxColors(
     primary = Color(0xFF5E68C0),       // Soft indigo (instead of harsh purple)
     primaryVariant = Color(0xFF3F51B5),
     secondary = Color(0xFF26A69A),     // Calm teal
-    background = Color(0xFFF5F7FA),    // Very light gray (not white!)
-    surface = Color(0xFFFFFFFF),       // White cards
+    // The page is the extreme of the ladder, and every plane descends from it --
+    // the mirror of the dark theme, where the page is the darkest thing on screen
+    // and planes rise away from it. It used to sit in the MIDDLE: `surface` was
+    // white and therefore lighter than the page, `surfaceContainer` darker, so
+    // depth had no direction and a card cleared the page by 2.84 L* in one
+    // direction while a panel cleared it by 2.84 in the other. See the tiers below.
+    background = Color(0xFFFFFFFF),
+    surface = Color(0xFFECEEF2),
     surfaceVariant = Color(0xFFE8EAF0),
     error = Color(0xFFD32F2F),
     onPrimary = Color.White,
@@ -157,9 +163,18 @@ internal val LightColorPalette = NxColors(
     onSecondaryContainer = Color(0xFF0A3B33),
     tertiaryContainer = Color(0xFFF6E2CE),
     onTertiaryContainer = Color(0xFF4A2A09),
-    surfaceContainerLow  = Color(0xFFF0F2F6),
-    surfaceContainer     = Color(0xFFEAECF2),
-    surfaceContainerHigh = Color(0xFFE2E5EC),
+    // L* 100 / 96.99 / 94.05 / 91.30 / 87.82 counting `background` and `surface`
+    // above. Spread over 12.2 L* where it used to cover 9.1 with the page in the
+    // middle of it, so the pairs that actually sit next to each other clear the
+    // threshold at which two flat fields read as separate planes: page to a widget
+    // is 5.95 (was 2.84), page to a card is 8.70 (was 3.76).
+    //
+    // The floor is `textSecondary`, which needs 4.5:1 against any plane it is read
+    // on and therefore caps the deepest rung at L* 86.5. The bottom rung sits 1.32
+    // above that, so this ladder cannot go deeper without moving the text with it.
+    surfaceContainerLow  = Color(0xFFF6F6FA),
+    surfaceContainer     = Color(0xFFE4E6EC),
+    surfaceContainerHigh = Color(0xFFDADCE4),
     decorativeRamp = listOf(
         Color(0xFF6D28D9), Color(0xFF0284C7), Color(0xFF059669), Color(0xFFD97706),
         Color(0xFFDB2777), Color(0xFF0D9488), Color(0xFFEA580C), Color(0xFF4F46E5),
