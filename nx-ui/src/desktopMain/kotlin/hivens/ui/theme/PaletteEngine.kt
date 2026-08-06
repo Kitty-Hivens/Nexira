@@ -1,6 +1,7 @@
 package hivens.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.materialkolor.dynamiccolor.DynamicColor
 import com.materialkolor.dynamiccolor.MaterialDynamicColors
 import com.materialkolor.hct.Hct
@@ -42,25 +43,53 @@ fun generatedNxColors(base: NxColors, spec: PaletteSpec): NxColors {
     fun severity(hue: Double): Color =
         Color(TonalPalette.fromHueAndChroma(hue, severityChroma).tone(severityTone))
 
+    /**
+     * The seed decides the colour; the palette keeps the lightness.
+     *
+     * Tone is not the wallpaper's to choose. It carries the depth the surface
+     * ladder is built on and the contrast every text role was measured against,
+     * and the scheme has its own opinion about both -- on a light ground it puts
+     * `surface` and `background` at the same near-white tone, so switching this
+     * on collapsed a panel into the page and pulled the ladder from 12.2 L* down
+     * to 6. The panel went from #ECEEF2 to near-white and the whole depth
+     * arrangement went with it.
+     *
+     * Hue and chroma from the scheme at the base's own tone is what tinting
+     * means: the same plane, in another colour. Every separation and every
+     * contrast ratio measured against the fixed palette survives unchanged,
+     * because nothing moves in lightness at all.
+     *
+     * Planes, the line role and the text that is read on them only. An accent is
+     * not a plane and changing it is the point of seeding, so those stay the
+     * scheme's -- and they have to, since the scheme computes each on-colour to
+     * contrast against its own accent. Pinning the accent's tone while its label
+     * kept the scheme's put the pair at 3.87 against a floor of 4.5.
+     */
+    fun tinted(dc: DynamicColor, keep: Color): Color {
+        val seeded = Hct.fromInt(dc.getArgb(scheme))
+        val tone = Hct.fromInt(keep.toArgb()).tone
+        return Color(TonalPalette.fromHueAndChroma(seeded.hue, seeded.chroma).tone(tone.roundToInt()))
+    }
+
     return base.copy(
         primary              = role(m.primary()),
         primaryVariant       = role(m.primary()).copy(alpha = 0.8f),
         secondary            = role(m.secondary()),
         tertiary             = role(m.tertiary()),
         onTertiary           = role(m.onTertiary()),
-        background           = role(m.background()),
-        surface              = role(m.surface()),
-        surfaceVariant       = role(m.surfaceVariant()),
-        surfaceContainerLow  = role(m.surfaceContainerLow()),
-        surfaceContainer     = role(m.surfaceContainer()),
-        surfaceContainerHigh = role(m.surfaceContainerHigh()),
-        outline              = role(m.outline()),
+        background           = tinted(m.background(), base.background),
+        surface              = tinted(m.surface(), base.surface),
+        surfaceVariant       = tinted(m.surfaceVariant(), base.surfaceVariant),
+        surfaceContainerLow  = tinted(m.surfaceContainerLow(), base.surfaceContainerLow),
+        surfaceContainer     = tinted(m.surfaceContainer(), base.surfaceContainer),
+        surfaceContainerHigh = tinted(m.surfaceContainerHigh(), base.surfaceContainerHigh),
+        outline              = tinted(m.outline(), base.outline),
         onPrimary            = role(m.onPrimary()),
         onSecondary          = role(m.onSecondary()),
         onBackground         = role(m.onBackground()),
         onSurface            = role(m.onSurface()),
-        textPrimary          = role(m.onSurface()),
-        textSecondary        = role(m.onSurfaceVariant()),
+        textPrimary          = tinted(m.onSurface(), base.textPrimary),
+        textSecondary        = tinted(m.onSurfaceVariant(), base.textSecondary),
         error                = Color(errorArgb),
         criticalAccent       = Color(errorArgb),
         success              = severity(SUCCESS_HUE),

@@ -3,6 +3,7 @@ package hivens.ui.theme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class PaletteEngineTest {
 
@@ -70,5 +71,50 @@ class PaletteEngineTest {
         assertEquals(base.originSmartycraft, p.originSmartycraft)
         assertEquals(base.decorativeRamp, p.decorativeRamp)
         assertNotEquals(base.warnAccent, p.warnAccent)
+    }
+
+    @Test
+    fun seedingTintsWithoutRelighting() {
+        // A wallpaper may say what colour a plane is. It may not say how light it
+        // is: tone carries the depth the surface ladder is built on and the
+        // contrast every text role was measured against. The scheme has its own
+        // opinion -- on a light ground it puts `surface` and `background` at one
+        // near-white tone -- and letting it through collapsed the panel into the
+        // page and pulled the ladder from 12.2 L* to 6.
+        for (seed in listOf(0xFFD9A0B8.toInt(), 0xFF3B82F6.toInt(), 0xFF9AA0A6.toInt(), 0xFF000000.toInt())) {
+            for (dark in listOf(true, false)) {
+                val fixed = if (dark) DarkColorPalette else LightColorPalette
+                val seeded = seededNxColors(fixed, seed, dark)
+                for ((role, pick) in ladderRoles) {
+                    val before = lstar(pick(fixed))
+                    val after = lstar(pick(seeded))
+                    assertTrue(
+                        kotlin.math.abs(before - after) <= 1.0,
+                        "seed $seed ${if (dark) "dark" else "light"}: $role moved " +
+                            "${"%.2f".format(before)} -> ${"%.2f".format(after)} L*",
+                    )
+                }
+                assertNotEquals(
+                    seeded.background, seeded.surface,
+                    "a panel and the page must not resolve to one colour",
+                )
+            }
+        }
+    }
+
+    private val ladderRoles = listOf<Pair<String, (NxColors) -> androidx.compose.ui.graphics.Color>>(
+        "background" to { it.background },
+        "surfaceContainerLow" to { it.surfaceContainerLow },
+        "surface" to { it.surface },
+        "surfaceContainer" to { it.surfaceContainer },
+        "surfaceContainerHigh" to { it.surfaceContainerHigh },
+        "textPrimary" to { it.textPrimary },
+        "textSecondary" to { it.textSecondary },
+    )
+
+    private fun lstar(c: androidx.compose.ui.graphics.Color): Double {
+        fun lin(v: Float) = if (v <= 0.04045f) v / 12.92 else Math.pow(((v + 0.055) / 1.055), 2.4)
+        val y = 0.2126 * lin(c.red) + 0.7152 * lin(c.green) + 0.0722 * lin(c.blue)
+        return if (y > 0.008856) 116 * Math.cbrt(y) - 16 else 903.3 * y
     }
 }
