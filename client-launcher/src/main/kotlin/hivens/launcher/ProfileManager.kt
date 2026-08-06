@@ -3,13 +3,13 @@ package hivens.launcher
 import hivens.config.Storage
 import hivens.core.api.interfaces.IInstanceProfileStore
 import hivens.core.data.InstanceProfile
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class ProfileManager(
@@ -124,27 +124,19 @@ class ProfileManager(
      * temp-file -> final rename.
      */
     fun save(): Unit = synchronized(writeLock) {
-        val file = workDir.resolve(fileName)
-        val tmp = workDir.resolve("$fileName.tmp")
         try {
             val container = ProfilesContainer(
                 lastServerId = lastServerId,
                 profiles = profiles.toMap(),
                 favorites = _favorites.toSet()
             )
-            val text = json.encodeToString(container)
-            Files.writeString(tmp, text)
-            try {
-                Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                // Some Windows-style filesystems (FAT32 over USB) don't support
-                // ATOMIC_MOVE across filename changes; fall back to plain
-                // replace which is still better than the prior writeString.
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
-            }
+            // The hand-rolled tmp-then-rename this replaces published whole files
+            // but never flushed them, so a power loss could persist the rename over
+            // bytes still in the page cache. AtomicFiles is the same sequence with
+            // the fsyncs, and keeps the non-atomic-filesystem fallback.
+            AtomicFiles.writeString(workDir.resolve(fileName), json.encodeToString(container))
         } catch (e: IOException) {
             log.error("Failed to save profiles!", e)
-            runCatching { Files.deleteIfExists(tmp) }
         }
     }
 }

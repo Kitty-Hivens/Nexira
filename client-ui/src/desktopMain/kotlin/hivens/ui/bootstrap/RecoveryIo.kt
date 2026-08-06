@@ -1,6 +1,7 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -81,8 +82,7 @@ object RecoveryIo {
 
     private fun writeSettings(dataDir: Path, root: JsonObject) {
         runCatching {
-            Files.createDirectories(dataDir)
-            Files.writeString(dataDir.resolve(Storage.SETTINGS_FILE), pretty.encodeToString(JsonObject.serializer(), root))
+            AtomicFiles.writeString(dataDir.resolve(Storage.SETTINGS_FILE), pretty.encodeToString(JsonObject.serializer(), root))
         }
     }
 

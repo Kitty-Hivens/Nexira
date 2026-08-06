@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SettingsData
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -38,9 +39,10 @@ class SettingsService(
         synchronized(lock) {
             cachedSettings = settings
             try {
-                if (settingsFile.parent != null) Files.createDirectories(settingsFile.parent)
-                val text = json.encodeToString(settings)
-                Files.writeString(settingsFile, text)
+                // Atomic: a torn write here is not a corrupt setting, it is every
+                // setting. `reload` cannot tell truncated JSON from absent JSON, so
+                // it falls back to defaults and the loss never reaches the UI.
+                AtomicFiles.writeString(settingsFile, json.encodeToString(settings))
             } catch (e: IOException) {
                 log.error("Failed to save settings", e)
             }
