@@ -589,10 +589,10 @@ class TransferEngine(
     private suspend fun openJournal(t: Transfer, url: String, partial: Path): TransferJournal {
         val stored = journals.read(partial)
         val applies = stored != null && appliesTo(stored, t)
-        if (applies && t.expect != null) return stored!!
+        if (applies && t.expect != null) return stored
 
         val probe = probe(t, url)
-        if (applies && stored!!.size == probe.size && validatorHolds(stored.etag, probe.etag)) return stored
+        if (applies && stored.size == probe.size && validatorHolds(stored.etag, probe.etag)) return stored
 
         if (stored != null) {
             log.info(
