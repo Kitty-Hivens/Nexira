@@ -42,9 +42,12 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -541,6 +544,85 @@ class LauncherControllerTest {
 
         assertEquals("i-running", namedDuringSession)
         assertNull(controller.runningPackInstanceId.value, "and nothing is playing once the process is gone")
+    }
+
+    private fun packInstance(id: String) = hivens.core.data.PackInstance(
+        id                    = id,
+        packRef               = hivens.core.data.PackReference(
+            origin  = hivens.core.data.PackOrigin.Mirror,
+            id      = "modern-explorer",
+            version = "2026.05.26.1",
+        ),
+        displayName           = "Pack $id",
+        instanceDirName       = "dir-$id",
+        createdAtEpoch        = 0L,
+        pinnedPackVersion     = "2026.05.26.1",
+        cachedManifest        = hivens.core.data.CachedManifestSnapshot(
+            minecraftVersion = "1.12.2",
+            loaderName       = "forge",
+            loaderVersion    = "14.23.5.2922",
+            javaMajor        = 8,
+        ),
+    )
+
+    /**
+     * Stopping one pack and starting another immediately is allowed: abort sets Idle
+     * while the first launch is still parked in a wait that cancellation cannot
+     * interrupt. When it finally wakes -- after the second game is live -- everything
+     * its tail would clear belongs to the second one.
+     */
+    @Test
+    fun `an aborted launch waking up late does not clear the session that replaced it`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+
+        val first = packInstance("first")
+        val second = packInstance("second")
+        for (i in listOf(first, second)) {
+            Files.createDirectories(sandbox.resolve("instances").resolve(i.instanceDirName))
+        }
+        coEvery { packRepository.get(any()) } answers { if (firstArg<String>() == "first") first else second }
+
+        // Uninterruptible, the way `Process.waitFor` is: cancelling the launch job
+        // does not free it, which is the whole premise of the race.
+        val firstExit = CompletableDeferred<Int>()
+        val firstHandle = mockk<LaunchHandle>(relaxed = true)
+        coEvery { firstHandle.awaitExit() } coAnswers { withContext(NonCancellable) { firstExit.await() } }
+        val secondHandle = mockk<LaunchHandle>(relaxed = true)
+        val secondExit = CompletableDeferred<Int>()
+        coEvery { secondHandle.awaitExit() } coAnswers { withContext(NonCancellable) { secondExit.await() } }
+
+        val handles = ArrayDeque(listOf(firstHandle, secondHandle))
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), boundLaunch = any(), seal = any(), displayName = any(),
+                onLog = any(),
+            )
+        } answers { SpawnResult.Started(handles.removeFirst()) }
+
+        val controller = newController(this)
+        val session = SessionData(playerName = "tester", uuid = "u", accessToken = "tok")
+
+        controller.launchPackInstance(session, first)
+        advanceUntilIdle()
+        assertEquals("first", controller.runningPackInstanceId.value)
+
+        controller.abort()
+        controller.launchPackInstance(session, second)
+        advanceUntilIdle()
+        assertEquals("second", controller.runningPackInstanceId.value, "the second launch owns the controller now")
+
+        // The first game finally dies, long after the second is live.
+        firstExit.complete(143)
+        advanceUntilIdle()
+
+        assertEquals("second", controller.runningPackInstanceId.value, "the first launch's tail cleared the second's session")
+        assertIs<LaunchState.GameRunning>(controller.state.value, "and overwrote the state it had no claim on")
+
+        secondExit.complete(0)
+        advanceUntilIdle()
     }
 
     /**
