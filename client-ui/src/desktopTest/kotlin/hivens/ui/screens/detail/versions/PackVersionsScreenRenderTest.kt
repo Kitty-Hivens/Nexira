@@ -33,14 +33,18 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
+import hivens.launcher.launch.RunningPackSource
 import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
@@ -139,6 +143,11 @@ class PackVersionsScreenRenderTest {
         override fun report(id: String, status: PackUpdateStatus) {}
     }
 
+    /** Nothing is playing, so the running-pack guard stays out of the way. */
+    private object IdleLaunches : RunningPackSource {
+        override val runningPackInstanceId: StateFlow<String?> = MutableStateFlow(null)
+    }
+
     private fun render(width: Int, height: Int, style: StyleSpec, name: String) {
         startKoin {
             modules(module {
@@ -146,6 +155,7 @@ class PackVersionsScreenRenderTest {
                 single<PackUpdater> { FakeUpdater }
                 single<IMirrorPackClient> { FakeMirror }
                 single<PackUpdateStatusHub> { FakeHub }
+                single<RunningPackSource> { IdleLaunches }
                 single { ModIconResolver(resolveProjectIcon = { null }) }
             })
         }
@@ -153,11 +163,12 @@ class PackVersionsScreenRenderTest {
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
             NxTheme(useDarkTheme = true, style = style) {
-                Box(Modifier.fillMaxSize().background(Color(0xFF102030))) {
+                Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
                     PackVersionsScreen(instanceId = "1", onBack = {})
                 }
             }
         }
+        val painted: Double
         try {
             // Pump frames so the screen's suspend loads (build list, preview, diff)
             // land before the captured frame -- a single render would freeze the
@@ -168,12 +179,38 @@ class PackVersionsScreenRenderTest {
                 frameNanos += 16_000_000L
                 Thread.sleep(10)
             }
-            val png = scene.render(frameNanos).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-            Files.write(out, png.bytes)
+            val frame = scene.render(frameNanos)
+            Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
+            painted = paintedFraction(frame)
         } finally {
             scene.close()
         }
-        assertTrue(Files.size(out) > 0, "rendered PNG is non-empty")
+        // A composition that throws still encodes a perfectly valid PNG of the bare
+        // backdrop, so file size says nothing about whether the screen is on it.
+        // Ask the frame instead.
+        assertTrue(painted > MIN_PAINTED, "the screen covers ${(painted * 100).toInt()}% of the frame -- it did not render")
+    }
+
+    /**
+     * Share of sampled pixels that are not the bare backdrop the scene was cleared
+     * to. Sampled on a stride: this separates a drawn screen from an empty one, and
+     * does not need to be exact to do that.
+     */
+    private fun paintedFraction(frame: Image): Double {
+        val bmp = Bitmap.makeFromImage(frame)
+        var painted = 0
+        var sampled = 0
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                if (bmp.getColor(x, y) != BACKDROP) painted++
+                sampled++
+                x += 4
+            }
+            y += 4
+        }
+        return painted.toDouble() / sampled
     }
 
     @Test fun `renders at FHD under Celestia`() = render(1920, 1080, CelestiaStyle, "pack-versions-fhd-celestia.png")
@@ -181,4 +218,16 @@ class PackVersionsScreenRenderTest {
     @Test fun `renders at FHD under Brut`() = render(1920, 1080, BrutStyle, "pack-versions-fhd-brut.png")
 
     @Test fun `renders at 2K under Celestia`() = render(2560, 1440, CelestiaStyle, "pack-versions-2k-celestia.png")
+
+    private companion object {
+        /** What the scene is cleared to, so anything else on the frame is the screen. */
+        val BACKDROP = 0xFF102030.toInt()
+
+        /**
+         * Well under what a drawn screen covers and well over the stray pixels an
+         * empty one leaves (a partial spinner). Not a layout assertion -- it only
+         * has to tell "rendered" from "did not".
+         */
+        const val MIN_PAINTED = 0.10
+    }
 }
