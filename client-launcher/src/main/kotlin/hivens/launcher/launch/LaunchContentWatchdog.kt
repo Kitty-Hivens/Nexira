@@ -7,11 +7,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardWatchEventKinds
-import java.nio.file.WatchService
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,14 +24,22 @@ import java.util.concurrent.TimeUnit
  *
  * Two mechanisms, because they fail in different ways:
  *
- *  - The watch answers immediately and, more to the point, answers about things
- *    that are no longer there. A jar planted before the loader scans and unlinked
- *    right after is gone by the time anything walks the directory, but the loader
- *    has it open and running. Only an event says it was ever there.
- *  - The pass at [settleMillis] is the backstop. A watch can miss -- it is
- *    poll-backed on macOS, it drops events under pressure, and a filesystem the
- *    instance lives on may not support it at all. The deadline pass owes nothing
- *    to any of that; it walks and hashes.
+ *  - A listing of `mods/` every [pollMillis] is what sees content that does not
+ *    survive to be walked. A jar planted before the loader scans and unlinked
+ *    right after is gone by the time anything hashes the directory, but the
+ *    loader has it open and running. Catching it means noticing while it is
+ *    still there.
+ *  - The pass at [settleMillis] is the backstop. It owes nothing to timing: it
+ *    walks and hashes, so a jar dropped in and left behind is found even if
+ *    every poll happened to fall the wrong side of it.
+ *
+ * The listing is deliberately not a [java.nio.file.WatchService]. The JDK only
+ * has a native watcher on some platforms; on the rest -- macOS among them -- it
+ * degrades to polling on an interval of its own choosing, measured in seconds.
+ * That is wider than the entire window this guard exists to cover, so the one
+ * mechanism that can see a vanished jar would be the one that quietly does
+ * nothing there. Reading the directory costs a readdir and a stat per entry and
+ * behaves the same on every platform.
  *
  * The deadline has only a LOWER bound that matters. Running late costs a cheated
  * session a few more seconds before it ends; running early leaves the tail of the
@@ -65,30 +71,20 @@ internal class LaunchContentWatchdog(
         if (!Files.isDirectory(modsDir)) return@withContext emptyList()
 
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settleMillis)
-        var watcher: WatchService? = null
-        try {
-            watcher = register(modsDir)
-            while (currentCoroutineContext().isActive && System.nanoTime() < deadline) {
-                val key = watcher?.poll(pollMillis, TimeUnit.MILLISECONDS)
-                if (key == null) {
-                    // No watch to wait on: still pace the loop so cancellation and
-                    // the deadline are both observed.
-                    if (watcher == null) delay(pollMillis)
-                    continue
-                }
-                // The events are not read for their contents. What belongs under
-                // `mods/` is one rule and it lives in the sync service; duplicating
-                // a filename filter here is how the launch gate and the session
-                // guard would come to disagree. An event only says "look again".
-                key.pollEvents()
-                key.reset()
-                inspect().takeIf { it.isNotEmpty() }?.let { return@withContext it }
-            }
-            if (!currentCoroutineContext().isActive) return@withContext emptyList()
-            inspect()
-        } finally {
-            runCatching { watcher?.close() }
+        var seen = snapshot(modsDir)
+        while (currentCoroutineContext().isActive && System.nanoTime() < deadline) {
+            delay(pollMillis)
+            val now = snapshot(modsDir)
+            if (now == seen) continue
+            seen = now
+            // The change is not read for what it was. What belongs under `mods/`
+            // is one rule and it lives in the sync service; duplicating a filename
+            // filter here is how the launch gate and the session guard would come
+            // to disagree. A difference only says "look again".
+            inspect().takeIf { it.isNotEmpty() }?.let { return@withContext it }
         }
+        if (!currentCoroutineContext().isActive) return@withContext emptyList()
+        inspect()
     }
 
     private suspend fun inspect(): List<String> {
@@ -100,23 +96,36 @@ internal class LaunchContentWatchdog(
     }
 
     /**
-     * Null when the platform or filesystem will not give us a watch. That is a
-     * degraded guard, not a broken one -- the deadline pass still runs -- so it is
-     * logged and carried on from rather than failing the launch.
+     * What is in `mods/` at this instant, cheaply enough to be asked every
+     * [pollMillis]: an entry appearing, vanishing or being swapped in place all
+     * show up as a different snapshot. Deliberately does not hash -- this only
+     * decides whether the expensive look is worth doing.
+     *
+     * A directory that cannot be read yields an empty snapshot rather than
+     * throwing. A transient read failure must not end the watch, and the settle
+     * pass still runs.
      */
-    private fun register(modsDir: Path): WatchService? =
-        runCatching {
-            FileSystems.getDefault().newWatchService().also { service ->
-                modsDir.register(
-                    service,
-                    StandardWatchEventKinds.ENTRY_CREATE,
-                    StandardWatchEventKinds.ENTRY_DELETE,
-                    StandardWatchEventKinds.ENTRY_MODIFY,
-                )
-            }
-        }.onFailure {
-            log.warn("launch watch: no file watch on {}, falling back to the settle pass alone: {}", modsDir, it.toString())
-        }.getOrNull()
+    private fun snapshot(modsDir: Path): Map<String, Mark> = runCatching {
+        Files.newDirectoryStream(modsDir).use { entries ->
+            entries.associate { entry -> entry.fileName.toString() to mark(entry) }
+        }
+    }.getOrElse { emptyMap() }
+
+    /**
+     * Unreadable entries get [Mark.UNREADABLE] instead of propagating: a file
+     * removed between the readdir and the stat is exactly the race being watched
+     * for, and it should read as a change, not as a failure.
+     */
+    private fun mark(entry: Path): Mark =
+        runCatching { Files.readAttributes(entry, BasicFileAttributes::class.java) }
+            .map { Mark(it.size(), it.lastModifiedTime().toMillis()) }
+            .getOrDefault(Mark.UNREADABLE)
+
+    private data class Mark(val size: Long, val modifiedMillis: Long) {
+        companion object {
+            val UNREADABLE = Mark(-1L, -1L)
+        }
+    }
 
     internal companion object {
         /**
@@ -127,7 +136,12 @@ internal class LaunchContentWatchdog(
          */
         const val SETTLE_MILLIS = 90_000L
 
-        /** How often the watch is asked, and therefore how fast cancellation lands. */
+        /**
+         * How often `mods/` is listed. This is the resolution of the guard: a jar
+         * that is both planted and unlinked inside one interval is seen by nothing,
+         * so it is short enough that doing so would have to be deliberate and
+         * precise. Also how fast cancellation lands.
+         */
         const val POLL_MILLIS = 250L
     }
 }

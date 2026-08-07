@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 
 /**
  * The watchdog is driven with millisecond settles so the tests exercise the real
- * WatchService against a real directory without waiting out the production window.
+ * polling against a real directory without waiting out the production window.
  */
 class LaunchContentWatchdogTest {
 
@@ -101,7 +101,7 @@ class LaunchContentWatchdogTest {
     /**
      * The case the settle pass cannot see: a jar that is planted, picked up by the
      * loader, and unlinked again. Nothing is on disk by the time the deadline pass
-     * walks the directory -- only the event says it was ever there.
+     * walks the directory -- it is only ever seen while it is there.
      */
     @Test
     fun `a jar that appears and is removed again is still caught`() = runTest {
@@ -110,7 +110,7 @@ class LaunchContentWatchdogTest {
         val sync = DiskSensingSync(planted)
 
         // Long enough that the deadline pass runs well after the file is gone: if
-        // the event were not acted on, this returns clean.
+        // the change were not acted on, this returns clean.
         val watchdog = LaunchContentWatchdog(sync, dir, expected = null, settleMillis = 5_000, pollMillis = 20)
         val running = async(Dispatchers.IO) { watchdog.run() }
         withContext(Dispatchers.IO) {
@@ -120,7 +120,7 @@ class LaunchContentWatchdogTest {
             Files.deleteIfExists(planted)
         }
 
-        assertEquals(listOf("freecam.jar"), running.await(), "the event is the only evidence left")
+        assertEquals(listOf("freecam.jar"), running.await(), "seen while it was there, or not at all")
     }
 
     @Test
