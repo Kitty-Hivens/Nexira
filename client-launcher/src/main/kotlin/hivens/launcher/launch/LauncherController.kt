@@ -78,7 +78,7 @@ class LauncherController(
     private val smartyPlanner: SmartyModPlanner,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
-) {
+) : RunningPackSource {
 
     private val logger = LoggerFactory.getLogger(LauncherController::class.java)
 
@@ -177,16 +177,12 @@ class LauncherController(
     private val _runningPackInstanceId = MutableStateFlow<String?>(null)
 
     /**
-     * The pack instance whose game is live, or null when nothing is running or the
-     * live session came from the SC server list (which lays its files out under
-     * `clients/`, so no pack instance is at stake).
-     *
      * [LaunchState] deliberately carries no target identity -- it is the shared
      * Compose-free contract and a frontend renders it without caring what was
      * launched. This is the separate question "whose files are in use right now",
      * which the settings surfaces need in order to warn about rewriting them.
      */
-    val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
+    override val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
 
     private val _events = MutableSharedFlow<LaunchLogEvent>(
         extraBufferCapacity = 256,

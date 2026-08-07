@@ -6,7 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
-import hivens.launcher.launch.LauncherController
+import hivens.launcher.launch.RunningPackSource
 import hivens.ui.i18n.LocalStrings
 import org.koin.compose.koinInject
 
@@ -26,8 +26,8 @@ import org.koin.compose.koinInject
  */
 @Composable
 internal fun rememberRunningPackGuard(packId: String): RunningPackGuard {
-    val controller: LauncherController = koinInject()
-    val runningId by controller.runningPackInstanceId.collectAsState()
+    val running: RunningPackSource = koinInject()
+    val runningId by running.runningPackInstanceId.collectAsState()
     val guard = remember(packId) { RunningPackGuard() }
     guard.isRunning = runningId == packId
     return guard

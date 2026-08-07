@@ -34,6 +34,7 @@ import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
+import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.AgentExtractor
 import hivens.launcher.ProfilerProfileStore
@@ -654,6 +655,10 @@ val launchPipelineModule = module {
      * types (i18n strings, console service) leak in.
      */
     singleOf(::LauncherController)
+
+    // The slice the settings surfaces consume, so they do not pull the whole
+    // orchestrator in to ask one question. Same instance, not a second one.
+    single<RunningPackSource> { get<LauncherController>() }
 
     /**
      * Basic launch service. All collaborators are constructor-injected so the
