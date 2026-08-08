@@ -105,6 +105,9 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     val selections: SelectionRegistry = koinInject()
 
     LaunchedEffect(state) { state.load() }
+    // Separate from load(): this one runs for as long as the tab is on screen,
+    // picking up anything added to the folders from outside the launcher.
+    LaunchedEffect(state) { state.watchContentFolders() }
 
     // The selection lives on the activity surface, so this view publishes it and
     // takes it back down on the way out. Leaving the tab with rows still ticked
