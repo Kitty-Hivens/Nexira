@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +33,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.Dispatchers
@@ -238,16 +241,19 @@ private fun NewsSkeleton() {
         colors.surfaceContainer,
     )
 
-    val transition = rememberInfiniteTransition(label = "skeleton")
-    val translateAnim by transition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmer"
-    )
+    // A still style parks the sweep off-frame rather than restarting it every
+    // frame, which is what a collapsed duration would do to an endless loop.
+    val sweep = Motion.sweep
+    val translateAnim by if (Motion.isStill) {
+        remember { mutableStateOf(0f) }
+    } else {
+        rememberInfiniteTransition(label = "skeleton").animateFloat(
+            initialValue  = 0f,
+            targetValue   = 1000f,
+            animationSpec = infiniteRepeatable(sweep.of(), RepeatMode.Restart),
+            label = "shimmer"
+        )
+    }
 
     val brush = Brush.linearGradient(
         colors = shimmerColors,
