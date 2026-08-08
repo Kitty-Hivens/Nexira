@@ -36,6 +36,7 @@ import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /**
@@ -65,7 +66,7 @@ internal fun SelectionPill(
     val height = props.heightDp.dp
     val corner by animateDpAsState(
         targetValue = if (open) style.panelCorner else height / 2,
-        animationSpec = tween(style.animationDurationMs(380)),
+        animationSpec = Motion.reveal.of(),
         label = "selectionCorner",
     )
     val shape = RoundedCornerShape(corner)
@@ -75,7 +76,7 @@ internal fun SelectionPill(
         modifier = Modifier
             .heightIn(min = height)
             .widthIn(max = maxWidth)
-            .animateContentSize(tween(style.animationDurationMs(380)))
+            .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
         tier = props.frostTier,

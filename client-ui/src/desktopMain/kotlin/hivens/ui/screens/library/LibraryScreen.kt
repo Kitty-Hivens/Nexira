@@ -65,7 +65,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.library.LocalLibraryContext
@@ -237,13 +237,11 @@ private fun NewLocalPackDialog(
         (if (mc.isBlank()) pool else pool.filter { it.contains(mc.trim(), ignoreCase = true) }).take(60)
     }
 
-    // Unfold on open: fade the scrim in and scale the card up from 92%.
-    // Durations run through the active style so Brut (animationMultiplier 0)
-    // collapses the unfold to instant, honouring its motion-off contract.
-    val style = LocalStyle.current
+    // Unfold on open: the scrim fades in and the card arrives. Both are motion
+    // roles, so a still style collapses the unfold to instant on its own.
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
-    val scrimAlpha by animateFloatAsState(if (shown) 0.72f else 0f, animationSpec = tween(style.animationDurationMs(180)), label = "scrim")
+    val scrimAlpha by animateFloatAsState(if (shown) 0.72f else 0f, animationSpec = Motion.fade, label = "scrim")
 
     Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         Box(
@@ -253,8 +251,8 @@ private fun NewLocalPackDialog(
         ) {
           AnimatedVisibility(
               visible = shown,
-              enter = fadeIn(tween(style.animationDurationMs(200))) + scaleIn(tween(style.animationDurationMs(200)), initialScale = 0.92f),
-              exit  = fadeOut(tween(style.animationDurationMs(120))) + scaleOut(tween(style.animationDurationMs(120)), targetScale = 0.95f),
+              enter = Motion.emphasis.enter,
+              exit  = Motion.emphasis.exit,
           ) {
             NxSurface(
                 level = NxSurfaceLevel.Floating,

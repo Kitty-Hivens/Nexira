@@ -66,6 +66,7 @@ import coil3.size.Size
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.Motion
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -241,6 +242,7 @@ private fun GalleryLightbox(
         val offsetX = remember(images) { Animatable(0f) }
         var boxW by remember(images) { mutableStateOf(1f) }
         val jelly = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+        val gallerySlide = Motion.panelSlide.of<Float>()
 
         // Commit a page move with slide-out -> swap -> slide-in; spring back to centre
         // when there is no neighbour in that direction.
@@ -250,10 +252,10 @@ private fun GalleryLightbox(
                 return
             }
             scope.launch {
-                offsetX.animateTo(-dir * boxW, tween(170))
+                offsetX.animateTo(-dir * boxW, gallerySlide)
                 onIndexChange(index + dir)
                 offsetX.snapTo(dir * boxW)
-                offsetX.animateTo(0f, tween(220))
+                offsetX.animateTo(0f, gallerySlide)
             }
         }
 

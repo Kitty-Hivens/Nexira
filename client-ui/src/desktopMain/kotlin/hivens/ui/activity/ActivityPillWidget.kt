@@ -70,6 +70,7 @@ import hivens.ui.surface.FrostTier
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -165,16 +166,16 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                 // an overshoot. It is not yet a panel and does not pretend to be
                 // one -- there is nothing to read until it has drawn itself out.
                 enter = slideInVertically(
-                    animationSpec = tween(style.animationDurationMs(260), easing = ArriveEasing),
+                    animationSpec = Motion.emphasis.of(),
                     initialOffsetY = { it * 2 },
                 ) + scaleIn(
-                    animationSpec = tween(style.animationDurationMs(260), easing = ArriveEasing),
+                    animationSpec = Motion.emphasis.of(),
                     initialScale = 0.5f,
-                ) + fadeIn(tween(style.animationDurationMs(160))),
+                ) + fadeIn(Motion.fade.of()),
                 exit = scaleOut(
-                    animationSpec = tween(style.animationDurationMs(200)),
+                    animationSpec = Motion.fade.of(),
                     targetScale = 0.96f,
-                ) + fadeOut(tween(style.animationDurationMs(160))),
+                ) + fadeOut(Motion.fade.of()),
             ) {
                 val hasBody = selection != null || subject != null
                 if (hasBody) {
@@ -184,8 +185,12 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                     // ball being swapped for a bar.
                     val birthKey = selection?.let { "selection" } ?: subject?.key
                     var open by remember(birthKey) { mutableStateOf(false) }
+                    // Opens once the arrival has finished, so the two stages read
+                    // as one object rather than overlapping. Read out here: a role
+                    // needs composition, the effect body does not have it.
+                    val arrivalMs = Motion.emphasis.durationMs.toLong()
                     LaunchedEffect(birthKey) {
-                        delay(style.animationDurationMs(220).toLong())
+                        delay(arrivalMs)
                         open = true
                     }
                     // Selection takes the body. What the launcher is doing on its
@@ -228,7 +233,7 @@ internal fun Pill(
     // is the second half of the arrival: one shape becoming another.
     val corner by animateDpAsState(
         targetValue = if (open) style.panelCorner else height / 2,
-        animationSpec = tween(style.animationDurationMs(380), easing = OpenEasing),
+        animationSpec = Motion.reveal.of(),
         label = "pillCorner",
     )
     val shape = RoundedCornerShape(corner)
@@ -251,7 +256,7 @@ internal fun Pill(
             // and the surplus becomes a gap down the middle, which reads as two
             // unrelated clusters rather than one object.
             .widthIn(max = maxWidth)
-            .animateContentSize(tween(style.animationDurationMs(380), easing = OpenEasing))
+            .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
         tier = props.frostTier,
@@ -372,12 +377,12 @@ private fun EdgeMeasure(
     // A job whose size is not known yet still has to look alive. A static track
     // reads as stalled, which is what a launcher does for the first seconds of
     // every install -- exactly when the user is watching hardest.
-    val sweep = if (fraction == null && style.animationMultiplier > 0f) {
+    val sweep = if (fraction == null && !Motion.isStill) {
         rememberInfiniteTransition(label = "pillSweep").animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(style.animationDurationMs(1_600), easing = LinearEasing),
+                animation = Motion.sweep.of(),
                 repeatMode = RepeatMode.Restart,
             ),
             label = "pillSweepValue",
@@ -516,8 +521,4 @@ private val STACK_OVERLAP = 8.dp
 
 
 
-/** Arrival: overshoots, the way something landing does. */
-private val ArriveEasing = CubicBezierEasing(0.15f, 1.4f, 0.64f, 0.96f)
 
-/** Opening: fast then settling, with no overshoot to fight the arrival's. */
-private val OpenEasing = CubicBezierEasing(0.16f, 0.84f, 0.28f, 1f)

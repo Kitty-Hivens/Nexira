@@ -44,6 +44,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.LocalThemeReveal
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /**
@@ -225,7 +226,8 @@ internal fun DayNightRow(
     val style = LocalStyle.current
     val tint = if (checked) MoonBlue else SunOrange
     val reveal = LocalThemeReveal.current
-    val durationMs = style.animationDurationMs(550)
+    // The theme wipe's own pace -- a set piece rather than an interface response.
+    val durationMs = Motion.ownRhythm(THEME_REVEAL_MS).durationMs
     var switchOrigin by remember { mutableStateOf(Offset.Zero) }
     val onToggle: (Boolean) -> Unit = { newValue ->
         if (reveal != null) reveal.reveal(switchOrigin, durationMs) { onCheckedChange(newValue) }
@@ -277,3 +279,6 @@ internal fun PickerBlock(
         )
     }
 }
+
+/** How long the theme wipe takes to cross the window. */
+private const val THEME_REVEAL_MS = 550
