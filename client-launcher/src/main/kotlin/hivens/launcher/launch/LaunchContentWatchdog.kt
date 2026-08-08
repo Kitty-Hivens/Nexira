@@ -1,6 +1,7 @@
 package hivens.launcher.launch
 
 import hivens.core.api.interfaces.IPackSyncService
+import hivens.launcher.util.DirectorySnapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -9,7 +10,6 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.TimeUnit
 
 /**
@@ -71,10 +71,10 @@ internal class LaunchContentWatchdog(
         if (!Files.isDirectory(modsDir)) return@withContext emptyList()
 
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settleMillis)
-        var seen = snapshot(modsDir)
+        var seen = DirectorySnapshot.of(modsDir)
         while (currentCoroutineContext().isActive && System.nanoTime() < deadline) {
             delay(pollMillis)
-            val now = snapshot(modsDir)
+            val now = DirectorySnapshot.of(modsDir)
             if (now == seen) continue
             seen = now
             // The change is not read for what it was. What belongs under `mods/`
@@ -93,38 +93,6 @@ internal class LaunchContentWatchdog(
             .getOrNull()
             ?: return emptyList()
         return if (inspection.isClean) emptyList() else inspection.findings
-    }
-
-    /**
-     * What is in `mods/` at this instant, cheaply enough to be asked every
-     * [pollMillis]: an entry appearing, vanishing or being swapped in place all
-     * show up as a different snapshot. Deliberately does not hash -- this only
-     * decides whether the expensive look is worth doing.
-     *
-     * A directory that cannot be read yields an empty snapshot rather than
-     * throwing. A transient read failure must not end the watch, and the settle
-     * pass still runs.
-     */
-    private fun snapshot(modsDir: Path): Map<String, Mark> = runCatching {
-        Files.newDirectoryStream(modsDir).use { entries ->
-            entries.associate { entry -> entry.fileName.toString() to mark(entry) }
-        }
-    }.getOrElse { emptyMap() }
-
-    /**
-     * Unreadable entries get [Mark.UNREADABLE] instead of propagating: a file
-     * removed between the readdir and the stat is exactly the race being watched
-     * for, and it should read as a change, not as a failure.
-     */
-    private fun mark(entry: Path): Mark =
-        runCatching { Files.readAttributes(entry, BasicFileAttributes::class.java) }
-            .map { Mark(it.size(), it.lastModifiedTime().toMillis()) }
-            .getOrDefault(Mark.UNREADABLE)
-
-    private data class Mark(val size: Long, val modifiedMillis: Long) {
-        companion object {
-            val UNREADABLE = Mark(-1L, -1L)
-        }
     }
 
     internal companion object {

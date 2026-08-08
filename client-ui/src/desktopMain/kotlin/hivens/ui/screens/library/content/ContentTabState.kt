@@ -20,6 +20,7 @@ import hivens.core.smrt.ModIconResolver
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentManager
+import hivens.launcher.instance.ContentFolderWatch
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.modrinth.ModrinthClient
@@ -75,6 +76,7 @@ internal class ContentTabState(
     private val controller: LauncherController,
     private val iconResolver: ModIconResolver,
     private val modrinth: ModrinthClient,
+    private val watch: ContentFolderWatch,
     private val scope: CoroutineScope,
 ) {
     /**
@@ -165,6 +167,21 @@ internal class ContentTabState(
         }.getOrNull()
         manifest = m
         if (m != null) optionalState = OptionalContentRules.enabledState(m.mods, instance.optionalContent)
+    }
+
+    /**
+     * Rescans whenever the content folders change underneath the launcher.
+     *
+     * A player who drops a jar into `mods/` from a file manager expects to find it
+     * listed when they switch back. Every other rescan here follows a mutation made
+     * from inside this screen, so before this the only way to see an outside change
+     * was to leave the tab and come back.
+     *
+     * Runs for as long as it is collected -- the effect that starts it is keyed on
+     * this state, so leaving the screen stops the polling.
+     */
+    suspend fun watchContentFolders() {
+        watch.changes(instanceDir).collect { rescan() }
     }
 
     private suspend fun rescan() {
@@ -397,6 +414,7 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
             controller   = controller,
             iconResolver = iconResolver,
             modrinth     = modrinth,
+            watch        = ContentFolderWatch(),
             scope        = scope,
         )
     }
