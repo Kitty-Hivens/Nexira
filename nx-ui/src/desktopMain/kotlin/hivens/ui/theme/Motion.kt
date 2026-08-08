@@ -3,6 +3,7 @@ package hivens.ui.theme
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.DurationBasedAnimationSpec
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -87,6 +88,31 @@ object Motion {
     val sweep: MotionRole
         @Composable @ReadOnlyComposable get() = role(SWEEP_MS, LinearEasing)
 
+    /**
+     * True when the active style asks for no motion at all.
+     *
+     * A finite animation handles that by resolving to 1ms and never being seen. An
+     * endless one cannot: `infiniteRepeatable` around a 1ms spec does not stop, it
+     * restarts every frame, turning stillness into a strobe. Anything that loops
+     * forever -- a spinner, a pulse, a drifting backdrop -- must ask this and hold
+     * its resting value instead.
+     */
+    val isStill: Boolean
+        @Composable @ReadOnlyComposable get() = LocalStyle.current.animationMultiplier == 0f
+
+    /**
+     * A duration the vocabulary does not name, still scaled by the active style.
+     *
+     * For decorative effects whose period belongs to the effect itself -- a
+     * shimmer crossing a card, a glow breathing -- where the number is an artistic
+     * choice rather than a role. Anything the interface does in answer to the user
+     * is a role above, and reaching here for one of those is how the ad-hoc set
+     * grew in the first place.
+     */
+    @Composable
+    @ReadOnlyComposable
+    fun ownRhythm(baseMs: Int, easing: Easing = Standard): MotionRole = role(baseMs, easing)
+
     @Composable
     @ReadOnlyComposable
     private fun role(
@@ -148,8 +174,12 @@ class MotionRole internal constructor(
     private val exitOf: (MotionRole) -> ExitTransition,
 ) : FiniteAnimationSpec<Float> by tween(durationMs, easing = easing) {
 
-    /** The same role as a spec for any animatable type. */
-    fun <T> of(): FiniteAnimationSpec<T> = tween(durationMs, easing = easing)
+    /**
+     * The same role as a spec for any animatable type. Duration-based rather than
+     * merely finite so it also feeds `infiniteRepeatable`, which a pulse or a
+     * spinner needs.
+     */
+    fun <T> of(): DurationBasedAnimationSpec<T> = tween(durationMs, easing = easing)
 
     val enter: EnterTransition get() = enterOf(this)
 

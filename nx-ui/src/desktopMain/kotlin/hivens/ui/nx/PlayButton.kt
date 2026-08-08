@@ -1,14 +1,12 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +38,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /** Corner of the Play plate under a rounded style -- a rounded rectangle
@@ -98,24 +97,25 @@ fun PlayButton(
         hovered && interactive -> lerp(ink, inkContent, 0.10f)
         else                   -> ink
     }
-    val fill by animateColorAsState(fillTarget, tween(style.animationDurationMs(110)), label = "playFill")
+    val fill by animateColorAsState(fillTarget, Motion.tap.of(), label = "playFill")
     val plateScale by animateFloatAsState(
         targetValue   = if (pressed && interactive) 0.97f else 1f,
-        animationSpec = tween(style.animationDurationMs(90)),
+        animationSpec = Motion.tap,
         label         = "playScale",
     )
     val glyphNudge by animateDpAsState(
         targetValue   = if (hovered && interactive) 2.dp else 0.dp,
-        animationSpec = tween(style.animationDurationMs(110)),
+        animationSpec = Motion.tap.of(),
         label         = "playNudge",
     )
 
-    val contentPulse: Float = if (busy && style.animationMultiplier > 0f) {
+    val pulseSpec = Motion.drift
+    val contentPulse: Float = if (busy && !Motion.isStill) {
         val transition = rememberInfiniteTransition(label = "playBusy")
         val a by transition.animateFloat(
             initialValue  = 0.55f,
             targetValue   = 0.95f,
-            animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(pulseSpec.of(), RepeatMode.Reverse),
             label         = "playBusyAlpha",
         )
         a

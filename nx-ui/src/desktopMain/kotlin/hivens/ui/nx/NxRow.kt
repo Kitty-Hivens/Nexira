@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /**
@@ -109,7 +110,7 @@ internal fun softHoverAlpha(interaction: MutableInteractionSource): Float {
     }
     val alpha by animateFloatAsState(
         targetValue   = target,
-        animationSpec = tween(durationMillis = LocalStyle.current.animationDurationMs(150)),
+        animationSpec = Motion.tap,
         label         = "softHoverAlpha",
     )
     return alpha

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import hivens.ui.theme.Motion
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -103,8 +104,8 @@ private fun NxContextMenuPopup(
     ) {
         AnimatedVisibility(
             visibleState = states,
-            enter = fadeIn(tween(120)) + scaleIn(tween(120), initialScale = 0.9f, transformOrigin = TransformOrigin(1f, 0f)),
-            exit  = fadeOut(tween(90)) + scaleOut(tween(90), targetScale = 0.92f, transformOrigin = TransformOrigin(1f, 0f)),
+            enter = fadeIn(Motion.tap.of()) + scaleIn(Motion.tap.of(), initialScale = 0.9f, transformOrigin = TransformOrigin(1f, 0f)),
+            exit  = fadeOut(Motion.tap.of()) + scaleOut(Motion.tap.of(), targetScale = 0.92f, transformOrigin = TransformOrigin(1f, 0f)),
         ) {
             NxSurface(
                 level    = NxSurfaceLevel.Floating,
