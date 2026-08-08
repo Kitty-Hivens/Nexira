@@ -469,7 +469,7 @@ val mirrorModule = module {
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
     single { ModrinthClient(get(named("direct")), get(), caches = get()) }
-    single { SmrtSyncService(get(), get(), get(), get()) }
+    single { SmrtSyncService(get(), get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by
     // origin so the Browse UI stays source-agnostic.

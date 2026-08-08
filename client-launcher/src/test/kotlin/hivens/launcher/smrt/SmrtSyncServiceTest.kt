@@ -3,7 +3,6 @@ package hivens.launcher.smrt
 import hivens.test.testTransferEngine
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.HttpClientProvider
-import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -126,8 +125,52 @@ class SmrtSyncServiceTest {
         return SmrtSyncService(
             client,
             modrinth,
-            ProtectedPaths(tempDir("pp").resolve("pp.json"), json),
             testTransferEngine(provider),
+        )
+    }
+
+
+    // ── Assets the pack owns ──────────────────────────────────────────────────
+
+    private val serversBytes = "MIRROR-SERVER-LIST".toByteArray()
+
+    private fun assetManifest() = """
+        {"schema_version":2,"pack_id":"test","pack_version":"1","generated_at":"now",
+         "minecraft":{"version":"1.20.1"},"loader":{"name":"fabric","version":"0.19.2"},"java":{"major":17},
+         "mods":[],
+         "assets":[
+           {"dest":"servers.dat","sha1":"${sha1(serversBytes)}","size_bytes":${serversBytes.size},"required":true,"source":{"type":"smrt_static","url":"$SERVERS_URL"}}
+         ]}
+    """.trimIndent()
+
+    private fun assetService(): SmrtSyncService = serviceWith(
+        MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond(assetManifest(), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                SERVERS_URL -> respond(ByteReadChannel(serversBytes), HttpStatusCode.OK)
+                else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+            }
+        }
+    )
+
+    /**
+     * The mirror ships the server list on purpose, so a pack that names it must be
+     * able to deliver it. A name-based exemption used to skip any listed path that
+     * already existed on disk, which meant the pack's own `servers.dat` never
+     * arrived after the first install -- the exemption belongs to the `clients/`
+     * path, where there is no baseline to reason with.
+     */
+    @Test
+    fun `the pack delivers its own server list over an existing one`() = runTest {
+        val dir = tempDir("asset-owned")
+        Files.writeString(dir.resolve("servers.dat"), "STALE")
+
+        assetService().sync("test", dir)
+
+        assertContentEquals(
+            serversBytes,
+            Files.readAllBytes(dir.resolve("servers.dat")),
+            "an asset the pack names must land even when a file is already there",
         )
     }
 
@@ -639,5 +682,6 @@ class SmrtSyncServiceTest {
         const val MANIFEST_URL = "https://mirror.test/v1/packs/test/manifest"
         const val REQ_URL = "https://mirror.test/req.jar"
         const val OPT_URL = "https://mirror.test/opt.jar"
+        const val SERVERS_URL = "https://mirror.test/servers.dat"
     }
 }

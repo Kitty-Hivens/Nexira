@@ -15,7 +15,6 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
-import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
@@ -87,7 +86,6 @@ class PackUpdateServiceTest {
         val dataDir = tempDir("data")
         val clientDir: Path = dataDir.resolve("instances").resolve("inst")
         val repo = FakeRepo()
-        private val protectedPaths = ProtectedPaths(tempDir("pp").resolve("pp.json"), json)
 
         // The installed baseline (V1), served at its own version URL so the update
         // path can fetch the baseline mods with identity (not just latest/target).
@@ -144,7 +142,7 @@ class PackUpdateServiceTest {
         }
         private val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR, json)
-        val sync = SmrtSyncService(client, ModrinthClient(provider, testTransferEngine(provider), json), protectedPaths, testTransferEngine(provider))
+        val sync = SmrtSyncService(client, ModrinthClient(provider, testTransferEngine(provider), json), testTransferEngine(provider))
         private val snapshots = PackSnapshotService(dataDir, json)
         val journal = ApplyJournal(dataDir, json)
         val service = PackUpdateService(client, sync, repo, snapshots, journal, dataDir)
