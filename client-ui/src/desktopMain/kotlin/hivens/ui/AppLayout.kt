@@ -1,6 +1,5 @@
 package hivens.ui
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -30,6 +29,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
@@ -37,7 +37,6 @@ import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
-import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalStyle
@@ -115,12 +114,11 @@ fun AppLayout(
     // because navigation is not yet a widget surface; the center region widget
     // invokes it. Reads currentSession/selectedServer live on each recompose.
     val centerBody: @Composable () -> Unit = {
-        // Screen-to-screen Crossfade duration follows the active style. Under
-        // Brut (animationMultiplier = 0) the swap is effectively instant; under
-        // Celestia it is the fade role.
-        Crossfade(
-            targetState   = currentScreen,
-            animationSpec = Motion.fade,
+        // How a screen replaces another is the swap primitive's business, not the
+        // router's. A still style collapses it without this site knowing.
+        NxSwap(
+            target = currentScreen,
+            label  = "screen",
         ) { screen ->
                 when (screen) {
                     Screen.Home -> {
