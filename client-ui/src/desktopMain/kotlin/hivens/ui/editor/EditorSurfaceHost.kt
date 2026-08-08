@@ -89,6 +89,7 @@ import hivens.ui.layout.LayoutReconcile
 import hivens.ui.nx.AdaptiveWidth
 import hivens.ui.nx.WidthClass
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
@@ -412,7 +413,7 @@ fun EditorSurfaceHost(
         // Edit-mode reflow duration -- slot add / remove / resize animates while
         // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
-            LocalStyle.current.animationDurationMs(260)
+            Motion.panelSlide.durationMs
         } else 0,
         // Canvas slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
@@ -670,7 +671,7 @@ private fun EditModePill(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val motionMs = LocalStyle.current.animationDurationMs(260)
+    val motionMs = Motion.panelSlide.durationMs
     AnimatedVisibility(
         visible  = active,
         enter    = fadeIn(tween(motionMs)) + slideInVertically(tween(motionMs)) { -it },
@@ -933,7 +934,7 @@ private fun surfaceHasSettings(surface: SurfaceId?): Boolean =
 
 @Composable
 private fun EditModeVignette(active: Boolean) {
-    val motionMs = LocalStyle.current.animationDurationMs(320)
+    val motionMs = Motion.fade.durationMs
     val alpha by animateFloatAsState(
         targetValue   = if (active) 1f else 0f,
         animationSpec = tween(motionMs),

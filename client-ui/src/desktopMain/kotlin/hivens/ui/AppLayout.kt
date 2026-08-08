@@ -37,6 +37,7 @@ import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalStyle
@@ -116,11 +117,10 @@ fun AppLayout(
     val centerBody: @Composable () -> Unit = {
         // Screen-to-screen Crossfade duration follows the active style. Under
         // Brut (animationMultiplier = 0) the swap is effectively instant; under
-        // Celestia keeps the 180ms fade.
-        val crossfadeMs = LocalStyle.current.animationDurationMs(180)
+        // Celestia it is the fade role.
         Crossfade(
             targetState   = currentScreen,
-            animationSpec = tween(crossfadeMs),
+            animationSpec = Motion.fade,
         ) { screen ->
                 when (screen) {
                     Screen.Home -> {

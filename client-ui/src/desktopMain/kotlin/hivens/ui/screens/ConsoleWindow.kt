@@ -101,6 +101,7 @@ import hivens.ui.screens.console.LogSelection
 import hivens.ui.screens.console.buildLineModels
 import hivens.ui.screens.console.rememberLogCanvasState
 import hivens.ui.theme.CelestiaStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalMonoFamily
@@ -768,7 +769,7 @@ internal fun ConsoleContent(
             // style: appear on action, dissolve when idle).
             Crossfade(
                 targetState   = copiedFlash,
-                animationSpec = tween(180),
+                animationSpec = Motion.fade.of(),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp),

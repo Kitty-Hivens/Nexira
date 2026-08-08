@@ -34,6 +34,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -365,7 +366,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     } else {
                         AnimatedVisibility(
                             visible = state.modsLoaded,
-                            enter   = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
+                            enter   = slideInVertically(initialOffsetY = { 50 }, animationSpec = Motion.panelSlide.of()) + fadeIn(Motion.panelSlide.of())
                         ) {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(state.mods) { mod ->

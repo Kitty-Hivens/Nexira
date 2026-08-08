@@ -70,8 +70,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalCanvasSlotSizeDp
 import hivens.widget.api.LocalCubeGeometry
 import hivens.widget.api.LocalLayoutGraph
@@ -113,8 +113,7 @@ fun EditableWidgetChrome(
     content: @Composable () -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
-    val chromeMotionMs = style.animationDurationMs(220)
+    val chromeMotionMs = Motion.fade.durationMs
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }

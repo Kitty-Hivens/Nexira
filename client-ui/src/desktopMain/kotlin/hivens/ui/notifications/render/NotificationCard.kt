@@ -59,6 +59,7 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColors
 import hivens.ui.nx.NxTooltip
 import hivens.ui.theme.NxTheme
@@ -82,6 +83,8 @@ fun NotificationCard(
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
     val palette = NxTheme.colors
     val style = LocalStyle.current
+    // Read here, not inside the drag coroutine: a role needs composition.
+    val swipeSpec = Motion.panelSlide.of<Float>()
     val accentColor = severityAccent(group.severity, group.kind, palette)
     // Critical pulses only when the active style allows motion; Brut stays static.
     val accentAlpha = if (group.severity == Severity.Critical && style.softGlowEnabled) criticalPulse() else 1f
@@ -122,11 +125,11 @@ fun NotificationCard(
                         if (abs(dx) >= threshold) {
                             val target = if (dx > 0) size.width.toFloat() else -size.width.toFloat()
                             scope.launch {
-                                offsetX.animateTo(target, tween(style.animationDurationMs(180)))
+                                offsetX.animateTo(target, swipeSpec)
                                 onDismiss()
                             }
                         } else {
-                            scope.launch { offsetX.animateTo(0f, tween(style.animationDurationMs(180))) }
+                            scope.launch { offsetX.animateTo(0f, swipeSpec) }
                         }
                     },
                     onHorizontalDrag = { change, delta ->

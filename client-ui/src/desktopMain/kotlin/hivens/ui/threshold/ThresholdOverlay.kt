@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.press_start_2p
 import hivens.ui.i18n.AppStrings
+import hivens.ui.theme.Motion
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -124,7 +125,8 @@ fun ThresholdOverlay(
     // skipped the readout entirely on a warm boot, which is exactly the
     // "boot animation sometimes missing" complaint.
     val entryAlpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { entryAlpha.animateTo(1f, tween(120)) }
+    val entrySpec = Motion.tap.of<Float>()
+    LaunchedEffect(Unit) { entryAlpha.animateTo(1f, entrySpec) }
 
     val motion = remember { BarMotion() }
     var bar by remember { mutableStateOf(0f) }
