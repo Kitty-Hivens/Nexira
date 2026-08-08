@@ -18,7 +18,6 @@ import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.update.UpdatePlan
 import hivens.launcher.util.ModArchives
-import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -44,7 +43,6 @@ import java.util.Comparator
 class SmrtSyncService(
     private val client: SmrtPackClient,
     private val modrinth: ModrinthClient,
-    private val protectedPaths: ProtectedPaths,
     private val transfers: TransferEngine,
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
@@ -564,24 +562,23 @@ class SmrtSyncService(
         return plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
+    /**
+     * No name-based exemption here, deliberately.
+     *
+     * The `clients/` path needs one: it downloads whatever the server's manifest
+     * lists, with no record of what it put there last time, so without a list of
+     * names to leave alone it overwrites a player's own settings. The mirror was
+     * built to replace that path and does not have the problem -- it keeps the
+     * installed version's manifest as a baseline, so the reconciler can tell a file
+     * the pack shipped from one the player wrote, and answers each case on its own.
+     *
+     * Carrying the list here made the mirror worse rather than safer: a name on it
+     * was skipped in BOTH directions, so a pack could not deliver its own
+     * `servers.dat` or its JEI settings at all -- the pack ships the server list on
+     * purpose, and the exemption silently dropped it.
+     */
     private suspend fun planAsset(asset: SmrtAssetEntry, clientDir: Path): Transfer? {
-        // resolveSafe FIRST: a manifest entry like
-        // `../../config/servers.dat` happens to match the protected-
-        // suffix list (ProtectedPaths.isProtected lowercases + checks
-        // endsWith/contains on the raw string), so running the
-        // isProtected gate before path normalisation would silently
-        // skip a path-escape attempt as "protected" instead of loudly
-        // failing the manifest. The traversal IOException needs to
-        // win over the protected-path debug log.
         val dest = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
-        // Protected paths (e.g. user-edited options.txt) are honored
-        // here just like in the SC code path -- if the user has tuned
-        // their FOV, sync must not overwrite. Protection only kicks in
-        // when the file is already present and non-empty.
-        if (protectedPaths.isProtected(asset.dest) && fileIsPresentAndNonEmpty(dest)) {
-            log.debug("smrt sync: skipping protected {}", asset.dest)
-            return null
-        }
         return plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
     }
 
@@ -677,8 +674,6 @@ class SmrtSyncService(
         return DigestAlgorithm.SHA1.of(dest).equals(expectedSha1, ignoreCase = true)
     }
 
-    private fun fileIsPresentAndNonEmpty(p: Path): Boolean =
-        Files.exists(p) && Files.isRegularFile(p) && Files.size(p) > 0L
 
     companion object {
         /**
