@@ -16,9 +16,32 @@ import java.nio.file.Path
 
 internal class GameCommandBuilder(
     private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
+    // Injected rather than read at the call site so the decision can be exercised
+    // without a compositor.
+    private val waylandSession: Boolean = OS.isLinux && !System.getenv("WAYLAND_DISPLAY").isNullOrBlank(),
 ) {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
     private val neoForgeDetector = NeoForgeVersionDetector()
+
+
+    /**
+     * FML draws its own window while mods load and hands it over when Minecraft
+     * takes the display. It allows one second for that handoff.
+     *
+     * On Wayland a surface nobody is looking at stops receiving frame callbacks,
+     * so the early window's loop stalls the moment the user switches workspace.
+     * The handoff then misses its second and takes the launch down with it --
+     * "trouble handing off the window, tried for 1 second", then exit 1. Not a
+     * corner case: a large pack loads for a minute, and nobody watches a progress
+     * bar for a minute.
+     *
+     * Skipping the early window removes the handoff rather than racing it: the
+     * game opens its own window when it is ready. What is lost is FML's loading
+     * bar, which the launcher is already showing on its own surface.
+     */
+    private fun addEarlyWindowGuard(args: MutableList<String>) {
+        if (waylandSession) args.add("-Dfml.earlyprogresswindow=false")
+    }
 
     private data class VersionConfig(
         val mainClass: String,
@@ -221,6 +244,7 @@ internal class GameCommandBuilder(
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.14.0.jar,jna-platform-5.14.0.jar")
         }
+        addEarlyWindowGuard(args)
 
         // 6. Memory Allocation & Custom JVM Args
         val (gcArgs, systemArgs) = config.jvmArgs.partition { it.startsWith("-XX:") }
@@ -385,6 +409,7 @@ internal class GameCommandBuilder(
         val nativesPath = gameDir.resolve(nativesDirName).toAbsolutePath()
         args.add("-Djava.library.path=$nativesPath")
         args.add("-Dfml.ignoreInvalidMinecraftCertificates=true")
+        addEarlyWindowGuard(args)
 
         args.addAll(userJvmArgs(jvmArgsOverride, restrictJvmArgs))
         addAttachGuard(args, restrictJvmArgs)
