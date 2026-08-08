@@ -52,6 +52,7 @@ import coil3.compose.SubcomposeAsyncImage
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
+import hivens.ui.components.channelColor
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -473,9 +474,4 @@ private fun Footer(
 
 private const val SEARCH_THRESHOLD = 8
 
-@Composable
-private fun channelColor(channel: VersionChannel): Color = when (channel) {
-    VersionChannel.Release -> NxTheme.colors.success
-    VersionChannel.Beta -> NxTheme.colors.warnAccent
-    VersionChannel.Alpha -> NxTheme.colors.error
-}
+
