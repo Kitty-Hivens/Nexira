@@ -1,6 +1,7 @@
 package hivens.launcher.instance
 
 import hivens.launcher.util.DirectorySnapshot
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -29,6 +30,13 @@ import java.nio.file.Path
 class ContentFolderWatch(
     private val pollMillis: Long = POLL_MILLIS,
     private val settleMillis: Long = SETTLE_MILLIS,
+    /**
+     * Where the polling runs. Injected so a test can drive it on a scheduler with a
+     * virtual clock: the waits here are the whole mechanism, and asserting on them
+     * against a real clock makes the result depend on how loaded the machine is
+     * rather than on the code.
+     */
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     /**
@@ -48,7 +56,7 @@ class ContentFolderWatch(
             seen = settle(dirs, now)
             emit(Unit)
         }
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(dispatcher)
 
     /** Waits for [dirs] to stop changing, and answers with the state it settled on. */
     private suspend fun settle(dirs: List<Path>, first: Map<String, DirectorySnapshot.Mark>): Map<String, DirectorySnapshot.Mark> {
