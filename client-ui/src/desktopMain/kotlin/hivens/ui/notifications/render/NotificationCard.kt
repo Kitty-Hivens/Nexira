@@ -334,12 +334,16 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 
 @Composable
 private fun criticalPulse(): Float {
+    // Full strength rather than a strobe when the style asks for stillness: the
+    // card still has to read as critical without moving.
+    val pulseRhythm = Motion.ownRhythm(CRITICAL_PULSE_MS)
+    if (Motion.isStill) return 1.0f
     val transition = rememberInfiniteTransition(label = "critical-pulse")
     val v by transition.animateFloat(
         initialValue = 0.55f,
         targetValue  = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900),
+            animation = pulseRhythm.of(),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "critical-pulse-alpha",
@@ -368,3 +372,6 @@ private fun relativeTime(created: Instant, now: Instant, strings: AppStrings): S
         else             -> strings.notifTimeDays(seconds / 86_400)
     }
 }
+
+/** How fast a critical card pulses. */
+private const val CRITICAL_PULSE_MS = 900

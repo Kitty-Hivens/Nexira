@@ -16,6 +16,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.PathEffect
@@ -29,6 +31,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotPath
 
@@ -49,11 +52,16 @@ fun EmptySlotPlaceholder(
     registry: DropTargetRegistry,
 ) {
     val s = LocalStrings.current
-    val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
+    // Holds mid-breath under a still style: a loop cannot express stillness by
+    // shortening, so it has to not run.
+    val breathRhythm = Motion.ownRhythm(BREATH_MS)
+    val breath by if (Motion.isStill) {
+        remember { mutableStateOf(0.65f) }
+    } else rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
         initialValue  = 0.45f,
         targetValue   = 0.85f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 1600, easing = LinearEasing),
+            animation  = breathRhythm.of(),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "empty-slot-breath-value",
@@ -104,3 +112,6 @@ fun EmptySlotPlaceholder(
         }
     }
 }
+
+/** How long an empty slot takes to breathe in and out. */
+private const val BREATH_MS = 1600

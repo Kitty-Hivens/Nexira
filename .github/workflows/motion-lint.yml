@@ -1,0 +1,40 @@
+name: motion-lint
+
+# A duration written at a call site is a duration no style can reach. The scale
+# exists so a still style is still everywhere; this keeps call sites from walking
+# around it again, the way the spacing scale ended up with no readers at all.
+
+on:
+  pull_request:
+    branches: [stable, dev]
+    paths:
+      - "**/*.kt"
+      - "scripts/check-motion.py"
+      - ".github/workflows/motion-lint.yml"
+  push:
+    branches: [dev, stable]
+    paths:
+      - "**/*.kt"
+      - "scripts/check-motion.py"
+      - ".github/workflows/motion-lint.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Motion-scale bypasses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Strict: the baseline is clean, so this only ever fires on a newly
+      # introduced bypass. An exemption is a line in the script naming why the
+      # scale cannot reach that site.
+      - name: Scan for motion-scale bypasses
+        run: python3 scripts/check-motion.py --strict
