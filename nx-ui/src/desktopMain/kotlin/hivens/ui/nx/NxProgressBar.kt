@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /**
@@ -52,7 +53,7 @@ fun NxProgressBar(
 ) {
     val style = LocalStyle.current
     val corner = style.badgeStyle.corner
-    val still = style.animationMultiplier == 0f
+    val still = Motion.isStill
 
     // NaN passes coerceIn -- both of its comparisons are false against NaN -- and
     // then becomes the animation's current value, so every later valid value
@@ -64,7 +65,7 @@ fun NxProgressBar(
     // the bar. Motion-off collapses the tween to 1ms, so the value still lands.
     val fraction by animateFloatAsState(
         targetValue    = target ?: 0f,
-        animationSpec  = tween(style.animationDurationMs(220), easing = LinearEasing),
+        animationSpec  = Motion.colorShift,
         label          = "nxProgress",
     )
 
@@ -74,7 +75,7 @@ fun NxProgressBar(
             initialValue  = -INDETERMINATE_SPAN,
             targetValue   = 1f,
             animationSpec = infiniteRepeatable(
-                animation  = tween(style.animationDurationMs(1_150), easing = LinearEasing),
+                animation  = Motion.sweep.of(),
                 repeatMode = RepeatMode.Restart,
             ),
             label = "nxProgressSweepValue",

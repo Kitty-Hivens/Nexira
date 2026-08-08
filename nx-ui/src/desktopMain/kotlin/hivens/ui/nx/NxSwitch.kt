@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 
 /**
  * Skin-driven toggle. Geometry (track/thumb size + corners) comes from the active
@@ -44,11 +45,13 @@ fun NxSwitch(
     val trackColor by animateColorAsState(
         targetValue = if (checked) (accent ?: colors.primary).copy(alpha = alpha)
                       else colors.outline.copy(alpha = 0.5f * alpha),
+        animationSpec = Motion.colorShift.of(),
         label = "nxSwitchTrack",
     )
     val pad = (st.trackHeight - st.thumbSize) / 2
     val thumbX by animateDpAsState(
         targetValue = if (checked) st.trackWidth - st.thumbSize - pad else pad,
+        animationSpec = Motion.tap.of(),
         label = "nxSwitchThumb",
     )
     Box(

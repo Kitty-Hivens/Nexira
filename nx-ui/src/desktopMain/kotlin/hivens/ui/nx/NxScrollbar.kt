@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 // One look for every list bar (Rule 0). Geometry and the 40%/75% textSecondary mix
@@ -50,9 +51,12 @@ private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
     // follows buttonCorner so a Brut UI gets a square bar, not a lone rounded one.
     val alpha by animateFloatAsState(
         targetValue   = if (revealed) 1f else 0f,
+        // Duration and curve come from the fade role; the idle pause before
+        // hiding is UX pacing rather than motion, so it is not scaled with it.
         animationSpec = tween(
-            durationMillis = style.animationDurationMs(if (revealed) FadeInMs else FadeOutMs),
+            durationMillis = Motion.fade.durationMs,
             delayMillis    = if (revealed) 0 else IdleFadeDelayMs,
+            easing         = Motion.fade.easing,
         ),
         label = "nxScrollbarAlpha",
     )
@@ -60,7 +64,7 @@ private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
         minimalHeight       = MinLength,
         thickness           = Thickness,
         shape               = RoundedCornerShape(style.buttonCorner),
-        hoverDurationMillis = style.animationDurationMs(HoverCrossfadeMs),
+        hoverDurationMillis = Motion.colorShift.durationMs,
         unhoverColor        = base.copy(alpha = 0.40f * alpha),
         hoverColor          = base.copy(alpha = 0.75f * alpha),
     )

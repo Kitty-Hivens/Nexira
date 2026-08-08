@@ -2,6 +2,9 @@ package hivens.ui.effects
 
 import androidx.compose.animation.core.*
 import androidx.compose.runtime.getValue
+import hivens.ui.theme.Motion
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind
@@ -29,16 +32,21 @@ fun Modifier.pulsatingGlow(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    val inf = rememberInfiniteTransition(label = "pulsatingGlow")
-    val intensity by inf.animateFloat(
-        initialValue = 0.18f,
-        targetValue  = 0.72f,
-        animationSpec = infiniteRepeatable(
-            tween(950, easing = FastOutSlowInEasing),
-            RepeatMode.Reverse
-        ),
-        label = "glowIntensity"
-    )
+    // A loop cannot express stillness by collapsing its duration -- a 1ms
+    // repeat restarts every frame. Under a still style the glow holds its
+    // resting intensity instead.
+    val still = Motion.isStill
+    val pulse = Motion.ownRhythm(PULSE_MS)
+    val intensity by if (still) {
+        remember { mutableStateOf(GLOW_REST) }
+    } else {
+        rememberInfiniteTransition(label = "pulsatingGlow").animateFloat(
+            initialValue = GLOW_REST,
+            targetValue  = 0.72f,
+            animationSpec = infiniteRepeatable(pulse.of(), RepeatMode.Reverse),
+            label = "glowIntensity"
+        )
+    }
 
     drawBehind {
         val cPx = cornerRadius.toPx()
@@ -65,12 +73,13 @@ fun Modifier.shimmerOverlay(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    val inf = rememberInfiniteTransition(label = "shimmer")
-    val offsetX by inf.animateFloat(
+    if (Motion.isStill) return@composed this
+    val sweepRhythm = Motion.ownRhythm(SHIMMER_MS)
+    val offsetX by rememberInfiniteTransition(label = "shimmer").animateFloat(
         initialValue = -1.1f,
         targetValue  =  2.1f,
         animationSpec = infiniteRepeatable(
-            tween(3_200, delayMillis = 700, easing = FastOutSlowInEasing),
+            tween(sweepRhythm.durationMs, delayMillis = SHIMMER_GAP_MS, easing = sweepRhythm.easing),
             RepeatMode.Restart
         ),
         label = "shimmerX"
@@ -101,16 +110,17 @@ fun Modifier.neonBorder(
     cornerRadius: Dp,
     strokeWidth: Dp = 2.dp
 ): Modifier = composed {
-    val inf = rememberInfiniteTransition(label = "neonBorder")
-    val alpha by inf.animateFloat(
-        initialValue = 0.50f,
-        targetValue  = 1.00f,
-        animationSpec = infiniteRepeatable(
-            tween(1_100, easing = FastOutSlowInEasing),
-            RepeatMode.Reverse
-        ),
-        label = "neonAlpha"
-    )
+    val neonRhythm = Motion.ownRhythm(NEON_MS)
+    val alpha by if (Motion.isStill) {
+        remember { mutableStateOf(1f) }
+    } else {
+        rememberInfiniteTransition(label = "neonBorder").animateFloat(
+            initialValue = 0.50f,
+            targetValue  = 1.00f,
+            animationSpec = infiniteRepeatable(neonRhythm.of(), RepeatMode.Reverse),
+            label = "neonAlpha"
+        )
+    }
 
     drawWithContent {
         drawContent()
@@ -137,3 +147,11 @@ fun Modifier.neonBorder(
     }
 }
 
+// Periods of the decorative effects above. Artistic choices rather than roles on
+// the motion scale, but still routed through it so a slower or still style
+// reaches them.
+private const val PULSE_MS = 950
+private const val SHIMMER_MS = 3_200
+private const val SHIMMER_GAP_MS = 700
+private const val NEON_MS = 1_100
+private const val GLOW_REST = 0.18f
