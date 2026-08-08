@@ -1,11 +1,17 @@
 name: Tests
 
-# Unit-test matrix on every code PR.
+# Unit-test matrix on every code PR and every code push to a working branch.
 #
-# build_release.yml runs the same suites minus widget-processor, but only on a release tag --
-# so OS-specific regressions stayed invisible until a tag was cut (that is how
-# a macOS native-classifier assumption and Windows path-separator asserts once
-# reached a release and blocked it). This workflow runs them at PR time instead.
+# build_release.yml runs these suites on a release tag -- so OS-specific
+# regressions stayed invisible until a tag was cut (that is how a macOS
+# native-classifier assumption and Windows path-separator asserts once reached a
+# release and blocked it). This workflow runs them at PR time instead.
+#
+# dev is in the push list because work lands there as direct commits, not as
+# pull requests. Without it the first run of any test on that code is the nightly
+# tag, which puts hours and a stack of unrelated commits between a break and the
+# report -- exactly the gap that let a macOS-only watch assumption and a
+# composition that never rendered both reach a nightly.
 #
 # Full 3-OS matrix, deliberately NOT Linux-only: the failures that motivated
 # this were all green on Linux, so a Linux-only PR run would not have caught
@@ -23,7 +29,15 @@ on:
       - 'gradle.properties'
       - '.github/workflows/tests.yml'
   push:
-    branches: [stable]
+    branches: [dev, stable]
+    # Same filter as the PR trigger: a CHANGELOG or docs commit on dev should not
+    # spend a three-OS matrix.
+    paths:
+      - '**.kt'
+      - '**.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - '.github/workflows/tests.yml'
 
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.ref }}
@@ -94,11 +108,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
-          path: |
-            client-config/build/reports/tests/
-            client-core/build/reports/tests/
-            client-launcher/build/reports/tests/
-            client-update/build/reports/tests/
-            client-ui/build/reports/tests/
-            client-i18n/build/reports/tests/
-            client-render3d/build/reports/tests/
+          # Every module, not a hand-kept subset -- a suite whose report is not
+          # collected is one whose failure has to be read off the raw log.
+          path: '*/build/reports/tests/'
