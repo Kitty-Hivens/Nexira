@@ -232,6 +232,13 @@ object RussianStrings : AppStrings {
     override val settingsDiagnosticBundleHint    = "Соберёт в один ZIP redact'нутые логи, отчёты о сбоях, историю действий и сведения о системе — отправлять в поддержку."
     override val settingsReportOnGithub          = "Сообщить на GitHub с пакетом"
 
+    override val reportDescribeHeading  = "Описание"
+    override val reportCrashHint        = "Что вы делали, когда лаунчер упал?"
+    override val reportBundleHint       = "Опишите проблему."
+    override val reportLanguageNudge    = "Пишите по-английски, если можете: трекер англоязычный."
+    override val reportBundleCreated    = $$"Диагностический пакет `$bundle` собран в data-директории лаунчера, полный путь скопирован в буфер обмена."
+    override val reportBundleAttach     = "**Перетащите ZIP в это окно перед отправкой** (GitHub принимает drag-and-drop)."
+
     // File Manager
     override fun fileDownloading(n: Int) =
         "Загрузка обновлений ($n ${russianPlural(n, "файл", "файла", "файлов")})..."

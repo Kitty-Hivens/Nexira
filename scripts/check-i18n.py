@@ -37,12 +37,12 @@ ROOT = Path(__file__).resolve().parent.parent
 SCAN_EXT = ".kt"
 EXCLUDE_DIR_PARTS = {"build", "i18n"}
 
-# Which modules count as Compose UI is asked of the build file, not kept as a
-# list here: the heuristic below is only sound where Compose is, and a list is
-# how nx-ui went unscanned after it was split out of client-ui. Any module whose
-# build applies a Compose plugin or depends on the runtime qualifies, so the next
-# UI module is covered the day it lands.
-COMPOSE_MARKERS = ("plugins.compose", "org.jetbrains.compose", "compose.runtime")
+# Every module carrying sources is scanned, not only the Compose ones.
+# User-facing text is not confined to the UI: the launcher composes a GitHub
+# issue body in client-launcher, and it sat in one language for every user
+# because nothing looked there. The heuristic reports nothing on engine code
+# that has no user-facing strings, so the wider scope costs a longer file walk
+# and buys the modules where a regression would otherwise be invisible.
 
 # Main source sets only. A render test hardcodes labels on purpose -- the rule is
 # about what ships, and a test fixture is not user-facing text.
@@ -56,12 +56,6 @@ def scan_roots() -> list[Path]:
         build_file = module / "build.gradle.kts"
         src = module / "src"
         if not src.is_dir() or not build_file.is_file():
-            continue
-        try:
-            build_text = build_file.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        if not any(marker in build_text for marker in COMPOSE_MARKERS):
             continue
         roots.extend(p for p in sorted(src.iterdir()) if p.is_dir() and _is_main_source_set(p))
     return roots

@@ -41,6 +41,47 @@ class IssueReporterTest {
         return URLDecoder.decode(bodyParam, Charsets.UTF_8)
     }
 
+    // ── Prompt language ─────────────────────────────────────────────────────
+
+    /**
+     * The body is read by whoever picks the issue up, so its structure is one
+     * language. Only the lines addressed to the author are translated.
+     */
+    @Test
+    fun `the default body is English throughout`() {
+        val cyrillic = Regex("[\\u0400-\\u04FF]")
+        val crash = decodedBody(IssueReporter.crashIssueUrl(fakeCrashReport()))
+        val bundle = decodedBody(IssueReporter.bundleIssueUrl(Paths.get("nexira-diag.zip")))
+
+        assertFalse(cyrillic.containsMatchIn(crash), "crash body carries text no default locale asked for")
+        assertFalse(cyrillic.containsMatchIn(bundle), "bundle body carries text no default locale asked for")
+    }
+
+    @Test
+    fun `prompts reach the body while the structure stays put`() {
+        val prompts = ReportPrompts(
+            describeHeading = "Beschreibung",
+            bundleHint      = "Beschreiben Sie das Problem.",
+            languageNudge   = "Bitte auf Englisch.",
+            bundleCreated   = $$"Paket `$bundle` liegt bereit.",
+            bundleAttach    = "**ZIP hierher ziehen.**",
+        )
+
+        val body = decodedBody(IssueReporter.bundleIssueUrl(Paths.get("some-bundle.zip"), prompts))
+
+        assertTrue(body.contains("## Beschreibung"), "the author-facing heading follows the prompts")
+        assertTrue(body.contains("Beschreiben Sie das Problem. Bitte auf Englisch."), "hint and nudge land together")
+        assertTrue(body.contains("Paket `some-bundle.zip` liegt bereit."), "the bundle name fills its placeholder")
+        assertTrue(body.contains("## Diagnostic bundle"), "the machine-read heading stays English")
+    }
+
+    @Test
+    fun `an unfilled placeholder never reaches the body`() {
+        val body = decodedBody(IssueReporter.bundleIssueUrl(Paths.get("b.zip")))
+
+        assertFalse(body.contains($$"$bundle"), "the placeholder was rendered instead of substituted")
+    }
+
     @Test
     fun `crash issue url starts with the configured GitHub new-issue endpoint`() {
         val url = IssueReporter.crashIssueUrl(fakeCrashReport())

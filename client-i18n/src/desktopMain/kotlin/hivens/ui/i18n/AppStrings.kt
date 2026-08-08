@@ -243,6 +243,18 @@ interface AppStrings {
      *  triggers when user clicks Submit in their browser — never the launcher itself. */
     val settingsReportOnGithub: String
 
+    /** Prompts inside the GitHub issue body the launcher pre-fills. Only the parts
+     *  the author reads while writing are localised; headings and collected fields
+     *  stay English so the tracker stays searchable. */
+    val reportDescribeHeading: String
+    val reportCrashHint: String
+    val reportBundleHint: String
+    /** Nudge toward the tracker's working language -- advisory, never enforced. */
+    val reportLanguageNudge: String
+    /** `$bundle` is replaced with the ZIP's file name. */
+    val reportBundleCreated: String
+    val reportBundleAttach: String
+
     // --- File Manager ---
     fun fileDownloading(n: Int): String
 

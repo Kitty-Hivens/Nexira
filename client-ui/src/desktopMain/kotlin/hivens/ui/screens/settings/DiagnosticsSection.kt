@@ -16,6 +16,7 @@ import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.AppRelauncher
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.bootstrap.RecoveryEntry
+import hivens.ui.diag.reportPrompts
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
@@ -169,7 +170,7 @@ internal fun DiagnosticsSection(
                                     // file manager OR paste it into a comment.
                                     Toolkit.getDefaultToolkit().systemClipboard
                                         .setContents(StringSelection(zip.toString()), null)
-                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
+                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -193,7 +194,7 @@ internal fun DiagnosticsSection(
                     runCatching {
                         Toolkit.getDefaultToolkit().systemClipboard
                             .setContents(StringSelection(zip.toString()), null)
-                        SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
+                        SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
                     }
                 }
             }
