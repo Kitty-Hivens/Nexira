@@ -39,26 +39,32 @@ object IssueReporter {
         .withZone(ZoneId.systemDefault())
 
     /** URL that opens a new Issue pre-filled with the crash report. */
-    fun crashIssueUrl(report: CrashReporter.CrashReport): String {
+    fun crashIssueUrl(
+        report: CrashReporter.CrashReport,
+        prompts: ReportPrompts = ReportPrompts.English,
+    ): String {
         // Title also goes through Redactor: it ends up in the GET URL, which
         // means browser history / corporate proxy logs / GitHub request logs
         // would all see it raw. Body redaction alone isn't enough.
         val rawTitle = "[crash] ${report.thread}: ${report.stackTrace.lineSequence().firstOrNull().orEmpty().take(120)}"
         val title = Redactor.redact(rawTitle)
-        val body = buildCrashBody(report)
+        val body = buildCrashBody(report, prompts)
         return buildUrl(title = title, body = body, labels = "crash,auto-report")
     }
 
     /** URL that opens a new Issue with instructions to attach the bundle ZIP. */
-    fun bundleIssueUrl(bundlePath: Path): String {
+    fun bundleIssueUrl(
+        bundlePath: Path,
+        prompts: ReportPrompts = ReportPrompts.English,
+    ): String {
         val title = "[bug] "
-        val body = buildBundleBody(bundlePath)
+        val body = buildBundleBody(bundlePath, prompts)
         return buildUrl(title = title, body = body, labels = "bug,with-bundle")
     }
 
     // ── Body templates ──────────────────────────────────────────────────────
 
-    private fun buildCrashBody(report: CrashReporter.CrashReport): String {
+    private fun buildCrashBody(report: CrashReporter.CrashReport, prompts: ReportPrompts): String {
         // Use the snapshot frozen at crash time, NOT a fresh ActionRing.snapshot():
         // if the process keeps running after an uncaught exception (which the
         // default handler does -- it shows the dialog without exiting), the ring
@@ -79,8 +85,8 @@ object IssueReporter {
         // which is the realistic leak surface the body redaction
         // catches.
         return Redactor.redact(buildString {
-            appendLine("## Описание")
-            appendLine("<!-- Опишите что вы делали когда лаунчер упал. -->")
+            appendLine("## ${prompts.describeHeading}")
+            appendLine("<!-- ${prompts.crashHint} ${prompts.languageNudge} -->")
             appendLine()
             appendLine("## Crash report")
             appendLine()
@@ -104,7 +110,7 @@ object IssueReporter {
         }).trimToUrlBudget()
     }
 
-    private fun buildBundleBody(bundlePath: Path): String = buildString {
+    private fun buildBundleBody(bundlePath: Path, prompts: ReportPrompts): String = buildString {
         // ONLY the file name lands in the URL -- never the absolute path. The
         // absolute path leaks `~/.local/share/...` (Linux) or
         // `C:\Users\<username>\AppData\...` (Windows) into the GitHub URL,
@@ -113,16 +119,15 @@ object IssueReporter {
         // caller in SettingsScreen.onClick), so they have what they need to
         // locate the file locally.
         val bundleName = bundlePath.fileName?.toString() ?: "diagnostic-bundle.zip"
-        appendLine("## Описание")
-        appendLine("<!-- Опишите проблему. -->")
+        appendLine("## ${prompts.describeHeading}")
+        appendLine("<!-- ${prompts.bundleHint} ${prompts.languageNudge} -->")
         appendLine()
         appendLine("## Diagnostic bundle")
         appendLine()
-        appendLine("Diagnostic bundle ZIP `$bundleName` создан в data-директории лаунчера, ")
-        appendLine("полный путь скопирован в буфер обмена.")
+        appendLine(prompts.bundleCreatedFor(bundleName))
         appendLine()
-        appendLine("**Перетащите этот ZIP в это окно перед отправкой Issue** (GitHub поддерживает drag-and-drop).")
-        appendLine("Содержимое: redacted launcher / network / game / crash logs, action ring, system info, crash reports.")
+        appendLine(prompts.bundleAttach)
+        appendLine("Contents: redacted launcher / network / game / crash logs, action ring, system info, crash reports.")
         appendLine()
         appendLine("---")
         appendLine("- **Nexira version:** ${Branding.VERSION}")

@@ -235,6 +235,13 @@ object EnglishStrings : AppStrings {
     override val settingsDiagnosticBundleHint    = "Bundles redacted logs, crash reports, action history and system info into one ZIP for support."
     override val settingsReportOnGithub          = "Report on GitHub with bundle"
 
+    override val reportDescribeHeading  = "Description"
+    override val reportCrashHint        = "What were you doing when the launcher crashed?"
+    override val reportBundleHint       = "Describe the problem."
+    override val reportLanguageNudge    = "Please write in English if you can."
+    override val reportBundleCreated    = $$"The diagnostic bundle `$bundle` was created in the launcher's data directory, and its full path is on your clipboard."
+    override val reportBundleAttach     = "**Drag the ZIP into this window before submitting** (GitHub accepts drag-and-drop)."
+
     // File Manager
     override fun fileDownloading(n: Int) = "Downloading updates ($n ${twoFormPlural(n, "file", "files")})..."
 
