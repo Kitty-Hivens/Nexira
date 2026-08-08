@@ -198,19 +198,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Kept in step with the PR matrix in tests.yml -- a release must not be
+      # checked against less than a pull request is. Seven suites were listed
+      # here while tests.yml ran twenty, so the design system, the widget kernel
+      # and all three auth providers were unguarded on the one run that gates a
+      # tag.
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-update:test :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest --continue
+        run: >-
+          ./gradlew
+          :client-config:test :client-core:test :client-launcher:test :client-update:test
+          :client-auth:test :client-auth-smartycraft:test :client-auth-microsoft:test
+          :client-cli:test :client-media:test :client-tray:test
+          :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
+          :client-easter:desktopTest :nx-ui:desktopTest
+          :widget-api:test :widget-model:test :widget-processor:test
+          :authlib-agent:test :profiler-agent:test
+          --continue
 
       - name: Upload test reports
         if: always()   # we publish it even if it falls, so we can see what's broken
         uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
-          path: |
-            client-config/build/reports/tests/
-            client-core/build/reports/tests/
-            client-launcher/build/reports/tests/
-            client-ui/build/reports/tests/
+          # Every module, not a hand-kept subset -- a suite whose report is not
+          # collected is one whose failure has to be read off the raw log.
+          path: '*/build/reports/tests/'
 
   # ─────────────────────────────────────────────────────────────────────────
   # Extract changelog section for this version from CHANGELOG.md
