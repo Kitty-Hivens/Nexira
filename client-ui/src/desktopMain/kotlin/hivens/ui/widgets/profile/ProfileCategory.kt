@@ -1,5 +1,6 @@
 package hivens.ui.widgets.profile
 
+import hivens.core.data.PackAuthRequirement
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
@@ -16,7 +17,9 @@ import hivens.ui.icons.NxIcon
 enum class ProfileCategory(
     val icon: IconKey,
     val label: (AppStrings) -> String,
+    /** The credential provider this category speaks for, as stored on an account. */
+    val providerKey: String,
 ) {
-    SmartyCraft(NxIcon.AccountCircle, { "SmartyCraft" }),
-    Microsoft(  NxIcon.Public,        { "Microsoft" }),
+    SmartyCraft(NxIcon.AccountCircle, { "SmartyCraft" }, PackAuthRequirement.SmartyCraft.PROVIDER_KEY),
+    Microsoft(  NxIcon.Public,        { "Microsoft" },   PackAuthRequirement.Microsoft.PROVIDER_KEY),
 }
