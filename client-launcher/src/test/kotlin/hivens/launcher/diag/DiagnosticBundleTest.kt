@@ -78,6 +78,15 @@ class DiagnosticBundleTest {
     }
 
     @Test
+    fun `system info names the graphics backend in use`() {
+        val text = entries(DiagnosticBundle.create(paths, renderBackend = "SOFTWARE_FAST"))["system-info.txt"].orEmpty()
+        assertTrue(
+            text.contains("Renderer   : SOFTWARE_FAST"),
+            "a software fallback is felt across the machine and must be visible in the bundle",
+        )
+    }
+
+    @Test
     fun `abbreviateHome folds the home prefix and leaves anything else alone`() {
         assertEquals("~", DiagnosticBundle.abbreviateHome("/home/alice", "/home/alice"))
         assertEquals("~/.local/share/nexira", DiagnosticBundle.abbreviateHome("/home/alice/.local/share/nexira", "/home/alice"))

@@ -56,6 +56,7 @@ import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalWidgetDecorator
+import hivens.ui.diag.RenderBackend
 import hivens.ui.diag.SkinemaGate
 import hivens.ui.diag.UiRecoverySignal
 import hivens.auth.AccountStore
@@ -299,6 +300,16 @@ fun FrameWindowScope.AppShellContent(
     // environment where it fails; latch the process gate before the background
     // or any player composes.
     remember { SkinemaGate.enabled = ModuleId.Skinema.id !in settings.disabledModules }
+
+    // Which backend Skiko settled on. Resolved after the first frame, because
+    // the layer picks its API while it initialises, and recorded once: a shell
+    // that fell back to software rasterises the whole window on the CPU, which
+    // is felt across the machine and is otherwise indistinguishable in a report
+    // from a launcher that is simply busy.
+    LaunchedEffect(window) {
+        withFrameNanos { }
+        LoggerFactory.getLogger("RenderBackend").info("UI render backend: {}", RenderBackend.probe(window))
+    }
 
     // Window starts visible. Tray is the dock-style fallback for
     // close-while-game-running, not a launcher hide-by-default

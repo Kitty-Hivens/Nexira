@@ -27,6 +27,7 @@ lives in this English file.
 ## [Unreleased]
 
 ### Changed
+- The launcher reports the graphics backend it actually draws through. Every readout of it -- About, the debug HUD -- was built on the `skiko.renderApi` system property, which is a request the launcher never makes, so all three said "default" on every machine including one that had fallen back to software rasterisation. The resolved `GraphicsApi` is read off the window's `SkiaLayer` after the first frame, logged once at startup, and carried in the diagnostic bundle. The distinction matters outside the launcher: a software fallback rasterises the whole window on the CPU, which is felt across the machine and reads in a report as everything going slow rather than as a launcher problem.
 - The diagnostic bundle names the modules boot recovery has switched off. A module stays off across restarts and changes what a whole feature does -- with skinema off, every player reports that it cannot open the file -- and nothing in the bundle said which ones were off, so a report reads as a broken feature rather than a disabled one.
 
 ### Fixed
