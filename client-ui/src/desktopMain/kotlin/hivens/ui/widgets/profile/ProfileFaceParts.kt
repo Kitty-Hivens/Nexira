@@ -20,11 +20,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.auth.AccountStore
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.SessionData
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import org.koin.compose.koinInject
+
+/**
+ * The face the shell should wear right now: the user's choice first, licence
+ * priority behind it.
+ *
+ * Every site that recomputes the face after an account is added or removed goes
+ * through here. Calling [AccountStore.primarySession] bare re-decides by
+ * priority alone, which silently discards the choice the moment the user signs
+ * anything in or out.
+ */
+internal fun AccountStore.faceSession(settingsService: ISettingsService): SessionData? =
+    primarySession(settingsService.getSettings().preferredFaceProvider)
 
 /**
  * Which signed-in account fronts the shell, when more than one is signed in.
@@ -65,7 +78,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
         // Re-resolve through the store rather than loading the named account
         // directly: naming a provider whose account has since gone must land on
         // the same fallback the shell uses at startup.
-        credentials.primarySession(providerKey)?.let { ctx.onLogin(it) }
+        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
     }
 
     // Auto first: it is the default and the state a user returns to, so it reads

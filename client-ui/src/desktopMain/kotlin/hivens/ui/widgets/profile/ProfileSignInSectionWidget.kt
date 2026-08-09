@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
@@ -65,6 +66,7 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()
+    val settingsService: ISettingsService = koinInject()
 
     // The device-code provider is registered only when a client id is configured.
     val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
@@ -89,7 +91,7 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
             } else {
                 MicrosoftSignInButton(
                     onSignedIn = {
-                        credentials.primarySession()?.let { ctx.onLogin(it) }
+                        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
                         refreshKey++
                     },
                     puppetId = "account.signin.microsoft",
@@ -103,6 +105,7 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
 private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
+    val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
 
     // Signing out of Microsoft removes its account; if it was the only one, that
@@ -115,7 +118,7 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
         }
         credentials.listAccounts().firstOrNull { it.providerId == MS_KEY }
             ?.let { credentials.removeAccount(it.accountId) }
-        credentials.primarySession()?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
         onChanged()
     }
 
