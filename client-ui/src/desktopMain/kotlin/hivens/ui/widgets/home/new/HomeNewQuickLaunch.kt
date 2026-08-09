@@ -39,8 +39,8 @@ data class QuickLaunchProps(
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val p = instance.rememberProps<QuickLaunchProps>()
     val s = LocalStrings.current
-    val qt = rememberQuickLaunchTarget() ?: return
-    val target = qt.target
+    val quickLaunch = rememberQuickLaunchTarget() ?: return
+    val target = quickLaunch.target
 
     val label = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart
 
@@ -78,7 +78,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            QuickLaunchButton(qt = qt, defaultLabel = p.buttonLabel.ifBlank { s.homeQuickButton })
+            QuickLaunchButton(quickLaunch = quickLaunch, defaultLabel = p.buttonLabel.ifBlank { s.homeQuickButton })
         }
     }
 }

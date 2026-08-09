@@ -137,7 +137,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
  * The shared launch pill for the home widgets, walking the same launch states
  * the pack-detail hero does off [IndicationCenter]: a running target turns
  * into Exit (stops the game), prepare/sync shows the inert wait, and otherwise
- * it plays / offline-plays / routes to sign-in per the resolved [qt]. Keeps the
+ * it plays / offline-plays / routes to sign-in per the resolved [quickLaunch]. Keeps the
  * one launch affordance in one place instead of each widget re-deriving it.
  *
  * [defaultLabel] is the play label the widget wants when the affordance carries
@@ -145,7 +145,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
  */
 @Composable
 internal fun QuickLaunchButton(
-    qt: QuickLaunchTarget,
+    quickLaunch: QuickLaunchTarget,
     defaultLabel: String,
     modifier: Modifier = Modifier,
     iconOnly: Boolean = false,
@@ -153,7 +153,7 @@ internal fun QuickLaunchButton(
     val s = LocalStrings.current
     val indications: IndicationCenter = koinInject()
     val controller: LauncherController = koinInject()
-    val indication by indications.launchIndication(qt.target.id).collectAsState()
+    val indication by indications.launchIndication(quickLaunch.target.id).collectAsState()
 
     val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
     val running = indication is LaunchIndication.Running
@@ -162,12 +162,12 @@ internal fun QuickLaunchButton(
         label    = when {
             running -> s.packPlayExit
             busy    -> s.packPlayWait
-            else    -> qt.buttonLabel ?: defaultLabel
+            else    -> quickLaunch.buttonLabel ?: defaultLabel
         },
-        icon     = if (running) NxIcon.Stop else qt.icon,
+        icon     = if (running) NxIcon.Stop else quickLaunch.icon,
         busy     = busy,
-        onClick  = if (running) { { controller.abort() } } else qt.launch,
-        enabled  = if (running) true else qt.canLaunch,
+        onClick  = if (running) { { controller.abort() } } else quickLaunch.launch,
+        enabled  = if (running) true else quickLaunch.canLaunch,
         iconOnly = iconOnly,
         modifier = modifier,
     )
