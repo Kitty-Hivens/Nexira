@@ -1097,6 +1097,7 @@ object RussianStrings : AppStrings {
 
     // --- Layout editor: common actions ---
     override val editorClose   = "Закрыть"
+    override val editorEnterLayout          = "Редактировать компоновку"
     override val editorCancel  = "Отмена"
     override val editorDelete  = "Удалить"
     override val editorReset   = "Сбросить"

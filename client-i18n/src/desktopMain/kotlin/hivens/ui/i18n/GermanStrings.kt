@@ -1083,6 +1083,7 @@ object GermanStrings : AppStrings {
 
     // --- Layout editor: common actions ---
     override val editorClose   = "Schließen"
+    override val editorEnterLayout          = "Layout bearbeiten"
     override val editorCancel  = "Abbrechen"
     override val editorDelete  = "Löschen"
     override val editorReset   = "Zurücksetzen"
