@@ -17,6 +17,7 @@ import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.AppRelauncher
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.bootstrap.RecoveryEntry
+import hivens.ui.diag.RenderBackend
 import hivens.ui.diag.reportPrompts
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.flexible.Flexible
@@ -150,7 +151,7 @@ internal fun DiagnosticsSection(
                                 bundleBusy = true
                                 bundleScope.launch {
                                     val zip = withContext(Dispatchers.IO) {
-                                        runCatching { DiagnosticBundle.create(paths, disabledModules()) }.getOrNull()
+                                        runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }.getOrNull()
                                     }
                                     if (zip != null) {
                                         lastBundlePath = zip
@@ -189,7 +190,7 @@ internal fun DiagnosticsSection(
                     bundleBusy = true
                     bundleScope.launch {
                         val zip = withContext(Dispatchers.IO) {
-                            runCatching { DiagnosticBundle.create(paths, disabledModules()) }.getOrNull()
+                            runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }.getOrNull()
                         }
                         if (zip != null) lastBundlePath = zip
                         bundleBusy = false
