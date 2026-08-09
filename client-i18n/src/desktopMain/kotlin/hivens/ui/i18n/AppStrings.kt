@@ -1150,6 +1150,8 @@ interface AppStrings {
 
     // --- Layout editor: common actions ---
     val editorClose: String
+    /** Context-menu entry that enters layout edit mode -- the only way in besides Ctrl+E. */
+    val editorEnterLayout: String
     val editorCancel: String
     val editorDelete: String
     val editorReset: String

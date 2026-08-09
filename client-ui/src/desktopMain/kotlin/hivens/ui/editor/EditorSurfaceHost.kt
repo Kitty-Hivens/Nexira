@@ -50,8 +50,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -87,6 +91,8 @@ import hivens.ui.icons.Symbol
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.layout.LayoutReconcile
 import hivens.ui.nx.AdaptiveWidth
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.Motion
@@ -174,6 +180,9 @@ fun EditorSurfaceHost(
     var editing       by remember(availableSurfaces) { mutableStateOf(false) }
     var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
     var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
+    // Where a right-click landed while NOT editing, which is the only thing that
+    // opens the way in. Null closes the menu.
+    var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
     var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
     var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
     var selectedSurface by remember(availableSurfaces) {
@@ -440,6 +449,28 @@ fun EditorSurfaceHost(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                // The way into edit mode for anyone who does not already know the
+                // chord. Right-clicking the background of the thing you want to
+                // rearrange is how every desktop offers this, so it is the gesture
+                // people try first -- and until now the only entrance was Ctrl+E,
+                // documented nowhere in the interface.
+                //
+                // Final pass, like the slot chrome: a press any widget claimed
+                // belongs to that widget. While editing this does nothing, because
+                // the slot chrome owns right-click there.
+                .pointerInput(editing) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                            if (editing || event.type != PointerEventType.Press) continue
+                            val change = event.changes.first()
+                            if (event.buttons.isSecondaryPressed && !change.isConsumed) {
+                                entryMenuAt = change.position
+                                change.consume()
+                            }
+                        }
+                    }
+                }
                 .onKeyEvent { ev ->
                     // Escape exits edit mode. Ctrl+E entry/toggle is
                     // handled at Window scope (see AppShell) so it works
@@ -463,6 +494,23 @@ fun EditorSurfaceHost(
             // primary tint at very low alpha to communicate "this whole
             // pane is being edited", without obscuring content.
             content()
+
+            entryMenuAt?.let { at ->
+                NxContextMenu(
+                    anchorInWindow   = at,
+                    expanded         = true,
+                    onDismissRequest = { entryMenuAt = null },
+                ) {
+                    NxMenuItem(
+                        label = LocalStrings.current.editorEnterLayout,
+                        icon  = NxIcon.ViewQuilt,
+                        hint  = "Ctrl+E",
+                    ) {
+                        entryMenuAt = null
+                        editing = true
+                    }
+                }
+            }
 
             // Center-anchored chrome layer: inset past the left rail and right
             // panel so the vignette + overlays stay over the center pane exactly

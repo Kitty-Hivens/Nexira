@@ -128,6 +128,10 @@ private fun NxContextMenuPopup(
  * One menu row. Hover lifts a subtle accent (error tint for [destructive]); a
  * [selected] row reads in the accent with a trailing check. The leading [icon] and
  * label share the row's colour so a destructive row reads red at a glance.
+ *
+ * [hint] trails the label in muted type -- for the keystroke that does the same
+ * thing. A menu is where a shortcut is discovered: someone who reaches for the
+ * menu is by definition someone who does not know the chord yet.
  */
 @Composable
 fun NxMenuItem(
@@ -135,6 +139,7 @@ fun NxMenuItem(
     icon: IconKey? = null,
     destructive: Boolean = false,
     selected: Boolean = false,
+    hint: String? = null,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -160,8 +165,16 @@ fun NxMenuItem(
             Spacer(Modifier.width(10.dp))
         }
         Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
+        if (hint != null || selected) Spacer(Modifier.weight(1f))
+        if (hint != null) {
+            Text(
+                text  = hint,
+                style = MaterialTheme.typography.labelSmall,
+                color = NxTheme.colors.textSecondary,
+            )
+            if (selected) Spacer(Modifier.width(8.dp))
+        }
         if (selected) {
-            Spacer(Modifier.weight(1f))
             Symbol(NxIcon.Check, contentDescription = null, tint = color, size = 18.dp)
         }
     }
