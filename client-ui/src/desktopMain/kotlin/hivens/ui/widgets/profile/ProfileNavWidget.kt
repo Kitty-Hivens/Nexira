@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -80,5 +81,11 @@ fun ProfileNavWidget(instance: WidgetInstance) {
                 )
             }
         }
+
+        // The face choice belongs beside the list of providers rather than
+        // inside one of their sections: it is a statement about which of them
+        // wins, so it cannot live in a pane that shows only one at a time.
+        Spacer(Modifier.weight(1f))
+        FacePicker()
     }
 }

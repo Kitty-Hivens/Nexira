@@ -212,6 +212,23 @@ class CredentialsManagerTest {
     }
 
     @Test
+    fun `a named provider outranks licence priority`() {
+        manager.save(session())
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
+        // Licence priority alone puts Microsoft in front; naming SmartyCraft is
+        // the user overruling that, which is the whole point of the setting.
+        assertEquals("ChaosA", manager.primarySession("smartycraft")?.playerName)
+    }
+
+    @Test
+    fun `a named provider with no account falls back to priority`() {
+        manager.save(session())
+        // The choice survives the account it named being signed out, so it must
+        // not strand the shell faceless when that happens.
+        assertEquals("ChaosA", manager.primarySession("microsoft")?.playerName)
+    }
+
+    @Test
     fun `re-saving the same identity upserts rather than duplicates`() {
         manager.save(session())
         manager.save(session(playerName = "ChaosA"))   // same uuid -> same accountId
