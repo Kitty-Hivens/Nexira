@@ -318,3 +318,15 @@ data class SettingsData(
      */
     val disabledModules: Set<String> = emptySet(),
 )
+
+/**
+ * Drops the face choice when [providerKey] is the provider it names.
+ *
+ * The choice outlives the account that carried it otherwise: nothing shows the
+ * setting once a single account is left, so a preference made months ago sits
+ * unreachable on disk and re-decides the shell's face the moment that provider
+ * is signed into again. A choice the user cannot see is not a choice they can
+ * be held to.
+ */
+fun SettingsData.releasingFace(providerKey: String): SettingsData =
+    if (preferredFaceProvider == providerKey) copy(preferredFaceProvider = null) else this

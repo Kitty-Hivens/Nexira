@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.releasingFace
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
 import hivens.ui.LoginPanel
@@ -110,6 +111,8 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
         }
         credentials.listAccounts().firstOrNull { it.providerId == SC_KEY }
             ?.let { credentials.removeAccount(it.accountId) }
+        // The face choice goes with the account it named -- see releasingFace.
+        settingsService.saveSettings(settingsService.getSettings().releasingFace(SC_KEY))
         credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
         onChanged()
     }

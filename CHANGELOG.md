@@ -31,6 +31,7 @@ lives in this English file.
 - The diagnostic bundle names the modules boot recovery has switched off. A module stays off across restarts and changes what a whole feature does -- with skinema off, every player reports that it cannot open the file -- and nothing in the bundle said which ones were off, so a report reads as a broken feature rather than a disabled one.
 
 ### Added
+- Signing out releases the face choice it named. The picker is only on screen while two accounts are signed in, so a choice left behind by an account that is gone became a setting nobody could see or change -- and it re-decided the shell's face the moment that provider was signed into again, long after the decision was made and forgotten. Both per-provider sign-outs and the full logout now clear it, and the shell falls back to licence priority as it does on a fresh install.
 - The profile names which signed-in account fronts the shell. `SettingsData.preferredFaceProvider` was read on every startup and written nowhere, so it was permanently null and licence priority decided alone -- a user signed into both providers had no way to say which one the shell should wear. The nav lists Auto plus each provider that has an account, and the choice applies at once rather than at the next start. It appears only above two accounts, where the choice has more than one outcome. `AccountStore.primarySession` already implemented the preference and its fallback; both are now under test, having had no caller that exercised them.
 
 ### Fixed
