@@ -25,11 +25,9 @@ import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.platform.PlatformPaths
-import io.github.vinceglb.filekit.FileKit
+import hivens.ui.utils.pickFiles
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -299,14 +297,13 @@ internal class ContentTabState(
     // -- add / delete ---------------------------------------------------------
 
     /** Drop files into the folder the active filter points at (mods by default). */
-    fun addFiles(dialogTitle: String) {
+    fun addFiles(dialogSettings: FileKitDialogSettings) {
         scope.launch {
             val kind = filter.kind ?: ContentKind.Mod
             val extensions = if (kind == ContentKind.Mod) listOf("jar") else listOf("zip")
-            val picked = FileKit.openFilePicker(
-                type           = FileKitType.File(extensions = extensions),
-                mode           = FileKitMode.Multiple(),
-                dialogSettings = FileKitDialogSettings(title = dialogTitle),
+            val picked = pickFiles(
+                type     = FileKitType.File(extensions = extensions),
+                settings = dialogSettings,
             )
             val sources = picked.orEmpty().map { Path.of(it.path) }
             if (sources.isNotEmpty()) {

@@ -24,10 +24,9 @@ import hivens.launcher.ProfileManager
 import hivens.launcher.platform.ServerNameValidator
 import hivens.launcher.ProfilerProfileStore
 import hivens.ui.platform.SystemActions
-import io.github.vinceglb.filekit.FileKit
+import hivens.ui.utils.pickFile
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -172,11 +171,11 @@ internal class ServerSettingsState(
         save()
     }
 
-    fun pickIcon(dialogTitle: String) {
+    fun pickIcon(dialogSettings: FileKitDialogSettings) {
         scope.launch {
-            val file = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg")),
-                dialogSettings = FileKitDialogSettings(title = dialogTitle),
+            val file = pickFile(
+                type     = FileKitType.File(extensions = listOf("png", "jpg", "jpeg")),
+                settings = dialogSettings,
             )
             file?.path?.let { selectedPath ->
                 withContext(Dispatchers.IO) {
@@ -193,11 +192,11 @@ internal class ServerSettingsState(
         }
     }
 
-    fun pickJava(dialogTitle: String) {
+    fun pickJava(dialogSettings: FileKitDialogSettings) {
         scope.launch {
-            val file = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("exe", "bin")),
-                dialogSettings = FileKitDialogSettings(title = dialogTitle),
+            val file = pickFile(
+                type     = FileKitType.File(extensions = listOf("exe", "bin")),
+                settings = dialogSettings,
             )
             file?.path?.let { javaPath = it }
         }

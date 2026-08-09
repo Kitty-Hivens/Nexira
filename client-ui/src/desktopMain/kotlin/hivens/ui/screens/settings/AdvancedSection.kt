@@ -21,9 +21,9 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.rememberFileDialogSettings
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +52,7 @@ internal fun AdvancedSection(paths: PlatformPaths, form: SettingsFormState, save
     var showError     by remember { mutableStateOf<String?>(null) }
     var desktopDone   by remember { mutableStateOf(false) }
     val moveScope     = rememberCoroutineScope()
+    val dialogSettings = rememberFileDialogSettings(s.settingsDataDirMove)
 
     NxSection(s.settingsSectionUpdates) {
         NxToggle(
@@ -102,7 +103,7 @@ internal fun AdvancedSection(paths: PlatformPaths, form: SettingsFormState, save
                     val pickResult = runCatching {
                         FileKit.openDirectoryPicker(
                             directory      = PlatformFile(paths.dataDir.toFile()),
-                            dialogSettings = FileKitDialogSettings(title = s.settingsDataDirMove),
+                            dialogSettings = dialogSettings,
                         )
                     }
                     val pickedFile = pickResult.getOrElse { ex ->

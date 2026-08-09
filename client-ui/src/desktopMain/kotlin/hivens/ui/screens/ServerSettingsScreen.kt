@@ -36,6 +36,7 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.rememberFileDialogSettings
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -63,6 +64,9 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     // Wipes clients/<assetDir> irrecoverably. The visible button gates this on a
     // confirm dialog; the puppet hook runs it directly (automation bypass).
     val performResetClient = { state.resetClient(onBack) }
+
+    val iconDialogSettings = rememberFileDialogSettings(s.serverSettingsPickIcon)
+    val javaDialogSettings = rememberFileDialogSettings(s.serverSettingsPickJava)
 
     // Puppet ids prefixed with the server's assetDir so concurrent settings
     // dialogs (theoretical -- Nexira keeps only one open at a time today) stay
@@ -101,7 +105,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     .size(48.dp)
                     .clip(MaterialTheme.shapes.medium)
                     .background(NxTheme.colors.surface)
-                    .clickable { state.pickIcon(s.serverSettingsPickIcon) },
+                    .clickable { state.pickIcon(iconDialogSettings) },
                 contentAlignment = Alignment.Center
             ) {
                 val icon = state.serverIcon
@@ -177,7 +181,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         singleLine    = true,
                         colors        = settingsFieldColors(),
                         trailingIcon  = {
-                            IconButton(onClick = { state.pickJava(s.serverSettingsPickJava) }) {
+                            IconButton(onClick = { state.pickJava(javaDialogSettings) }) {
                                 Symbol(NxIcon.Folder, null, tint = NxTheme.colors.primary)
                             }
                         }

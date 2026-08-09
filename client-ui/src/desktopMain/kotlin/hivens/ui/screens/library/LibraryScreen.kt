@@ -67,15 +67,14 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -128,11 +127,13 @@ fun LibraryScreen(
         }
     }
 
+    val importDialogSettings = rememberFileDialogSettings(s.browseImport)
+
     fun startImport() {
         scope.launch {
-            val picked = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("mrpack", "zip")),
-                dialogSettings = FileKitDialogSettings(title = s.browseImport),
+            val picked = pickFile(
+                type     = FileKitType.File(extensions = listOf("mrpack", "zip")),
+                settings = importDialogSettings,
             )
             val path = picked?.path ?: return@launch
             importing = true
