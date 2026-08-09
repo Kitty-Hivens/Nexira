@@ -36,10 +36,9 @@ import hivens.ui.skin3d.SkinView3D
 import hivens.ui.skin3d.SkinViewState
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -112,12 +111,13 @@ fun rememberSkinUploader(session: SessionData, onSkinChanged: () -> Unit): SkinU
     val skinRepository: SkinRepository = koinInject()
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
+    val dialogSettings = rememberFileDialogSettings(s.profileUploadSkin)
 
     val pick: () -> Unit = {
         scope.launch {
-            val picked = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("png")),
-                dialogSettings = FileKitDialogSettings(title = s.profileUploadSkin),
+            val picked = pickFile(
+                type     = FileKitType.File(extensions = listOf("png")),
+                settings = dialogSettings,
             )
             val file = picked?.path?.let { File(it) }
             if (file != null) {

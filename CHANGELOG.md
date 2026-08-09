@@ -26,6 +26,9 @@ lives in this English file.
 
 ## [Unreleased]
 
+### Fixed
+- Every native file dialog in the launcher was opened with no owner window. `FileKitDialogSettings` was built by hand at eight call sites and none of them filled `parentWindow`, so the Win32 `IFileDialog` came up as a top-level window of its own: its own taskbar button, its z-order untied from the launcher, and over a maximized window it could land behind it. From the user's side the button did nothing, and there was nothing in the log to say otherwise, because the picker path logged nothing at all -- an opened-and-cancelled dialog and a dialog that never appeared left the same empty diagnostic bundle. The music player's "open file" was the reported case; the pack import, the content add, the wallpaper picker, the skin and cape import, the server icon and Java binary pickers and the data-directory mover all shared it. Pickers now go through `hivens.ui.utils.pickFile` / `pickFiles`, which take the owner from the window the shell already publishes as `LocalComposeWindow`, log what the dialog did, and turn a picker that cannot run at all into a logged null instead of an exception thrown out of a composition scope.
+
 ## [2.4.0-beta5] - 2026-08-05
 
 2.4.0-beta5 is a [critical] release. It fixes checks that were not running and repairs that could not happen. The guard meant to protect a mod's settings was matching the mod's own jar, so the most commonly installed mods were never updated, never retired when a pack moved on, and never repaired when their archive was damaged. A modern-loader pack picked which version file to read by directory order. The launcher hash could be poisoned by a single error page and stayed poisoned across restarts. The JVM-argument builder could compose a set the JVM refuses to start with. Stop gave up after a signal a wedged game ignores.

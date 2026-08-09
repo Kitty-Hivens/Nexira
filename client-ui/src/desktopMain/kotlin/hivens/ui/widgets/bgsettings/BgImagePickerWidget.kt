@@ -27,12 +27,11 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxIconButton
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +57,7 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
     // Read off the optimizer, not off local state: leaving the screen mid-transcode and
     // coming back used to show an idle picker over work that was still running.
     val optimizing by optimizer.optimizing.collectAsState()
+    val dialogSettings = rememberFileDialogSettings(s.backgroundPickFile)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(s.backgroundSectionImage)
@@ -74,12 +74,12 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                 modifier = Modifier.weight(1f),
                 onClick  = {
                     scope.launch {
-                        val picked = FileKit.openFilePicker(
-                            type           = FileKitType.File(extensions = listOf(
+                        val picked = pickFile(
+                            type     = FileKitType.File(extensions = listOf(
                                 "png", "jpg", "jpeg", "webp", "bmp", "gif", "apng",
                                 "mp4", "m4v", "mov", "webm", "mkv", "ogv",
                             )),
-                            dialogSettings = FileKitDialogSettings(title = s.backgroundPickFile),
+                            settings = dialogSettings,
                         )?.path ?: return@launch
                         // Time-based media (video, GIF, animated PNG/WebP) taller than
                         // the screen is transcoded down once and cached; optimize()

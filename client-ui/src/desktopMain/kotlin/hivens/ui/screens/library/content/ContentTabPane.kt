@@ -49,10 +49,6 @@ import coil3.compose.AsyncImage
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
 import hivens.launcher.modrinth.ModrinthClient
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
-import io.github.vinceglb.filekit.path
 import hivens.core.data.PackInstance
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstalledContent
@@ -78,6 +74,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
+import hivens.ui.utils.rememberFileDialogSettings
 import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -103,6 +100,7 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
     val state = rememberContentTabState(instance)
     val selections: SelectionRegistry = koinInject()
+    val addDialogSettings = rememberFileDialogSettings(s.contentAddFiles)
 
     LaunchedEffect(state) { state.load() }
     // Separate from load(): this one runs for as long as the tab is on screen,
@@ -164,7 +162,7 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                 state.filter.kind == ContentKind.ResourcePack ||
                 state.filter.kind == ContentKind.ShaderPack,
             canFindProjects = state.isLocal,
-            onAddFiles     = { state.addFiles(s.contentAddFiles) },
+            onAddFiles     = { state.addFiles(addDialogSettings) },
             onFindProjects = state::startBrowsing,
         )
 

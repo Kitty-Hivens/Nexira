@@ -64,6 +64,8 @@ import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
@@ -72,16 +74,11 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import java.nio.file.Paths
 import kotlin.io.path.name
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -93,6 +90,10 @@ import org.koin.compose.koinInject
 @Serializable
 data class MusicProps(
     @PropLabel("widget.home.new.music.title") val title: String = "",
+)
+
+private val AUDIO_EXTENSIONS = listOf(
+    "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "aiff", "aif", "au",
 )
 
 @Widget(id = "home.new.music", displayName = "widget.home.new.music", propsClass = MusicProps::class)
@@ -117,16 +118,13 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
     val musicService = remember(player) { MusicPlayerServiceImpl(player) }
     provideService(MusicPlayerService::class, instance.instanceId, musicService)
 
-    val pickFile = {
+    val dialogSettings = rememberFileDialogSettings(s.audioPickTrack)
+    val openTrack = {
         scope.launch {
-            val picked = withContext(Dispatchers.IO) {
-                FileKit.openFilePicker(
-                    type           = FileKitType.File(extensions = listOf(
-                        "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "aiff", "aif", "au",
-                    )),
-                    dialogSettings = FileKitDialogSettings(title = s.audioPickTrack),
-                )
-            }
+            val picked = pickFile(
+                type     = FileKitType.File(extensions = AUDIO_EXTENSIONS),
+                settings = dialogSettings,
+            )
             val path = picked?.path?.let { Paths.get(it) }
             if (path != null) player.open(path)
         }
@@ -138,7 +136,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         state       = state,
         track       = track,
         volume      = volume,
-        onPick      = { pickFile() },
+        onPick      = { openTrack() },
         onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
         onStop      = { player.stop() },
         onVolume    = { player.setVolume(it) },

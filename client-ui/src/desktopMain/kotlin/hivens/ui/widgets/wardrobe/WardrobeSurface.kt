@@ -83,10 +83,10 @@ import hivens.ui.skin3d.layered
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.profile.SkinHero
-import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -185,6 +185,7 @@ private fun Wardrobe(session: SessionData) {
     var selectedDefault by remember { mutableStateOf<DefaultSkinProvider.DefaultSkin?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val dialogSettings = rememberFileDialogSettings()
 
     val data by produceState(WardrobeData(), refreshKey) {
         value = withContext(Dispatchers.IO) {
@@ -265,7 +266,7 @@ private fun Wardrobe(session: SessionData) {
 
     fun importInto(kind: SkinLibrary.Kind, select: (String) -> Unit) {
         scope.launch {
-            val picked = FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png")))
+            val picked = pickFile(type = FileKitType.File(extensions = listOf("png")), settings = dialogSettings)
             val file = picked?.path?.let { File(it) } ?: return@launch
             val bytes = withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrNull() } ?: return@launch
             val entry = withContext(Dispatchers.IO) {
