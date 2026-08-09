@@ -55,6 +55,6 @@ jobs:
           # quick-fixes available in Ultimate and Ultimate Plus plans
           push-fixes: 'none'
           # Mount the runner's JDK 26 into the linter container so projectJDK
-          # (/root/.jdks/jdk) resolves the Gradle toolchain. Comma-splits into
-          # `qodana scan` args.
-          args: -v,${{ steps.jdk26.outputs.path }}:/root/.jdks/jdk
+          # (/root/.jdks/jdk) resolves the Gradle toolchain. Space-separated: the
+          # comma form is deprecated and the action warns on it every run.
+          args: -v ${{ steps.jdk26.outputs.path }}:/root/.jdks/jdk
