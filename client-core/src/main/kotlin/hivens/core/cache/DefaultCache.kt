@@ -6,6 +6,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -34,6 +35,7 @@ import org.slf4j.LoggerFactory
  *  - [ioDispatcher] is injectable so disk hops stay under a test scheduler's
  *    virtual time.
  */
+@OptIn(DelicateCoroutinesApi::class) // CoroutineStart.ATOMIC, for the reason given at each use.
 class DefaultCache<V>(
     private val diskStore: DiskStore<V>,
     private val config: CacheConfig<V>,

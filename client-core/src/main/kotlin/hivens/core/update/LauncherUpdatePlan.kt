@@ -76,7 +76,7 @@ object LauncherUpdatePlanner {
             val usable = patch != null &&
                 !localSha.isNullOrEmpty() && patch.fromSha1.equals(localSha, ignoreCase = true) &&
                 !remoteSha.isNullOrEmpty() && patch.toSha1.equals(remoteSha, ignoreCase = true)
-            actions += if (usable) FileAction.Patch(path, patch!!) else FileAction.Download(path)
+            actions += if (usable) FileAction.Patch(path, patch) else FileAction.Download(path)
         }
         for (path in diff.toDelete) actions += FileAction.Delete(path)
         return LauncherUpdatePlan(actions)

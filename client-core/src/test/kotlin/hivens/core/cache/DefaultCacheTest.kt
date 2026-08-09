@@ -2,6 +2,7 @@ package hivens.core.cache
 
 import hivens.test.TestClock
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
@@ -19,6 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DefaultCacheTest {
 
     /** In-memory [DiskStore] with knobs for failure + write counting. */

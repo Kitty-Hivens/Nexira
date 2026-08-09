@@ -1,6 +1,7 @@
 package hivens.core.activity
 
 import hivens.test.TestClock
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -16,6 +17,7 @@ import kotlin.test.assertTrue
  * an unthrottled feed and unbounded growth all land somewhere a toast never
  * reached.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ActivityRegistryTest {
 
     private fun running(done: Long, total: Long = 100, detail: String? = null) =

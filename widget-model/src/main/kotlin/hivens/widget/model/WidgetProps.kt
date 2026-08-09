@@ -40,6 +40,7 @@ annotation class PropColor
 // Fixed option set for a String field -- renders a dropdown. (enum
 // fields already render a dropdown from their serial kind; this is for
 // String-typed choices that are not a Kotlin enum.)
+@OptIn(ExperimentalSerializationApi::class) // @SerialInfo is the only way to carry this to the descriptor.
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class PropChoice(val options: Array<String>)
