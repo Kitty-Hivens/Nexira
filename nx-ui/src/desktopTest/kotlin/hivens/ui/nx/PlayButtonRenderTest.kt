@@ -22,7 +22,9 @@ import hivens.ui.theme.LocalNxColors
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxColors
 import hivens.ui.theme.StyleSpec
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -45,7 +47,7 @@ class PlayButtonRenderTest {
                 LocalStyle provides style,
             ) {
                 Column(
-                    modifier            = Modifier.fillMaxSize().background(Color(0xFF16181D)).padding(16.dp),
+                    modifier            = Modifier.fillMaxSize().background(Color(BACKDROP)).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -63,15 +65,20 @@ class PlayButtonRenderTest {
                 }
             }
         }
+        val painted: Double
         try {
-            val png = scene.render().encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
+            val frame = scene.render()
+            val png = frame.encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
             val out = File("build/render/play-button-$name.png")
             out.parentFile.mkdirs()
             out.writeBytes(png.bytes)
-            assertTrue(out.length() > 0)
+            painted = paintedFraction(frame)
         } finally {
             scene.close()
         }
+        // A composition that throws still encodes a valid PNG of the bare backdrop,
+        // so file size says nothing about whether the buttons are on it.
+        assertTrue(painted > MIN_PAINTED, "the sheet covers ${(painted * 100).toInt()}% of the frame -- it did not render")
     }
 
     @Test fun `renders under Celestia dark`() = render(CelestiaStyle, DarkColorPalette, "celestia-dark")
@@ -79,4 +86,33 @@ class PlayButtonRenderTest {
     @Test fun `renders under Celestia light`() = render(CelestiaStyle, LightColorPalette, "celestia-light")
 
     @Test fun `renders under Brut dark`() = render(BrutStyle, DarkColorPalette, "brut-dark")
+
+    /** Share of sampled pixels that are not the bare backdrop the sheet sits on. */
+    private fun paintedFraction(frame: Image): Double {
+        val bmp = Bitmap.makeFromImage(frame)
+        var painted = 0
+        var sampled = 0
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                if (bmp.getColor(x, y) != BACKDROP) painted++
+                sampled++
+                x += 4
+            }
+            y += 4
+        }
+        return painted.toDouble() / sampled
+    }
+
+    private companion object {
+        /** What the sheet is cleared to, so anything else on it is a button. */
+        val BACKDROP = 0xFF16181D.toInt()
+
+        /**
+         * Eight buttons on the sheet cover far more than this; an empty frame
+         * covers nothing. Only has to tell those two apart.
+         */
+        const val MIN_PAINTED = 0.05
+    }
 }
