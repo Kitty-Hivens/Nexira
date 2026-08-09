@@ -48,9 +48,9 @@ data class LaunchButtonProps(
 fun LaunchButtonWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<LaunchButtonProps>()
     val s = LocalStrings.current
-    val qt = rememberQuickLaunchTarget() ?: return
-    val target = qt.target
-    val ready = qt.canLaunch
+    val quickLaunch = rememberQuickLaunchTarget() ?: return
+    val target = quickLaunch.target
+    val ready = quickLaunch.canLaunch
 
     val gradient = Brush.linearGradient(
         colors = listOf(
@@ -68,7 +68,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                 NxTheme.colors.surfaceVariant,
                 NxTheme.colors.surfaceVariant,
             )))
-            .clickable(enabled = ready, onClick = qt.launch)
+            .clickable(enabled = ready, onClick = quickLaunch.launch)
             .padding(horizontal = 20.dp, vertical = 18.dp),
     ) {
         Row(
@@ -82,7 +82,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                     .background(Color.White.copy(alpha = if (ready) 0.18f else 0.06f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Symbol(icon = qt.icon,
+                Symbol(icon = quickLaunch.icon,
                     contentDescription = null,
                     tint               = if (ready) Color.White else NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(28.dp),
@@ -91,7 +91,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = if (ready) qt.buttonLabel ?: p.label.ifBlank { s.launchTileReady } else s.launchTileBlocked,
+                    text       = if (ready) quickLaunch.buttonLabel ?: p.label.ifBlank { s.launchTileReady } else s.launchTileBlocked,
                     style      = MaterialTheme.typography.titleLarge,
                     color      = if (ready) Color.White else NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.SemiBold,
