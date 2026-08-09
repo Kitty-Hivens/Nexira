@@ -21,7 +21,9 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
@@ -82,11 +84,12 @@ class PackSettingsWindowRenderTest {
             NxTheme(useDarkTheme = true, style = style) {
                 // A vivid backdrop so any bleed-through of the overlay surface shows
                 // up as a pink tint -- proves the window is actually opaque.
-                Box(Modifier.fillMaxSize().background(Color(0xFFE91E63))) {
+                Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
                     PackSettingsWindow(pack = pack, instanceDir = Path.of("/tmp/render"), onInstanceChange = {}, onDismiss = {})
                 }
             }
         }
+        val painted: Double
         try {
             var frameNanos = 0L
             repeat(20) {
@@ -94,12 +97,16 @@ class PackSettingsWindowRenderTest {
                 frameNanos += 16_000_000L
                 Thread.sleep(10)
             }
-            val png = scene.render(frameNanos).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-            Files.write(out, png.bytes)
+            val frame = scene.render(frameNanos)
+            Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
+            painted = paintedFraction(frame)
         } finally {
             scene.close()
         }
-        assertTrue(Files.size(out) > 0, "rendered PNG is non-empty")
+        // The window is drawn over a vivid pink ground on purpose. Measuring how much
+        // of the frame is no longer pink says both that the window rendered and that
+        // it is opaque, where file size said neither.
+        assertTrue(painted > MIN_PAINTED, "the window covers ${(painted * 100).toInt()}% of the frame -- it did not render")
     }
 
     @Test fun `renders at FHD 1920x1080 under Celestia`() = render(1920, 1080, CelestiaStyle, "pack-settings-fhd.png")
@@ -107,4 +114,33 @@ class PackSettingsWindowRenderTest {
     @Test fun `renders at FHD 1920x1080 under Brut`() = render(1920, 1080, BrutStyle, "pack-settings-fhd-brut.png")
 
     @Test fun `renders at 2K 2560x1440 under Celestia`() = render(2560, 1440, CelestiaStyle, "pack-settings-2k.png")
+
+    /** Share of sampled pixels that are no longer the backdrop the window sits on. */
+    private fun paintedFraction(frame: Image): Double {
+        val bmp = Bitmap.makeFromImage(frame)
+        var painted = 0
+        var sampled = 0
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                if (bmp.getColor(x, y) != BACKDROP) painted++
+                sampled++
+                x += 4
+            }
+            y += 4
+        }
+        return painted.toDouble() / sampled
+    }
+
+    private companion object {
+        /** The vivid ground the window is drawn over, so bleed-through is visible. */
+        val BACKDROP = 0xFFE91E63.toInt()
+
+        /**
+         * A floating window covers a good part of the frame; an empty one covers
+         * none of it. Only has to tell those apart, not pin a layout.
+         */
+        const val MIN_PAINTED = 0.10
+    }
 }
