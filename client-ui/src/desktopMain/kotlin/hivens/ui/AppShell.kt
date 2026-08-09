@@ -1168,7 +1168,15 @@ fun AppRoot(
     // of a per-screen hardcoded return target.
     val backStack     = remember { NavBackStack(Screen.Home) }
     var pendingLogout by remember { mutableStateOf(false) }
-    val doLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated }
+    // Clearing every account takes the face choice with it: it names a provider
+    // that no longer has one, and nothing surfaces the setting again until two
+    // accounts are back, so it would decide the face of a session the user set
+    // up long after making it.
+    val doLogout = {
+        credentialsManager.clear()
+        settingsService.saveSettings(settingsService.getSettings().copy(preferredFaceProvider = null))
+        appState = AppState.Unauthenticated
+    }
 
     // Mouse side buttons (back/forward) -> history navigation. Compose's pointer
     // layer only surfaces primary/secondary/tertiary on this platform, so listen at

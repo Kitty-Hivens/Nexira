@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.releasingFace
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
 import hivens.ui.components.MicrosoftSignInButton
@@ -118,6 +119,8 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
         }
         credentials.listAccounts().firstOrNull { it.providerId == MS_KEY }
             ?.let { credentials.removeAccount(it.accountId) }
+        // The face choice goes with the account it named -- see releasingFace.
+        settingsService.saveSettings(settingsService.getSettings().releasingFace(MS_KEY))
         credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
         onChanged()
     }
