@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
@@ -64,6 +65,7 @@ private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
+    val settingsService: ISettingsService = koinInject()
 
     var refreshKey by remember { mutableIntStateOf(0) }
     val scSession = remember(refreshKey, ctx.session) { credentials.accountFor(SC_KEY) }
@@ -75,7 +77,7 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
                 // Microsoft button is suppressed -- it has its own section.
                 LoginPanel(
                     onLogin = {
-                        credentials.primarySession()?.let { ctx.onLogin(it) }
+                        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
                         refreshKey++
                     },
                     showMicrosoft = false,
@@ -91,6 +93,7 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
 private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
+    val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
 
     // Bumped by the skin uploader so the skin re-loads after upload/refresh.
@@ -107,7 +110,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
         }
         credentials.listAccounts().firstOrNull { it.providerId == SC_KEY }
             ?.let { credentials.removeAccount(it.accountId) }
-        credentials.primarySession()?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
         onChanged()
     }
 
