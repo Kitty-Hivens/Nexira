@@ -89,7 +89,7 @@ abstract class AbstractCachingAuthProvider : AuthProvider {
 
     /**
      * True for the narrow set of transient network failures seen on the auth
-     * channel -- h2 frame resets over SOCKS, raw socket resets during TLS,
+     * channel -- mid-stream h2 frame resets, raw socket resets during TLS,
      * ktor's wrapped channel-closed exception. NOT true for [AuthException]
      * (server rejections) or SSL cert errors (those need user opt-in).
      */
