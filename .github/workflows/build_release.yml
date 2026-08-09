@@ -215,6 +215,18 @@ jobs:
           :authlib-agent:test :profiler-agent:test
           --continue
 
+      # Gradle's daemon keeps the .lock files under ~/.gradle/caches open for as
+      # long as it lives. On Windows another process cannot read an open file, so
+      # setup-java's post-job cache save runs tar into "Device or resource busy"
+      # on modules-2.lock and five others, and abandons the whole archive. The
+      # cache is therefore never written, which is why it is never found either --
+      # every Windows run re-downloads the dependencies it already had.
+      #
+      # POSIX runners have no such rule and save fine, so this is Windows-only.
+      - name: Release Gradle's file locks before the cache is saved
+        if: always() && runner.os == 'Windows'
+        run: ./gradlew --stop
+
       - name: Upload test reports
         if: always()   # we publish it even if it falls, so we can see what's broken
         uses: actions/upload-artifact@v7
