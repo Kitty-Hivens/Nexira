@@ -69,6 +69,15 @@ class DiagnosticBundleTest {
     }
 
     @Test
+    fun `system info names the modules recovery switched off`() {
+        val off = entries(DiagnosticBundle.create(paths, setOf("skinema", "tray")))["system-info.txt"].orEmpty()
+        assertTrue(off.contains("Modules off: skinema, tray"), "a disabled module must be visible to a support reader")
+
+        val none = entries(DiagnosticBundle.create(paths))["system-info.txt"].orEmpty()
+        assertTrue(none.contains("Modules off: (none)"), "an all-enabled launcher must say so rather than leave the line blank")
+    }
+
+    @Test
     fun `abbreviateHome folds the home prefix and leaves anything else alone`() {
         assertEquals("~", DiagnosticBundle.abbreviateHome("/home/alice", "/home/alice"))
         assertEquals("~/.local/share/nexira", DiagnosticBundle.abbreviateHome("/home/alice/.local/share/nexira", "/home/alice"))
