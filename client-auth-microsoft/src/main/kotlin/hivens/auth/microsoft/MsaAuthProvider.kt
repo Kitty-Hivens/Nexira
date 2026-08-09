@@ -28,9 +28,11 @@ import java.nio.charset.StandardCharsets
  * Microsoft (MSA) auth via the OAuth 2.0 device-code grant, then the Xbox Live
  * -> XSTS -> Minecraft-services token exchange + profile fetch.
  *
- * Runs on the proxy-free [HttpClientProvider] (login.microsoftonline.com /
- * *.xboxlive.com / api.minecraftservices.com must be reached DIRECTLY, never
- * through the SmartyCraft SOCKS channel). Implements [AuthProvider] so the
+ * Runs on the direct [HttpClientProvider] (login.microsoftonline.com /
+ * *.xboxlive.com / api.minecraftservices.com must be reached under strict TLS,
+ * never over the SmartyCraft channel, whose client honours a user-granted SSL
+ * bypass -- a Microsoft token must not travel over a connection the user told
+ * the launcher to trust unconditionally). Implements [AuthProvider] so the
  * registry/gate see it as a provider, and [DeviceCodeAuthProvider] as the
  * interactive entry point; [login] and [completeTwoFactor] are unsupported --
  * there is no username/password path.
