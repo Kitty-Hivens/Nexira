@@ -1,6 +1,7 @@
 package hivens.widget.api
 
 import hivens.widget.model.CommandKey
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -10,6 +11,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class WidgetCommandRegistryTest {
 
     private val clearKey = CommandKey<Unit>("clear")

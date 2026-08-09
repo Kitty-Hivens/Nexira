@@ -8,6 +8,7 @@ import hivens.core.time.Clock
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.AutoSyncService
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -31,6 +32,7 @@ import kotlin.test.assertTrue
  * flight, and a re-emission carrying nothing new does not resurrect what the user
  * dismissed.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ActivityDriverStaleTest {
 
     private class FakeHub : PackUpdateStatusHub {

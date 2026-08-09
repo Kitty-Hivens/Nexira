@@ -64,6 +64,7 @@ internal class LauncherService(
      *
      * @see [ILauncherService.launchClientWithLogs]
      */
+    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
     override suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
@@ -120,6 +121,7 @@ internal class LauncherService(
         SpawnResult.Failed(LaunchError.Internal(e.message ?: ""))
     }
 
+    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
     override suspend fun launchClient(
         sessionData: SessionData,
         serverProfile: ServerProfile,
