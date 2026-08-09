@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
+import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.AppRelauncher
@@ -37,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import org.koin.compose.koinInject
 
 /**
  * Beacon diagnostic surface + About link.
@@ -63,6 +65,10 @@ internal fun DiagnosticsSection(
 ) {
     val s  = LocalStrings.current
     val af = LocalAprilFools.current
+    // Read at bundle time rather than composition time: recovery can switch a
+    // module off mid-session, and the bundle should say what is off now.
+    val settingsService: ISettingsService = koinInject()
+    val disabledModules = { settingsService.getSettings().disabledModules }
 
     // April Fools debug panel -- secret unlock. Only wire the 5-tap gesture when the
     // active impl actually renders a panel: a build that resolves the NoOp has an
@@ -144,7 +150,7 @@ internal fun DiagnosticsSection(
                                 bundleBusy = true
                                 bundleScope.launch {
                                     val zip = withContext(Dispatchers.IO) {
-                                        runCatching { DiagnosticBundle.create(paths) }.getOrNull()
+                                        runCatching { DiagnosticBundle.create(paths, disabledModules()) }.getOrNull()
                                     }
                                     if (zip != null) {
                                         lastBundlePath = zip
@@ -183,7 +189,7 @@ internal fun DiagnosticsSection(
                     bundleBusy = true
                     bundleScope.launch {
                         val zip = withContext(Dispatchers.IO) {
-                            runCatching { DiagnosticBundle.create(paths) }.getOrNull()
+                            runCatching { DiagnosticBundle.create(paths, disabledModules()) }.getOrNull()
                         }
                         if (zip != null) lastBundlePath = zip
                         bundleBusy = false
