@@ -106,17 +106,21 @@ class LinuxUpdateApplicatorTest {
     // costs is what the user watches a dead window for ---
 
     @Test
-    fun `a download already at the staging path is installed without a copy`() {
-        val exe = file("Nexira.AppImage", "OLD")
-        val staged = file("Nexira.AppImage.new", "NEW")
+    fun `the path the download is given is the path the install moves from`() {
+        // The two halves have to name the same file or the install copies the
+        // image after the process has been told to exit, which is the whole
+        // point of choosing the download destination. Note this is what pins the
+        // saving: a copy of a file onto itself is a no-op, so no assertion about
+        // the file can tell a redundant copy from a skipped one.
+        val exe = file("Nexira-2.3.0.AppImage", "OLD")
+        val asset = "Nexira-2.3.1.AppImage"
+        val staged = applicator.stagedPathFor(exe, fallbackDir = dir.resolve("updates"), fileName = asset)
+        Files.writeString(staged, "NEW")
 
-        applicator.swapBinary(staged, exe, exe, dir.resolve("Nexira.AppImage.backup"))
+        applicator.swapBinary(staged, exe, applicator.targetFor(exe, asset), dir.resolve("Nexira-2.3.0.AppImage.backup"))
 
-        assertEquals("NEW", Files.readString(exe))
-        assertFalse(
-            Files.exists(staged),
-            "the staged image is the one that was moved into place -- a copy would have left it behind",
-        )
+        assertEquals("NEW", Files.readString(dir.resolve(asset)))
+        assertFalse(Files.exists(staged), "the staged image is the one that moved into place")
     }
 
     @Test
