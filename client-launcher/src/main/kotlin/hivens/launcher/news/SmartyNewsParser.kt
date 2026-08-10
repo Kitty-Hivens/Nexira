@@ -213,8 +213,12 @@ internal object SmartyNewsParser {
     private const val IMAGE_CLASS = "news-block-img"
     private const val DATE_CLASS = "news-date-block"
     private const val DESC_CLASS = "news-desc"
-    private const val VIEWS_MARK = " просмотр"
-    private const val TIME_MARK = " в "
+    // Input, not output: these are the literals the upstream page is written in,
+    // matched against its markup. They belong to the site's wire format the same
+    // way an element class does, so they stay in Russian whatever language the
+    // launcher is running in -- translating them would stop the parse.
+    private const val VIEWS_MARK = " просмотр" // i18n-allow
+    private const val TIME_MARK = " в " // i18n-allow
 
     private val MOSCOW: ZoneOffset = ZoneOffset.ofHours(3)
     private val WHITESPACE = Regex("\\s+")
@@ -225,10 +229,14 @@ internal object SmartyNewsParser {
         "mdash" to "—", "ndash" to "–", "hellip" to "…",
     )
 
-    /** Month names as the date tile writes them, in the genitive the site uses. */
+    /**
+     * Month names as the date tile writes them, in the genitive the site uses.
+     * Parser input like [VIEWS_MARK]; the rendered date comes from the launcher's
+     * own formatting, not from these.
+     */
     private val MONTHS = mapOf(
-        "января" to 1, "февраля" to 2, "марта" to 3, "апреля" to 4,
-        "мая" to 5, "июня" to 6, "июля" to 7, "августа" to 8,
-        "сентября" to 9, "октября" to 10, "ноября" to 11, "декабря" to 12,
+        "января" to 1, "февраля" to 2, "марта" to 3, "апреля" to 4, // i18n-allow
+        "мая" to 5, "июня" to 6, "июля" to 7, "августа" to 8, // i18n-allow
+        "сентября" to 9, "октября" to 10, "ноября" to 11, "декабря" to 12, // i18n-allow
     )
 }
