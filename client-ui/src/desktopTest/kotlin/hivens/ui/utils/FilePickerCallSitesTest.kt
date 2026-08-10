@@ -21,6 +21,13 @@ class FilePickerCallSitesTest {
     private val sourceRoot = File("src/desktopMain/kotlin")
     private val helper = "hivens/ui/utils/FilePickers.kt"
 
+    /** Paths are compared with `/` so the helper is excluded on Windows too, where [File.path] separates with `\`. */
+    private fun sourcesOutsideHelper(): Sequence<Pair<String, File>> =
+        sourceRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .map { it.relativeTo(sourceRoot).invariantSeparatorsPath to it }
+            .filterNot { (path, _) -> path == helper }
+
     @Test
     fun `the picker helper is where the sources live`() {
         assertTrue(
@@ -32,11 +39,9 @@ class FilePickerCallSitesTest {
 
     @Test
     fun `no screen opens a file picker without the helper`() {
-        val offenders = sourceRoot.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.path.endsWith(helper) }
-            .filter { "FileKit.openFilePicker" in it.readText() }
-            .map { it.relativeTo(sourceRoot).path }
+        val offenders = sourcesOutsideHelper()
+            .filter { (_, file) -> "FileKit.openFilePicker" in file.readText() }
+            .map { (path, _) -> path }
             .toList()
 
         assertEquals(
@@ -49,11 +54,9 @@ class FilePickerCallSitesTest {
 
     @Test
     fun `dialog settings are not hand-built outside the helper`() {
-        val offenders = sourceRoot.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .filterNot { it.path.endsWith(helper) }
-            .filter { "FileKitDialogSettings(" in it.readText() }
-            .map { it.relativeTo(sourceRoot).path }
+        val offenders = sourcesOutsideHelper()
+            .filter { (_, file) -> "FileKitDialogSettings(" in file.readText() }
+            .map { (path, _) -> path }
             .toList()
 
         assertEquals(
