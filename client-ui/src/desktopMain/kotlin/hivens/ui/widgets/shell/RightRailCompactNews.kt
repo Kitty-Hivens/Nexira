@@ -11,12 +11,23 @@ import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
 
+/**
+ * Which of the two images upstream publishes for an entry the rows fetch.
+ * Thumbnail is what a 38dp row needs and several times less to download; Full
+ * is the size the site shows on its own page, for a display scaled far enough
+ * up that the small one would be stretched.
+ */
+@Serializable
+enum class NewsImageSource { Thumbnail, Full }
+
 @Serializable
 data class CompactNewsProps(
     // 0 = show the whole feed; > 0 caps it (after the title filter).
     @PropLabel("widget.appshell.rightrail.compactnews.maxItems") @PropRange(0.0, 50.0)
     val maxItems: Int = 0,
     @PropLabel("widget.appshell.rightrail.compactnews.showTitle") val showTitle: Boolean = true,
+    @PropLabel("widget.appshell.rightrail.compactnews.imageSource")
+    val imageSource: NewsImageSource = NewsImageSource.Thumbnail,
 )
 
 @Widget(
@@ -29,9 +40,10 @@ fun RightRailCompactNews(instance: WidgetInstance) {
     val ctx = LocalRightRailContext.current
     val props = instance.rememberProps<CompactNewsProps>()
     CompactNewsFeed(
-        sslBypass = ctx.sslBypass,
-        maxItems  = props.maxItems,
-        showTitle = props.showTitle,
-        modifier  = Modifier.fillMaxSize(),
+        sslBypass   = ctx.sslBypass,
+        maxItems    = props.maxItems,
+        showTitle   = props.showTitle,
+        imageSource = props.imageSource,
+        modifier    = Modifier.fillMaxSize(),
     )
 }

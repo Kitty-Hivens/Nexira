@@ -1129,6 +1129,7 @@ object GermanStrings : AppStrings {
         "widget.appshell.rightrail.compactnews" to "Neuigkeiten",
         "widget.appshell.rightrail.compactnews.maxItems" to "Max. Einträge (0 = alle)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Titel anzeigen",
+        "widget.appshell.rightrail.compactnews.imageSource" to "Bildquelle",
         "widget.bg.enable.toggle" to "Hintergrund an/aus",
         "widget.bg.fx.animspeed" to "Animationstempo",
         "widget.bg.fx.blur" to "Unschärfe",

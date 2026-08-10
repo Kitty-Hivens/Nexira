@@ -10,7 +10,10 @@ import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
 /**
@@ -51,9 +54,20 @@ class SmartyCraftNewsFeed(
         return if (index == 1) dashboardFloor() else fetched
     }
 
-    private suspend fun load(index: Int): NewsPage {
+    /**
+     * Off the caller's thread: the caller is a composition effect, so the body
+     * read and the scan over a page of markup would otherwise run on the UI
+     * thread -- and they are started by the scroll that needs it to stay free.
+     *
+     * A cancellation is re-thrown rather than reported as a failed read. Caught
+     * and turned into an empty page it would be indistinguishable from an
+     * outage: the caller would write that emptiness over live state on its way
+     * out, and the cache would hand the same nothing to everyone waiting on the
+     * page this coroutine was fetching for them.
+     */
+    private suspend fun load(index: Int): NewsPage = withContext(Dispatchers.IO) {
         val url = "${config.baseUrl.trimEnd('/')}/index_page$index"
-        return runCatching {
+        runCatching {
             val html: String = clientProvider.current.get(url).body()
             SmartyNewsParser.parse(html, config.baseUrl, index).also {
                 if (it.items.isEmpty()) {
@@ -61,17 +75,23 @@ class SmartyCraftNewsFeed(
                 }
             }
         }.onFailure {
+            if (it is CancellationException) throw it
             log.warn("News page {} could not be read", index, it)
         }.getOrDefault(NewsPage(page = index, totalPages = index))
     }
 
     /**
-     * The dashboard's own news, as one page with nothing after it. It is the
-     * same three entries the launcher read before the archive was reachable.
+     * The dashboard's own news, as one page with nothing after it, marked as the
+     * floor it is. It is the same three entries the launcher read before the
+     * archive was reachable -- and a surface told only that the page is complete
+     * would settle for them.
      */
     private suspend fun dashboardFloor(): NewsPage =
         runCatching { dashboard.fetchDashboardData().await().news }
-            .onFailure { log.warn("News fallback to the dashboard failed", it) }
+            .onFailure {
+                if (it is CancellationException) throw it
+                log.warn("News fallback to the dashboard failed", it)
+            }
             .getOrDefault(emptyList())
-            .let { NewsPage(items = it, page = 1, totalPages = 1) }
+            .let { NewsPage(items = it, page = 1, totalPages = 1, fallback = true) }
 }

@@ -3,7 +3,7 @@ package hivens.launcher.news
 import hivens.core.data.NewsItem
 import hivens.core.data.NewsPage
 import java.time.LocalDateTime
-import java.time.ZoneOffset
+import java.time.ZoneId
 
 /**
  * Reads a SmartyCraft index page into news entries.
@@ -57,12 +57,14 @@ internal object SmartyNewsParser {
     private fun item(block: String, baseUrl: String): NewsItem? {
         val id = between(block, BLOCK_MARK, "\"")?.toIntOrNull() ?: return null
         val title = title(block, id) ?: return null
+        val image = imageSrc(block)
         return NewsItem(
             id = id,
             title = title,
             views = views(block),
             dateEpochSeconds = publishedAt(block),
-            imageUrl = imageUrl(block, baseUrl),
+            imageUrl = image?.let { absolute(it, baseUrl) },
+            thumbnailUrl = image?.let(::thumbnailOf)?.let { absolute(it, baseUrl) },
         )
     }
 
@@ -77,18 +79,30 @@ internal object SmartyNewsParser {
             ?.takeIf { it.isNotBlank() }
 
     /**
-     * The entry thumbnail, absolutised. The tag carries several attributes in no
-     * guaranteed order, so the class picks the tag and the src is read out of
-     * that tag rather than out of the block.
+     * The entry's image as the page writes it. The tag carries several attributes
+     * in no guaranteed order, so the class picks the tag and the src is read out
+     * of that tag rather than out of the block.
      */
-    private fun imageUrl(block: String, baseUrl: String): String? {
+    private fun imageSrc(block: String): String? {
         val tag = tags(block, "<img ").firstOrNull { it.contains(IMAGE_CLASS) } ?: return null
-        val src = between(tag, "src=\"", "\"")?.takeIf { it.isNotBlank() } ?: return null
-        return when {
-            src.startsWith("http://") || src.startsWith("https://") -> src
-            src.startsWith("/") -> "${baseUrl.trimEnd('/')}$src"
-            else -> "${baseUrl.trimEnd('/')}/$src"
-        }
+        return between(tag, "src=\"", "\"")?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * The thumbnail the site keeps beside a news image: the same path with one
+     * directory inserted. Only paths under the news image root have one, and a
+     * path that already names it is its own thumbnail.
+     */
+    private fun thumbnailOf(src: String): String? = when {
+        THUMB_ROOT in src -> src
+        IMAGE_ROOT in src -> src.replaceFirst(IMAGE_ROOT, THUMB_ROOT)
+        else -> null
+    }
+
+    private fun absolute(src: String, baseUrl: String): String = when {
+        src.startsWith("http://") || src.startsWith("https://") -> src
+        src.startsWith("/") -> "${baseUrl.trimEnd('/')}$src"
+        else -> "${baseUrl.trimEnd('/')}/$src"
     }
 
     /**
@@ -110,7 +124,7 @@ internal object SmartyNewsParser {
         val year = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: return 0L
         val (hour, minute) = timeOfDay(rest)
         return runCatching {
-            LocalDateTime.of(year, month, day, hour, minute).toEpochSecond(MOSCOW)
+            LocalDateTime.of(year, month, day, hour, minute).atZone(MOSCOW).toEpochSecond()
         }.getOrDefault(0L)
     }
 
@@ -211,6 +225,8 @@ internal object SmartyNewsParser {
 
     private const val BLOCK_MARK = "<div id=\"news"
     private const val IMAGE_CLASS = "news-block-img"
+    private const val IMAGE_ROOT = "images/news/"
+    private const val THUMB_ROOT = "images/news/mini/"
     private const val DATE_CLASS = "news-date-block"
     private const val DESC_CLASS = "news-desc"
     // Input, not output: these are the literals the upstream page is written in,
@@ -220,7 +236,13 @@ internal object SmartyNewsParser {
     private const val VIEWS_MARK = " просмотр" // i18n-allow
     private const val TIME_MARK = " в " // i18n-allow
 
-    private val MOSCOW: ZoneOffset = ZoneOffset.ofHours(3)
+    /**
+     * The zone the site writes its dates in, as a zone rather than a fixed
+     * offset: Moscow was UTC+4 between 2011 and 2014, and the archive reaches
+     * back past that. An hour wrong is a day wrong for anything published near
+     * midnight, which is most of it.
+     */
+    private val MOSCOW: ZoneId = ZoneId.of("Europe/Moscow")
     private val WHITESPACE = Regex("\\s+")
 
     private val NAMED = mapOf(

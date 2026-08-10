@@ -1143,6 +1143,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.rightrail.compactnews" to "Лента новостей",
         "widget.appshell.rightrail.compactnews.maxItems" to "Макс. элементов (0 = все)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Показывать заголовок",
+        "widget.appshell.rightrail.compactnews.imageSource" to "Источник картинки",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
         "widget.bg.fx.blur" to "Размытие",
