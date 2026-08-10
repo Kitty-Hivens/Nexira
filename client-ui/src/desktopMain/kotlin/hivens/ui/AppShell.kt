@@ -74,6 +74,7 @@ import hivens.ui.background.FrostBackdrop
 import hivens.ui.surface.LocalBackdropPainter
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
+import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
 import hivens.ui.chrome.LocalUseCustomChrome
@@ -852,6 +853,7 @@ fun FrameWindowScope.AppShellContent(
                 LocalWindowMaximizer                     provides maximizer,
                 LocalComposeWindow                       provides window,
                 LocalChromeClose                         provides onCloseChrome,
+                LocalWindowHide                          provides { isWindowVisible = false },
                 LocalUseCustomChrome                     provides settings.useCustomChrome,
             ) {
             val effectiveStyle = styleSpec

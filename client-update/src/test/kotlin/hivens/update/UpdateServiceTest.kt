@@ -2,6 +2,7 @@ package hivens.update
 
 import hivens.test.testTransferEngine
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ReleaseChannel
 import hivens.core.data.SettingsData
 import hivens.test.MockResponse
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.*
 
 class UpdateServiceTest {
@@ -81,6 +83,7 @@ class UpdateServiceTest {
             json = json,
             dataDirectory = tempDir,
             settingsService = settings,
+            applicator = defaultStaging,
             currentVersion = currentVersion
         )
     }
@@ -110,8 +113,19 @@ class UpdateServiceTest {
             json = json,
             dataDirectory = tempDir,
             settingsService = settings,
+            applicator = defaultStaging,
             currentVersion = currentVersion
         )
+    }
+
+    /**
+     * An applicator that keeps every default on the interface: the download goes
+     * to the updates directory and nothing is staged elsewhere. That is the
+     * shape for a platform whose installer is a separate program; the path where
+     * the applicator redirects the download is [LinuxUpdateApplicatorTest].
+     */
+    private val defaultStaging = object : IUpdateApplicator {
+        override fun scheduleUpdate(installerPath: Path) = Unit
     }
 
     // ─── Fixtures ─────────────────────────────────────────────────────────────
@@ -893,7 +907,8 @@ class UpdateServiceTest {
             transfers = testTransferEngine(buildMockClient(body = "{}")),
             json = json,
             dataDirectory = tempDir,
-            settingsService = fakeSettings()
+            settingsService = fakeSettings(),
+            applicator = defaultStaging,
         )
         svc.cleanupOldUpdates()
 

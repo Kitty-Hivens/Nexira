@@ -725,7 +725,8 @@ val updateModule = module {
             transfers       = get(),
             json            = get(),
             dataDirectory   = get(),
-            settingsService = get()
+            settingsService = get(),
+            applicator      = get(),
         )
     }
 
