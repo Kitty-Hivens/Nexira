@@ -767,7 +767,7 @@ class TransferEngine(
         )
     }
 
-    private fun partialOf(dest: Path): Path = dest.resolveSibling("${dest.fileName}.part")
+    private fun partialOf(dest: Path): Path = TransferStaging.partialOf(dest)
 
     private fun dropPartial(partial: Path) {
         runCatching { Files.deleteIfExists(partial) }

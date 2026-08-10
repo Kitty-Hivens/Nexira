@@ -22,7 +22,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -48,6 +50,10 @@ import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.VersionChannel
+import hivens.launcher.PackOperation
+import hivens.launcher.PackOperationKind
+import hivens.launcher.PackOperationPhase
+import hivens.launcher.PackOperationService
 import hivens.ui.components.ChannelChip
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -65,21 +71,6 @@ import hivens.ui.theme.decorativeColor
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
-/** Which long operation the footer is narrating. The two read differently: one
- *  installs a different build, the other puts the current one back. */
-internal enum class PackSettingsOpKind { Update, Repair }
-
-/** Lifecycle of the window's current async operation, rendered in the footer strip. */
-internal sealed interface PackSettingsOp {
-    data object Idle : PackSettingsOp
-    data class Running(val kind: PackSettingsOpKind, val current: Int, val total: Int, val path: String) : PackSettingsOp
-    data class Done(val version: String) : PackSettingsOp
-
-    /** A finished repair. Says what it looked at, not just that it ran. */
-    data class Repaired(val checked: Int, val repaired: Int) : PackSettingsOp
-    data class Failed(val reason: String) : PackSettingsOp
-}
-
 /**
  * The floating pack-settings window: a scrimmed overlay hosting a section rail
  * on the left and the selected section's controls on the right -- the global
@@ -91,6 +82,11 @@ internal sealed interface PackSettingsOp {
  * dismiss. The footer is a layout-stable status strip for the section-launched
  * async work (an update apply, a failed check), so progress never reflows the
  * panes (Rule 6).
+ *
+ * The long operations it narrates belong to [PackOperationService], not to this
+ * composition: reopening the window over a repair that is still running finds it
+ * and picks the narration back up, where window-local state would have shown an
+ * idle footer and offered to start a second one.
  *
  * A pack instance is the unit of edit: sections mutate it and flow the result
  * back through [onInstanceChange] (which persists and refreshes the hero), so
@@ -117,7 +113,20 @@ fun PackSettingsWindow(
     // dispatches a category the rail no longer shows.
     if (selected !in categories) selected = PackSettingsCategory.General
 
-    var opState by remember(pack.id) { mutableStateOf<PackSettingsOp>(PackSettingsOp.Idle) }
+    val operations: PackOperationService = koinInject()
+    val inFlight by operations.operations.collectAsState()
+    val operation = inFlight[pack.id]
+    // A check is short and belongs to the window, so its failure is a window-local
+    // line rather than an entry in the app-scoped registry.
+    var notice by remember(pack.id) { mutableStateOf<String?>(null) }
+
+    // The result of a finished operation is read here and nowhere else, so it is
+    // dropped when the window goes: a repair from twenty minutes ago has nothing
+    // to say to the next visit. A running one is left alone -- closing the window
+    // is not what ends it.
+    DisposableEffect(pack.id) {
+        onDispose { operations.dismiss(pack.id) }
+    }
 
     // Scrim: click outside dismisses; the card swallows clicks so a stray tap
     // inside does not close the window. Esc closes from anywhere in the overlay
@@ -202,16 +211,16 @@ fun PackSettingsWindow(
                             PackSettingsCategory.Runtime ->
                                 PackRuntimeSection(pack, instanceDir, onInstanceChange)
                             PackSettingsCategory.Version ->
-                                PackVersionSection(pack, onInstanceChange, onOpenVersions, onOpState = { opState = it })
+                                PackVersionSection(pack, operation, onInstanceChange, onOpenVersions, onNotice = { notice = it })
                             PackSettingsCategory.Content ->
                                 PackContentSection(pack, onInstanceChange)
                             PackSettingsCategory.Data ->
-                                PackDataSection(pack, instanceDir, onInstanceChange, onDismiss, onOpState = { opState = it })
+                                PackDataSection(pack, instanceDir, operation, onInstanceChange, onDismiss)
                         }
                     }
                 }
 
-                FooterStatus(opState)
+                FooterStatus(operation, notice)
             }
         }
     }
@@ -295,28 +304,31 @@ private fun HeaderAvatar(pack: PackInstance) {
     )
 }
 
-/** Layout-stable footer strip: the section-launched operation's progress/result. */
+/**
+ * Layout-stable footer strip: the instance's long operation, or -- when it has
+ * none -- whatever the window itself has to report.
+ */
 @Composable
-private fun FooterStatus(state: PackSettingsOp) {
+private fun FooterStatus(operation: PackOperation?, notice: String?) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     Box(
         modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 18.dp, vertical = 6.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        when (state) {
-            PackSettingsOp.Idle -> Unit
-            is PackSettingsOp.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (state.total > 0) {
+        val phase = operation?.phase
+        when {
+            phase is PackOperationPhase.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (phase.total > 0) {
                     LinearProgressIndicator(
-                        progress = { state.current.toFloat() / state.total },
+                        progress = { phase.current.toFloat() / phase.total },
                         modifier = Modifier.width(140.dp),
                         color    = colors.primary,
                     )
                     Text(
-                        text     = when (state.kind) {
-                            PackSettingsOpKind.Update -> s.packVersionsApplying(state.current, state.total, state.path)
-                            PackSettingsOpKind.Repair -> s.packSettingsRepairProgress(state.current, state.total, state.path)
+                        text     = when (operation.kind) {
+                            PackOperationKind.Update -> s.packVersionsApplying(phase.current, phase.total, phase.path)
+                            PackOperationKind.Repair -> s.packSettingsRepairProgress(phase.current, phase.total, phase.path)
                         },
                         style    = MaterialTheme.typography.labelSmall,
                         color    = colors.textSecondary,
@@ -327,23 +339,29 @@ private fun FooterStatus(state: PackSettingsOp) {
                     LinearProgressIndicator(modifier = Modifier.width(140.dp), color = colors.primary)
                 }
             }
-            is PackSettingsOp.Done -> Text(
-                text  = s.packVersionsApplied(state.version),
+            phase is PackOperationPhase.Updated -> Text(
+                text  = s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.success,
             )
-            is PackSettingsOp.Repaired -> Text(
-                text  = s.packSettingsRepairDone(state.checked, state.repaired),
+            phase is PackOperationPhase.Repaired -> Text(
+                text  = s.packSettingsRepairDone(phase.checked, phase.repaired),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.success,
             )
-            is PackSettingsOp.Failed -> Text(
-                text     = s.packVersionsFailed(state.reason),
-                style    = MaterialTheme.typography.labelSmall,
-                color    = colors.error,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            phase is PackOperationPhase.Failed -> FooterError(s.packVersionsFailed(phase.message))
+            notice != null -> FooterError(notice)
         }
     }
+}
+
+@Composable
+private fun FooterError(text: String) {
+    Text(
+        text     = text,
+        style    = MaterialTheme.typography.labelSmall,
+        color    = NxTheme.colors.error,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }

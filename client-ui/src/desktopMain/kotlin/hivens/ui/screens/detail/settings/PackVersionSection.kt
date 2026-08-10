@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -28,6 +29,10 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
+import hivens.launcher.PackOperation
+import hivens.launcher.PackOperationKind
+import hivens.launcher.PackOperationPhase
+import hivens.launcher.PackOperationService
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.rememberRunningPackGuard
@@ -41,7 +46,6 @@ import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxTheme
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -49,17 +53,18 @@ import org.koin.compose.koinInject
  * Compact version panel for a mirror instance: the installed build with its
  * channel, the mirror's latest-build line, a manual check, follow-latest, and
  * the available-update banner. A green update applies right here (progress in
- * the window's footer strip via [onOpState]); an amber one routes to the
- * versions screen where the full diff and the snapshot story live. The build
+ * the window's footer strip, narrated from [operation]); an amber one routes to
+ * the versions screen where the full diff and the snapshot story live. The build
  * list and restore points themselves moved to that screen -- a narrow settings
  * pane is no place for a history table.
  */
 @Composable
 internal fun PackVersionSection(
     pack: PackInstance,
+    operation: PackOperation?,
     onInstanceChange: (PackInstance) -> Unit,
     onOpenVersions: () -> Unit = {},
-    onOpState: (PackSettingsOp) -> Unit = {},
+    onNotice: (String?) -> Unit = {},
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
@@ -67,15 +72,22 @@ internal fun PackVersionSection(
     val repo: IPackRepository = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
-    // Two scopes on purpose: a check is cheap and belongs to the window, an apply
-    // outlives it. See applyLatest.
+    val operations: PackOperationService = koinInject()
+    // A check is cheap and belongs to the window; an apply outlives it and is the
+    // registry's. See applyLatest.
     val scope = rememberCoroutineScope()
-    val appScope: CoroutineScope = koinInject()
 
-    var busy by remember(pack.id) { mutableStateOf(false) }
+    var checking by remember(pack.id) { mutableStateOf(false) }
     var check by remember(pack.id) { mutableStateOf<UpdateCheck?>(null) }
+    val busy = checking || operation?.isRunning == true
 
     val current = pack.pinnedPackVersion ?: pack.packRef.version ?: "?"
+
+    // The banner offers a build that is now installed. The instance record itself
+    // is refreshed a level up, by whoever holds it -- see PackDetailScreen.
+    LaunchedEffect(operation?.phase) {
+        if (operation?.phase is PackOperationPhase.Updated) check = null
+    }
 
     // Both reads are best-effort: offline settings stay usable, the lines just
     // do not render.
@@ -93,11 +105,12 @@ internal fun PackVersionSection(
     fun runCheck() {
         if (busy) return
         scope.launch {
-            busy = true
+            checking = true
+            onNotice(null)
             // Explicit action: go past the cache. Answering "check now" out of a
             // four-minute-old entry is what made this button feel like a coin flip.
             check = runCatching { updater.checkForUpdate(pack, forceRefresh = true) }
-                .onFailure { onOpState(PackSettingsOp.Failed(it.message ?: s.packVersionCheckFailed)) }
+                .onFailure { onNotice(s.packVersionsFailed(it.message ?: s.packVersionCheckFailed)) }
                 .getOrNull()
             // Feed the shared hub so the ambient badges (card, hero) reflect what
             // this manual check just learned.
@@ -106,7 +119,7 @@ internal fun PackVersionSection(
                 UpdateCheck.UpToDate -> hub.report(pack.id, PackUpdateStatus.UpToDate)
                 null -> Unit
             }
-            busy = false
+            checking = false
         }
     }
 
@@ -116,29 +129,23 @@ internal fun PackVersionSection(
 
     fun applyLatest() {
         if (busy) return
-        // The app scope, not the composition's: this window is dismissed by Esc, by
-        // the scrim and by its own close button, and on the composition scope every
-        // one of those cancels the apply mid-flight. The rollback does run (it is
-        // blocking, so cancellation cannot stop it) and the files come back, but the
-        // user is left with an update that silently did not happen and a snapshot
-        // nobody cleans up. The same lesson is already written down on
-        // LauncherController.setOptionalModsAsync.
-        appScope.launch {
-            busy = true
-            onOpState(PackSettingsOp.Running(PackSettingsOpKind.Update, 0, 0, ""))
-            runCatching {
-                updater.applyUpdate(pack, null) { c, t, p ->
-                    onOpState(PackSettingsOp.Running(PackSettingsOpKind.Update, c, t, p.substringAfterLast('/')))
-                }
-            }.onSuccess { outcome ->
-                repo.get(pack.id)?.let(onInstanceChange)
-                check = null
-                hub.report(pack.id, PackUpdateStatus.UpToDate)
-                onOpState(PackSettingsOp.Done((outcome as? UpdateOutcome.Applied)?.toVersion ?: current))
-            }.onFailure {
-                onOpState(PackSettingsOp.Failed(it.message ?: s.packVersionCheckFailed))
+        onNotice(null)
+        // The registry's scope, not the composition's: this window is dismissed by
+        // Esc, by the scrim and by its own close button, and on the composition
+        // scope every one of those cancels the apply mid-flight. The rollback does
+        // run (it is blocking, so cancellation cannot stop it) and the files come
+        // back, but the user is left with an update that silently did not happen
+        // and a snapshot nobody cleans up. The same lesson is already written down
+        // on LauncherController.setOptionalModsAsync.
+        operations.start(pack, PackOperationKind.Update) { progress ->
+            val outcome = updater.applyUpdate(pack, null) { c, t, p ->
+                progress(c, t, p.substringAfterLast('/'))
             }
-            busy = false
+            // Reported from inside the operation, not from the section: the badges
+            // this feeds have to agree with reality whether or not the window that
+            // started the apply is still open.
+            hub.report(pack.id, PackUpdateStatus.UpToDate)
+            PackOperationPhase.Updated((outcome as? UpdateOutcome.Applied)?.toVersion ?: current)
         }
     }
 

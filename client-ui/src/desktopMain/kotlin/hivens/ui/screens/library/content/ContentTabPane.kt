@@ -590,7 +590,7 @@ private fun ContentDetailsDialog(
                 description?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
                 }
-                MetaLine(s.contentDetailSize, humanSize(content.sizeBytes))
+                MetaLine(s.contentDetailSize, humanSize(content.sizeBytes, s))
                 license?.let {
                     Text(s.contentTabModLicensePrefix(it), style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
                 }
