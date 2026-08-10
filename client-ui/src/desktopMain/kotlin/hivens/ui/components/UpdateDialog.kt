@@ -18,6 +18,7 @@ import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.update.UpdateService
+import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -28,9 +29,21 @@ import hivens.ui.theme.NxTheme
 import java.nio.file.Paths
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
+
+/**
+ * How long the window is given to leave the screen before the process does.
+ * Two frames at 60Hz plus room for a compositor that batches the unmap into its
+ * own next frame -- short enough that nobody waits on it, since what it is
+ * waiting for is already invisible.
+ */
+private val WINDOW_TEARDOWN_GRACE = 150.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +56,7 @@ fun UpdateDialog(
     val logger         = LoggerFactory.getLogger("UpdateDialog")
     val scope          = rememberCoroutineScope()
     val updateApplicator: IUpdateApplicator = koinInject()
+    val hideWindow     = LocalWindowHide.current
 
     var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.Idle) }
     var errorMessage  by remember { mutableStateOf<String?>(null) }
@@ -94,14 +108,38 @@ fun UpdateDialog(
     // Same shape as launchDownload: PuppetClick("update.install") and the
     // Ready-state Button onClick both schedule + exit identically.
     fun installUpdate(installerPath: String) {
-        try {
-            updateApplicator.scheduleUpdate(Paths.get(installerPath))
-            logger.info("Update scheduled, exiting...")
-            exitProcess(0)
-        } catch (e: Exception) {
-            logger.error("Failed to schedule update", e)
-            errorMessage  = "${s.updateScheduleFailed}: ${e.message}"
-            downloadState = DownloadState.Failed
+        scope.launch {
+            try {
+                updateApplicator.scheduleUpdate(Paths.get(installerPath))
+            } catch (e: Exception) {
+                logger.error("Failed to schedule update", e)
+                errorMessage  = "${s.updateScheduleFailed}: ${e.message}"
+                downloadState = DownloadState.Failed
+                return@launch
+            }
+            // Take the window down BEFORE exiting, and only after scheduling:
+            // scheduling can fail, and the error above needs a window to appear
+            // in.
+            //
+            // The install itself runs in a JVM shutdown hook, and the native
+            // window is destroyed by process exit rather than before it -- so
+            // the launcher stays on screen, no longer drawing, for the whole
+            // swap. It reads as a hang. Hiding first means the desktop is rid of
+            // it before the work starts; where a tray is up, the tray icon is
+            // what remains until the process goes.
+            //
+            // The grace is for the compositor, not for us: hiding and exiting in
+            // the same breath gives it no chance to act on the unmap, which
+            // looks exactly like not hiding at all. NonCancellable because from
+            // here the process is committed to exiting -- a cancelled scope
+            // would leave a hidden launcher with the hook still armed.
+            withContext(NonCancellable) {
+                hideWindow()
+                withFrameNanos {}
+                delay(WINDOW_TEARDOWN_GRACE)
+                logger.info("Update scheduled, exiting...")
+                exitProcess(0)
+            }
         }
     }
 

@@ -26,6 +26,17 @@ val LocalComposeWindow = staticCompositionLocalOf<ComposeWindow?> { null }
 val LocalChromeClose = staticCompositionLocalOf<() -> Unit> { {} }
 
 /**
+ * Takes the window off screen without ending the process -- the same state the
+ * tray hide sets, reachable from a widget that has no path to it.
+ *
+ * The launcher update needs this: the swap runs in a JVM shutdown hook, and the
+ * native window is destroyed by process exit rather than before it, so without a
+ * hide the launcher sits on screen not drawing for as long as the swap takes.
+ * Default no-op, like the close path above.
+ */
+val LocalWindowHide = staticCompositionLocalOf<() -> Unit> { {} }
+
+/**
  * Whether the in-app top bar replaces the OS chrome (undecorated window). Mirrors
  * SettingsData.useCustomChrome, provided from AppShell. When false the OS title
  * bar is shown, so the bar's caption buttons / window-drag must stand down (the

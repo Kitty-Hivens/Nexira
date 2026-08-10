@@ -8,6 +8,7 @@ import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.core.data.ReleaseChannel
 import hivens.core.data.ReleaseManifest
@@ -35,6 +36,7 @@ class UpdateService(
     private val json: Json,
     dataDirectory: Path,
     private val settingsService: ISettingsService,
+    private val applicator: IUpdateApplicator,
     private val currentVersion: String = Branding.VERSION.removePrefix("v"),
 ) {
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
@@ -317,7 +319,13 @@ class UpdateService(
         onProgress: (downloaded: Long, total: Long, speed: Double) -> Unit
     ): Path = withContext(Dispatchers.IO) {
         val fileName = update.downloadUrl.substringAfterLast("/")
-        val targetFile = updateDir.resolve(fileName)
+        // The applicator picks the destination: one that installs by replacing
+        // files wants the bytes beside its own install, so the install itself is
+        // a rename. That copy would otherwise happen after the process has been
+        // told to exit, where it costs the user a launcher frozen on screen for
+        // as long as it takes.
+        val targetFile = applicator.stagingPath(updateDir, fileName)
+        Files.createDirectories(targetFile.parent)
 
         // Same gate as [verifyChecksum], applied before a byte moves: an update with
         // no pinned hash is a verification failure and not a reason to skip the
@@ -359,6 +367,14 @@ class UpdateService(
     }
 
     fun cleanupOldUpdates() {
+        // Anything the applicator staged outside the updates directory: a
+        // download the user never installed would otherwise sit beside the
+        // launcher binary, one full image per version checked.
+        applicator.stagedLeftovers().forEach { staged ->
+            runCatching { Files.deleteIfExists(staged) }
+                .onSuccess { logger.debug("Deleted staged update: {}", staged) }
+                .onFailure { logger.warn("Could not delete staged update {}", staged, it) }
+        }
         try {
             Files.list(updateDir).use { stream ->
                 stream
