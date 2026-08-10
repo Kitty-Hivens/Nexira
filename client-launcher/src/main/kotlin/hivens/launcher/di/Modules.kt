@@ -63,6 +63,7 @@ import hivens.launcher.cache.CacheFactory
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallCoordinator
 import hivens.launcher.PackInstallService
+import hivens.launcher.PackOperationService
 import hivens.launcher.imports.ForeignInstanceImporter
 import hivens.launcher.imports.FtbAppSource
 import hivens.launcher.imports.LocalPackCreator
@@ -80,6 +81,7 @@ import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
@@ -539,6 +541,13 @@ val mirrorModule = module {
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     // Instance-level mutations that reach past the registry (full delete, detach).
     single { PackInstanceService(repository = get(), dataDir = get()) }
+    // On-disk size of an instance, measured on the app scope and shared, so a
+    // surface that asks again does not re-walk a tree the size of a world save.
+    single { InstanceSizeService(dataDir = get(), scope = get(), clock = get()) }
+    // App-scoped owner of the operations that rewrite an installed instance
+    // (an update apply, a repair): one per instance, outliving the surface that
+    // started it -- see PackOperationService.
+    single { PackOperationService(scope = get(), sizes = get()) }
     // Update write side: moves an installed mirror instance to another build
     // (forward update or version switch) via the reconcile engine. Concrete
     // SmrtPackClient for the summary/version-list poll the interface slice lacks.

@@ -70,6 +70,7 @@ import hivens.ui.components.ChannelChip
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.formatBuildTime
 import hivens.ui.components.formatBuildTimestamp
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.CenteredProgress
@@ -705,7 +706,7 @@ private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: Mod
                 NxDiffRow(
                     kind     = entry.kind.toRowKind(),
                     title    = subject?.dest ?: "?",
-                    trailing = sizeLabel(entry.from?.sizeBytes, entry.to?.sizeBytes),
+                    trailing = sizeLabel(entry.from?.sizeBytes, entry.to?.sizeBytes, s),
                 )
             }
         }
@@ -740,6 +741,7 @@ private fun DiffGroup(entries: List<DiffEntry<SmrtModEntry>>, labels: DiffLabels
 
 @Composable
 private fun ModDiffRow(entry: DiffEntry<SmrtModEntry>, labels: DiffLabels, icons: ModIconResolver) {
+    val s = LocalStrings.current
     val subject = entry.to ?: entry.from ?: return
     val title = subject.display?.name?.takeIf { it.isNotBlank() } ?: subject.filename
     // The mirror's registry labels beat anything derivable from the manifests:
@@ -755,7 +757,7 @@ private fun ModDiffRow(entry: DiffEntry<SmrtModEntry>, labels: DiffLabels, icons
         kind     = entry.kind.toRowKind(),
         title    = title,
         subtitle = subtitle,
-        trailing = sizeLabel(entry.from?.sizeBytes, entry.to?.sizeBytes),
+        trailing = sizeLabel(entry.from?.sizeBytes, entry.to?.sizeBytes, s),
         leading  = { ModDiffIcon(subject, icons) },
     )
 }
@@ -898,9 +900,9 @@ private fun DiffKind.toRowKind(): NxDiffRowKind = when (this) {
     DiffKind.Updated -> NxDiffRowKind.Updated
 }
 
-private fun sizeLabel(fromBytes: Long?, toBytes: Long?): String? = when {
-    fromBytes != null && toBytes != null && fromBytes != toBytes -> "${humanSize(fromBytes)} → ${humanSize(toBytes)}"
-    toBytes != null -> humanSize(toBytes)
-    fromBytes != null -> humanSize(fromBytes)
+private fun sizeLabel(fromBytes: Long?, toBytes: Long?, s: AppStrings): String? = when {
+    fromBytes != null && toBytes != null && fromBytes != toBytes -> "${humanSize(fromBytes, s)} → ${humanSize(toBytes, s)}"
+    toBytes != null -> humanSize(toBytes, s)
+    fromBytes != null -> humanSize(fromBytes, s)
     else -> null
 }

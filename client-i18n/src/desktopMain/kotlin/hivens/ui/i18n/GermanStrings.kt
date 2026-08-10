@@ -336,6 +336,7 @@ object GermanStrings : AppStrings {
     override val aboutTitle                = "Über den Launcher"
     override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
     override val locale = java.util.Locale.GERMAN
+    override val byteUnits = listOf("B", "KB", "MB", "GB", "TB")
     override fun aboutBuildDate(date: String) = "Erstellt: $date"
     override val aboutRenderer = "Renderer"
     override val aboutSectionCreator       = "Ersteller"

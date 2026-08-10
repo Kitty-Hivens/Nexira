@@ -29,6 +29,13 @@ interface AppStrings {
     /** App locale, for date/number formatting in widgets (not the system default). */
     val locale: java.util.Locale
 
+    /**
+     * Binary byte units as this language abbreviates them, smallest first: bytes,
+     * then kilo-, mega-, giga-, tera-. Read alongside [locale] by the size
+     * formatter, so a figure carries both the language's units and its decimal mark.
+     */
+    val byteUnits: List<String>
+
     // --- Dashboard ---
     fun dashboardWelcome(name: String): String
     val dashboardServers: String

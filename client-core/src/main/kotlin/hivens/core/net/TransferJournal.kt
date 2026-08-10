@@ -89,7 +89,7 @@ class JournalStore(private val json: Json = DEFAULT_JSON) {
             journal.size == transfer.size &&
             journal.expect == transfer.expect?.value
 
-    private fun pathFor(partial: Path): Path = partial.resolveSibling("${partial.fileName}.state")
+    private fun pathFor(partial: Path): Path = TransferStaging.journalOf(partial)
 
     private companion object {
         val log = LoggerFactory.getLogger(JournalStore::class.java)

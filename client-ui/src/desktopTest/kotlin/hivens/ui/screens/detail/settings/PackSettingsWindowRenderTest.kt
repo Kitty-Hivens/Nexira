@@ -15,10 +15,15 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.launcher.PackOperationService
+import hivens.launcher.instance.InstanceSizeService
 import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.skia.Bitmap
@@ -72,10 +77,13 @@ class PackSettingsWindowRenderTest {
     )
 
     private fun render(width: Int, height: Int, style: StyleSpec, name: String) {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         startKoin {
             modules(module {
                 single<IPackRepository> { FakeRepo() }
                 single<IMirrorPackClient> { OfflineMirror }
+                single { InstanceSizeService(dataDir = Path.of("/tmp/render"), scope = scope) }
+                single { PackOperationService(scope = scope, sizes = get()) }
             })
         }
         val out = Path.of("build/render", name)

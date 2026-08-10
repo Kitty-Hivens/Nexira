@@ -50,6 +50,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
+import hivens.launcher.PackOperationService
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
@@ -140,6 +141,18 @@ fun PackDetailScreen(
         instance = repo.observe().firstOrNull()?.firstOrNull { it.id == instanceId }
             ?: repo.get(instanceId)
         resolved = true
+    }
+
+    // An update or a repair rewrites the instance record from the app scope, and
+    // it outlives the settings window that started it. This screen holds the
+    // snapshot everything below it renders, so it is the one that has to re-read
+    // it -- including after a failure, whose rollback also writes the record.
+    val operations: PackOperationService = koinInject()
+    val instanceOperations by operations.operations.collectAsState()
+    LaunchedEffect(instanceOperations[instanceId]?.phase) {
+        if (instanceOperations[instanceId]?.isRunning == false) {
+            instance = repo.get(instanceId) ?: instance
+        }
     }
 
     if (!resolved) {
