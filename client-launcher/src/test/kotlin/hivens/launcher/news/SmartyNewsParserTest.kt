@@ -84,8 +84,48 @@ class SmartyNewsParserTest {
         assertEquals("Итоги конкурса", item.title)
         assertEquals(182, item.views)
         assertEquals("$base/images/news/competition/9.jpg", item.imageUrl)
+        assertEquals("$base/images/news/mini/competition/9.jpg", item.thumbnailUrl)
         // 2026-08-01 00:15 in Moscow, which is what the site writes its dates in.
         assertEquals(1_785_532_500L, item.dateEpochSeconds)
+    }
+
+    // The archive reaches back to 2013, and Moscow was UTC+4 until October 2014.
+    // An hour wrong is a day wrong for an entry published just after midnight.
+    @Test
+    fun `a date from before the offset changed is read in the offset of its day`() {
+        val html = page(
+            block(
+                id = 12, title = "Старая запись", image = "images/news/news1", day = "1",
+                month = "апреля", year = dateTile("Апреля", "2013"), time = "00:15", views = "9 просмотров",
+            )
+        )
+        assertEquals(1_364_760_900L, SmartyNewsParser.parse(html, base).items.single().dateEpochSeconds)
+    }
+
+    @Test
+    fun `a source outside the news image root has no thumbnail`() {
+        val html = """
+            <div id="news475" class="content-block np">
+                <img src="upload/banner.png" alt=" " class="news-block-img">
+                <h1><a href="news475#full">Чужая картинка</a></h1>
+            </div>
+        """.trimIndent()
+        val item = SmartyNewsParser.parse(page(html), base).items.single()
+        assertEquals("$base/upload/banner.png", item.imageUrl)
+        assertNull(item.thumbnailUrl, "only the news image root keeps thumbnails beside it")
+    }
+
+    @Test
+    fun `a source that already names the thumbnail is its own thumbnail`() {
+        val html = """
+            <div id="news474" class="content-block np">
+                <img src="images/news/mini/news9.jpg" alt=" " class="news-block-img">
+                <h1><a href="news474#full">Уже миниатюра</a></h1>
+            </div>
+        """.trimIndent()
+        val item = SmartyNewsParser.parse(page(html), base).items.single()
+        assertEquals("$base/images/news/mini/news9.jpg", item.imageUrl)
+        assertEquals(item.imageUrl, item.thumbnailUrl)
     }
 
     @Test
@@ -192,6 +232,7 @@ class SmartyNewsParserTest {
         """.trimIndent()
         val item = SmartyNewsParser.parse(page(html), base).items.single()
         assertNull(item.imageUrl)
+        assertNull(item.thumbnailUrl)
         assertEquals(7, item.views)
     }
 

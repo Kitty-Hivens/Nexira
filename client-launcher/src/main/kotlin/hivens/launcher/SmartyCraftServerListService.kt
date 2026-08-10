@@ -64,13 +64,15 @@ class SmartyCraftServerListService(
                 .map { getProfile(it) }
             val news = response.news.map { newsDto ->
                 val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
-                val imageUrl = "${protocolConfig.baseUrl}/images/news/mini/$imageName"
                 NewsItem(
                     id = newsDto.id,
                     title = newsDto.name,
                     views = newsDto.views,
                     dateEpochSeconds = newsDto.date,
-                    imageUrl = imageUrl,
+                    // Both sizes, so a surface picks the one it draws at. The
+                    // thumbnail is what this path always used.
+                    imageUrl = "${protocolConfig.baseUrl}/images/news/$imageName",
+                    thumbnailUrl = "${protocolConfig.baseUrl}/images/news/mini/$imageName",
                 )
             }
             // Persist only on success so a transient outage cannot overwrite the

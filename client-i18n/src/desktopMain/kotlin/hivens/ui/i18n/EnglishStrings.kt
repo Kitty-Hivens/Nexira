@@ -1128,6 +1128,7 @@ object EnglishStrings : AppStrings {
         "widget.appshell.rightrail.compactnews" to "News feed",
         "widget.appshell.rightrail.compactnews.maxItems" to "Max items (0 = all)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Show title",
+        "widget.appshell.rightrail.compactnews.imageSource" to "Image source",
         "widget.bg.enable.toggle" to "Background on/off",
         "widget.bg.fx.animspeed" to "Animation speed",
         "widget.bg.fx.blur" to "Blur",

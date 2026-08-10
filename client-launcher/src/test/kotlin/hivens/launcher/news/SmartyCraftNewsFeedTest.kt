@@ -65,6 +65,7 @@ class SmartyCraftNewsFeedTest {
         assertEquals(1, page.page)
         assertEquals(45, page.totalPages)
         assertTrue(page.hasMore, "the archive goes on past the first page")
+        assertTrue(!page.fallback, "this is the archive itself")
     }
 
     @Test
@@ -92,6 +93,7 @@ class SmartyCraftNewsFeedTest {
         assertEquals(listOf(1), page.items.map { it.id })
         assertEquals(1, page.totalPages, "the fallback is one page and there is nothing after it")
         assertTrue(!page.hasMore)
+        assertTrue(page.fallback, "and it says it is a floor, not the archive")
         assertEquals(1, dashboard.reads)
     }
 
