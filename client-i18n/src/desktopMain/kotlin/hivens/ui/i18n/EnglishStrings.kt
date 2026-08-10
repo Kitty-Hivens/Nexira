@@ -728,6 +728,8 @@ object EnglishStrings : AppStrings {
     override val browseDetailInstallReady  = "Ready to install"
     override val browseDetailInstallHint   = "Creates a new instance under your data directory."
     override val browseDetailInstallButton = "Install"
+    override val contentInstallRetry       = "Retry"
+    override val contentInstallFailed      = "The download did not finish"
     override val browseDetailTagsTitle     = "Tags"
     override val browseDetailAboutTitle       = "About this pack"
     override fun browseDetailAbout(mods: Int, assets: Int) =

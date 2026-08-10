@@ -54,12 +54,14 @@ class PackDetailStateTest {
         repo: IPackRepository,
         onLaunch: (SessionData, PackInstance) -> Unit = { _, _ -> },
         onAbort: () -> Unit = {},
+        onOpenFolder: (Path) -> Unit = {},
     ) = PackDetailState(
         instanceId = "inst-1",
         repo = repo,
         dataDir = Path.of("/data"),
         launch = onLaunch,
         abort = onAbort,
+        openInFileManager = onOpenFolder,
     )
 
     @Test
@@ -155,6 +157,19 @@ class PackDetailStateTest {
 
         assertEquals("Edited", state.pack?.displayName)
         assertEquals(0, repo.getCalls, "the caller handed us the new record; re-reading it is round-tripping our own write")
+    }
+
+    @Test
+    fun `opening the folder waits for a resolved pack`() = runTest {
+        var opened: Path? = null
+        val state = state(FakeRepo(observed = listOf(pack())), onOpenFolder = { opened = it })
+
+        state.openFolder()
+        assertNull(opened, "there is no directory to open before the pack resolves")
+
+        state.resolve()
+        state.openFolder()
+        assertEquals(Path.of("/data", "instances", "industrial"), opened)
     }
 
     @Test

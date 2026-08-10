@@ -70,8 +70,11 @@ fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
     if (s.themeMode == ThemeMode.System && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
 
 /**
- * Wallpapers darker than this drive the dark theme. Mid-grey has to fall on one
- * side, and dark is the launcher's default, so it takes the tie.
+ * Wallpapers below this luminance drive the dark theme.
+ *
+ * The comparison is strict, so exactly mid-grey resolves to the light theme.
+ * Nothing rides on which side takes the tie -- it is stated only because a
+ * threshold nobody wrote down is a threshold somebody later flips by accident.
  */
 const val WALLPAPER_DARK_THRESHOLD = 0.5f
 

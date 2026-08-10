@@ -85,7 +85,8 @@ internal fun copyAllText(entries: List<LogEntry>): String =
  * first line, so the menu action always does something rather than appearing
  * broken.
  */
-internal fun copyLineText(lines: List<String>, caretLine: Int?): String? {
-    val text = lines.getOrNull(caretLine ?: 0) ?: return null
-    return text.takeIf { it.isNotBlank() }
+internal fun copyLineText(lineCount: Int, caretLine: Int?, textAt: (Int) -> String): String? {
+    val index = caretLine ?: 0
+    if (index !in 0 until lineCount) return null
+    return textAt(index).takeIf { it.isNotBlank() }
 }

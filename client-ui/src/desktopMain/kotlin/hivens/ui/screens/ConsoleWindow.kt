@@ -518,7 +518,7 @@ internal fun ConsoleContent(
         // No caret yet (e.g. right-click before any left-click) -> first line, matching
         // the old field-copy behaviour so the menu action always does something.
         val caret = selection.focus?.line ?: selection.anchor?.line
-        val lineText = copyLineText(models.lines.map { it.text }, caret) ?: return
+        val lineText = copyLineText(models.lines.size, caret) { models.lines[it].text } ?: return
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(lineText))) }
         copiedFlash = true
         scope.launch {

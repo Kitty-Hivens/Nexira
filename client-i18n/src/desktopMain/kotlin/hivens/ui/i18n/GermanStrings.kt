@@ -726,6 +726,8 @@ object GermanStrings : AppStrings {
     override val browseDetailInstallReady  = "Bereit zur Installation"
     override val browseDetailInstallHint   = "Erstellt eine neue Instanz in deinem Datenverzeichnis."
     override val browseDetailInstallButton = "Installieren"
+    override val contentInstallRetry       = "Erneut versuchen"
+    override val contentInstallFailed      = "Der Download wurde nicht abgeschlossen"
     override val browseDetailTagsTitle     = "Tags"
     override val browseDetailAboutTitle       = "Über dieses Pack"
     override fun browseDetailAbout(mods: Int, assets: Int) =

@@ -5,7 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
@@ -47,6 +46,7 @@ internal class PackDetailState(
     private val dataDir: Path,
     private val launch: (SessionData, PackInstance) -> Unit,
     private val abort: () -> Unit,
+    private val openInFileManager: (Path) -> Unit,
 ) {
     var resolution by mutableStateOf<PackResolution>(PackResolution.Loading)
         private set
@@ -94,7 +94,7 @@ internal class PackDetailState(
     fun abortLaunch() = abort()
 
     fun openFolder() {
-        instanceDir?.let { SystemActions.openFolder(it.toString()) }
+        instanceDir?.let(openInFileManager)
     }
 }
 
@@ -116,6 +116,7 @@ internal fun rememberPackDetailState(instanceId: String): PackDetailState {
                 controller.launchPackInstance(session, pack)
             },
             abort      = controller::abort,
+            openInFileManager = { dir -> SystemActions.openFolder(dir.toString()) },
         )
     }
 }
