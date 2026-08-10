@@ -74,7 +74,10 @@ import hivens.ui.background.LocalBackdrop
 import hivens.ui.background.FrostBackdrop
 import hivens.ui.surface.LocalBackdropPainter
 import hivens.ui.chrome.LocalChromeClose
+import hivens.core.api.rosterAfterFetch
 import hivens.ui.chrome.LocalComposeWindow
+import hivens.ui.chrome.ShellChord
+import hivens.ui.chrome.resolveShellChord
 import hivens.ui.chrome.LocalUseCustomChrome
 import hivens.ui.chrome.LocalWindowMaximizer
 import hivens.ui.chrome.LocalWindowState
@@ -633,12 +636,7 @@ fun FrameWindowScope.AppShellContent(
                 val data = runInterruptible(Dispatchers.IO) {
                     serverListService.fetchDashboardData().get()
                 }
-                when {
-                    data.servers.isNotEmpty() -> data.servers
-                    seedFromCache.isEmpty()   -> emptyList()
-                    // Probable outage: keep the cached roster.
-                    else                      -> seedFromCache
-                }
+                rosterAfterFetch(fetched = data.servers, cached = seedFromCache)
             } catch (e: CancellationException) {
                 // Composition leave / locale switch / exit mid-fetch
                 // must propagate cooperatively; converting to "outage"
@@ -776,32 +774,20 @@ fun FrameWindowScope.AppShellContent(
         // event time, and recomposition keeps them pointing at fresh captures.
         chrome.onCloseRequest = onCloseChrome
         chrome.onPreviewKey = { ev ->
-            // Window-scoped chords (preview = before focus dispatch) so they
-            // fire no matter which composable holds focus -- the side rails
-            // own focus, so a host Box-level handler misses them. Consume
-            // both edges so they never reach a focused control, and act on
-            // release only so holding does not repeat on auto-repeat KeyDowns.
-            when {
-                // Ctrl+E toggles widget edit mode. EditorSurfaceHost observes
-                // the controller signal and gates on its surface being editable.
-                ev.isCtrlPressed && ev.key == Key.E -> {
-                    if (ev.type == KeyEventType.KeyUp) editModeController.requestEditToggle()
-                    true
-                }
-                // Ctrl+N collapses / expands the right rail. ShellRightRegion
-                // observes the signal and flips its collapsed prop.
-                ev.isCtrlPressed && ev.key == Key.N -> {
-                    if (ev.type == KeyEventType.KeyUp) editModeController.requestRightRailToggle()
-                    true
-                }
-                // F9 toggles the dev UI-debug overlay. Only claimed on a non-release
-                // build (debugOverlay.available); otherwise the key falls through.
-                debugOverlay.available && ev.key == Key.F9 -> {
-                    if (ev.type == KeyEventType.KeyUp) debugOverlay.toggle()
-                    true
-                }
-                else -> false
+            // Window-scoped chords (preview = before focus dispatch) so they fire
+            // no matter which composable holds focus -- the side rails own focus,
+            // so a host Box-level handler misses them. resolveShellChord decides
+            // what was pressed and whether to swallow it; the observers of these
+            // signals gate on their own state (EditorSurfaceHost on the surface
+            // being editable, ShellRightRegion on the rail).
+            val resolved = resolveShellChord(ev, debugOverlay.available)
+            when (resolved.chord) {
+                ShellChord.ToggleEditMode     -> editModeController.requestEditToggle()
+                ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()
+                ShellChord.ToggleDebugOverlay -> debugOverlay.toggle()
+                null                          -> Unit
             }
+            resolved.consume
         }
         run {
             // Pulled-forward: triggered by the .show watcher above when a
