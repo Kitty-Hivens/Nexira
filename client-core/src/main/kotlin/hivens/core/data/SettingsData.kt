@@ -69,6 +69,43 @@ enum class AmberUpdatePolicy { Ask, SnapshotThenApply, Hold }
 fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
     if (s.themeMode == ThemeMode.System && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
 
+/**
+ * Wallpapers darker than this drive the dark theme. Mid-grey has to fall on one
+ * side, and dark is the launcher's default, so it takes the tie.
+ */
+const val WALLPAPER_DARK_THRESHOLD = 0.5f
+
+/**
+ * The dark flag an automatic theme source wants, or null when nothing should
+ * change.
+ *
+ * Three sources write one boolean -- the manual toggle, the OS scheme, and the
+ * wallpaper's brightness -- and each had its own effect deciding when to fire,
+ * with the persist repeated alongside. Stated once here: the mode picks which
+ * source is listened to at all, a source with nothing to say (no wallpaper
+ * decoded yet, no readable OS scheme) says nothing, and a source that agrees
+ * with the current value asks for no write.
+ *
+ * Returning null rather than the unchanged value is the point: every caller
+ * both sets state and persists, and a settings file rewritten on every
+ * wallpaper tick is a write per frame during a crossfade.
+ */
+fun darkThemeFor(
+    mode: ThemeMode,
+    current: Boolean,
+    wallpaperLuminance: Float? = null,
+    systemDark: Boolean? = null,
+): Boolean? {
+    val wanted = when (mode) {
+        // The user said so; nothing automatic overrides that until they
+        // choose another mode.
+        ThemeMode.Manual -> null
+        ThemeMode.System -> systemDark
+        ThemeMode.Wallpaper -> wallpaperLuminance?.let { it < WALLPAPER_DARK_THRESHOLD }
+    }
+    return wanted?.takeIf { it != current }
+}
+
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,

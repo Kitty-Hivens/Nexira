@@ -41,6 +41,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
+import hivens.core.data.darkThemeFor
 import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.AutoSyncService
 import hivens.launcher.update.ApplyRecovery
@@ -339,27 +340,28 @@ fun FrameWindowScope.AppShellContent(
     var systemThemeAvailable by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { systemThemeAvailable = withContext(Dispatchers.IO) { SystemTheme.probe() } != null }
     var wallpaperLuminance by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(themeMode, wallpaperLuminance) {
-        val luma = wallpaperLuminance
-        if (themeMode == ThemeMode.Wallpaper && luma != null) {
-            val wantDark = luma < 0.5f
-            if (wantDark != isDarkTheme) {
-                isDarkTheme = wantDark
-                settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = isDarkTheme))
-            }
+
+    // Applying an automatic source: set the flag and persist it, so the next cold
+    // start opens on what was last observed instead of flashing the old scheme.
+    // darkThemeFor returns null when nothing should change, which keeps a
+    // wallpaper crossfade from writing the settings file on every tick.
+    val applyAutomaticDark: suspend (Boolean?) -> Unit = { wanted ->
+        if (wanted != null) {
+            isDarkTheme = wanted
+            settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = wanted))
         }
+    }
+
+    LaunchedEffect(themeMode, wallpaperLuminance) {
+        applyAutomaticDark(darkThemeFor(themeMode, isDarkTheme, wallpaperLuminance = wallpaperLuminance))
     }
     // System mode: follow the OS scheme while the mode is active -- the cold flow
     // (portal signal on Linux, polling fallback) runs only while collected, so the
-    // other modes cost nothing. Persisting each flip keeps the next cold start on
-    // the last observed scheme (no startup flash).
+    // other modes cost nothing.
     LaunchedEffect(themeMode) {
         if (themeMode != ThemeMode.System) return@LaunchedEffect
         SystemTheme.observe().collect { dark ->
-            if (dark != null && dark != isDarkTheme) {
-                isDarkTheme = dark
-                settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = dark))
-            }
+            applyAutomaticDark(darkThemeFor(themeMode, isDarkTheme, systemDark = dark))
         }
     }
     var currentLocale by remember {
