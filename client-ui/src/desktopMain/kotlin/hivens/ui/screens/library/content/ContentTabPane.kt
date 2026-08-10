@@ -454,20 +454,14 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
 @Composable
 private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifier: Modifier, onBack: () -> Unit) {
     val s = LocalStrings.current
-    val modrinth: ModrinthClient = koinInject()
+    val state = rememberModBrowserState(mcVersion, loader, modsDir)
     val scope = rememberCoroutineScope()
-    var query by remember { mutableStateOf("") }
     var submitted by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<ModrinthSearchHit>?>(null) }
-    var installed by remember { mutableStateOf(emptySet<String>()) }
-    var working by remember { mutableStateOf(emptySet<String>()) }
 
-    // Debounce typing, then search on the settled query.
-    LaunchedEffect(query) { delay(350); submitted = query }
-    LaunchedEffect(submitted, mcVersion, loader) {
-        results = null
-        results = runCatching { withContext(Dispatchers.IO) { modrinth.searchMods(submitted, mcVersion, loader).hits } }.getOrDefault(emptyList())
-    }
+    // Debounce typing, then search on the settled query. The debounce is a
+    // composition concern; what the settled query does is the holder's.
+    LaunchedEffect(state.query) { delay(350); submitted = state.query }
+    LaunchedEffect(state, submitted) { state.runSearch(submitted) }
 
     Column(
         modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -479,9 +473,9 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
             }
             Text(s.contentFindProjects, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
         }
-        ContentSearch(query, { query = it }, s.contentSearchPlaceholder)
+        ContentSearch(state.query, { state.query = it }, s.contentSearchPlaceholder)
 
-        val r = results
+        val r = state.results
         when {
             r == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
@@ -498,21 +492,9 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
                         items(items = r, key = { it.projectId }) { hit ->
                             ModResultRow(
                                 hit       = hit,
-                                installed = hit.projectId in installed,
-                                working   = hit.projectId in working,
-                                onInstall = {
-                                    working = working + hit.projectId
-                                    scope.launch {
-                                        runCatching {
-                                            modrinth.bestModVersion(hit.projectId, mcVersion, loader)?.let { v ->
-                                                val f = v.primaryFile()
-                                                modrinth.downloadTo(f.url, modsDir.resolve(f.filename))
-                                            }
-                                        }
-                                        working = working - hit.projectId
-                                        installed = installed + hit.projectId
-                                    }
-                                },
+                                installed = hit.projectId in state.installed,
+                                working   = hit.projectId in state.working,
+                                onInstall = { scope.launch { state.installMod(hit) } },
                             )
                         }
                     }
