@@ -97,21 +97,6 @@ import hivens.ui.nx.WidthClass
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
-import hivens.ui.widgets.about.LocalAboutContext
-import hivens.ui.widgets.about.STUB_ABOUT
-import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
-import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
-import hivens.ui.widgets.home.classic.LocalHomeClassicContext
-import hivens.ui.widgets.home.new.LocalHomeNewContext
-import hivens.ui.widgets.library.LocalLibraryContext
-import hivens.ui.widgets.profile.LocalProfileContext
-import hivens.ui.widgets.profile.STUB_PROFILE
-import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
-import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
-import hivens.ui.widgets.shell.LocalLeftRailContext
-import hivens.ui.widgets.shell.LocalRightRailContext
-import hivens.ui.widgets.themepicker.LocalThemePickerContext
-import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalLayoutGraph
@@ -168,8 +153,9 @@ fun EditorSurfaceHost(
     centerEndInset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
-    val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView) {
-        availableSurfacesFor(currentScreen, homeView)
+    val graphForSurfaces = LocalLayoutGraph.current
+    val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView, graphForSurfaces) {
+        EditorSurfaces.availableFor(currentScreen, homeView, graphForSurfaces)
     }
     val controller: EditModeController = koinInject()
     val layoutRepo: LayoutGraphRepository = koinInject()
@@ -431,20 +417,14 @@ fun EditorSurfaceHost(
         } else {
             { _, _ -> }
         },
-        // Stub surface contexts. Surface composables that mount under
-        // content() override with the real values; widgets dropped on
-        // a foreign surface fall through to the stubs and render
-        // with no-op callbacks instead of crashing the launcher.
-        LocalHomeClassicContext provides STUB_HOME_CLASSIC,
-        LocalHomeNewContext     provides STUB_HOME_NEW,
-        LocalLibraryContext     provides STUB_LIBRARY,
-        LocalLeftRailContext    provides STUB_LEFTRAIL,
-        LocalRightRailContext     provides STUB_RIGHTRAIL,
-        LocalAboutContext         provides STUB_ABOUT,
-        LocalBgSettingsContext    provides STUB_BG_SETTINGS,
-        LocalProfileContext       provides STUB_PROFILE,
-        LocalServerDetailsContext provides STUB_SERVER_DETAILS,
-        LocalThemePickerContext   provides STUB_THEME_PICKER,
+        // Stub surface contexts, spread from the registry. Surface composables
+        // that mount under content() override with the real values; widgets
+        // dropped on a foreign surface fall through to the stubs and render
+        // with no-op callbacks instead of crashing the launcher. Derived rather
+        // than listed, so a surface that declares a stub is provided one by
+        // existing -- the closed wall this replaced let a new surface fall
+        // through it without a word.
+        *EditorSurfaces.stubs,
     ) {
         Box(
             modifier = Modifier
@@ -927,56 +907,21 @@ private fun ToolChip(
 }
 
 private fun surfaceIcon(surface: SurfaceId): IconKey =
-    when (surface.value) {
-        "appshell.root"      -> NxIcon.Dashboard
-        "appshell.leftrail"  -> NxIcon.ViewSidebar
-        "appshell.rightrail" -> NxIcon.ViewQuilt
-        "appshell.topbar"    -> NxIcon.Layers
-        "appshell.body"      -> NxIcon.ViewQuilt
-        "appshell.overlay"   -> NxIcon.Layers
-        else                 -> NxIcon.Home
-    }
+    EditorSurfaces.spec(surface)?.icon ?: NxIcon.Home
 
-private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
-    "appshell.root"       -> s.editorSurfShortShell
-    "home.classic"        -> s.editorSurfShortHome
-    "home.new"            -> s.editorSurfShortHome
-    "library"             -> s.editorSurfShortLibrary
-    "appshell.leftrail"   -> s.editorSurfShortLeftRail
-    "appshell.rightrail"  -> s.editorSurfShortRightRail
-    "appshell.topbar"     -> s.editorSurfShortTopBar
-    "appshell.body"       -> s.editorSurfShortBody
-    "appshell.overlay"    -> s.editorSurfShortOverlay
-    "about"               -> s.editorSurfShortAbout
-    "bg.settings"         -> s.editorSurfShortBg
-    "profile"             -> s.editorSurfShortProfile
-    "server.details"      -> s.editorSurfShortServer
-    "theme.picker"        -> s.editorSurfShortTheme
-    else                  -> surface.value
-}
+// Falls back to the raw id for a surface with no spec: better a visible
+// `home.experiment` in the picker than a blank chip, and the registry test
+// catches the omission before a build ships it.
+private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String =
+    EditorSurfaces.spec(surface)?.shortName?.invoke(s) ?: surface.value
 
-private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
-    "appshell.root"       -> s.editorSurfShell
-    "home.classic"        -> s.editorSurfHomeClassic
-    "home.new"            -> s.editorSurfHomeNew
-    "library"             -> s.editorSurfLibrary
-    "appshell.leftrail"   -> s.editorSurfLeftRail
-    "appshell.rightrail"  -> s.editorSurfRightRail
-    "appshell.topbar"     -> s.editorSurfTopBar
-    "appshell.body"       -> s.editorSurfBody
-    "appshell.overlay"    -> s.editorSurfOverlay
-    "about"               -> s.editorSurfAbout
-    "bg.settings"         -> s.editorSurfBg
-    "profile"             -> s.editorSurfProfile
-    "server.details"      -> s.editorSurfServer
-    "theme.picker"        -> s.editorSurfTheme
-    else                  -> surface.value
-}
+private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String =
+    EditorSurfaces.spec(surface)?.name?.invoke(s) ?: surface.value
 
 // Surfaces that expose surface-level settings (a SurfacePropertiesPanel),
-// distinct from per-widget props. Currently only the left nav rail.
+// distinct from per-widget props.
 private fun surfaceHasSettings(surface: SurfaceId?): Boolean =
-    surface?.value == "appshell.leftrail"
+    surface != null && EditorSurfaces.spec(surface)?.hasSettings == true
 
 // ── Vignette ────────────────────────────────────────────────────────────────
 
@@ -1051,41 +996,4 @@ private fun transparentPointerIcon(): PointerIcon {
     val cursor = java.awt.Toolkit.getDefaultToolkit()
         .createCustomCursor(image, java.awt.Point(0, 0), "drag-ghost")
     return PointerIcon(cursor)
-}
-
-// ── Surface routing ─────────────────────────────────────────────────────────
-
-// All surfaces editable on the given screen. The first entry is the
-// "main" content surface and is selected by default; the two rails
-// follow. Other screens (Settings, Profile, etc.) are not widget-
-// composed yet and return an empty list (FAB stays hidden).
-private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<SurfaceId> {
-    // The center surface for this screen, or null for screens not yet widgetized.
-    val main: SurfaceId? = when (screen) {
-        Screen.Home -> when (homeView) {
-            HomeView.Classic      -> SurfaceId("home.classic")
-            HomeView.LibraryFirst -> SurfaceId("library")
-            HomeView.New          -> SurfaceId("home.new")
-        }
-        Screen.About                  -> SurfaceId("about")
-        Screen.BackgroundSettings     -> SurfaceId("bg.settings")
-        Screen.Library                -> SurfaceId("library")
-        Screen.Profile                -> SurfaceId("profile")
-        is Screen.ServerDetails       -> SurfaceId("server.details")
-        Screen.ThemePicker            -> SurfaceId("theme.picker")
-        // Other widget-composed surfaces from B.1 land here as the
-        // rest of the screens migrate over.
-        else                          -> null
-    }
-    // The shell + rails are always present, so they are editable from every
-    // screen even when the center is not yet a widget surface. The center
-    // surface (when there is one) is first, so it stays the default selection.
-    return listOfNotNull(main) + listOf(
-        SurfaceId("appshell.topbar"),
-        SurfaceId("appshell.overlay"),
-        SurfaceId("appshell.leftrail"),
-        SurfaceId("appshell.rightrail"),
-        SurfaceId("appshell.body"),
-        SurfaceId("appshell.root"),
-    )
 }
