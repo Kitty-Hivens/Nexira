@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import dev.hivens.skinema.compose.VideoScale
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -51,7 +50,6 @@ import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
 import hivens.launcher.PackOperationService
-import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
@@ -68,8 +66,6 @@ import hivens.core.launch.LaunchControlMode
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -101,16 +97,15 @@ import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
- * Worlds). Resolves the instance lazily via [IPackRepository] from
- * the [Screen.PackDetail.instanceId] in the navigation entry so the
- * sealed Screen class stays small.
+ * Worlds). [PackDetailState] resolves the instance from the
+ * [Screen.PackDetail.instanceId] in the navigation entry, so the sealed Screen
+ * class stays small and the screen itself renders rather than fetches.
  *
  * Tabs are scoped to a single per-instance dir (`<dataDir>/instances/
  * <instance.instanceDirName>`) for Files / Worlds; the Content tab
@@ -128,46 +123,33 @@ fun PackDetailScreen(
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
 
-    val repo: IPackRepository = koinInject()
+    val state = rememberPackDetailState(instanceId)
     val paths: PlatformPaths = koinInject()
-    val controller: LauncherController = koinInject()
-    val launchDriver: LaunchDriver = koinInject()
     val indications: IndicationCenter = koinInject()
     val updateHub: PackUpdateStatusHub = koinInject()
     val autoUpdateStatuses by updateHub.statuses.collectAsState()
-    var instance by remember { mutableStateOf<PackInstance?>(null) }
-    var resolved by remember { mutableStateOf(false) }
-    LaunchedEffect(instanceId) {
-        instance = repo.observe().firstOrNull()?.firstOrNull { it.id == instanceId }
-            ?: repo.get(instanceId)
-        resolved = true
-    }
 
-    // An update or a repair rewrites the instance record from the app scope, and
-    // it outlives the settings window that started it. This screen holds the
-    // snapshot everything below it renders, so it is the one that has to re-read
-    // it -- including after a failure, whose rollback also writes the record.
+    LaunchedEffect(state) { state.resolve() }
+
     val operations: PackOperationService = koinInject()
     val instanceOperations by operations.operations.collectAsState()
     LaunchedEffect(instanceOperations[instanceId]?.phase) {
-        if (instanceOperations[instanceId]?.isRunning == false) {
-            instance = repo.get(instanceId) ?: instance
+        if (instanceOperations[instanceId]?.isRunning == false) state.refresh()
+    }
+
+    when (val resolution = state.resolution) {
+        PackResolution.Loading -> {
+            CenteredProgress(Modifier.fillMaxSize())
+            return
         }
+        PackResolution.NotFound -> {
+            NotFound(onBack = onBack)
+            return
+        }
+        is PackResolution.Ready -> Unit
     }
-
-    if (!resolved) {
-        CenteredProgress(Modifier.fillMaxSize())
-        return
-    }
-    val pack = instance
-    if (pack == null) {
-        NotFound(onBack = onBack)
-        return
-    }
-
-    val instanceDir = remember(pack.instanceDirName) {
-        paths.dataDir.resolve("instances").resolve(pack.instanceDirName)
-    }
+    val pack = state.pack ?: return
+    val instanceDir = state.instanceDir ?: return
 
     var tabIndex by remember(pack.id) { mutableIntStateOf(0) }
     val s = LocalStrings.current
@@ -180,12 +162,9 @@ fun PackDetailScreen(
     // surface has to reach them -- a scenario that cannot start a launch cannot check
     // what a launch does to the instance.
     PuppetClick("packDetail.play", enabled = authedSession != null) {
-        authedSession?.let { session ->
-            launchDriver.observe(LaunchTarget.Pack(pack))
-            controller.launchPackInstance(session, pack)
-        }
+        authedSession?.let { state.play(it) }
     }
-    PuppetClick("packDetail.abort") { controller.abort() }
+    PuppetClick("packDetail.abort") { state.abortLaunch() }
 
     Column(Modifier.fillMaxSize()) {
         Hero(
@@ -193,17 +172,10 @@ fun PackDetailScreen(
             playEnabled    = authedSession != null,
             indication     = launchIndication,
             onBack         = onBack,
-            onPlay         = {
-                authedSession?.let { session ->
-                    // Observer first, then launch: the first-non-Idle await must
-                    // subscribe before Prepare fires.
-                    launchDriver.observe(LaunchTarget.Pack(pack))
-                    controller.launchPackInstance(session, pack)
-                }
-            },
-            onAbort        = { controller.abort() },
+            onPlay         = { authedSession?.let { state.play(it) } },
+            onAbort        = { state.abortLaunch() },
             onOpenSettings = { showSettings = true },
-            onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
+            onOpenFolder   = { state.openFolder() },
             versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
             pending        = autoUpdateStatuses[pack.id] as? PackUpdateStatus.Pending,
             onOpenVersions = { onOpenVersions(false) },
@@ -236,7 +208,7 @@ fun PackDetailScreen(
         PackSettingsWindow(
             pack             = pack,
             instanceDir      = instanceDir,
-            onInstanceChange = { instance = it },
+            onInstanceChange = { state.adopt(it) },
             onDismiss        = { showSettings = false },
             onOpenVersions   = { onOpenVersions(true) },
         )
