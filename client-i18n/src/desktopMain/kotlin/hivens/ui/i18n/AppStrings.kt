@@ -43,6 +43,8 @@ interface AppStrings {
     val launchButton: String
     val launchAbort: String
     val launchRunning: String
+    /** Stops the running game from the dashboard control. */
+    val launchStop: String
     val launchDownloading: String
     val launchPreparing: String
     val launchFailed: String

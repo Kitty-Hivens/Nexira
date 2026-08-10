@@ -63,7 +63,9 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.core.launch.LaunchControlMode
 import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
@@ -508,14 +510,17 @@ private fun Hero(
                 // The pill walks the launch: Play -> wait (prepare/sync, inert)
                 // -> Exit (stop the running game) -> Play again. Failed falls
                 // back to Play -- the error toast carries the diagnosis.
-                val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
-                val running = indication is LaunchIndication.Running
+                val mode = indication.controlMode()
                 PlayButton(
-                    label    = when { running -> s.packPlayExit; busy -> s.packPlayWait; else -> s.packDetailPlay },
-                    icon     = if (running) NxIcon.Stop else NxIcon.PlayArrow,
-                    busy     = busy,
-                    onClick  = if (running) onAbort else onPlay,
-                    enabled  = if (running) true else playEnabled,
+                    label    = when (mode) {
+                        LaunchControlMode.Stop -> s.packPlayExit
+                        LaunchControlMode.Wait -> s.packPlayWait
+                        LaunchControlMode.Play -> s.packDetailPlay
+                    },
+                    icon     = if (mode == LaunchControlMode.Stop) NxIcon.Stop else NxIcon.PlayArrow,
+                    busy     = mode == LaunchControlMode.Wait,
+                    onClick  = if (mode == LaunchControlMode.Stop) onAbort else onPlay,
+                    enabled  = if (mode == LaunchControlMode.Stop) true else playEnabled,
                     iconOnly = playIconOnly,
                 )
             }

@@ -11,6 +11,7 @@ import hivens.auth.OfflineAuthProvider
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
+import hivens.core.launch.LaunchControlMode
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
@@ -19,6 +20,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
@@ -155,19 +157,18 @@ internal fun QuickLaunchButton(
     val controller: LauncherController = koinInject()
     val indication by indications.launchIndication(quickLaunch.target.id).collectAsState()
 
-    val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
-    val running = indication is LaunchIndication.Running
+    val mode = indication.controlMode()
 
     PlayButton(
-        label    = when {
-            running -> s.packPlayExit
-            busy    -> s.packPlayWait
-            else    -> quickLaunch.buttonLabel ?: defaultLabel
+        label    = when (mode) {
+            LaunchControlMode.Stop -> s.packPlayExit
+            LaunchControlMode.Wait -> s.packPlayWait
+            LaunchControlMode.Play -> quickLaunch.buttonLabel ?: defaultLabel
         },
-        icon     = if (running) NxIcon.Stop else quickLaunch.icon,
-        busy     = busy,
-        onClick  = if (running) { { controller.abort() } } else quickLaunch.launch,
-        enabled  = if (running) true else quickLaunch.canLaunch,
+        icon     = if (mode == LaunchControlMode.Stop) NxIcon.Stop else quickLaunch.icon,
+        busy     = mode == LaunchControlMode.Wait,
+        onClick  = if (mode == LaunchControlMode.Stop) { { controller.abort() } } else quickLaunch.launch,
+        enabled  = if (mode == LaunchControlMode.Stop) true else quickLaunch.canLaunch,
         iconOnly = iconOnly,
         modifier = modifier,
     )
