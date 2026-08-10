@@ -44,6 +44,8 @@ class WidgetRegistryProcessor(
                     slots = extracted.slots,
                     propsClassFqn = extracted.propsClassFqn,
                     functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",
+                    provides = extracted.provides,
+                    injects = extracted.injects,
                 ),
                 containingFile = symbol.containingFile,
                 symbol = symbol,
@@ -76,6 +78,19 @@ class WidgetRegistryProcessor(
             }
             // Emit nothing so the build fails on the diagnostics above.
             return emptyList()
+        }
+
+        // A contract read by someone and offered by no one. Reported as a
+        // warning rather than an error: a plugin-supplied provider is the point
+        // of the SPI, so a build with only the consumer in it is a legitimate
+        // state -- what is not legitimate is nobody noticing.
+        val byWidget = widgets.associateBy { it.model }
+        injectorsWithoutProvider(widgets.map { it.model }).forEach { (model, unmet) ->
+            env.logger.warn(
+                "@Widget '${model.id}' injects ${unmet.joinToString()} but no widget in this build " +
+                    "provides it -- the registry will hand it null on every frame.",
+                byWidget[model]?.symbol,
+            )
         }
 
         emitGeneratedFile(widgets)

@@ -4,6 +4,7 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 // Pins the kernel-3 contract: every widget kind referenced from the
 // bundled default layout must exist in the KSP-generated registry.
@@ -108,6 +109,33 @@ class WidgetRegistryConsistencyTest {
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")
+    }
+
+    @Test
+    fun `every injected service contract has a provider in the build`() {
+        val descriptors = GeneratedWidgetRegistry.all().values
+        val provided = descriptors.flatMapTo(HashSet()) { it.provides }
+        val unmet = descriptors
+            .associate { it.kind.value to it.injects.filterNot { contract -> contract in provided } }
+            .filterValues { it.isNotEmpty() }
+
+        assertEquals(
+            emptyMap(),
+            unmet,
+            "these widgets read a service contract no widget provides, so the registry hands them " +
+                "null on every frame -- indistinguishable from a widget that does nothing",
+        )
+    }
+
+    @Test
+    fun `the service annotations reach the registry at all`() {
+        // The pair that exists today. If this ever goes empty the processor has
+        // stopped reading the annotations, and the check above passes vacuously.
+        val descriptors = GeneratedWidgetRegistry.all().values
+        assertTrue(
+            descriptors.any { it.provides.isNotEmpty() } && descriptors.any { it.injects.isNotEmpty() },
+            "no widget declares a service contract -- either the annotations are gone or KSP is not reading them",
+        )
     }
 
     @Test
