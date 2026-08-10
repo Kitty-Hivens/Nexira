@@ -57,6 +57,8 @@ import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalWidgetDecorator
+import hivens.ui.bootstrap.ShellStartup
+import hivens.ui.bootstrap.StartupPolicy
 import hivens.ui.diag.RenderBackend
 import hivens.ui.diag.SkinemaGate
 import hivens.ui.diag.UiRecoverySignal
@@ -75,7 +77,6 @@ import hivens.ui.background.LocalBackdrop
 import hivens.ui.background.FrostBackdrop
 import hivens.ui.surface.LocalBackdropPainter
 import hivens.ui.chrome.LocalChromeClose
-import hivens.core.api.rosterAfterFetch
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.resolveShellChord
@@ -578,109 +579,41 @@ fun FrameWindowScope.AppShellContent(
             exit          = s.trayExit,
         )
 
-        // ── Tray + notifier bring-up, then server-list fetch (run once) ──
-        // The tray no longer carries servers, so init() needs no seed; the
-        // dashboard-server fetch further down now feeds only the auto-sync
-        // opt-in. Callback wiring and locale-reactive labels are split into
-        // their own focused effects below.
+        // ── Bring-up: tray, notifier, roster, background services (run once) ──
+        // The sequence itself lives in ShellStartup, outside composition and
+        // over functions rather than the singletons, so its order -- which is
+        // load-bearing -- can be verified. This site only wires the real ones in.
         LaunchedEffect(Unit) {
-            withContext(Dispatchers.IO) {
-                // Recovery gates: a disabled tray leaves it NOT_STARTED
-                // (isSupported/canBeReady false) so a close quits instead of
-                // hiding; a disabled notifier stays unsupported.
-                val trayEnabled   = ModuleId.Tray.id   !in settings.disabledModules
-                val notifyEnabled = ModuleId.Notify.id !in settings.disabledModules
-
-                try {
-                    val iconBytes = Res.readBytes("drawable/favicon.png")
-                    if (trayEnabled) tray.init(
-                        iconStream = iconBytes.inputStream(),
-                        strings    = trayLabels,
-                        appName    = Branding.TITLE
-                    )
-                    if (notifyEnabled) SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
-                } catch (_: Exception) {
-                    runCatching {
-                        val iconBytes = Res.readBytes("drawable/icon.png")
-                        if (trayEnabled) tray.init(
-                            iconStream = iconBytes.inputStream(),
-                            strings    = trayLabels,
-                            appName    = Branding.TITLE
-                        )
-                        if (notifyEnabled) SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
+            ShellStartup(
+                policy = StartupPolicy(
+                    trayEnabled         = ModuleId.Tray.id   !in settings.disabledModules,
+                    notifierEnabled     = ModuleId.Notify.id !in settings.disabledModules,
+                    experimentalEnabled = settings.experimentalFeaturesEnabled,
+                    autoSyncAllPacks    = settings.autoSyncAllPacks,
+                    autoUpdatePacks     = settings.autoUpdatePacks,
+                ),
+                bringUpTray     = { icon ->
+                    withContext(Dispatchers.IO) {
+                        tray.init(iconStream = icon.inputStream(), strings = trayLabels, appName = Branding.TITLE)
                     }
-                }
-            }
-
-            // Tray failed to init -- restore the window so the user isn't
-            // stuck with no reachable UI. The scenario is: user clicked
-            // close during INITIALIZING window (the close handler uses
-            // canBeReady, not isSupported, to avoid killing the launcher
-            // mid-init). Without this restore the process keeps running
-            // with no UI and the user has to kill it.
-            if (!tray.isSupported && !isWindowVisible) {
-                isWindowVisible = true
-            }
-
-            // ── Fetch the server roster (feeds the auto-sync opt-in) ────
-            // [SmartyCraftServerListService.fetchDashboardData] swallows
-            // network failures and returns an empty roster rather than
-            // throwing, so an outage looks like a successful empty fetch.
-            // Tell the two apart via the disk cache: a previously-cached
-            // non-empty roster going empty implies an outage, so keep the
-            // cached list (auto-sync then still refreshes the packs the user
-            // actually has); an already-empty cache going empty is accepted
-            // as the new truth. The false-negative (a transient outage wiping
-            // a real roster) hurts more than the false-positive, so the
-            // heuristic leans toward preserving the cache.
-            val seedFromCache = withContext(Dispatchers.IO) { serverListCache.load() }
-            val dashboardServers = try {
-                val data = runInterruptible(Dispatchers.IO) {
-                    serverListService.fetchDashboardData().get()
-                }
-                rosterAfterFetch(fetched = data.servers, cached = seedFromCache)
-            } catch (e: CancellationException) {
-                // Composition leave / locale switch / exit mid-fetch
-                // must propagate cooperatively; converting to "outage"
-                // would defeat structured concurrency.
-                throw e
-            } catch (_: Exception) {
-                /* fall back to the cached roster */
-                seedFromCache
-            }
-
-            // ── Auto-sync (experimental, opt-in) ──────────────────────
-            // Fire-and-forget background sync of every installed pack.
-            // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
-            // child to match the rest of the experimental opt-ins. Runs on
-            // applicationScope so it survives composition resets but does
-            // get cancelled on JVM exit -- the alternative (GlobalScope)
-            // leaks network/file handles past window close until the
-            // process actually exits. The service itself is a singleton
-            // and idempotent (no-ops on subsequent calls while already
-            // running).
-            if (settings.experimentalFeaturesEnabled
-                && settings.autoSyncAllPacks
-                && dashboardServers.isNotEmpty()
-            ) {
-                applicationScope.launch {
-                    autoSyncService.syncAll(dashboardServers)
-                }
-            }
-
-            // Roll back any update a hard crash (kill / power loss / OOM) interrupted
-            // before anything else touches instances -- runs regardless of the
-            // auto-update setting, since a half-applied instance must be repaired.
-            applicationScope.launch { applyRecovery.recoverInterrupted() }
-
-            // Background auto-update of installed mirror packs -- same experimental
-            // gating as auto-sync, a separate axis (packs, not SC servers). The
-            // service is a singleton and reads the current policy each pass.
-            if (settings.experimentalFeaturesEnabled && settings.autoUpdatePacks) {
-                applicationScope.launch {
-                    packAutoUpdateService.runOnce()
-                }
-            }
+                },
+                bringUpNotifier = { icon ->
+                    withContext(Dispatchers.IO) {
+                        SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = icon)
+                    }
+                },
+                readIcon        = { path -> Res.readBytes(path) },
+                trayIsSupported = { tray.isSupported },
+                showWindow      = { isWindowVisible = true },
+                cachedRoster    = { withContext(Dispatchers.IO) { serverListCache.load() } },
+                fetchRoster     = {
+                    runInterruptible(Dispatchers.IO) { serverListService.fetchDashboardData().get() }.servers
+                },
+                syncAll             = { servers -> autoSyncService.syncAll(servers) },
+                recoverInterrupted  = { applyRecovery.recoverInterrupted() },
+                autoUpdatePacks     = { packAutoUpdateService.runOnce() },
+                appScope            = applicationScope,
+            ).run(windowVisible = { isWindowVisible })
         }
 
         // ── Tray / notifier callbacks (run once) ──────────────────────
