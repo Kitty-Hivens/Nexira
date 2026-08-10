@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
@@ -26,7 +27,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import hivens.core.api.interfaces.IServerListService
+import hivens.core.api.interfaces.INewsFeed
 import hivens.core.data.NewsItem
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.i18n.LocalStrings
@@ -35,16 +36,10 @@ import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
-import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-
-private val log = LoggerFactory.getLogger("CompactNewsFeed")
 
 @Composable
 fun CompactNewsFeed(
@@ -53,33 +48,49 @@ fun CompactNewsFeed(
     showTitle: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val serverListService: IServerListService = koinInject()
+    val feed: INewsFeed = koinInject()
     val s       = LocalStrings.current
 
     var news    by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var loadingMore by remember { mutableStateOf(false) }
     var query   by remember { mutableStateOf("") }
+    // The page to ask for next, and whether the archive has one. The feed is
+    // walked a page at a time: the rail opens on one page and the rest arrive as
+    // the reader reaches the end of what is loaded.
+    var nextPage by remember { mutableStateOf(2) }
+    var exhausted by remember { mutableStateOf(false) }
     // Bumped by the retry button to re-trigger the fetch effect. The effect
     // re-runs on (a) initial composition, (b) an SSL bypass grant for the
     // host, (c) an explicit retry click, so a first-call failure doesn't
     // strand the strip at "no news" forever.
     var retryTick by remember { mutableStateOf(0) }
 
-    suspend fun fetch(forceRefresh: Boolean) {
+    suspend fun loadFirst(forceRefresh: Boolean) {
         loading = true
-        try {
-            // Interruptible: the fetch is a blocking Future.get(), and a plain
-            // withContext leaves the thread sitting in it after the strip has gone
-            // away. Cancelling now interrupts the wait instead of outliving it.
-            val data = runInterruptible(Dispatchers.IO) {
-                if (forceRefresh) serverListService.refresh().get()
-                else              serverListService.fetchDashboardData().get()
-            }
-            news = data.news
-        } catch (e: Exception) {
-            log.warn("News fetch failed", e)
-        }
+        val page = feed.page(1, forceRefresh)
+        news = page.items
+        nextPage = 2
+        exhausted = !page.hasMore
         loading = false
+    }
+
+    suspend fun loadNext() {
+        if (loadingMore || exhausted) return
+        loadingMore = true
+        val page = feed.page(nextPage)
+        // Keyed by id rather than appended blind: an entry published while the
+        // reader is walking the archive shifts every later page down by one, and
+        // the row it pushes over would otherwise arrive twice.
+        val known = news.mapTo(HashSet()) { it.id }
+        news = news + page.items.filterNot { it.id in known }
+        // A page that came back with nothing ends the walk, whether it was the
+        // end of the archive or a page that failed to load: retrying it on every
+        // scroll event is how a rail with no network turns into a request loop.
+        // Reopening the rail starts the walk over.
+        exhausted = !page.hasMore || page.items.isEmpty()
+        nextPage += 1
+        loadingMore = false
     }
 
     LaunchedEffect(retryTick, sslBypass) {
@@ -91,12 +102,40 @@ fun CompactNewsFeed(
         // hits upstream, even if a successful fetch had already cached an
         // empty news list earlier in the session.
         val explicit = retryTick > 0
-        if (explicit) fetch(forceRefresh = true)
-        else if (news.isEmpty()) fetch(forceRefresh = false)
+        if (explicit) loadFirst(forceRefresh = true)
+        else if (news.isEmpty()) loadFirst(forceRefresh = false)
+    }
+
+    val listState = rememberLazyListState()
+
+    // A widget that was told to show twenty fills up to twenty without being
+    // scrolled -- the count is what it promises, not what it stops at. An
+    // uncapped rail pages on scroll instead (below).
+    //
+    // Both effects are keyed on the setting, never on the state they watch: a
+    // key that moves restarts the effect, and restarting it mid-fetch cancels
+    // the page it is waiting for -- leaving the feed convinced a load it no
+    // longer has is still running. The signals come through a snapshot instead.
+    LaunchedEffect(maxItems) {
+        if (maxItems <= 0) return@LaunchedEffect
+        snapshotFlow { loading to news.size }.collect { (busy, loaded) ->
+            if (!busy && loaded < maxItems) loadNext()
+        }
+    }
+
+    LaunchedEffect(maxItems, listState) {
+        if (maxItems > 0) return@LaunchedEffect
+        // The last row in view, against everything loaded: asking a few rows
+        // early is what keeps the feed going rather than stopping to load.
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+            .collect { last -> if (last >= news.size - PREFETCH_ROWS) loadNext() }
     }
 
     val shown = remember(news, query, maxItems) {
         news.asSequence()
+            // The list is keyed by news id; upstream repeating one across a page
+            // boundary would otherwise be a crash rather than a duplicate row.
+            .distinctBy { it.id }
             .filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
             .let { seq -> if (maxItems > 0) seq.take(maxItems) else seq }
             .toList()
@@ -161,20 +200,47 @@ fun CompactNewsFeed(
                     )
                 }
 
-                else -> LazyColumn(
-                    modifier       = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 4.dp),
-                ) {
-                    items(shown) { item ->
-                        CompactNewsItem(item = item)
-                        HorizontalDivider(
-                            color    = NxTheme.colors.outline,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
+                else -> {
+                    LazyColumn(
+                        state          = listState,
+                        modifier       = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                    ) {
+                        items(shown, key = { it.id }) { item ->
+                            CompactNewsItem(item = item)
+                            HorizontalDivider(
+                                color    = NxTheme.colors.outline,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                        if (loadingMore) {
+                            item(key = FEED_TAIL_KEY) { FeedTail() }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/** How close to the end of the loaded rows the next page is asked for. */
+private const val PREFETCH_ROWS = 3
+
+/** Stable key for the tail row, so it never collides with a news id. */
+private const val FEED_TAIL_KEY = "feed-tail"
+
+/** The "there is more coming" row under the last loaded entry. */
+@Composable
+private fun FeedTail() {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(
+            color       = NxTheme.colors.primary.copy(alpha = 0.6f),
+            strokeWidth = 2.dp,
+            modifier    = Modifier.size(16.dp),
+        )
     }
 }
 
