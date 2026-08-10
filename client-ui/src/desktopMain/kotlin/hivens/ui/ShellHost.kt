@@ -20,6 +20,8 @@ import androidx.compose.ui.window.rememberWindowState
 import hivens.config.Branding
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.chrome.IS_TILING_WM
+import hivens.ui.chrome.initialWindowSize
+import hivens.ui.chrome.screenWorkArea
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
@@ -29,6 +31,12 @@ import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
+
+/**
+ * The size the window returns to when un-maximised. Not what it opens at --
+ * see [initialWindowSize].
+ */
+private val RESTORE_SIZE = DpSize(1100.dp, 720.dp)
 
 /**
  * Late-bound window callbacks. The window is created BEFORE Koin exists, so
@@ -62,19 +70,23 @@ fun ApplicationScope.ShellHost(
 ) {
     val outcome by outcomeFlow.collectAsState()
 
-    // Placement policy:
-    //  - tiling WM: the compositor owns geometry/fullscreen. Floating + platform
-    //    default lets it place us (forcing a maximize fights it).
-    //  - everything else (undecorated custom chrome OR native decoration): open
-    //    MAXIMIZED NATIVELY, so the OS owns the maximized geometry per its own
-    //    rules -- never a hand-computed frame. The size below is only the restore
-    //    target. On an undecorated frame WindowMaximizer hands AWT the work-area
-    //    rect via maximizedBounds so the native maximize respects the taskbar.
     val undecorated = pre.peek.useCustomChrome && !IS_TILING_WM
+    // Maximised everywhere, and born at the size it will be.
+    //
+    // The OS owns the maximised geometry per its own rules -- never a
+    // hand-computed frame; on an undecorated frame WindowMaximizer hands AWT the
+    // work-area rect via maximizedBounds so the native maximise respects the
+    // taskbar, and a tiling compositor assigns the frame regardless of what we
+    // ask for.
+    //
+    // The size still matters before any of that happens: Compose draws one frame
+    // before showing the window, sized to this request, so asking for less than
+    // the window becomes leaves the rest of the frame bare white. That is what a
+    // tiled launcher did with the old 1100x720 -- see [initialWindowSize].
     val windowState = rememberWindowState(
-        placement = if (IS_TILING_WM) WindowPlacement.Floating else WindowPlacement.Maximized,
+        placement = WindowPlacement.Maximized,
         position  = WindowPosition.PlatformDefault,
-        size      = DpSize(1100.dp, 720.dp),
+        size      = remember { initialWindowSize(screenWorkArea(null), RESTORE_SIZE) },
     )
     val visibleState = remember { mutableStateOf(true) }
     val chrome = remember { WindowChromeHooks(defaultClose = { exitApplication() }) }
