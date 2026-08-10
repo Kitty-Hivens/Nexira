@@ -96,6 +96,13 @@ import hivens.ui.puppet.PuppetToggle
 import hivens.ui.generated.resources.Res
 import hivens.ui.screens.console.DocPos
 import hivens.ui.screens.console.LineModels
+import hivens.ui.screens.console.clampMatchIndex
+import hivens.ui.screens.console.compileSearch
+import hivens.ui.screens.console.copyAllText
+import hivens.ui.screens.console.copyLineText
+import hivens.ui.screens.console.nextMatchIndex
+import hivens.ui.screens.console.previousMatchIndex
+import hivens.ui.screens.console.shouldPageHistory
 import hivens.ui.screens.console.LogCanvas
 import hivens.ui.screens.console.LogSelection
 import hivens.ui.screens.console.buildLineModels
@@ -381,11 +388,7 @@ internal fun ConsoleContent(
     // Compile regex once per debounced query change. Invalid pattern -> null
     // (filter falls back to "match nothing" so the user sees an empty buffer
     // rather than an exception while they are still typing).
-    val searchRegex = remember(effectiveQuery, regexMode) {
-        if (regexMode && effectiveQuery.isNotBlank()) {
-            runCatching { Regex(effectiveQuery, RegexOption.IGNORE_CASE) }.getOrNull()
-        } else null
-    }
+    val searchRegex = remember(effectiveQuery, regexMode) { compileSearch(effectiveQuery, regexMode) }
 
     // ── Render: filter + counts + annotate, all OFF the UI thread ──────────
     // The whole O(n) pass -- severity/query filtering, warn/error counts, and
@@ -431,7 +434,7 @@ internal fun ConsoleContent(
 
     // Clamp current match index when the match set shrinks past it.
     LaunchedEffect(models.matches.size) {
-        if (currentMatch >= models.matches.size) currentMatch = 0
+        currentMatch = clampMatchIndex(currentMatch, models.matches.size)
     }
 
     // Initial focus on the log area: BasicTextField is read-only but still
@@ -477,10 +480,9 @@ internal fun ConsoleContent(
     // page. loadHistoryBefore prepends to the buffer on the drainer and the next
     // snapshot carries the older entries; we only do the scroll-anchor shift.
     LaunchedEffect(canvasState.scroll.offsetPx, historyOffset, isLive) {
-        if (!isLive) return@LaunchedEffect
-        if (historyLoading) return@LaunchedEffect
-        if (historyOffset <= 0) return@LaunchedEffect
-        if (canvasState.scroll.offsetPx > 80f) return@LaunchedEffect
+        if (!shouldPageHistory(isLive, historyLoading, historyOffset, canvasState.scroll.offsetPx)) {
+            return@LaunchedEffect
+        }
         historyLoading = true
         try {
             val loaded = gameConsole.loadHistoryBefore(count = 500)
@@ -501,9 +503,7 @@ internal fun ConsoleContent(
 
     // ── Copy actions ───────────────────────────────────────────────────────
     fun copyAll() {
-        val text = entries.joinToString("\n") { e ->
-            if (e.type == LogType.DIVIDER) e.text else "[${e.timestamp}] ${e.text}"
-        }
+        val text = copyAllText(entries)
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
         copiedFlash = true
         scope.launch {
@@ -517,9 +517,8 @@ internal fun ConsoleContent(
     fun copyLine() {
         // No caret yet (e.g. right-click before any left-click) -> first line, matching
         // the old field-copy behaviour so the menu action always does something.
-        val lineIdx = selection.focus?.line ?: selection.anchor?.line ?: 0
-        val lineText = models.lines.getOrNull(lineIdx)?.text ?: return
-        if (lineText.isBlank()) return
+        val caret = selection.focus?.line ?: selection.anchor?.line
+        val lineText = copyLineText(models.lines.map { it.text }, caret) ?: return
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(lineText))) }
         copiedFlash = true
         scope.launch {
@@ -553,16 +552,17 @@ internal fun ConsoleContent(
     }
 
     fun jumpNext() {
-        if (models.matches.isEmpty()) return
-        currentMatch = (currentMatch + 1) % models.matches.size
-        scrollToMatch(currentMatch)
+        val next = nextMatchIndex(currentMatch, models.matches.size)
+        if (next < 0) return
+        currentMatch = next
+        scrollToMatch(next)
     }
 
     fun jumpPrev() {
-        if (models.matches.isEmpty()) return
-        currentMatch = if (currentMatch == 0) models.matches.lastIndex
-                       else currentMatch - 1
-        scrollToMatch(currentMatch)
+        val prev = previousMatchIndex(currentMatch, models.matches.size)
+        if (prev < 0) return
+        currentMatch = prev
+        scrollToMatch(prev)
     }
 
     fun openSearch() {
