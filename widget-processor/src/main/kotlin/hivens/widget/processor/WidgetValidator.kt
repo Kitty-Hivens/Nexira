@@ -19,6 +19,8 @@ internal object WidgetValidator {
     private const val WIDGET_INSTANCE_FQN = "hivens.widget.model.WidgetInstance"
 
     private const val SERIALIZABLE_ANNOTATION_FQN = "kotlinx.serialization.Serializable"
+    private const val PROVIDES_SERVICE_FQN = "hivens.widget.model.ProvidesService"
+    private const val INJECT_SERVICE_FQN = "hivens.widget.model.InjectService"
 
     // Annotation args extracted from a valid @Widget declaration.
     data class Extracted(
@@ -29,6 +31,10 @@ internal object WidgetValidator {
         // FQN of the @Serializable props class, or null for Unit::class
         // (a propless widget).
         val propsClassFqn: String?,
+        /** Contracts declared via @ProvidesService, by FQN. */
+        val provides: List<String>,
+        /** Contracts declared via @InjectService, by FQN. */
+        val injects: List<String>,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -151,12 +157,34 @@ internal object WidgetValidator {
             }
         }
 
+        // Until now nothing in the processor referenced the two service
+        // annotations, so a widget could claim a contract it never registers,
+        // or read one no widget provides, and the build stayed quiet either
+        // way. Carrying them through is what lets the mismatch be seen.
         return Extracted(
             id = id,
             displayName = displayName,
             removable = removable,
             slots = sanitized,
             propsClassFqn = propsClassFqn,
+            provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
+            injects = symbol.serviceContracts(INJECT_SERVICE_FQN, "services"),
         )
+    }
+
+    /**
+     * FQNs listed in [annotationFqn]'s vararg [argument], empty when the widget
+     * carries no such annotation. KSP hands a vararg of KClass over as a list
+     * of KSType.
+     */
+    private fun KSFunctionDeclaration.serviceContracts(annotationFqn: String, argument: String): List<String> {
+        val annotation = annotations.firstOrNull {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn
+        } ?: return emptyList()
+        val raw = annotation.arguments.firstOrNull { it.name?.asString() == argument }?.value
+        return (raw as? List<*>).orEmpty()
+            .filterIsInstance<KSType>()
+            .mapNotNull { it.declaration.qualifiedName?.asString() }
+            .distinct()
     }
 }

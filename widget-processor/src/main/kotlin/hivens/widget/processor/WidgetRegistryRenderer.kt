@@ -15,7 +15,28 @@ internal data class WidgetModel(
     /** FQN of the @Serializable props class, or null for a propless widget. */
     val propsClassFqn: String?,
     val functionFqn: String,
+    /** Service contracts from @ProvidesService, by FQN. */
+    val provides: List<String> = emptyList(),
+    /** Service contracts from @InjectService, by FQN. */
+    val injects: List<String> = emptyList(),
 )
+
+/**
+ * Injected contracts no widget in this build provides, keyed by the widget that
+ * reads them.
+ *
+ * A consumer whose provider is absent is not a crash: the registry hands it
+ * null every frame and the widget renders its disabled state forever. That is
+ * correct behaviour for a provider the user has not placed yet, and
+ * indistinguishable from a contract nothing can ever satisfy -- which is what
+ * this separates.
+ */
+internal fun injectorsWithoutProvider(widgets: List<WidgetModel>): Map<WidgetModel, List<String>> {
+    val provided = widgets.flatMapTo(HashSet()) { it.provides }
+    return widgets
+        .associateWith { widget -> widget.injects.filterNot { it in provided } }
+        .filterValues { it.isNotEmpty() }
+}
 
 internal const val GENERATED_PACKAGE = "hivens.widget.generated"
 internal const val GENERATED_FILE_NAME = "GeneratedWidgetRegistry"
@@ -66,6 +87,12 @@ internal fun renderRegistry(widgets: List<WidgetModel>): String = buildString {
         appendLine("            override val displayName: String = \"${entry.displayName.kotlinEscape()}\"")
         appendLine("            override val removable: Boolean = ${entry.removable}")
         appendLine("            override val slots: List<SlotId> = ${entry.slots.toSlotIdListLiteral()}")
+        if (entry.provides.isNotEmpty()) {
+            appendLine("            override val provides: Set<String> = ${entry.provides.toStringSetLiteral()}")
+        }
+        if (entry.injects.isNotEmpty()) {
+            appendLine("            override val injects: Set<String> = ${entry.injects.toStringSetLiteral()}")
+        }
         if (entry.propsClassFqn != null) {
             val fqn = entry.propsClassFqn
             appendLine("            override val propsSerializer: KSerializer<*>? = $fqn.serializer()")
@@ -83,6 +110,9 @@ internal fun renderRegistry(widgets: List<WidgetModel>): String = buildString {
     appendLine("    override fun get(kind: WidgetKind): WidgetDescriptor? = map[kind]")
     appendLine("}")
 }
+
+private fun List<String>.toStringSetLiteral(): String =
+    joinToString(prefix = "setOf(", postfix = ")") { "\"${it.kotlinEscape()}\"" }
 
 private fun List<String>.toSlotIdListLiteral(): String =
     if (isEmpty()) "emptyList()"

@@ -199,6 +199,18 @@ fun EditorSurfaceHost(
     // settings panel, and any slot selection, so re-entering does not silently reopen
     // the last panel with the palette still hidden.
     LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false; clearSlotSelection() } }
+
+    // Commit the arrangement at the points where the user has finished a
+    // thought: leaving edit mode, and moving to another surface. Writes are
+    // debounced 200ms, and the only other flush is the shutdown hook, so until
+    // now a crash inside that window took the last edit with it -- and an edit
+    // session can end without the process ending at all.
+    //
+    // Per-mutation flushing stays off the table: a drag mutates the graph every
+    // frame, and a synchronous disk write per frame is worse than the gap.
+    // Keyed on both, so it fires when either changes; flush is a no-op with
+    // nothing pending, which is what entering edit mode hits.
+    LaunchedEffect(editing, selectedSurface) { layoutRepo.flush() }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.

@@ -28,7 +28,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.widget.model.CanvasPlacement
+import hivens.widget.model.FlowPlacement
 import hivens.widget.model.GridCell
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -36,6 +36,7 @@ import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.flowPlacement
 import hivens.widget.model.traverse
 
 // Renders every widget at the addressed slot. Two entry forms:
@@ -120,18 +121,17 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     val descriptor = registry[instance.kind]
                     if (descriptor != null) {
                         val movable = rememberWidgetMovable(descriptor, instance)
-                        val sizeMod = canvasSizeModifier(instance.canvas)
-                        when {
-                            // Weight wins over an explicit size in a flow slot: resizing
-                            // a weighted widget must not strip its flex (else the
-                            // weighted center region stops filling between the rails).
-                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                        // Precedence lives on the model as flowPlacement(), so the
+                        // two flow branches cannot drift apart and the rule is
+                        // testable without a composition.
+                        when (val placement = instance.flowPlacement()) {
+                            is FlowPlacement.Weighted -> Box(Modifier.weight(placement.weight)) {
                                 decorator(address, index, descriptor, instance) { movable() }
                             }
-                            sizeMod != null -> Box(sizeMod) {
+                            is FlowPlacement.Bounded -> Box(boundedModifier(placement)) {
                                 decorator(address, index, descriptor, instance) { movable() }
                             }
-                            else -> decorator(address, index, descriptor, instance) { movable() }
+                            FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
                         }
                     } else {
                         unknownDecorator(address, index, instance)
@@ -264,18 +264,17 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     val descriptor = registry[instance.kind]
                     if (descriptor != null) {
                         val movable = rememberWidgetMovable(descriptor, instance)
-                        val sizeMod = canvasSizeModifier(instance.canvas)
-                        when {
-                            // Weight wins over an explicit size in a flow slot: resizing
-                            // a weighted widget must not strip its flex (else the
-                            // weighted center region stops filling between the rails).
-                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                        // Precedence lives on the model as flowPlacement(), so the
+                        // two flow branches cannot drift apart and the rule is
+                        // testable without a composition.
+                        when (val placement = instance.flowPlacement()) {
+                            is FlowPlacement.Weighted -> Box(Modifier.weight(placement.weight)) {
                                 decorator(address, index, descriptor, instance) { movable() }
                             }
-                            sizeMod != null -> Box(sizeMod) {
+                            is FlowPlacement.Bounded -> Box(boundedModifier(placement)) {
                                 decorator(address, index, descriptor, instance) { movable() }
                             }
-                            else -> decorator(address, index, descriptor, instance) { movable() }
+                            FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
                         }
                     } else {
                         unknownDecorator(address, index, instance)
@@ -294,11 +293,10 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
 // box with phantom padding. A fixed extent only suits the free canvas (which sets
 // Modifier.size directly). Only a resized widget carries a size, so untouched
 // layouts are unaffected.
-private fun canvasSizeModifier(cp: CanvasPlacement?): Modifier? {
-    if (cp == null || (cp.width <= 0f && cp.height <= 0f)) return null
+private fun boundedModifier(placement: FlowPlacement.Bounded): Modifier {
     var m: Modifier = Modifier
-    if (cp.width > 0f) m = m.widthIn(max = cp.width.dp)
-    if (cp.height > 0f) m = m.heightIn(max = cp.height.dp)
+    if (placement.widthDp > 0f) m = m.widthIn(max = placement.widthDp.dp)
+    if (placement.heightDp > 0f) m = m.heightIn(max = placement.heightDp.dp)
     return m
 }
 

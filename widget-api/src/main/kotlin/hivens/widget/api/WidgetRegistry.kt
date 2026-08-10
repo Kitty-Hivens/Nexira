@@ -37,6 +37,18 @@ interface WidgetDescriptor {
     val defaultPropsJson: JsonObject
         get() = JsonObject(emptyMap())
 
+    // Service contracts this widget claims, populated by the KSP processor from
+    // @ProvidesService / @InjectService. Names, not classes: the registry stays
+    // reflection-free, and the only consumer is a comparison between the two
+    // sets. Registration itself is still the widget's own provideService(...)
+    // call -- the annotations describe intent, and recording them here is what
+    // lets anything check that the intent is satisfiable.
+    val provides: Set<String>
+        get() = emptySet()
+
+    val injects: Set<String>
+        get() = emptySet()
+
     @Composable
     fun Render(instance: WidgetInstance)
 }
