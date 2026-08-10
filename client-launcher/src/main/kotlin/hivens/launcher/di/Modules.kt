@@ -56,6 +56,7 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.cache.CacheConfig
 import hivens.core.data.DashboardData
+import hivens.core.data.NewsPage
 import hivens.core.data.ModuleId
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
@@ -83,6 +84,7 @@ import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
+import hivens.launcher.news.SmartyCraftNewsFeed
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
@@ -826,6 +828,19 @@ val appModule = module {
         SmartyCraftServerListService(get(), get(), get(), dashboardCache())
     }
 
+    // The news archive, read from the site's paginated index rather than from the
+    // dashboard payload -- which carries three entries and is why a widget asked
+    // for twenty showed three. Same channel as the rest of the smartycraft
+    // traffic; the dashboard stays the floor when the site cannot be read.
+    single<INewsFeed> {
+        SmartyCraftNewsFeed(
+            clientProvider = get<HttpClientProvider>(),
+            config = get(),
+            dashboard = get(),
+            cache = newsCache(),
+        )
+    }
+
     // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
     // entry per id so a mutation is an O(1) put, not a full-file rewrite. Migrates a
     // legacy packs.json on first open (renamed to *.migrated). Empty -> empty list.
@@ -875,6 +890,23 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
         version = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
     )
 }
+
+/**
+ * In-memory news-page cache (single-flight + 10-min SWR), keyed by page number.
+ * Scrolling back up a rail, or reopening it, reads what was already fetched
+ * instead of asking upstream for a page it just had; a page that came back empty
+ * is not stored, so a failed read retries rather than sticking.
+ */
+private fun Scope.newsCache() =
+    get<CacheFactory>().createInMemory<NewsPage>(
+        "news",
+        CacheConfig(
+            ttlMs = 10 * 60_000L,
+            staleTtlMs = Long.MAX_VALUE,
+            maxEntries = 64,
+            shouldStore = { it.items.isNotEmpty() },
+        ),
+    )
 
 /**
  * In-memory dashboard cache (single-flight + 10-min SWR). The disk seed for the
