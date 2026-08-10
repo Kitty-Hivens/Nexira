@@ -33,8 +33,7 @@ class DarkThemeSourceTest {
     }
 
     @Test
-    fun `mid grey goes dark`() {
-        // The threshold has to land on one side; dark is the launcher's default.
+    fun `the threshold is strict, so exact mid-grey is light`() {
         assertEquals(true, darkThemeFor(ThemeMode.Wallpaper, current = false, wallpaperLuminance = WALLPAPER_DARK_THRESHOLD - 0.001f))
         assertEquals(false, darkThemeFor(ThemeMode.Wallpaper, current = true, wallpaperLuminance = WALLPAPER_DARK_THRESHOLD))
     }

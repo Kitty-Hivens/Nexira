@@ -779,6 +779,10 @@ interface AppStrings {
     val browseDetailInstallReady: String
     val browseDetailInstallHint: String
     val browseDetailInstallButton: String
+    /** Retry label on a mod whose install did not land. */
+    val contentInstallRetry: String
+    /** Tooltip on that retry, saying why it is offered. */
+    val contentInstallFailed: String
     val browseDetailTagsTitle: String
     val browseDetailAboutTitle: String
     /** Placeholder pack blurb shown until the mirror ships a real description. Receives the mod and asset counts. */

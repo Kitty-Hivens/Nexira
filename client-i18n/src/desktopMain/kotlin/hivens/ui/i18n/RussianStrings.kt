@@ -727,6 +727,8 @@ object RussianStrings : AppStrings {
     override val browseDetailInstallReady  = "Готово к установке"
     override val browseDetailInstallHint   = "Создаст новый instance в твоей data-папке."
     override val browseDetailInstallButton = "Установить"
+    override val contentInstallRetry       = "Повторить"
+    override val contentInstallFailed      = "Загрузка не завершилась"
     override val browseDetailTagsTitle     = "Теги"
     override val browseDetailAboutTitle       = "О сборке"
     override fun browseDetailAbout(mods: Int, assets: Int) =

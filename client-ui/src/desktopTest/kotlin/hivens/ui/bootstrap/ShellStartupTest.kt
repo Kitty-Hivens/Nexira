@@ -1,12 +1,14 @@
 package hivens.ui.bootstrap
 
 import hivens.core.api.model.ServerProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -55,8 +57,8 @@ class ShellStartupTest {
         },
         trayIsSupported = { traySupported },
         showWindow = { recorder.calls += "showWindow" },
-        cachedRoster = { cached },
-        fetchRoster = fetch,
+        cachedRoster = { recorder.calls += "cachedRoster"; cached },
+        fetchRoster = { recorder.calls += "fetchRoster"; fetch() },
         syncAll = { servers -> recorder.calls += "syncAll"; recorder.syncedWith = servers },
         recoverInterrupted = { recorder.calls += "recover" },
         autoUpdatePacks = { recorder.calls += "autoUpdate" },
@@ -70,8 +72,9 @@ class ShellStartupTest {
         advanceUntilIdle()
 
         val tray = rec.calls.indexOf("tray")
-        val sync = rec.calls.indexOf("syncAll")
-        assertTrue(tray >= 0 && sync > tray, "the close path asks the tray whether hiding is possible")
+        val fetched = rec.calls.indexOf("fetchRoster")
+        assertTrue(tray >= 0, "the tray is brought up")
+        assertTrue(fetched > tray, "the close path asks the tray whether hiding is possible, so it cannot wait on a network call")
     }
 
     @Test
@@ -105,23 +108,31 @@ class ShellStartupTest {
     @Test
     fun `no icon at all leaves the launcher running`() = runTest {
         val rec = Recorder()
-        startup(rec, iconFails = setOf("drawable/favicon.png", "drawable/icon.png"))
-            .run(windowVisible = { true })
+        // A tray whose init never ran reports unsupported, which is what puts the
+        // window back -- the scenario is only itself with both halves.
+        startup(rec, traySupported = false, iconFails = setOf("drawable/favicon.png", "drawable/icon.png"))
+            .run(windowVisible = { false })
         advanceUntilIdle()
 
         assertFalse("tray" in rec.calls)
+        assertTrue("showWindow" in rec.calls, "otherwise a close-to-tray during init strands the process")
         assertTrue("recover" in rec.calls, "no tray is a degraded launcher, not a dead one")
     }
 
     @Test
-    fun `a disabled module is not brought up`() = runTest {
-        val rec = Recorder()
-        startup(rec, policy = allOn.copy(trayEnabled = false, notifierEnabled = false))
-            .run(windowVisible = { true })
+    fun `each module is gated on its own flag`() = runTest {
+        // Separately, so a notifier wired to the tray's flag cannot pass.
+        val trayOnly = Recorder()
+        startup(trayOnly, policy = allOn.copy(notifierEnabled = false)).run(windowVisible = { true })
         advanceUntilIdle()
+        assertTrue("tray" in trayOnly.calls)
+        assertFalse("notifier" in trayOnly.calls)
 
-        assertFalse("tray" in rec.calls)
-        assertFalse("notifier" in rec.calls)
+        val notifierOnly = Recorder()
+        startup(notifierOnly, policy = allOn.copy(trayEnabled = false)).run(windowVisible = { true })
+        advanceUntilIdle()
+        assertFalse("tray" in notifierOnly.calls)
+        assertTrue("notifier" in notifierOnly.calls)
     }
 
     @Test
@@ -163,6 +174,37 @@ class ShellStartupTest {
         advanceUntilIdle()
 
         assertEquals(listOf("Industrial"), rec.syncedWith?.map { it.name })
+    }
+
+    @Test
+    fun `a cancelled fetch propagates instead of reading as an outage`() = runTest {
+        val rec = Recorder()
+        val startup = startup(rec, cached = listOf(server("Industrial")), fetch = { throw CancellationException("left") })
+
+        assertFailsWith<CancellationException> { startup.run(windowVisible = { true }) }
+        assertFalse("syncAll" in rec.calls, "treating a composition leave as an outage would defeat structured concurrency")
+    }
+
+    @Test
+    fun `a cancelled icon read propagates too`() = runTest {
+        val rec = Recorder()
+        val startup = ShellStartup(
+            policy = allOn,
+            bringUpTray = { rec.calls += "tray" },
+            bringUpNotifier = { rec.calls += "notifier" },
+            readIcon = { throw CancellationException("left") },
+            trayIsSupported = { true },
+            showWindow = { rec.calls += "showWindow" },
+            cachedRoster = { emptyList() },
+            fetchRoster = { emptyList() },
+            syncAll = { },
+            recoverInterrupted = { rec.calls += "recover" },
+            autoUpdatePacks = { },
+            appScope = this,
+        )
+
+        assertFailsWith<CancellationException> { startup.run(windowVisible = { true }) }
+        assertFalse("recover" in rec.calls, "a cancelled bring-up must not go on to start background work")
     }
 
     @Test

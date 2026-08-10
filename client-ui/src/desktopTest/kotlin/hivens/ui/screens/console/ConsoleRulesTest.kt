@@ -113,18 +113,36 @@ class ConsoleRulesTest {
         assertEquals("[12:00:01] started\n---- session ----\n[12:00:09] done", text)
     }
 
+    // The buffer is passed as a size plus an accessor rather than a list: the
+    // caller holds up to 50k line models, and materialising them to read one
+    // line is a copy of the whole console per right-click.
+    private fun copyLineFrom(lines: List<String>, caretLine: Int?): String? =
+        copyLineText(lines.size, caretLine) { lines[it] }
+
     @Test
     fun `copying a line with no caret falls back to the first`() {
-        assertEquals("first", copyLineText(listOf("first", "second"), caretLine = null))
+        assertEquals("first", copyLineFrom(listOf("first", "second"), caretLine = null))
     }
 
     @Test
     fun `a blank line is not worth copying`() {
-        assertNull(copyLineText(listOf("   "), caretLine = 0))
+        assertNull(copyLineFrom(listOf("   "), caretLine = 0))
     }
 
     @Test
     fun `a caret past the end copies nothing`() {
-        assertNull(copyLineText(listOf("only"), caretLine = 9))
+        assertNull(copyLineFrom(listOf("only"), caretLine = 9))
+    }
+
+    @Test
+    fun `the accessor is never called for an out-of-range caret`() {
+        var touched = false
+        assertNull(copyLineText(lineCount = 2, caretLine = 5) { touched = true; "x" })
+        assertFalse(touched, "an index check that reads first would throw on the buffer it is guarding")
+    }
+
+    @Test
+    fun `an empty buffer copies nothing`() {
+        assertNull(copyLineText(lineCount = 0, caretLine = null) { error("must not read an empty buffer") })
     }
 }

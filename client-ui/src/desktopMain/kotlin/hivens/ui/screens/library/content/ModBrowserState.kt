@@ -34,6 +34,14 @@ internal class ModBrowserState(
 ) {
     var query by mutableStateOf("")
 
+    /**
+     * The query the search actually ran on. Kept beside [query] rather than in
+     * the composable: split across two lifetimes, a rebuilt holder would reset
+     * one and not the other, and the browser would search for text no longer in
+     * its own box.
+     */
+    var submitted by mutableStateOf("")
+
     /** Null while a search is in flight, so the browser can show its spinner. */
     var results by mutableStateOf<List<ModrinthSearchHit>?>(null)
         private set

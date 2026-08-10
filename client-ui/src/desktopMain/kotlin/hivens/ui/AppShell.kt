@@ -5,10 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -141,7 +137,6 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -602,7 +597,9 @@ fun FrameWindowScope.AppShellContent(
                         SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = icon)
                     }
                 },
-                readIcon        = { path -> Res.readBytes(path) },
+                // Off the composition dispatcher: Res.readBytes is suspend but never
+                // dispatches, so reading it here would inflate a jar entry on the EDT.
+                readIcon        = { path -> withContext(Dispatchers.IO) { Res.readBytes(path) } },
                 trayIsSupported = { tray.isSupported },
                 showWindow      = { isWindowVisible = true },
                 cachedRoster    = { withContext(Dispatchers.IO) { serverListCache.load() } },

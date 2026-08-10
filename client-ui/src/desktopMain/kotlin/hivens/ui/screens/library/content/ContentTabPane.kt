@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
-import hivens.launcher.modrinth.ModrinthClient
 import hivens.core.data.PackInstance
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstalledContent
@@ -456,12 +455,12 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
     val s = LocalStrings.current
     val state = rememberModBrowserState(mcVersion, loader, modsDir)
     val scope = rememberCoroutineScope()
-    var submitted by remember { mutableStateOf("") }
 
-    // Debounce typing, then search on the settled query. The debounce is a
-    // composition concern; what the settled query does is the holder's.
-    LaunchedEffect(state.query) { delay(350); submitted = state.query }
-    LaunchedEffect(state, submitted) { state.runSearch(submitted) }
+    // Debounce typing, then search on the settled query. The timer is a
+    // composition concern; both halves of the query live on the holder, so a
+    // rebuilt one cannot leave them disagreeing.
+    LaunchedEffect(state, state.query) { delay(350); state.submitted = state.query }
+    LaunchedEffect(state, state.submitted) { state.runSearch(state.submitted) }
 
     Column(
         modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -494,6 +493,7 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
                                 hit       = hit,
                                 installed = hit.projectId in state.installed,
                                 working   = hit.projectId in state.working,
+                                failed    = hit.projectId in state.failed,
                                 onInstall = { scope.launch { state.installMod(hit) } },
                             )
                         }
@@ -506,7 +506,7 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
 }
 
 @Composable
-private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Boolean, onInstall: () -> Unit) {
+private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Boolean, failed: Boolean, onInstall: () -> Unit) {
     val s = LocalStrings.current
     val shape = RoundedCornerShape(7.dp)
     Row(
@@ -530,6 +530,12 @@ private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Bo
         when {
             installed -> Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.primary, size = 20.dp)
             working   -> CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            // A download that did not land says so and offers the action again.
+            // Silence here reads as success, which is the failure this replaced.
+            failed    -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Symbol(NxIcon.Warning, contentDescription = s.contentInstallFailed, tint = NxTheme.colors.error, size = 18.dp)
+                NxButton(label = s.contentInstallRetry, onClick = onInstall, style = NxButtonStyle.Secondary)
+            }
             else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
         }
     }
