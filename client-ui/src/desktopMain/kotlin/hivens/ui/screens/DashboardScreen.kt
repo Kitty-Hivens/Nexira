@@ -30,7 +30,6 @@ fun DashboardScreen(
     initialSelectedServer: ServerProfile?,
     onServerSelected: (ServerProfile) -> Unit,
     onSessionUpdated: (SessionData) -> Unit,
-    onCloseApp: () -> Unit,
     onOpenServerSettings: (ServerProfile) -> Unit,
     onOpenDetails: (ServerProfile) -> Unit,
 ) {
@@ -38,14 +37,13 @@ fun DashboardScreen(
 
     val ctx = remember(
         session, initialSelectedServer, onServerSelected, onSessionUpdated,
-        onCloseApp, onOpenServerSettings, onOpenDetails,
+        onOpenServerSettings, onOpenDetails,
     ) {
         HomeClassicContext(
             session               = session,
             initialSelectedServer = initialSelectedServer,
             onServerSelected      = onServerSelected,
             onSessionUpdated      = onSessionUpdated,
-            onCloseApp            = onCloseApp,
             onOpenServerSettings  = onOpenServerSettings,
             onOpenDetails         = onOpenDetails,
         )

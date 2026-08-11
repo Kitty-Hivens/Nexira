@@ -14,7 +14,6 @@ data class HomeClassicContext(
     val initialSelectedServer: ServerProfile?,
     val onServerSelected: (ServerProfile) -> Unit,
     val onSessionUpdated: (SessionData) -> Unit,
-    val onCloseApp: () -> Unit,
     val onOpenServerSettings: (ServerProfile) -> Unit,
     val onOpenDetails: (ServerProfile) -> Unit,
 )

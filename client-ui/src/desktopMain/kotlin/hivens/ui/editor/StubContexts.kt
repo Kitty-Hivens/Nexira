@@ -29,7 +29,6 @@ internal val STUB_HOME_CLASSIC = HomeClassicContext(
     initialSelectedServer = null,
     onServerSelected      = {},
     onSessionUpdated      = {},
-    onCloseApp            = {},
     onOpenServerSettings  = {},
     onOpenDetails         = {},
 )

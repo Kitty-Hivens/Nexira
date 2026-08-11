@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IServerListService
-import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.launch.LaunchState
 import hivens.launcher.AutoSyncService
@@ -68,7 +67,6 @@ import org.koin.compose.koinInject
 fun HomeClassicContent(instance: WidgetInstance) {
     val ctx = LocalHomeClassicContext.current
     val serverListService: IServerListService = koinInject()
-    val settingsService: ISettingsService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
@@ -81,7 +79,6 @@ fun HomeClassicContent(instance: WidgetInstance) {
     val syncSnapshot by autoSyncService.snapshot.collectAsState()
     val syncStates = syncSnapshot.perServer
     val syncOverall = syncSnapshot.overall
-    var hiddenForCurrentSession by remember { mutableStateOf(false) }
 
     var servers by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
     var selectedServerState by remember { mutableStateOf(ctx.initialSelectedServer) }
@@ -117,19 +114,6 @@ fun HomeClassicContent(instance: WidgetInstance) {
             } finally {
                 withContext(Dispatchers.Main) { isLoadingServers = false }
             }
-        }
-    }
-
-    LaunchedEffect(launchState) {
-        when (launchState) {
-            is LaunchState.GameRunning -> {
-                if (settingsService.getSettings().closeAfterStart && !hiddenForCurrentSession) {
-                    hiddenForCurrentSession = true
-                    ctx.onCloseApp()
-                }
-            }
-            is LaunchState.Idle, is LaunchState.Error -> hiddenForCurrentSession = false
-            else -> {}
         }
     }
 

@@ -27,7 +27,7 @@ exclude:
   # corresponding getter calls in surrounding composables, so every state
   # mutation in an event handler / coroutine / when-branch gets flagged
   # even when the value is obviously read elsewhere in the same file
-  # (e.g. `if (!hiddenForCurrentSession) { hiddenForCurrentSession = true }`).
+  # (e.g. `if (!thresholdDone) { thresholdDone = true }`).
   # The previous removal of this exclusion 2026-05-17 was premature -- the
   # 2.2.16 release PR triggered 21 such false positives across 8 Compose
   # files. The rule is genuinely useful for plain Kotlin code, but the

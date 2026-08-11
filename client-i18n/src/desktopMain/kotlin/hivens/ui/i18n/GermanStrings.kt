@@ -100,8 +100,8 @@ object GermanStrings : AppStrings {
     override val settingsCustomChrome               = "Eigene Titelleiste"
     override val settingsCustomChromeDesc           = "Ersetzt die Titelleiste des Fensters durch die eigene obere Leiste. Wirkt ab dem nächsten Start."
     override val settingsCustomChromeTiling         = "Dein Fenstermanager zeichnet keine Titelleiste, hier ändert das nichts."
-    override val settingsCloseAfterLaunch   = "Launcher nach Spielstart in Tray minimieren"
-    override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet."
+    override val settingsCloseAfterLaunch   = "Launcher nach Spielstart ausblenden"
+    override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet; ohne Tray wird das Fenster minimiert."
     override val settingsSaved              = "Einstellungen gespeichert"
     override val settingsLanguage           = "Sprache"
 

@@ -100,8 +100,8 @@ object RussianStrings : AppStrings {
     override val settingsCustomChrome               = "Своя строка заголовка"
     override val settingsCustomChromeDesc           = "Заменяет заголовок окна собственной верхней панелью. Применится при следующем запуске."
     override val settingsCustomChromeTiling         = "Твой оконный менеджер не рисует заголовок, так что здесь это ничего не меняет."
-    override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска игры"
-    override val settingsCloseAfterLaunchDesc = "Прячет лаунчер в системный трей, как только запускается игра."
+    override val settingsCloseAfterLaunch   = "Свернуть лаунчер после запуска игры"
+    override val settingsCloseAfterLaunchDesc = "Прячет лаунчер в системный трей, как только запускается игра, а если трея нет — сворачивает окно."
     override val settingsSaved              = "Настройки сохранены"
     override val settingsLanguage           = "Язык"
 
