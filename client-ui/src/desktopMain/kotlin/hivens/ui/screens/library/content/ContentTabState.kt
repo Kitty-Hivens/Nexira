@@ -1,6 +1,7 @@
 package hivens.ui.screens.library.content
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -66,7 +67,7 @@ internal sealed class ContentIconState {
  */
 @Stable
 internal class ContentTabState(
-    val instance: PackInstance,
+    initialInstance: PackInstance,
     val instanceDir: Path,
     private val scanner: InstanceContentScanner,
     private val manager: InstanceContentManager,
@@ -78,15 +79,28 @@ internal class ContentTabState(
     private val scope: CoroutineScope,
 ) {
     /**
+     * The record this tab is looking at. It is rewritten under the tab -- an
+     * optional flipped in the settings window, a build applied on the app scope,
+     * a detach -- and the tab is one of its readers, not its owner, so it follows
+     * rather than keeps the copy it opened with. Writing back from a captured
+     * copy is also how a rename made meanwhile got clobbered.
+     */
+    var instance by mutableStateOf(initialInstance)
+        private set
+
+    /**
      * A detached instance is fully user-owned: any mod can be toggled (a
      * `.disabled` rename) or deleted. A tracked MIRROR pack keeps its required
      * mods locked but still lets the user flip OPTIONAL ones -- through the
      * pack's optional-content path (persisted + relabelled), not a raw rename --
      * so the choice survives a pack update. Other tracked origins (Modrinth /
      * SC) are display-only here.
+     *
+     * Read off [instance] rather than fixed at construction: a detach turns a
+     * tracked pack into a local one without the tab being rebuilt.
      */
-    val isLocal = instance.packRef.origin == PackOrigin.Local
-    val isMirror = instance.packRef.origin == PackOrigin.Mirror
+    val isLocal: Boolean get() = instance.packRef.origin == PackOrigin.Local
+    val isMirror: Boolean get() = instance.packRef.origin == PackOrigin.Mirror
 
     /** Null until the first scan lands, which the pane renders as loading. */
     var items by mutableStateOf<List<InstalledContent>?>(null)
@@ -118,6 +132,9 @@ internal class ContentTabState(
     private val projectCache = mutableStateMapOf<String, ModrinthProject?>()
 
     private var manifest by mutableStateOf<SmrtPackManifest?>(null)
+
+    /** The build [manifest] was fetched for; null until one is loaded. */
+    private var manifestVersion: String? = null
     private var optionalState by mutableStateOf<Map<String, Boolean>>(emptyMap())
 
     /** filename -> manifest entry, for classifying rows on a tracked mirror pack. */
@@ -155,15 +172,37 @@ internal class ContentTabState(
         rescan()
     }
 
+    /**
+     * Takes a rewritten record. A new build means a different manifest, so the rows
+     * are re-classified against the one that is actually installed; anything else
+     * only has to re-seed the optional state, which is the field the settings window
+     * writes to as well.
+     *
+     * "New build" is asked of the manifest that is loaded rather than of the record
+     * this replaces: a re-seed cancelled halfway -- another write lands while the
+     * fetch is in flight -- would otherwise leave the tab classifying rows against
+     * the previous build's manifest with nothing left to say so.
+     */
+    suspend fun adopt(updated: PackInstance) {
+        if (updated == instance) return
+        instance = updated
+        if (!isMirror) return
+        if (manifest == null || manifestVersion != updated.installedVersion()) loadManifest()
+        else manifest?.let { optionalState = OptionalContentRules.enabledState(it.mods, updated.optionalContent) }
+    }
+
+    private fun PackInstance.installedVersion(): String? = pinnedPackVersion ?: packRef.version
+
     private suspend fun loadManifest() {
         val m = runCatching {
             withContext(Dispatchers.IO) {
-                val v = instance.pinnedPackVersion ?: instance.packRef.version
+                val v = instance.installedVersion()
                 if (!v.isNullOrBlank()) mirrorClient.fetchManifestVersion(instance.packRef.id, v)
                 else mirrorClient.fetchManifest(instance.packRef.id)
             }
         }.getOrNull()
         manifest = m
+        manifestVersion = if (m != null) instance.installedVersion() else null
         if (m != null) optionalState = OptionalContentRules.enabledState(m.mods, instance.optionalContent)
     }
 
@@ -253,7 +292,16 @@ internal class ContentTabState(
         // disk lands asynchronously behind it.
         val next = OptionalContentRules.applyToggle(m.mods, optionalState, fileName, enable)
         optionalState = next
-        controller.setOptionalModsAsync(instance, m, OptionalContentRules.togglesFrom(m.mods, next))
+        publish(m, next)
+    }
+
+    /**
+     * Hand a selection to the launcher. Whole-selection writes supersede each
+     * other there, so a rapid pair reaches the record as one value and the re-seed
+     * that follows agrees with what is on screen.
+     */
+    private fun publish(manifest: SmrtPackManifest, state: Map<String, Boolean>) {
+        controller.setOptionalModsAsync(instance, manifest, OptionalContentRules.togglesFrom(manifest.mods, state))
     }
 
     /**
@@ -273,7 +321,7 @@ internal class ContentTabState(
             var next = optionalState
             optional.forEach { next = OptionalContentRules.applyToggle(m.mods, next, it.fileName, enable) }
             optionalState = next
-            controller.setOptionalModsAsync(instance, m, OptionalContentRules.togglesFrom(m.mods, next))
+            publish(m, next)
         }
         if (onDisk.isNotEmpty()) {
             scope.launch {
@@ -401,9 +449,9 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
     val iconResolver: ModIconResolver = koinInject()
     val modrinth: ModrinthClient = koinInject()
     val scope = rememberCoroutineScope()
-    return remember(instance.id) {
+    val state = remember(instance.id) {
         ContentTabState(
-            instance     = instance,
+            initialInstance = instance,
             instanceDir  = paths.dataDir.resolve("instances").resolve(instance.instanceDirName),
             scanner      = scanner,
             manager      = InstanceContentManager(),
@@ -415,6 +463,10 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
             scope        = scope,
         )
     }
+    // Keyed on the record, not on its id: the tab keeps its scan, its icons and
+    // its selection across a rewrite, and only re-reads what the rewrite changed.
+    LaunchedEffect(state, instance) { state.adopt(instance) }
+    return state
 }
 
 // ── Pure rules (unit-tested without a scanner, a manifest client or a disk) ──

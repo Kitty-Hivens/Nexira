@@ -6,7 +6,11 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.SessionData
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Path
 import kotlin.test.Test
@@ -19,9 +23,10 @@ import kotlin.test.assertTrue
  * that owns its own IO cannot be exercised without a composition, which is half
  * of why this issue exists.
  *
- * What matters here is the difference between "this pack is gone" and "the read
- * came back empty for a moment" -- the screen renders a dead end for the first
- * and must not for the second.
+ * What matters here is that the screen READS the record rather than holding a
+ * copy of it: everything that rewrites an instance -- the settings window, an
+ * update on the app scope, the playtime a finished session writes back -- does so
+ * through the same registry, and the screen has to show what it says.
  */
 class PackDetailStateTest {
 
@@ -33,21 +38,21 @@ class PackDetailStateTest {
         createdAtEpoch = 0L,
     )
 
-    private class FakeRepo(
-        private val observed: List<PackInstance> = emptyList(),
-        private val stored: MutableMap<String, PackInstance> = mutableMapOf(),
-    ) : IPackRepository {
-        var getCalls = 0
-            private set
+    private class FakeRepo(initial: List<PackInstance> = emptyList()) : IPackRepository {
+        private val instances = MutableStateFlow(initial)
 
-        override fun observe(): Flow<List<PackInstance>> = flowOf(observed)
-        override suspend fun list(): List<PackInstance> = observed
-        override suspend fun get(id: String): PackInstance? {
-            getCalls++
-            return stored[id]
+        override fun observe(): Flow<List<PackInstance>> = instances
+        override suspend fun list(): List<PackInstance> = instances.value
+        override suspend fun get(id: String): PackInstance? = instances.value.firstOrNull { it.id == id }
+        override suspend fun put(instance: PackInstance) {
+            instances.update { current ->
+                if (current.any { it.id == instance.id }) current.map { if (it.id == instance.id) instance else it }
+                else current + instance
+            }
         }
-        override suspend fun put(instance: PackInstance) { stored[instance.id] = instance }
-        override suspend fun delete(id: String) { stored.remove(id) }
+        override suspend fun delete(id: String) {
+            instances.update { current -> current.filterNot { it.id == id } }
+        }
     }
 
     private fun state(
@@ -64,71 +69,68 @@ class PackDetailStateTest {
         openInFileManager = onOpenFolder,
     )
 
-    @Test
-    fun `resolves from the observed list without a direct read`() = runTest {
-        val repo = FakeRepo(observed = listOf(pack()))
-        val state = state(repo)
-
-        state.resolve()
-
-        assertEquals(PackResolution.Ready(pack()), state.resolution)
-        assertEquals(0, repo.getCalls, "the list already had it; a second read is a wasted round trip")
+    /** Starts the screen's collection on the test's own scope and lets it settle. */
+    private fun TestScope.observing(state: PackDetailState): PackDetailState {
+        backgroundScope.launch { state.observe() }
+        runCurrent()
+        return state
     }
 
     @Test
-    fun `falls back to a direct read when the list has not emitted it`() = runTest {
-        // Navigation can land here before the repository's first emission, so a
-        // miss on the flow is not a missing pack.
-        val repo = FakeRepo(observed = emptyList(), stored = mutableMapOf("inst-1" to pack()))
-        val state = state(repo)
-
-        state.resolve()
+    fun `resolves from the registry's first emission`() = runTest {
+        val state = observing(state(FakeRepo(listOf(pack()))))
 
         assertEquals(PackResolution.Ready(pack()), state.resolution)
-        assertEquals(1, repo.getCalls)
     }
 
     @Test
-    fun `a pack in neither place is not found`() = runTest {
-        val state = state(FakeRepo())
-
-        state.resolve()
+    fun `a pack the registry does not have is a dead end`() = runTest {
+        val state = observing(state(FakeRepo()))
 
         assertEquals(PackResolution.NotFound, state.resolution)
     }
 
     @Test
-    fun `refresh picks up a record an operation rewrote`() = runTest {
-        val repo = FakeRepo(observed = listOf(pack()), stored = mutableMapOf("inst-1" to pack(name = "Renamed")))
-        val state = state(repo)
-        state.resolve()
+    fun `a rewrite of the record reaches the screen`() = runTest {
+        // What a rename in the settings window, an update applied on the app scope
+        // and the playtime written after a session all look like from here.
+        val repo = FakeRepo(listOf(pack()))
+        val state = observing(state(repo))
 
-        state.refresh()
+        repo.put(pack(name = "Renamed"))
+        runCurrent()
 
         assertEquals("Renamed", state.pack?.displayName)
     }
 
     @Test
-    fun `an empty refresh keeps what is on screen`() = runTest {
-        val repo = FakeRepo(observed = listOf(pack()))
-        val state = state(repo)
-        state.resolve()
+    fun `a deleted pack turns the screen into a dead end`() = runTest {
+        val repo = FakeRepo(listOf(pack()))
+        val state = observing(state(repo))
 
-        state.refresh()
+        repo.delete("inst-1")
+        runCurrent()
 
-        assertEquals(
-            PackResolution.Ready(pack()),
-            state.resolution,
-            "a transient miss must not turn a live screen into a dead end",
-        )
+        assertEquals(PackResolution.NotFound, state.resolution)
+    }
+
+    @Test
+    fun `another instance changing says nothing about this one`() = runTest {
+        val repo = FakeRepo(listOf(pack()))
+        val state = observing(state(repo))
+
+        repo.put(pack(id = "inst-2", name = "Something else"))
+        runCurrent()
+
+        assertEquals(PackResolution.Ready(pack()), state.resolution)
     }
 
     @Test
     fun `the instance directory follows the resolved pack`() = runTest {
-        val state = state(FakeRepo(observed = listOf(pack())))
+        val state = state(FakeRepo(listOf(pack())))
         assertNull(state.instanceDir, "nothing is resolved yet")
 
-        state.resolve()
+        observing(state)
 
         assertEquals(Path.of("/data", "instances", "industrial"), state.instanceDir)
     }
@@ -136,38 +138,42 @@ class PackDetailStateTest {
     @Test
     fun `play launches the resolved pack and nothing before that`() = runTest {
         var launched: PackInstance? = null
-        val state = state(FakeRepo(observed = listOf(pack())), onLaunch = { _, p -> launched = p })
+        val state = state(FakeRepo(listOf(pack())), onLaunch = { _, p -> launched = p })
         val session = SessionData()
 
         state.play(session)
         assertNull(launched, "there is no pack to launch until it resolves")
 
-        state.resolve()
+        observing(state)
         state.play(session)
         assertEquals("inst-1", launched?.id)
     }
 
     @Test
-    fun `adopt takes the settings window's rewrite without a read`() = runTest {
-        val repo = FakeRepo(observed = listOf(pack()))
-        val state = state(repo)
-        state.resolve()
+    fun `play carries the record as it stands now`() = runTest {
+        // The launch reads the runtime -- heap, java path, jvm args -- so handing it
+        // the copy the screen opened with would run the game on settings the user
+        // has since changed.
+        var launched: PackInstance? = null
+        val repo = FakeRepo(listOf(pack()))
+        val state = observing(state(repo, onLaunch = { _, p -> launched = p }))
 
-        state.adopt(pack(name = "Edited"))
+        repo.put(pack(name = "Renamed"))
+        runCurrent()
+        state.play(SessionData())
 
-        assertEquals("Edited", state.pack?.displayName)
-        assertEquals(0, repo.getCalls, "the caller handed us the new record; re-reading it is round-tripping our own write")
+        assertEquals("Renamed", launched?.displayName)
     }
 
     @Test
     fun `opening the folder waits for a resolved pack`() = runTest {
         var opened: Path? = null
-        val state = state(FakeRepo(observed = listOf(pack())), onOpenFolder = { opened = it })
+        val state = state(FakeRepo(listOf(pack())), onOpenFolder = { opened = it })
 
         state.openFolder()
         assertNull(opened, "there is no directory to open before the pack resolves")
 
-        state.resolve()
+        observing(state)
         state.openFolder()
         assertEquals(Path.of("/data", "instances", "industrial"), opened)
     }

@@ -99,13 +99,22 @@ fun HomeClassicContent(instance: WidgetInstance) {
                 }
                 withContext(Dispatchers.Main) {
                     servers = data.servers
-                    if (selectedServerState == null && servers.isNotEmpty()) {
-                        val lastId = profileManager.lastServerId
-                        val default = servers.find { it.assetDir == lastId } ?: servers.firstOrNull()
-                        if (default != null) {
-                            selectedServerState = default
-                            ctx.onServerSelected(default)
-                        }
+                    // Re-resolve the selection against the list that just arrived,
+                    // rather than only seeding it when there is none. The selection
+                    // is held above this screen for the process lifetime, so what
+                    // sits in it is a profile from whichever fetch first produced
+                    // it -- and Play launches THAT one, address, version, checksums
+                    // and all, however many times the roster has changed since.
+                    val wanted = selectedServerState?.assetDir ?: profileManager.lastServerId
+                    // Falls back to the first entry only when nothing is selected
+                    // yet: a fetch that comes back without the selected server --
+                    // a partial roster, a bad response -- must not quietly move
+                    // the selection onto a different server and launch that one.
+                    val resolved = servers.find { it.assetDir == wanted }
+                        ?: servers.firstOrNull().takeIf { selectedServerState == null }
+                    if (resolved != null && resolved != selectedServerState) {
+                        selectedServerState = resolved
+                        ctx.onServerSelected(resolved)
                     }
                 }
             } catch (e: Exception) {
@@ -188,8 +197,9 @@ fun HomeClassicContent(instance: WidgetInstance) {
                         onLaunch = { srv ->
                             selectedServerState = srv
                             ctx.onServerSelected(srv)
-                            launchDriver.observe(LaunchTarget.Server(srv))
-                            controller.launch(ctx.session, srv, ctx.onSessionUpdated)
+                            if (controller.launch(ctx.session, srv, ctx.onSessionUpdated)) {
+                                launchDriver.observe(LaunchTarget.Server(srv))
+                            }
                         },
                         onSettings  = { ctx.onOpenServerSettings(it) },
                         onDetails   = { ctx.onOpenDetails(it) },
@@ -234,8 +244,9 @@ fun HomeClassicContent(instance: WidgetInstance) {
                 state        = launchState,
                 onLaunch     = {
                     selectedServerState?.let { srv ->
-                        launchDriver.observe(LaunchTarget.Server(srv))
-                        controller.launch(ctx.session, srv, ctx.onSessionUpdated)
+                        if (controller.launch(ctx.session, srv, ctx.onSessionUpdated)) {
+                            launchDriver.observe(LaunchTarget.Server(srv))
+                        }
                     }
                 },
                 onAbort      = { controller.abort() },

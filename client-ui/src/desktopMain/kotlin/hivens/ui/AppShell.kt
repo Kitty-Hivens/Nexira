@@ -113,7 +113,6 @@ import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.theme.ThemeManager
 import hivens.ui.system.SystemNotifier
-import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.logic.PostLaunchGate
@@ -194,8 +193,16 @@ sealed class Screen {
     object ThemePicker        : Screen()
     object About              : Screen()
     object BackgroundSettings : Screen()
-    data class ServerSettings(val server: ServerProfile) : Screen()
-    data class ServerDetails (val server: ServerProfile) : Screen()
+    /**
+     * The two server-scoped screens carry the roster id, not the roster entry.
+     * A [ServerProfile] copied into the back stack aged with every fetch -- the
+     * screens went on showing, and launching, an address the roster had since
+     * changed -- and made two visits to the same server structurally different
+     * entries, which is what the dedupe and popTo compare. Same reasoning as
+     * [PackDetail], which has carried an id since it was written.
+     */
+    data class ServerSettings(val serverId: String) : Screen()
+    data class ServerDetails (val serverId: String) : Screen()
 
     /**
      * Library card click target. Carries the PackInstance UUID; the
@@ -594,12 +601,6 @@ fun FrameWindowScope.AppShellContent(
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }
 
-        // Per-domain console preferences -- the same JSON-file-per-manager
-        // shape as customization / background. Loaded eagerly so the
-        // first render uses persisted font / wrap / gutter choices.
-        val consoleSettingsManager = remember { ConsoleSettingsManager(dataDirectory, customizationJson) }
-        var consoleSettings        by remember { mutableStateOf(consoleSettingsManager.load()) }
-
         // Localized tray labels, derived from the active locale's strings.
         // Strings is a data class, so its structural equality lets the
         // locale-reactive effect below re-fire only when a label actually
@@ -901,16 +902,13 @@ fun FrameWindowScope.AppShellContent(
             // what actually projects the palette into the window's surface;
             // this site only ensures the composition locals are in scope.
             if (gameConsole.shouldShowConsole) {
+                // Console preferences are the store's; the window collects them
+                // itself so a slider drag does not recompose the shell.
                 ConsoleWindow(
                     isDarkTheme    = isDarkTheme,
                     onClose        = { gameConsole.hide() },
                     customTheme    = customTheme,
                     style          = effectiveStyle,
-                    settings       = consoleSettings,
-                    onSettingsChange = { updated ->
-                        consoleSettings = updated
-                        consoleSettingsManager.save(updated)
-                    },
                 )
             }
 

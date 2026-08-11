@@ -14,7 +14,6 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.platform.SystemActions
-import kotlinx.coroutines.flow.firstOrNull
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
@@ -26,8 +25,8 @@ internal sealed interface PackResolution {
 }
 
 /**
- * State holder for [PackDetailScreen]: resolving the instance, re-reading it
- * when a background operation rewrites the record, and the launch intents.
+ * State holder for [PackDetailScreen]: following the instance record and the
+ * launch intents.
  *
  * The screen used to reach the launcher directly -- repository, controller,
  * launch driver -- and run the launch in click lambdas, twice over, since the
@@ -57,33 +56,23 @@ internal class PackDetailState(
     val instanceDir: Path? get() = pack?.let { dataDir.resolve("instances").resolve(it.instanceDirName) }
 
     /**
-     * First read: the observed list if it has emitted, else a direct get. Both
-     * are tried because navigation can land here before the repository's first
-     * emission, and a miss on the flow is not a missing pack.
-     */
-    suspend fun resolve() {
-        val found = repo.observe().firstOrNull()?.firstOrNull { it.id == instanceId }
-            ?: repo.get(instanceId)
-        resolution = if (found == null) PackResolution.NotFound else PackResolution.Ready(found)
-    }
-
-    /**
-     * Re-read after a background operation finished.
+     * Follows the record for as long as the screen is up.
      *
-     * An update or a repair rewrites the record from the app scope and outlives
-     * the settings window that started it, so the screen holding the snapshot is
-     * the one that has to refresh -- including after a failure, whose rollback
-     * writes the record too. A read that comes back empty keeps the current
-     * snapshot: a transient miss must not turn the screen into a not-found.
+     * Every write re-emits the whole registry -- a rename or a toggle from the
+     * settings window, a build applied on the app scope, the auto-updater at
+     * startup, the playtime the launch writes back when the game exits -- so the
+     * screen is one of the readers of the record rather than the holder of a copy
+     * taken when it opened. The store's first emission is its snapshot, so an
+     * instance missing from a later one has been deleted, which is a dead end and
+     * says so.
+     *
+     * Never returns: the effect that starts it is what bounds it.
      */
-    suspend fun refresh() {
-        val found = repo.get(instanceId) ?: return
-        resolution = PackResolution.Ready(found)
-    }
-
-    /** Adopt an instance the settings window just rewrote, without a re-read. */
-    fun adopt(instance: PackInstance) {
-        resolution = PackResolution.Ready(instance)
+    suspend fun observe() {
+        repo.observe().collect { instances ->
+            val found = instances.firstOrNull { it.id == instanceId }
+            resolution = if (found == null) PackResolution.NotFound else PackResolution.Ready(found)
+        }
     }
 
     fun play(session: SessionData) {
@@ -109,11 +98,14 @@ internal fun rememberPackDetailState(instanceId: String): PackDetailState {
             instanceId = instanceId,
             repo       = repo,
             dataDir    = paths.dataDir,
-            // Observer first, then launch: the first-non-Idle await has to be
-            // subscribed before Prepare fires.
+            // Launch first, then observe: the controller answers whether it took
+            // this launch, and only a launch that started has anything to narrate.
+            // The state it publishes is a StateFlow, so the observer still sees the
+            // Prepare it subscribes after.
             launch     = { session, pack ->
-                launchDriver.observe(LaunchTarget.Pack(pack))
-                controller.launchPackInstance(session, pack)
+                if (controller.launchPackInstance(session, pack)) {
+                    launchDriver.observe(LaunchTarget.Pack(pack))
+                }
             },
             abort      = controller::abort,
             openInFileManager = { dir -> SystemActions.openFolder(dir.toString()) },

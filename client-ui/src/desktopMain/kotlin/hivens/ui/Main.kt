@@ -51,6 +51,7 @@ import hivens.tray.LibTrayController
 import hivens.tray.TrayController
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
@@ -95,6 +96,9 @@ val uiModule = module {
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
     single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
     single { GameConsoleService(get()) }
+    // One owner of console.json for the three surfaces that read it: the shell's
+    // window, Settings > Console and the pack's Logs tab.
+    single { ConsoleSettingsStore(get<Path>(), get(), get()) }
     // AWT-backed icon downscaler for the content scanner (the engine module
     // stays free of java.desktop; the seam interface lives in core).
     single<IconProcessor> { ImageIoIconProcessor() }

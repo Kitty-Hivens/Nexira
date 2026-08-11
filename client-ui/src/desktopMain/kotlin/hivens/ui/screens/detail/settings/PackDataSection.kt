@@ -6,7 +6,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -27,6 +26,7 @@ import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
@@ -53,7 +53,6 @@ internal fun PackDataSection(
     pack: PackInstance,
     instanceDir: Path,
     operation: PackOperation?,
-    onInstanceChange: (PackInstance) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
@@ -61,7 +60,11 @@ internal fun PackDataSection(
     val updates: PackUpdateService = koinInject()
     val operations: PackOperationService = koinInject()
     val sizes: InstanceSizeService = koinInject()
-    val scope = rememberCoroutineScope()
+    // Both actions here rewrite the instance and outlive this window: deleting it
+    // makes the screen behind resolve to a dead end, which disposes the window --
+    // and on the composition's scope that cancelled the delete's own tail, so the
+    // size entry for an instance that no longer exists was left behind.
+    val scope: CoroutineScope = koinInject()
 
     // A repair rewrites whatever does not match, so it is one of the operations
     // that must not surprise a live session.
@@ -113,7 +116,7 @@ internal fun PackDataSection(
             NxRow(title = s.packSettingsDetach, subtitle = s.packSettingsDetachDesc) {
                 NxButton(
                     s.packSettingsDetachAction,
-                    onClick = { scope.launch { onInstanceChange(service.detachToLocal(pack)) } },
+                    onClick = { scope.launch { service.detachToLocal(pack) } },
                     style = NxButtonStyle.Secondary,
                     compact = true,
                 )

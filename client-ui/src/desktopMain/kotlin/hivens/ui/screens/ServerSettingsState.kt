@@ -1,6 +1,7 @@
 package hivens.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import hivens.core.io.deleteTree
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -65,7 +66,7 @@ private val log = LoggerFactory.getLogger("ServerSettingsState")
 
 @Stable
 internal class ServerSettingsState(
-    val server: ServerProfile,
+    initialServer: ServerProfile,
     private val profileManager: ProfileManager,
     private val manifestProcessor: IManifestProcessorService,
     private val settingsService: ISettingsService,
@@ -75,8 +76,27 @@ internal class ServerSettingsState(
     private val dataDirectory: Path,
     private val scope: CoroutineScope,
 ) {
-    /** Whether the experimental JVM-args builder entry points are shown. */
-    val jvmBuilderEnabled: Boolean = settingsService.getSettings().jvmBuilderEnabled
+    /**
+     * The roster entry this screen is editing settings for. Held by id -- the
+     * holder must not be rebuilt when the roster is re-resolved, or the form would
+     * reload from disk and take the edits the user has not saved with it -- but its
+     * fields are followed, so what the screen reads is what the roster says now.
+     */
+    var server by mutableStateOf(initialServer)
+        private set
+
+    /** Take a re-resolved roster entry for the same server. */
+    fun adopt(updated: ServerProfile) {
+        if (updated.assetDir == server.assetDir) server = updated
+    }
+
+    /**
+     * Whether the experimental JVM-args builder entry points are shown. Read when
+     * asked rather than captured at construction: this holder is remembered per
+     * server and would otherwise answer with the flag as it stood the first time
+     * the screen was opened.
+     */
+    val jvmBuilderEnabled: Boolean get() = settingsService.getSettings().jvmBuilderEnabled
 
     var javaPath by mutableStateOf("")
     var memoryMb by mutableStateOf(4096)
@@ -261,9 +281,13 @@ internal fun rememberServerSettingsState(server: ServerProfile): ServerSettingsS
     val playerRepository: PlayerRepository = koinInject()
     val dataDirectory: Path = koinInject()
     val scope = rememberCoroutineScope()
-    return remember(server) {
+    // Keyed on the server's id, not on the roster entry: the entry is re-resolved
+    // while the screen is open -- its checksum set changes on every server-side
+    // push -- and re-keying on it would rebuild this holder and reload the form
+    // from disk, taking the edits the user had not saved yet with it.
+    val state = remember(server.assetDir) {
         ServerSettingsState(
-            server = server,
+            initialServer = server,
             profileManager = profileManager,
             manifestProcessor = manifestProcessor,
             settingsService = settingsService,
@@ -274,6 +298,10 @@ internal fun rememberServerSettingsState(server: ServerProfile): ServerSettingsS
             scope = scope,
         )
     }
+    // The entry itself is followed: the holder keeps the form, the roster keeps the
+    // address, the version and the checksums it launches and repairs against.
+    LaunchedEffect(state, server) { state.adopt(server) }
+    return state
 }
 
 // ── Pure logic (unit-tested without a ProfileManager) ────────────────────────

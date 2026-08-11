@@ -71,12 +71,16 @@ fun ServerDetailsSurface(
     val s = LocalStrings.current
     val paths: PlatformPaths = koinInject()
 
-    val assetsPath = remember(server) { paths.clientDir(server.assetDir).toFile() }
-    val description = remember(server) { mutableStateOf<String?>(null) }
-    val bannerImage = remember(server) { mutableStateOf<ImageBitmap?>(null) }
-    var isLoading by remember(server) { mutableStateOf(true) }
+    // Everything below is keyed on the server's id rather than the roster entry:
+    // the entry is re-resolved while the page is open and differs by fields these
+    // reads do not depend on, and re-keying on it flashed the page back to its
+    // loading state and re-read both files for nothing.
+    val assetsPath = remember(server.assetDir) { paths.clientDir(server.assetDir).toFile() }
+    val description = remember(server.assetDir) { mutableStateOf<String?>(null) }
+    val bannerImage = remember(server.assetDir) { mutableStateOf<ImageBitmap?>(null) }
+    var isLoading by remember(server.assetDir) { mutableStateOf(true) }
 
-    LaunchedEffect(server) {
+    LaunchedEffect(server.assetDir) {
         withContext(Dispatchers.IO) {
             val descFile = File(assetsPath, "description.txt")
             if (descFile.exists()) description.value = descFile.readText()

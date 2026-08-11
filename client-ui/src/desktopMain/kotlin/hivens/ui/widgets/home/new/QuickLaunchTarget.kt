@@ -101,8 +101,11 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
             icon = NxIcon.PlayArrow,
             launch = launch@{
                 val real = session ?: return@launch
-                launchDriver.observe(LaunchTarget.Pack(target))
-                controller.launchPackInstance(real, target)
+                // Narrated only if the controller took it -- the button's own gate
+                // is a frame behind the state it reads.
+                if (controller.launchPackInstance(real, target)) {
+                    launchDriver.observe(LaunchTarget.Pack(target))
+                }
             },
         )
         LaunchAffordance.PlayOffline -> QuickLaunchTarget(
@@ -114,12 +117,17 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
             launch = {
                 // Same offline identity LoginPanel's button mints; the shipped
                 // offline-launch path handles the rest from the cached manifest.
-                val name = offlineName
-                if (!name.isNullOrBlank()) {
-                    scope.launch {
-                        val offlineSession = withContext(Dispatchers.IO) { offlineProvider.login(name, "", "") }
+                //
+                // Re-read at the click rather than launched under the name the
+                // affordance was resolved with: what decides whether to offer the
+                // button can afford to lag by a frame, what the game runs as
+                // cannot.
+                scope.launch {
+                    val name = withContext(Dispatchers.IO) { settingsService.getSettings().offlinePlayerName }
+                    if (name.isNullOrBlank()) return@launch
+                    val offlineSession = withContext(Dispatchers.IO) { offlineProvider.login(name, "", "") }
+                    if (controller.launchPackInstance(offlineSession, target)) {
                         launchDriver.observe(LaunchTarget.Pack(target))
-                        controller.launchPackInstance(offlineSession, target)
                     }
                 }
             },

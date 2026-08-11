@@ -28,6 +28,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,7 +36,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +65,12 @@ import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
 import hivens.core.update.UpdateCheck
+import hivens.core.update.UpdateOutcome
 import hivens.core.update.VersionChannel
+import hivens.launcher.PackOperation
+import hivens.launcher.PackOperationKind
+import hivens.launcher.PackOperationPhase
+import hivens.launcher.PackOperationService
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.formatBuildTime
@@ -98,22 +103,12 @@ import hivens.ui.utils.humanSize
 import hivens.ui.theme.decorativeColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.time.Instant
 
 /** Which base the changelog diff compares the selected build against. */
 private enum class DiffBase { Previous, Installed }
-
-/** Lifecycle of a switch/restore run, rendered in the layout-stable status row. */
-private sealed interface ApplyState {
-    data object Idle : ApplyState
-    data class Running(val current: Int, val total: Int, val path: String) : ApplyState
-    data class Done(val version: String) : ApplyState
-    data class Failed(val reason: String) : ApplyState
-}
 
 /**
  * Full-screen version manager for a mirror pack instance: the retained build
@@ -132,56 +127,93 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     val mirror: IMirrorPackClient = koinInject()
     val icons: ModIconResolver = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
+    val operations: PackOperationService = koinInject()
     val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
 
-    var instance by remember(instanceId) { mutableStateOf<PackInstance?>(null) }
-    var resolved by remember(instanceId) { mutableStateOf(false) }
-    LaunchedEffect(instanceId) {
-        instance = repo.observe().firstOrNull()?.firstOrNull { it.id == instanceId } ?: repo.get(instanceId)
-        resolved = true
+    // Follows the registry rather than reading it once: an apply started in the
+    // settings window this screen was opened from lands underneath it, and so does
+    // the auto-update pass at startup. Both used to leave the "current" marker,
+    // the switch banner and the restore points describing the build before them.
+    val instances by remember { repo.observe() }.collectAsState(initial = null)
+    val inFlight by operations.operations.collectAsState()
+    val pack = instances?.firstOrNull { it.id == instanceId }
+
+    // A finished outcome is read here and nowhere else once the screen goes; a
+    // running operation is left alone, since leaving is not what ends it.
+    DisposableEffect(instanceId) {
+        onDispose { operations.dismiss(instanceId) }
     }
 
-    if (!resolved) {
+    if (instances == null) {
         CenteredProgress(Modifier.fillMaxSize())
         return
     }
-    val pack = instance ?: run { onBack(); return }
+    if (pack == null) {
+        // Deleted from under the screen: leave rather than paint a version manager
+        // for an instance that is gone.
+        LaunchedEffect(instanceId) { onBack() }
+        CenteredProgress(Modifier.fillMaxSize())
+        return
+    }
     val installedVersion = pack.pinnedPackVersion ?: pack.packRef.version
+    val operation = inFlight[instanceId]
+    val busy = operation?.isRunning == true
 
     var builds by remember(pack.id) { mutableStateOf<List<SmrtManifestBuild>?>(null) }
     var loadFailed by remember(pack.id) { mutableStateOf(false) }
     var loadTick by remember(pack.id) { mutableIntStateOf(0) }
     var selected by remember(pack.id) { mutableStateOf<SmrtManifestBuild?>(null) }
     var snapshots by remember(pack.id) { mutableStateOf<List<PackSnapshot>>(emptyList()) }
-    var applyState by remember(pack.id) { mutableStateOf<ApplyState>(ApplyState.Idle) }
     var confirmTarget by remember(pack.id) { mutableStateOf<UpdateCheck.Available?>(null) }
-
-    fun refreshInstance() {
-        scope.launch { repo.get(pack.id)?.let { instance = it } }
-    }
 
     // A switch and a rollback both rewrite the instance on disk. Warned about,
     // not blocked, when that instance is the one currently playing.
     val runningGuard = rememberRunningPackGuard(pack.id)
 
-    fun afterApply() {
-        refreshInstance()
-        // listSnapshots walks the snapshot root and reads a record per entry. Both
-        // callers here run on the composition's dispatcher, which is the UI thread,
-        // so the walk has to be handed to IO or it stalls the window.
-        scope.launch {
-            snapshots = withContext(Dispatchers.IO) {
-                runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
+    // Both rewrite the whole instance and outlive this screen: Back, the corner
+    // close and a click on a breadcrumb all dispose it, and on the composition's
+    // scope every one of those cancelled the apply mid-flight -- the rollback put
+    // the files back and the user was left with a switch that silently did not
+    // happen. Same owner the settings window's apply already uses.
+    fun doSwitch(targetVersion: String) {
+        operations.start(pack, PackOperationKind.Update) { progress ->
+            val fresh = repo.get(pack.id) ?: pack
+            val outcome = updater.applyUpdate(fresh, targetVersion) { current, total, path ->
+                progress(current, total, path.substringAfterLast('/'))
             }
+            // The user just handled this instance's version by hand: clear any
+            // stale Pending so the ambient badges agree with reality.
+            hub.report(pack.id, PackUpdateStatus.UpToDate)
+            // The build that ended up installed, which is not the asked-for one
+            // when the apply found it already in place.
+            PackOperationPhase.Updated((outcome as? UpdateOutcome.Applied)?.toVersion ?: targetVersion)
         }
     }
 
-    fun doSwitch(targetVersion: String) =
-        runSwitch(scope, updater, repo, hub, pack, targetVersion, onState = { applyState = it }, onDone = ::afterApply)
+    fun doRestore(snapshotId: String) {
+        operations.start(pack, PackOperationKind.Update) { _ ->
+            val fresh = repo.get(pack.id) ?: pack
+            val restored = updater.rollback(fresh, snapshotId)
+            hub.report(pack.id, PackUpdateStatus.UpToDate)
+            PackOperationPhase.Updated(
+                restored.pinnedPackVersion ?: restored.packRef.version ?: snapshotId,
+            )
+        }
+    }
 
-    fun doRestore(snapshotId: String) =
-        runRestore(scope, updater, repo, hub, pack, snapshotId, onState = { applyState = it }, onDone = ::afterApply)
+    // Re-listed when the installed build changes and when an operation ends: an
+    // apply writes a restore point and the retention sweep drops the oldest, and
+    // neither of those is this screen's own doing any more. The walk reads a
+    // record per entry, so it goes to IO rather than stalling the window.
+    LaunchedEffect(pack.id, installedVersion, loadTick, operation?.isRunning) {
+        // Not while one is running: the apply is writing a snapshot under the same
+        // root this walks, and the list it would produce is neither current nor
+        // final. The end of the operation re-runs this.
+        if (operation?.isRunning == true) return@LaunchedEffect
+        snapshots = withContext(Dispatchers.IO) {
+            runCatching { updater.listSnapshots(pack) }.getOrDefault(snapshots)
+        }
+    }
 
     // Stale-then-fresh: a cached listing paints at once, the reloaded one replaces
     // it in place. Reading it once instead left the screen showing whatever the
@@ -190,9 +222,6 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     LaunchedEffect(pack.id, loadTick) {
         loadFailed = false
         builds = null
-        snapshots = withContext(Dispatchers.IO) {
-            runCatching { updater.listSnapshots(pack) }.getOrDefault(emptyList())
-        }
         updater.availableBuildsStream(pack)
             .catch { loadFailed = true }
             .collect { list ->
@@ -241,7 +270,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                             updater          = updater,
                             mirror           = mirror,
                             icons            = icons,
-                            busy             = applyState is ApplyState.Running,
+                            busy             = busy,
                             onSwitch         = { preview ->
                                 if (preview.compat.isSafe) {
                                     runningGuard.run { doSwitch(sel.versionNumber) }
@@ -253,7 +282,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                         if (snapshots.isNotEmpty()) {
                             SnapshotsSection(
                                 snapshots = snapshots,
-                                busy      = applyState is ApplyState.Running,
+                                busy      = busy,
                                 onRestore = { snap -> runningGuard.run { doRestore(snap.id) } },
                             )
                         }
@@ -262,7 +291,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                     }
                 }
             }
-            StatusRow(applyState)
+            StatusRow(operation)
         }
         // Corner close mirrors the settings window: the screen is a route (back
         // works too), but a transient-feeling surface earns an explicit exit.
@@ -297,63 +326,6 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     }
 
     runningGuard.Dialog()
-}
-
-// ─── Actions ─────────────────────────────────────────────────────────────────
-
-private fun runSwitch(
-    scope: kotlinx.coroutines.CoroutineScope,
-    updater: PackUpdater,
-    repo: IPackRepository,
-    hub: PackUpdateStatusHub,
-    pack: PackInstance,
-    targetVersion: String,
-    onState: (ApplyState) -> Unit,
-    onDone: () -> Unit,
-) {
-    scope.launch {
-        onState(ApplyState.Running(0, 0, ""))
-        runCatching {
-            val fresh = repo.get(pack.id) ?: pack
-            updater.applyUpdate(fresh, targetVersion) { current, total, path ->
-                onState(ApplyState.Running(current, total, path.substringAfterLast('/')))
-            }
-        }.onSuccess {
-            // The user just handled this instance's version by hand: clear any
-            // stale Pending so the ambient badges agree with reality. Quiet on
-            // purpose -- the result already shows in this screen's status row.
-            hub.report(pack.id, PackUpdateStatus.UpToDate)
-            onState(ApplyState.Done(targetVersion))
-            onDone()
-        }.onFailure {
-            onState(ApplyState.Failed(it.message ?: it.toString()))
-        }
-    }
-}
-
-private fun runRestore(
-    scope: kotlinx.coroutines.CoroutineScope,
-    updater: PackUpdater,
-    repo: IPackRepository,
-    hub: PackUpdateStatusHub,
-    pack: PackInstance,
-    snapshotId: String,
-    onState: (ApplyState) -> Unit,
-    onDone: () -> Unit,
-) {
-    scope.launch {
-        onState(ApplyState.Running(0, 0, ""))
-        runCatching {
-            val fresh = repo.get(pack.id) ?: pack
-            updater.rollback(fresh, snapshotId)
-        }.onSuccess {
-            hub.report(pack.id, PackUpdateStatus.UpToDate)
-            onState(ApplyState.Done(it.pinnedPackVersion ?: ""))
-            onDone()
-        }.onFailure {
-            onState(ApplyState.Failed(it.message ?: it.toString()))
-        }
-    }
 }
 
 // ─── Left pane: build list ───────────────────────────────────────────────────
@@ -573,7 +545,7 @@ private fun BuildDetailPane(
                     tone  = if (p.compat.isSafe) NxCalloutTone.Info else NxCalloutTone.Warning,
                 ) {
                     Row {
-                        PuppetClick("packVersions.switch.${build.versionNumber}") { onSwitch(p) }
+                        PuppetClick("packVersions.switch.${build.versionNumber}", enabled = !busy) { onSwitch(p) }
                         NxButton(
                             label   = s.packVersionsSwitchTo,
                             onClick = { onSwitch(p) },
@@ -850,23 +822,26 @@ private fun SnapshotsSection(
 /**
  * Layout-stable bottom strip for the in-progress/last operation (Rule 6: a
  * transient affordance lives in a reserved slot, it never reflows the panes).
+ *
+ * Narrates whatever this instance is running, whether or not this screen is what
+ * started it -- an apply begun in the settings window carries on underneath.
  */
 @Composable
-private fun StatusRow(state: ApplyState) {
+private fun StatusRow(operation: PackOperation?) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     Box(Modifier.fillMaxWidth().height(34.dp).padding(top = 8.dp), contentAlignment = Alignment.CenterStart) {
-        when (state) {
-            ApplyState.Idle -> Unit
-            is ApplyState.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (state.total > 0) {
+        when (val phase = operation?.phase) {
+            null -> Unit
+            is PackOperationPhase.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (phase.total > 0) {
                     LinearProgressIndicator(
-                        progress = { state.current.toFloat() / state.total },
+                        progress = { phase.current.toFloat() / phase.total },
                         modifier = Modifier.width(160.dp),
                         color    = colors.primary,
                     )
                     Text(
-                        text  = s.packVersionsApplying(state.current, state.total, state.path),
+                        text  = s.packVersionsApplying(phase.current, phase.total, phase.path),
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.textSecondary,
                         maxLines = 1,
@@ -876,13 +851,18 @@ private fun StatusRow(state: ApplyState) {
                     LinearProgressIndicator(modifier = Modifier.width(160.dp), color = colors.primary)
                 }
             }
-            is ApplyState.Done -> Text(
-                text  = s.packVersionsApplied(state.version),
+            is PackOperationPhase.Updated -> Text(
+                text  = s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.success,
             )
-            is ApplyState.Failed -> Text(
-                text     = s.packVersionsFailed(state.reason),
+            is PackOperationPhase.Repaired -> Text(
+                text  = s.packSettingsRepairDone(phase.checked, phase.repaired),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.success,
+            )
+            is PackOperationPhase.Failed -> Text(
+                text     = s.packVersionsFailed(phase.message),
                 style    = MaterialTheme.typography.labelSmall,
                 color    = colors.error,
                 maxLines = 1,

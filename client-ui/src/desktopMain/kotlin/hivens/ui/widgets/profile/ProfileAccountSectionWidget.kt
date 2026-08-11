@@ -68,8 +68,10 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
 
-    var refreshKey by remember { mutableIntStateOf(0) }
-    val scSession = remember(refreshKey, ctx.session) { credentials.accountFor(SC_KEY) }
+    // The surface's revision rather than a key of this section's own: the nav's
+    // face picker has to hear about a sign-out that happens here.
+    val revision = ctx.accountsRevision
+    val scSession = remember(revision.value, ctx.session) { credentials.accountFor(SC_KEY) }
 
     Box(Modifier.fillMaxWidth()) {
         Column(Modifier.widthIn(max = 520.dp)) {
@@ -79,12 +81,12 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
                 LoginPanel(
                     onLogin = {
                         credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
-                        refreshKey++
+                        revision.value++
                     },
                     showMicrosoft = false,
                 )
             } else {
-                SmartyCraftAccount(scSession) { refreshKey++ }
+                SmartyCraftAccount(scSession) { revision.value++ }
             }
         }
     }

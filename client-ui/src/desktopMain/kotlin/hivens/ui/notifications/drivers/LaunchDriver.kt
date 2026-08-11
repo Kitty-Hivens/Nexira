@@ -28,7 +28,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -65,21 +64,30 @@ class LaunchDriver(
 ) {
     private val log = LoggerFactory.getLogger(LaunchDriver::class.java)
 
-    // Per-target de-dup: rapid double-clicks must not stack observers.
-    // put-then-cancel-previous is atomic via ConcurrentHashMap.put returning
-    // the prior mapping.
+    // Per-target de-dup: a re-launch of the same target must not stack observers.
+    // put-then-cancel-previous is atomic via ConcurrentHashMap.put returning the
+    // prior mapping.
     private val observerJobs: ConcurrentHashMap<String, Job> = ConcurrentHashMap()
 
+    /**
+     * Narrates the launch that has just been accepted for [target].
+     *
+     * Call it only when the controller took the launch -- `launch` and
+     * `launchPackInstance` both answer that. Guessing instead is what produced the
+     * two failures this shape replaced: eviction on the click cost the running
+     * game its narration when the controller refused the launch, and waiting for a
+     * Prepare to arrive could not tell whose Prepare it was, because a refused
+     * click is by construction newer than the launch it was refused for.
+     *
+     * With the caller gated, every prior observation belongs to a launch that has
+     * ended -- the controller only accepts from Idle or Error -- so replacing them
+     * here is both safe and necessary: when a launch is aborted and the next starts
+     * at once, `controller.state` can conflate the terminal Idle into the new
+     * Prepare, leaving the old collector open to process the new launch's
+     * GameRunning under the old target.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun observe(target: LaunchTarget) {
-        // Single active launch only (the controller enforces it via its
-        // launchLock), so at most one observer should ever be live.
-        // Cancel EVERY prior observer, not just the same target's: when
-        // launch A is aborted and B starts immediately, controller.state
-        // can conflate A's terminal Idle into B's Prepare, leaving A's
-        // collector open. A stale A-observer would then process B's
-        // GameRunning and attach A's dead process stdin sink + register
-        // the session under A. Cancelling all prior jobs closes that race.
         observerJobs.values.forEach { it.cancel() }
         observerJobs.clear()
         val job = appScope.launch {
@@ -92,17 +100,17 @@ class LaunchDriver(
                 controller.events.collect { event -> onLaunchEvent(target, event) }
             }
             try {
-                // dropWhile-until-Prepare handles BOTH stale-Idle and stale-
-                // terminal (Error / GameRunning from a previous launch).
-                // Every fresh launch transitions through Prepare(INIT) first,
-                // so the new launch's first state passes the gate.
+                // No gate on the leading state any more. The accepted launch set
+                // Prepare before the call returned, so every value from here is
+                // this launch's -- and waiting for a Prepare that a fast failure
+                // has already moved past would park this collector for ever and
+                // leave that failure unreported.
                 //
                 // transformWhile-emit-then-stop terminates the flow on the
                 // first terminal value seen. `return@launch` from inside a
                 // crossinline `collect { }` lambda is prohibited; this is
                 // the flow-operator equivalent.
                 controller.state
-                    .dropWhile { it !is LaunchState.Prepare }
                     .transformWhile { state ->
                         emit(state)
                         state !is LaunchState.Idle && state !is LaunchState.Error
@@ -296,11 +304,11 @@ class LaunchDriver(
             }
             twoFactorGate.request(target.displayName, serverId) { session ->
                 appScope.launch {
-                    observe(target)
-                    when (target) {
+                    val accepted = when (target) {
                         is LaunchTarget.Pack -> controller.launchPackInstance(session, target.instance)
                         is LaunchTarget.Server -> controller.launch(session, target.server)
                     }
+                    if (accepted) observe(target)
                 }
             }
             return
@@ -350,8 +358,9 @@ class LaunchDriver(
     private fun relaunchOffline(instance: PackInstance, name: String) {
         appScope.launch {
             val session = offlineProvider.login(name, "", "")
-            observe(LaunchTarget.Pack(instance))
-            controller.launchPackInstance(session, instance)
+            // Only narrate what the controller took: this action lives on a sticky
+            // notification, so it can be clicked long after another game is up.
+            if (controller.launchPackInstance(session, instance)) observe(LaunchTarget.Pack(instance))
         }
     }
 

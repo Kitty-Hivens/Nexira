@@ -106,6 +106,7 @@ import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
+import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
@@ -251,6 +252,9 @@ fun EditorSurfaceHost(
 
     val dragController = remember { DragController() }
     val registry       = remember { DropTargetRegistry() }
+    // Descriptor knowledge for the preset load below; the structural reconcile in
+    // the launcher has no registry to consult.
+    val widgetRegistry = LocalWidgetRegistry.current
     val focusManager   = LocalFocusManager.current
     val density        = LocalDensity.current
 
@@ -579,7 +583,27 @@ fun EditorSurfaceHost(
                             } ?: return@launch
                             when (result) {
                                 is LayoutReconcile.Result.Ok -> {
-                                    layoutRepo.update { result.graph }
+                                    // And the registry-aware pass on top of it: the
+                                    // structural one seeds missing surfaces and slots
+                                    // but knows nothing of widget descriptors, so a
+                                    // preset saved before a container declared a child
+                                    // slot arrives without it -- the slot draws its
+                                    // placeholder, highlights on hover, and silently
+                                    // swallows every drop until the next start
+                                    // reconciles what this wrote to disk.
+                                    val seeded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                        WidgetGraphReconciler.reconcile(
+                                            graph    = result.graph,
+                                            registry = widgetRegistry,
+                                        )
+                                    }
+                                    if (seeded.seededSlots > 0) {
+                                        log.info(
+                                            "Preset '{}': seeded {} declared container child slot(s)",
+                                            meta.name, seeded.seededSlots,
+                                        )
+                                    }
+                                    layoutRepo.update { seeded.graph }
                                     onCustomizationChanged(env.customization)
                                     onUiStyleChanged(env.uiStyle)
                                     presetPanelOpen = false

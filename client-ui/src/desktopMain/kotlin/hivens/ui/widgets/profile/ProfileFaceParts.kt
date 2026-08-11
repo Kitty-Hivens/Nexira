@@ -61,12 +61,16 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
 
-    // Keyed on the session so signing a provider in or out re-reads the list:
-    // the picker's whole job is to name one of the accounts that exist now.
-    val accounts = remember(ctx.session) { credentials.listAccounts() }
+    // Keyed on the surface's account revision as well as the session: the picker's
+    // whole job is to name one of the accounts that exist now, and signing out of
+    // one that was not fronting the shell leaves the session structurally
+    // identical -- so on that alone the picker went on offering a provider that
+    // had just been removed, and choosing it wrote the preference for it.
+    val revision = ctx.accountsRevision.value
+    val accounts = remember(revision, ctx.session) { credentials.listAccounts() }
     if (accounts.size < 2) return
 
-    var preferred by remember(ctx.session) {
+    var preferred by remember(revision, ctx.session) {
         mutableStateOf(settingsService.getSettings().preferredFaceProvider)
     }
 

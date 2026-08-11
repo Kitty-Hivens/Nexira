@@ -1,6 +1,5 @@
 package hivens.ui
 
-import hivens.core.api.model.ServerProfile
 import hivens.core.data.PackOrigin
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -74,7 +73,7 @@ class NavBackStackTest {
     @Test
     fun topLevelDestinationResetsHistory() {
         val nav = NavBackStack(Screen.Home)
-        nav.navigate(Screen.ServerSettings(ServerProfile()))
+        nav.navigate(Screen.ServerSettings("industrial"))
         assertTrue(nav.canGoBack)
         nav.navigate(Screen.Library)
         assertEquals(Screen.Library, nav.current)
