@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IMirrorPackClient
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
@@ -62,14 +61,13 @@ import org.koin.compose.koinInject
 internal fun PackVersionSection(
     pack: PackInstance,
     operation: PackOperation?,
-    onInstanceChange: (PackInstance) -> Unit,
+    save: (PackInstance) -> Unit,
     onOpenVersions: () -> Unit = {},
     onNotice: (String?) -> Unit = {},
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     val updater: PackUpdater = koinInject()
-    val repo: IPackRepository = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
     val operations: PackOperationService = koinInject()
@@ -187,11 +185,7 @@ internal fun PackVersionSection(
             pack.followLatest,
             description = s.packVersionFollowLatestDesc,
             icon = NxIcon.Sync,
-        ) { enabled ->
-            val updated = pack.copy(followLatest = enabled)
-            onInstanceChange(updated)
-            scope.launch { repo.put(updated) }
-        }
+        ) { enabled -> save(pack.copy(followLatest = enabled)) }
         // Up-to-date is a quiet one-liner inside the section, not a banner block.
         if (check == UpdateCheck.UpToDate) {
             Text(s.packVersionUpToDate, style = MaterialTheme.typography.bodySmall, color = colors.success)

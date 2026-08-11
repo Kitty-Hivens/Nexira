@@ -134,8 +134,8 @@ fun AppLayout(
                                     initialSelectedServer = selectedServer,
                                     onServerSelected      = { selectedServer = it },
                                     onSessionUpdated      = { currentSession = it },
-                                    onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
-                                    onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
+                                    onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it.assetDir)) },
+                                    onOpenDetails         = { onScreenChange(Screen.ServerDetails(it.assetDir)) }
                                 )
                                 appState is AppState.Loading -> ContentLoadingPlaceholder()
                                 else -> ContentLoginRequiredPlaceholder(
@@ -215,16 +215,20 @@ fun AppLayout(
                         )
 
                     is Screen.ServerSettings ->
-                        ServerSettingsScreen(
-                            server = screen.server,
-                            onBack = onBack
-                        )
+                        WithServer(screen.serverId, onBack) { server ->
+                            ServerSettingsScreen(
+                                server = server,
+                                onBack = onBack
+                            )
+                        }
 
                     is Screen.ServerDetails ->
-                        ServerDetailsSurface(
-                            server = screen.server,
-                            onBack = onBack,
-                        )
+                        WithServer(screen.serverId, onBack) { server ->
+                            ServerDetailsSurface(
+                                server = server,
+                                onBack = onBack,
+                            )
+                        }
 
                     Screen.Library -> LibraryScreen(
                         appState       = appState,
@@ -371,6 +375,29 @@ fun AppSidebar(
 }
 
 private const val SIDEBAR_SURFACE = "appshell.leftrail"
+
+/**
+ * Renders [content] once the roster entry behind a server-scoped route resolves.
+ *
+ * A server that is no longer on the roster leaves rather than paints a screen
+ * built on an entry nothing serves any more -- the same exit the version manager
+ * takes when its instance is deleted underneath it.
+ */
+@Composable
+private fun WithServer(
+    serverId: String,
+    onBack: () -> Unit,
+    content: @Composable (ServerProfile) -> Unit,
+) {
+    when (val resolution = rememberServerResolution(serverId)) {
+        ServerResolution.Loading -> ContentLoadingPlaceholder()
+        ServerResolution.NotFound -> {
+            LaunchedEffect(serverId) { onBack() }
+            ContentLoadingPlaceholder()
+        }
+        is ServerResolution.Ready -> content(resolution.server)
+    }
+}
 
 // ─── Loading placeholder ──────────────────────────────────────────────────────
 

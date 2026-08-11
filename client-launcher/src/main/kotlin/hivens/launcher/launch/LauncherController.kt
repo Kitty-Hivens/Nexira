@@ -45,7 +45,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.slf4j.MDCContext
 
 /**
@@ -124,14 +128,31 @@ class LauncherController(
      * cancelled the persistence mid-flight and the toggle silently
      * reverted on next load. The launcher-side scope outlives the UI
      * so the write always reaches disk.
+     *
+     * Each call carries the WHOLE selection, so a second flip made before the
+     * first has landed supersedes it rather than adding to it. The scope is
+     * multi-threaded, so without the sequence below the two could land in either
+     * order and the older selection could be the one left on disk -- a toggle
+     * the user flipped last, silently undone. Superseded calls are dropped, and
+     * what is left runs one at a time per instance.
      */
     fun setOptionalModsAsync(
         instance: PackInstance,
         manifest: SmrtPackManifest,
         toggles: List<ContentToggle>,
     ) {
-        appScope.launch { setOptionalMods(instance, manifest, toggles) }
+        val latest = optionalWriteSeq.computeIfAbsent(instance.id) { AtomicLong() }.incrementAndGet()
+        appScope.launch {
+            optionalWriteLocks.computeIfAbsent(instance.id) { Mutex() }.withLock {
+                if (optionalWriteSeq[instance.id]?.get() != latest) return@withLock
+                setOptionalMods(instance, manifest, toggles)
+            }
+        }
     }
+
+    /** Per-instance ordering for [setOptionalModsAsync]; see its KDoc. */
+    private val optionalWriteSeq = ConcurrentHashMap<String, AtomicLong>()
+    private val optionalWriteLocks = ConcurrentHashMap<String, Mutex>()
 
     /**
      * The pack's own `mods/` baseline as filename -> sha1, from the installed
@@ -246,6 +267,8 @@ class LauncherController(
      * SC server-list launch. Delegates the gate/token/MDC/spawn/wait/exit
      * machinery to [launchInternal]; [prepareServerLaunch] supplies the
      * SC-specific auth + sync + java steps and the spawn binding.
+     *
+     * @return false when a launch was already under way and this one was refused.
      */
     fun launch(
         currentSession: SessionData,
@@ -304,7 +327,7 @@ class LauncherController(
         label: String,
         onStart: () -> Unit,
         prepare: suspend CoroutineScope.() -> Prepared,
-    ) {
+    ): Boolean {
         // Re-entry guard must be atomic with the launchJob assignment. Without
         // the lock two parallel callers (UI double-click, tray-launch racing
         // dashboard-launch) could both observe Idle, both pass the gate, both
@@ -314,7 +337,7 @@ class LauncherController(
         // during the long flow.
         synchronized(launchLock) {
             if (_state.value !is LaunchState.Idle &&
-                _state.value !is LaunchState.Error) return
+                _state.value !is LaunchState.Error) return false
             _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
         }
 
@@ -414,6 +437,7 @@ class LauncherController(
                 }
             }
         }
+        return true
     }
 
     /**
@@ -610,6 +634,8 @@ class LauncherController(
      * come from [launchInternal]; [preparePackLaunch] supplies the manifest
      * resolve + pack auth + spawn binding, so the existing UI surfaces
      * (LaunchControlPanel, GameConsoleService) plug in unchanged.
+     *
+     * @return false when a launch was already under way and this one was refused.
      */
     fun launchPackInstance(
         currentSession: SessionData,

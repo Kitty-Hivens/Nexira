@@ -138,6 +138,13 @@ fun EditableWidgetChrome(
     // in-flight visual translation, committed to a target cell on release.
     val liveCell = rememberUpdatedState(instance.cell)
     val cubeGeo = rememberUpdatedState(LocalCubeGeometry.current)
+    // Same reason, for the values the flow-reorder branch hands on: a gesture that
+    // does not restart between drags would announce the position the widget held
+    // when it was first dragged, and commit through the host's first drop handler
+    // rather than the one built against the layout as it stands.
+    val liveIndex = rememberUpdatedState(index)
+    val liveInstance = rememberUpdatedState(instance)
+    val liveCommitDrop = rememberUpdatedState(onCommitDrop)
     var cubeDrag by remember { mutableStateOf(Offset.Zero) }
     // Cursor anchor for the right-click context menu (null = closed).
     var menuAnchor by remember { mutableStateOf<Offset?>(null) }
@@ -268,7 +275,12 @@ fun EditableWidgetChrome(
                             }
                         }
                     }
-                    .pointerInput(instance.instanceId, isCanvas) {
+                    // Keyed on the slot and its orientation as well as the widget:
+                    // which branch this gesture takes IS the orientation, and a
+                    // slot flipped from Column to CubeGrid under a widget left the
+                    // running gesture reordering a grid. Restarting between drags
+                    // costs nothing; mid-drag neither value can change.
+                    .pointerInput(instance.instanceId, path, orientation) {
                         awaitEachGesture {
                             // requireUnconsumed: yield to the hover affordances
                             // and resize handle stacked above (each consumes its
@@ -332,7 +344,7 @@ fun EditableWidgetChrome(
                                         ?: return@awaitEachGesture
                                     val bounds = widgetWindowBounds ?: return@awaitEachGesture
                                     controller.begin(
-                                        payload         = DragPayload.ExistingWidget(path, index, instance),
+                                        payload         = DragPayload.ExistingWidget(path, liveIndex.value, liveInstance.value),
                                         pointerInWindow = bounds.topLeft + slop.position,
                                         pickupOffset    = slop.position,
                                         widgetSize      = Offset(bounds.width, bounds.height),
@@ -347,7 +359,7 @@ fun EditableWidgetChrome(
                                         }
                                         change.consume()
                                     }
-                                    onCommitDrop(last)
+                                    liveCommitDrop.value(last)
                                     controller.end()
                                 }
                             }

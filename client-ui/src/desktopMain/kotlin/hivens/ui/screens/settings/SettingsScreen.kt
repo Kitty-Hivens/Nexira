@@ -99,7 +99,7 @@ fun SettingsScreen(
                             uiStyle                      = uiStyle,
                             onUiStyleChanged             = onUiStyleChanged,
                         )
-                        SettingsCategory.Console -> ConsoleSection(paths = paths)
+                        SettingsCategory.Console -> ConsoleSection()
                         SettingsCategory.Network -> NetworkSection()
                         SettingsCategory.Smarty -> SmartySection(
                             form = form,

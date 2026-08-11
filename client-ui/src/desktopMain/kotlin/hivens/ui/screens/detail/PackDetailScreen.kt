@@ -49,8 +49,6 @@ import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
-import hivens.launcher.PackOperationService
-import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.VideoMedia
@@ -63,6 +61,8 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.core.launch.LaunchControlMode
+import hivens.core.launch.LaunchState
+import hivens.launcher.launch.LauncherController
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
@@ -89,7 +89,7 @@ import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
-import hivens.ui.utils.ConsoleSettingsManager
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import java.io.File
@@ -97,8 +97,9 @@ import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 
 /**
@@ -124,18 +125,15 @@ fun PackDetailScreen(
     PuppetClick("packDetail.back") { onBack() }
 
     val state = rememberPackDetailState(instanceId)
-    val paths: PlatformPaths = koinInject()
+    val controller: LauncherController = koinInject()
     val indications: IndicationCenter = koinInject()
     val updateHub: PackUpdateStatusHub = koinInject()
     val autoUpdateStatuses by updateHub.statuses.collectAsState()
 
-    LaunchedEffect(state) { state.resolve() }
-
-    val operations: PackOperationService = koinInject()
-    val instanceOperations by operations.operations.collectAsState()
-    LaunchedEffect(instanceOperations[instanceId]?.phase) {
-        if (instanceOperations[instanceId]?.isRunning == false) state.refresh()
-    }
+    // Following the record covers every writer at once: the settings window, an
+    // update or repair running on the app scope, the auto-updater, and the launch
+    // writing playtime back when the game exits.
+    LaunchedEffect(state) { state.observe() }
 
     when (val resolution = state.resolution) {
         PackResolution.Loading -> {
@@ -158,10 +156,24 @@ fun PackDetailScreen(
     val authedSession = (appState as? AppState.Authenticated)?.session
     val launchIndication by indications.launchIndication(pack.id).collectAsState()
 
+    // The launcher runs one game at a time, and this page only knew about its own
+    // pack: with another one up, Play read as available, the controller refused it,
+    // and the click cost the running game its narration for nothing. Same test the
+    // home launch controls use.
+    // Collapsed to the one question this screen asks before collecting it:
+    // Downloading republishes per progress callback, and this page has no reason
+    // to repaint at frame rate while some other pack downloads.
+    val launcherIdle by remember(controller) {
+        controller.state
+            .map { it is LaunchState.Idle || it is LaunchState.Error }
+            .distinctUntilChanged()
+    }.collectAsState(initial = true)
+    val canPlay = authedSession != null && launcherIdle
+
     // The hero's play/abort are the only way to drive a pack launch, so the control
     // surface has to reach them -- a scenario that cannot start a launch cannot check
     // what a launch does to the instance.
-    PuppetClick("packDetail.play", enabled = authedSession != null) {
+    PuppetClick("packDetail.play", enabled = canPlay) {
         authedSession?.let { state.play(it) }
     }
     PuppetClick("packDetail.abort") { state.abortLaunch() }
@@ -169,7 +181,7 @@ fun PackDetailScreen(
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
-            playEnabled    = authedSession != null,
+            playEnabled    = canPlay,
             indication     = launchIndication,
             onBack         = onBack,
             onPlay         = { authedSession?.let { state.play(it) } },
@@ -199,18 +211,17 @@ fun PackDetailScreen(
                 0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
-                3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)
+                3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)
             }
         }
     }
 
     if (showSettings) {
         PackSettingsWindow(
-            pack             = pack,
-            instanceDir      = instanceDir,
-            onInstanceChange = { state.adopt(it) },
-            onDismiss        = { showSettings = false },
-            onOpenVersions   = { onOpenVersions(true) },
+            pack           = pack,
+            instanceDir    = instanceDir,
+            onDismiss      = { showSettings = false },
+            onOpenVersions = { onOpenVersions(true) },
         )
     }
 }
@@ -230,16 +241,15 @@ fun PackDetailScreen(
  * off-thread and run through the redactor so an external latest.log is
  * as safe to screenshot as our own capture.
  *
- * ConsoleSettings load through the same manager AppShell + the
- * standalone window use, so font / wrap / gutter / timestamps stay one
- * source of truth across every console surface.
+ * ConsoleSettings come from the store AppShell + the standalone window
+ * read, so font / wrap / gutter / timestamps are one source of truth
+ * across every console surface rather than three copies of one file.
  */
 @Composable
-private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
+private fun PackLogsTab(packId: String, instanceDir: Path) {
     val gameConsole: GameConsoleService = koinInject()
-    val consoleJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
-    val consoleSettingsManager = remember { ConsoleSettingsManager(dataDir, consoleJson) }
-    var consoleSettings by remember { mutableStateOf(consoleSettingsManager.load()) }
+    val consoleSettingsStore: ConsoleSettingsStore = koinInject()
+    val consoleSettings by consoleSettingsStore.settings.collectAsState()
 
     // Re-list when a session starts: a new captured file appears and the
     // instance's latest.log gets rewritten. Keyed on the monotonic
@@ -297,10 +307,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
                 } else {
                     ConsoleContent(
                         settings = consoleSettings,
-                        onSettingsChange = { new ->
-                            consoleSettings = new
-                            consoleSettingsManager.save(new)
-                        },
+                        onSettingsChange = consoleSettingsStore::update,
                         source = source,
                     )
                 }

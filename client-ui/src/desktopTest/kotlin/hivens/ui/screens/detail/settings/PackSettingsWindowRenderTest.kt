@@ -83,6 +83,9 @@ class PackSettingsWindowRenderTest {
                 single<IPackRepository> { FakeRepo() }
                 single<IMirrorPackClient> { OfflineMirror }
                 single { InstanceSizeService(dataDir = Path.of("/tmp/render"), scope = scope) }
+                // The window persists an edit on the app scope, so the graph has
+                // to hold one -- a write must outlive the window that made it.
+                single<CoroutineScope> { scope }
                 single { PackOperationService(scope = scope, sizes = get()) }
             })
         }
@@ -93,7 +96,7 @@ class PackSettingsWindowRenderTest {
                 // A vivid backdrop so any bleed-through of the overlay surface shows
                 // up as a pink tint -- proves the window is actually opaque.
                 Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
-                    PackSettingsWindow(pack = pack, instanceDir = Path.of("/tmp/render"), onInstanceChange = {}, onDismiss = {})
+                    PackSettingsWindow(pack = pack, instanceDir = Path.of("/tmp/render"), onDismiss = {})
                 }
             }
         }

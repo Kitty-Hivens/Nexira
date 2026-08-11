@@ -115,6 +115,7 @@ import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.StyleSpec
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.FilterRule
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.HighlightRule
@@ -258,10 +259,13 @@ fun ConsoleWindow(
     onClose: () -> Unit,
     customTheme: CustomTheme? = null,
     style: StyleSpec = CelestiaStyle,
-    settings: ConsoleSettings = ConsoleSettings(),
-    onSettingsChange: (ConsoleSettings) -> Unit = {},
 ) {
     val title = LocalStrings.current.consoleTitle
+    // Collected here rather than by the shell that hosts this window: the store
+    // publishes on every reported slider value, and the shell root is the last
+    // composable that should be repainting for it.
+    val settingsStore: ConsoleSettingsStore = koinInject()
+    val settings by settingsStore.settings.collectAsState()
     val windowState = rememberWindowState(width = 960.dp, height = 620.dp)
 
     Window(
@@ -283,7 +287,7 @@ fun ConsoleWindow(
             style        = style,
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = NxTheme.colors.background) {
-                ConsoleContent(settings = settings, onSettingsChange = onSettingsChange)
+                ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
             }
         }
     }

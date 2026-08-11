@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.JvmArgsPresets
 import hivens.core.jvm.JvmConfig
@@ -53,21 +52,16 @@ import java.nio.file.Path
 internal fun PackRuntimeSection(
     pack: PackInstance,
     instanceDir: Path,
-    onInstanceChange: (PackInstance) -> Unit,
+    save: (PackInstance) -> Unit,
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
-    val repo: IPackRepository = koinInject()
     val profilerStore: ProfilerProfileStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val scope = rememberCoroutineScope()
     val runtime = pack.runtime
 
-    fun commit(rt: InstanceRuntime) {
-        val updated = pack.copy(runtime = rt)
-        onInstanceChange(updated)
-        scope.launch { repo.put(updated) }
-    }
+    fun commit(rt: InstanceRuntime) = save(pack.copy(runtime = rt))
 
     // Auto-heap resolution mirrors the old settings tab: the adaptive profile when
     // enabled and present, else the physical-memory heuristic.

@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.interfaces.IMirrorPackClient
+import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.VersionChannel
@@ -68,8 +70,21 @@ import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
+
+/** An edit on screen that the registry has not carried back yet. */
+private class Edit(val instance: PackInstance, val persist: Boolean)
+
+/**
+ * How long an edit waits before it is written: long enough that typing is one
+ * write rather than one per character, short enough that a click on Close right
+ * after a toggle is the dispose path's problem and not a visible lag.
+ */
+private const val EDIT_SETTLE_MS = 250L
 
 /**
  * The floating pack-settings window: a scrimmed overlay hosting a section rail
@@ -88,21 +103,66 @@ import java.nio.file.Path
  * and picks the narration back up, where window-local state would have shown an
  * idle footer and offered to start a second one.
  *
- * A pack instance is the unit of edit: sections mutate it and flow the result
- * back through [onInstanceChange] (which persists and refreshes the hero), so
- * there is no separate form-state blob -- each control is a `copy` + `put`.
+ * A pack instance is the unit of edit: each control is a `copy` handed to [save],
+ * which persists it, and the rewritten record arrives back through [pack] because
+ * the screen that hosts this window follows the registry. There is no separate
+ * form-state blob, and the write lives here rather than in each section -- one
+ * write per edit, from the record as this window is showing it.
  */
 @Composable
 fun PackSettingsWindow(
     pack: PackInstance,
     instanceDir: Path,
-    onInstanceChange: (PackInstance) -> Unit,
     onDismiss: () -> Unit,
     onOpenVersions: () -> Unit = {},
 ) {
     val s = LocalStrings.current
     val style = LocalStyle.current
+    val repo: IPackRepository = koinInject()
+    val appScope: CoroutineScope = koinInject()
     PuppetScreen("PackSettings.${pack.id}")
+
+    // What the controls render: the record, plus the edit that has not come back
+    // through it yet. A put is a durable write on another dispatcher and the fields
+    // here are fully controlled, so rendering straight off the record dropped
+    // characters between the keystroke and the record catching up, and left a
+    // switch sitting still until it did. Edits compose onto the overlay, so a
+    // second one made inside that window builds on the first.
+    //
+    // The overlay lives only until the write it stands for has been made: from
+    // then on the record is the truth again, whatever it says -- our value, a
+    // write that failed and reverted, or a build applied underneath. [Edit.persist]
+    // is false for an edit something else writes (optional content goes through the
+    // launcher), where the wait is for that write rather than for one made here.
+    var edit by remember(pack.id) { mutableStateOf<Edit?>(null) }
+    val shown = edit?.instance ?: pack
+    LaunchedEffect(edit) {
+        val current = edit ?: return@LaunchedEffect
+        // Settle first: a text field commits per keystroke, and one durable write
+        // per character both hammers the registry and lets two of them reach it out
+        // of order -- leaving the record on an older value than the field shows.
+        // A newer edit cancels this effect, so only what the typing settles on is
+        // written, and only ever one write at a time.
+        delay(EDIT_SETTLE_MS)
+        if (current.persist) repo.put(current.instance)
+        if (edit === current) edit = null
+    }
+    // Closing the window is not what discards an edit it has not written yet, and
+    // the composition scope above dies with it.
+    val unwritten = rememberUpdatedState(edit)
+    DisposableEffect(pack.id) {
+        onDispose {
+            unwritten.value?.takeIf { it.persist }?.let { pendingEdit ->
+                appScope.launch { repo.put(pendingEdit.instance) }
+            }
+        }
+    }
+
+    /** Show an edit and persist it. */
+    val save: (PackInstance) -> Unit = { updated -> edit = Edit(updated, persist = true) }
+
+    /** Show an edit that something else persists -- optional content goes through the launcher. */
+    val adopt: (PackInstance) -> Unit = { updated -> edit = Edit(updated, persist = false) }
 
     val isMirror = pack.packRef.origin == PackOrigin.Mirror
     val categories = remember(isMirror) {
@@ -165,7 +225,7 @@ fun PackSettingsWindow(
                 .clickable(card, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
-                WindowHeader(pack = pack, isMirror = isMirror, onDismiss = onDismiss)
+                WindowHeader(pack = shown, isMirror = isMirror, onDismiss = onDismiss)
 
                 Row(Modifier.weight(1f).fillMaxWidth().padding(start = 12.dp, end = 16.dp)) {
                     // ── Rail (the global Settings nav grammar) ────────────
@@ -207,15 +267,15 @@ fun PackSettingsWindow(
                     ) {
                         when (selected) {
                             PackSettingsCategory.General ->
-                                PackGeneralSection(pack, onInstanceChange)
+                                PackGeneralSection(shown, save)
                             PackSettingsCategory.Runtime ->
-                                PackRuntimeSection(pack, instanceDir, onInstanceChange)
+                                PackRuntimeSection(shown, instanceDir, save)
                             PackSettingsCategory.Version ->
-                                PackVersionSection(pack, operation, onInstanceChange, onOpenVersions, onNotice = { notice = it })
+                                PackVersionSection(shown, operation, save, onOpenVersions, onNotice = { notice = it })
                             PackSettingsCategory.Content ->
-                                PackContentSection(pack, onInstanceChange)
+                                PackContentSection(shown, adopt)
                             PackSettingsCategory.Data ->
-                                PackDataSection(pack, instanceDir, operation, onInstanceChange, onDismiss)
+                                PackDataSection(shown, instanceDir, operation, onDismiss)
                         }
                     }
                 }

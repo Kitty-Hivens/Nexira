@@ -71,8 +71,10 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
 
     // The device-code provider is registered only when a client id is configured.
     val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
-    var refreshKey by remember { mutableIntStateOf(0) }
-    val msSession = remember(refreshKey, ctx.session) { credentials.accountFor(MS_KEY) }
+    // Shared with the account section and the nav's face picker -- see
+    // ProfileContext.accountsRevision.
+    val revision = ctx.accountsRevision
+    val msSession = remember(revision.value, ctx.session) { credentials.accountFor(MS_KEY) }
 
     // Microsoft / multi-account is deferred to a later release. With no Microsoft
     // client id configured the provider never registers, so there is nothing to
@@ -88,12 +90,12 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (msSession != null) {
-                MicrosoftAccount(msSession) { refreshKey++ }
+                MicrosoftAccount(msSession) { revision.value++ }
             } else {
                 MicrosoftSignInButton(
                     onSignedIn = {
                         credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
-                        refreshKey++
+                        revision.value++
                     },
                     puppetId = "account.signin.microsoft",
                 )

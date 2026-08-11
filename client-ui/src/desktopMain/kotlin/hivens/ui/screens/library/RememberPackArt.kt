@@ -14,7 +14,12 @@ import org.koin.compose.koinInject
  * Native cover for an instance, resolved through [PackArtResolver]. Art captured
  * at install is returned immediately; otherwise it resolves off-thread and the
  * card/hero shows its pixel placeholder until the real cover lands (or stays on
- * it if the source has none). Keyed on [PackInstance.id], cached in the resolver.
+ * it if the source has none). Cached in the resolver.
+ *
+ * Keyed on the art the record carries as well as its id: an update that captures
+ * a new cover rewrites the same instance, and produceState keeps its last value
+ * across a key change -- so the initial value is re-applied here rather than left
+ * showing the cover the pack used to have.
  */
 @Composable
 fun rememberPackArt(instance: PackInstance): PackArt {
@@ -22,7 +27,10 @@ fun rememberPackArt(instance: PackInstance): PackArt {
     val art by produceState(
         initialValue = PackArt(instance.iconUrl, instance.bannerUrl),
         key1         = instance.id,
+        key2         = instance.iconUrl,
+        key3         = instance.bannerUrl,
     ) {
+        value = PackArt(instance.iconUrl, instance.bannerUrl)
         if (instance.iconUrl == null && instance.bannerUrl == null) {
             value = withContext(Dispatchers.IO) { resolver.resolve(instance) }
         }

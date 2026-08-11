@@ -22,6 +22,16 @@ import hivens.core.data.SessionData
 class ProfileContext(
     val session: SessionData?,
     val selectedCategory: MutableState<ProfileCategory>,
+    /**
+     * Bumped whenever an account is signed in or out. [hivens.auth.AccountStore]
+     * has no reactive seam, and the surface's slots are siblings: the face picker
+     * in the nav cannot see a sign-out that happened in the account section. The
+     * session alone does not carry it either -- removing an account that was not
+     * fronting the shell resolves to the same [SessionData], so a picker keyed on
+     * that kept offering a provider that was gone, and choosing it wrote the
+     * preference for an account that no longer existed.
+     */
+    val accountsRevision: MutableState<Int>,
     val onLogin: (SessionData) -> Unit,
     val onLogout: () -> Unit,
 )
@@ -34,6 +44,7 @@ val LocalProfileContext: ProvidableCompositionLocal<ProfileContext> =
 internal val STUB_PROFILE: ProfileContext = ProfileContext(
     session          = SessionData(),
     selectedCategory = mutableStateOf(ProfileCategory.SmartyCraft),
+    accountsRevision = mutableStateOf(0),
     onLogin          = {},
     onLogout         = {},
 )

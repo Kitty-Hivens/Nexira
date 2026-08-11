@@ -74,11 +74,15 @@ fun ProfileSurface(
     // Per-provider sections each own their signed-in/out state, so the category
     // no longer flips with the session; default to the SmartyCraft section.
     val selectedCategory = remember { mutableStateOf(ProfileCategory.SmartyCraft) }
+    // Shared by every section that adds or removes an account, and by the face
+    // picker that has to stop offering one that is gone.
+    val accountsRevision = remember { mutableStateOf(0) }
 
-    val ctx = remember(session, selectedCategory) {
+    val ctx = remember(session, selectedCategory, accountsRevision) {
         ProfileContext(
             session          = session,
             selectedCategory = selectedCategory,
+            accountsRevision = accountsRevision,
             onLogin          = onLogin,
             onLogout         = onLogout,
         )
