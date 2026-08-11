@@ -13,7 +13,7 @@ versionsPlugin    = "0.58.0"
 # against the Kotlin 2.4.10 toolchain here (:widget-processor / :client-ui
 # kspKotlinDesktop both green). Bump when a newer KSP ships; it does not need to
 # match the Kotlin minor.
-ksp               = "2.3.10"
+ksp               = "2.3.11"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
 ktor              = "3.5.2"
