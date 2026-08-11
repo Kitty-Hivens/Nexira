@@ -103,8 +103,8 @@ object EnglishStrings : AppStrings {
     override val settingsCustomChrome               = "In-app title bar"
     override val settingsCustomChromeDesc           = "Replace the window's title bar with the app's own top bar. Applies on the next launch."
     override val settingsCustomChromeTiling         = "Your window manager draws no title bar, so this changes nothing here."
-    override val settingsCloseAfterLaunch   = "Hide launcher to tray after the game starts"
-    override val settingsCloseAfterLaunchDesc = "Hides the launcher to the system tray once the game starts."
+    override val settingsCloseAfterLaunch   = "Hide the launcher after the game starts"
+    override val settingsCloseAfterLaunchDesc = "Hides the launcher to the system tray once the game starts, or minimizes the window where there is no tray."
     override val settingsSaved              = "Settings saved"
     override val settingsLanguage           = "Language"
 

@@ -61,7 +61,6 @@ import org.koin.compose.koinInject
 @Composable
 fun AppLayout(
     appState: AppState,
-    onCloseApp: () -> Unit,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
     onReplaceScreen: (Screen) -> Unit = {},
@@ -135,7 +134,6 @@ fun AppLayout(
                                     initialSelectedServer = selectedServer,
                                     onServerSelected      = { selectedServer = it },
                                     onSessionUpdated      = { currentSession = it },
-                                    onCloseApp            = onCloseApp,
                                     onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
                                     onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
                                 )

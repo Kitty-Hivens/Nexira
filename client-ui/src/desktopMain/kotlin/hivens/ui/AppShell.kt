@@ -116,6 +116,8 @@ import hivens.ui.system.SystemNotifier
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.logic.PostLaunchGate
+import hivens.ui.logic.PostLaunchMove
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetChromeRenderer
@@ -320,6 +322,14 @@ fun FrameWindowScope.AppShellContent(
     // Window() parameter there); the delegate keeps every reader/writer.
     var isWindowVisible by visibleState
 
+    // Bringing the window back is two writes, not one: setting visible=true
+    // alone leaves a window that was taskbar-minimized before it was hidden
+    // minimized, so the tray click that asked for it reads as doing nothing.
+    val revealWindow: () -> Unit = {
+        if (windowState.isMinimized) windowState.isMinimized = false
+        isWindowVisible = true
+    }
+
     var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
     // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
     // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
@@ -464,12 +474,19 @@ fun FrameWindowScope.AppShellContent(
             delay(500.milliseconds)
             if (showFile.exists()) {
                 showFile.delete()
-                // Un-minimize: setting visible=true alone leaves a taskbar-minimized window minimized.
-                if (windowState.isMinimized) windowState.isMinimized = false
-                isWindowVisible = true
+                revealWindow()
                 raiseTick++
             }
         }
+    }
+
+    // Getting out of the way once the game is up is the shell's move, not a
+    // screen's: the classic dashboard widget that used to own it is composed for
+    // one launch path, so a pack started from the Library or a pack page -- or a
+    // relaunch driven from a notification -- left the launcher sitting in front
+    // of the game.
+    val postLaunch = remember {
+        PostLaunchGate(runningAtMount = (controller.state.value as? LaunchState.GameRunning)?.handle)
     }
 
     LaunchedEffect(launchState) {
@@ -483,6 +500,26 @@ fun FrameWindowScope.AppShellContent(
                 }
             }
             else -> tray.setGameStatus(false)
+        }
+        val move = postLaunch.onState(
+            state = launchState,
+            // Read where it is acted on: Downloading re-keys this effect on every
+            // progress tick, and getSettings takes the lock a save holds across a
+            // file write.
+            hideAfterStart = launchState is LaunchState.GameRunning &&
+                settingsService.getSettings().closeAfterStart,
+            // isSupported, not canBeReady: hiding into a tray that is still
+            // settling -- or never comes up at all -- leaves nothing to click.
+            // The close button prefers canBeReady because its alternative is
+            // quitting the launcher; here the alternative is the taskbar.
+            trayReady       = tray.isSupported,
+            windowMinimized = windowState.isMinimized,
+        )
+        when (move) {
+            PostLaunchMove.Stay       -> Unit
+            PostLaunchMove.HideToTray -> SwingUtilities.invokeLater { isWindowVisible = false }
+            PostLaunchMove.Minimize   -> windowState.isMinimized = true
+            PostLaunchMove.Restore    -> windowState.isMinimized = false
         }
     }
 
@@ -602,7 +639,7 @@ fun FrameWindowScope.AppShellContent(
                 // dispatches, so reading it here would inflate a jar entry on the EDT.
                 readIcon        = { path -> withContext(Dispatchers.IO) { Res.readBytes(path) } },
                 trayIsSupported = { tray.isSupported },
-                showWindow      = { isWindowVisible = true },
+                showWindow      = revealWindow,
                 cachedRoster    = { withContext(Dispatchers.IO) { serverListCache.load() } },
                 fetchRoster     = {
                     runInterruptible(Dispatchers.IO) { serverListService.fetchDashboardData().get() }.servers
@@ -620,13 +657,13 @@ fun FrameWindowScope.AppShellContent(
         // once, not on every recomposition.
         LaunchedEffect(Unit) {
             tray.onShowWindow = {
-                SwingUtilities.invokeLater { isWindowVisible = true }
+                SwingUtilities.invokeLater { revealWindow() }
             }
 
             // libnotify fires on its own thread, so hop to the AWT thread
             // before touching window state.
             SystemNotifier.onShowWindow = {
-                SwingUtilities.invokeLater { isWindowVisible = true }
+                SwingUtilities.invokeLater { revealWindow() }
             }
 
             tray.onExit = {
@@ -904,18 +941,6 @@ fun FrameWindowScope.AppShellContent(
                     )
                 } else {
                     AppRoot(
-                        onCloseApp = {
-                            val gameRunning = launchState is LaunchState.GameRunning
-                            if (gameRunning && tray.canBeReady) {
-                                // Same canBeReady reasoning as the Window
-                                // onCloseRequest: don't pull the rug from
-                                // under a running game just because tray
-                                // init is still mid-flight.
-                                isWindowVisible = false
-                            } else {
-                                exitApp()
-                            }
-                        },
                         onWallpaperSeed = { wallpaperSeed = it },
                         onWallpaperLuminance = { wallpaperLuminance = it },
                         onRealExit   = exitApp,
@@ -1022,7 +1047,6 @@ fun FrameWindowScope.AppShellContent(
 
 @Composable
 fun AppRoot(
-    onCloseApp: () -> Unit,
     onWallpaperSeed: (Int?) -> Unit,
     onWallpaperLuminance: (Float?) -> Unit,
     isDarkTheme: Boolean,
@@ -1261,7 +1285,6 @@ fun AppRoot(
         ) {
             AppLayout(
                 appState = appState,
-                onCloseApp = onCloseApp,
                 currentScreen = backStack.current,
                 onScreenChange = backStack::navigate,
                 onReplaceScreen = backStack::replaceCurrent,
