@@ -357,8 +357,8 @@ fun main(args: Array<String>) {
     )
 
     // Boot inversion: the window goes up FIRST (ShellHost renders the
-    // threshold), and everything slow -- pending data-dir move, NetworkState
-    // restore, migration detect, Koin -- runs here behind the live boot
+    // threshold), and everything slow -- pending data-dir move, migration
+    // detect, Koin -- runs here behind the live boot
     // screen. Daemon thread so a user closing the window mid-boot is not
     // held hostage by a stuck phase.
     val bootOutcome = MutableStateFlow<BootOutcome?>(null)

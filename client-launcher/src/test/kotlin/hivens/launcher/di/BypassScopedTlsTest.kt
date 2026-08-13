@@ -2,7 +2,7 @@ package hivens.launcher.di
 
 import com.sun.net.httpserver.HttpsConfigurator
 import com.sun.net.httpserver.HttpsServer
-import hivens.launcher.network.NetworkState
+import hivens.core.security.SslBypassStore
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.tls.HandshakeCertificates
@@ -51,7 +51,6 @@ class BypassScopedTlsTest {
     fun setup() {
         dataDir = Files.createTempDirectory("nexira-bypass-tls-test-")
         startKoin { modules(module { single { dataDir } }, networkModule) }
-        NetworkState.clearForTests()
 
         // Issued to a name we never connect to, and signed by nobody: the
         // certificate fails both the chain check and the name check, which is
@@ -76,13 +75,13 @@ class BypassScopedTlsTest {
     @AfterTest
     fun teardown() {
         server.stop(0)
-        NetworkState.clearForTests()
         stopKoin()
         Files.walk(dataDir).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
         }
     }
 
+    private fun bypasses(): SslBypassStore = GlobalContext.get().get()
     private fun bypassClient(): OkHttpClient = GlobalContext.get().get(named("insecure"))
     private fun directClient(): OkHttpClient = GlobalContext.get().get(named("direct"))
 
@@ -91,7 +90,7 @@ class BypassScopedTlsTest {
      * ::1 and 127.0.0.1 on a dual-stack machine: the client would then try two
      * routes and report whichever failure came first, so a certificate verdict
      * could hide behind a connect error. The grant is keyed on this string
-     * either way -- NetworkState matches the host as written.
+     * either way -- the store matches the host as written.
      */
     private fun get(client: OkHttpClient): String =
         client.newCall(Request.Builder().url("https://$HOST:$port/").build())
@@ -104,26 +103,26 @@ class BypassScopedTlsTest {
 
     @Test
     fun `a grant for this host lets the bypass client through`() {
-        NetworkState.grantBypass(HOST, Instant.now().plusSeconds(60))
+        bypasses().grant(HOST, Instant.now().plusSeconds(60))
         assertEquals("ok", get(bypassClient()))
     }
 
     @Test
     fun `a grant for another host does not relax this one`() {
         // The regression that mattered: one grant, every host relaxed.
-        NetworkState.grantBypass("www.smartycraft.ru", Instant.now().plusSeconds(60))
+        bypasses().grant("www.smartycraft.ru", Instant.now().plusSeconds(60))
         assertFailsWith<SSLException> { get(bypassClient()) }
     }
 
     @Test
     fun `an expired grant stops relaxing the host`() {
-        NetworkState.grantBypass(HOST, Instant.now().minusSeconds(1))
+        bypasses().grant(HOST, Instant.now().minusSeconds(1))
         assertFailsWith<SSLException> { get(bypassClient()) }
     }
 
     @Test
     fun `the direct client never honours a grant`() {
-        NetworkState.grantBypass(HOST, Instant.now().plusSeconds(60))
+        bypasses().grant(HOST, Instant.now().plusSeconds(60))
         val failure = assertFailsWith<Exception> { get(directClient()) }
         assertTrue(
             failure is SSLException || failure.cause is SSLException,

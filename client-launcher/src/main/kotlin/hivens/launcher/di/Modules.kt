@@ -12,7 +12,7 @@ import hivens.auth.microsoft.MsaAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
 import hivens.launcher.network.CertificateTrustGate
 import hivens.launcher.network.CertificateTrustInterceptor
-import hivens.launcher.network.NetworkState
+import hivens.launcher.network.JsonSslBypassStore
 import hivens.launcher.network.MsaConfig
 import hivens.launcher.network.MsaConfigLoader
 import hivens.launcher.network.ServerProtocolConfig
@@ -80,6 +80,7 @@ import hivens.launcher.cache.ModrinthCaches
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
+import hivens.core.security.SslBypassStore
 import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentScanCache
@@ -174,11 +175,19 @@ val networkModule = module {
     }
 
     /**
+     * The hosts the user has agreed to reach on a refused certificate. Reads its
+     * file when it is built, so no caller can be handed one that has not loaded
+     * yet -- the ordering the bootstrap used to keep by hand, by initializing a
+     * global before anything could resolve a client.
+     */
+    single<SslBypassStore> { JsonSslBypassStore(get<Path>().resolve("ssl-bypasses.json")) }
+
+    /**
      * Where a refused certificate is parked for the shell to ask about. Held here
      * rather than in the UI module because the transport is what discovers the
      * refusal, and the launcher must not depend on the shell to report it.
      */
-    single { CertificateTrustGate() }
+    single { CertificateTrustGate(get()) }
 
     // ── Smartycraft channel ───────────────────────────────────────────────────
     // Everything on `*.smartycraft.ru`. See the routing taxonomy in
@@ -197,13 +206,14 @@ val networkModule = module {
      */
     single<OkHttpClient>(named("insecure")) {
         val cfg: ServerProtocolConfig = get()
-        val (socketFactory, trustManager) = buildBypassScopedSsl()
+        val bypasses: SslBypassStore = get()
+        val (socketFactory, trustManager) = buildBypassScopedSsl(bypasses)
 
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
-            .hostnameVerifier(bypassScopedHostnameVerifier())
+            .hostnameVerifier(bypassScopedHostnameVerifier(bypasses))
             .build()
     }
 
@@ -249,7 +259,7 @@ val networkModule = module {
     /**
      * Default (smartycraft) [HttpClientProvider] -- hands out the bypass
      * client while a grant for the smartycraft host is live, the direct one
-     * otherwise. Reading [NetworkState] per request rather than at
+     * otherwise. Reading the bypass set per request rather than at
      * construction is what lets a grant made mid-session take effect on the
      * next call instead of after a relaunch.
      *
@@ -259,10 +269,11 @@ val networkModule = module {
      */
     single {
         val cfg: ServerProtocolConfig = get()
+        val bypasses: SslBypassStore = get()
         val direct   = buildHttpClient(get<OkHttpClient>(named("direct")),   get())
         val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
         HttpClientProvider {
-            if (NetworkState.bypassFor(cfg.sslBypassHost)) insecure else direct
+            if (bypasses.isBypassed(cfg.sslBypassHost)) insecure else direct
         }
     }
 
@@ -315,12 +326,13 @@ val networkModule = module {
     single<Call.Factory> {
         val direct   = get<OkHttpClient>(named("direct"))
         val insecure = get<OkHttpClient>(named("insecure"))
+        val bypasses: SslBypassStore = get()
         Call.Factory { request ->
             // The request's own host, not the configured smartycraft one. This
             // factory backs the process-wide Coil loader, so keying on a fixed
             // host meant a grant for smartycraft also relaxed pack art from the
             // mirror and Modrinth.
-            val client = if (NetworkState.bypassFor(request.url.host)) insecure else direct
+            val client = if (bypasses.isBypassed(request.url.host)) insecure else direct
             client.newCall(request)
         }
     }
@@ -995,11 +1007,11 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
  * the mirror and from Modrinth too.
  *
  * Here the peer's own name decides. Verification is skipped only while
- * [NetworkState] holds a live grant for that exact host; every other host on
+ * [bypasses] holds a live grant for that exact host; every other host on
  * the same client gets full platform validation. Which client a call site
  * picks is then a routing detail, not a security decision.
  */
-private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
+private fun buildBypassScopedSsl(bypasses: SslBypassStore): Pair<SSLSocketFactory, X509TrustManager> {
     val platform = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         .apply { init(null as KeyStore?) }
         .trustManagers
@@ -1008,12 +1020,12 @@ private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
 
     val trustManager = object : X509ExtendedTrustManager() {
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) {
-            if (granted(peerHostOf(socket))) return
+            if (granted(bypasses, peerHostOf(socket))) return
             platform.checkServerTrusted(chain, authType, socket)
         }
 
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) {
-            if (granted(engine?.peerHost)) return
+            if (granted(bypasses, engine?.peerHost)) return
             platform.checkServerTrusted(chain, authType, engine)
         }
 
@@ -1043,7 +1055,8 @@ private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
 }
 
 /** True when the user currently holds a bypass for [host]. Null host never matches. */
-private fun granted(host: String?): Boolean = host != null && NetworkState.bypassFor(host)
+private fun granted(bypasses: SslBypassStore, host: String?): Boolean =
+    host != null && bypasses.isBypassed(host)
 
 /**
  * Peer name for an in-progress handshake. `handshakeSession` is the JSSE hook
@@ -1058,7 +1071,7 @@ private fun peerHostOf(socket: Socket?): String? =
  * Hostname verification for the bypass channel: skipped for a host under a
  * live grant, the platform check for everything else.
  */
-private fun bypassScopedHostnameVerifier(): HostnameVerifier {
+private fun bypassScopedHostnameVerifier(bypasses: SslBypassStore): HostnameVerifier {
     val platform = HttpsURLConnection.getDefaultHostnameVerifier()
-    return HostnameVerifier { host, session -> granted(host) || platform.verify(host, session) }
+    return HostnameVerifier { host, session -> granted(bypasses, host) || platform.verify(host, session) }
 }

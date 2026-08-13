@@ -44,8 +44,8 @@ import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.ServerListCacheStore
 import hivens.core.diag.ActionRing
+import hivens.core.security.SslBypassStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
-import hivens.launcher.network.NetworkState
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.debug.DebugOverlay
 import hivens.ui.debug.DebugOverlayState
@@ -1103,6 +1103,7 @@ fun AppRoot(
     val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val authRegistry: AuthProviderRegistry     = koinInject()
+    val bypassStore: SslBypassStore            = koinInject()
     // Present only when a Microsoft client id is configured -- the registry holds
     // the refreshable provider exactly then, so auto-login is gated by its presence.
     val msaProvider: RefreshableAuthProvider?  =
@@ -1201,7 +1202,7 @@ fun AppRoot(
     // A bypass policy flip restarts the effect for an immediate fresh attempt
     // with a reset ladder (the flip is a user action). A manual login racing
     // the loop wins: the loop re-reads the state each pass.
-    val autoLoginBypasses by NetworkState.bypassesState.collectAsState()
+    val autoLoginBypasses by bypassStore.bypasses.collectAsState()
     LaunchedEffect(autoLoginBypasses) {
         var attempt = 0
         while (appState !is AppState.Authenticated) {

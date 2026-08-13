@@ -2,7 +2,7 @@ package hivens.launcher.di
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IServerProtocol
-import hivens.launcher.network.NetworkState
+import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.protocol.LauncherHashCache
 import okhttp3.Call
@@ -38,7 +38,6 @@ class NetworkModuleGraphTest {
 
     @AfterTest
     fun teardown() {
-        NetworkState.clearForTests()
         stopKoin()
         Files.walk(dataDir).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
@@ -58,6 +57,7 @@ class NetworkModuleGraphTest {
         koin.get<LauncherHashCache>()
         koin.get<IServerProtocol>()
         koin.get<IServerProtocol>(named("insecure"))
+        koin.get<SslBypassStore>()
     }
 
     @Test
@@ -78,13 +78,14 @@ class NetworkModuleGraphTest {
         val provider = koin.get<HttpClientProvider>()
         val host = koin.get<ServerProtocolConfig>().sslBypassHost
 
+        val bypasses = koin.get<SslBypassStore>()
         val strict = provider.current
-        NetworkState.grantBypass(host, Instant.now().plusSeconds(60))
+        bypasses.grant(host, Instant.now().plusSeconds(60))
         val bypassed = provider.current
-        NetworkState.revokeBypass(host)
+        bypasses.revoke(host)
 
         // The provider is a singleton, so a grant that arrives mid-session only
-        // reaches the next call if the selector re-reads NetworkState rather
+        // reaches the next call if the selector re-reads the bypass set rather
         // than capturing a client at construction.
         assertNotSame(strict, bypassed)
         assertSame(strict, provider.current)

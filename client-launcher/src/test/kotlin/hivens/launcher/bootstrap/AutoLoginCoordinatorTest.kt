@@ -8,7 +8,6 @@ import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.launcher.bootstrap.AutoLoginCoordinator.Resolution
-import hivens.launcher.network.NetworkState
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -150,20 +149,13 @@ class AutoLoginCoordinatorTest {
     fun `a certificate error stops auto-login instead of granting itself a bypass`() = runTest {
         coEvery { authService.login(any(), any(), any()) } throws
             AuthException(AuthStatus.INTERNAL_ERROR, "certificate expired", isSslError = true)
-        NetworkState.clearForTests()
-        try {
-            assertIs<Resolution.CertificateUntrusted>(resolve(SettingsData(), saved = scSaved))
-            // The point of the resolution. Turning certificate checking off is
-            // the user's decision, taken at the login panel's prompt; having
-            // saved a password once is not that decision, and the attacker who
-            // presents the bad certificate is the one who profits from it.
-            assertTrue(
-                NetworkState.listBypasses().isEmpty(),
-                "auto-login must not grant a bypass on its own",
-            )
-        } finally {
-            NetworkState.clearForTests()
-        }
+        // The point of the resolution: it reports the refusal and stops there.
+        // Turning certificate checking off is the user's decision, taken at the
+        // login panel's prompt; having saved a password once is not that
+        // decision, and the attacker presenting the bad certificate is the one
+        // who profits from it. The coordinator is handed no bypass store at all,
+        // so granting one is not something it can reach.
+        assertIs<Resolution.CertificateUntrusted>(resolve(SettingsData(), saved = scSaved))
     }
 
     // ── backoff policy ───────────────────────────────────────────────────────
