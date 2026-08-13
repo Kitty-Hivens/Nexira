@@ -24,7 +24,7 @@ data class InstanceRuntime(
      * patched modules, etc).
      */
     override val javaPath: String? = null,
-    override val memoryMb: Int = RuntimePrefs.PACK_MEMORY_MB,
+    override val memoryMb: Int = RuntimePrefs.NO_PINNED_MEMORY,
     /**
      * Pin this instance to its explicit [memoryMb] instead of the global adaptive
      * sizer. Default false so [SettingsData.adaptiveMemoryEnabled] governs every

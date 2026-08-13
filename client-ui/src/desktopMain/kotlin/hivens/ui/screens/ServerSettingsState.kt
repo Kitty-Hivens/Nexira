@@ -17,6 +17,7 @@ import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
+import hivens.core.data.RuntimePrefs
 import hivens.core.data.OptionalMod
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.SystemMemory
@@ -99,13 +100,14 @@ internal class ServerSettingsState(
     val jvmBuilderEnabled: Boolean get() = settingsService.getSettings().jvmBuilderEnabled
 
     var javaPath by mutableStateOf("")
-    var memoryMb by mutableStateOf(4096)
+    /** Zero until the profile loads one or the user picks one; see [RuntimePrefs.memoryMb]. */
+    var memoryMb by mutableStateOf(RuntimePrefs.NO_PINNED_MEMORY)
     var isAutoMode by mutableStateOf(true)
     var resolvedAutoMb by mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb()))
         private set
     var jvmArgs by mutableStateOf("")
-    var winWidth by mutableStateOf("925")
-    var winHeight by mutableStateOf("530")
+    var winWidth by mutableStateOf(RuntimePrefs.WINDOW_WIDTH.toString())
+    var winHeight by mutableStateOf(RuntimePrefs.WINDOW_HEIGHT.toString())
     var fullScreen by mutableStateOf(false)
     var autoConnect by mutableStateOf(true)
     var serverIcon by mutableStateOf<ImageBitmap?>(null)
@@ -329,8 +331,8 @@ internal fun assembleProfile(
         memoryMb     = memoryMb,
         fixedMemory  = !isAutoMode,
         jvmArgs      = jvmArgs.ifBlank { null },
-        windowWidth  = winWidth.toIntOrNull() ?: 925,
-        windowHeight = winHeight.toIntOrNull() ?: 530,
+        windowWidth  = winWidth.toIntOrNull() ?: RuntimePrefs.WINDOW_WIDTH,
+        windowHeight = winHeight.toIntOrNull() ?: RuntimePrefs.WINDOW_HEIGHT,
         fullScreen   = fullScreen,
         autoConnect  = autoConnect,
         // Merge the editor's canonical toggles over whatever the base carried,
