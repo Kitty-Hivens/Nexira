@@ -283,6 +283,7 @@ fun FrameWindowScope.AppShellContent(
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
     val widgetStateStore: WidgetStateStore = koinInject()
     val editModeController: EditModeController  = koinInject()
+    val sessions: hivens.ui.notifications.SessionRegistry = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
     // LauncherController.appScope and any other fire-and-forget work.
@@ -496,10 +497,18 @@ fun FrameWindowScope.AppShellContent(
         PostLaunchGate(runningAtMount = (controller.state.value as? LaunchState.GameRunning)?.handle)
     }
 
-    LaunchedEffect(launchState) {
-        val serverName = profileManager.lastServerId
+    // What the tray tooltip names: the session that is actually running. It used to
+    // read the last SmartyCraft server id, which is not what a pack launch started
+    // and is not even what the last launch was -- a pack played after a server left
+    // the tooltip naming the server. The registration lands from the launch driver,
+    // so the effect keys on it too and the name settles a moment after the state.
+    val activeSessions by sessions.active.collectAsState()
+
+    LaunchedEffect(launchState, activeSessions) {
+        val runningName = activeSessions.values.firstOrNull()?.packDisplayName
+            ?: profileManager.lastServerId
         when (launchState) {
-            is LaunchState.GameRunning -> tray.setGameStatus(true, serverName)
+            is LaunchState.GameRunning -> tray.setGameStatus(true, runningName)
             is LaunchState.Error -> {
                 tray.setGameStatus(false)
                 if (!isWindowVisible) {
@@ -530,10 +539,15 @@ fun FrameWindowScope.AppShellContent(
             PostLaunchMove.Stay       -> Unit
             PostLaunchMove.HideToTray -> {
                 ActionRing.record("Game started: hiding the launcher to the tray")
+                // Also to the log file: the action ring lives in memory and reaches a
+                // reader only through a diagnostic bundle, which is a lot to collect
+                // for one line while chasing "it did not hide".
+                LoggerFactory.getLogger("PostLaunch").info("Game running: hiding the launcher to the tray")
                 SwingUtilities.invokeLater { isWindowVisible = false }
             }
             PostLaunchMove.Minimize   -> {
                 ActionRing.record("Game started: no tray icon is up, minimizing the window instead")
+                LoggerFactory.getLogger("PostLaunch").info("Game running: no tray icon, minimizing the window")
                 windowState.isMinimized = true
             }
             PostLaunchMove.Restore    -> windowState.isMinimized = false
