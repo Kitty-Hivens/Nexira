@@ -61,7 +61,9 @@ import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxKebabButton
+import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxButtonStyle
@@ -154,6 +156,9 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
             onQuery        = { state.query = it },
             filter         = state.filter,
             onFilter       = { state.filter = it },
+            scope          = state.visibleScope,
+            onScope        = { state.visibleScope = it },
+            offersOptional = state.hasOptional,
             // Adding mods is gated behind detach; resource / shader packs can be added
             // any time (switch to their filter to target that folder). "Find projects"
             // is the Modrinth MOD browser, so it stays mod-gated.
@@ -248,12 +253,16 @@ private fun Toolbar(
     onQuery: (String) -> Unit,
     filter: ContentFilter,
     onFilter: (ContentFilter) -> Unit,
+    scope: ContentScope,
+    onScope: (ContentScope) -> Unit,
+    offersOptional: Boolean,
     canAdd: Boolean,
     canFindProjects: Boolean,
     onAddFiles: () -> Unit,
     onFindProjects: () -> Unit,
 ) {
     val s = LocalStrings.current
+    var filtersOpen by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ContentSearch(query, onQuery, s.contentSearchPlaceholder)
         Row(
@@ -266,6 +275,36 @@ private fun Toolbar(
             FilterChip(s.contentFilterResourcePacks, filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
             FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
             Spacer(Modifier.weight(1f))
+            // The section chips answer "what kind of thing"; everything that
+            // narrows WITHIN a section lives behind this one control, so the row
+            // does not grow a chip per axis. Tinted while something is on, because
+            // a list that is quietly shorter than the folder is a mystery.
+            if (offersOptional) {
+                Box {
+                    NxIconButton(
+                        icon               = NxIcon.Tune,
+                        contentDescription = s.contentFiltersMore,
+                        onClick            = { filtersOpen = true },
+                        tint               = if (scope == ContentScope.Everything) NxTheme.colors.textSecondary
+                                             else NxTheme.colors.primary,
+                    )
+                    NxContextMenu(expanded = filtersOpen, onDismissRequest = { filtersOpen = false }) {
+                        NxMenuItem(
+                            label    = s.contentFilterOptionalOnly,
+                            icon     = NxIcon.Widgets,
+                            selected = scope == ContentScope.OptionalOnly,
+                            hint     = s.contentFilterOptionalOnlyHint,
+                            onClick  = {
+                                onScope(
+                                    if (scope == ContentScope.OptionalOnly) ContentScope.Everything
+                                    else ContentScope.OptionalOnly,
+                                )
+                                filtersOpen = false
+                            },
+                        )
+                    }
+                }
+            }
             if (canFindProjects) {
                 NxButton(label = s.contentFindProjects, onClick = onFindProjects, style = NxButtonStyle.Secondary, icon = NxIcon.Search, compact = true)
             }

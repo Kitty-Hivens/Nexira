@@ -47,6 +47,15 @@ internal enum class ContentFilter(val kind: ContentKind?) {
     All(null), Mods(ContentKind.Mod), ResourcePacks(ContentKind.ResourcePack), ShaderPacks(ContentKind.ShaderPack)
 }
 
+/**
+ * Whether the list is narrowed to what the pack leaves up to the player.
+ *
+ * A separate axis from [ContentFilter], not a fifth section: optional is a
+ * property of a mod, not a folder, and a player looking for what they may turn
+ * off is asking a different question from what kind of thing it is.
+ */
+internal enum class ContentScope { Everything, OptionalOnly }
+
 /** Pre-resolved icon for a content row: embedded/probed jar bytes, a remote URL, or none. */
 internal sealed class ContentIconState {
     class Bytes(val data: ByteArray) : ContentIconState()
@@ -108,6 +117,8 @@ internal class ContentTabState(
 
     var query by mutableStateOf("")
     var filter by mutableStateOf(ContentFilter.All)
+    // Not `scope`: the constructor already holds the coroutine one.
+    var visibleScope by mutableStateOf(ContentScope.Everything)
 
     var selectedKeys by mutableStateOf(emptySet<String>())
         private set
@@ -142,8 +153,22 @@ internal class ContentTabState(
         manifest?.mods?.associateBy { it.filename }.orEmpty()
     }
 
+    /** Filenames the pack marks optional, i.e. the ones a player may turn off. */
+    private val optionalNames: Set<String> by derivedStateOf {
+        manifestMods.values.filterNot { it.required }.map { it.filename }.toSet()
+    }
+
+    /**
+     * Whether the optional-only chip has anything to offer. A local pack curates
+     * nothing and a pack whose manifest declares no optional mods would give the
+     * chip an empty list to show, which is worse than not offering it.
+     */
+    val hasOptional: Boolean by derivedStateOf { optionalNames.isNotEmpty() }
+
     /** What the list shows: the scan narrowed by the filter chips and the search. */
-    val visible: List<InstalledContent> by derivedStateOf { filterContent(items.orEmpty(), query, filter) }
+    val visible: List<InstalledContent> by derivedStateOf {
+        filterContent(items.orEmpty(), query, filter, visibleScope, optionalNames)
+    }
 
     /** The ticked rows, in list order. */
     val picked: List<InstalledContent> by derivedStateOf {
@@ -515,13 +540,23 @@ internal fun contentRowRules(
     )
 }
 
-/** The filter chips and the search box, over the scan. */
+/**
+ * The filter chips and the search box, over the scan.
+ *
+ * [optionalNames] is what the pack's manifest leaves up to the player; it is
+ * consulted only under [ContentScope.OptionalOnly], so a caller with no manifest
+ * -- a local pack, an offline fetch that came back empty -- passes an empty set
+ * and the scope simply has nothing to show.
+ */
 internal fun filterContent(
     items: List<InstalledContent>,
     query: String,
     filter: ContentFilter,
+    scope: ContentScope = ContentScope.Everything,
+    optionalNames: Set<String> = emptySet(),
 ): List<InstalledContent> = items.filter { c ->
     (filter.kind == null || c.kind == filter.kind) &&
+        (scope == ContentScope.Everything || c.fileName in optionalNames) &&
         (
             query.isBlank() ||
                 c.displayName.contains(query, ignoreCase = true) ||

@@ -138,6 +138,40 @@ class ContentTabRulesTest {
         assertEquals(emptyList(), filterContent(items, "sodium", ContentFilter.ShaderPacks))
     }
 
+    @Test
+    fun `the optional scope narrows to what the pack leaves up to the player`() {
+        // The section says what kind of thing it is; this says whether the player
+        // may turn it off. They are separate questions and compose.
+        val optional = setOf("sodium.jar")
+
+        assertEquals(
+            listOf("sodium.jar"),
+            filterContent(items, "", ContentFilter.All, ContentScope.OptionalOnly, optional).map { it.fileName },
+        )
+        assertEquals(
+            listOf("sodium.jar"),
+            filterContent(items, "", ContentFilter.Mods, ContentScope.OptionalOnly, optional).map { it.fileName },
+        )
+        assertEquals(
+            emptyList(),
+            filterContent(items, "", ContentFilter.ShaderPacks, ContentScope.OptionalOnly, optional),
+            "a shader pack is never the pack's optional content",
+        )
+        assertEquals(
+            emptyList(),
+            filterContent(items, "iris", ContentFilter.All, ContentScope.OptionalOnly, optional),
+            "the search still applies inside the scope",
+        )
+    }
+
+    @Test
+    fun `an empty optional set shows nothing under the optional scope`() {
+        // A local pack curates nothing, and an offline manifest fetch comes back
+        // with nothing to curate: an empty list is the honest answer, not the whole
+        // folder.
+        assertEquals(emptyList(), filterContent(items, "", ContentFilter.All, ContentScope.OptionalOnly, emptySet()))
+    }
+
     // -- a selection ----------------------------------------------------------
 
     @Test
