@@ -129,8 +129,12 @@ class JavaManagerService(
 
                 onProgress("Unpacking Java $version archive...")
                 log.info("Unpacking to {}", targetDir)
-                installUnpacked(archive, targetDir, isZip)
-                Files.deleteIfExists(archive)
+                // A ~200 MB archive expanded on whatever thread called in is a
+                // minute of a parked dispatcher; the unpack names its own.
+                withContext(Dispatchers.IO) {
+                    installUnpacked(archive, targetDir, isZip)
+                    Files.deleteIfExists(archive)
+                }
                 return
             } catch (e: Exception) {
                 // Whatever arrived is left where it is. The partial beside this

@@ -44,6 +44,7 @@ import org.koin.compose.koinInject
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun CompactNewsFeed(
@@ -135,7 +136,7 @@ fun CompactNewsFeed(
     }
 
     LaunchedEffect(query) {
-        delay(FILTER_DEBOUNCE_MS)
+        delay(FILTER_DEBOUNCE_MS.milliseconds)
         settled = query
     }
 
@@ -561,4 +562,3 @@ private fun CompactNewsItem(
 }
 
 // ─── Auth loading slot ────────────────────────────────────────────────────────
-

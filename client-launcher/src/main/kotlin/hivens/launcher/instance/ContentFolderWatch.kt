@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Emits whenever an instance's content folders change on disk, so a screen showing
@@ -50,7 +51,7 @@ class ContentFolderWatch(
         val dirs = FOLDERS.map { instanceDir.resolve(it) }
         var seen = DirectorySnapshot.ofAll(dirs)
         while (currentCoroutineContext().isActive) {
-            delay(pollMillis)
+            delay(pollMillis.milliseconds)
             val now = DirectorySnapshot.ofAll(dirs)
             if (now == seen) continue
             seen = settle(dirs, now)
@@ -62,7 +63,7 @@ class ContentFolderWatch(
     private suspend fun settle(dirs: List<Path>, first: Map<String, DirectorySnapshot.Mark>): Map<String, DirectorySnapshot.Mark> {
         var last = first
         while (currentCoroutineContext().isActive) {
-            delay(settleMillis)
+            delay(settleMillis.milliseconds)
             val again = DirectorySnapshot.ofAll(dirs)
             if (again == last) return last
             last = again

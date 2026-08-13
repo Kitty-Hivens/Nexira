@@ -28,6 +28,8 @@ import hivens.launcher.security.JavaBinary
 import hivens.launcher.security.LaunchEnvironment
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 import java.io.OutputStream
@@ -490,7 +492,10 @@ internal class LauncherService(
  * the orchestrator sends [terminate] first to let the wait return.
  */
 private class ProcessLaunchHandle(private val process: Process) : LaunchHandle {
-    override suspend fun awaitExit(): Int = process.waitFor()
+    // On IO by its own doing rather than by the caller's promise: the wait is
+    // unbounded, and a blocking wait that borrows whatever thread it was called on
+    // is one refactor away from parking a dispatcher that had other work.
+    override suspend fun awaitExit(): Int = withContext(Dispatchers.IO) { process.waitFor() }
 
     /**
      * SIGTERM, then SIGKILL if the game did not take the hint.

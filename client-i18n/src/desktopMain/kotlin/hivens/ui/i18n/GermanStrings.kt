@@ -1,6 +1,7 @@
 package hivens.ui.i18n
 
 import hivens.core.data.PackAuthRequirement
+import java.util.Locale
 
 object GermanStrings : AppStrings {
 
@@ -335,7 +336,7 @@ object GermanStrings : AppStrings {
     // =========================================================================
     override val aboutTitle                = "Über den Launcher"
     override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
-    override val locale = java.util.Locale.GERMAN
+    override val locale: Locale = Locale.GERMAN
     override val byteUnits = listOf("B", "KB", "MB", "GB", "TB")
     override fun aboutBuildDate(date: String) = "Erstellt: $date"
     override val aboutRenderer = "Renderer"

@@ -529,7 +529,7 @@ packaging {
         // native runner (no cross-building).
         if (System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)) {
             add("-XX:+AutoCreateSharedArchive")
-            add("-XX:SharedArchiveFile=\$APPDIR/app.jsa")
+            add($$"-XX:SharedArchiveFile=$APPDIR/app.jsa")
         }
     })
 

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 // In-process audio playback for the MusicPlayerWidget, backed by Skinema
 // (FFmpeg via Panama, audio = true). Plays mp3 / ogg / flac / opus / vorbis /
@@ -192,7 +193,7 @@ class AudioPlayer(private val scope: CoroutineScope) {
                     releaseEngine()
                     break
                 }
-                delay(POLL_INTERVAL_MS)
+                delay(POLL_INTERVAL_MS.milliseconds)
             }
         }
     }

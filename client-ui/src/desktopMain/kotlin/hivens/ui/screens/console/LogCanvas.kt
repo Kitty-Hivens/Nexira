@@ -32,6 +32,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import hivens.ui.screens.ConsolePalette
 import hivens.ui.utils.LogType
+import kotlin.time.Duration.Companion.milliseconds
 
 // Virtualized log view. Draws only the lines a viewport covers, from cached per-line
 // layouts, at a pixel scroll offset -- so append and scroll are O(visible), never
@@ -178,7 +179,7 @@ internal fun LogCanvas(
         while (true) {
             state.scroll.scrollBy(autoScroll * lineHeightPx * AUTO_SCROLL_STEP_FACTOR)
             selection.extendTo(state.hitTest(dragPos.x, dragPos.y, lines, effStyle, topPadPx, startPadPx))
-            delay(AUTO_SCROLL_TICK_MS)
+            delay(AUTO_SCROLL_TICK_MS.milliseconds)
         }
     }
 

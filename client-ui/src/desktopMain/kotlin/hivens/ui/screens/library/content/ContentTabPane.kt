@@ -87,6 +87,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Library PackDetail Content tab. Reads what is ACTUALLY installed under the
@@ -605,7 +606,7 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
     // Debounce typing, then search on the settled query. The timer is a
     // composition concern; both halves of the query live on the holder, so a
     // rebuilt one cannot leave them disagreeing.
-    LaunchedEffect(state, state.query) { delay(350); state.submitted = state.query }
+    LaunchedEffect(state, state.query) { delay(350.milliseconds); state.submitted = state.query }
     LaunchedEffect(state, state.submitted) { state.runSearch(state.submitted) }
 
     Column(

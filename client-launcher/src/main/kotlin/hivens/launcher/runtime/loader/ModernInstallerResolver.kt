@@ -126,12 +126,22 @@ class ModernInstallerResolver(
         return out
     }
 
-    /** Runs the installer into [dotMinecraft] unless a prior run completed. */
-    private suspend fun ensureInstalled(mcVersion: String, loaderVersion: String, dotMinecraft: Path) {
+    /**
+     * Runs the installer into [dotMinecraft] unless a prior run completed.
+     *
+     * Names its own dispatcher rather than borrowing the caller's thread: the body
+     * is disk work start to finish and ends in a spawned installer, which is
+     * minutes of blocking on whatever thread happened to call in.
+     */
+    private suspend fun ensureInstalled(
+        mcVersion: String,
+        loaderVersion: String,
+        dotMinecraft: Path,
+    ) = withContext(Dispatchers.IO) {
         val marker = dotMinecraft.resolve(INSTALLED_MARKER)
         if (Files.isRegularFile(marker)) {
             log.info("{} {} already installed in cache, skipping installer", loaderId, loaderVersion)
-            return
+            return@withContext
         }
         // A leftover dir with no marker is a failed prior run -- start clean so
         // the installer never appends to half-written state.

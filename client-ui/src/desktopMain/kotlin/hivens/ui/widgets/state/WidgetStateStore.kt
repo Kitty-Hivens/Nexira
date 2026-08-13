@@ -18,6 +18,7 @@ import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Disk store for per-instance widget state ([WidgetStateHost]). Separate from the
@@ -57,7 +58,7 @@ class WidgetStateStore(
 
     init {
         scope.launch {
-            writeRequests.debounce(DEBOUNCE_MS).collect { writeMutex.withLock { writeNow() } }
+            writeRequests.debounce(DEBOUNCE_MS.milliseconds).collect { writeMutex.withLock { writeNow() } }
         }
     }
 

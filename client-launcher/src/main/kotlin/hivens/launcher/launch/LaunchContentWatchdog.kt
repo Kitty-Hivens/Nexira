@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Watches an instance's `mods/` from the moment the game process starts until the
@@ -73,7 +74,7 @@ internal class LaunchContentWatchdog(
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settleMillis)
         var seen = DirectorySnapshot.of(modsDir)
         while (currentCoroutineContext().isActive && System.nanoTime() < deadline) {
-            delay(pollMillis)
+            delay(pollMillis.milliseconds)
             val now = DirectorySnapshot.of(modsDir)
             if (now == seen) continue
             seen = now

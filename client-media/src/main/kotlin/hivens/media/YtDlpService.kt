@@ -11,12 +11,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
@@ -26,7 +28,6 @@ import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.coroutineContext
 
 /**
  * Plays video from a service page (YouTube, Vimeo, ...) by running yt-dlp to
@@ -81,6 +82,9 @@ class YtDlpService(
     override suspend fun resolve(url: String): Path {
         val hash = hash(url)
         existingCached(hash)?.let { return it }
+        // The Deferred IS the map's value and the caller awaits it a few lines
+        // down; it is in flight, not dropped.
+        @Suppress("DeferredResultUnused")
         val deferred = inflight.computeIfAbsent(url) {
             scope.async(Dispatchers.IO) {
                 try {
@@ -94,8 +98,8 @@ class YtDlpService(
         return deferred.await()
     }
 
-    private suspend fun download(pageUrl: String, hash: String): Path {
-        existingCached(hash)?.let { return it }
+    private suspend fun download(pageUrl: String, hash: String): Path = withContext(Dispatchers.IO) {
+        existingCached(hash)?.let { return@withContext it }
         val progress = stateOf(pageUrl)
         progress.value = MediaFetch.InstallingTool()
         val ytdlp = ensureBinary(progress)
@@ -109,7 +113,7 @@ class YtDlpService(
         }
         val file = existingCached(hash) ?: throw IOException("yt-dlp produced no playable file for $pageUrl")
         evictOverCap()
-        return file
+        file
     }
 
     private fun existingCached(hash: String): Path? {
@@ -156,7 +160,11 @@ class YtDlpService(
      * read, so the check is the same one the install path already makes: the binary
      * has to answer `--version` before it is used.
      */
-    private suspend fun downloadBinary(asset: String, target: Path, progress: MutableStateFlow<MediaFetch>) {
+    private suspend fun downloadBinary(
+        asset: String,
+        target: Path,
+        progress: MutableStateFlow<MediaFetch>,
+    ) = withContext(Dispatchers.IO) {
         transfers.fetch(Transfer(url = "$RELEASE_BASE/$asset", dest = target, skip = SkipIfPresent.Never)) { done, total ->
             progress.value = MediaFetch.InstallingTool(done, total)
         }
@@ -200,7 +208,11 @@ class YtDlpService(
      * a bare blocking waitFor cannot notice a cancellation at all -- at a period
      * short enough to feel immediate and long enough to cost nothing.
      */
-    private suspend fun runProcess(cmd: List<String>, timeoutSeconds: Long, onLine: (String) -> Unit) {
+    private suspend fun runProcess(
+        cmd: List<String>,
+        timeoutSeconds: Long,
+        onLine: (String) -> Unit,
+    ) = withContext(Dispatchers.IO) {
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val tail = StringBuilder()
         // Drain stdout in a daemon thread so a full pipe buffer cannot wedge the
@@ -220,7 +232,7 @@ class YtDlpService(
         val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
         try {
             while (proc.isAlive) {
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 if (System.nanoTime() >= deadlineNanos) {
                     kill(proc)
                     throw IOException("yt-dlp timed out after ${timeoutSeconds}s")

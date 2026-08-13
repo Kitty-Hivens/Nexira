@@ -44,6 +44,7 @@ import java.io.File
 import hivens.config.Branding
 import hivens.ui.diag.RenderBackend
 import hivens.ui.theme.NxTheme
+import kotlin.time.Duration.Companion.milliseconds
 
 // Fixed HUD palette: a debug overlay reads over any wallpaper/theme, so it is a
 // deliberate dark chip with light text rather than themed surfaces. The panel
@@ -221,7 +222,7 @@ private fun PerfHud(modifier: Modifier) {
             heapUsed = (rt.totalMemory() - rt.freeMemory()) shr 20
             heapMax = rt.maxMemory() shr 20
             rss = withContext(Dispatchers.IO) { readRssMb() }
-            delay(500)
+            delay(500.milliseconds)
         }
     }
 
