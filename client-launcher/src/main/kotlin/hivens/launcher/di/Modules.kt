@@ -10,6 +10,8 @@ import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
 import hivens.auth.microsoft.MsaAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
+import hivens.launcher.network.CertificateTrustGate
+import hivens.launcher.network.CertificateTrustInterceptor
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.MsaConfig
 import hivens.launcher.network.MsaConfigLoader
@@ -171,6 +173,13 @@ val networkModule = module {
         }
     }
 
+    /**
+     * Where a refused certificate is parked for the shell to ask about. Held here
+     * rather than in the UI module because the transport is what discovers the
+     * refusal, and the launcher must not depend on the shell to report it.
+     */
+    single { CertificateTrustGate() }
+
     // ── Smartycraft channel ───────────────────────────────────────────────────
     // Everything on `*.smartycraft.ru`. See the routing taxonomy in
     // [HttpClientProvider]'s KDoc.
@@ -213,9 +222,15 @@ val networkModule = module {
      */
     single<OkHttpClient>(named("direct")) {
         val cfg: ServerProtocolConfig = get()
+        val trustGate: CertificateTrustGate = get()
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
+            // A refused certificate on the smartycraft host becomes a question the
+            // shell can ask, from whichever read hit it. Before this, only the login
+            // form could ask -- so the roster and the news, neither of which needs a
+            // session, were unreadable until the user had signed in.
+            .addInterceptor(CertificateTrustInterceptor(trustGate) { cfg.sslBypassHost })
             // HTTP/1.1 only. This channel carries the pack downloads, which are
             // fetched one file at a time, so multiplexing buys nothing while h2's
             // framing adds a failure mode we have seen in the wild: a middlebox on
