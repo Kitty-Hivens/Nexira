@@ -110,7 +110,7 @@ skinemaNatives    = "8.1.1-1"
 # agent classes need Java 8 bytecode, so that pin is now scoped to compileJava and
 # 6.x resolves on every test classpath.
 mockk             = "1.14.11"
-junit             = "6.1.2"
+junit             = "6.1.3"
 
 [libraries]
 # Logging
