@@ -522,10 +522,20 @@ fun FrameWindowScope.AppShellContent(
             trayReady       = tray.isSupported,
             windowMinimized = windowState.isMinimized,
         )
+        // Recorded, because the decision is otherwise invisible: "the launcher did
+        // not hide" and "it hid into a tray that is not there" and "it asked the
+        // compositor to minimize and was ignored" look identical from the outside,
+        // and the action log is what a diagnostic bundle carries.
         when (move) {
             PostLaunchMove.Stay       -> Unit
-            PostLaunchMove.HideToTray -> SwingUtilities.invokeLater { isWindowVisible = false }
-            PostLaunchMove.Minimize   -> windowState.isMinimized = true
+            PostLaunchMove.HideToTray -> {
+                ActionRing.record("Game started: hiding the launcher to the tray")
+                SwingUtilities.invokeLater { isWindowVisible = false }
+            }
+            PostLaunchMove.Minimize   -> {
+                ActionRing.record("Game started: no tray icon is up, minimizing the window instead")
+                windowState.isMinimized = true
+            }
             PostLaunchMove.Restore    -> windowState.isMinimized = false
         }
     }
