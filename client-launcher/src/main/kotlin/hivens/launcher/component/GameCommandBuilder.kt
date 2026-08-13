@@ -3,7 +3,7 @@ package hivens.launcher.component
 import hivens.config.Branding
 import hivens.config.Protocol
 import hivens.core.api.model.ServerProfile
-import hivens.core.data.InstanceProfile
+import hivens.core.data.RuntimePrefs
 import hivens.core.data.SessionData
 import hivens.core.logging.Redactor
 import hivens.core.platform.OS
@@ -118,7 +118,7 @@ internal class GameCommandBuilder(
         clientRoot: Path,
         serverProfile: ServerProfile,
         session: SessionData,
-        userProfile: InstanceProfile,
+        userProfile: RuntimePrefs,
         classpath: String,
         agentJarPath: Path? = null,
         metricsOutPath: Path? = null,

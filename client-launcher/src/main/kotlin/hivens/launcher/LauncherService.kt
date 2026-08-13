@@ -9,6 +9,7 @@ import hivens.core.data.HeapProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
+import hivens.core.data.RuntimePrefs
 import hivens.core.data.SessionData
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.HeapDeriver
@@ -443,14 +444,13 @@ internal class LauncherService(
 
         /**
          * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s
-         * fallback ladder but pulls the override from [InstanceRuntime]
-         * instead of the legacy [InstanceProfile]. The runtime's
-         * `javaPath` lands here as the highest priority; without it the
-         * caller's pre-resolved [defaultPath] wins (LauncherController
+         * fallback ladder minus its managed-Java step, which the pack path
+         * has already taken: [RuntimePrefs.javaPath] wins, and without it
+         * the caller's pre-resolved [defaultPath] does (LauncherController
          * already consulted JavaManager for the pack's Java major).
          */
         internal fun resolvePackJavaPath(
-            runtime: InstanceRuntime,
+            runtime: RuntimePrefs,
             defaultPath: Path,
         ): String {
             val explicit = runtime.javaPath
@@ -469,7 +469,7 @@ internal class LauncherService(
          */
         internal suspend fun resolveJavaPath(
             javaManager: IJavaManager,
-            profile: InstanceProfile,
+            profile: RuntimePrefs,
             defaultPath: Path,
             version: String
         ): String {
