@@ -169,7 +169,15 @@ internal class ContentTabState(
         manifest?.mods?.associateBy { it.filename }.orEmpty()
     }
 
-    /** Filenames the pack marks optional, i.e. the ones a player may turn off. */
+    /**
+     * Filenames the pack marks optional, i.e. the ones a player may turn off.
+     *
+     * Mods only, and deliberately: the whole optional-content pipeline is -- the
+     * rules read `manifest.mods`, the toggles persist per mod, and the relabel
+     * renames jars. A manifest asset carries the same `required` flag, but nothing
+     * acts on it, so listing an optional resource pack here would offer a switch
+     * that does not exist.
+     */
     private val optionalNames: Set<String> by derivedStateOf {
         manifestMods.values.filterNot { it.required }.map { it.filename }.toSet()
     }
@@ -181,8 +189,30 @@ internal class ContentTabState(
      */
     val hasOptional: Boolean by derivedStateOf { optionalNames.isNotEmpty() }
 
+    /**
+     * Everything the pack ships that this tab can show, as selection keys.
+     *
+     * Mods AND assets: a resource pack or a shader the pack ships lives in the
+     * manifest's assets with a path rather than a bare filename, and reading only
+     * the mods filed every one of them under the player. Keyed by kind as well as
+     * name, since the same file name in two folders is two different rows.
+     *
+     * Assets outside the folders this tab lists -- configs, scripts -- have no row
+     * to classify and are skipped.
+     */
+    private val packContentKeys: Set<String> by derivedStateOf {
+        val m = manifest ?: return@derivedStateOf emptySet()
+        buildSet {
+            m.mods.forEach { add(contentKey(ContentKind.Mod, it.filename)) }
+            m.assets.forEach { asset ->
+                val kind = kindOfDest(asset.dest) ?: return@forEach
+                add(contentKey(kind, asset.dest.substringAfterLast('/')))
+            }
+        }
+    }
+
     /** Whether the pack curates anything here, which is what the owner axis sorts by. */
-    val hasPackContent: Boolean by derivedStateOf { manifestMods.isNotEmpty() }
+    val hasPackContent: Boolean by derivedStateOf { packContentKeys.isNotEmpty() }
 
     /** What the list shows: the scan narrowed by the section, the filters and the search. */
     val visible: List<InstalledContent> by derivedStateOf {
@@ -192,7 +222,7 @@ internal class ContentTabState(
             filter         = filter,
             filters        = filters,
             optionalNames  = optionalNames,
-            packNames      = manifestMods.keys,
+            packKeys       = packContentKeys,
             effectiveOn    = { rulesFor(it).effectiveEnabled },
         )
     }
@@ -573,10 +603,13 @@ internal fun contentRowRules(
 /**
  * The section chips, the filter panel and the search box, over the scan.
  *
- * [optionalNames] and [packNames] come from the pack's manifest: a caller without
+ * [optionalNames] and [packKeys] come from the pack's manifest: a caller without
  * one -- a local pack, an offline fetch that came back empty -- passes empty sets,
  * and the axes that depend on them narrow to nothing rather than lying. That is
  * why the panel offers them only where the manifest actually has content.
+ *
+ * [packKeys] holds selection keys, not names: the pack ships mods under a filename
+ * and assets under a path, and two folders can carry the same file name.
  */
 internal fun filterContent(
     items: List<InstalledContent>,
@@ -584,15 +617,15 @@ internal fun filterContent(
     filter: ContentFilter,
     filters: ContentFilters = ContentFilters(),
     optionalNames: Set<String> = emptySet(),
-    packNames: Set<String> = emptySet(),
+    packKeys: Set<String> = emptySet(),
     effectiveOn: (InstalledContent) -> Boolean = { it.enabled },
 ): List<InstalledContent> = items.filter { c ->
     (filter.kind == null || c.kind == filter.kind) &&
         (!filters.optionalOnly || c.fileName in optionalNames) &&
         when (filters.owner) {
             ContentOwner.Any  -> true
-            ContentOwner.Pack -> c.fileName in packNames
-            ContentOwner.User -> c.fileName !in packNames
+            ContentOwner.Pack -> c.selectionKey() in packKeys
+            ContentOwner.User -> c.selectionKey() !in packKeys
         } &&
         when (filters.status) {
             ContentStatus.Any      -> true
@@ -621,7 +654,19 @@ internal fun lockedCount(
 }
 
 /** Stable across a rescan: kind plus filename is what the row is keyed on too. */
-internal fun InstalledContent.selectionKey(): String = "$kind:$fileName"
+internal fun InstalledContent.selectionKey(): String = contentKey(kind, fileName)
+
+/** The same key from parts, for matching a manifest entry against a scanned row. */
+internal fun contentKey(kind: ContentKind, fileName: String): String = "$kind:$fileName"
+
+/** Which of this tab's folders a manifest asset lands in, or null when it lands elsewhere. */
+internal fun kindOfDest(dest: String): ContentKind? =
+    when (dest.substringBefore('/')) {
+        ContentKind.Mod.folder()          -> ContentKind.Mod
+        ContentKind.ResourcePack.folder() -> ContentKind.ResourcePack
+        ContentKind.ShaderPack.folder()   -> ContentKind.ShaderPack
+        else                              -> null
+    }
 
 internal fun ContentKind.folder(): String = when (this) {
     ContentKind.Mod -> "mods"

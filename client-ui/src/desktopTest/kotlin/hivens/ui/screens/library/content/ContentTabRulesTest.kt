@@ -6,6 +6,7 @@ import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstalledContent
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -184,18 +185,56 @@ class ContentTabRulesTest {
 
     @Test
     fun `the owner axis separates what the pack ships from what the player added`() {
-        val packContent = setOf("sodium.jar", "faithful.zip")
+        // A resource pack the pack ships is in the manifest's ASSETS, under a path
+        // rather than a bare name -- reading only the mods filed every mirror-shipped
+        // resource pack under the player.
+        val packContent = setOf(
+            contentKey(ContentKind.Mod, "sodium.jar"),
+            contentKey(ContentKind.ResourcePack, "faithful.zip"),
+        )
 
         assertEquals(
             listOf("sodium.jar", "faithful.zip"),
-            filterContent(items, "", ContentFilter.All, ContentFilters(owner = ContentOwner.Pack), packNames = packContent)
+            filterContent(items, "", ContentFilter.All, ContentFilters(owner = ContentOwner.Pack), packKeys = packContent)
                 .map { it.fileName },
         )
         assertEquals(
             listOf("iris.jar", "complementary.zip"),
-            filterContent(items, "", ContentFilter.All, ContentFilters(owner = ContentOwner.User), packNames = packContent)
+            filterContent(items, "", ContentFilter.All, ContentFilters(owner = ContentOwner.User), packKeys = packContent)
                 .map { it.fileName },
         )
+    }
+
+    @Test
+    fun `the same file name in two folders is two different rows`() {
+        // The pack ships a mod called pack.jar; the player drops a resource pack
+        // called pack.jar. Matching on the name alone would hand the player's file
+        // to the pack.
+        val both = listOf(
+            content("pack.jar", ContentKind.Mod),
+            content("pack.jar", ContentKind.ResourcePack),
+        )
+        val packContent = setOf(contentKey(ContentKind.Mod, "pack.jar"))
+
+        assertEquals(
+            listOf(ContentKind.Mod),
+            filterContent(both, "", ContentFilter.All, ContentFilters(owner = ContentOwner.Pack), packKeys = packContent)
+                .map { it.kind },
+        )
+        assertEquals(
+            listOf(ContentKind.ResourcePack),
+            filterContent(both, "", ContentFilter.All, ContentFilters(owner = ContentOwner.User), packKeys = packContent)
+                .map { it.kind },
+        )
+    }
+
+    @Test
+    fun `a manifest asset is filed under the folder its path names`() {
+        assertEquals(ContentKind.ResourcePack, kindOfDest("resourcepacks/FreshAnimations.zip"))
+        assertEquals(ContentKind.ShaderPack, kindOfDest("shaderpacks/complementary.zip"))
+        assertEquals(ContentKind.Mod, kindOfDest("mods/sodium.jar"))
+        assertNull(kindOfDest("config/sodium-options.json"), "a config has no row here to classify")
+        assertNull(kindOfDest("options.txt"))
     }
 
     @Test
@@ -211,7 +250,7 @@ class ContentTabRulesTest {
             filter        = ContentFilter.Mods,
             filters       = filters,
             optionalNames = setOf("sodium.jar", "iris.jar"),
-            packNames     = setOf("sodium.jar"),
+            packKeys      = setOf(contentKey(ContentKind.Mod, "sodium.jar")),
             effectiveOn   = { true },
         )
         assertEquals(listOf("sodium.jar"), shown.map { it.fileName }, "optional AND on AND the pack's AND a mod")
