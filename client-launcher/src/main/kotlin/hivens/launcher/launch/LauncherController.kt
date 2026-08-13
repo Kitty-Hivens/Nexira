@@ -448,12 +448,22 @@ class LauncherController(
      *
      * A [CoroutineScope] extension so `isActive` inside the sync callbacks reads
      * the launch coroutine's cancellation, matching the pre-extraction body.
+     *
+     * The file probes here block, deliberately: a launch runs on the app scope,
+     * whose dispatcher is [Dispatchers.IO]. Moving them to their own IO context
+     * would only add a hop -- and take the launch off the caller's dispatcher,
+     * which is what the tests drive it on.
      */
+    @Suppress("BlockingMethodInNonBlockingContext")
     private suspend fun CoroutineScope.prepareServerLaunch(
         currentSession: SessionData,
         server: ServerProfile,
         onSessionRefreshed: ((SessionData) -> Unit)?,
     ): Prepared {
+        // Named rather than implicit: `isActive` inside the sync callbacks below is
+        // the LAUNCH coroutine's, not that of whatever suspends around it, and an
+        // implicit receiver leaves the reader (and the linter) guessing which.
+        val launchScope = this
         val settings = settingsService.getSettings()
         val isOffline = settings.isOfflineMode
 
@@ -578,7 +588,7 @@ class LauncherController(
                     ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
                     messageUI = { /* log */ },
                     progressUI = { progress ->
-                        if (!isActive) return@processSession
+                        if (!launchScope.isActive) return@processSession
                         _state.value = LaunchState.Downloading(
                             currentFileIdx   = progress.currentFileIdx,
                             totalFiles       = progress.totalFiles,
@@ -593,7 +603,7 @@ class LauncherController(
                     // the progress bar froze at 20% during the MD5 walk on
                     // 1000-file modpacks -- 5-30s of perceived hang.
                     verifyUI = { verified, total ->
-                        if (!isActive) return@processSession
+                        if (!launchScope.isActive) return@processSession
                         val fraction = if (total > 0) verified.toFloat() / total else 0f
                         setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
                     },

@@ -7,9 +7,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = LoggerFactory.getLogger("SystemTheme")
 
@@ -64,10 +66,17 @@ object SystemTheme {
             emit(probe())
         }
         while (true) {
-            delay(pollMs)
+            delay(pollMs.milliseconds)
             emit(probe())
         }
     }
+        // [probe] declares its own IO context, but the monitor below does not get
+        // to: a callbackFlow's producer runs wherever the flow is collected, and
+        // this one is collected from a composition effect -- the EDT on desktop.
+        // Starting and tearing down the `gdbus monitor` subprocess therefore
+        // happened on the UI thread, once per collection and again every time the
+        // portal restarted under it.
+        .flowOn(Dispatchers.IO)
 
     /**
      * The portal's `SettingChanged` stream: each relevant signal line yields the new

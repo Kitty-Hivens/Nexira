@@ -187,7 +187,9 @@ private fun Verbs(selection: Selection, s: AppStrings, labelled: Boolean) {
 @Composable
 private fun SelectionStack(items: List<SelectionItem>, ambient: Activity?) {
     Box(contentAlignment = Alignment.Center) {
-        Row(horizontalArrangement = Arrangement.spacedBy(-8.dp)) {
+        // Negative spacing: the faces overlap by design, so the stack reads as one
+        // group. Parenthesised because `-8.dp` at a glance is a subtraction.
+        Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
             items.take(3).reversed().forEach { StackFace(it.key, it.title, it.icon) }
             val hidden = items.size - minOf(items.size, 3)
             if (hidden > 0) StackOverflow(hidden)

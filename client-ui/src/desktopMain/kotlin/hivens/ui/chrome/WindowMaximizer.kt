@@ -13,6 +13,7 @@ import java.awt.Toolkit
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.WindowStateListener
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 /**
@@ -190,7 +191,7 @@ class WindowMaximizer(private val state: WindowState) {
     }
 
     private companion object {
-        val log = LoggerFactory.getLogger(WindowMaximizer::class.java)
+        val log: Logger = LoggerFactory.getLogger(WindowMaximizer::class.java)
         val DEBUG = System.getProperty("nexira.puppet.port") != null
     }
 }

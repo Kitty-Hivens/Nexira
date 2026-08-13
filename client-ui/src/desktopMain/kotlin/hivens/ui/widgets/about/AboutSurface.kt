@@ -31,6 +31,7 @@ import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.minutes
 
 private const val SURFACE = "about"
 
@@ -139,7 +140,7 @@ fun AboutSurface(onBack: () -> Unit) {
             if (state !is UpdateCheckState.Available && state !is UpdateCheckState.Checking) {
                 triggerUpdateCheck()
             }
-            delay(5 * 60_000L)
+            delay(5.minutes)
         }
     }
 

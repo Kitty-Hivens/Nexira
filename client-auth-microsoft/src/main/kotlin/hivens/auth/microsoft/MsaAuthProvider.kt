@@ -23,6 +23,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Microsoft (MSA) auth via the OAuth 2.0 device-code grant, then the Xbox Live
@@ -82,7 +83,7 @@ class MsaAuthProvider(
         var waitedMs = 0L
         val maxMs = challenge.expiresInSeconds.coerceAtLeast(1) * 1000L
         while (waitedMs < maxMs) {
-            delay(intervalMs)            // also the cancellation point: dialog dismiss aborts here
+            delay(intervalMs.milliseconds)            // also the cancellation point: dialog dismiss aborts here
             waitedMs += intervalMs
             val resp = http.post(TOKEN_URL) {
                 contentType(ContentType.Application.FormUrlEncoded)

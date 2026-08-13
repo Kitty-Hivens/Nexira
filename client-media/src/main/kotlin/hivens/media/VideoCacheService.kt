@@ -10,6 +10,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
@@ -70,6 +71,9 @@ class VideoCacheService(
             touch(target)
             return target
         }
+        // The Deferred IS the map's value and the caller awaits it a few lines
+        // down; it is in flight, not dropped.
+        @Suppress("DeferredResultUnused")
         val deferred = inflight.computeIfAbsent(url) {
             scope.async(Dispatchers.IO) {
                 try {
@@ -84,8 +88,8 @@ class VideoCacheService(
         return deferred.await()
     }
 
-    private suspend fun download(url: String, target: Path) {
-        if (isUsable(target)) return
+    private suspend fun download(url: String, target: Path) = withContext(Dispatchers.IO) {
+        if (isUsable(target)) return@withContext
         Files.createDirectories(dir)
         val progress = stateOf(url)
         progress.value = MediaFetch.Downloading(0L, 0L)

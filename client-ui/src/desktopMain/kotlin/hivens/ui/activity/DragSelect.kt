@@ -22,6 +22,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Hold a row to start selecting, keep holding and move to select the run you
@@ -179,7 +180,7 @@ private fun edgeScroll(
     return scope.launch {
         while (isActive) {
             listState.scrollBy(rate * MAX_STEP_PX)
-            delay(FRAME_MS)
+            delay(FRAME_MS.milliseconds)
         }
     }
 }

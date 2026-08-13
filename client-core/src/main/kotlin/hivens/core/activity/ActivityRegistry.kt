@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The single account of what the launcher is currently doing. Installs, updates,
@@ -127,7 +128,7 @@ class ActivityRegistry(
             evictions.remove(key)?.cancel()
             if (clean is ActivityPhase.Succeeded || clean is ActivityPhase.Cancelled) {
                 evictions[key] = scope.launch {
-                    delay(terminalHoldMs)
+                    delay(terminalHoldMs.milliseconds)
                     synchronized(lock) {
                         // Only evict if it is still the settled entry we scheduled for.
                         val current = entries[key]
@@ -215,7 +216,7 @@ class ActivityRegistry(
         dirty = true
         if (pendingPublish != null) return
         pendingPublish = scope.launch {
-            delay(minPublishIntervalMs)
+            delay(minPublishIntervalMs.milliseconds)
             synchronized(lock) {
                 pendingPublish = null
                 if (dirty) {

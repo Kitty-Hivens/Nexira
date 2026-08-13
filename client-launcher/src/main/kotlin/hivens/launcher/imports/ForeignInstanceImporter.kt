@@ -9,6 +9,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -18,7 +19,6 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.UUID
-import kotlin.coroutines.coroutineContext
 
 /**
  * Turns a [DiscoveredInstance] found in a foreign launcher into a Nexira
@@ -108,7 +108,7 @@ class ForeignInstanceImporter(
         src: Path,
         dest: Path,
         progress: (Int, Int, String) -> Unit,
-    ) {
+    ) = withContext(Dispatchers.IO) {
         var count = 0
         Files.newDirectoryStream(src).use { top ->
             for (child in top) {
@@ -117,7 +117,7 @@ class ForeignInstanceImporter(
                 if (lower in skipTopLevel || lower.startsWith("launcher_") || lower.startsWith("bootstrap_log")) continue
                 Files.walk(child).use { tree ->
                     for (path in tree) {
-                        coroutineContext.ensureActive()
+                        currentCoroutineContext().ensureActive()
                         val rel = src.relativize(path)
                         val target = dest.resolve(rel.toString())
                         if (Files.isDirectory(path)) {
@@ -141,10 +141,14 @@ class ForeignInstanceImporter(
      * whose runtime lives in the launcher's own cache, simply fall through to
      * ensureRuntime). Existing shared-root files are left untouched.
      */
-    private suspend fun seedSharedRuntime(src: Path, mc: String, progress: (Int, Int, String) -> Unit) {
+    private suspend fun seedSharedRuntime(
+        src: Path,
+        mc: String,
+        progress: (Int, Int, String) -> Unit,
+    ) = withContext(Dispatchers.IO) {
         val srcAssets = src.resolve("assets")
         val srcLibs = src.resolve("libraries")
-        if (!Files.isDirectory(srcAssets.resolve("objects")) && !Files.isDirectory(srcLibs)) return
+        if (!Files.isDirectory(srcAssets.resolve("objects")) && !Files.isDirectory(srcLibs)) return@withContext
 
         var linked = 0
         if (Files.isDirectory(srcAssets)) linked += mirrorTree(srcAssets, assetsDir) { progress(it, 0, "assets") }
@@ -162,11 +166,11 @@ class ForeignInstanceImporter(
     }
 
     /** Hardlink-or-copy every regular file under [from] into [to], skipping ones already present. */
-    private suspend fun mirrorTree(from: Path, to: Path, onProgress: (Int) -> Unit): Int {
+    private suspend fun mirrorTree(from: Path, to: Path, onProgress: (Int) -> Unit): Int = withContext(Dispatchers.IO) {
         var n = 0
         Files.walk(from).use { tree ->
             for (path in tree) {
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 if (!Files.isRegularFile(path) || Files.isSymbolicLink(path)) continue
                 val target = to.resolve(from.relativize(path).toString())
                 if (Files.exists(target)) continue
@@ -175,7 +179,7 @@ class ForeignInstanceImporter(
                 if (++n % 200 == 0) onProgress(n)
             }
         }
-        return n
+        n
     }
 
     /** Prefer a hardlink (shared inode, zero extra bytes); fall back to a copy across filesystems. */

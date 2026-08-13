@@ -546,7 +546,11 @@ class SmrtSyncService(
      * removed and the active variant fetched. Forge 1.12.2 scans both `mods/`
      * and `mods/{mcversion}/`, so flat placement still loads.
      */
-    private suspend fun planMod(mod: SmrtModEntry, clientDir: Path, enabled: Boolean): Transfer? {
+    private suspend fun planMod(
+        mod: SmrtModEntry,
+        clientDir: Path,
+        enabled: Boolean,
+    ): Transfer? = withContext(Dispatchers.IO) {
         val modsDir = clientDir.resolve("mods")
         val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
         val disabledDest = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
@@ -556,10 +560,10 @@ class SmrtSyncService(
         if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
             Files.createDirectories(dest.parent)
             fileOpRetry("smrt sync move ${mod.filename}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
-            return null
+            return@withContext null
         }
         runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
-        return plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
+        plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
     /**

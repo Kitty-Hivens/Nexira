@@ -23,6 +23,7 @@ import hivens.ui.scene3d.Scene3DView
 import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.delay
 import kotlin.math.PI
+import kotlin.time.Duration.Companion.milliseconds
 
 // Live 3D Minecraft-skin view. Builds the posable rig from [buildRig] and
 // hosts it in a Scene3DView: the scene traversal (double-sided alpha-tested
@@ -139,7 +140,7 @@ fun SkinView3D(
             if (!autoSpin && state.animator.isSettled(state.timeMs)) return@LaunchedEffect
             var last = withFrameMillis { it }
             while (true) {
-                delay(MIN_ADVANCE_MS)
+                delay(MIN_ADVANCE_MS.milliseconds)
                 val now = withFrameMillis { it }
                 val delta = now - last
                 last = now

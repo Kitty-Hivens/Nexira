@@ -80,6 +80,7 @@ import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.milliseconds
 
 /** How the measure is drawn. See the design review for what each costs. */
 @Serializable
@@ -190,7 +191,7 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                     // needs composition, the effect body does not have it.
                     val arrivalMs = Motion.emphasis.durationMs.toLong()
                     LaunchedEffect(birthKey) {
-                        delay(arrivalMs)
+                        delay(arrivalMs.milliseconds)
                         open = true
                     }
                     // Selection takes the body. What the launcher is doing on its
@@ -518,7 +519,3 @@ private const val STACK_MAX = 3
 
 /** How far each face hides behind the one in front of it. */
 private val STACK_OVERLAP = 8.dp
-
-
-
-

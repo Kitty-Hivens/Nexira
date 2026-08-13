@@ -72,6 +72,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Interactive video player over a LOCAL file (Skinema is local-only -- a URL goes
@@ -149,7 +150,7 @@ fun VideoPlayer(
                 SkinemaPlayer.State.Paused  -> handoff?.playing = false
                 else                        -> Unit
             }
-            delay(200)
+            delay(200.milliseconds)
         }
     }
     val durationNanos = player.durationNanos ?: 0L
@@ -173,7 +174,7 @@ fun VideoPlayer(
     LaunchedEffect(player, lastPointerNanos, isPlaying) {
         pointerIdle = false
         if (isPlaying) {
-            delay(CONTROLS_IDLE_MS)
+            delay(CONTROLS_IDLE_MS.milliseconds)
             pointerIdle = true
         }
     }

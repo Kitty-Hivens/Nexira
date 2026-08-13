@@ -23,6 +23,7 @@ import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -31,7 +32,6 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.coroutines.coroutineContext
 
 /**
  * Downscales an oversized video wallpaper to the display height ONCE, caching
@@ -94,6 +94,9 @@ class BackgroundOptimizer(
         val dst = cacheDir.resolve("$key.mp4")
         if (isUsable(dst)) return dst
 
+        // The Deferred IS the map's value and the caller awaits it a few lines
+        // down; it is in flight, not dropped.
+        @Suppress("DeferredResultUnused")
         val deferred = inflight.computeIfAbsent(key) {
             // Published before the coroutine is even scheduled: announcing the
             // work from inside it would leave a window where the picker is idle
@@ -148,7 +151,13 @@ class BackgroundOptimizer(
      * cancellation that only landed between encoders would still run a full pass
      * on a file nobody wants any more.
      */
-    private suspend fun transcode(src: Path, dst: Path, sw: Int, sh: Int, maxHeight: Int) {
+    private suspend fun transcode(
+        src: Path,
+        dst: Path,
+        sw: Int,
+        sh: Int,
+        maxHeight: Int,
+    ) = withContext(Dispatchers.IO) {
         Files.createDirectories(cacheDir)
         val dh = maxHeight.let { it - (it % 2) }
         val dw = ((sw.toLong() * dh / sh).toInt()).let { it - (it % 2) }.coerceAtLeast(2)
@@ -161,7 +170,7 @@ class BackgroundOptimizer(
                 VideoDecoder.open(src).use { dec ->
                     MediaWriter.open(part, VideoEncodeConfig(encoder, dw, dh, TRANSCODE_FPS)).use { writer ->
                         while (true) {
-                            coroutineContext.ensureActive()
+                            currentCoroutineContext().ensureActive()
                             val frame = dec.nextFrame() ?: break
                             writer.writeFrame(scaleRgba(frame.rgba, frame.width, frame.height, dw, dh), frame.ptsNanos)
                         }
@@ -170,7 +179,7 @@ class BackgroundOptimizer(
                 }
                 Files.move(part, dst, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
                 log.info("Optimized wallpaper {} -> {}x{} via {}", src.fileName, dw, dh, encoder)
-                return
+                return@withContext
             } catch (e: CancellationException) {
                 runCatching { Files.deleteIfExists(part) }
                 log.info("Wallpaper transcode of {} cancelled", src.fileName)

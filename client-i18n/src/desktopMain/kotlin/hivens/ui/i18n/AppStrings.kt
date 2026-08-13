@@ -1,5 +1,7 @@
 package hivens.ui.i18n
 
+import java.util.Locale
+
 interface AppStrings {
 
     // --- App ---
@@ -27,7 +29,7 @@ interface AppStrings {
     val navBack: String
     val navForward: String
     /** App locale, for date/number formatting in widgets (not the system default). */
-    val locale: java.util.Locale
+    val locale: Locale
 
     /**
      * Binary byte units as this language abbreviates them, smallest first: bytes,

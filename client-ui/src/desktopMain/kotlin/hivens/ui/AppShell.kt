@@ -1187,7 +1187,7 @@ fun AppRoot(
     var persistedBackground by remember { mutableStateOf(backgroundSettings) }
     LaunchedEffect(backgroundSettings) {
         if (backgroundSettings == persistedBackground) return@LaunchedEffect
-        delay(300)
+        delay(300.milliseconds)
         withContext(Dispatchers.IO) { backgroundManager.save(backgroundSettings) }
         persistedBackground = backgroundSettings
     }
@@ -1249,7 +1249,7 @@ fun AppRoot(
                     val delayMs = AutoLoginCoordinator.retryDelayMs(attempt)
                     attempt += 1
                     ActionRing.record("Auto-login: network down, retry #$attempt in ${delayMs / 1000}s")
-                    delay(delayMs)
+                    delay(delayMs.milliseconds)
                 }
             }
         }

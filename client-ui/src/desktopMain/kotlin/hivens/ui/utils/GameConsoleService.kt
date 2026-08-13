@@ -23,6 +23,7 @@ import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = LoggerFactory.getLogger("GameConsoleService")
 
@@ -285,7 +286,7 @@ class GameConsoleService(
         // what keeps queued lines ordered ahead of the close -- but a drainer
         // that died on an unexpected throw would otherwise strand the caller
         // forever, and a console mirror is never worth hanging a shutdown over.
-        val acked = queued && withTimeoutOrNull(CLOSE_ACK_TIMEOUT_MS) { done.await() } != null
+        val acked = queued && withTimeoutOrNull(CLOSE_ACK_TIMEOUT_MS.milliseconds) { done.await() } != null
         channel.close()
         scope.cancel()
         if (queued && !acked) {

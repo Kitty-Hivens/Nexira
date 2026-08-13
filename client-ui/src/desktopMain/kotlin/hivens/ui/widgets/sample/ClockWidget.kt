@@ -52,6 +52,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.time.Duration.Companion.milliseconds
 
 @Serializable
 enum class ClockMode { Analog, Digital, Both }
@@ -100,7 +101,7 @@ fun ClockWidget(instance: WidgetInstance) {
             // hand steps cleanly on the second (quartz-style) rather than
             // drifting or double-stepping. A continuous sweep would need
             // per-frame recomposition, which a background clock does not earn.
-            delay(1000L - now.nano / 1_000_000L)
+            delay((1000L - now.nano / 1_000_000L).milliseconds)
         }
     }
 
