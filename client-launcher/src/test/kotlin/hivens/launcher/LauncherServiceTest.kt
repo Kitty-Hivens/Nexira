@@ -245,7 +245,7 @@ class LauncherServiceTest {
                 javaPath = "/usr/bin/true",
             ))
         }
-        val manifestProcessor = ManifestProcessorService(json)
+        val manifestProcessor = ManifestProcessorService()
         val classpathProvider = ClasspathProvider(manifestProcessor, osName = "Linux")
         // EnvironmentPreparer takes an HttpClientProvider for the fallback
         // download path. Our pre-populated natives + assets short-circuit

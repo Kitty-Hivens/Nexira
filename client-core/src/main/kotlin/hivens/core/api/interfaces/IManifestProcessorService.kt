@@ -13,7 +13,7 @@ interface IManifestProcessorService {
 
     /**
      * Set of jar names to exclude from sync. [userState] maps `mod.id ->
-     * enabled?`; mods absent from the map fall back to their `isDefault`.
+     * enabled?`; mods absent from the map fall back to [OptionalMod.enabledByDefault].
      * Disabled mods contribute their `jars` (and `infoFile`, if any) to
      * the returned set.
      */

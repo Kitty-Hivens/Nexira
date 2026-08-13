@@ -127,11 +127,11 @@ internal class GameCommandBuilder(
         memoryMB   = memoryMB,
         clientRoot = clientRoot,
         target     = LaunchTarget(
-            mcVersion         = serverProfile.version,
-            neoForgeArgs      = serverProfile.neoForgeArgs,
-            ignoreModulesList = serverProfile.ignoreModulesList,
-            jvmArgsOverride   = userProfile.jvmArgs,
-            displayName       = serverProfile.name,
+            mcVersion       = serverProfile.version,
+            neoForgeArgs    = serverProfile.neoForgeArgs,
+            ignoredModules  = serverProfile.ignoredModules,
+            jvmArgsOverride = userProfile.jvmArgs,
+            displayName     = serverProfile.name,
         ),
         session    = session,
         classpath  = classpath,
@@ -240,7 +240,11 @@ internal class GameCommandBuilder(
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
 
             val defaultIgnore = "client,securejarhandler,asm,bootstraplauncher,JarJarFileSystems,client-extra,neoforge-"
-            val ignoreList = target.ignoreModulesList?.takeIf { it.isNotBlank() } ?: defaultIgnore
+            val ignoreList = target.ignoredModules
+                .filter { it.isNotBlank() }
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(",")
+                ?: defaultIgnore
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.14.0.jar,jna-platform-5.14.0.jar")
         }
@@ -656,7 +660,7 @@ internal class GameCommandBuilder(
             }
 
             // Backend arguments still win -- server can override what was detected.
-            val backendArgs = target.neoForgeArgs ?: emptyMap()
+            val backendArgs = target.neoForgeArgs?.asFmlArgs().orEmpty()
             val finalFmlArgs = defaultFmlArgs + backendArgs
 
             finalFmlArgs.forEach { (key, value) ->

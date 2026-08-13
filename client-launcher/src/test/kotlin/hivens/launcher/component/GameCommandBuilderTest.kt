@@ -1,5 +1,6 @@
 package hivens.launcher.component
 
+import hivens.core.api.model.NeoForgeArgs
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OfflineIdentity
@@ -487,7 +488,7 @@ class GameCommandBuilderTest {
     @Test
     fun `1_21_1 backend neoForgeArgs override defaults`() {
         val srv = server(version = "1.21.1").copy(
-            neoForgeArgs = mapOf("neoForgeVersion" to "99.0.0")
+            neoForgeArgs = NeoForgeArgs(neoForgeVersion = "99.0.0")
         )
         val cmd = builder.build(
             javaExec = "/usr/bin/java",
@@ -571,13 +572,13 @@ class GameCommandBuilderTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Custom ignoreModulesList from server profile
+    // Custom ignored modules from server profile
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `1_21_1 uses custom ignoreModulesList when provided`() {
+    fun `1_21_1 uses the profile's ignored modules when provided`() {
         val srv = server(version = "1.21.1").copy(
-            ignoreModulesList = "client,custom-module,another"
+            ignoredModules = listOf("client", "custom-module", "another")
         )
         val cmd = builder.build(
             javaExec = "/usr/bin/java",

@@ -154,7 +154,7 @@ internal class ServerSettingsState(
         val loadedMods = manifestProcessor.getOptionalModsForClient(server)
         mods = loadedMods
         loadedMods.forEach { mod ->
-            modStates[mod.id] = p.optionalModsState.getOrDefault(mod.id, mod.isDefault)
+            modStates[mod.id] = p.optionalModsState.getOrDefault(mod.id, mod.enabledByDefault)
         }
         modsLoaded = true
 

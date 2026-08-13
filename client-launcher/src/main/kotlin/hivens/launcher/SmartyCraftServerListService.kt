@@ -9,13 +9,16 @@ import hivens.core.cache.Cache
 import hivens.core.cache.PassthroughCache
 import hivens.core.data.DashboardData
 import hivens.core.data.NewsItem
+import hivens.core.data.OptionalMod
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.ServerNameValidator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 
@@ -33,6 +36,13 @@ class SmartyCraftServerListService(
     private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
     private val cache: ServerListCacheStore = ServerListCacheStore.NoOp,
     private val dashboardCache: Cache<DashboardData> = PassthroughCache(),
+    /**
+     * Reads the optional-mod objects the dashboard embeds. Lenient about keys
+     * it does not know: this is the one place the upstream's own shape is
+     * turned into the launcher's, and a field added there must not cost a
+     * server its mod list.
+     */
+    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
 ) : IServerListService {
 
     private val logger = LoggerFactory.getLogger(SmartyCraftServerListService::class.java)
@@ -87,16 +97,36 @@ class SmartyCraftServerListService(
 
     private fun getProfile(srv: SmartyServer): ServerProfile =
         ServerProfile(
-            name             = srv.id,
-            title            = srv.title ?: srv.id,
-            version          = srv.version ?: "1.7.10",
-            ip               = srv.ip,
-            port             = srv.port,
-            assetDir         = srv.assetDir,
-            extraCheckSum    = srv.extraCheckSum,
-            optionalModsData = (srv.optionalMods as? JsonObject) ?: emptyMap(),
-            source           = ServerSource.Smartycraft,
+            name          = srv.id,
+            title         = srv.title ?: srv.id,
+            version       = srv.version ?: "1.7.10",
+            ip            = srv.ip,
+            port          = srv.port,
+            assetDir      = srv.assetDir,
+            extraCheckSum = srv.extraCheckSum,
+            optionalMods  = optionalMods(srv),
+            source        = ServerSource.Smartycraft,
         )
+
+    /**
+     * The server's optional mods, decoded here rather than carried onward as
+     * JSON for whoever reads the profile to interpret.
+     *
+     * One unreadable entry costs that entry and is logged; the rest of the
+     * server's list still loads. The upstream shape drifts, and dropping a
+     * whole server's mod list over one mod nobody could parse is the worse
+     * end of that trade.
+     */
+    private fun optionalMods(srv: SmartyServer): Map<String, OptionalMod> {
+        val raw = srv.optionalMods as? JsonObject ?: return emptyMap()
+        return buildMap {
+            for ((modId, element) in raw) {
+                runCatching { json.decodeFromJsonElement<OptionalMod>(element) }
+                    .onSuccess { put(modId, it) }
+                    .onFailure { logger.error("Dropping optional mod '{}' of '{}': {}", modId, srv.id, it.message) }
+            }
+        }
+    }
 
     private companion object {
         // One dashboard per session; a fixed key is enough.

@@ -1,5 +1,7 @@
 package hivens.launcher.component
 
+import hivens.core.api.model.NeoForgeArgs
+
 /**
  * Pack/server-agnostic input for [GameCommandBuilder.build]. Both
  * the legacy SC server-centric flow and the Hivens pack-centric
@@ -19,17 +21,17 @@ internal data class LaunchTarget(
     val mcVersion: String,
     /**
      * NeoForge-only argument overrides (`fml.neoForgeVersion`,
-     * `fml.fmlVersion`, etc). Null / empty defers to the in-bundle
+     * `fml.fmlVersion`, etc). Null defers to the in-bundle
      * auto-detector + baked defaults. SC server-list profiles pre-fill
      * these from the dashboard; pack-centric installs leave them null
      * and let the detector run.
      */
-    val neoForgeArgs: Map<String, String>? = null,
+    val neoForgeArgs: NeoForgeArgs? = null,
     /**
-     * Optional override of NeoForge's `-DignoreList=...` system property.
-     * Null defers to the version-keyed default in GameCommandBuilder.
+     * Modules to leave out of NeoForge's module path (`-DignoreList=...`).
+     * Empty defers to the version-keyed default in GameCommandBuilder.
      */
-    val ignoreModulesList: String? = null,
+    val ignoredModules: List<String> = emptyList(),
     /**
      * Free-text JVM args; whitespace-split into argv. Null / blank
      * keeps the VersionConfig's baked-in `-XX:` GC args. Wins over
