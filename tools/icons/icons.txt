@@ -1,8 +1,8 @@
-# Material Symbols icons bundled in the app, one per line.
-# Format: PascalName            (ligature derived as snake_case)
 #     or: PascalName=ligature   (explicit, when the names differ)
-# The constant NxIcon.PascalName carries the ligature; the font is subset to
 # exactly these glyphs. To add an icon: add a line, run tools/icons/regenerate.py.
+# Format: PascalName            (ligature derived as snake_case)
+# Material Symbols icons bundled in the app, one per line.
+# The constant NxIcon.PascalName carries the ligature; the font is subset to
 AccountCircle
 Add
 ArrowBack
@@ -24,7 +24,6 @@ Code
 Computer
 ContentCopy
 DarkMode
-LightMode
 Dashboard
 Delete
 DeleteForever
@@ -36,6 +35,8 @@ ExpandLess
 ExpandMore
 Favorite
 FavoriteBorder=favorite
+FilterAlt
+FilterAltOff
 FlipToBack
 FlipToFront
 Folder
@@ -54,6 +55,7 @@ KeyboardArrowUp
 Lan
 Language
 Layers
+LightMode
 Lock
 Memory
 MenuOpen

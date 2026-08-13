@@ -185,7 +185,9 @@ fun NxMenuItem(
  * overflow button opens leftwards and stays on screen), just below it -- flipping
  * above when it would overrun the window bottom.
  */
-private class BelowAnchorEndAligned(private val gapPx: Int) : PopupPositionProvider {
+// Shared with NxPopoverPanel: a panel hangs off its trigger the same way a menu
+// does, and two copies of the flip-near-the-bottom rule would drift.
+internal class BelowAnchorEndAligned(private val gapPx: Int) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,

@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,11 +62,15 @@ import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxPanelGroup
+import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSwitch
+import hivens.ui.nx.NxToggle
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.customization.glassSurfaceAlpha
@@ -156,9 +161,12 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
             onQuery        = { state.query = it },
             filter         = state.filter,
             onFilter       = { state.filter = it },
-            scope          = state.visibleScope,
-            onScope        = { state.visibleScope = it },
+            filters        = state.filters,
+            onFilters      = { state.filters = it },
             offersOptional = state.hasOptional,
+            offersOwner    = state.hasPackContent,
+            shownCount     = state.visible.size,
+            scannedCount   = state.scannedCount,
             // Adding mods is gated behind detach; resource / shader packs can be added
             // any time (switch to their filter to target that folder). "Find projects"
             // is the Modrinth MOD browser, so it stays mod-gated.
@@ -253,9 +261,12 @@ private fun Toolbar(
     onQuery: (String) -> Unit,
     filter: ContentFilter,
     onFilter: (ContentFilter) -> Unit,
-    scope: ContentScope,
-    onScope: (ContentScope) -> Unit,
+    filters: ContentFilters,
+    onFilters: (ContentFilters) -> Unit,
     offersOptional: Boolean,
+    offersOwner: Boolean,
+    shownCount: Int,
+    scannedCount: Int,
     canAdd: Boolean,
     canFindProjects: Boolean,
     onAddFiles: () -> Unit,
@@ -275,41 +286,133 @@ private fun Toolbar(
             FilterChip(s.contentFilterResourcePacks, filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
             FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
             Spacer(Modifier.weight(1f))
-            // The section chips answer "what kind of thing"; everything that
-            // narrows WITHIN a section lives behind this one control, so the row
-            // does not grow a chip per axis. Tinted while something is on, because
-            // a list that is quietly shorter than the folder is a mystery.
-            if (offersOptional) {
-                Box {
-                    NxIconButton(
-                        icon               = NxIcon.Tune,
-                        contentDescription = s.contentFiltersMore,
-                        onClick            = { filtersOpen = true },
-                        tint               = if (scope == ContentScope.Everything) NxTheme.colors.textSecondary
-                                             else NxTheme.colors.primary,
-                    )
-                    NxContextMenu(expanded = filtersOpen, onDismissRequest = { filtersOpen = false }) {
-                        NxMenuItem(
-                            label    = s.contentFilterOptionalOnly,
-                            icon     = NxIcon.Widgets,
-                            selected = scope == ContentScope.OptionalOnly,
-                            hint     = s.contentFilterOptionalOnlyHint,
-                            onClick  = {
-                                onScope(
-                                    if (scope == ContentScope.OptionalOnly) ContentScope.Everything
-                                    else ContentScope.OptionalOnly,
-                                )
-                                filtersOpen = false
-                            },
-                        )
-                    }
-                }
-            }
+            // The chips answer what kind of thing a row is; everything that
+            // narrows WITHIN a section lives in one panel, so the row does not
+            // grow a control per axis.
+            ContentFilterButton(
+                filters        = filters,
+                onFilters      = onFilters,
+                offersOptional = offersOptional,
+                offersOwner    = offersOwner,
+                shownCount     = shownCount,
+                scannedCount   = scannedCount,
+            )
             if (canFindProjects) {
                 NxButton(label = s.contentFindProjects, onClick = onFindProjects, style = NxButtonStyle.Secondary, icon = NxIcon.Search, compact = true)
             }
             if (canAdd) {
                 NxButton(label = s.contentAddFiles, onClick = onAddFiles, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
+            }
+        }
+    }
+}
+
+/**
+ * The filter trigger and its panel.
+ *
+ * Badged with the number of active axes and tinted while any is on: a list quietly
+ * shorter than the folder reads as content having gone missing, and the badge is
+ * what separates "nothing matches" from "nothing is there".
+ *
+ * An axis whose data the pack does not carry is not offered -- a local pack curates
+ * nothing, so "optional" and "who added it" would be questions with one answer.
+ */
+@Composable
+private fun ContentFilterButton(
+    filters: ContentFilters,
+    onFilters: (ContentFilters) -> Unit,
+    offersOptional: Boolean,
+    offersOwner: Boolean,
+    shownCount: Int,
+    scannedCount: Int,
+) {
+    val s = LocalStrings.current
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Box(contentAlignment = Alignment.TopEnd) {
+            NxIconButton(
+                // Always the funnel: the crossed-out one reads as "no filtering",
+                // which is the opposite of what an active filter means. The badge
+                // and the tint carry the state.
+                icon               = NxIcon.FilterAlt,
+                contentDescription = s.contentFiltersTitle,
+                onClick            = { open = true },
+                tint               = if (filters.isEmpty) NxTheme.colors.textSecondary else NxTheme.colors.primary,
+            )
+            if (!filters.isEmpty) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 2.dp, end = 2.dp)
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(NxTheme.colors.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text       = filters.activeCount.toString(),
+                        style      = MaterialTheme.typography.labelSmall,
+                        color      = NxTheme.colors.onPrimary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+        NxPopoverPanel(
+            expanded         = open,
+            onDismissRequest = { open = false },
+            title            = s.contentFiltersTitle,
+            footer           = {
+                Text(
+                    text  = s.contentFiltersShown(shownCount, scannedCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxTheme.colors.textSecondary,
+                )
+                NxButton(
+                    label   = s.contentFiltersReset,
+                    onClick = { onFilters(ContentFilters()) },
+                    style   = NxButtonStyle.Tertiary,
+                    enabled = !filters.isEmpty,
+                    compact = true,
+                )
+            },
+        ) {
+            if (offersOptional) {
+                // A chip, not a settings toggle: every axis in this panel is asked
+                // the same way, and a switch row among chip rows reads as a
+                // different kind of thing than it is.
+                NxPanelGroup(s.contentFilterGroupCurated, hint = s.contentFilterOptionalOnlyHint) {
+                    NxChoiceChip(s.contentFilterOptionalOnly, filters.optionalOnly) {
+                        onFilters(filters.copy(optionalOnly = !filters.optionalOnly))
+                    }
+                }
+            }
+            NxPanelGroup(s.contentFilterGroupStatus) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    NxChoiceChip(s.contentFilterAny, filters.status == ContentStatus.Any) {
+                        onFilters(filters.copy(status = ContentStatus.Any))
+                    }
+                    NxChoiceChip(s.contentFilterEnabled, filters.status == ContentStatus.Enabled) {
+                        onFilters(filters.copy(status = ContentStatus.Enabled))
+                    }
+                    NxChoiceChip(s.contentFilterDisabled, filters.status == ContentStatus.Disabled) {
+                        onFilters(filters.copy(status = ContentStatus.Disabled))
+                    }
+                }
+            }
+            if (offersOwner) {
+                NxPanelGroup(s.contentFilterGroupOwner) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        NxChoiceChip(s.contentFilterAny, filters.owner == ContentOwner.Any) {
+                            onFilters(filters.copy(owner = ContentOwner.Any))
+                        }
+                        NxChoiceChip(s.contentFilterOwnerPack, filters.owner == ContentOwner.Pack) {
+                            onFilters(filters.copy(owner = ContentOwner.Pack))
+                        }
+                        NxChoiceChip(s.contentFilterOwnerUser, filters.owner == ContentOwner.User) {
+                            onFilters(filters.copy(owner = ContentOwner.User))
+                        }
+                    }
+                }
             }
         }
     }

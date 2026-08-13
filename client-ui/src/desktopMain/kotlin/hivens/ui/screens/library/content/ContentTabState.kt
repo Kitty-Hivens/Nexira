@@ -47,14 +47,31 @@ internal enum class ContentFilter(val kind: ContentKind?) {
     All(null), Mods(ContentKind.Mod), ResourcePacks(ContentKind.ResourcePack), ShaderPacks(ContentKind.ShaderPack)
 }
 
+/** Whether a row is on, off, or either -- as the row itself reads it. */
+internal enum class ContentStatus { Any, Enabled, Disabled }
+
+/** Who put a file there: the pack, or the player. */
+internal enum class ContentOwner { Any, Pack, User }
+
 /**
- * Whether the list is narrowed to what the pack leaves up to the player.
- *
- * A separate axis from [ContentFilter], not a fifth section: optional is a
- * property of a mod, not a folder, and a player looking for what they may turn
- * off is asking a different question from what kind of thing it is.
+ * The axes that narrow WITHIN a section, as opposed to [ContentFilter], which
+ * chooses the section itself. Optional is not a kind of thing -- it is a property
+ * of a mod the pack curates -- and neither is on-or-off, or who added it, so none
+ * of the three belongs in a row of section chips.
  */
-internal enum class ContentScope { Everything, OptionalOnly }
+internal data class ContentFilters(
+    val optionalOnly: Boolean = false,
+    val status: ContentStatus = ContentStatus.Any,
+    val owner: ContentOwner = ContentOwner.Any,
+) {
+    /** How many axes are narrowing the list right now -- what the trigger badges. */
+    val activeCount: Int =
+        (if (optionalOnly) 1 else 0) +
+            (if (status != ContentStatus.Any) 1 else 0) +
+            (if (owner != ContentOwner.Any) 1 else 0)
+
+    val isEmpty: Boolean get() = activeCount == 0
+}
 
 /** Pre-resolved icon for a content row: embedded/probed jar bytes, a remote URL, or none. */
 internal sealed class ContentIconState {
@@ -117,8 +134,7 @@ internal class ContentTabState(
 
     var query by mutableStateOf("")
     var filter by mutableStateOf(ContentFilter.All)
-    // Not `scope`: the constructor already holds the coroutine one.
-    var visibleScope by mutableStateOf(ContentScope.Everything)
+    var filters by mutableStateOf(ContentFilters())
 
     var selectedKeys by mutableStateOf(emptySet<String>())
         private set
@@ -159,16 +175,30 @@ internal class ContentTabState(
     }
 
     /**
-     * Whether the optional-only chip has anything to offer. A local pack curates
-     * nothing and a pack whose manifest declares no optional mods would give the
-     * chip an empty list to show, which is worse than not offering it.
+     * Whether the optional axis has anything to offer. A local pack curates nothing
+     * and a pack whose manifest names no optional mods would give that filter an
+     * empty list to show, which is worse than not offering it at all.
      */
     val hasOptional: Boolean by derivedStateOf { optionalNames.isNotEmpty() }
 
-    /** What the list shows: the scan narrowed by the filter chips and the search. */
+    /** Whether the pack curates anything here, which is what the owner axis sorts by. */
+    val hasPackContent: Boolean by derivedStateOf { manifestMods.isNotEmpty() }
+
+    /** What the list shows: the scan narrowed by the section, the filters and the search. */
     val visible: List<InstalledContent> by derivedStateOf {
-        filterContent(items.orEmpty(), query, filter, visibleScope, optionalNames)
+        filterContent(
+            items          = items.orEmpty(),
+            query          = query,
+            filter         = filter,
+            filters        = filters,
+            optionalNames  = optionalNames,
+            packNames      = manifestMods.keys,
+            effectiveOn    = { rulesFor(it).effectiveEnabled },
+        )
     }
+
+    /** How many rows the scan holds before the filters narrow it -- the panel's denominator. */
+    val scannedCount: Int by derivedStateOf { items.orEmpty().size }
 
     /** The ticked rows, in list order. */
     val picked: List<InstalledContent> by derivedStateOf {
@@ -541,22 +571,37 @@ internal fun contentRowRules(
 }
 
 /**
- * The filter chips and the search box, over the scan.
+ * The section chips, the filter panel and the search box, over the scan.
  *
- * [optionalNames] is what the pack's manifest leaves up to the player; it is
- * consulted only under [ContentScope.OptionalOnly], so a caller with no manifest
- * -- a local pack, an offline fetch that came back empty -- passes an empty set
- * and the scope simply has nothing to show.
+ * [optionalNames] and [packNames] come from the pack's manifest: a caller without
+ * one -- a local pack, an offline fetch that came back empty -- passes empty sets,
+ * and the axes that depend on them narrow to nothing rather than lying. That is
+ * why the panel offers them only where the manifest actually has content.
  */
 internal fun filterContent(
     items: List<InstalledContent>,
     query: String,
     filter: ContentFilter,
-    scope: ContentScope = ContentScope.Everything,
+    filters: ContentFilters = ContentFilters(),
     optionalNames: Set<String> = emptySet(),
+    packNames: Set<String> = emptySet(),
+    effectiveOn: (InstalledContent) -> Boolean = { it.enabled },
 ): List<InstalledContent> = items.filter { c ->
     (filter.kind == null || c.kind == filter.kind) &&
-        (scope == ContentScope.Everything || c.fileName in optionalNames) &&
+        (!filters.optionalOnly || c.fileName in optionalNames) &&
+        when (filters.owner) {
+            ContentOwner.Any  -> true
+            ContentOwner.Pack -> c.fileName in packNames
+            ContentOwner.User -> c.fileName !in packNames
+        } &&
+        when (filters.status) {
+            ContentStatus.Any      -> true
+            // The row's own reading, not the file name on disk: an optional mod the
+            // pack has not relabelled yet is off in the record and still `.jar` in
+            // the folder, and the list must agree with the switch beside it.
+            ContentStatus.Enabled  -> effectiveOn(c)
+            ContentStatus.Disabled -> !effectiveOn(c)
+        } &&
         (
             query.isBlank() ||
                 c.displayName.contains(query, ignoreCase = true) ||

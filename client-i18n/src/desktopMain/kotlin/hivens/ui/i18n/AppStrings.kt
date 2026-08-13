@@ -823,7 +823,17 @@ interface AppStrings {
     val contentFilterMods: String
     val contentFilterResourcePacks: String
     val contentFilterShaderPacks: String
-    val contentFiltersMore: String
+    val contentFiltersTitle: String
+    val contentFiltersReset: String
+    fun contentFiltersShown(shown: Int, total: Int): String
+    val contentFilterGroupCurated: String
+    val contentFilterGroupStatus: String
+    val contentFilterGroupOwner: String
+    val contentFilterAny: String
+    val contentFilterEnabled: String
+    val contentFilterDisabled: String
+    val contentFilterOwnerPack: String
+    val contentFilterOwnerUser: String
     val contentFilterOptionalOnly: String
     val contentFilterOptionalOnlyHint: String
     val contentDeleteTitle: String
