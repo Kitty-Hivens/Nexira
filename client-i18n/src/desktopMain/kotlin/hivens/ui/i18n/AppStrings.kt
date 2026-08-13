@@ -823,6 +823,9 @@ interface AppStrings {
     val contentFilterMods: String
     val contentFilterResourcePacks: String
     val contentFilterShaderPacks: String
+    val contentFiltersMore: String
+    val contentFilterOptionalOnly: String
+    val contentFilterOptionalOnlyHint: String
     val contentDeleteTitle: String
     val contentDeleteBody: String
     fun contentBulkDeleteBody(count: Int): String
