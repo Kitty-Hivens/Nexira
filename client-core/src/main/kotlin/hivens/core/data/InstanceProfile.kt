@@ -6,12 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class InstanceProfile(
     val serverId: String = "",
-    /**
-     * Default heap for new per-server profiles. 6 GB matches modded-MC
-     * reality (SmartyCraft packs run 50-70 mods, need 4-6 GB to be
-     * smooth); the constructor screen overwrites this on save.
-     */
-    val memoryMb: Int = 6144,
+    /** Starting heap for a new per-server profile; the constructor screen overwrites it on save. */
+    override val memoryMb: Int = RuntimePrefs.SERVER_MEMORY_MB,
     /**
      * Pin this server to its explicit [memoryMb] instead of the global adaptive
      * sizer. Set true the moment the user picks a RAM value in RamSelector.
@@ -19,12 +15,12 @@ data class InstanceProfile(
      * instance out of the box -- a fresh field (not a flipped opt-in) so
      * profiles persisted before it default to adaptive, not to a stale opt-out.
      */
-    val fixedMemory: Boolean = false,
-    val javaPath: String? = null,
-    val jvmArgs: String? = null,
-    val windowWidth: Int = 925,
-    val windowHeight: Int = 530,
-    val fullScreen: Boolean = false,
+    override val fixedMemory: Boolean = false,
+    override val javaPath: String? = null,
+    override val jvmArgs: String? = null,
+    override val windowWidth: Int = RuntimePrefs.WINDOW_WIDTH,
+    override val windowHeight: Int = RuntimePrefs.WINDOW_HEIGHT,
+    override val fullScreen: Boolean = false,
     val autoConnect: Boolean = true,
     /**
      * Per-mod enabled/disabled bits. An immutable [Map] so the record keeps
@@ -33,4 +29,4 @@ data class InstanceProfile(
      * Updated by rebuilding via `copy(optionalModsState = ...)`.
      */
     val optionalModsState: Map<String, Boolean> = emptyMap(),
-)
+) : RuntimePrefs

@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.InstanceRuntime
+import hivens.core.data.RuntimePrefs
 import hivens.core.data.PackInstance
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.JvmArgsPresets
@@ -81,7 +82,7 @@ internal fun PackRuntimeSection(
         RamSelector(
             isAuto = !runtime.fixedMemory,
             resolvedAutoMb = resolvedAutoMb,
-            currentMb = if (runtime.memoryMb > 0) runtime.memoryMb else 4096,
+            currentMb = if (runtime.memoryMb > 0) runtime.memoryMb else RuntimePrefs.PACK_MEMORY_MB,
             onAutoSelected = { commit(runtime.copy(fixedMemory = false)) },
             onValueChanged = { commit(runtime.copy(memoryMb = it, fixedMemory = true)) },
             modifier = Modifier.fillMaxWidth(),
