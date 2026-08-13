@@ -6,46 +6,31 @@ import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.OptionalMod
 import hivens.core.data.flatten
-import kotlinx.serialization.json.*
-import org.slf4j.LoggerFactory
 
-class ManifestProcessorService(
-    private val json: Json
-) : IManifestProcessorService {
-
-    private val log = LoggerFactory.getLogger(ManifestProcessorService::class.java)
+class ManifestProcessorService : IManifestProcessorService {
 
     override fun flattenManifest(manifest: FileManifest): Map<String, FileData> = manifest.flatten()
 
-    override fun getOptionalModsForClient(profile: ServerProfile): List<OptionalMod> {
-        val result = ArrayList<OptionalMod>()
-        val rawMods = profile.optionalModsData ?: return result
-
-        rawMods.forEach { (modId, modData) ->
-            try {
-                val decoded = json.decodeFromJsonElement<OptionalMod>(modData)
-                // Defaulting layer: upstream sometimes omits `id` and `jars`
-                // entirely, expecting the manifest key to stand in for them.
-                // We patch via copy() rather than mutating since OptionalMod
-                // fields are now `val`.
-                val mod = decoded.copy(
-                    id   = decoded.id.ifEmpty { modId },
-                    jars = decoded.jars.ifEmpty { listOf("$modId.jar") },
-                )
-                result.add(mod)
-            } catch (e: Exception) {
-                log.error("Error parsing mod configuration '$modId': ${e.message}")
-            }
+    /**
+     * Upstream omits `id` and `jars` on a mod whose key already says both,
+     * so the key stands in for them. Applied on the way out rather than when
+     * the profile is built, because a profile served from the disk cache was
+     * written before this rule existed and needs it too.
+     */
+    override fun getOptionalModsForClient(profile: ServerProfile): List<OptionalMod> =
+        profile.optionalMods.map { (modId, mod) ->
+            mod.copy(
+                id   = mod.id.ifEmpty { modId },
+                jars = mod.jars.ifEmpty { listOf("$modId.jar") },
+            )
         }
-        return result
-    }
 
     override fun calculateIgnoredFiles(profile: ServerProfile, userState: Map<String, Boolean>): Set<String> {
         val available = getOptionalModsForClient(profile)
         if (available.isEmpty()) return emptySet()
         val ignored = HashSet<String>()
         for (mod in available) {
-            val isEnabled = userState[mod.id] ?: mod.isDefault
+            val isEnabled = userState[mod.id] ?: mod.enabledByDefault
             if (!isEnabled) {
                 ignored.addAll(mod.jars)
                 if (mod.infoFile != null) ignored.add(mod.infoFile!!)

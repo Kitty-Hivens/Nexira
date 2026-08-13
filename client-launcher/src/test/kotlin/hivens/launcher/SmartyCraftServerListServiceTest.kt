@@ -19,9 +19,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -119,6 +121,34 @@ class SmartyCraftServerListServiceTest {
         SmartyCraftServerListService(ServerRepository(down), cache = store2, dashboardCache = memCache())
             .fetchDashboardData().await()
         assertEquals(0, store2.saved.size, "an empty/failed fetch must not overwrite the tray seed")
+    }
+
+    @Test
+    fun `an optional mod nobody can parse costs that mod, not the server's list`() = runBlocking {
+        // The dashboard's own shape drifts. Decoding happens here, at the one
+        // point where the upstream's JSON becomes the launcher's model, and a
+        // single bad entry must not take the rest of the server's mods with it.
+        val declared = Json.parseToJsonElement(
+            """
+            {
+              "optifine": { "name": "OptiFine", "jars": ["optifine.jar"], "selected": true },
+              "broken":   { "name": "Broken",   "jars": "not-a-list" }
+            }
+            """.trimIndent(),
+        )
+        val protocol = FakeServerProtocol().apply {
+            loaderResult = {
+                LoaderResponse(
+                    status = "OK",
+                    servers = listOf(SmartyServer(id = "Industrial", ip = "127.0.0.1", optionalMods = declared)),
+                )
+            }
+        }
+        val profile = SmartyCraftServerListService(ServerRepository(protocol), dashboardCache = memCache())
+            .fetchDashboardData().await().servers.single()
+
+        assertEquals(setOf("optifine"), profile.optionalMods.keys)
+        assertTrue(profile.optionalMods.getValue("optifine").enabledByDefault)
     }
 
     @Test

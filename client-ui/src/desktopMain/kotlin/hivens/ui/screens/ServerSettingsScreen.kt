@@ -86,7 +86,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     // Per-mod toggle. Mods load asynchronously -- registry mirrors what's
     // currently composed, so puppet calls before modsLoaded return 404.
     state.mods.forEach { mod ->
-        PuppetToggle("$pkey.mod.${mod.id}", state.modStates[mod.id] ?: mod.isDefault) {
+        PuppetToggle("$pkey.mod.${mod.id}", state.modStates[mod.id] ?: mod.enabledByDefault) {
             state.modStates[mod.id] = it
         }
     }
@@ -374,7 +374,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         ) {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(state.mods) { mod ->
-                                    val currentState = state.modStates[mod.id] ?: mod.isDefault
+                                    val currentState = state.modStates[mod.id] ?: mod.enabledByDefault
 
                                     ModItemCard(
                                         mod       = mod,

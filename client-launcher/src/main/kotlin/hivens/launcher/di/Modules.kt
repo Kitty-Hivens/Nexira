@@ -670,7 +670,7 @@ val launchPipelineModule = module {
     single<IFileDownloadService> {
         FileDownloadService(get(named("smartycraft")), get(), get(), get<ServerProtocolConfig>())
     }
-    single<IManifestProcessorService> { ManifestProcessorService(get()) }
+    single<IManifestProcessorService> { ManifestProcessorService() }
     single { ProfileManager(get(), get()) }
     single<IInstanceProfileStore> { get<ProfileManager>() }
 
@@ -841,7 +841,7 @@ val appModule = module {
     }
 
     single<IServerListService> {
-        SmartyCraftServerListService(get(), get(), get(), dashboardCache())
+        SmartyCraftServerListService(get(), get(), get(), dashboardCache(), get())
     }
 
     // The news archive, read from the site's paginated index rather than from the
