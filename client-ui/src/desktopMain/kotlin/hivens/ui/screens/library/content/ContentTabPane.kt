@@ -331,15 +331,19 @@ private fun ContentFilterButton(
     Box {
         Box(contentAlignment = Alignment.TopEnd) {
             NxIconButton(
-                // Always the funnel: the crossed-out one reads as "no filtering",
-                // which is the opposite of what an active filter means. The badge
-                // and the tint carry the state.
-                icon               = NxIcon.FilterAlt,
+                // Turns into the close while the panel is out, and the panel's own
+                // close lands on this exact spot -- so the control the user pressed
+                // reads as having become the corner of what opened. Otherwise the
+                // plain funnel: the crossed-out one reads as "no filtering", which
+                // is the opposite of what an active filter means, so the badge and
+                // the tint carry that instead.
+                icon               = if (open) NxIcon.Close else NxIcon.FilterAlt,
                 contentDescription = s.contentFiltersTitle,
-                onClick            = { open = true },
-                tint               = if (filters.isEmpty) NxTheme.colors.textSecondary else NxTheme.colors.primary,
+                onClick            = { open = !open },
+                tint               = if (filters.isEmpty && !open) NxTheme.colors.textSecondary
+                                     else NxTheme.colors.primary,
             )
-            if (!filters.isEmpty) {
+            if (!filters.isEmpty && !open) {
                 Box(
                     modifier = Modifier
                         .padding(top = 2.dp, end = 2.dp)
