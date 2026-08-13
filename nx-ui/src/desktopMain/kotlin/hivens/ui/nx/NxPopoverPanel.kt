@@ -20,10 +20,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -44,10 +50,18 @@ import hivens.ui.theme.NxTheme
  * optional footer for the action that undoes all of it at once, and it does not
  * dismiss on a click inside.
  *
- * Declare it inside the `Box` that wraps the trigger; it anchors under that box,
- * end-aligned, and flips above near the window bottom. The body scrolls once it
- * outgrows [maxBodyHeight], so a panel can carry more groups than the window is
- * tall without the footer walking off screen.
+ * Declare it inside the `Box` that wraps the trigger. It does not hang BELOW the
+ * trigger -- it grows OUT of it: the panel's corner lands on the trigger's corner
+ * and it scales up from that point, so the control the user pressed becomes the
+ * corner of what opened. Keep the trigger the same size as [NxIconButton]'s
+ * default and the panel's own close lands exactly on it, which is what makes the
+ * icon read as having turned into the close.
+ *
+ * Near the window bottom it grows upward instead, and the scale origin follows --
+ * the provider measures where the panel actually landed and reports it back, so
+ * the motion always starts at the trigger rather than at a corner that happens to
+ * be nearest. The body scrolls once it outgrows [maxBodyHeight], so a panel can
+ * carry more groups than the window is tall without its footer walking off screen.
  */
 @Composable
 fun NxPopoverPanel(
@@ -66,8 +80,11 @@ fun NxPopoverPanel(
     // popup on the frame the flag flips would cut the fade.
     if (!states.currentState && !states.targetState) return
 
-    val gapPx = with(LocalDensity.current) { 6.dp.roundToPx() }
-    val provider = remember(gapPx) { BelowAnchorEndAligned(gapPx) }
+    // Written by the position provider during layout and read by the transition --
+    // the same handshake Material's own menu uses, because only the provider knows
+    // which way the panel had to go to fit.
+    val origin = remember { mutableStateOf(TransformOrigin(1f, 0f)) }
+    val provider = remember(origin) { FromAnchorCorner(origin) }
 
     Popup(
         popupPositionProvider = provider,
@@ -76,8 +93,14 @@ fun NxPopoverPanel(
     ) {
         AnimatedVisibility(
             visibleState = states,
-            enter = fadeIn(Motion.tap.of()) + scaleIn(Motion.tap.of(), initialScale = 0.94f, transformOrigin = TransformOrigin(1f, 0f)),
-            exit  = fadeOut(Motion.tap.of()) + scaleOut(Motion.tap.of(), targetScale = 0.94f, transformOrigin = TransformOrigin(1f, 0f)),
+            // Unfolds from the trigger rather than appearing beside it: the scale
+            // starts near nothing at the corner the user pressed. The fade is the
+            // quicker of the two so the panel reads as an object arriving, not as
+            // text swelling into place.
+            enter = fadeIn(Motion.tap.of()) +
+                scaleIn(Motion.reveal.of(), initialScale = 0.10f, transformOrigin = origin.value),
+            exit  = fadeOut(Motion.tap.of()) +
+                scaleOut(Motion.tap.of(), targetScale = 0.10f, transformOrigin = origin.value),
         ) {
             NxSurface(
                 level    = NxSurfaceLevel.Floating,
@@ -90,8 +113,10 @@ fun NxPopoverPanel(
                 modifier = modifier.width(width),
             ) {
                 Column(Modifier.fillMaxWidth()) {
+                    // No inset on the end and none on top: the close sits exactly
+                    // where the trigger is, so the panel's corner IS that control.
                     Row(
-                        modifier          = Modifier.fillMaxWidth().padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 8.dp),
+                        modifier          = Modifier.fillMaxWidth().padding(start = 14.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -105,7 +130,6 @@ fun NxPopoverPanel(
                             icon               = NxIcon.Close,
                             contentDescription = null,
                             onClick            = onDismissRequest,
-                            iconSize           = 16.dp,
                         )
                     }
                     HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
@@ -130,6 +154,40 @@ fun NxPopoverPanel(
                 }
             }
         }
+    }
+}
+
+/**
+ * Puts the panel's corner on the trigger's corner and reports which corner that
+ * turned out to be, so the growth starts there.
+ *
+ * Down and to the left by default. Near the bottom of the window it grows upward
+ * instead -- the panel's bottom edge on the trigger's bottom edge -- and a panel
+ * wider than the space to its left slides right, with the origin moved along it so
+ * the motion still begins at the control.
+ */
+private class FromAnchorCorner(
+    private val origin: MutableState<TransformOrigin>,
+) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x = (anchorBounds.right - popupContentSize.width)
+            .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+        val growsDown = anchorBounds.top + popupContentSize.height <= windowSize.height
+        val y = if (growsDown) {
+            anchorBounds.top
+        } else {
+            (anchorBounds.bottom - popupContentSize.height).coerceAtLeast(0)
+        }
+        val originX = if (popupContentSize.width == 0) 1f
+                      else ((anchorBounds.right - x).toFloat() / popupContentSize.width).coerceIn(0f, 1f)
+        val originY = if (growsDown) 0f else 1f
+        origin.value = TransformOrigin(originX, originY)
+        return IntOffset(x, y)
     }
 }
 
