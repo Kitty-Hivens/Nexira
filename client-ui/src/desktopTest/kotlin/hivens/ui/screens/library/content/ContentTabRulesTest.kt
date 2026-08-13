@@ -139,37 +139,82 @@ class ContentTabRulesTest {
     }
 
     @Test
-    fun `the optional scope narrows to what the pack leaves up to the player`() {
-        // The section says what kind of thing it is; this says whether the player
-        // may turn it off. They are separate questions and compose.
+    fun `the optional axis narrows to what the pack leaves up to the player`() {
+        // The section says what kind of thing a row is; this says whether the
+        // player may turn it off. Separate questions, and they compose.
         val optional = setOf("sodium.jar")
+        val only = ContentFilters(optionalOnly = true)
 
         assertEquals(
             listOf("sodium.jar"),
-            filterContent(items, "", ContentFilter.All, ContentScope.OptionalOnly, optional).map { it.fileName },
-        )
-        assertEquals(
-            listOf("sodium.jar"),
-            filterContent(items, "", ContentFilter.Mods, ContentScope.OptionalOnly, optional).map { it.fileName },
+            filterContent(items, "", ContentFilter.All, only, optional).map { it.fileName },
         )
         assertEquals(
             emptyList(),
-            filterContent(items, "", ContentFilter.ShaderPacks, ContentScope.OptionalOnly, optional),
+            filterContent(items, "", ContentFilter.ShaderPacks, only, optional),
             "a shader pack is never the pack's optional content",
         )
         assertEquals(
             emptyList(),
-            filterContent(items, "iris", ContentFilter.All, ContentScope.OptionalOnly, optional),
-            "the search still applies inside the scope",
+            filterContent(items, "iris", ContentFilter.All, only, optional),
+            "the search still applies inside the axis",
+        )
+        assertEquals(
+            emptyList(),
+            filterContent(items, "", ContentFilter.All, only, emptySet()),
+            "no manifest means nothing is curated, which is empty rather than everything",
         )
     }
 
     @Test
-    fun `an empty optional set shows nothing under the optional scope`() {
-        // A local pack curates nothing, and an offline manifest fetch comes back
-        // with nothing to curate: an empty list is the honest answer, not the whole
-        // folder.
-        assertEquals(emptyList(), filterContent(items, "", ContentFilter.All, ContentScope.OptionalOnly, emptySet()))
+    fun `the state axis reads the row, not the file name`() {
+        // An optional mod switched off is off in the record before the relabel
+        // lands on disk, and the list has to agree with the switch beside it.
+        val offByRecord = setOf("sodium.jar")
+        val shown = filterContent(
+            items       = items,
+            query       = "",
+            filter      = ContentFilter.All,
+            filters     = ContentFilters(status = ContentStatus.Disabled),
+            effectiveOn = { it.fileName !in offByRecord },
+        )
+
+        assertEquals(listOf("sodium.jar"), shown.map { it.fileName })
+    }
+
+    @Test
+    fun `the owner axis separates what the pack ships from what the player added`() {
+        val packContent = setOf("sodium.jar", "faithful.zip")
+
+        assertEquals(
+            listOf("sodium.jar", "faithful.zip"),
+            filterContent(items, "", ContentFilter.All, ContentFilters(owner = ContentOwner.Pack), packNames = packContent)
+                .map { it.fileName },
+        )
+        assertEquals(
+            listOf("iris.jar", "complementary.zip"),
+            filterContent(items, "", ContentFilter.All, ContentFilters(owner = ContentOwner.User), packNames = packContent)
+                .map { it.fileName },
+        )
+    }
+
+    @Test
+    fun `the axes compose, and the count of active ones is what the trigger badges`() {
+        val filters = ContentFilters(optionalOnly = true, status = ContentStatus.Enabled, owner = ContentOwner.Pack)
+        assertEquals(3, filters.activeCount)
+        assertEquals(0, ContentFilters().activeCount)
+        assertTrue(ContentFilters().isEmpty)
+
+        val shown = filterContent(
+            items         = items,
+            query         = "",
+            filter        = ContentFilter.Mods,
+            filters       = filters,
+            optionalNames = setOf("sodium.jar", "iris.jar"),
+            packNames     = setOf("sodium.jar"),
+            effectiveOn   = { true },
+        )
+        assertEquals(listOf("sodium.jar"), shown.map { it.fileName }, "optional AND on AND the pack's AND a mod")
     }
 
     // -- a selection ----------------------------------------------------------
