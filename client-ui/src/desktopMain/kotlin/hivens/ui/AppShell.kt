@@ -1019,10 +1019,13 @@ fun FrameWindowScope.AppShellContent(
                 paletteFromWallpaper = paletteFromWallpaper,
             ) {
                 DebugOverlay(debugOverlay)
-                // Inside the theme on purpose: the prompt is a Dialog with its own
-                // composition, and raised from outside it finds no NxColors and takes
+                // Inside the theme on purpose: the prompts are Dialogs with their own
+                // composition, and one raised from outside finds no NxColors and takes
                 // the shell down.
                 hivens.ui.components.TwoFactorPromptHost()
+                // Whatever read the host -- the roster, the news, a login -- parks its
+                // refused certificate here for the user to answer once.
+                hivens.ui.components.CertificatePromptHost()
             }
             // Synthetic resize grips -- undecorated drops the native border. Only
             // with custom chrome (else the OS frame resizes); self-gates to
