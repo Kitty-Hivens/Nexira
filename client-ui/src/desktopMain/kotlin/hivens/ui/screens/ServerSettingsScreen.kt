@@ -152,7 +152,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     RamSelector(
                         isAuto = state.isAutoMode,
                         resolvedAutoMb = state.resolvedAutoMb,
-                        currentMb = state.memoryMb,
+                        // Nothing pinned: offer what the next launch would use anyway.
+                        currentMb = state.memoryMb.takeIf { it > 0 } ?: state.resolvedAutoMb,
                         // Auto un-pins (fixedMemory=false); picking a value pins (Fixed).
                         onAutoSelected = { state.isAutoMode = true },
                         onValueChanged = { state.memoryMb = it; state.isAutoMode = false },

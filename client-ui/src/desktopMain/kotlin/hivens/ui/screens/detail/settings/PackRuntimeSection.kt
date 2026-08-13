@@ -82,7 +82,9 @@ internal fun PackRuntimeSection(
         RamSelector(
             isAuto = !runtime.fixedMemory,
             resolvedAutoMb = resolvedAutoMb,
-            currentMb = if (runtime.memoryMb > 0) runtime.memoryMb else RuntimePrefs.PACK_MEMORY_MB,
+            // Nothing pinned: offer what the next launch would use anyway, so
+            // leaving Auto starts from the real number rather than a constant.
+            currentMb = runtime.memoryMb.takeIf { it > 0 } ?: resolvedAutoMb,
             onAutoSelected = { commit(runtime.copy(fixedMemory = false)) },
             onValueChanged = { commit(runtime.copy(memoryMb = it, fixedMemory = true)) },
             modifier = Modifier.fillMaxWidth(),

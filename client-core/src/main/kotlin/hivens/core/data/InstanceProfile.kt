@@ -6,8 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class InstanceProfile(
     val serverId: String = "",
-    /** Starting heap for a new per-server profile; the constructor screen overwrites it on save. */
-    override val memoryMb: Int = RuntimePrefs.SERVER_MEMORY_MB,
+    override val memoryMb: Int = RuntimePrefs.NO_PINNED_MEMORY,
     /**
      * Pin this server to its explicit [memoryMb] instead of the global adaptive
      * sizer. Set true the moment the user picks a RAM value in RamSelector.

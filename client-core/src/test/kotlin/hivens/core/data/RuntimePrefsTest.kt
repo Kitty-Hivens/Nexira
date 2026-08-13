@@ -5,6 +5,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RuntimePrefsTest {
@@ -15,7 +16,6 @@ class RuntimePrefsTest {
     fun `both records answer the same launch questions`() {
         val prefs: List<RuntimePrefs> = listOf(InstanceProfile(), InstanceRuntime())
         for (p in prefs) {
-            assertTrue(p.memoryMb > 0)
             assertEquals(RuntimePrefs.WINDOW_WIDTH, p.windowWidth)
             assertEquals(RuntimePrefs.WINDOW_HEIGHT, p.windowHeight)
             assertEquals(false, p.fixedMemory)
@@ -45,9 +45,16 @@ class RuntimePrefsTest {
         assertTrue("fullScreen" in runtime.keys)
     }
 
+    /**
+     * A fresh record pins no heap, whichever of the two it is. The launch path
+     * sizes an unpinned instance from the machine and the adaptive sizer, so a
+     * number here would be one nothing reads and the two used to disagree on.
+     */
     @Test
-    fun `each record starts at the heap named for it`() {
-        assertEquals(RuntimePrefs.SERVER_MEMORY_MB, InstanceProfile().memoryMb)
-        assertEquals(RuntimePrefs.PACK_MEMORY_MB, InstanceRuntime().memoryMb)
+    fun `neither record is born pinning a heap`() {
+        assertEquals(RuntimePrefs.NO_PINNED_MEMORY, InstanceProfile().memoryMb)
+        assertEquals(RuntimePrefs.NO_PINNED_MEMORY, InstanceRuntime().memoryMb)
+        assertFalse(InstanceProfile().fixedMemory)
+        assertFalse(InstanceRuntime().fixedMemory)
     }
 }
