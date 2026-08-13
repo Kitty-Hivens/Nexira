@@ -22,7 +22,7 @@ import javax.swing.SwingUtilities
  *     gate, log dir) plus a direct [SettingsPeek] of settings.json for the
  *     window-creation-time values (undecorated chrome, locale) that
  *     normally live behind Koin.
- *   - [completeBoot] is the slow remainder (data move, NetworkState, Koin),
+ *   - [completeBoot] is the slow remainder (data move, migration, Koin),
  *     run by hivens.ui.Main on a background thread behind the live
  *     boot-threshold window.
  */

@@ -1,10 +1,7 @@
 package hivens.launcher.network
 
-import java.nio.file.Files
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -20,19 +17,13 @@ class CertificateTrustGateTest {
 
     private val host = "www.smartycraft.ru"
 
-    @BeforeTest
-    fun isolate() {
-        // NetworkState is a process-wide singleton with on-disk persistence; point it
-        // at a scratch file so a grant here neither reads nor writes the real one.
-        NetworkState.initialize(Files.createTempDirectory("cert-gate").resolve("bypasses.json"))
-    }
-
-    @AfterTest
-    fun clean() = NetworkState.revokeBypass(host)
+    // In memory and one per test: the grants used to live in a process-wide
+    // singleton every case had to wipe around itself.
+    private val bypasses = JsonSslBypassStore()
 
     @Test
     fun `a refused certificate is raised for the user`() {
-        val gate = CertificateTrustGate()
+        val gate = CertificateTrustGate(bypasses)
 
         gate.request(host)
 
@@ -41,8 +32,8 @@ class CertificateTrustGateTest {
 
     @Test
     fun `a host that is already trusted asks nothing`() {
-        NetworkState.grantBypass(host, Instant.now().plus(1, ChronoUnit.HOURS))
-        val gate = CertificateTrustGate()
+        bypasses.grant(host, Instant.now().plus(1, ChronoUnit.HOURS))
+        val gate = CertificateTrustGate(bypasses)
 
         gate.request(host)
 
@@ -52,7 +43,7 @@ class CertificateTrustGateTest {
     @Test
     fun `background reads do not stack a second question`() {
         // The roster, the news and the image loader all fail the same way at once.
-        val gate = CertificateTrustGate()
+        val gate = CertificateTrustGate(bypasses)
         gate.request(host)
 
         gate.request(host)
@@ -64,19 +55,19 @@ class CertificateTrustGateTest {
     @Test
     fun `accepting grants the bypass and runs what was waiting`() {
         var retried = false
-        val gate = CertificateTrustGate()
+        val gate = CertificateTrustGate(bypasses)
         gate.request(host) { retried = true }
 
         gate.accept(Instant.now().plus(1, ChronoUnit.HOURS))
 
-        assertTrue(NetworkState.bypassFor(host), "the transport may use the bypass client now")
+        assertTrue(bypasses.isBypassed(host), "the transport may use the bypass client now")
         assertTrue(retried, "the login that provoked the question is the thing that resumes")
         assertNull(gate.pending.value)
     }
 
     @Test
     fun `a refusal is not asked again by a background read`() {
-        val gate = CertificateTrustGate()
+        val gate = CertificateTrustGate(bypasses)
         gate.request(host)
         gate.dismiss()
 
@@ -89,7 +80,7 @@ class CertificateTrustGateTest {
     fun `an explicit attempt asks again after a refusal`() {
         // Signing in IS the user asking for that host, so the earlier "no" to a
         // background read must not silently swallow the attempt.
-        val gate = CertificateTrustGate()
+        val gate = CertificateTrustGate(bypasses)
         gate.request(host)
         gate.dismiss()
 
@@ -100,7 +91,7 @@ class CertificateTrustGateTest {
 
     @Test
     fun `an explicit attempt takes over a question raised in the background`() {
-        val gate = CertificateTrustGate()
+        val gate = CertificateTrustGate(bypasses)
         gate.request(host)
         var retried = false
 

@@ -49,7 +49,7 @@ data class ServerProtocolConfig(
     val clientFilesBase: String get() = "$baseUrl/launcher/clients"
 
     /**
-     * Hostname used as the key in [hivens.launcher.network.NetworkState]'s per-host
+     * Hostname used as the key in [hivens.core.security.SslBypassStore]'s per-host
      * SSL-bypass set. Extracted from [baseUrl]'s URI authority so a Mirror
      * operator pointing the launcher at `https://mirror.example.com` keys
      * bypasses against `mirror.example.com`, not the production smartycraft

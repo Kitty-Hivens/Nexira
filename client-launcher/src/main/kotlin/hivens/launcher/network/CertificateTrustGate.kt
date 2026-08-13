@@ -1,5 +1,6 @@
 package hivens.launcher.network
 
+import hivens.core.security.SslBypassStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,17 +12,17 @@ import java.time.Instant
  *
  * The decision used to live inside the login form, and the form was the only place
  * that could ask for it. Every read of the SmartyCraft host goes through the client
- * [NetworkState] picks, so before a login had granted the bypass, reads that need no
- * session at all -- the server roster, the news the site publishes publicly -- failed
- * at the transport and their surfaces showed nothing. Signing in was the way to get
- * news, which is not what either of them is about.
+ * the [SslBypassStore] picks, so before a login had granted the bypass, reads that
+ * need no session at all -- the server roster, the news the site publishes publicly
+ * -- failed at the transport and their surfaces showed nothing. Signing in was the
+ * way to get news, which is not what either of them is about.
  *
  * One slot at a time: the host, plus what to retry once the user accepts. A raise for
  * a host that is already trusted, already pending, or that the user has already turned
  * down is dropped -- background reads retry on their own and must not stack dialogs
  * or nag.
  */
-class CertificateTrustGate {
+class CertificateTrustGate(private val bypasses: SslBypassStore) {
 
     /**
      * @param host the host whose certificate was refused.
@@ -42,7 +43,7 @@ class CertificateTrustGate {
 
     @Synchronized
     fun request(host: String, onGranted: (() -> Unit)? = null) {
-        if (host.isBlank() || NetworkState.bypassFor(host)) return
+        if (host.isBlank() || bypasses.isBypassed(host)) return
         val explicit = onGranted != null
         if (!explicit && host in declined) return
         val current = _pending.value
@@ -59,7 +60,7 @@ class CertificateTrustGate {
     fun accept(until: Instant) {
         val request = _pending.value ?: return
         _pending.value = null
-        NetworkState.grantBypass(request.host, until)
+        bypasses.grant(request.host, until)
         request.onGranted?.invoke()
     }
 

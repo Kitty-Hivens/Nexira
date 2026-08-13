@@ -155,7 +155,7 @@ class DataDirMoverTest {
     fun `after applyPending, a fresh PlatformPaths reader sees the new data-dir`() {
         // Regression for the stale-paths bug in LauncherBootstrap.preBoot:
         // when a pending move applies, the rest of preBoot must re-resolve
-        // PlatformPaths so Files.createDirectories, NetworkState.initialize,
+        // PlatformPaths so Files.createDirectories, the bypass store,
         // SingleInstance.acquire, and Koin singletons all see the new dir
         // instead of recreating + wiring against the now-empty old path.
         // This test pins the underlying contract that the re-resolve relies

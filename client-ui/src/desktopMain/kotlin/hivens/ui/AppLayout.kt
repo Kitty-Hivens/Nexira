@@ -16,7 +16,7 @@ import hivens.core.data.HomeView
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
-import hivens.launcher.network.NetworkState
+import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.hasUsableImage
@@ -106,8 +106,9 @@ fun AppLayout(
     else NxTheme.colors.background
 
     val bypassHost = protocolConfig.sslBypassHost
-    val bypassesList by NetworkState.bypassesState.collectAsState()
-    val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
+    val bypassStore: SslBypassStore = koinInject()
+    val bypassesList by bypassStore.bypasses.collectAsState()
+    val sslBypass = remember(bypassesList, bypassHost) { bypassStore.isBypassed(bypassHost) }
 
     // The center region's screen router. Defined here (not in the layout graph)
     // because navigation is not yet a widget surface; the center region widget

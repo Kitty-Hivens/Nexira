@@ -37,7 +37,7 @@ import hivens.core.launch.LaunchState
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ProfileManager
 import hivens.launcher.launch.LauncherController
-import hivens.launcher.network.NetworkState
+import hivens.core.security.SslBypassStore
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
 import hivens.ui.customization.glassSurfaceAlpha
@@ -86,8 +86,9 @@ fun HomeClassicContent(instance: WidgetInstance) {
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
     var isLoadingServers by remember { mutableStateOf(true) }
     val bypassHost = protocolConfig.sslBypassHost
-    val bypassesList by NetworkState.bypassesState.collectAsState()
-    val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
+    val bypassStore: SslBypassStore = koinInject()
+    val bypassesList by bypassStore.bypasses.collectAsState()
+    val sslBypass = remember(bypassesList, bypassHost) { bypassStore.isBypassed(bypassHost) }
 
     fun fetchServers(forceRefresh: Boolean = false) {
         isLoadingServers = true

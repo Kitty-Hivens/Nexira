@@ -11,7 +11,6 @@ import hivens.launcher.di.mirrorModule
 import hivens.launcher.di.networkModule
 import hivens.launcher.di.runtimeModule
 import hivens.launcher.di.updateModule
-import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.DataDirMigration
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
@@ -27,8 +26,8 @@ import kotlin.system.exitProcess
  * Everything that has to happen before an entrypoint takes over the JVM:
  * log directory resolution so logback.xml's `${nexira.logs.dir}`
  * substitution works on the very first LoggerFactory call, pending
- * data-dir migration, session-id tagging, NetworkState SSL-bypass
- * restore, crash-report handler, single-instance lock, Koin startup.
+ * data-dir migration, session-id tagging, crash-report handler,
+ * single-instance lock, Koin startup.
  *
  * The pipeline is split in two so the GUI can show a window BEFORE the
  * heavy boot work runs (the boot-threshold screen):
@@ -38,7 +37,7 @@ import kotlin.system.exitProcess
  *     the single-instance gate (so a duplicate launch never flashes a
  *     window before yielding to the running instance).
  *   - [completeCore] + [finishBoot] -- the potentially-slow remainder
- *     (data-dir move, NetworkState restore, migration detect, Koin). The
+ *     (data-dir move, migration detect, Koin). The
  *     GUI runs these on a background thread behind a live window and maps
  *     the [Phase] callbacks onto its progress bar; the CLI runs them
  *     inline.
@@ -168,9 +167,8 @@ object LauncherBootstrap {
 
     /**
      * The potentially-slow, AWT-free middle: pending data-dir move,
-     * post-move re-resolution, NetworkState SSL-bypass restore, data-dir
-     * creation, CrashReporter construction. Safe to run on a background
-     * thread behind a live window.
+     * post-move re-resolution, data-dir creation, CrashReporter
+     * construction. Safe to run on a background thread behind a live window.
      */
     fun completeCore(
         pre: PreWindow,
@@ -212,15 +210,6 @@ object LauncherBootstrap {
         }
 
         onPhase(Phase.Network)
-
-        // Vault #2: wire SSL-bypass persistence. Expired entries from prior
-        // sessions are dropped during load -- a 30-day grant from a month ago
-        // doesn't silently re-arm itself. Called before Koin / HttpClientProvider
-        // bootstrap so the very first network request sees the correct bypass
-        // state. (Calling later would race: HttpClientProvider's selector
-        // reads `NetworkState.bypassFor(...)` and could see an empty set if
-        // initialize hadn't run yet.)
-        NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
 
         Files.createDirectories(paths.dataDir)
 
