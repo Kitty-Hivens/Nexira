@@ -91,7 +91,10 @@ class PackInstaller(
             packRef               = PackReference(
                 origin  = PackOrigin.Mirror,
                 id      = packId,
-                version = manifest.packVersion,
+                // A mirror build that declares no version floats, same as the
+                // mrpack and CurseForge installers resolve it. The empty string
+                // would read as a pin at every later comparison.
+                version = manifest.packVersion.ifBlank { null },
             ),
             displayName           = summary.displayName,
             iconUrl               = summary.iconUrl,
@@ -99,7 +102,7 @@ class PackInstaller(
             instanceDirName       = instanceDir,
             createdAtEpoch        = Instant.now().epochSecond,
             lastPlayedEpochOrZero = 0L,
-            pinnedPackVersion     = manifest.packVersion,
+            pinnedPackVersion     = manifest.packVersion.ifBlank { null },
             runtime               = InstanceRuntime(),  // heap left to the global adaptive sizer
             optionalContent       = optionalToggles,
             forkedFrom            = null,

@@ -33,6 +33,13 @@ interface IPackRepository {
      * Persist [instance]. Creates if its id is unknown, replaces if
      * known. The id is the source of truth for identity, NOT the
      * displayName (the user can rename instances freely).
+     *
+     * Implementations hold the instance to [hivens.core.data.PackIdentity]
+     * before storing it: a reference that names no pack is a bug in whatever
+     * built it, and the store is where it stops rather than where it is kept
+     * until some later screen cannot resolve it.
+     *
+     * @throws IllegalArgumentException when the instance's identity is malformed.
      */
     suspend fun put(instance: PackInstance)
 
