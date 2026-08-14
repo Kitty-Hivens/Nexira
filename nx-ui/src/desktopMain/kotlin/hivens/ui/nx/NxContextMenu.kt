@@ -158,7 +158,7 @@ fun NxMenuItem(
             .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .background(if (hovered) hoverTint.copy(alpha = 0.14f) else Color.Transparent)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = Spacing.s14, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {

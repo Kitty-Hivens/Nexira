@@ -59,7 +59,7 @@ fun NxCalloutBanner(
             .clip(shape)
             .background(accent.copy(alpha = 0.12f))
             .border(1.dp, accent.copy(alpha = 0.4f), shape)
-            .padding(14.dp),
+            .padding(Spacing.s14),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
     ) {
         Symbol(glyph, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))

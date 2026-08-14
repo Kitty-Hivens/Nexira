@@ -40,6 +40,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /** Corner of the Play plate under a rounded style -- a rounded rectangle
  *  between a bare rectangle and a full stadium, not a pill. */
@@ -139,8 +140,8 @@ fun PlayButton(
     val pad = when {
         iconOnly && compact -> PaddingValues(7.dp)
         iconOnly            -> PaddingValues(9.dp)
-        compact             -> PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-        else                -> PaddingValues(horizontal = 20.dp, vertical = 9.dp)
+        compact             -> PaddingValues(horizontal = Spacing.s14, vertical = Spacing.s6)
+        else                -> PaddingValues(horizontal = Spacing.s20, vertical = 9.dp)
     }
 
     Row(
