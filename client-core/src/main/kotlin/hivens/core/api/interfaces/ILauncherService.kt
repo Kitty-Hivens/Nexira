@@ -23,7 +23,6 @@ interface ILauncherService {
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int,
     ): SpawnResult
 
     /** Same as [launchClient], plus streams stdout / stderr through [onLog]. */
@@ -36,7 +35,6 @@ interface ILauncherService {
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean = false,
         onLog: (String, LauncherLogType) -> Unit,
     ): SpawnResult
@@ -75,9 +73,6 @@ interface ILauncherService {
      *                         wants 25, legacy-Forge-1.12.2 wants 8). The
      *                         per-instance [InstanceRuntime.javaPath] still wins
      *                         over both override and managed default.
-     * @param allocatedMemoryMB Fallback heap (MB) when the instance's
-     *                         own [InstanceRuntime.memoryMb] is 0 or
-     *                         below the launcher floor.
      * @param displayName      Human label for log lines.
      * @param onLog            Stdout / stderr line callback.
      */
@@ -87,7 +82,6 @@ interface ILauncherService {
         runtime: InstanceRuntime,
         clientRootPath: Path,
         javaPathOverride: Path?,
-        allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean = false,
         // Point authlib's auth/account/session hosts at the SmartyCraft host.
         // Only for a session that IS an SC one -- the redirect decides where the

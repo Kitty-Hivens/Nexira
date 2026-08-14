@@ -112,13 +112,6 @@ fun darkThemeFor(
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,
-    /**
-     * Fallback default heap (MB) when an InstanceProfile doesn't
-     * specify its own. 6 GB matches modded-MC reality (SmartyCraft
-     * packs need 4-6 GB to be smooth); RamSelector caps the choice at
-     * 75% of detected system RAM so low-RAM systems still scale down.
-     */
-    val memoryMB: Int = 6144,
     val isDarkTheme: Boolean = true,
     /**
      * Derive the colour palette from the wallpaper (Material You / Monet): the

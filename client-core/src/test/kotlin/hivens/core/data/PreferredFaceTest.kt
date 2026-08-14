@@ -34,7 +34,7 @@ class PreferredFaceTest {
 
     @Test
     fun `nothing else in the settings moves`() {
-        val settings = SettingsData(preferredFaceProvider = sc, memoryMB = 4096, disabledModules = setOf("tray"))
+        val settings = SettingsData(preferredFaceProvider = sc, disabledModules = setOf("tray"))
         val released = settings.releasingFace(sc)
         assertEquals(settings.copy(preferredFaceProvider = null), released)
     }

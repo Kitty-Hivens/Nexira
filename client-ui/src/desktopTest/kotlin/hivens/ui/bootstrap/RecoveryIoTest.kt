@@ -38,22 +38,22 @@ class RecoveryIoTest {
 
     @Test
     fun `writeDisabledModules preserves sibling keys`() {
-        Files.writeString(settings(), """{ "memoryMB": 8192, "locale": "de" }""")
+        Files.writeString(settings(), """{ "javaPath": "/opt/jdk/bin/java", "locale": "de" }""")
         RecoveryIo.writeDisabledModules(dataDir, setOf("skinema", "tray"))
 
         val root = readJson()
-        assertEquals(8192, root["memoryMB"]?.jsonPrimitive?.intOrNull, "sibling keys must survive the write")
+        assertEquals("/opt/jdk/bin/java", root["javaPath"]?.jsonPrimitive?.contentOrNull, "sibling keys must survive the write")
         assertEquals("de", root["locale"]?.jsonPrimitive?.contentOrNull)
         assertEquals(setOf("skinema", "tray"), RecoveryIo.readDisabledModules(dataDir))
     }
 
     @Test
     fun `resetSettings drops other keys but keeps disabledModules`() {
-        Files.writeString(settings(), """{ "memoryMB": 8192, "disabledModules": ["keyring"] }""")
+        Files.writeString(settings(), """{ "javaPath": "/opt/jdk/bin/java", "disabledModules": ["keyring"] }""")
         RecoveryIo.resetSettings(dataDir)
 
         val root = readJson()
-        assertFalse(root.containsKey("memoryMB"), "reset must drop other settings to defaults")
+        assertFalse(root.containsKey("javaPath"), "reset must drop other settings to defaults")
         assertEquals(setOf("keyring"), RecoveryIo.readDisabledModules(dataDir), "a reset must not re-enable a disabled module")
     }
 
@@ -70,7 +70,7 @@ class RecoveryIoTest {
         val previous = Locale.getDefault()
         Locale.setDefault(Locale.forLanguageTag("ru-RU"))
         try {
-            Files.writeString(settings(), """{ "locale": "de", "memoryMB": 8192 }""")
+            Files.writeString(settings(), """{ "locale": "de", "javaPath": "/opt/jdk/bin/java" }""")
             RecoveryIo.resetSettings(dataDir)
 
             // A reset is someone starting over: the same launcher a fresh install
