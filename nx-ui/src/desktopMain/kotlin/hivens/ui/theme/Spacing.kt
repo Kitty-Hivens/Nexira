@@ -8,12 +8,16 @@ import androidx.compose.ui.unit.dp
  * here instead of picking a fresh dp per call site, so sibling surfaces stay in
  * step and a drifting value has a single place to be corrected.
  *
- * The ladder is a rule, not a list. Steps of 2 up to twelve, steps of 4 up to
+ * The ladder is a rule, not a list. Steps of 2 up to sixteen, steps of 4 up to
  * twenty four, then 32. Every rung earns its place: the previous seven-rung
  * version was derived from an ideal rather than from this codebase, and left out
- * three of the six most widely used values, so 6, 10 and 20 dp had nowhere to go
+ * four of the most widely used values, so 6, 10, 14 and 20 dp had nowhere to go
  * and the scale ended up with no call sites at all. A scale that cannot express
  * what the interface already does is decoration.
+ *
+ * [s14] is the clearest case of that: it is the inner padding of every card in
+ * the app, the horizontal inset of a row or a menu item, and the gap in every
+ * grid, across thirty one files that arrived at it independently.
  *
  * Rungs are named for what they measure. Reading `s6` at a call site says the
  * same thing `6.dp` did, and adds the one fact the literal could not: that the
@@ -40,6 +44,8 @@ object Spacing {
     val s10: Dp = 10.dp
     /** Component inner padding: card content, list rows. */
     val s12: Dp = 12.dp
+    /** Card inset, row inset, grid gap. The app's own unit of rhythm. */
+    val s14: Dp = 14.dp
     /** Section padding: panel edges, dialog content. */
     val s16: Dp = 16.dp
     val s20: Dp = 20.dp
@@ -49,5 +55,5 @@ object Spacing {
     val s32: Dp = 32.dp
 
     /** Every rung, ascending. The ladder itself, for a check that wants to walk it. */
-    val rungs: List<Dp> = listOf(s2, s4, s6, s8, s10, s12, s16, s20, s24, s32)
+    val rungs: List<Dp> = listOf(s2, s4, s6, s8, s10, s12, s14, s16, s20, s24, s32)
 }

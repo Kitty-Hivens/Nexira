@@ -117,7 +117,7 @@ fun NxPopoverPanel(
                     // No inset on the end and none on top: the close sits exactly
                     // where the trigger is, so the panel's corner IS that control.
                     Row(
-                        modifier          = Modifier.fillMaxWidth().padding(start = 14.dp, bottom = Spacing.s6),
+                        modifier          = Modifier.fillMaxWidth().padding(start = Spacing.s14, bottom = Spacing.s6),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -139,8 +139,8 @@ fun NxPopoverPanel(
                             .fillMaxWidth()
                             .heightIn(max = maxBodyHeight)
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 14.dp, vertical = Spacing.s12),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                            .padding(horizontal = Spacing.s14, vertical = Spacing.s12),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.s14),
                     ) {
                         content()
                     }

@@ -8,20 +8,20 @@ import kotlin.test.assertTrue
 class SpacingTest {
 
     /**
-     * The ladder is a rule: steps of 2 up to twelve, steps of 4 up to twenty
+     * The ladder is a rule: steps of 2 up to sixteen, steps of 4 up to twenty
      * four, then 32. Pinned because the rule is the whole argument for these
      * rungs and not others, and a rung added by eye is how the previous scale
      * ended up unable to express what the interface does.
      */
     @Test
     fun `the ladder follows its own rule`() {
-        assertEquals(listOf(2, 4, 6, 8, 10, 12, 16, 20, 24, 32).map { it.dp }, Spacing.rungs)
+        assertEquals(listOf(2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32).map { it.dp }, Spacing.rungs)
 
         val values = Spacing.rungs.map { it.value.toInt() }
         for ((low, high) in values.zipWithNext()) {
             val step = high - low
             val expected = when {
-                high <= 12 -> 2
+                high <= 16 -> 2
                 high <= 24 -> 4
                 else -> 8
             }

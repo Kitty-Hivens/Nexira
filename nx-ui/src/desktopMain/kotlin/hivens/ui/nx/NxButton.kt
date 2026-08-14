@@ -25,6 +25,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Spacing
 
 /**
  * The one button. Four emphasis roles -- a call site picks a role, not colours. The per-widget freedom the old de-facto base button
@@ -80,8 +81,8 @@ fun NxButton(
     }
     val bordered = style == NxButtonStyle.Secondary
     val dim = if (enabled) 1f else 0.45f
-    val pad = if (compact) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-              else PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+    val pad = if (compact) PaddingValues(horizontal = Spacing.s12, vertical = Spacing.s6)
+              else PaddingValues(horizontal = 18.dp, vertical = Spacing.s10)
 
     // Hover/press feedback through the shared ShapedStateLayer, provided as
     // LocalIndication so the clickable picks it up.
