@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A labeled slider whose track is **bounded** so it never runs to the window
@@ -51,7 +52,7 @@ fun NxSlider(
                 fontWeight = FontWeight.Medium,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
-                modifier   = Modifier.weight(1f, fill = false).padding(end = 8.dp),
+                modifier   = Modifier.weight(1f, fill = false).padding(end = Spacing.s8),
             )
             Text(
                 valueText,

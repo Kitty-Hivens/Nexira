@@ -29,6 +29,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A clickable navigation row: icon + title (+ optional [subtitle]) + a trailing
@@ -66,13 +67,13 @@ fun NxNavRow(
             modifier              = Modifier
                 .fillMaxWidth()
                 .background(NxTheme.colors.textPrimary.copy(alpha = alpha))
-                .padding(16.dp),
+                .padding(Spacing.s16),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon, null, tint = iconTint, size = 24.dp)
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(Spacing.s16))
                 Column {
                     Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {

@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * Icon-only clickable with a shape-correct CIRCULAR state layer: the hover/press
@@ -44,7 +45,7 @@ fun NxIconButton(
                 enabled           = enabled,
                 onClick           = onClick,
             )
-            .padding(6.dp),
+            .padding(Spacing.s6),
         contentAlignment = Alignment.Center,
     ) {
         Symbol(icon, contentDescription, tint = shownTint, size = iconSize)

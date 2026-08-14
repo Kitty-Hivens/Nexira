@@ -4,34 +4,50 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The one spacing scale. Gaps, paddings and inter-element arrangement pull
- * from here instead of picking a fresh dp per call site, so sibling surfaces
- * stay in step and drift (the old 3/5/7/9/14/22dp strays) has a single place
- * to be corrected.
+ * The one spacing scale: gaps, paddings and inter-element arrangement pull from
+ * here instead of picking a fresh dp per call site, so sibling surfaces stay in
+ * step and a drifting value has a single place to be corrected.
  *
- * A 2-based geometric-ish step: each token is a deliberate rung, not an
- * arbitrary number. Reach for the nearest rung rather than reintroducing an
- * off-scale value; a genuinely new need is a new named token here, not a
- * literal at the call site.
+ * The ladder is a rule, not a list. Steps of 2 up to twelve, steps of 4 up to
+ * twenty four, then 32. Every rung earns its place: the previous seven-rung
+ * version was derived from an ideal rather than from this codebase, and left out
+ * three of the six most widely used values, so 6, 10 and 20 dp had nowhere to go
+ * and the scale ended up with no call sites at all. A scale that cannot express
+ * what the interface already does is decoration.
+ *
+ * Rungs are named for what they measure. Reading `s6` at a call site says the
+ * same thing `6.dp` did, and adds the one fact the literal could not: that the
+ * value is on the scale. A value that is not here is a value to move to the
+ * nearest rung, not a rung to add.
  *
  * These are base dp. The global density knob (customization densityScale,
  * applied as a [androidx.compose.ui.unit.Density] override at the shell root)
  * multiplies them at layout time, so the scale composes with user density
  * without any per-token arithmetic.
+ *
+ * Spacing only. A component's own dimensions, a corner radius, a stroke or an
+ * icon size are not gaps between things, and they answer to the shape tokens on
+ * [StyleSpec] or to the component itself.
  */
 object Spacing {
-    /** Hairline gap -- icon-to-label, chip inner padding. */
-    val xxs: Dp = 2.dp
-    /** Tight gap -- dense rows, badge padding. */
-    val xs: Dp = 4.dp
-    /** The default small gap -- most inter-element spacing. */
-    val sm: Dp = 8.dp
-    /** Component inner padding -- card content, list rows. */
-    val md: Dp = 12.dp
-    /** Section padding -- panel edges, dialog content. */
-    val lg: Dp = 16.dp
-    /** Block separation -- between grouped sections. */
-    val xl: Dp = 24.dp
+    /** Hairline gap: icon to label, chip inner padding. */
+    val s2: Dp = 2.dp
+    /** Tight gap: dense rows, badge padding. */
+    val s4: Dp = 4.dp
+    val s6: Dp = 6.dp
+    /** The default small gap, and the most used value in the tree. */
+    val s8: Dp = 8.dp
+    val s10: Dp = 10.dp
+    /** Component inner padding: card content, list rows. */
+    val s12: Dp = 12.dp
+    /** Section padding: panel edges, dialog content. */
+    val s16: Dp = 16.dp
+    val s20: Dp = 20.dp
+    /** Block separation, between grouped sections. */
+    val s24: Dp = 24.dp
     /** Page-level breathing room. */
-    val xxl: Dp = 32.dp
+    val s32: Dp = 32.dp
+
+    /** Every rung, ascending. The ladder itself, for a check that wants to walk it. */
+    val rungs: List<Dp> = listOf(s2, s4, s6, s8, s10, s12, s16, s20, s24, s32)
 }

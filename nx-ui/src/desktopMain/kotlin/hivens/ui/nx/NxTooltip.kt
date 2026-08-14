@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * Hover tooltip for desktop pointers: [text] appears near the cursor after a
@@ -51,7 +52,7 @@ fun NxTooltip(
                     text = text,
                     style = MaterialTheme.typography.labelSmall,
                     color = NxTheme.colors.textPrimary,
-                    modifier = Modifier.widthIn(max = 280.dp).padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.widthIn(max = 280.dp).padding(horizontal = Spacing.s8, vertical = Spacing.s4),
                 )
             }
         },
