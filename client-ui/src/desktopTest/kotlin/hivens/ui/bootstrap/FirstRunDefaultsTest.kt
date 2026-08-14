@@ -87,7 +87,7 @@ class FirstRunDefaultsTest {
 
     @Test
     fun `an existing settings file is never touched`() {
-        val existing = """{ "locale": "en", "isDarkTheme": false, "memoryMB": 8192 }"""
+        val existing = """{ "locale": "en", "isDarkTheme": false, "javaPath": "/opt/jdk/bin/java" }"""
         Files.writeString(settings(), existing)
 
         FirstRunDefaults.seed(dataDir, Locale.forLanguageTag("ru-RU"))
@@ -104,7 +104,7 @@ class FirstRunDefaultsTest {
         // that never opens the settings screen keeps following the defaults it
         // did not need an opinion about.
         assertFalse("locale" in keys, "a value equal to the shipped default must not be pinned")
-        assertFalse("memoryMB" in keys)
+        assertFalse("javaPath" in keys)
         assertTrue("themeMode" in keys, "the theme mode is the one thing a first run does decide")
     }
 }

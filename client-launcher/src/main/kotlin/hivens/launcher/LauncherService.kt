@@ -73,7 +73,6 @@ internal class LauncherService(
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean,
         onLog: (String, LauncherLogType) -> Unit
     ): SpawnResult = try {
@@ -85,7 +84,7 @@ internal class LauncherService(
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, profile.fixedMemory),
             instanceDir = clientRootPath,
-            baseMemoryMb = baselineMemory(profile.fixedMemory, profile.memoryMb, allocatedMemoryMB, SystemMemory.totalPhysicalMb()),
+            baseMemoryMb = baselineMemory(profile.fixedMemory, profile.memoryMb, SystemMemory.totalPhysicalMb()),
         )
         val memory = adaptive.memoryMb
 
@@ -130,10 +129,9 @@ internal class LauncherService(
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int
     ): SpawnResult {
         return launchClientWithLogs(
-            sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB,
+            sessionData, serverProfile, clientRootPath, javaExecutablePath,
             adaptiveEnabled = false,
         ) { _, _ -> /* Logs are ignored */ }
     }
@@ -144,7 +142,6 @@ internal class LauncherService(
         runtime: InstanceRuntime,
         clientRootPath: Path,
         javaPathOverride: Path?,
-        allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean,
         redirectAuthHost: Boolean,
         useNetworkAgent: Boolean,
@@ -162,7 +159,7 @@ internal class LauncherService(
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
-            baseMemoryMb = baselineMemory(runtime.fixedMemory, runtime.memoryMb, allocatedMemoryMB, SystemMemory.totalPhysicalMb()),
+            baseMemoryMb = baselineMemory(runtime.fixedMemory, runtime.memoryMb, SystemMemory.totalPhysicalMb()),
         )
         val memory = adaptive.memoryMb
 
@@ -410,14 +407,10 @@ internal class LauncherService(
             runtime.copy(libraries = runtime.libraries.map { if (it === target) it.copy(path = newPath) else it })
 
         /**
-         * Memory allocation rule: profile's per-instance value wins when positive,
-         * otherwise the launcher's globally allocated value is used. Anything below
-         * 768 MB is bumped to 1024 MB to keep modded clients viable.
+         * A pinned heap as the launch will use it: anything below 768 MB is bumped
+         * to 1024 MB, which is the floor a modded client needs to be viable at all.
          */
-        internal fun normalizeMemory(profileMb: Int, allocatedMb: Int): Int {
-            val raw = if (profileMb > 0) profileMb else allocatedMb
-            return if (raw < 768) 1024 else raw
-        }
+        internal fun normalizeMemory(profileMb: Int): Int = if (profileMb < 768) 1024 else profileMb
 
         /**
          * Whether the adaptive heap sizer applies to an instance: the global signal
@@ -430,16 +423,21 @@ internal class LauncherService(
         /**
          * The baseline heap before any adaptive refinement. A pinned instance
          * ([fixedMemory]) keeps its explicit [profileMb] (respected as-is, even above
-         * the machine ceiling -- a deliberate value is the user's call); an unpinned
-         * instance uses the machine-aware [AutomaticHeap] baseline, which is also the
+         * the machine ceiling -- a deliberate value is the user's call); everything
+         * else uses the machine-aware [AutomaticHeap] baseline, which is also the
          * cold-start the adaptive sizer grows from. Pure.
+         *
+         * "Everything else" includes an instance flagged as pinned that names no
+         * heap. That combination is not reachable from the UI -- pinning happens by
+         * choosing a number, which is what writes one -- so a record carrying it has
+         * been edited by hand, and the machine baseline is a better answer for it
+         * than a stored constant was.
          */
         internal fun baselineMemory(
             fixedMemory: Boolean,
             profileMb: Int,
-            allocatedMb: Int,
             systemRamMb: Int,
-        ): Int = if (fixedMemory) normalizeMemory(profileMb, allocatedMb)
+        ): Int = if (fixedMemory && profileMb > 0) normalizeMemory(profileMb)
                  else AutomaticHeap.compute(systemRamMb)
 
         /**

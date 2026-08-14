@@ -61,26 +61,17 @@ class LauncherServiceTest {
     // ── normalizeMemory ──────────────────────────────────────────────────────
 
     @Test
-    fun `normalizeMemory bumps tiny allocations up to 1024`() {
-        assertEquals(1024, normalizeMemory(profileMb = 0, allocatedMb = 512))
-        assertEquals(1024, normalizeMemory(profileMb = 256, allocatedMb = 8192))
-        assertEquals(1024, normalizeMemory(profileMb = 0, allocatedMb = 0))
+    fun `normalizeMemory bumps a pin below the modded floor up to 1024`() {
+        assertEquals(1024, normalizeMemory(512))
+        assertEquals(1024, normalizeMemory(256))
+        assertEquals(1024, normalizeMemory(0))
     }
 
     @Test
-    fun `normalizeMemory honours profile when positive`() {
-        assertEquals(2048, normalizeMemory(profileMb = 2048, allocatedMb = 4096))
-    }
-
-    @Test
-    fun `normalizeMemory falls back to allocated when profile is zero`() {
-        assertEquals(4096, normalizeMemory(profileMb = 0, allocatedMb = 4096))
-    }
-
-    @Test
-    fun `normalizeMemory leaves comfortable values alone`() {
-        assertEquals(8192, normalizeMemory(profileMb = 0, allocatedMb = 8192))
-        assertEquals(768, normalizeMemory(profileMb = 768, allocatedMb = 0))
+    fun `normalizeMemory leaves a usable pin alone`() {
+        assertEquals(2048, normalizeMemory(2048))
+        assertEquals(8192, normalizeMemory(8192))
+        assertEquals(768, normalizeMemory(768))
     }
 
     // ── adaptiveApplies (the per-instance gate) ──────────────────────────────
@@ -98,23 +89,23 @@ class LauncherServiceTest {
     @Test
     fun `baselineMemory honours an explicit pin, uncapped`() {
         // Fixed: a deliberate value is respected even above 75% of a small machine.
-        assertEquals(6144, baselineMemory(fixedMemory = true, profileMb = 6144, allocatedMb = 4096, systemRamMb = 4096))
+        assertEquals(6144, baselineMemory(fixedMemory = true, profileMb = 6144, systemRamMb = 4096))
     }
 
     @Test
     fun `baselineMemory still floors a tiny pin`() {
-        assertEquals(1024, baselineMemory(fixedMemory = true, profileMb = 256, allocatedMb = 0, systemRamMb = 16384))
+        assertEquals(1024, baselineMemory(fixedMemory = true, profileMb = 256, systemRamMb = 16384))
     }
 
     @Test
     fun `unpinned ignores the stored value and uses the Automatic baseline`() {
         // The cold-start over-allocation regression: a 4 GB box no longer gets 6144.
-        assertEquals(2457, baselineMemory(fixedMemory = false, profileMb = 6144, allocatedMb = 6144, systemRamMb = 4096))
+        assertEquals(2457, baselineMemory(fixedMemory = false, profileMb = 6144, systemRamMb = 4096))
     }
 
     @Test
     fun `unpinned scales the Automatic baseline with the machine`() {
-        assertEquals(9830, baselineMemory(fixedMemory = false, profileMb = 4096, allocatedMb = 4096, systemRamMb = 16384))
+        assertEquals(9830, baselineMemory(fixedMemory = false, profileMb = 4096, systemRamMb = 16384))
     }
 
     // ── resolveJavaPath ──────────────────────────────────────────────────────
@@ -305,7 +296,6 @@ class LauncherServiceTest {
             serverProfile = serverProfile,
             clientRootPath = clientRoot,
             javaExecutablePath = clientRoot / "ghost-java",  // never used; profile.javaPath wins
-            allocatedMemoryMB = 4096,
         ) { msg, type -> captured.add(msg to type) }
 
         // /usr/bin/true exits immediately with 0; awaitExit() blocks on the real

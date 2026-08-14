@@ -630,7 +630,6 @@ class LauncherController(
                     serverProfile = server,
                     clientRootPath = clientDir,
                     javaExecutablePath = javaPath,
-                    allocatedMemoryMB = settings.memoryMB,
                     adaptiveEnabled = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
                     onLog = onLog,
                 )
@@ -791,7 +790,6 @@ class LauncherController(
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
                     javaPathOverride     = javaOverride,
-                    allocatedMemoryMB    = settings.memoryMB,
                     adaptiveEnabled      = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
                     // Redirect authlib away from the Mojang hosts only when the
                     // session being carried is an SC one. Keying this on the
