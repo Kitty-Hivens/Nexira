@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * Parse a hex string into a [Color] or null. Accepts `#RRGGBB` / `#AARRGGBB`
@@ -58,7 +59,7 @@ fun NxColorField(
     Row(
         modifier              = modifier,
         verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
     ) {
         Box(
             Modifier
@@ -81,7 +82,7 @@ fun NxColorField(
                 modifier = Modifier
                     .clip(RoundedCornerShape(LocalStyle.current.buttonCorner))
                     .clickable { text = ""; onClear() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = Spacing.s8, vertical = Spacing.s4),
             )
         }
     }

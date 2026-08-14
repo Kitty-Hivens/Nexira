@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A settings/config section: an accent header label over a single opaque body
@@ -49,10 +50,10 @@ fun NxSection(
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Spacing.s8))
         NxSurface(level = level, glass = false, modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier            = Modifier.fillMaxWidth().padding(16.dp),
+                modifier            = Modifier.fillMaxWidth().padding(Spacing.s16),
                 verticalArrangement = Arrangement.spacedBy(spacing),
                 content             = content,
             )

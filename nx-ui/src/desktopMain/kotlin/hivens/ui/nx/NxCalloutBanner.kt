@@ -21,6 +21,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /** Severity of a [NxCalloutBanner]; drives its accent colour and default glyph. */
 enum class NxCalloutTone { Info, Warning, Error }
@@ -59,12 +60,12 @@ fun NxCalloutBanner(
             .background(accent.copy(alpha = 0.12f))
             .border(1.dp, accent.copy(alpha = 0.4f), shape)
             .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
     ) {
         Symbol(glyph, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
         Column(
             modifier            = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s8),
         ) {
             if (title != null) {
                 Text(title, style = MaterialTheme.typography.titleSmall, color = accent, fontWeight = FontWeight.Bold)

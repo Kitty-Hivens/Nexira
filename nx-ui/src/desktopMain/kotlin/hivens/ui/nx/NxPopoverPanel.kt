@@ -40,6 +40,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A titled panel that hangs off a control, for choices that do not fit a menu.
@@ -116,7 +117,7 @@ fun NxPopoverPanel(
                     // No inset on the end and none on top: the close sits exactly
                     // where the trigger is, so the panel's corner IS that control.
                     Row(
-                        modifier          = Modifier.fillMaxWidth().padding(start = 14.dp, bottom = 6.dp),
+                        modifier          = Modifier.fillMaxWidth().padding(start = 14.dp, bottom = Spacing.s6),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -138,7 +139,7 @@ fun NxPopoverPanel(
                             .fillMaxWidth()
                             .heightIn(max = maxBodyHeight)
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(horizontal = 14.dp, vertical = Spacing.s12),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         content()
@@ -146,7 +147,7 @@ fun NxPopoverPanel(
                     footer?.let {
                         HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
                         Row(
-                            modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                            modifier              = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
                             verticalAlignment     = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) { it() }
@@ -202,7 +203,7 @@ fun NxPanelGroup(
     hint: String? = null,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.s6)) {
         Text(
             text  = label,
             style = MaterialTheme.typography.labelSmall,

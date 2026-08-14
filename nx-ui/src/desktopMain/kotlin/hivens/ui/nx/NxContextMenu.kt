@@ -45,6 +45,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 import kotlin.math.roundToInt
 
 /**
@@ -116,7 +117,7 @@ private fun NxContextMenuPopup(
                 shape    = MaterialTheme.shapes.medium,
                 modifier = Modifier.width(IntrinsicSize.Max),
             ) {
-                Column(Modifier.padding(vertical = 6.dp)) {
+                Column(Modifier.padding(vertical = Spacing.s6)) {
                     content()
                 }
             }
@@ -162,7 +163,7 @@ fun NxMenuItem(
     ) {
         if (icon != null) {
             Symbol(icon, contentDescription = null, tint = color, size = 18.dp)
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(Spacing.s10))
         }
         Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
         if (hint != null || selected) Spacer(Modifier.weight(1f))
@@ -172,7 +173,7 @@ fun NxMenuItem(
                 style = MaterialTheme.typography.labelSmall,
                 color = NxTheme.colors.textSecondary,
             )
-            if (selected) Spacer(Modifier.width(8.dp))
+            if (selected) Spacer(Modifier.width(Spacing.s8))
         }
         if (selected) {
             Symbol(NxIcon.Check, contentDescription = null, tint = color, size = 18.dp)

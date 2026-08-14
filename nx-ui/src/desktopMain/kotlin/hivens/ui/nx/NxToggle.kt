@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * One label(+ optional [description] / [icon]) and an [NxSwitch], as a single
@@ -50,7 +51,7 @@ fun NxToggle(
                 // a whole-row wash.
                 val iconTint = if (accent != null && checked) accent else NxTheme.colors.textSecondary
                 Symbol(icon, null, tint = iconTint.copy(alpha = alpha), size = 22.dp)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Spacing.s12))
             }
             Column {
                 Text(
@@ -71,10 +72,10 @@ fun NxToggle(
                 }
             }
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Spacing.s12))
         if (trailing != null) {
             trailing()
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(Spacing.s12))
         }
         NxSwitch(
             checked         = checked,

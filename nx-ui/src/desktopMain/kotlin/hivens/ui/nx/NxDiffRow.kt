@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /** What happened to the entry a [NxDiffRow] describes. */
 enum class NxDiffRowKind { Added, Removed, Updated }
@@ -50,7 +51,7 @@ fun NxDiffRow(
     Row(
         modifier              = modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
     ) {
         Box(
             modifier         = Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(accent.copy(alpha = 0.16f)),

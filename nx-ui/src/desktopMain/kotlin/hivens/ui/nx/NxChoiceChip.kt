@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A small selectable chip (e.g. regex / bold). Selected = an accent wash + accent
@@ -54,6 +55,6 @@ fun NxChoiceChip(
                 enabled           = enabled,
                 onClick           = onToggle,
             )
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = Spacing.s10, vertical = Spacing.s6),
     )
 }
