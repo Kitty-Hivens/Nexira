@@ -35,13 +35,11 @@ class UpdateServiceTest {
     }
 
     private fun fakeSettings(
-        experimentalFeaturesEnabled: Boolean = true,
         mandatoryUpdatesEnabled: Boolean = true,
         updateChannel: ReleaseChannel = ReleaseChannel.Release,  // Release so existing /releases/latest mocks work
         nightlyChannel: Boolean = false
     ): ISettingsService = FakeSettingsService(
         SettingsData(
-            experimentalFeaturesEnabled = experimentalFeaturesEnabled,
             mandatoryUpdatesEnabled = mandatoryUpdatesEnabled,
             updateChannel = updateChannel,
             nightlyChannel = nightlyChannel
@@ -1036,20 +1034,22 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `experimental master OFF forces both children OFF`() = runTest {
-        // Master off -> prereleases off (so /releases/latest is the path, not
-        // /releases) AND mandatory off (so even a high floor doesn't block).
+    fun `mandatory updates off leaves a floor above current advisory`() = runTest {
+        // The floor is published and sits far above the installed version; with
+        // enforcement off the update is still offered, just not forced. This used
+        // to be gated by a second, master switch as well -- the knob now stands on
+        // its own, so the floor is answered by exactly one setting.
         val release = githubReleaseJson(tagName = "v99.0.0")
         val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
         val svc = createService(
             MockResponse(urlContains = "releases/latest",     body = release),
             MockResponse(urlContains = "releases",            body = "BOOM", status = HttpStatusCode.InternalServerError),
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
-            settings = fakeSettings(experimentalFeaturesEnabled = false)
+            settings = fakeSettings(mandatoryUpdatesEnabled = false)
         )
         val update = svc.checkForUpdate()
         assertNotNull(update)
-        assertFalse(update.isMandatory, "Master off must force mandatory off even when floor > current")
+        assertFalse(update.isMandatory, "Enforcement off must leave the floor advisory even when it is above current")
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

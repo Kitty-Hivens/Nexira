@@ -646,7 +646,6 @@ fun FrameWindowScope.AppShellContent(
                 policy = StartupPolicy(
                     trayEnabled         = ModuleId.Tray.id   !in settings.disabledModules,
                     notifierEnabled     = ModuleId.Notify.id !in settings.disabledModules,
-                    experimentalEnabled = settings.experimentalFeaturesEnabled,
                     autoSyncAllPacks    = settings.autoSyncAllPacks,
                     autoUpdatePacks     = settings.autoUpdatePacks,
                 ),

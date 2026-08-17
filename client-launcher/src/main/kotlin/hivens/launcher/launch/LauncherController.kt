@@ -630,7 +630,7 @@ class LauncherController(
                     serverProfile = server,
                     clientRootPath = clientDir,
                     javaExecutablePath = javaPath,
-                    adaptiveEnabled = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
+                    adaptiveEnabled = settings.adaptiveMemoryEnabled,
                     onLog = onLog,
                 )
             },
@@ -790,7 +790,7 @@ class LauncherController(
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
                     javaPathOverride     = javaOverride,
-                    adaptiveEnabled      = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
+                    adaptiveEnabled      = settings.adaptiveMemoryEnabled,
                     // Redirect authlib away from the Mojang hosts only when the
                     // session being carried is an SC one. Keying this on the
                     // pack's ORIGIN instead put a mirror pack with no auth block

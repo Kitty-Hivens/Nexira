@@ -105,12 +105,12 @@ fun SettingsScreen(
                             form = form,
                             save = ::save,
                         )
-                        SettingsCategory.Experimental -> ExperimentalSection(
+                        SettingsCategory.Advanced -> AdvancedSection(
+                            paths           = paths,
                             form            = form,
                             save            = ::save,
                             initialSettings = initialSettings,
                         )
-                        SettingsCategory.Advanced -> AdvancedSection(paths = paths, form = form, save = ::save)
                         SettingsCategory.Diagnostics -> DiagnosticsSection(
                             paths       = paths,
                             onOpenAbout = onOpenAbout,

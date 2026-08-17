@@ -124,10 +124,7 @@ class UpdateService(
      * Checks availability of updates.
      *
      * The selected channel (stable vs prerelease) and whether mandatory updates
-     * are honoured both come from [ISettingsService] -- see the experimental
-     * fields on `SettingsData`. The master `experimentalFeaturesEnabled` toggle
-     * gates both children: if it's off, both sub-toggles are forced to false
-     * regardless of their stored values.
+     * are honoured both come from [ISettingsService].
      */
     suspend fun checkForUpdate(): LauncherUpdate? = withContext(Dispatchers.IO) {
         try {
@@ -150,7 +147,7 @@ class UpdateService(
             // /releases/latest (which drops prereleases). Nightlies are then filtered
             // from the candidate below unless nightlyEnabled.
             val includePrereleases = channel.ordinal >= ReleaseChannel.Beta.ordinal || nightlyEnabled
-            val mandatoryEnabled = settings.experimentalFeaturesEnabled && settings.mandatoryUpdatesEnabled
+            val mandatoryEnabled = settings.mandatoryUpdatesEnabled
 
             logger.info(
                 "Checking for launcher updates (channel: {}, mandatory: {})",
@@ -465,7 +462,7 @@ class UpdateService(
      *
      * Returns null when:
      *   - the meta cooldown hasn't elapsed yet,
-     *   - mandatory updates are disabled in settings (master OFF or child OFF),
+     *   - mandatory updates are disabled in settings,
      *   - the channel meta file is missing / unreadable / has no floor,
      *   - the floor is at-or-below the installed version,
      *   - the subsequent release fetch fails for any reason.
@@ -480,9 +477,7 @@ class UpdateService(
             if (!shouldCheckMeta()) return@withContext null
 
             val settings = settingsService.getSettings()
-            val mandatoryEnabled = settings.experimentalFeaturesEnabled &&
-                                   settings.mandatoryUpdatesEnabled
-            if (!mandatoryEnabled) {
+            if (!settings.mandatoryUpdatesEnabled) {
                 updateLastMetaCheck()
                 return@withContext null
             }

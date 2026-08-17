@@ -285,7 +285,7 @@ interface AppStrings {
     // --- Server Settings: Extended ---
     val serverSettingsJvmArgs: String
     val serverSettingsJvmArgsHint: String
-    /** Button label that opens the visual JVM args builder when the experimental toggle is on. */
+    /** Button label that opens the visual JVM args builder when its toggle is on. */
     val serverSettingsJvmBuildArgs: String
     val serverSettingsResolution: String
     val serverSettingsWidth: String
@@ -411,11 +411,9 @@ interface AppStrings {
     /** Label on the hint's action button that restores the window. */
     val trayHintShow: String
 
-    // --- Settings: Experimental features ---
-    val settingsSectionExperimental: String
-    val settingsExperimentalMaster: String
-    val settingsExperimentalMasterDesc: String
+    // --- Settings: Advanced (updates, launch, data directory) ---
     val settingsSectionUpdates: String
+    val settingsSectionLaunch: String
     val settingsPreReleases: String
     val settingsPreReleasesDesc: String
     val settingsMandatoryUpdates: String
@@ -680,7 +678,6 @@ interface AppStrings {
     val settingsCategoryAppearance: String
     val settingsCategoryNetwork: String
     val settingsCategorySmarty: String
-    val settingsCategoryExperimental: String
     val settingsCategoryAdvanced: String
     val settingsCategoryDiagnostics: String
     val settingsCategoryConsole: String
