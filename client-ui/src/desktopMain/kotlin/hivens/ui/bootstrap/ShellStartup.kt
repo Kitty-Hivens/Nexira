@@ -13,19 +13,16 @@ private val log = LoggerFactory.getLogger("ShellStartup")
  * Which background work the session is allowed to start, read from settings
  * once at bring-up.
  *
- * The auto-* flags are two axes under one master opt-in: packs and SmartyCraft
- * servers are updated by different services and were opted into separately.
+ * The auto-* flags are two independent axes: mirror pack builds and SmartyCraft
+ * clients are updated by different services, are opted into separately, and do
+ * not share a reliability record.
  */
 data class StartupPolicy(
     val trayEnabled: Boolean,
     val notifierEnabled: Boolean,
-    val experimentalEnabled: Boolean,
     val autoSyncAllPacks: Boolean,
     val autoUpdatePacks: Boolean,
-) {
-    val syncsRoster: Boolean get() = experimentalEnabled && autoSyncAllPacks
-    val updatesPacks: Boolean get() = experimentalEnabled && autoUpdatePacks
-}
+)
 
 /**
  * What the shell does once, on the way up: bring the tray and the notifier
@@ -73,14 +70,14 @@ class ShellStartup(
         // Fire-and-forget on the app scope: these outlive a composition reset
         // (a locale switch, a crash reload) but are cancelled on JVM exit,
         // unlike a GlobalScope launch which would leak handles past close.
-        if (policy.syncsRoster && roster.isNotEmpty()) appScope.launch { syncAll(roster) }
+        if (policy.autoSyncAllPacks && roster.isNotEmpty()) appScope.launch { syncAll(roster) }
 
         // Runs regardless of the auto-update opt-in: an update a hard crash
         // interrupted leaves a half-applied instance, and that has to be
         // repaired before anything else touches it.
         appScope.launch { recoverInterrupted() }
 
-        if (policy.updatesPacks) appScope.launch { autoUpdatePacks() }
+        if (policy.autoUpdatePacks) appScope.launch { autoUpdatePacks() }
     }
 
     /**

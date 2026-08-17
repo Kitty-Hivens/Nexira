@@ -57,8 +57,8 @@ import hivens.ui.theme.NxTheme
  * expressiveness stays as a row state (day/night sun/moon + reveal,
  * the offline accent), never a whole-row wash.
  *
- * Network bypasses live separately in [NetworkSection]; experimental
- * toggles in [ExperimentalSection].
+ * Network bypasses live separately in [NetworkSection]; update, content,
+ * launch and protocol knobs in [AdvancedSection].
  */
 @Composable
 internal fun AppearanceSection(

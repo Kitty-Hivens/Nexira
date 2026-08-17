@@ -68,8 +68,7 @@ internal fun PackRuntimeSection(
     // enabled and present, else the physical-memory heuristic.
     var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
     LaunchedEffect(instanceDir) {
-        val settings = settingsService.getSettings()
-        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
+        val adaptiveOn = settingsService.getSettings().adaptiveMemoryEnabled
         val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(instanceDir)?.derivedHeapMb } else null
         resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
     }

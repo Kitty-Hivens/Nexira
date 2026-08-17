@@ -33,7 +33,6 @@ internal class SettingsFormState(initial: SettingsData) {
     var closeAfterStart        by mutableStateOf(initial.closeAfterStart)
     var useCustomChrome        by mutableStateOf(initial.useCustomChrome)
     var isOfflineMode          by mutableStateOf(initial.isOfflineMode)
-    var experimentalEnabled    by mutableStateOf(initial.experimentalFeaturesEnabled)
     var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
     var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
     var autoUpdatePacks        by mutableStateOf(initial.autoUpdatePacks)
@@ -68,7 +67,6 @@ internal class SettingsFormState(initial: SettingsData) {
             closeAfterStart             = closeAfterStart,
             useCustomChrome             = useCustomChrome,
             isOfflineMode               = isOfflineMode,
-            experimentalFeaturesEnabled = experimentalEnabled,
             mandatoryUpdatesEnabled     = mandatoryUpdates,
             autoSyncAllPacks            = autoSyncAllPacks,
             autoUpdatePacks             = autoUpdatePacks,

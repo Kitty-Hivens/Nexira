@@ -29,7 +29,6 @@ class ShellStartupTest {
     private val allOn = StartupPolicy(
         trayEnabled = true,
         notifierEnabled = true,
-        experimentalEnabled = true,
         autoSyncAllPacks = true,
         autoUpdatePacks = true,
     )
@@ -138,7 +137,7 @@ class ShellStartupTest {
     @Test
     fun `interrupted updates are recovered whatever the opt-ins say`() = runTest {
         val rec = Recorder()
-        val off = allOn.copy(experimentalEnabled = false, autoSyncAllPacks = false, autoUpdatePacks = false)
+        val off = allOn.copy(autoSyncAllPacks = false, autoUpdatePacks = false)
         startup(rec, policy = off).run(windowVisible = { true })
         advanceUntilIdle()
 
@@ -148,13 +147,23 @@ class ShellStartupTest {
     }
 
     @Test
-    fun `auto-sync needs the master opt-in as well as its own`() = runTest {
-        val rec = Recorder()
-        startup(rec, policy = allOn.copy(experimentalEnabled = false), fetch = { listOf(server("Industrial")) })
+    fun `the two auto passes are opted into separately`() = runTest {
+        // Mirror builds and SmartyCraft clients are updated by different services
+        // and have different reliability records, so neither opt-in may gate the
+        // other -- a shared master is what this replaces.
+        val syncOnly = Recorder()
+        startup(syncOnly, policy = allOn.copy(autoUpdatePacks = false), fetch = { listOf(server("Industrial")) })
             .run(windowVisible = { true })
         advanceUntilIdle()
+        assertTrue("syncAll" in syncOnly.calls)
+        assertFalse("autoUpdate" in syncOnly.calls)
 
-        assertFalse("syncAll" in rec.calls)
+        val updateOnly = Recorder()
+        startup(updateOnly, policy = allOn.copy(autoSyncAllPacks = false), fetch = { listOf(server("Industrial")) })
+            .run(windowVisible = { true })
+        advanceUntilIdle()
+        assertFalse("syncAll" in updateOnly.calls)
+        assertTrue("autoUpdate" in updateOnly.calls)
     }
 
     @Test

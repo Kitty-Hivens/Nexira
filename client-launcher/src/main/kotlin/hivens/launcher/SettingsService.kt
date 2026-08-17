@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SettingsData
+import hivens.core.data.foldLegacyExperimentalGate
 import hivens.core.io.AtomicFiles
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -57,7 +58,10 @@ class SettingsService(
         }
         try {
             val text = Files.readString(settingsFile)
-            cachedSettings = json.decodeFromString<SettingsData>(text)
+            // Fold on the way in, so every reader downstream sees knobs that already
+            // account for the retired experimental master. The fold clears the legacy
+            // flag, and the next save persists that.
+            cachedSettings = foldLegacyExperimentalGate(json.decodeFromString<SettingsData>(text))
         } catch (e: Exception) {
             log.error("Failed to load settings, using defaults", e)
             cachedSettings = SettingsData()

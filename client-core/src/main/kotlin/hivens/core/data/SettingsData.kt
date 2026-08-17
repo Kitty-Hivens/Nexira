@@ -70,6 +70,33 @@ fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
     if (s.themeMode == ThemeMode.System && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
 
 /**
+ * Folds the retired experimental master into the knobs it used to suppress.
+ *
+ * That master was read at four launch-path sites, so a user who switched it off
+ * was switching off mandatory-update enforcement, both auto-update passes and
+ * adaptive heap sizing -- whatever those knobs stored individually. Removing the
+ * gate without this would turn all four back on at the next start, silently and
+ * on someone who had deliberately turned them off.
+ *
+ * Applied once on load and cleared, so the fold cannot re-fire against knobs the
+ * user re-enables afterwards.
+ *
+ * The JVM-args builder and the mimic-version override are deliberately not
+ * folded: the gate only ever greyed out their rows, while
+ * `ServerSettingsState.jvmBuilderEnabled` and `SettingsRestoreHook` read the
+ * stored values directly. They were live with the master off, so switching the
+ * master off never expressed an intent to disable them.
+ */
+fun foldLegacyExperimentalGate(s: SettingsData): SettingsData =
+    if (s.experimentalFeaturesEnabled) s else s.copy(
+        experimentalFeaturesEnabled = true,
+        mandatoryUpdatesEnabled     = false,
+        autoSyncAllPacks            = false,
+        autoUpdatePacks             = false,
+        adaptiveMemoryEnabled       = false,
+    )
+
+/**
  * Wallpapers below this luminance drive the dark theme.
  *
  * The comparison is strict, so exactly mid-grey resolves to the light theme.
@@ -164,13 +191,15 @@ data class SettingsData(
      */
     val offlinePlayerName: String? = null,
 
-    // ── Experimental features ────────────────────────────────────────────
-    // Master gates its children -- switching it off disables every sub-toggle
-    // regardless of their stored values. Defaults ON so the section's tools
-    // (adaptive memory, JVM-args builder, the update-channel picker) are
-    // reachable out of the box; each child then carries its own safe default.
+    // ── Updates, launch and protocol ─────────────────────────────────────
 
-    /** Master switch for the entire experimental features section. */
+    /**
+     * Legacy master that used to gate the settings section these knobs lived in.
+     * Read only by [foldLegacyExperimentalGate], which folds a stored `false`
+     * into the knobs it actually suppressed and then clears itself; nothing else
+     * consults it. Kept as a field so that fold has something to read on a file
+     * written by an older build.
+     */
     val experimentalFeaturesEnabled: Boolean = true,
 
     /**
@@ -184,9 +213,10 @@ data class SettingsData(
 
     /**
      * Update channel the user follows (Release / Beta / Alpha / Dev / Git).
-     * Release/Beta/Alpha pick a GitHub release; Dev/Git build from source and
-     * are only reachable when [experimentalFeaturesEnabled] is on. Defaults to
-     * [ReleaseChannel.Release]; the user picks a channel in the update manager.
+     * Release/Beta/Alpha pick a GitHub release; Dev/Git build from source.
+     * Defaults to [ReleaseChannel.Release]. The settings surface offers the
+     * pre-releases toggle, which maps onto Release / Beta; the other channels
+     * are reached by editing the file.
      */
     val updateChannel: ReleaseChannel = ReleaseChannel.Release,
 
@@ -199,11 +229,23 @@ data class SettingsData(
     val nightlyChannel: Boolean = false,
 
     /**
-     * Sync all installed server packs in background on startup.
+     * Sync all installed SmartyCraft clients in background on startup.
      * "Installed" means a non-empty `clients/<server>/` directory --
-     * never triggers a many-GB first-time pack download out of nowhere.
+     * never triggers a many-GB first-time download out of nowhere.
      * Sequential to avoid bandwidth contention; ManifestCache makes the
      * common nothing-changed case complete in milliseconds.
+     *
+     * Not a sibling of [autoUpdatePacks] despite reading like one. That one
+     * moves a mirror instance between pinned manifests; this one re-runs the
+     * SmartyCraft sync, and carries two limits that are not going away:
+     *
+     *  * A two-factor account is never logged in from here. SmartyCraft mints a
+     *    uid per login and invalidates the previous one, so a background pass
+     *    would revoke the session the player just unlocked with a code. Such an
+     *    account therefore syncs only against a manifest cached by an earlier
+     *    manual login, and a server without one is skipped.
+     *  * The whole raw-server path is deprecated since 2.4.0 and removed in
+     *    2.5.0 at the latest (#318), so its defects are not being fixed.
      *
      * Off by default: most users play 1-2 servers; this is maintainer-
      * grade convenience for users with many servers installed.
@@ -218,7 +260,12 @@ data class SettingsData(
      */
     val autoUpdatePacks: Boolean = true,
 
-    /** How the auto-updater treats an amber (structural) pending update. See [AmberUpdatePolicy]. */
+    /**
+     * How the unattended pass treats a pending update that changes Minecraft or the
+     * loader family, as graded by `classifyCompat` against the installed manifest.
+     * A mirror-instance concept only: [autoSyncAllPacks] has no such classification.
+     * See [AmberUpdatePolicy].
+     */
     val amberUpdatePolicy: AmberUpdatePolicy = AmberUpdatePolicy.Ask,
 
     /**
@@ -236,10 +283,11 @@ data class SettingsData(
     /**
      * Adaptive memory: let the profiler agent size each instance's heap from its
      * observed live-set + peak instead of the static per-instance heap. On by
-     * default (under the experimental master) -- the master switch that governs
-     * EVERY instance. An instance opts out only by pinning a specific RAM value
-     * (`fixedMemory` on `InstanceProfile` / `InstanceRuntime`); turning this off
-     * forces every instance back to its static heap.
+     * default, and the switch that governs EVERY instance -- this is the normal
+     * path a heap is decided by, not an alternative one. An instance opts out
+     * only by pinning a specific RAM value (`fixedMemory` on `InstanceProfile` /
+     * `InstanceRuntime`); turning this off forces every instance back to the
+     * machine-derived baseline.
      */
     val adaptiveMemoryEnabled: Boolean = true,
 

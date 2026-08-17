@@ -92,10 +92,10 @@ internal class ServerSettingsState(
     }
 
     /**
-     * Whether the experimental JVM-args builder entry points are shown. Read when
-     * asked rather than captured at construction: this holder is remembered per
-     * server and would otherwise answer with the flag as it stood the first time
-     * the screen was opened.
+     * Whether the JVM-args builder entry points are shown. Read when asked rather
+     * than captured at construction: this holder is remembered per server and
+     * would otherwise answer with the flag as it stood the first time the screen
+     * was opened.
      */
     val jvmBuilderEnabled: Boolean get() = settingsService.getSettings().jvmBuilderEnabled
 
@@ -143,8 +143,7 @@ internal class ServerSettingsState(
         // the next launch will actually use -- the adaptive-derived heap when
         // adaptive is on and has data, otherwise the machine-aware baseline.
         isAutoMode = !p.fixedMemory
-        val settings = settingsService.getSettings()
-        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
+        val adaptiveOn = settingsService.getSettings().adaptiveMemoryEnabled
         val clientDir = clientDirOrNull()
         val derivedMb = if (adaptiveOn && clientDir != null) {
             withContext(Dispatchers.IO) { profilerStore.readProfile(clientDir)?.derivedHeapMb }
