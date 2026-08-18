@@ -580,12 +580,17 @@ fun FrameWindowScope.AppShellContent(
         // Came back from a crash restart: surface a one-shot notice so the reload
         // -- which resets the current screen -- is not silent. consumeRecovered()
         // is one-shot, so a normal start stays quiet.
+        // Composing is not evidence of anything: the shell mounts under the
+        // still-opaque threshold, and a render-path crash happens after this
+        // point by construction. Staying up is the evidence, so the crash guard
+        // hears about it only once the session has lasted.
+        LaunchedEffect(Unit) {
+            delay(UiRecoverySignal.HEALTHY_SESSION_MS)
+            UiRecoverySignal.noteShellHealthy()
+        }
+
         val notificationCenter: NotificationCenter = koinInject()
         LaunchedEffect(Unit) {
-            // Reaching here means the shell composed, which is the only evidence
-            // that a restart actually recovered rather than looping. The crash
-            // guard counts by time window and cannot tell those apart on its own.
-            UiRecoverySignal.noteShellComposed()
             if (UiRecoverySignal.consumeRecovered()) {
                 notificationCenter.push(
                     sourceKey = "ui-recovery",
