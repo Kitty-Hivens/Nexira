@@ -28,6 +28,9 @@ class RecoveryIoTest {
 
     @AfterTest
     fun teardown() {
+        // The reset latch is process-global and one-way by design; leaving it set
+        // silences every store's writes for the rest of the fork.
+        RecoveryIo.resetForTests()
         Files.walk(dataDir).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { entry -> Files.deleteIfExists(entry) }
         }

@@ -27,6 +27,23 @@ object RecoveryIo {
 
     private val pretty = Json { prettyPrint = true }
 
+    /**
+     * Whether this process has deleted state files out from under its own
+     * in-memory copies of them.
+     *
+     * The resets below run while the launcher is up, holding stores loaded from
+     * the very files being deleted. Their shutdown hooks then wrote those copies
+     * straight back, so a reset survived exactly as long as it took to relaunch
+     * and the next boot loaded the same broken state -- which is the whole of
+     * what these buttons are for.
+     *
+     * Once set it stays set: after a reset nothing in memory is authoritative
+     * any more, and the surface that offers these buttons relaunches anyway.
+     */
+    @Volatile
+    var stateWasReset: Boolean = false
+        private set
+
     // -- module registry --------------------------------------------------
 
     fun readDisabledModules(dataDir: Path): Set<String> = runCatching {
@@ -46,10 +63,16 @@ object RecoveryIo {
     // -- resets -----------------------------------------------------------
 
     /** Delete the widget layout graph so it re-seeds the bundled default next boot. */
-    fun resetLayout(dataDir: Path) = deleteQuietly(dataDir.resolve(Storage.LAYOUT_GRAPH_FILE))
+    fun resetLayout(dataDir: Path) {
+        stateWasReset = true
+        deleteQuietly(dataDir.resolve(Storage.LAYOUT_GRAPH_FILE))
+    }
 
     /** Delete theme / background / console / widget-state so each re-seeds its default. */
-    fun resetCustomization(dataDir: Path) = CUSTOMIZATION_FILES.forEach { deleteQuietly(dataDir.resolve(it)) }
+    fun resetCustomization(dataDir: Path) {
+        stateWasReset = true
+        CUSTOMIZATION_FILES.forEach { deleteQuietly(dataDir.resolve(it)) }
+    }
 
     /**
      * Reset settings to defaults while KEEPING `disabledModules` -- else the reset
@@ -68,6 +91,17 @@ object RecoveryIo {
             dataDir,
             if (keep.isEmpty()) root else JsonObject(root + ("disabledModules" to modulesArray(keep))),
         )
+    }
+
+    /**
+     * Clears the reset latch. Internal for unit tests only.
+     *
+     * [stateWasReset] is process-global and deliberately one-way, so a single
+     * test that calls a reset would otherwise silence every store's writes for
+     * the rest of the fork and fail unrelated tests.
+     */
+    internal fun resetForTests() {
+        stateWasReset = false
     }
 
     // -- helpers ----------------------------------------------------------
