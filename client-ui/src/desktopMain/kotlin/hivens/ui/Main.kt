@@ -73,6 +73,7 @@ import hivens.widget.api.command
 import hivens.ui.debug.DebugOverlayState
 import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
+import hivens.module.pixelplayer.generated.PixelPlayerWidgetRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -122,7 +123,7 @@ val uiModule = module {
     // the shell regions and the sign-in panel are non-removable because a layout
     // without them has no navigation and no way to sign in, and shadowing them
     // by id would be that removal through a side door.
-    single<WidgetRegistry> { CompositeWidgetRegistry(listOf(GeneratedWidgetRegistry)) }
+    single<WidgetRegistry> { CompositeWidgetRegistry(listOf(GeneratedWidgetRegistry, PixelPlayerWidgetRegistry)) }
 
     // Cross-widget service registry (Phase D). One global instance per
     // launcher process. Provider widgets register via provideService
