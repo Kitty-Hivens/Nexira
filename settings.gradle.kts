@@ -113,6 +113,10 @@ include(":client-render3d")
 // surface with three imports into the rest of the tree; separate so it
 // cannot be disturbed by, and cannot disturb, ordinary UI work.
 include(":client-easter")
+// A widget-carrying module that is not client-ui: the proof that the kernel
+// accepts widgets from outside its single generated registry. Depends on the
+// kernel and on nothing else in-tree -- no client-ui, no nx-ui, no NxTheme.
+include(":module-pixelplayer")
 include(":widget-model")
 include(":widget-api")
 include(":widget-processor")
