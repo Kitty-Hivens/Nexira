@@ -191,9 +191,9 @@ kotlin {
 // configuration per target compilation, not per source set.
 dependencies {
     add("kspDesktop", project(":widget-processor"))
-    // A widget-carrying module that is not this one. Its widgets reach the
-    // kernel through the composite registry in Main.kt, not by living here.
-    add("desktopMainImplementation", project(":module-pixelplayer"))
+    // Widget modules arrive from the user's widgets directory at boot, not from
+    // this build. The loader is what finds them.
+    add("desktopMainImplementation", project(":widget-loader"))
 }
 
 // BUILD_TIME = Unix epoch millis of last commit (`git log -1 --format=%ct

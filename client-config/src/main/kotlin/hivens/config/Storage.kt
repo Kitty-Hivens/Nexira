@@ -14,6 +14,9 @@ object Storage {
     const val RECOVERY_REQUEST_FILE = "recovery.request"
     const val PRESETS_DIR           = "presets"
 
+    /** Widget modules dropped in by the user. Scanned at boot; no install step. */
+    const val WIDGETS_DIR           = "widgets"
+
     /** Extracted runtime helpers under the data dir (e.g. the profiler agent jar). */
     const val RUNTIME_DIR           = "runtime"
     /** Per-instance: the profiler agent's last-session metrics (the agent writes it). */

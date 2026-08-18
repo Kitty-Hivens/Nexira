@@ -113,12 +113,17 @@ include(":client-render3d")
 // surface with three imports into the rest of the tree; separate so it
 // cannot be disturbed by, and cannot disturb, ordinary UI work.
 include(":client-easter")
-// A widget-carrying module that is not client-ui: the proof that the kernel
-// accepts widgets from outside its single generated registry. Depends on the
-// kernel and on nothing else in-tree -- no client-ui, no nx-ui, no NxTheme.
-include(":module-pixelplayer")
 include(":widget-model")
 include(":widget-api")
 include(":widget-processor")
+// Not part of the launcher. A worked example of a widget module: it builds to an
+// ordinary jar, is discovered from the widgets directory at runtime, and depends
+// on the kernel and nothing else in-tree -- no client-ui, no nx-ui, no NxTheme.
+// Kept in the build so it keeps compiling against the API it demonstrates.
+include(":examples:widget-pixelplayer")
+// Runtime discovery of widget modules: scans a directory for jars, checks the
+// ABI they declare, and hands back registries. Separate from :widget-api so a
+// module author compiles against the kernel without pulling in its loader.
+include(":widget-loader")
 include(":profiler-agent")
 include(":authlib-agent")
