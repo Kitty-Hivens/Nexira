@@ -24,6 +24,7 @@ export default defineConfig({
           translations: { ru: 'Начало работы' },
           items: [
             { label: 'Installation', slug: 'installation', translations: { ru: 'Установка' } },
+            { label: 'Widget modules', slug: 'widgets', translations: { ru: 'Модули виджетов' } },
             { label: 'Troubleshooting', slug: 'troubleshooting', translations: { ru: 'Устранение неполадок' } },
           ],
         },
@@ -34,6 +35,7 @@ export default defineConfig({
             { label: 'Building from Source', slug: 'dev/building', translations: { ru: 'Сборка из исходников' } },
             { label: 'Native image', slug: 'dev/native-image', translations: { ru: 'Нативная сборка' } },
             { label: 'Architecture', slug: 'dev/architecture', translations: { ru: 'Архитектура' } },
+            { label: 'Writing a widget module', slug: 'dev/widgets', translations: { ru: 'Как написать модуль виджета' } },
           ],
         },
       ],
