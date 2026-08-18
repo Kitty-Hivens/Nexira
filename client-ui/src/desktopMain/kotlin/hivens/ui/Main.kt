@@ -123,7 +123,20 @@ val uiModule = module {
     // the shell regions and the sign-in panel are non-removable because a layout
     // without them has no navigation and no way to sign in, and shadowing them
     // by id would be that removal through a side door.
-    single<WidgetRegistry> { CompositeWidgetRegistry(listOf(GeneratedWidgetRegistry, PixelPlayerWidgetRegistry)) }
+    single<WidgetRegistry> {
+        val registry = CompositeWidgetRegistry(listOf(GeneratedWidgetRegistry, PixelPlayerWidgetRegistry))
+        // A contribution that loses its id loses it silently otherwise: the
+        // widget simply never appears, and nothing anywhere says why. The
+        // composite deliberately has no logger of its own, so the diagnostic
+        // gets read out here, where one exists.
+        registry.shadowed.forEach {
+            LoggerFactory.getLogger("Widgets").warn(
+                "Widget kind {} from registry #{} is shadowed by registry #{} and will not be used",
+                it.kind.value, it.bySource, it.heldBy,
+            )
+        }
+        registry
+    }
 
     // Cross-widget service registry (Phase D). One global instance per
     // launcher process. Provider widgets register via provideService

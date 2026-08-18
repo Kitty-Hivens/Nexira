@@ -18,6 +18,8 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.io.path.createDirectories
+import androidx.compose.ui.ExperimentalComposeUiApi
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 /**
@@ -25,7 +27,9 @@ import kotlin.test.Test
  * `IntrinsicSize.Max` and a weighted spacer measures as zero there. Rendered
  * rather than asserted: the defect is a distance, and a distance is seen.
  */
+@Ignore("visual capture harness; run on demand")
 class MenuHintProbe {
+    @OptIn(ExperimentalComposeUiApi::class)
     @Test
     fun probe() {
         val scene = ImageComposeScene(width = 760, height = 260, density = Density(2f)) {
