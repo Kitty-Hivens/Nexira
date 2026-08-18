@@ -94,4 +94,23 @@ class UiRecoverySignalTest {
         b.initCause(a)
         assertFalse(UiRecoverySignal.isStructural(a))
     }
+
+    @Test
+    fun `a shell that composed clears the crashes before it`() {
+        // The reported failure: crash, come back, be used, crash, come back, be
+        // used, crash -- and the third one lands in the recovery surface even
+        // though the launcher worked every time in between. The guard counts
+        // crashes in a 20-second window, and three short-but-working sessions
+        // fit inside one.
+        val t0 = 1_000_000L
+        assertEquals(ShellRecovery.RETRY, UiRecoverySignal.recordShellCrash(t0))
+        assertEquals(ShellRecovery.RETRY, UiRecoverySignal.recordShellCrash(t0 + 5_000))
+
+        // The shell came up. Whatever happened before is not a loop.
+        UiRecoverySignal.noteShellComposed()
+
+        // Without the reset this third crash inside the same window latches safe
+        // mode; with it, the launcher is allowed to keep working.
+        assertEquals(ShellRecovery.RETRY, UiRecoverySignal.recordShellCrash(t0 + 10_000))
+    }
 }

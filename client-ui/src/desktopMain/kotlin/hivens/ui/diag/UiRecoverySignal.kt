@@ -97,6 +97,26 @@ object UiRecoverySignal {
     private val crashTimes = ArrayDeque<Long>()
 
     /**
+     * The shell composed. Clears the crash history, because the guard below
+     * counts crashes in a time window and a window cannot tell a crash LOOP from
+     * a run of separate faults.
+     *
+     * The loop it is meant to catch is one where the rebuild hits the same fault
+     * before the shell is ever on screen, so no composition happens between the
+     * restarts. Three faults that each let the shell come up, be used, and then
+     * fail are not that: the user got a working launcher back every time, and
+     * dropping them into the recovery surface on the third takes away a launcher
+     * that demonstrably works.
+     *
+     * So a successful composition is the thing that resets the count, and a
+     * composition that never happens is what lets it accumulate.
+     */
+    @Synchronized
+    fun noteShellComposed() {
+        crashTimes.clear()
+    }
+
+    /**
      * Record a shell-composition crash and decide how to recover. Thread-safe;
      * called from the entry point's main thread after `application {}` unwinds.
      */
