@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
@@ -31,15 +33,10 @@ internal data class PlayerState(
     val current: Path? get() = tracks.getOrNull(index)
     val fraction: Float get() = if (durationMs <= 0L) 0f else (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
 
-    // Data class equality over a ByteArray compares references, which would make
-    // every poll look like a change and repaint the artwork each tick. Identity
-    // is the right comparison here anyway: the array is replaced only on open.
-    override fun equals(other: Any?): Boolean =
-        other is PlayerState && tracks == other.tracks && index == other.index && playing == other.playing &&
-            positionMs == other.positionMs && durationMs == other.durationMs && title == other.title &&
-            artist == other.artist && artwork === other.artwork && failed == other.failed
-
-    override fun hashCode(): Int = listOf(tracks, index, playing, positionMs, durationMs, title, artist, failed).hashCode()
+    // [artwork] is compared by reference, which is what a data class does with an
+    // array and what is wanted here: the array is replaced only when a track
+    // opens, so identity already means "different cover" without walking
+    // megabytes of JPEG on every 200ms poll.
 }
 
 /**
@@ -50,8 +47,9 @@ internal data class PlayerState(
  * still work, and a module that borrows the trunk's engine has not shown that.
  *
  * Every engine touch and the poll loop run on one confined dispatcher, so the
- * mutable fields need no lock and the five-second close of a decode thread never
- * lands on the drawing thread.
+ * mutable fields are safely published and the five-second close of a decode
+ * thread never lands on the drawing thread. Confinement is not enough on its
+ * own for the compound operations -- see [gate].
  */
 internal class PixelPlayer private constructor() {
 
@@ -71,8 +69,30 @@ internal class PixelPlayer private constructor() {
 
     private val engine = Dispatchers.IO.limitedParallelism(1)
 
+    /**
+     * Serialises the compound operations, which confinement alone does not.
+     *
+     * `limitedParallelism(1)` gives visibility and ordering, but [close] suspends
+     * while joining the poll job and the slot is released there. Two Next presses
+     * then interleave: both read the same index, the second resumes inside its
+     * own close and shuts the player the first had just opened, so two presses
+     * advance one track and the audio device is opened and closed within
+     * milliseconds.
+     */
+    private val gate = Mutex()
+
     private var player: VideoPlayer? = null
     private var pollJob: Job? = null
+
+    /**
+     * Whether the user wants sound, as distinct from whether sound is coming out.
+     *
+     * Stepping used to resume from `playing || player != null`, so Next on a
+     * paused player started it, and two quick Nexts read the first track's
+     * `Opening` state as not-playing and left the third one silent. Intent
+     * survives both.
+     */
+    private var wantsPlayback = false
 
     /** How many mounted widgets are looking at this player. */
     private val views = java.util.concurrent.atomic.AtomicInteger(0)
@@ -80,26 +100,38 @@ internal class PixelPlayer private constructor() {
     /** Replaces the playlist. Keeps playing if the current track is still in it. */
     fun setTracks(tracks: List<Path>) {
         scope.launch(engine) {
-            val keep = _state.value.current
-            val keptIndex = tracks.indexOf(keep)
-            if (keptIndex >= 0) {
-                _state.value = _state.value.copy(tracks = tracks, index = keptIndex)
-                return@launch
+            // An unconfigured copy of the widget hands over an empty list on its
+            // first composition. Taking that literally means dropping a second
+            // player onto a surface, or navigating to a page that already has
+            // one, stops whatever the configured one was playing. An empty list
+            // is the absence of a request, not a request for silence.
+            if (tracks.isEmpty() && _state.value.tracks.isNotEmpty()) return@launch
+            gate.withLock {
+                val keep = _state.value.current
+                val keptIndex = tracks.indexOf(keep)
+                if (keptIndex >= 0) {
+                    _state.value = _state.value.copy(tracks = tracks, index = keptIndex)
+                } else {
+                    close()
+                    _state.value = PlayerState(tracks = tracks, index = if (tracks.isEmpty()) -1 else 0)
+                }
             }
-            close()
-            _state.value = PlayerState(tracks = tracks, index = if (tracks.isEmpty()) -1 else 0)
         }
     }
 
     fun toggle() {
         scope.launch(engine) {
+            gate.withLock {
             val p = player
             if (p == null) {
                 openCurrent(autoPlay = true)
             } else if (_state.value.playing) {
+                wantsPlayback = false
                 p.pause()
             } else {
+                wantsPlayback = true
                 if (p.state == VideoPlayer.State.Ended) p.seek(0L) else p.resume()
+            }
             }
         }
     }
@@ -110,7 +142,9 @@ internal class PixelPlayer private constructor() {
         // The convention every player has: back restarts the track unless you
         // are already at its beginning, where it steps.
         scope.launch(engine) {
-            if (_state.value.positionMs > RESTART_WINDOW_MS) player?.seek(0L) else stepNow(-1)
+            gate.withLock {
+                if (_state.value.positionMs > RESTART_WINDOW_MS) player?.seek(0L) else stepNow(-1)
+            }
         }
     }
 
@@ -151,17 +185,17 @@ internal class PixelPlayer private constructor() {
     }
 
     private fun step(delta: Int) {
-        scope.launch(engine) { stepNow(delta) }
+        scope.launch(engine) { gate.withLock { stepNow(delta) } }
     }
 
     private suspend fun stepNow(delta: Int) {
         val s = _state.value
         if (s.tracks.isEmpty()) return
-        val wasPlaying = s.playing || player != null
+        val resume = wantsPlayback
         val next = ((s.index + delta) % s.tracks.size + s.tracks.size) % s.tracks.size
         close()
         _state.value = s.copy(index = next, positionMs = 0, durationMs = 0, title = "", artist = "", artwork = null, failed = false)
-        if (wasPlaying) openCurrent(autoPlay = true)
+        if (resume) openCurrent(autoPlay = true)
     }
 
     private fun openCurrent(autoPlay: Boolean) {
@@ -171,6 +205,7 @@ internal class PixelPlayer private constructor() {
             return
         }
         player = p
+        wantsPlayback = autoPlay
         if (!autoPlay) p.pause()
         _state.value = _state.value.copy(failed = false, title = Playlist.titleOf(file))
         startPolling()
@@ -192,11 +227,14 @@ internal class PixelPlayer private constructor() {
                     durationMs = (p.durationNanos ?: 0L) / 1_000_000L,
                     failed = st is VideoPlayer.State.Failed,
                 )
-                if (st is VideoPlayer.State.Failed) break
+                // A corrupt or unsupported file is one file, not the end of the
+                // folder. Skipping it is what a queue does; halting turns one bad
+                // track into a player that never plays again.
+                if (st is VideoPlayer.State.Failed) { advanceFromPoll(); break }
                 // A finished track hands over to the next one: a folder is a
                 // queue, and stopping dead at every track end is not playing a
                 // folder, it is playing one file repeatedly by hand.
-                if (st == VideoPlayer.State.Ended) { stepNow(+1); break }
+                if (st == VideoPlayer.State.Ended) { advanceFromPoll(); break }
                 delay(POLL_MS.milliseconds)
             }
         }
@@ -227,6 +265,30 @@ internal class PixelPlayer private constructor() {
     private suspend fun close() {
         pollJob?.cancelAndJoin()
         pollJob = null
+        dropEngine()
+    }
+
+    /**
+     * Step to the next track from INSIDE the poll loop.
+     *
+     * [close] joins the poll job, and the poll loop is that job -- joining from
+     * within cancels the caller and throws before the engine is closed, so the
+     * finished track kept its decode thread and its audio device and nothing
+     * ever started the next one. The loop breaks immediately after this, which
+     * is what makes cancelling unnecessary here.
+     */
+    private fun advanceFromPoll() {
+        pollJob = null
+        dropEngine()
+        val s = _state.value
+        if (s.tracks.isEmpty()) return
+        val next = (s.index + 1) % s.tracks.size
+        _state.value = s.copy(index = next, positionMs = 0, durationMs = 0, title = "", artist = "", artwork = null, failed = false, playing = false)
+        openCurrent(autoPlay = true)
+    }
+
+    /** Closes the engine and forgets it. Does not touch the poll job. */
+    private fun dropEngine() {
         player?.close()
         player = null
         _state.value = _state.value.copy(playing = false)

@@ -11,8 +11,8 @@ plugins {
 // depends on neither client-ui nor nx-ui: no NxTheme, no design tokens, no
 // shared primitives. What it draws, it draws itself.
 dependencies {
-    implementation(project(":widget-model"))
-    implementation(project(":widget-api"))
+    api(project(":widget-model"))
+    api(project(":widget-api"))
     implementation(libs.compose.runtime)
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)

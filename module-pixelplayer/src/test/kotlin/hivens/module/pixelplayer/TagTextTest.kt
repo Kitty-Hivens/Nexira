@@ -25,9 +25,31 @@ class TagTextTest {
     }
 
     @Test
-    fun `shift-jis read as latin-1 is recovered`() {
-        val original = "東方"
-        assertEquals(original, TagText.repair(misread(original, "Shift_JIS")))
+    fun `shift-jis mojibake is left alone rather than guessed at`() {
+        // Shift-JIS trail bytes span most of the byte range, so its round trip
+        // proves nothing and accepting it corrupted real Latin-1 names. A title
+        // that stays broken falls through to the file name; one silently turned
+        // into kanji does not, and looks like the truth.
+        val broken = misread("東方", "Shift_JIS")
+        assertEquals(broken, TagText.repair(broken))
+    }
+
+    @Test
+    fun `doubled umlauts are not eaten`() {
+        // The false positive that survived the first guard: two adjacent high
+        // bytes clear a run check, and Shift-JIS accepted them. Finnish and the
+        // Nordic languages are full of these.
+        assertEquals("Jää", TagText.repair("Jää"))
+        assertEquals("ÅÄÖ", TagText.repair("ÅÄÖ"))
+        assertEquals("åäö", TagText.repair("åäö"))
+    }
+
+    @Test
+    fun `a name with a micro sign or a degree sign is legible`() {
+        // Both are real group names in the music this is pointed at, and an
+        // earlier threshold counted every character in U+0080..U+00BF as damage.
+        assertTrue(TagText.isLegible("µ's"))
+        assertTrue(TagText.isLegible("°C-ute"))
     }
 
     @Test

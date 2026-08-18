@@ -20,37 +20,34 @@ import java.nio.charset.StandardCharsets
  */
 internal object TagText {
 
-    private val SHIFT_JIS: Charset? = runCatching { Charset.forName("Shift_JIS") }.getOrNull()
-    private val WINDOWS_1251: Charset? = runCatching { Charset.forName("windows-1251") }.getOrNull()
-
     /**
-     * Candidates in the order they are tried. UTF-8 first because its round trip
-     * is the strictest: almost nothing that is not UTF-8 survives it, so a pass
-     * there is close to proof rather than preference.
+     * UTF-8 and nothing else, and the restriction is the point.
+     *
+     * The round trip is only evidence when the candidate charset is strict.
+     * UTF-8 is: its byte sequences are structured, an invalid one decodes to
+     * U+FFFD, and re-encoding has to reproduce the bytes exactly. Shift-JIS and
+     * windows-1251 are not. Shift-JIS trail bytes span most of the byte range,
+     * so a Finnish name like "Jaa" with two adjacent umlauts round-trips cleanly
+     * into kanji; windows-1251 is a full 8-bit table and accepts nearly anything
+     * that reaches it, which turned a truncated UTF-8 title into fluent-looking
+     * Cyrillic wreckage.
+     *
+     * So mojibake in those encodings is left alone rather than guessed at. A
+     * title that stays broken falls through to the file name; a Swedish artist
+     * silently turned into kanji does not, and looks like the truth.
      */
-    private val candidates: List<Charset> = listOfNotNull(StandardCharsets.UTF_8, SHIFT_JIS, WINDOWS_1251)
+    private val candidate: Charset = StandardCharsets.UTF_8
 
     fun repair(text: String): String {
-        // Nothing above U+00FF means the string never went through a Latin-1
-        // decode -- either it is plain ASCII, or the decoder already got it right
-        // and folding it back would destroy correct text.
         if (text.any { it.code > 0xFF }) return text
         // Mojibake comes in RUNS: a misread UTF-8 character is two or three high
-        // bytes in a row, a misread Shift-JIS one is two. Genuine Latin-1 text
-        // has isolated accented letters among ASCII. Without this the repair eats
-        // real names -- "Bjork" with an o-umlaut folds to a byte that is a valid
-        // Shift-JIS lead, the trailing "r" is a valid trail, the round trip
-        // passes, and the name becomes kanji.
+        // bytes in a row, while genuine Latin-1 has isolated accented letters
+        // among ASCII. A cheap precheck ahead of the real test below.
         if (!hasHighByteRun(text)) return text
 
         val raw = text.toByteArray(StandardCharsets.ISO_8859_1)
-        for (charset in candidates) {
-            val decoded = String(raw, charset)
-            if (!decoded.contains('�') && decoded.toByteArray(charset).contentEquals(raw)) {
-                return decoded
-            }
-        }
-        return text
+        val decoded = String(raw, candidate)
+        return if (!decoded.contains('\uFFFD') && decoded.toByteArray(candidate).contentEquals(raw)) decoded else text
     }
 
     /** Two or more consecutive characters in the Latin-1 high range. */
@@ -77,7 +74,11 @@ internal object TagText {
      */
     fun isLegible(text: String): Boolean {
         if (text.isBlank()) return false
-        val suspect = text.count { it == '�' || (it.code in 0x80..0xBF) }
+        // Only replacement characters and C1 controls count as damage. An earlier
+        // version treated all of U+0080..U+00BF that way and threw out real names:
+        // "µ's" and "°C-ute" are groups in exactly the music this is pointed at,
+        // and both lost to the file name.
+        val suspect = text.count { it == '�' || it.code in 0x80..0x9F }
         return suspect * 4 < text.length
     }
 }
