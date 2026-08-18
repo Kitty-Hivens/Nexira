@@ -166,7 +166,17 @@ fun NxMenuItem(
             Spacer(Modifier.width(Spacing.s10))
         }
         Text(label, style = MaterialTheme.typography.bodyMedium, color = color)
-        if (hint != null || selected) Spacer(Modifier.weight(1f))
+        if (hint != null || selected) {
+            // Two spacers, and the fixed one is load-bearing: the menu is sized
+            // with width(IntrinsicSize.Max), and a weighted child contributes
+            // nothing to an intrinsic measurement. So the popup shrank to
+            // label-plus-hint exactly, the weight had no slack left to take, and
+            // the shortcut sat flush against the label in every menu that
+            // carried one. The fixed gap is what the intrinsic pass can see; the
+            // weight still right-aligns the hint once a wider row sets the width.
+            Spacer(Modifier.width(Spacing.s16))
+            Spacer(Modifier.weight(1f))
+        }
         if (hint != null) {
             Text(
                 text  = hint,
