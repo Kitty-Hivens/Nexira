@@ -582,6 +582,10 @@ fun FrameWindowScope.AppShellContent(
         // is one-shot, so a normal start stays quiet.
         val notificationCenter: NotificationCenter = koinInject()
         LaunchedEffect(Unit) {
+            // Reaching here means the shell composed, which is the only evidence
+            // that a restart actually recovered rather than looping. The crash
+            // guard counts by time window and cannot tell those apart on its own.
+            UiRecoverySignal.noteShellComposed()
             if (UiRecoverySignal.consumeRecovered()) {
                 notificationCenter.push(
                     sourceKey = "ui-recovery",
