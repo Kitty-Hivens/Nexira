@@ -98,6 +98,13 @@ class WidgetRegistryProcessor(
         return emptyList()
     }
 
+    // Overridable so a second module carrying widgets emits a distinct object:
+    // two modules on one classpath cannot both own hivens.widget.generated.
+    // GeneratedWidgetRegistry, and the one that lost would take its widgets with
+    // it silently. Defaults keep the existing module's output byte-identical.
+    private val registryPackage = env.options["widgetRegistryPackage"] ?: DEFAULT_GENERATED_PACKAGE
+    private val registryName = env.options["widgetRegistryName"] ?: DEFAULT_GENERATED_NAME
+
     private fun emitGeneratedFile(widgets: List<WidgetEntry>) {
         val sourceFiles = widgets.mapNotNull { it.containingFile }.toTypedArray()
         // aggregating = true: any change to ANY @Widget source invalidates
@@ -106,12 +113,12 @@ class WidgetRegistryProcessor(
         val deps = Dependencies(aggregating = true, sources = sourceFiles)
         env.codeGenerator.createNewFile(
             dependencies = deps,
-            packageName = GENERATED_PACKAGE,
-            fileName = GENERATED_FILE_NAME,
+            packageName = registryPackage,
+            fileName = registryName,
             extensionName = "kt",
         ).use { stream ->
             stream.writer(Charsets.UTF_8).use { writer ->
-                writer.write(renderRegistry(widgets.map { it.model }))
+                writer.write(renderRegistry(widgets.map { it.model }, registryPackage, registryName))
             }
         }
     }

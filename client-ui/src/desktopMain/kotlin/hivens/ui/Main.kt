@@ -66,6 +66,7 @@ import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.CompositeWidgetRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
@@ -110,10 +111,18 @@ val uiModule = module {
     // client-cli -- which never injects it -- never loads libtray's natives.
     single<TrayController> { LibTrayController() }
 
-    // Widget kernel registry. KSP-generated; entries land as @Widget
-    // composables are added across the codebase. Kernel-1 starts the
-    // registry empty -- surface refactors arrive in kernel-3.
-    single<WidgetRegistry> { GeneratedWidgetRegistry }
+    // Widget kernel registry. The generated object is one source among however
+    // many the build carries: the kernel was always meant to accept widgets from
+    // outside a single compilation (the validator's rules apply to a reflected
+    // method, the processor warns rather than fails on a contract nobody here
+    // provides), and the composite is the part that was never written.
+    //
+    // Order is precedence and the built-in registry comes first, so a
+    // contributed widget cannot take over a kind the application depends on --
+    // the shell regions and the sign-in panel are non-removable because a layout
+    // without them has no navigation and no way to sign in, and shadowing them
+    // by id would be that removal through a side door.
+    single<WidgetRegistry> { CompositeWidgetRegistry(listOf(GeneratedWidgetRegistry)) }
 
     // Cross-widget service registry (Phase D). One global instance per
     // launcher process. Provider widgets register via provideService

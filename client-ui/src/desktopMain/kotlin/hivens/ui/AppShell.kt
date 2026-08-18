@@ -420,6 +420,16 @@ fun FrameWindowScope.AppShellContent(
             defaultKinds = defaultKinds,
             // Prune removed kinds only when a schema bump actually happened --
             // a deliberate app update is the safe moment to reap orphans.
+            //
+            // TRAP, armed the moment the registry has a second source: a kind
+            // vanishes here either because it was renamed away, or because the
+            // source that carried it is not in this build. The reconciler cannot
+            // tell those apart, and for the second it deletes the user's widgets
+            // along with their props and placement, permanently, on a file with
+            // no undo. Today every source is compiled in, so completeness is a
+            // build-time fact and this cannot fire. Whoever adds a source that
+            // can be absent has to gate this on the registry being complete
+            // BEFORE doing so, not after.
             prune        = layoutGraphRepo.migratedFromSchema != null,
         )
         if (result.graph != before) {
