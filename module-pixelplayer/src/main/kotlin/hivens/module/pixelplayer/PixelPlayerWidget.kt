@@ -42,6 +42,7 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.jetbrains.skia.Image as SkiaImage
@@ -52,6 +53,9 @@ import java.nio.file.Paths
  * form handles scalars; the extension list is a typed string for the same reason,
  * and it is parsed the way a person types it.
  */
+/** Long enough that a typed path never starts a walk of its own prefixes. */
+private const val SCAN_DEBOUNCE_MS = 400L
+
 @Serializable
 data class PixelPlayerProps(
     @PropLabel("Folder") val folder: String = "",
@@ -88,19 +92,38 @@ fun PixelPlayerWidget(instance: WidgetInstance) {
     // Rescan when the folder question changes, off the drawing thread: a song
     // library is a deep tree and walking it is not a frame's worth of work.
     LaunchedEffect(props.folder, props.recursive, props.extensions) {
+        // The folder is a text field, so this restarts per keystroke, and the
+        // prefixes a person types on the way to a path are real directories:
+        // typing "/home/haru/Music" begins with "/", and a recursive walk from
+        // there is the whole filesystem. NIO walks do not answer cancellation
+        // either, so an abandoned one runs to the end on an IO thread. The delay
+        // is cancellable and is what keeps those walks from ever starting.
+        delay(SCAN_DEBOUNCE_MS)
+        // Every failure here is the user's folder being unusual, not a bug: a
+        // subdirectory without execute permission makes Files.walk throw at
+        // terminal-op time, and an exception out of this effect unwinds the
+        // composition and restarts the shell. With the folder persisted in props
+        // that repeats on every start.
         val tracks = withContext(Dispatchers.IO) {
-            val root = runCatching { Paths.get(props.folder) }.getOrNull()
-            if (root == null || props.folder.isBlank()) emptyList()
-            else Playlist.scan(root, props.recursive, Playlist.parseExtensions(props.extensions))
+            runCatching {
+                val root = Paths.get(props.folder)
+                if (props.folder.isBlank()) emptyList()
+                else Playlist.scan(root, props.recursive, Playlist.parseExtensions(props.extensions))
+            }.getOrDefault(emptyList())
         }
         player.setTracks(tracks)
     }
 
     val state by player.state.collectAsState()
 
-    // Decoded once per track rather than per frame: the bytes only change on open.
-    val cover: ImageBitmap? = remember(state.artwork) {
-        state.artwork?.let { bytes ->
+    // Decoded off the composition thread: a `remember {}` runs during composition,
+    // and a three-thousand-pixel cover takes tens of milliseconds to decode, so
+    // every track change would drop frames. Keyed on the byte array's identity,
+    // which is what changes exactly once per track.
+    var cover: ImageBitmap? by remember { mutableStateOf(null) }
+    LaunchedEffect(state.artwork) {
+        val bytes = state.artwork
+        cover = if (bytes == null) null else withContext(Dispatchers.Default) {
             runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
         }
     }
