@@ -121,6 +121,21 @@ class WidgetRegistryProcessor(
                 writer.write(renderRegistry(widgets.map { it.model }, registryPackage, registryName))
             }
         }
+
+        // Discovery for a module loaded from a jar at runtime. Naming the
+        // provider here rather than agreeing a class name with the loader means
+        // a module author picks whatever names they like and still gets found;
+        // the only thing both sides have to agree on is the interface.
+        env.codeGenerator.createNewFileByPath(
+            dependencies = deps,
+            path = REGISTRY_SERVICE_FILE,
+            extensionName = "",
+        ).use { stream ->
+            stream.writer(Charsets.UTF_8).use { writer ->
+                writer.write(providerFqn(registryPackage, registryName))
+                writer.write("\n")
+            }
+        }
     }
 }
 

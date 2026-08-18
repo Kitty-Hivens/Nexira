@@ -122,7 +122,28 @@ internal fun renderRegistry(
     appendLine("    override fun all(): Map<WidgetKind, WidgetDescriptor> = map")
     appendLine("    override fun get(kind: WidgetKind): WidgetDescriptor? = map[kind]")
     appendLine("}")
+    appendLine()
+    appendLine("/**")
+    appendLine(" * ServiceLoader entry point for a module loaded at runtime.")
+    appendLine(" *")
+    appendLine(" * The registry above is an object, so its constructor is private and")
+    appendLine(" * ServiceLoader cannot instantiate it. This delegates to it and exists only")
+    appendLine(" * to be named in META-INF/services.")
+    appendLine(" */")
+    appendLine("class $objectName$PROVIDER_SUFFIX : WidgetRegistry by $objectName")
 }
+
+/**
+ * Name of the service the loader looks for. Written into the jar so discovery
+ * needs no agreed class name, only an agreed interface.
+ */
+internal const val REGISTRY_SERVICE_FILE = "META-INF/services/hivens.widget.api.WidgetRegistry"
+
+internal const val PROVIDER_SUFFIX = "Provider"
+
+/** FQN of the generated provider, which is what the service file names. */
+internal fun providerFqn(packageName: String, objectName: String): String =
+    if (packageName.isEmpty()) "$objectName$PROVIDER_SUFFIX" else "$packageName.$objectName$PROVIDER_SUFFIX"
 
 private fun List<String>.toStringSetLiteral(): String =
     joinToString(prefix = "setOf(", postfix = ")") { "\"${it.kotlinEscape()}\"" }
