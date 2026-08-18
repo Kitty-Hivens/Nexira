@@ -74,11 +74,17 @@ object UiRecoverySignal {
      */
     @Volatile private var pendingCrash: Throwable? = null
 
+    // Synchronized like the counting methods below, not merely @Volatile: the
+    // documented "first writer wins" is a check-then-act, and two broken frames
+    // can crash on different threads, so without the lock the report can name
+    // the second throwable.
+    @Synchronized
     fun recordPendingCrash(crash: Throwable) {
         if (pendingCrash == null) pendingCrash = crash
     }
 
     /** Read and clear the stashed render-path crash, if any. */
+    @Synchronized
     fun consumePendingCrash(): Throwable? = pendingCrash.also { pendingCrash = null }
 
     /**
@@ -89,9 +95,11 @@ object UiRecoverySignal {
      */
     @Volatile private var recovered: Boolean = false
 
+    @Synchronized
     fun markRecovered() { recovered = true }
 
     /** Read and clear the recovered flag; true only on the composition that follows a crash restart. */
+    @Synchronized
     fun consumeRecovered(): Boolean = recovered.also { recovered = false }
 
     private val crashTimes = ArrayDeque<Long>()

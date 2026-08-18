@@ -45,8 +45,8 @@ import java.util.Locale
  * Deliberately self-contained: it touches NO Koin, NxTheme, widget kernel, or
  * settings service -- those are exactly what a recovery boot distrusts (and, on a
  * user-requested recovery, boot is skipped entirely so none of them exist). It
- * reads and writes settings.json through the raw [RecoveryIo] and speaks the OS
- * locale via a pure stringsFor() lookup.
+ * reads and writes settings.json through the raw [RecoveryIo] and resolves its
+ * strings through a pure stringsFor() lookup.
  *
  * It offers what recovers a launcher an environment breaks: toggle a system module
  * off (tray on a DE without SNI, skinema when its natives fail, ...), reset a
@@ -58,8 +58,18 @@ fun RecoveryWindow(
     dataDir: Path,
     reason: UiRecoverySignal.RecoveryReason,
     onExit: () -> Unit,
+    /**
+     * The launcher's configured language, or null to read the OS default.
+     *
+     * A crash screen in a language the user did not choose is a crash screen
+     * they cannot act on, and the boot threshold already takes the same care
+     * (see SettingsPeek, whose locale exists for exactly this). It stays a
+     * parameter rather than a lookup so the surface still renders with no
+     * settings at all, which is the case a user-requested recovery boot is.
+     */
+    locale: String? = null,
 ) {
-    val s = remember { stringsFor(AppLocale.fromTag(Locale.getDefault().language)) }
+    val s = remember(locale) { stringsFor(AppLocale.fromTag(locale ?: Locale.getDefault().language)) }
     var disabled by remember { mutableStateOf(RecoveryIo.readDisabledModules(dataDir)) }
     var relaunchFailed by remember { mutableStateOf(false) }
     val windowState = rememberWindowState(position = WindowPosition(Alignment.Center))
