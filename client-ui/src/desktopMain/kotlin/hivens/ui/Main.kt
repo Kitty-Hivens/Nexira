@@ -509,6 +509,7 @@ private fun runShellWithRecovery(
                             dataDir = pre.core.initialPaths.dataDir,
                             reason = reason,
                             onExit = { exitApplication() },
+                            locale = pre.peek.locale,
                         )
                     } else {
                         // The restart flag lets ShellHost skip the threshold only
