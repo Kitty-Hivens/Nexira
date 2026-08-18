@@ -62,6 +62,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "nexira"
 
+// PARKED. Groundwork for a module-loading architecture that is not the shape the
+// launcher is built in today; it lives under experimental/ alongside the design
+// notes it came from. Kept in the build so it keeps compiling and its tests keep
+// running -- parked code that falls out of the build rots instead of waiting.
+include(":experimental:client-boot")
 include(":client-config")
 include(":client-core")
 // Auth seam carved out of the launcher god-module: :client-auth holds the
