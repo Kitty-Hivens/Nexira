@@ -32,6 +32,7 @@ import java.nio.file.Path
 import hivens.core.data.NewerBuildData
 import hivens.core.data.ReadOnlyStore
 import hivens.core.io.AtomicFiles
+import hivens.ui.bootstrap.RecoveryIo
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -93,6 +94,11 @@ class LayoutGraphRepository(
     // flush() which then persists synchronously under the same mutex.
     private var pendingWrite: Job? = null
 
+    // Whether the state flow holds an edit the file does not. pendingWrite alone
+    // could not answer that: it is replaced on every update and nulled only by
+    // flush, so a long-completed job left flush believing a write was still owed.
+    @Volatile private var dirty = false
+
     fun observe(): StateFlow<LayoutGraph> = state.asStateFlow()
 
     fun value(): LayoutGraph = state.value
@@ -128,6 +134,7 @@ class LayoutGraphRepository(
             }
 
             state.value = next
+            dirty = true
 
             // Cancel-and-reschedule debounce. Coalesces drag-thrash
             // gestures into ~1 write per DEBOUNCE_MS window.
@@ -178,15 +185,16 @@ class LayoutGraphRepository(
      * call from a JVM shutdown hook (does no suspending I/O dispatch
      * switch; the calling thread does the file write directly).
      *
-     * No-op when nothing is pending and the on-disk file is already up
-     * to date.
+     * No-op when the file already matches the graph in memory. That matters
+     * beyond saving a write: this runs from a shutdown hook, and on the path
+     * where the recovery surface has just deleted the file, writing it back
+     * would undo the reset the user asked for.
      */
     suspend fun flush() {
         mutex.withLock {
-            val pending = pendingWrite
+            if (!dirty) return@withLock
+            pendingWrite?.cancel()
             pendingWrite = null
-            if (pending == null) return@withLock
-            pending.cancel()
             writeNow()
         }
     }
@@ -246,6 +254,10 @@ class LayoutGraphRepository(
     // The debounce coroutine acquires the mutex inside its launched
     // block; flush() invokes from inside its own mutex.withLock.
     private fun writeNow() {
+        if (RecoveryIo.stateWasReset) {
+            log.debug("Layout graph was reset from the recovery surface -- not writing the in-memory copy back")
+            return
+        }
         if (readOnly) {
             log.debug("Layout graph at {} is from a newer build -- skipping write-back", file)
             return
@@ -253,6 +265,7 @@ class LayoutGraphRepository(
         try {
             val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = state.value)
             AtomicFiles.writeString(file, json.encodeToString(envelope))
+            dirty = false
         } catch (e: Exception) {
             log.error("Failed to persist layout graph at {}", file, e)
         }
