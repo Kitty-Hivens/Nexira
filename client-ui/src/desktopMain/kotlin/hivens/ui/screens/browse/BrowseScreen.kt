@@ -40,6 +40,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
@@ -54,6 +58,7 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Dimens
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -76,6 +81,9 @@ fun BrowseScreen(
     val s = LocalStrings.current
     val registry: PackCatalogueRegistry = koinInject()
     val origins = registry.origins
+
+    val session: BrowseSession = koinInject()
+    val imageContext = LocalPlatformContext.current
 
     var origin by remember { mutableStateOf(origins.firstOrNull() ?: PackOrigin.Mirror) }
     var query by remember { mutableStateOf("") }
@@ -102,20 +110,67 @@ fun BrowseScreen(
     var loadingMore by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
+    // What this source and query were last showing goes up first, before anything
+    // is asked of the catalogue. A spinner belongs over an empty screen, not over
+    // a list the user was reading a moment ago and is about to get back nearly
+    // unchanged -- which is every flip of the source switcher and every trip out
+    // of the screen and back.
     LaunchedEffect(origin, submittedQuery, retryTick) {
-        state = BrowseState.Loading
-        page = 0
-        endReached = false
-        state = try {
-            val catalogue = registry.forOrigin(origin)
-                ?: return@LaunchedEffect run { state = BrowseState.Empty }
-            val packs = withContext(Dispatchers.IO) { catalogue.search(submittedQuery, page = 0) }
-            if (packs.isEmpty()) BrowseState.Empty else BrowseState.Loaded(packs)
+        val remembered = session.get(origin, submittedQuery)
+        if (remembered != null) {
+            state = BrowseState.Loaded(remembered.packs)
+            page = remembered.nextPage
+            endReached = remembered.endReached
+        } else {
+            state = BrowseState.Loading
+            page = 0
+            endReached = false
+        }
+        val catalogue = registry.forOrigin(origin)
+            ?: return@LaunchedEffect run { state = BrowseState.Empty }
+        try {
+            // Stale first, fresh behind it. Assigning an equal list is not a
+            // repaint -- the state is compared, not trusted -- so a refresh that
+            // found nothing new costs the screen nothing.
+            catalogue.searchStream(submittedQuery, page = 0)
+                .flowOn(Dispatchers.IO)
+                .collect { packs ->
+                    if (packs.isEmpty()) {
+                        if (state !is BrowseState.Loaded) state = BrowseState.Empty
+                        return@collect
+                    }
+                    // The fresh page is compared against the front of what is
+                    // shown, not swapped in over it. Unchanged is the ordinary
+                    // answer, and there the pages scrolled on top still follow
+                    // from it and must survive -- replacing the list wholesale
+                    // would take a player back to the first twenty results a
+                    // second after they scrolled past them.
+                    val shown = (state as? BrowseState.Loaded)?.packs
+                    if (shown != null && shown.size >= packs.size && shown.subList(0, packs.size) == packs) {
+                        return@collect
+                    }
+                    page = 0
+                    endReached = false
+                    state = BrowseState.Loaded(packs)
+                    session.put(origin, submittedQuery, BrowseSession.Snapshot(packs, nextPage = 0, endReached = false))
+                }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            BrowseState.Error(e.message ?: s.browseErrorMessage)
+            // A source that failed while something of its own is on screen keeps
+            // showing it. Replacing a readable list with an error page loses more
+            // than the error explains.
+            if (state !is BrowseState.Loaded) state = BrowseState.Error(e.message ?: s.browseErrorMessage)
         }
+    }
+
+    // Both images of every card on the page, resolved as the page lands rather
+    // than as a card scrolls into view. They are all going to be fetched anyway
+    // -- the list is already paged -- and fetching them on sight is what makes a
+    // card change under the eye a moment after it is read.
+    LaunchedEffect(state) {
+        val packs = (state as? BrowseState.Loaded)?.packs ?: return@LaunchedEffect
+        prefetchCardArt(imageContext, packs)
     }
 
     // Only the first page was ever asked for, so a catalogue with more to give
@@ -135,7 +190,9 @@ fun BrowseScreen(
                     val fresh = next.filterNot { "${'$'}{it.origin}:${'$'}{it.id}" in seen }
                     if (fresh.isEmpty()) endReached = true else {
                         page += 1
-                        state = BrowseState.Loaded(current + fresh)
+                        val grown = current + fresh
+                        state = BrowseState.Loaded(grown)
+                        session.put(origin, submittedQuery, BrowseSession.Snapshot(grown, nextPage = page, endReached = false))
                     }
                 }.onFailure { endReached = true }
                 loadingMore = false
@@ -183,6 +240,22 @@ fun BrowseScreen(
                 is BrowseState.Loaded -> BrowseList(packs = st.packs, listState = listState, onOpenPack = onOpenPack)
             }
         }
+        }
+    }
+}
+
+/**
+ * Warms the image cache for a whole page of cards.
+ *
+ * A request with no target still runs and still lands in the loader's cache, so
+ * the card that composes later finds its icon and its banner already decoded and
+ * draws them on its first frame instead of fading them in over a placeholder.
+ */
+private fun prefetchCardArt(context: PlatformContext, packs: List<CataloguePack>) {
+    val loader = SingletonImageLoader.get(context)
+    packs.forEach { pack ->
+        listOfNotNull(pack.iconUrl, pack.bannerUrl).forEach { url ->
+            loader.enqueue(ImageRequest.Builder(context).data(url).build())
         }
     }
 }
