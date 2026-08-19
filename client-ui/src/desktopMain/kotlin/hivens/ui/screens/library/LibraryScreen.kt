@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -67,6 +68,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Dimens
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.library.LibraryContext
@@ -160,9 +162,20 @@ fun LibraryScreen(
     }
     CompositionLocalProvider(LocalLibraryContext provides ctx) {
         Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
-                SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
-                SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
+            // Centred under the same ceiling Browse uses: past a point the extra
+            // width of a wide monitor stops being room and starts stretching the
+            // rows, which keep their height while their width tracks the window.
+            // Its own Box so the error overlay below keeps its own alignment.
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Column(
+                    Modifier.fillMaxHeight()
+                        .widthIn(max = Dimens.contentMaxWidth)
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                ) {
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
+                }
             }
 
             (importError ?: createError)?.let { err ->
