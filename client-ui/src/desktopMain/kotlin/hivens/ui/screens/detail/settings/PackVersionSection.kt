@@ -205,9 +205,12 @@ internal fun PackVersionSection(
             body = if (c.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare,
             tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
         ) {
-            if (c.hasFileChanges) {
+            // No line at all when the plan is absent: the source could not say
+            // what would change without handing over the whole pack, and a
+            // count of zero would read as "nothing changes".
+            c.plan?.takeIf { !it.isEmpty }?.let { plan ->
                 Text(
-                    s.packVersionsPlanCounts(c.plan.toAdd.size, c.plan.toUpdate.size, c.plan.toDelete.size),
+                    s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.textSecondary,
                 )

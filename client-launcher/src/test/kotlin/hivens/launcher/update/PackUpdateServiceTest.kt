@@ -256,9 +256,9 @@ class PackUpdateServiceTest {
         val check = h.service.checkForUpdate(instance)
         assertTrue(check is UpdateCheck.Available)
         assertEquals(V2, check.toVersion)
-        assertTrue(check.plan.toUpdate.contains("mods/req.jar"))
-        assertTrue(check.plan.toDelete.contains("mods/drop.jar"))
-        assertTrue(check.plan.toAdd.contains("config/new.cfg"))
+        assertTrue(check.plan!!.toUpdate.contains("mods/req.jar"))
+        assertTrue(check.plan!!.toDelete.contains("mods/drop.jar"))
+        assertTrue(check.plan!!.toAdd.contains("config/new.cfg"))
     }
 
     @Test
@@ -371,8 +371,8 @@ class PackUpdateServiceTest {
         val check = h.service.previewSwitch(instance, V2)
         assertTrue(check is UpdateCheck.Available)
         assertEquals(V2, check.toVersion)
-        assertTrue(check.plan.toUpdate.contains("mods/req.jar"))
-        assertTrue(check.plan.toDelete.contains("mods/drop.jar"))
+        assertTrue(check.plan!!.toUpdate.contains("mods/req.jar"))
+        assertTrue(check.plan!!.toDelete.contains("mods/drop.jar"))
     }
 
     @Test
