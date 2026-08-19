@@ -136,6 +136,7 @@ class MrpackInstaller(
                 instanceDirName = instanceDirName,
                 createdAtEpoch = Instant.now().epochSecond,
                 pinnedPackVersion = pinned,
+                installedBuildKey = source?.buildKey,
                 runtime = InstanceRuntime(),  // heap left to the global adaptive sizer
                 cachedManifest = CachedManifestSnapshot(
                     minecraftVersion = mcVersion,
@@ -237,6 +238,7 @@ class MrpackInstaller(
             val updated = instance.copy(
                 packRef = instance.packRef.copy(version = pinned ?: instance.packRef.version),
                 pinnedPackVersion = pinned,
+                installedBuildKey = source?.buildKey ?: instance.installedBuildKey,
                 cachedManifest = CachedManifestSnapshot(
                     minecraftVersion = mcVersion,
                     loaderName = loaderName ?: "vanilla",
@@ -481,6 +483,12 @@ data class MrpackSource(
     val origin: PackOrigin,
     val id: String,
     val version: String?,
+    /**
+     * How the source identifies this build, where its version label does not.
+     * Recorded onto the instance so "which build is this" survives a source that
+     * publishes several under one number.
+     */
+    val buildKey: String? = null,
 )
 
 /** The launch-relevant subset of a `.mrpack` `modrinth.index.json`. */

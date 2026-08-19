@@ -42,7 +42,7 @@ class PackInstallCoordinator(
                 ?: throw IOException("Modrinth version ${version.id} carries no .mrpack download URL")
             mrpackInstaller.installFromUrl(
                 url = url,
-                source = MrpackSource(PackOrigin.Modrinth, pack.id, version.versionNumber),
+                source = MrpackSource(PackOrigin.Modrinth, pack.id, version.versionNumber, buildKey = version.id),
                 iconUrl = pack.iconUrl,
                 bannerUrl = pack.bannerUrl,
                 onReserveDir = onReserveDir,
