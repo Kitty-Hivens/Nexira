@@ -139,6 +139,24 @@ class ModrinthPackUpdater(
                 val scratch = Files.createTempDirectory("mrpack-update-")
                 val archive = scratch.resolve("pack.mrpack")
                 try {
+                    // An instance from before records existed has no baseline, and
+                    // without one an update cannot retire what the old version
+                    // shipped: every pack renames its jars per version, so the
+                    // instance ends up carrying two of each mod and the game will
+                    // not start. The old version's own archive is the baseline, and
+                    // fetching it happens once -- the update writes a record.
+                    val installedArchive = if (PackFileRecord.read(clientDir).isEmpty()) {
+                        val installed = currentVersionOf(current)
+                        val previous = ordered.firstOrNull { it.versionNumber == installed }
+                            ?: throw IOException(
+                                "cannot update ${instance.packRef.id}: it has no record of what the pack " +
+                                    "installed, and version '$installed' is no longer listed to read one from. " +
+                                    "Reinstall the pack to update it.",
+                            )
+                        scratch.resolve("installed.mrpack").also { client.downloadTo(previous.primaryFile().url, it) }
+                    } else {
+                        null
+                    }
                     client.downloadTo(target.primaryFile().url, archive)
                     // Say what went wrong here rather than let a zero-byte file
                     // reach the zip reader, which reports only "zip file is empty"
@@ -155,11 +173,14 @@ class ModrinthPackUpdater(
                         instance = current,
                         mrpack = archive,
                         source = MrpackSource(current.packRef.origin, current.packRef.id, target.versionNumber),
+                        installedArchive = installedArchive,
                         progress = progress ?: { _, _, _ -> },
                     )
                 } finally {
-                    runCatching { Files.deleteIfExists(archive) }
-                    runCatching { Files.deleteIfExists(scratch) }
+                    runCatching {
+                        Files.list(scratch).use { s -> s.forEach { Files.deleteIfExists(it) } }
+                        Files.deleteIfExists(scratch)
+                    }
                 }
                 log.info("modrinth update: {} -> {}", instance.instanceDirName, target.versionNumber)
                 UpdateOutcome.Applied(target.versionNumber, compat, plan = null)

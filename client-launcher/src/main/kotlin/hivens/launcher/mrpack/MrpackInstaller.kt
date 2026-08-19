@@ -172,6 +172,12 @@ class MrpackInstaller(
         instance: PackInstance,
         mrpack: Path,
         source: MrpackSource? = null,
+        /**
+         * The archive of the version currently installed, for an instance that
+         * predates the record. Its file list stands in for the baseline, which is
+         * the only way to know what the pack put here when nothing wrote it down.
+         */
+        installedArchive: Path? = null,
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
@@ -188,7 +194,14 @@ class MrpackInstaller(
                 ?: throw IOException("mrpack has no '$DEP_MINECRAFT' dependency")
             val (loaderName, loaderVersion) = resolveLoader(index.dependencies)
 
-            val old = PackFileRecord.read(clientDir)
+            // Without a baseline an update cannot retire what the previous
+            // version shipped, and a pack that renames its jars per version --
+            // which is every pack -- ends up with both copies installed and a
+            // game that will not start. Reading the old archive costs one small
+            // download and only happens until a record exists.
+            val old = PackFileRecord.read(clientDir).ifEmpty {
+                installedArchive?.let { baselineFrom(it) }.orEmpty()
+            }
             val files = index.files.filter { it.env?.client != ENV_UNSUPPORTED }
             // client-overrides wins on a clash, so it is read second.
             val overrides = overrideEntries(zip, OVERRIDES) + overrideEntries(zip, CLIENT_OVERRIDES)
@@ -247,6 +260,37 @@ class MrpackInstaller(
             log.info("mrpack update: {} now at {}", instance.instanceDirName, pinned ?: "an unnamed version")
             updated
         }
+    }
+
+    /**
+     * What a version of this pack ships, read out of its archive.
+     *
+     * Deliberately not the same thing as a record: it describes the pack, not
+     * what is on anyone's disk, so the hashes are the ones the index publishes
+     * and the sizes and times are unknown. That is enough for the only question
+     * asked of a baseline -- which paths were the pack's -- and enough for the
+     * hash comparison that decides whether a file needs fetching again.
+     */
+    private fun baselineFrom(archive: Path): Map<String, PackFileEntry> = runCatching {
+        ZipFile(archive.toFile()).use { zip ->
+            val indexEntry = zip.getEntry(INDEX_NAME) ?: return@use emptyMap()
+            val index = json.decodeFromString(
+                MrpackIndex.serializer(),
+                zip.getInputStream(indexEntry).readBytes().decodeToString(),
+            )
+            val out = HashMap<String, PackFileEntry>()
+            index.files.filter { it.env?.client != ENV_UNSUPPORTED }.forEach { file ->
+                out[file.path] = PackFileEntry(file.hashes[HASH_SHA1].orEmpty(), file.fileSize, 0L, null)
+            }
+            (overrideEntries(zip, OVERRIDES) + overrideEntries(zip, CLIENT_OVERRIDES)).forEach { (path, entry) ->
+                out[path] = PackFileEntry("", 0L, 0L, entry.crc)
+            }
+            log.info("mrpack update: baseline of {} file(s) read from the installed version's archive", out.size)
+            out
+        }
+    }.getOrElse {
+        log.warn("mrpack update: could not read the installed version's archive; nothing will be retired", it)
+        emptyMap()
     }
 
     /** An override entry as the archive holds it: where it lands, and its recorded CRC. */
