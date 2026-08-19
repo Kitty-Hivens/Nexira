@@ -18,6 +18,7 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.svg.SvgDecoder
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
 import hivens.auth.AuthProvider
@@ -1155,6 +1156,11 @@ fun AppRoot(
             ImageLoader.Builder(context)
                 .components {
                     add(OkHttpNetworkFetcherFactory(callFactory = { routingCallFactory }))
+                    // Pack descriptions carry rows of shields.io badges, and
+                    // shields.io answers with SVG. Registered explicitly rather
+                    // than left to the service loader, which this builder is
+                    // free to be configured out of.
+                    add(SvgDecoder.Factory())
                 }
                 .build()
         }
