@@ -56,6 +56,7 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
 import hivens.core.data.DashboardData
 import hivens.core.data.NewsPage
@@ -92,6 +93,8 @@ import hivens.launcher.news.SmartyCraftNewsFeed
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
+import hivens.launcher.catalogue.CachedPackCatalogue
+import hivens.core.api.catalogue.CataloguePack
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.OpenSmrtHelperResolver
@@ -509,7 +512,15 @@ val mirrorModule = module {
     // origin so the Browse UI stays source-agnostic.
     single { MirrorPackCatalogue(get()) }
     single { ModrinthPackCatalogue(get()) }
-    single { PackCatalogueRegistry(listOf(get<MirrorPackCatalogue>(), get<ModrinthPackCatalogue>())) }
+    single {
+        val searches = catalogueSearchCache()
+        PackCatalogueRegistry(
+            listOf(
+                CachedPackCatalogue(get<MirrorPackCatalogue>(), searches),
+                CachedPackCatalogue(get<ModrinthPackCatalogue>(), searches),
+            ),
+        )
+    }
     // Resolves an installed instance's native cover from its source when the
     // install didn't capture one (pre-field instances), so Library cards and the
     // PackDetail hero show real art instead of the pixel placeholder.
@@ -940,6 +951,24 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
         version = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
     )
 }
+
+/**
+ * In-memory catalogue-search cache (single-flight + 5-min SWR), keyed by source,
+ * page and query. Held in memory only on purpose: a listing written to disk
+ * would be the first thing shown on the next launch, and a catalogue is exactly
+ * the sort of thing that has moved on by then. An empty result is not stored, so
+ * a source that was briefly unreachable does not leave an empty Browse behind it.
+ */
+private fun Scope.catalogueSearchCache(): Cache<List<CataloguePack>> =
+    get<CacheFactory>().createInMemory(
+        "catalogue-search",
+        CacheConfig(
+            ttlMs = 5 * 60_000L,
+            staleTtlMs = Long.MAX_VALUE,
+            maxEntries = 64,
+            shouldStore = { it.isNotEmpty() },
+        ),
+    )
 
 /**
  * In-memory news-page cache (single-flight + 10-min SWR), keyed by page number.

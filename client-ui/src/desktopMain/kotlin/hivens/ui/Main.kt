@@ -72,6 +72,7 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.ui.debug.DebugOverlayState
+import hivens.ui.screens.browse.BrowseSession
 import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
@@ -107,6 +108,10 @@ val uiModule = module {
     // Dev UI-debug overlay switchboard. Process-lifetime so the toggle survives
     // shell recomposition + the crash-restart loop; inert on release builds.
     single { DebugOverlayState() }
+
+    // What Browse last showed per source and query, so flipping sources or
+    // stepping out of the screen comes back to the list instead of a spinner.
+    single { BrowseSession() }
 
     // System tray (client-tray seam): one libtray-backed impl. A plain single, so
     // client-cli -- which never injects it -- never loads libtray's natives.
