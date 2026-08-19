@@ -171,7 +171,7 @@ class ModrinthPackUpdater(
                     installer.update(
                         instance = current,
                         mrpack = archive,
-                        source = MrpackSource(current.packRef.origin, current.packRef.id, target.versionNumber),
+                        source = MrpackSource(current.packRef.origin, current.packRef.id, target.versionNumber, buildKey = target.id),
                         installedArchive = installedArchive,
                         progress = progress ?: { _, _, _ -> },
                     )

@@ -99,4 +99,20 @@ data class PackInstance(
      * installed version regardless of this policy.
      */
     val followLatest: Boolean = true,
+    /**
+     * Identity of the build this instance is on, as its source names builds --
+     * [pinnedPackVersion] is the LABEL of that build and is not always unique.
+     *
+     * Modrinth publishes one version per loader and Minecraft version, and they
+     * share a version number; three rows reading `1.15.56` are three different
+     * builds. Asked by label, every one of them answers "this is the installed
+     * one", and the surfaces that show which build is current, which to compare
+     * against, and which a switch would move away from all agreed on the wrong
+     * thing at once.
+     *
+     * Null on an instance installed before the field existed and on a source
+     * whose labels are unique (the mirror numbers builds itself), where the
+     * label is identity enough.
+     */
+    val installedBuildKey: String? = null,
 )
