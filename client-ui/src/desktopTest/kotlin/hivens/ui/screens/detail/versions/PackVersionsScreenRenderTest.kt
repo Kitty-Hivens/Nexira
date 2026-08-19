@@ -108,6 +108,18 @@ class PackVersionsScreenRenderTest {
                 "1.4.1", "release", "2026-07-02T10:00:00Z",
                 minecraftVersion = "1.20.1", loaderName = "fabric",
             ),
+            // Two builds wearing the same label. Modrinth publishes one version
+            // per loader and they routinely share a version_number, so a list
+            // keyed by the label throws "key was already used" and takes the
+            // shell with it. These render only because identity is separate.
+            PackBuild(
+                "2.8.0+1.21.11", "release", "2026-06-20T10:00:00Z", id = "mrv-fabric",
+                minecraftVersion = "1.21.1", loaderName = "fabric",
+            ),
+            PackBuild(
+                "2.8.0+1.21.11", "release", "2026-06-20T10:00:00Z", id = "mrv-neoforge",
+                minecraftVersion = "1.21.1", loaderName = "neoforge",
+            ),
         )
         override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck = UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =

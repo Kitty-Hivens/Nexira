@@ -38,7 +38,20 @@ data class PackBuild(
      */
     val minecraftVersion: String? = null,
     val loaderName: String? = null,
+    /**
+     * What identifies this build when its label does not.
+     *
+     * A mirror pack's version number is unique within it, so the label is the
+     * identity and this is null. Modrinth publishes one version object per
+     * loader, and those routinely share a version_number -- a pack shipping both
+     * a Fabric and a NeoForge build of 2.8.0 has two versions wearing that name.
+     * Anything that must tell two builds apart uses [key], never the label.
+     */
+    val id: String? = null,
 ) {
     /** Channel of this build, derived from the version string when the field is absent or unknown. */
     val channel: VersionChannel get() = VersionChannel.of(versionType, versionNumber)
+
+    /** Stable identity: the source's own id where it has one, the label otherwise. */
+    val key: String get() = id ?: versionNumber
 }

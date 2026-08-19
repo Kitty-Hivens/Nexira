@@ -223,6 +223,7 @@ class ModrinthPackUpdater(
 
     private fun ModrinthVersion.toPackBuild() = PackBuild(
         versionNumber = versionNumber,
+        id = id,
         versionType = versionType,
         datePublished = datePublished,
         // Mirror concepts. Modrinth publishes no content fingerprint, and no

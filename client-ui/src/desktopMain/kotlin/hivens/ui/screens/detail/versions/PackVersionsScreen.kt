@@ -362,7 +362,7 @@ private fun BuildListPane(
                 mutableStateOf(
                     setOfNotNull(
                         runs.firstOrNull { run -> run.drop(1).any { it.versionNumber == installedVersion } }
-                            ?.first()?.versionNumber,
+                            ?.first()?.key,
                     ),
                 )
             }
@@ -373,24 +373,28 @@ private fun BuildListPane(
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     runs.forEach { run ->
                         val head = run.first()
-                        item(key = head.versionNumber) {
+                        // Identity, not label: a Modrinth pack publishes one version
+                        // per loader and those share a version_number, so keying by
+                        // the label threw "key was already used" and took the shell
+                        // down with it.
+                        item(key = head.key) {
                             BuildRow(
                                 build       = head,
                                 isInstalled = head.versionNumber == installedVersion,
                                 isLatest    = head.versionNumber == latest,
                                 isSelected  = selected?.versionNumber == head.versionNumber,
                                 rebuildTail = run.size - 1,
-                                tailShown   = head.versionNumber in expandedRuns,
+                                tailShown   = head.key in expandedRuns,
                                 onToggleRun = {
-                                    expandedRuns = if (head.versionNumber in expandedRuns) expandedRuns - head.versionNumber
-                                    else expandedRuns + head.versionNumber
+                                    expandedRuns = if (head.key in expandedRuns) expandedRuns - head.key
+                                    else expandedRuns + head.key
                                 },
                                 onClick     = { onSelect(head) },
                             )
                         }
-                        if (head.versionNumber in expandedRuns) {
+                        if (head.key in expandedRuns) {
                             run.drop(1).forEach { member ->
-                                item(key = member.versionNumber) {
+                                item(key = member.key) {
                                     Box(Modifier.padding(start = 18.dp)) {
                                         BuildRow(
                                             build       = member,
