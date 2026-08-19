@@ -306,12 +306,15 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     }
 
     confirmTarget?.let { preview ->
-        val conflictLine = if (preview.plan.conflicts.isNotEmpty()) "\n" + s.packVersionsConflicts(preview.plan.conflicts.size) else ""
+        // The plan is absent for a source that cannot describe the change without
+        // being handed the pack; the confirmation then names the versions only.
+        val planLines = preview.plan?.let { plan ->
+            "\n" + s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size) +
+                if (plan.conflicts.isNotEmpty()) "\n" + s.packVersionsConflicts(plan.conflicts.size) else ""
+        }.orEmpty()
         DestructiveConfirmDialog(
             title        = s.packVersionsConfirmTitle,
-            body         = s.packVersionsConfirmBody(installedVersion ?: "?", preview.toVersion) + "\n" +
-                s.packVersionsPlanCounts(preview.plan.toAdd.size, preview.plan.toUpdate.size, preview.plan.toDelete.size) +
-                conflictLine,
+            body         = s.packVersionsConfirmBody(installedVersion ?: "?", preview.toVersion) + planLines,
             confirmLabel = s.packVersionSwitch,
             onConfirm    = {
                 val target = preview.toVersion
@@ -545,9 +548,13 @@ private fun BuildDetailPane(
             preview is UpdateCheck.Available -> {
                 val p = preview as UpdateCheck.Available
                 NxCalloutBanner(
-                    title = s.packVersionsPlanCounts(p.plan.toAdd.size, p.plan.toUpdate.size, p.plan.toDelete.size),
+                    // Without a plan the banner leads with the version instead of
+                    // a file tally, rather than showing a tally of nothing.
+                    title = p.plan
+                        ?.let { s.packVersionsPlanCounts(it.toAdd.size, it.toUpdate.size, it.toDelete.size) }
+                        ?: s.packVersionsSwitchTo,
                     body  = (if (p.compat.isSafe) s.packVersionSafe else s.packVersionNeedsCare) +
-                        (if (p.plan.conflicts.isNotEmpty()) "\n" + s.packVersionsConflicts(p.plan.conflicts.size) else ""),
+                        (p.plan?.takeIf { it.conflicts.isNotEmpty() }?.let { "\n" + s.packVersionsConflicts(it.conflicts.size) }.orEmpty()),
                     tone  = if (p.compat.isSafe) NxCalloutTone.Info else NxCalloutTone.Warning,
                 ) {
                     Row {

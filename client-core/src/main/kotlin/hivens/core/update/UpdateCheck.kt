@@ -12,21 +12,24 @@ sealed interface UpdateCheck {
 
     /**
      * A different build is available (newer for an update, older for a rollback).
-     * [plan] is the three-way reconcile against the current on-disk state and
      * [compat] grades how structural the change is (green = safe re-sync, amber =
-     * snapshot first). [hasFileChanges] is false when only the version label moved
-     * (e.g. a rebuild that touched no file), in which case applying just advances
-     * the recorded version.
+     * snapshot first).
+     *
+     * [plan] is the three-way reconcile against the current on-disk state, and it
+     * is null when the source cannot answer without being handed the whole pack.
+     * A mirror build lists its files with hashes, so the plan is free; a Modrinth
+     * version does not, and computing one would mean downloading the archive to
+     * decide whether to offer a download. Null is "not computed", which is not
+     * the same as "nothing changes" -- an empty plan means the version label
+     * moved and no file did, and applying it just advances the recorded version.
      */
     data class Available(
         val fromVersion: String?,
         val toVersion: String,
         val direction: UpdateDirection,
         val compat: CompatChange,
-        val plan: UpdatePlan,
-    ) : UpdateCheck {
-        val hasFileChanges: Boolean get() = !plan.isEmpty
-    }
+        val plan: UpdatePlan?,
+    ) : UpdateCheck
 }
 
 /**
