@@ -31,6 +31,9 @@ class RoutingPackUpdater(
 
     override fun handles(instance: PackInstance): Boolean = updaterFor(instance) != null
 
+    override fun describesBuildContents(instance: PackInstance): Boolean =
+        updaterFor(instance)?.describesBuildContents(instance) ?: false
+
     override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck =
         updaterFor(instance)?.checkForUpdate(instance, forceRefresh) ?: UpdateCheck.UpToDate
 

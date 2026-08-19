@@ -228,12 +228,16 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                 builds = list
                 // Keep the user's pick across the refresh; only seed a selection
                 // when there is none, or when the pick is gone from the listing.
-                val current = selected?.versionNumber
-                if (current == null || list.none { it.versionNumber == current }) {
-                    selected = list.firstOrNull { it.versionNumber == installedVersion } ?: list.firstOrNull()
+                val current = selected?.key
+                if (current == null || list.none { it.key == current }) {
+                    selected = installedBuildOf(list, pack) ?: list.firstOrNull()
                 }
             }
     }
+
+    // Resolved once, by identity: a source may publish several builds under one
+    // version number, and every marker on this screen has to mean the same one.
+    val installedBuild = builds?.let { installedBuildOf(it, pack) }
 
     val style = LocalStyle.current
     NxSurface(
@@ -248,8 +252,8 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                 BuildListPane(
                     builds           = builds,
                     loadFailed       = loadFailed,
-                    installedVersion = installedVersion,
-                    latest           = builds?.firstOrNull()?.versionNumber,
+                    installedKey     = installedBuild?.key,
+                    latestKey        = builds?.firstOrNull()?.key,
                     selected         = selected,
                     onSelect         = { selected = it },
                     onRetry          = { loadTick++ },
@@ -266,14 +270,18 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                             pack             = pack,
                             builds           = builds!!,
                             build            = sel,
+                            installedKey     = installedBuild?.key,
                             installedVersion = installedVersion,
+                            describesContents = updater.describesBuildContents(pack),
                             updater          = updater,
                             mirror           = mirror,
                             icons            = icons,
                             busy             = busy,
                             onSwitch         = { preview ->
                                 if (preview.compat.isSafe) {
-                                    runningGuard.run { doSwitch(sel.versionNumber) }
+                                    // The identity, as the confirm path already does:
+                                    // the build applied must be the row's own.
+                                    runningGuard.run { doSwitch(sel.key) }
                                 } else {
                                     confirmTarget = preview
                                 }
@@ -339,8 +347,8 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
 private fun BuildListPane(
     builds: List<PackBuild>?,
     loadFailed: Boolean,
-    installedVersion: String?,
-    latest: String?,
+    installedKey: String?,
+    latestKey: String?,
     selected: PackBuild?,
     onSelect: (PackBuild) -> Unit,
     onRetry: () -> Unit,
@@ -363,7 +371,7 @@ private fun BuildListPane(
             var expandedRuns by remember(builds) {
                 mutableStateOf(
                     setOfNotNull(
-                        runs.firstOrNull { run -> run.drop(1).any { it.versionNumber == installedVersion } }
+                        runs.firstOrNull { run -> run.drop(1).any { it.key == installedKey } }
                             ?.first()?.key,
                     ),
                 )
@@ -382,9 +390,9 @@ private fun BuildListPane(
                         item(key = head.key) {
                             BuildRow(
                                 build       = head,
-                                isInstalled = head.versionNumber == installedVersion,
-                                isLatest    = head.versionNumber == latest,
-                                isSelected  = selected?.versionNumber == head.versionNumber,
+                                isInstalled = head.key == installedKey,
+                                isLatest    = head.key == latestKey,
+                                isSelected  = selected?.key == head.key,
                                 rebuildTail = run.size - 1,
                                 tailShown   = head.key in expandedRuns,
                                 onToggleRun = {
@@ -400,9 +408,9 @@ private fun BuildListPane(
                                     Box(Modifier.padding(start = 18.dp)) {
                                         BuildRow(
                                             build       = member,
-                                            isInstalled = member.versionNumber == installedVersion,
-                                            isLatest    = member.versionNumber == latest,
-                                            isSelected  = selected?.versionNumber == member.versionNumber,
+                                            isInstalled = member.key == installedKey,
+                                            isLatest    = member.key == latestKey,
+                                            isSelected  = selected?.key == member.key,
                                             rebuildTail = 0,
                                             tailShown   = false,
                                             onToggleRun = {},
@@ -503,7 +511,9 @@ private fun BuildDetailPane(
     pack: PackInstance,
     builds: List<PackBuild>,
     build: PackBuild,
+    installedKey: String?,
     installedVersion: String?,
+    describesContents: Boolean,
     updater: PackUpdater,
     mirror: IMirrorPackClient,
     icons: ModIconResolver,
@@ -512,11 +522,11 @@ private fun BuildDetailPane(
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
-    val isInstalled = build.versionNumber == installedVersion
+    val isInstalled = build.key == installedKey
 
     // Compat preview for a would-be switch; refreshed when the selection or the
     // installed build changes. Null while loading or for the installed build.
-    val preview by produceState<UpdateCheck?>(null, build.versionNumber, installedVersion) {
+    val preview by produceState<UpdateCheck?>(null, build.key, installedKey) {
         value = null
         if (!isInstalled) {
             value = runCatching { updater.previewSwitch(pack, build.key) }.getOrNull()
@@ -583,7 +593,15 @@ private fun BuildDetailPane(
             }
         }
 
-        DiffSection(pack, builds, build, installedVersion, mirror, icons)
+        // Asked of the source, not attempted and reported when it fails: the
+        // mirror's manifest endpoint knows nothing about a pack from anywhere
+        // else, and the 404 it answers with reached the player as their pack
+        // having failed.
+        if (describesContents) {
+            DiffSection(pack, builds, build, installedKey, installedVersion, mirror, icons)
+        } else {
+            Text(s.packVersionsNoDiffSource, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+        }
     }
 }
 
@@ -592,25 +610,26 @@ private fun DiffSection(
     pack: PackInstance,
     builds: List<PackBuild>,
     build: PackBuild,
+    installedKey: String?,
     installedVersion: String?,
     mirror: IMirrorPackClient,
     icons: ModIconResolver,
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
-    var base by remember(build.versionNumber) { mutableStateOf(DiffBase.Previous) }
+    var base by remember(build.key) { mutableStateOf(DiffBase.Previous) }
 
     // Previous distinct-content build: skip same-fingerprint rebuild siblings so
     // "vs previous" answers "what did this build change", not "same as the rebuild".
     val previous = remember(builds, build) {
-        val idx = builds.indexOfFirst { it.versionNumber == build.versionNumber }
+        val idx = builds.indexOfFirst { it.key == build.key }
         if (idx < 0) null
         else builds.drop(idx + 1).firstOrNull { candidate ->
             build.fingerprint == null || candidate.fingerprint == null || candidate.fingerprint != build.fingerprint
         }
     }
 
-    val isInstalled = build.versionNumber == installedVersion
+    val isInstalled = build.key == installedKey
     val baseVersion = when (base) {
         DiffBase.Previous -> previous?.versionNumber
         DiffBase.Installed -> installedVersion

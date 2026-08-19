@@ -958,6 +958,8 @@ interface AppStrings {
     val packVersionsDiffVsInstalled: String
     val packVersionsIdentical: String
     val packVersionsFirstBuild: String
+    /** Shown where the file diff would be, for a source that publishes no per-build file list. */
+    val packVersionsNoDiffSource: String
     fun packVersionsAdded(n: Int): String
     fun packVersionsUpdated(n: Int): String
     fun packVersionsRemoved(n: Int): String

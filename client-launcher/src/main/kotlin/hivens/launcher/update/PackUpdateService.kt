@@ -69,6 +69,9 @@ class PackUpdateService(
     private fun currentVersionOf(instance: PackInstance): String? =
         instance.pinnedPackVersion ?: instance.packRef.version
 
+    /** Every mirror build has a manifest, so any two of them can be compared unread. */
+    override fun describesBuildContents(instance: PackInstance): Boolean = true
+
     /**
      * Read-only preview: is a different build current on the mirror, and what
      * would applying it do? Detection is label INEQUALITY, not tuple ordering:
