@@ -194,8 +194,6 @@ class MrpackInstaller(
             val overrides = overrideEntries(zip, OVERRIDES) + overrideEntries(zip, CLIENT_OVERRIDES)
             val ours = files.map { it.path }.toSet() + overrides.keys
 
-            retire(clientDir, old.keys - ours)
-
             val wanted = files.filterNot { file ->
                 val rec = old[file.path] ?: return@filterNot false
                 val dest = safeResolve(clientDir, file.path)
@@ -213,6 +211,14 @@ class MrpackInstaller(
             }
 
             applyOverrides(zip, clientDir, overrides, old)
+
+            // Retiring last, not first. A file this version drops is one the old
+            // version was still using, so removing it before the replacements are
+            // down means a failed download leaves an instance that is neither
+            // version. The launcher that defines the format deletes first and has
+            // no filesystem rollback, and an interrupted update there empties the
+            // instance.
+            retire(clientDir, old.keys - ours)
 
             val pinned = (source?.version ?: index.versionId).ifBlank { null }
             val updated = instance.copy(
