@@ -29,6 +29,16 @@ sealed interface UpdateCheck {
         val direction: UpdateDirection,
         val compat: CompatChange,
         val plan: UpdatePlan?,
+        /**
+         * What identifies the target build, where its label does not.
+         *
+         * Defaults to the label, which is what identifies a mirror build. A
+         * Modrinth pack can publish two versions under one number -- one per
+         * loader -- and asking for it by name then applies whichever came first,
+         * so the switch a user clicked and the switch that happens are the same
+         * build only by luck.
+         */
+        val targetKey: String = toVersion,
     ) : UpdateCheck
 }
 
