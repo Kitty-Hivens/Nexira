@@ -1,6 +1,7 @@
 package hivens.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
@@ -78,11 +79,19 @@ fun SettingsScreen(
                     onSelect = { selectedCategory = it },
                 )
 
+                // One scroll state per category, so a category opens at its top.
+                // Shared, it survived the switch: reading the bottom of Console
+                // and clicking Advanced landed part-way down a page that had
+                // never been scrolled.
+                val categoryScroll = remember(selectedCategory) { ScrollState(0) }
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(categoryScroll)
+                        // Inside the scrolled content: without it the last plane
+                        // ended flush against the clip with its bevel cut through.
+                        .padding(bottom = 24.dp),
                 ) {
                     when (selectedCategory) {
                         SettingsCategory.Appearance -> AppearanceSection(
