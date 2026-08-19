@@ -438,8 +438,11 @@ fun EditableWidgetChrome(
     }
 
     // Right-click context menu (replaces the old hover affordance buttons): the
-    // widget's actions, anchored at the cursor. A right-drag in a cube slot resizes
-    // by cells; a right-click with no drag opens this.
+    // widget's actions, anchored at the cursor. Any secondary press opens it,
+    // drag or no drag: cube slots have no resize gesture. The geometry for one is
+    // written (cubeResizeSpan) and nothing calls it, which is worth saying here
+    // because the comment that stood in this place described the gesture as
+    // though it worked.
     menuAnchor?.let { anchor ->
         NxContextMenu(anchorInWindow = anchor, expanded = true, onDismissRequest = { menuAnchor = null }) {
             WidgetContextMenuContent(
