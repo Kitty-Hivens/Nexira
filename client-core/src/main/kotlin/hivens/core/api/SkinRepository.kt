@@ -41,7 +41,10 @@ class SkinRepository(
             ProtocolStatus.SIZE -> "Error: Invalid size (need 64x32/64x64)"
             ProtocolStatus.TYPE -> "Error: Invalid file format"
             ProtocolStatus.HD -> "Error: HD skins are not available on your account"
-            else -> "Server error: ${response.status}"
+            // The message is what the server said went wrong; the status is
+            // the token it said it in. Showing the token alone put "Server
+            // error: ERROR" on screen and left the reason in a log file.
+            else -> "Server error: ${response.message?.takeIf { it.isNotBlank() } ?: response.status}"
         }
     }
 }

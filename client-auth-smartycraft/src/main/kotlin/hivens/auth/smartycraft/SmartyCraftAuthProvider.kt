@@ -96,7 +96,10 @@ class SmartyCraftAuthProvider(
                 ProtocolStatus.ACTIVE -> "Account is not activated. Check your email."
                 ProtocolStatus.VIRTUAL -> "Virtual account"
                 ProtocolStatus.SERVER -> "Invalid server"
-                else -> "Server error: ${response.status}"
+                // The message is what the server said went wrong; the status is
+            // the token it said it in. Showing the token alone put "Server
+            // error: ERROR" on screen and left the reason in a log file.
+            else -> "Server error: ${response.message?.takeIf { it.isNotBlank() } ?: response.status}"
             }
             throw AuthException(mapped, msg)
         }
