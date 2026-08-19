@@ -34,7 +34,7 @@ class PackFileRecordTest {
         file("mods/a.jar", "A")
         file("config/deep/b.toml", "B")
 
-        val captured = PackFileRecord.capture(dir)
+        val captured = PackFileRecord.captureAll(dir)
 
         assertEquals(setOf("mods/a.jar", "config/deep/b.toml"), captured.keys)
         assertEquals(1L, captured.getValue("mods/a.jar").size)
@@ -43,11 +43,11 @@ class PackFileRecordTest {
     @Test
     fun `the record never records itself`() {
         file("mods/a.jar", "A")
-        PackFileRecord.write(dir, PackFileRecord.capture(dir))
+        PackFileRecord.write(dir, PackFileRecord.captureAll(dir))
 
         // The second pass sees the file the first one wrote. If it took it in,
         // every install would leave a record whose own hash is already stale.
-        val second = PackFileRecord.capture(dir)
+        val second = PackFileRecord.captureAll(dir)
 
         assertEquals(setOf("mods/a.jar"), second.keys)
     }
@@ -57,7 +57,7 @@ class PackFileRecordTest {
         file("mods/a.jar", "A")
         file("config/b.toml", "B")
 
-        val captured = PackFileRecord.capture(dir, publishedSha1 = mapOf("mods/a.jar" to "abc123"))
+        val captured = PackFileRecord.captureAll(dir, publishedSha1 = mapOf("mods/a.jar" to "abc123"))
 
         assertEquals("abc123", captured.getValue("mods/a.jar").sha1, "the index's own hash is used as-is")
         // "B" -> sha1
@@ -69,7 +69,7 @@ class PackFileRecordTest {
         file("mods/a.jar", "A")
         file("config/b.toml", "B")
 
-        val captured = PackFileRecord.capture(dir, archiveCrc32 = mapOf("config/b.toml" to 12345L))
+        val captured = PackFileRecord.captureAll(dir, archiveCrc32 = mapOf("config/b.toml" to 12345L))
 
         assertNull(captured.getValue("mods/a.jar").crc32, "a file fetched by URL has no archive entry")
         assertEquals(12345L, captured.getValue("config/b.toml").crc32)
@@ -80,7 +80,7 @@ class PackFileRecordTest {
         file("mods/a.jar", "A")
         file("config/some name with spaces.toml", "B")
 
-        val captured = PackFileRecord.capture(dir, archiveCrc32 = mapOf("config/some name with spaces.toml" to 7L))
+        val captured = PackFileRecord.captureAll(dir, archiveCrc32 = mapOf("config/some name with spaces.toml" to 7L))
         PackFileRecord.write(dir, captured)
 
         assertEquals(captured, PackFileRecord.read(dir))
@@ -90,7 +90,7 @@ class PackFileRecordTest {
     fun `the record is sorted, so it diffs`() {
         file("z.txt", "Z")
         file("a.txt", "A")
-        PackFileRecord.write(dir, PackFileRecord.capture(dir))
+        PackFileRecord.write(dir, PackFileRecord.captureAll(dir))
 
         val paths = Files.readAllLines(dir.resolve(PackFileRecord.FILE_NAME)).map { it.substringAfterLast(" ") }
 

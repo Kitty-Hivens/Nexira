@@ -44,47 +44,72 @@ internal object PackFileRecord {
     private val log = LoggerFactory.getLogger(PackFileRecord::class.java)
 
     /**
-     * Takes stock of [clientDir] after an install.
+     * Takes stock of everything in [clientDir]. **For an install only.**
      *
      * A walk rather than a tally kept during the install, because the directory
      * is the truth: it already reflects entries the installer skipped as
      * client-unsupported, and it cannot drift from what was actually written.
-     * This is correct only immediately after an install creates the directory --
-     * the runtime provisioner writes to the shared roots and is not even given
-     * this path, so nothing else has been here yet.
+     * That holds only immediately after an install creates the directory -- the
+     * runtime provisioner writes to the shared roots and is not even given this
+     * path, so nothing else has been here yet.
+     *
+     * After an update the same walk would be wrong, and quietly so: by then the
+     * player's own mods and configs are in the directory too, recording them
+     * would claim them as the pack's, and the update after that would retire
+     * them as files the pack had dropped. Use [captureOf] there.
      *
      * [publishedSha1] supplies hashes the pack index already pins, which the
      * download was verified against; the rest are hashed here, and in practice
      * that means the overrides, which are configs.
      */
-    fun capture(
+    fun captureAll(
         clientDir: Path,
         publishedSha1: Map<String, String> = emptyMap(),
         archiveCrc32: Map<String, Long> = emptyMap(),
     ): Map<String, PackFileEntry> {
         val root = clientDir.normalize()
-        val out = sortedMapOf<String, PackFileEntry>()
+        val paths = mutableListOf<String>()
         Files.walk(root).use { stream ->
-            stream.filter { Files.isRegularFile(it) }.forEach { file ->
-                val rel = root.relativize(file).joinToString("/")
-                if (rel == FILE_NAME) return@forEach
-                if (rel.any { it == '\n' || it == '\r' }) {
-                    log.warn("pack record: skipping '{}' -- a newline in a path cannot be recorded line by line", rel)
-                    return@forEach
-                }
-                val entry = runCatching {
-                    PackFileEntry(
-                        sha1 = publishedSha1[rel] ?: sha1Of(file),
-                        size = Files.size(file),
-                        mtimeMs = Files.getLastModifiedTime(file).toMillis(),
-                        crc32 = archiveCrc32[rel],
-                    )
-                }.getOrElse {
-                    log.warn("pack record: could not read {}", rel, it)
-                    return@forEach
-                }
-                out[rel] = entry
+            stream.filter { Files.isRegularFile(it) }.forEach { paths += root.relativize(it).joinToString("/") }
+        }
+        return captureOf(clientDir, paths, publishedSha1, archiveCrc32)
+    }
+
+    /**
+     * Takes stock of exactly [paths], relative to [clientDir]. For an update,
+     * where the pack's own file set is known and the rest of the directory
+     * belongs to the player. A path that is not on disk is left out rather than
+     * recorded as missing: the record says what the pack put here, and a file
+     * that never landed was not put here.
+     */
+    fun captureOf(
+        clientDir: Path,
+        paths: Collection<String>,
+        publishedSha1: Map<String, String> = emptyMap(),
+        archiveCrc32: Map<String, Long> = emptyMap(),
+    ): Map<String, PackFileEntry> {
+        val root = clientDir.normalize()
+        val out = sortedMapOf<String, PackFileEntry>()
+        for (rel in paths) {
+            if (rel == FILE_NAME) continue
+            if (rel.any { it == '\n' || it == '\r' }) {
+                log.warn("pack record: skipping '{}' -- a newline in a path cannot be recorded line by line", rel)
+                continue
             }
+            val file = root.resolve(rel)
+            if (!Files.isRegularFile(file)) continue
+            val entry = runCatching {
+                PackFileEntry(
+                    sha1 = publishedSha1[rel] ?: sha1Of(file),
+                    size = Files.size(file),
+                    mtimeMs = Files.getLastModifiedTime(file).toMillis(),
+                    crc32 = archiveCrc32[rel],
+                )
+            }.getOrElse {
+                log.warn("pack record: could not read {}", rel, it)
+                continue
+            }
+            out[rel] = entry
         }
         return out
     }

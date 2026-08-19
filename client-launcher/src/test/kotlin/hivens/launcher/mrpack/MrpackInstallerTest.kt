@@ -216,6 +216,180 @@ class MrpackInstallerTest {
         assertEquals(modBytes.size.toLong(), record.getValue("mods/cool.jar").size)
     }
 
+
+    // -- update ---------------------------------------------------------------
+
+    private val modV2Bytes = "COOL-MOD-V2".toByteArray()
+    private val stableBytes = "NEVER-CHANGES".toByteArray()
+
+    /**
+     * Requests the mock actually served, so a test can assert what was NOT
+     * fetched. Concurrent because fetchAll downloads in parallel: a plain
+     * ArrayList here threw from inside the mock engine under load.
+     */
+    private val served = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+    private fun updateEngine() = MockEngine { req ->
+        val jsonH = headersOf(HttpHeaders.ContentType, "application/json")
+        val emptyIndex = """{"objects":{}}"""
+        val versionJson = """
+            {"assetIndex":{"id":"8","sha1":"${sha1(emptyIndex.toByteArray())}","size":${emptyIndex.length},"url":"$ASSET_INDEX_URL"},
+             "downloads":{"client":{"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+             "libraries":[]}
+        """.trimIndent()
+        val url = req.url.toString()
+        served += url
+        when (url) {
+            MANIFEST_URL -> respond("""{"versions":[{"id":"1.20.1","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonH)
+            VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonH)
+            ASSET_INDEX_URL -> respond(emptyIndex, HttpStatusCode.OK, jsonH)
+            CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+            MOD_URL -> respond(ByteReadChannel(modBytes), HttpStatusCode.OK)
+            MOD_V2_URL -> respond(ByteReadChannel(modV2Bytes), HttpStatusCode.OK)
+            STABLE_URL -> respond(ByteReadChannel(stableBytes), HttpStatusCode.OK)
+            else -> respond("missing $url", HttpStatusCode.NotFound)
+        }
+    }
+
+    /** Builds a pack whose contents differ between versions, so an update has work to do. */
+    private fun buildVersionedPack(second: Boolean): Path {
+        val file = Files.createTempFile("test-v", ".mrpack").also { tempDirs.add(it) }
+        val cool = if (second) modV2Bytes to MOD_V2_URL else modBytes to MOD_URL
+        val index = """
+            {"formatVersion":1,"game":"minecraft","versionId":"${if (second) "2.0.0" else "1.0.0"}","name":"Test Pack",
+             "dependencies":{"minecraft":"1.20.1"},
+             "files":[
+               {"path":"mods/cool.jar","hashes":{"sha1":"${sha1(cool.first)}"},"downloads":["${cool.second}"],"fileSize":${cool.first.size}},
+               {"path":"mods/stable.jar","hashes":{"sha1":"${sha1(stableBytes)}"},"downloads":["$STABLE_URL"],"fileSize":${stableBytes.size}}
+             ]}
+        """.trimIndent()
+        ZipOutputStream(Files.newOutputStream(file)).use { zos ->
+            zos.putNextEntry(ZipEntry("modrinth.index.json")); zos.write(index.toByteArray()); zos.closeEntry()
+            zos.putNextEntry(ZipEntry("overrides/config/foo.txt")); zos.write((if (second) "FOO-V2" else "FOO").toByteArray()); zos.closeEntry()
+            zos.putNextEntry(ZipEntry("overrides/config/keep.txt")); zos.write("KEEP".toByteArray()); zos.closeEntry()
+            if (!second) {
+                zos.putNextEntry(ZipEntry("overrides/config/gone.txt")); zos.write("GONE".toByteArray()); zos.closeEntry()
+            }
+        }
+        return file
+    }
+
+    private fun updatableInstaller(dataDir: Path): MrpackInstaller {
+        val provider = HttpClientProvider { HttpClient(updateEngine()) }
+        val provisioner = RuntimeProvisioner(
+            librariesDir = tempDir("libs"), assetsDir = tempDir("assets"), clientProvider = provider,
+            transfers = testTransferEngine(provider), json = json,
+            loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
+            versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+        )
+        return MrpackInstaller(testTransferEngine(provider), json, fakeJava, provisioner, FakeRepository(), dataDir)
+    }
+
+    @Test
+    fun `update moves the pack forward without touching what the player added`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+
+        // The player makes the instance theirs.
+        Files.writeString(clientDir.resolve("mods/mine.jar"), "MY-MOD")
+        Files.createDirectories(clientDir.resolve("saves/world"))
+        Files.writeString(clientDir.resolve("saves/world/level.dat"), "WORLD")
+
+        served.clear()
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertEquals("MY-MOD", clientDir.resolve("mods/mine.jar").readText(), "the player's mod survives")
+        assertEquals("WORLD", clientDir.resolve("saves/world/level.dat").readText(), "the player's world survives")
+        assertEquals("COOL-MOD-V2", clientDir.resolve("mods/cool.jar").readText(), "the changed mod is fetched")
+        assertEquals("FOO-V2", clientDir.resolve("config/foo.txt").readText(), "the changed override is written")
+        assertFalse(Files.exists(clientDir.resolve("config/gone.txt")), "what this version stopped shipping is retired")
+    }
+
+    @Test
+    fun `update does not re-fetch a mod the new version did not change`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+
+        served.clear()
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertTrue(MOD_V2_URL in served, "the changed mod is fetched")
+        assertFalse(STABLE_URL in served, "the unchanged mod is not fetched again -- this is the whole point")
+    }
+
+    @Test
+    fun `an override this version leaves alone keeps the player's edit`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+
+        Files.writeString(clientDir.resolve("config/keep.txt"), "PLAYER-TUNED")
+        Files.writeString(clientDir.resolve("config/foo.txt"), "PLAYER-ALSO-TUNED-THIS")
+
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertEquals("PLAYER-TUNED", clientDir.resolve("config/keep.txt").readText(),
+            "the pack did not move this file, so neither do we")
+        assertEquals("FOO-V2", clientDir.resolve("config/foo.txt").readText(),
+            "the pack did move this one, so the pack wins and the log says so")
+    }
+
+    @Test
+    fun `the new record holds the pack's files and not the player's`() = runTest {
+        // The trap: taking stock by walking the directory is right at install and
+        // wrong here. Recording the player's mod would claim it as the pack's,
+        // and the update after this one would retire it.
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        Files.writeString(clientDir.resolve("mods/mine.jar"), "MY-MOD")
+
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertEquals(
+            setOf("mods/cool.jar", "mods/stable.jar", "config/foo.txt", "config/keep.txt"),
+            PackFileRecord.read(clientDir).keys,
+        )
+    }
+
+    @Test
+    fun `an instance with no record deletes nothing`() = runTest {
+        // Instances installed before records existed. Not knowing what was ours,
+        // the safe reading is that none of it was.
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        Files.delete(clientDir.resolve(PackFileRecord.FILE_NAME))
+
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertTrue(Files.exists(clientDir.resolve("config/gone.txt")),
+            "with no record we cannot claim this file, so it stays")
+        assertEquals("FOO-V2", clientDir.resolve("config/foo.txt").readText(), "content is still brought up to date")
+    }
+
+    @Test
+    fun `update pins the instance to the new version`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+
+        val updated = installer.update(
+            instance,
+            buildVersionedPack(second = true),
+            source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "2.0.0"),
+        )
+
+        assertEquals("2.0.0", updated.pinnedPackVersion)
+        assertEquals("2.0.0", updated.packRef.version)
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://piston-meta.test/manifest.json"
         const val VERSION_URL = "https://piston-meta.test/1.20.1.json"
@@ -224,5 +398,7 @@ class MrpackInstallerTest {
         const val RES_BASE = "https://resources.test"
         const val MOD_URL = "https://cdn.test/cool.jar"
         const val BAD_URL = "https://cdn.test/nope.jar"
+        const val MOD_V2_URL = "https://cdn.test/cool-v2.jar"
+        const val STABLE_URL = "https://cdn.test/stable.jar"
     }
 }
