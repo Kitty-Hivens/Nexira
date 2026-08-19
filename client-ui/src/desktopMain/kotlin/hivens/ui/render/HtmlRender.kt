@@ -436,32 +436,28 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) 
 }
 
 /**
- * A block image, bounded by height.
+ * A block image. The column bounds its width; nothing bounds its height.
  *
- * A ceiling rather than a width is what actually gets one drawn: with no size
- * modifier the composable measures zero before the bitmap exists, and the loader
- * sizes its request from that measurement, so nothing is ever fetched and
- * nothing appears. Giving it a bounded height leaves the width free, so the
- * image keeps its own proportions and its own size up to the ceiling.
+ * That is `height: auto`, and it is the only arrangement that agrees with the
+ * source. A ceiling on the height silently decides the width too, and for
+ * anything wider than it is tall that decision is a large reduction: against a
+ * 560 ceiling a panel meant to fill the column was drawn two thirds of it, and
+ * against the badge-row ceiling of 220 a 1920x977 screenshot was drawn 432 wide.
  *
- * [maxHeight] therefore decides how large a large image gets. A figure is given
- * room; a badge in a row of badges is held to a strip so the row stays a row.
+ * [maxHeight] is left for the one case that genuinely wants it: a row of badges
+ * stays a row only if no member of it can set the height of the rest.
  */
 @Composable
-private fun SizedImage(src: String, alt: String?, maxHeight: Dp, modifier: Modifier = Modifier) {
+private fun SizedImage(src: String, alt: String?, maxHeight: Dp?, modifier: Modifier = Modifier) {
     AsyncImage(
         model              = src,
         contentDescription = alt,
         contentScale       = ContentScale.Fit,
-        modifier           = modifier.heightIn(max = maxHeight).clip(MaterialTheme.shapes.small),
+        modifier           = modifier
+            .then(if (maxHeight != null) Modifier.heightIn(max = maxHeight) else Modifier)
+            .clip(MaterialTheme.shapes.small),
     )
 }
-
-/**
- * Room for a screenshot. At the badge-row ceiling of 220 a 1920x977 shot was
- * drawn 432 wide -- a third of the column, on a page with the width to show it.
- */
-private val FIGURE_MAX_HEIGHT = 560.dp
 
 /** A row of badges stays a row; a tall one in it would set the height of the rest. */
 private val BADGE_MAX_HEIGHT = 220.dp
@@ -472,7 +468,7 @@ private fun ImageBlock(el: Element) {
     if (src.isBlank()) return
     // HTML width/height are CSS px, not dp -- honouring them as dp overflowed the
     // column (a width="660" banner blew past the content), so they are ignored.
-    SizedImage(src, el.attr("alt").ifBlank { null }, FIGURE_MAX_HEIGHT)
+    SizedImage(src, el.attr("alt").ifBlank { null }, maxHeight = null)
 }
 
 /** A still image and its optional wrapping link. */
@@ -535,7 +531,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                 .then(if (href != null) Modifier.clickable { onLink(href) } else Modifier),
             contentAlignment = if (center) Alignment.TopCenter else Alignment.TopStart,
         ) {
-            SizedImage(lone.src, lone.alt.ifBlank { null }, FIGURE_MAX_HEIGHT)
+            SizedImage(lone.src, lone.alt.ifBlank { null }, maxHeight = null)
             if (href != null && isPlayableVideoUrl(href)) {
                 Box(
                     modifier         = Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape)
