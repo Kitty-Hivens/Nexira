@@ -1,6 +1,6 @@
 package hivens.launcher.update
 
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.AmberUpdatePolicy
 import hivens.core.data.PackInstance
@@ -51,8 +51,8 @@ class PackAutoUpdateServiceTest {
             applied += instance.id
             return UpdateOutcome.Applied("2026.02.02", CompatChange.Same, UpdatePlan())
         }
-        override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = emptyList()
-        override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> = flowOf(emptyList())
+        override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = emptyList()
+        override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> = flowOf(emptyList())
         override fun listSnapshots(instance: PackInstance): List<PackSnapshot> = emptyList()
         override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance
     }

@@ -48,7 +48,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtBuildDiff
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.interfaces.IMirrorPackClient
@@ -159,10 +159,10 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     val operation = inFlight[instanceId]
     val busy = operation?.isRunning == true
 
-    var builds by remember(pack.id) { mutableStateOf<List<SmrtManifestBuild>?>(null) }
+    var builds by remember(pack.id) { mutableStateOf<List<PackBuild>?>(null) }
     var loadFailed by remember(pack.id) { mutableStateOf(false) }
     var loadTick by remember(pack.id) { mutableIntStateOf(0) }
-    var selected by remember(pack.id) { mutableStateOf<SmrtManifestBuild?>(null) }
+    var selected by remember(pack.id) { mutableStateOf<PackBuild?>(null) }
     var snapshots by remember(pack.id) { mutableStateOf<List<PackSnapshot>>(emptyList()) }
     var confirmTarget by remember(pack.id) { mutableStateOf<UpdateCheck.Available?>(null) }
 
@@ -332,12 +332,12 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
 
 @Composable
 private fun BuildListPane(
-    builds: List<SmrtManifestBuild>?,
+    builds: List<PackBuild>?,
     loadFailed: Boolean,
     installedVersion: String?,
     latest: String?,
-    selected: SmrtManifestBuild?,
-    onSelect: (SmrtManifestBuild) -> Unit,
+    selected: PackBuild?,
+    onSelect: (PackBuild) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -417,7 +417,7 @@ private fun BuildListPane(
 
 @Composable
 private fun BuildRow(
-    build: SmrtManifestBuild,
+    build: PackBuild,
     isInstalled: Boolean,
     isLatest: Boolean,
     isSelected: Boolean,
@@ -455,7 +455,13 @@ private fun BuildRow(
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text  = listOfNotNull(formatBuildTimestamp(build.datePublished), s.packVersionsCounts(build.modsCount, build.assetsCount)).joinToString("   "),
+                // Counts are omitted rather than zeroed when the source does not
+                // publish them: a pack that says "0 mods" reads as broken, and
+                // Modrinth cannot answer without handing over the whole archive.
+                text  = listOfNotNull(
+                    formatBuildTimestamp(build.datePublished),
+                    build.modsCount?.let { mods -> build.assetsCount?.let { assets -> s.packVersionsCounts(mods, assets) } },
+                ).joinToString("   "),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textSecondary,
             )
@@ -479,8 +485,8 @@ private fun BuildRow(
 @Composable
 private fun BuildDetailPane(
     pack: PackInstance,
-    builds: List<SmrtManifestBuild>,
-    build: SmrtManifestBuild,
+    builds: List<PackBuild>,
+    build: PackBuild,
     installedVersion: String?,
     updater: PackUpdater,
     mirror: IMirrorPackClient,
@@ -564,8 +570,8 @@ private fun BuildDetailPane(
 @Composable
 private fun DiffSection(
     pack: PackInstance,
-    builds: List<SmrtManifestBuild>,
-    build: SmrtManifestBuild,
+    builds: List<PackBuild>,
+    build: PackBuild,
     installedVersion: String?,
     mirror: IMirrorPackClient,
     icons: ModIconResolver,
