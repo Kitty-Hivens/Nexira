@@ -48,6 +48,8 @@ import hivens.ui.components.ImageGallery
 import hivens.ui.components.galleryMedia
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -308,10 +310,15 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
 private fun SidebarBlock(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-        Box(
-            modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(glassSurfaceAlpha(0.6f)).padding(16.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { content() }
+        // The library's plane, not a hand-rolled one. A bare tinted box has no
+        // edge, so on a page whose background is a wallpaper the block had
+        // nothing telling the eye where it started -- and it disagreed with every
+        // other card in the app, which all carry the bevel hairline.
+        NxSurface(level = NxSurfaceLevel.Raised, modifier = Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) { content() }
         }
     }
 }
