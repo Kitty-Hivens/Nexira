@@ -96,6 +96,18 @@ class PackVersionsScreenRenderTest {
                 modsCount = 3, assetsCount = 1,
             ),
             PackBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", fingerprint = "aa", modsCount = 2, assetsCount = 0),
+            // Builds from a source that publishes no counts and no fingerprint, so
+            // the row has to hold up with half its second line missing. It says
+            // what it runs on instead, which is the half a listing can always give.
+            PackBuild(
+                "1.4.2", "release", "2026-07-16T10:00:00Z",
+                changelog = "Fixed a crash on world load.",
+                minecraftVersion = "1.21.1", loaderName = "neoforge",
+            ),
+            PackBuild(
+                "1.4.1", "release", "2026-07-02T10:00:00Z",
+                minecraftVersion = "1.20.1", loaderName = "fabric",
+            ),
         )
         override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck = UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
