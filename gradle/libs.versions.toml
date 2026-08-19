@@ -42,6 +42,14 @@ jsoup             = "1.23.1"
 # implementation(<catalog accessor>) { ... } is rejected there (Provider vs String),
 # so client-ui builds the coordinates off this version instead.
 coil              = "3.5.0"
+
+# SVG rasteriser for pack descriptions. Skia's own SVG module is what the image
+# loader uses on this platform and it draws no text at all -- a shields.io badge
+# came out as two blank colour blocks -- and skiko exposes no way to hand it a
+# font manager. Chosen over Batik for being a fraction of the size and for having
+# no script engine and no external-entity resolution to switch off: description
+# markup is written by third parties.
+jsvg              = "2.0.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
 materialColorUtils = "5.0.0"
@@ -113,6 +121,7 @@ mockk             = "1.14.11"
 junit             = "6.1.3"
 
 [libraries]
+jsvg = { module = "com.github.weisj:jsvg", version.ref = "jsvg" }
 # Logging
 slf4j-api                       = { group = "org.slf4j",       name = "slf4j-api",                version.ref = "slf4j" }
 slf4j-simple                    = { group = "org.slf4j",       name = "slf4j-simple",             version.ref = "slf4j" }
