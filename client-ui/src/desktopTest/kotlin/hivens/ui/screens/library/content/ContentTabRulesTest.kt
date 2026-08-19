@@ -45,7 +45,7 @@ class ContentTabRulesTest {
 
     @Test
     fun `a detached instance owns its mods outright`() {
-        val rules = contentRowRules(content("sodium.jar"), manifestEntry = null, isLocal = true, optionalEnabled = null)
+        val rules = contentRowRules(content("sodium.jar"), manifestEntry = null, userOwned = true, optionalEnabled = null)
         assertTrue(rules.showToggle)
         assertTrue(rules.canDelete)
         assertFalse(rules.optional, "with no pack entry the toggle is a rename on disk")
@@ -57,7 +57,7 @@ class ContentTabRulesTest {
         val rules = contentRowRules(
             content("core.jar", enabled = false),
             manifestEntry   = entry("core.jar", required = true),
-            isLocal         = false,
+            userOwned       = false,
             optionalEnabled = null,
         )
         assertFalse(rules.showToggle, "you cannot disable what the pack mandates")
@@ -70,7 +70,7 @@ class ContentTabRulesTest {
         val rules = contentRowRules(
             content("shaders.jar"),
             manifestEntry   = entry("shaders.jar", required = false),
-            isLocal         = false,
+            userOwned       = false,
             optionalEnabled = false,
         )
         assertTrue(rules.showToggle)
@@ -86,7 +86,7 @@ class ContentTabRulesTest {
         val rules = contentRowRules(
             content("extras.jar", enabled = false),
             manifestEntry   = entry("extras.jar", required = false),
-            isLocal         = false,
+            userOwned       = false,
             optionalEnabled = null,
         )
         assertFalse(rules.effectiveEnabled)
@@ -95,7 +95,7 @@ class ContentTabRulesTest {
     @Test
     fun `cosmetics stay user-managed on a tracked instance`() {
         for (kind in listOf(ContentKind.ResourcePack, ContentKind.ShaderPack)) {
-            val rules = contentRowRules(content("pretty.zip", kind = kind), null, isLocal = false, optionalEnabled = null)
+            val rules = contentRowRules(content("pretty.zip", kind = kind), null, userOwned = false, optionalEnabled = null)
             assertTrue(rules.showToggle, "$kind is not part of the pack contract")
             assertTrue(rules.canDelete, "$kind is not part of the pack contract")
         }
@@ -105,7 +105,7 @@ class ContentTabRulesTest {
     fun `a tracked mod the pack does not list is display-only`() {
         // A Modrinth or SC instance: nothing curates the row here, and the
         // instance is not the user's to edit until it is detached.
-        val rules = contentRowRules(content("stray.jar"), manifestEntry = null, isLocal = false, optionalEnabled = null)
+        val rules = contentRowRules(content("stray.jar"), manifestEntry = null, userOwned = false, optionalEnabled = null)
         assertFalse(rules.showToggle)
         assertFalse(rules.canDelete)
     }
@@ -229,6 +229,35 @@ class ContentTabRulesTest {
     }
 
     @Test
+    fun `the pack's recorded files become row keys, and the rest is dropped`() {
+        val keys = placedKeysFrom(
+            setOf(
+                "mods/sodium.jar",
+                "resourcepacks/FreshAnimations.zip",
+                "shaderpacks/complementary.zip",
+                "config/sodium-options.json",
+                "options.txt",
+            ),
+        )
+
+        assertEquals(
+            setOf(
+                contentKey(ContentKind.Mod, "sodium.jar"),
+                contentKey(ContentKind.ResourcePack, "FreshAnimations.zip"),
+                contentKey(ContentKind.ShaderPack, "complementary.zip"),
+            ),
+            keys,
+            "only what this tab has a row for",
+        )
+    }
+
+    @Test
+    fun `no record stays unknown all the way through`() {
+        assertNull(placedKeysFrom(null), "an empty set here would read as 'the pack owns nothing'")
+        assertEquals(emptySet(), placedKeysFrom(emptySet()))
+    }
+
+    @Test
     fun `a manifest asset is filed under the folder its path names`() {
         assertEquals(ContentKind.ResourcePack, kindOfDest("resourcepacks/FreshAnimations.zip"))
         assertEquals(ContentKind.ShaderPack, kindOfDest("shaderpacks/complementary.zip"))
@@ -270,7 +299,7 @@ class ContentTabRulesTest {
             content("stray.jar"),     // tracked instance, unlisted: still not the user's
             content("faithful.zip", kind = ContentKind.ResourcePack),
         )
-        assertEquals(2, lockedCount(picked, isLocal = false, manifestMods = manifest))
-        assertEquals(0, lockedCount(picked, isLocal = true, manifestMods = manifest), "detaching hands everything back")
+        assertEquals(2, lockedCount(picked, userOwns = { false }, manifestMods = manifest))
+        assertEquals(0, lockedCount(picked, userOwns = { true }, manifestMods = manifest), "detaching hands everything back")
     }
 }

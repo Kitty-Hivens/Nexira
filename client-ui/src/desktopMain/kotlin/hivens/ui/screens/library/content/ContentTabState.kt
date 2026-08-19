@@ -23,6 +23,7 @@ import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.ContentFolderWatch
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.PackPlacedContent
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.platform.PlatformPaths
@@ -119,14 +120,27 @@ internal class ContentTabState(
      * `.disabled` rename) or deleted. A tracked MIRROR pack keeps its required
      * mods locked but still lets the user flip OPTIONAL ones -- through the
      * pack's optional-content path (persisted + relabelled), not a raw rename --
-     * so the choice survives a pack update. Other tracked origins (Modrinth /
-     * SC) are display-only here.
+     * so the choice survives a pack update. Another tracked origin answers
+     * through [placed] instead, per file.
      *
      * Read off [instance] rather than fixed at construction: a detach turns a
      * tracked pack into a local one without the tab being rebuilt.
      */
     val isLocal: Boolean get() = instance.packRef.origin == PackOrigin.Local
     val isMirror: Boolean get() = instance.packRef.origin == PackOrigin.Mirror
+
+    /**
+     * Selection keys for the files the pack itself placed, or null when this
+     * instance keeps no record of that.
+     *
+     * The mirror answers the same question from its manifest and does not need
+     * this. Every other tracked source did not answer it at all, and the only
+     * safe reading of "unknown" was that the pack owned the lot -- so a Modrinth
+     * pack showed its mods with no switch, no delete, no way to add one, and
+     * counted the player's own files among the pack's. With the record, the
+     * question is answered per file, exactly as far as it is actually known.
+     */
+    private var placed by mutableStateOf<Set<String>?>(null)
 
     /** Null until the first scan lands, which the pane renders as loading. */
     var items by mutableStateOf<List<InstalledContent>?>(null)
@@ -201,7 +215,7 @@ internal class ContentTabState(
      * to classify and are skipped.
      */
     private val packContentKeys: Set<String> by derivedStateOf {
-        val m = manifest ?: return@derivedStateOf emptySet()
+        val m = manifest ?: return@derivedStateOf placed.orEmpty()
         buildSet {
             m.mods.forEach { add(contentKey(ContentKind.Mod, it.filename)) }
             m.assets.forEach { asset ->
@@ -240,7 +254,7 @@ internal class ContentTabState(
      * action is the pack owning some of what was ticked, and naming the count is
      * the difference between a dead button and one that explains itself.
      */
-    val lockedCount: Int by derivedStateOf { lockedCount(picked, isLocal, manifestMods) }
+    val lockedCount: Int by derivedStateOf { lockedCount(picked, ::userOwns, manifestMods) }
 
     // Cancelled and replaced whenever the list changes, so a rescan does not
     // leave a previous prefetch racing the new one over the same keys.
@@ -308,6 +322,10 @@ internal class ContentTabState(
 
     private suspend fun rescan() {
         val scanned = withContext(Dispatchers.IO) { scanner.scan(instanceDir) }
+        // Re-read alongside the scan rather than once at open: an update rewrites
+        // the record and the folder together, and the rows would otherwise keep
+        // classifying against the file set of the build that was replaced.
+        placed = withContext(Dispatchers.IO) { placedKeysFrom(PackPlacedContent.paths(instanceDir)) }
         items = scanned
         prefetchIcons(scanned)
     }
@@ -356,9 +374,31 @@ internal class ContentTabState(
     fun rulesFor(content: InstalledContent): ContentRowRules = contentRowRules(
         content         = content,
         manifestEntry   = entryFor(content),
-        isLocal         = isLocal,
+        userOwned       = userOwns(content),
         optionalEnabled = optionalState[content.fileName],
     )
+
+    /**
+     * Whether this row is the player's to edit freely.
+     *
+     * A detached instance is all theirs. The mirror's sync owns its folder whole
+     * and answers no, as it always has. Anything else goes by the record: a file
+     * the pack placed is the pack's, a file beside it is not -- and an update
+     * only ever touches what the record names, so editing the rest is safe.
+     */
+    private fun userOwns(content: InstalledContent): Boolean = when {
+        isLocal  -> true
+        isMirror -> false
+        else     -> placed?.let { content.selectionKey() !in it } ?: false
+    }
+
+    /**
+     * Whether the player may put their own files into this instance at all.
+     *
+     * The same reasoning one step up: what an update leaves alone is what the
+     * record does not name, so a source that keeps one can be added to.
+     */
+    val canAddContent: Boolean get() = isLocal || (!isMirror && placed != null)
 
     fun iconFor(content: InstalledContent): ContentIconState? = iconCache[content.selectionKey()]
 
@@ -583,6 +623,8 @@ internal data class ContentRowRules(
 /**
  * [manifestEntry] is the pack's entry for this file, and null both when the pack
  * does not curate it and when the instance is not on a mirror pack at all.
+ * [userOwned] says the file is the player's rather than the pack's, which is the
+ * caller's reading of the instance and not something derivable from the row.
  * [optionalEnabled] is the pack's optional-content state for the file, if any.
  *
  * Resource and shader packs are cosmetic rather than part of the pack contract,
@@ -591,10 +633,10 @@ internal data class ContentRowRules(
 internal fun contentRowRules(
     content: InstalledContent,
     manifestEntry: SmrtModEntry?,
-    isLocal: Boolean,
+    userOwned: Boolean,
     optionalEnabled: Boolean?,
 ): ContentRowRules {
-    val freeEdit = isLocal || content.kind != ContentKind.Mod
+    val freeEdit = userOwned || content.kind != ContentKind.Mod
     val optional = manifestEntry != null && !manifestEntry.required
     return ContentRowRules(
         effectiveEnabled = when {
@@ -653,10 +695,10 @@ internal fun filterContent(
 /** How many of [picked] belong to the pack rather than to the user. */
 internal fun lockedCount(
     picked: List<InstalledContent>,
-    isLocal: Boolean,
+    userOwns: (InstalledContent) -> Boolean,
     manifestMods: Map<String, SmrtModEntry>,
 ): Int = picked.count { c ->
-    val freeEdit = isLocal || c.kind != ContentKind.Mod
+    val freeEdit = userOwns(c) || c.kind != ContentKind.Mod
     val entry = if (c.kind == ContentKind.Mod) manifestMods[c.fileName] else null
     !freeEdit && (entry == null || entry.required)
 }
@@ -666,6 +708,21 @@ internal fun InstalledContent.selectionKey(): String = contentKey(kind, fileName
 
 /** The same key from parts, for matching a manifest entry against a scanned row. */
 internal fun contentKey(kind: ContentKind, fileName: String): String = "$kind:$fileName"
+
+/**
+ * The pack's recorded file paths as row selection keys, or null when there is no
+ * record to read.
+ *
+ * A record names everything the pack placed, most of which -- configs, scripts,
+ * the loader's own files -- has no row on this tab and is dropped here rather
+ * than carried as keys nothing will ever match. Null is passed through instead of
+ * collapsing to an empty set, because "the pack placed nothing here" and "nobody
+ * knows what the pack placed" lead the rows to opposite conclusions.
+ */
+internal fun placedKeysFrom(paths: Set<String>?): Set<String>? =
+    paths?.mapNotNullTo(mutableSetOf()) { path ->
+        kindOfDest(path)?.let { contentKey(it, path.substringAfterLast('/')) }
+    }
 
 /** Which of this tab's folders a manifest asset lands in, or null when it lands elsewhere. */
 internal fun kindOfDest(dest: String): ContentKind? =
