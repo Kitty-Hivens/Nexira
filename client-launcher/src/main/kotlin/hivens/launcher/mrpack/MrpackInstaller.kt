@@ -15,6 +15,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.update.PackFileRecord
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -93,10 +94,25 @@ class MrpackInstaller(
             }
 
             // 2. Verbatim trees. client-overrides wins over overrides on a clash.
-            extractOverrides(zip, OVERRIDES, clientDir)
-            extractOverrides(zip, CLIENT_OVERRIDES, clientDir)
+            val overrideCrcs = extractOverrides(zip, OVERRIDES, clientDir) +
+                extractOverrides(zip, CLIENT_OVERRIDES, clientDir)
 
-            // 3. Canonical runtime into the shared roots (idempotent).
+            // 3. What the pack put here, before anything else can have been here.
+            //    An update reads this to tell the pack's own files from the
+            //    player's; without it the only safe answer is to reinstall, and
+            //    that takes their worlds and configs with it. Written before the
+            //    instance is registered, so a crash in between leaves an orphan
+            //    directory rather than a registered instance we know nothing about.
+            PackFileRecord.write(
+                clientDir,
+                PackFileRecord.capture(
+                    clientDir = clientDir,
+                    publishedSha1 = files.mapNotNull { f -> f.hashes[HASH_SHA1]?.let { f.path to it } }.toMap(),
+                    archiveCrc32 = overrideCrcs,
+                ),
+            )
+
+            // 4. Canonical runtime into the shared roots (idempotent).
             runtimeProvisioner.ensureRuntime(mcVersion, loaderName, loaderVersion, progress)
 
             // Provenance: a Modrinth install stamps origin/id/version from [source]
@@ -193,8 +209,18 @@ class MrpackInstaller(
         )
     }
 
-    private fun extractOverrides(zip: ZipFile, prefix: String, clientDir: Path) {
+    /**
+     * Copies one override tree into the instance and reports the CRC32 the
+     * archive recorded for each entry, keyed by the path it landed on.
+     *
+     * The CRC is the archive's own, taken from the zip's central directory
+     * rather than computed: a later version's archive names the same value for
+     * an unchanged entry, so keeping it is what lets an update tell which
+     * overrides moved without opening any of them.
+     */
+    private fun extractOverrides(zip: ZipFile, prefix: String, clientDir: Path): Map<String, Long> {
         val budget = UnpackBudget(UnpackLimits.PACK_CONTENT, "mrpack overrides")
+        val crcs = HashMap<String, Long>()
         val entries = zip.entries()
         while (entries.hasMoreElements()) {
             val entry = entries.nextElement()
@@ -205,7 +231,9 @@ class MrpackInstaller(
             Files.createDirectories(dest.parent)
             budget.entry()
             zip.getInputStream(entry).use { input -> budget.copyTo(input, dest) }
+            if (entry.crc >= 0) crcs[relative] = entry.crc
         }
+        return crcs
     }
 
     /** Resolves [relative] under [base], rejecting traversal that escapes it. */

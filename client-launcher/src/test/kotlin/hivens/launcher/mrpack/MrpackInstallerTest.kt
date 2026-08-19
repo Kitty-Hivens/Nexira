@@ -8,6 +8,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.update.PackFileRecord
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -30,6 +31,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MrpackInstallerTest {
@@ -181,6 +184,36 @@ class MrpackInstallerTest {
         assertEquals("AABBCCDD", instance.packRef.id, "pack id is the Modrinth project id")
         assertEquals("1.5.0", instance.packRef.version)
         assertEquals("1.5.0", instance.pinnedPackVersion, "pinned to the installed Modrinth version")
+    }
+
+
+    @Test
+    fun `install records what the pack placed, and only that`() = runTest {
+        val provider = HttpClientProvider { HttpClient(engine()) }
+        val dataDir = tempDir("data")
+        val provisioner = RuntimeProvisioner(
+            librariesDir = tempDir("libs"), assetsDir = tempDir("assets"), clientProvider = provider,
+            transfers = testTransferEngine(provider), json = json,
+            loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
+            versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+        )
+        val installer = MrpackInstaller(testTransferEngine(provider), json, fakeJava, provisioner, FakeRepository(), dataDir)
+
+        val instance = installer.install(buildMrpack())
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        val record = PackFileRecord.read(clientDir)
+
+        assertEquals(
+            setOf("mods/cool.jar", "config/foo.txt", "options.txt"),
+            record.keys,
+            "the record is exactly what landed: not the skipped client-unsupported file, " +
+                "not the server override, and not the record itself",
+        )
+        assertEquals(sha1(modBytes), record.getValue("mods/cool.jar").sha1, "the index's own hash is kept")
+        assertNull(record.getValue("mods/cool.jar").crc32, "a file fetched by URL has no archive entry")
+        assertNotNull(record.getValue("config/foo.txt").crc32, "an override carries the archive's CRC")
+        assertNotNull(record.getValue("options.txt").crc32, "a client override carries it too")
+        assertEquals(modBytes.size.toLong(), record.getValue("mods/cool.jar").size)
     }
 
     private companion object {
