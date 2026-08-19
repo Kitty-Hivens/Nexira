@@ -73,10 +73,14 @@ fun EmptySlotPlaceholder(
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
-            .padding(vertical = 6.dp)
+            // Measured before the inset, not after. Reporting the padded box
+            // registered a drop target six dp lower and twelve shorter than the
+            // thing on screen, so a drop aimed at the top edge of the dashes
+            // missed and was discarded without a word.
             .onGloballyPositioned { c: LayoutCoordinates ->
                 registry.registerSlot(path, c.boundsInWindow())
-            },
+            }
+            .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         // Dashed border via Canvas so we can use PathEffect; M3's
