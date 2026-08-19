@@ -22,6 +22,18 @@ interface PackUpdater {
     fun handles(instance: PackInstance): Boolean = true
 
     /**
+     * Whether this source can say what a build CONTAINS without installing it.
+     *
+     * The mirror publishes a manifest per build, so two of them can be compared
+     * before either is on disk. Modrinth publishes an archive and nothing else:
+     * answering the same question means downloading both, which is the update
+     * itself. A surface that asks anyway gets an error where it wanted a file
+     * list -- and asking the mirror's endpoint about a pack the mirror has never
+     * heard of gets a 404 shown to the player as a failure of their pack.
+     */
+    fun describesBuildContents(instance: PackInstance): Boolean = false
+
+    /**
      * Read-only: is a different build available for [instance], and what would it
      * change? [forceRefresh] bypasses the read cache and belongs to a check the
      * user asked for -- a background pass leaves it false, since answering from a

@@ -902,6 +902,7 @@ object GermanStrings : AppStrings {
     override val packVersionsDiffVsInstalled    = "Zum installierten"
     override val packVersionsIdentical          = "Keine Dateiänderungen: Rebuild mit neuem Label"
     override val packVersionsFirstBuild         = "Erster Build des Pakets, kein Vergleich möglich"
+    override val packVersionsNoDiffSource       = "Diese Quelle nennt den Inhalt eines Builds erst nach der Installation"
     override fun packVersionsAdded(n: Int)      = "Hinzugefügt ($n)"
     override fun packVersionsUpdated(n: Int)    = "Aktualisiert ($n)"
     override fun packVersionsRemoved(n: Int)    = "Entfernt ($n)"

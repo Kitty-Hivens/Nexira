@@ -906,6 +906,7 @@ object RussianStrings : AppStrings {
     override val packVersionsDiffVsInstalled    = "К установленной"
     override val packVersionsIdentical          = "Файлы не менялись: пересборка с новой меткой"
     override val packVersionsFirstBuild         = "Первый билд пака, сравнивать не с чем"
+    override val packVersionsNoDiffSource       = "Этот источник не раскрывает состав сборки до установки"
     override fun packVersionsAdded(n: Int)      = "Добавлено ($n)"
     override fun packVersionsUpdated(n: Int)    = "Обновлено ($n)"
     override fun packVersionsRemoved(n: Int)    = "Удалено ($n)"
