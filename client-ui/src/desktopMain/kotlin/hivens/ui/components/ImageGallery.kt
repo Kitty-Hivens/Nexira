@@ -4,18 +4,17 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,12 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberOverscrollEffect
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +59,9 @@ import coil3.size.Size
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.Motion
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -99,81 +95,64 @@ fun galleryMedia(full: List<String>, thumbs: List<String>): List<GalleryMedia> =
         }
     }
 
-// Max px the strip rubber-bands past either end before the release spring brings it home.
-private const val OVERPULL_MAX = 120f
+/**
+ * The narrowest a screenshot cell is allowed to get before the grid drops a
+ * column. Below this a Minecraft screenshot stops being readable -- the HUD, the
+ * inventory, whatever the shot was taken to show, all of it turns to texture.
+ */
+private val MIN_CELL = 300.dp
+
+/** Shots are framed 2:1, the shape a widescreen game window crops to most kindly. */
+private const val CELL_ASPECT = 2f
+
+private val CELL_GAP = 12.dp
 
 /**
- * Horizontal screenshot strip with a full-window lightbox. The strip scrolls by
- * mouse drag and by the always-present [HorizontalScrollbar] (so shots past the
- * fifth are reachable -- a desktop LazyRow won't move on a vertical wheel), and
- * carries the standard overscroll so a drag past the end springs back. Tapping a
- * shot opens [GalleryLightbox] over the whole window; arrows / arrow-keys page,
- * the scrim / Esc / close button dismiss.
+ * Screenshot grid with a full-window lightbox.
+ *
+ * A grid rather than a strip: the strip gave every shot the same 220x124 box and
+ * cropped whatever did not fit, which is the worst size a screenshot can be --
+ * too small to read and too cropped to recognise. Cells here are at least
+ * [MIN_CELL] wide and share the row evenly, so a wide window shows bigger shots
+ * rather than more of the same small ones, and every shot is on screen at once
+ * instead of behind a sideways scroll.
+ *
+ * Tapping a shot opens [GalleryLightbox] over the whole window; arrows /
+ * arrow-keys page, the scrim / Esc / close button dismiss.
  */
 @Composable
 fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
     if (media.isEmpty()) return
     // The lightbox pages images only; videos open in the player. The image index
-    // a strip click sets is into this filtered list.
+    // a cell click sets is into this filtered list.
     val images = remember(media) { media.filterIsInstance<GalleryMedia.Image>() }
     var lightbox by remember(media) { mutableStateOf<Int?>(null) }
     var video by remember(media) { mutableStateOf<GalleryMedia.Video?>(null) }
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    // Rubber-band: a drag the list can't absorb (past either end) feeds a damped
-    // [overpull] offset; releasing springs it back like jelly -- the same feel as the
-    // lightbox pager, but on the in-pack strip. rememberOverscrollEffect is a no-op on
-    // desktop, so this is what actually gives the strip its give.
-    val overpull = remember(media) { Animatable(0f) }
-    val jelly = remember { spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow) }
 
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        LazyRow(
-            state                 = listState,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            overscrollEffect      = rememberOverscrollEffect(),
-            modifier              = Modifier
-                .fillMaxWidth()
-                .offset { IntOffset(overpull.value.roundToInt(), 0) }
-                // Grab-and-drag panning: a desktop LazyRow only moves on the wheel or
-                // scrollbar, so hold left mouse button and drag the strip to scroll it.
-                // A tap (below drag slop) still falls through to the item's click.
-                .draggable(
-                    orientation  = Orientation.Horizontal,
-                    state        = rememberDraggableState { delta ->
-                        scope.launch {
-                            // Whatever the list couldn't scroll (delta + consumed) is the
-                            // edge overshoot; damp it so the strip only "gives" a little.
-                            val consumed = listState.scrollBy(-delta)
-                            val leftover = delta + consumed
-                            if (leftover != 0f) overpull.snapTo((overpull.value + leftover * 0.32f).coerceIn(-OVERPULL_MAX, OVERPULL_MAX))
-                        }
-                    },
-                    onDragStopped = { overpull.animateTo(0f, jelly) },
-                ),
-        ) {
-            itemsIndexed(media) { _, item ->
-                when (item) {
-                    is GalleryMedia.Image -> AsyncImage(
-                        model              = item.thumb,
-                        contentDescription = null,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier
-                            .width(220.dp)
-                            .height(124.dp)
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable { lightbox = images.indexOf(item) },
-                    )
-                    is GalleryMedia.Video -> VideoThumb(item, onClick = { video = item })
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        // How many cells of at least MIN_CELL fit, counting the gaps between
+        // them. One column always, however narrow the pane gets.
+        val columns = (((maxWidth + CELL_GAP) / (MIN_CELL + CELL_GAP)).toInt()).coerceAtLeast(1)
+        Column(verticalArrangement = Arrangement.spacedBy(CELL_GAP)) {
+            media.chunked(columns).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(CELL_GAP)) {
+                    row.forEach { item ->
+                        GalleryCell(
+                            item     = item,
+                            modifier = Modifier.weight(1f),
+                            onClick  = {
+                                when (item) {
+                                    is GalleryMedia.Image -> lightbox = images.indexOf(item)
+                                    is GalleryMedia.Video -> video = item
+                                }
+                            },
+                        )
+                    }
+                    // A short last row keeps the cell width of a full one instead
+                    // of one shot stretching across the pane.
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-        }
-        // Only worth a scrollbar once the strip actually overflows.
-        if (media.size > 3) {
-            HorizontalScrollbar(
-                adapter  = rememberScrollbarAdapter(listState),
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 
@@ -192,31 +171,41 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
     }
 }
 
-/** Strip cell for a video: poster (or dark placeholder) with a centered play badge. */
+/** One framed shot: the image at [CELL_ASPECT], on a plane with the library's own edge. */
 @Composable
-private fun VideoThumb(item: GalleryMedia.Video, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .width(220.dp)
-            .height(124.dp)
-            .clip(MaterialTheme.shapes.small)
-            .background(Color.Black.copy(alpha = 0.35f))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
+    NxSurface(
+        level    = NxSurfaceLevel.Raised,
+        shape    = shape,
+        // No blur behind a cell that is about to be covered by a photograph.
+        glass    = false,
+        modifier = modifier.aspectRatio(CELL_ASPECT).clickable(onClick = onClick),
     ) {
-        if (item.thumb != null) {
-            AsyncImage(
+        when (item) {
+            is GalleryMedia.Image -> AsyncImage(
                 model              = item.thumb,
                 contentDescription = null,
                 contentScale       = ContentScale.Crop,
-                modifier           = Modifier.fillMaxSize(),
+                modifier           = Modifier.fillMaxSize().clip(shape),
             )
-        }
-        Box(
-            modifier = Modifier.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+            is GalleryMedia.Video -> {
+                if (item.thumb != null) {
+                    AsyncImage(
+                        model              = item.thumb,
+                        contentDescription = null,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize().clip(shape),
+                    )
+                }
+                Box(
+                    modifier         = Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+            }
         }
     }
 }
@@ -319,7 +308,8 @@ private fun GalleryLightbox(
                     modifier           = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 80.dp, vertical = 56.dp)
-                        .offset { IntOffset(offsetX.value.roundToInt(), 0) },
+                        .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                        .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
                 )
             }
 
