@@ -1,6 +1,7 @@
 package hivens.ui.render
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -9,11 +10,14 @@ import org.slf4j.LoggerFactory
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,7 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -48,9 +54,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
+import coil3.size.Size as CoilSize
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -418,22 +429,44 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) 
     }
 }
 
+/**
+ * A block image, bounded by height.
+ *
+ * A ceiling rather than a width is what actually gets one drawn: with no size
+ * modifier the composable measures zero before the bitmap exists, and the loader
+ * sizes its request from that measurement, so nothing is ever fetched and
+ * nothing appears. Giving it a bounded height leaves the width free, so the
+ * image keeps its own proportions and its own size up to the ceiling.
+ *
+ * [maxHeight] therefore decides how large a large image gets. A figure is given
+ * room; a badge in a row of badges is held to a strip so the row stays a row.
+ */
+@Composable
+private fun SizedImage(src: String, alt: String?, maxHeight: Dp, modifier: Modifier = Modifier) {
+    AsyncImage(
+        model              = src,
+        contentDescription = alt,
+        contentScale       = ContentScale.Fit,
+        modifier           = modifier.heightIn(max = maxHeight).clip(MaterialTheme.shapes.small),
+    )
+}
+
+/**
+ * Room for a screenshot. At the badge-row ceiling of 220 a 1920x977 shot was
+ * drawn 432 wide -- a third of the column, on a page with the width to show it.
+ */
+private val FIGURE_MAX_HEIGHT = 560.dp
+
+/** A row of badges stays a row; a tall one in it would set the height of the rest. */
+private val BADGE_MAX_HEIGHT = 220.dp
+
 @Composable
 private fun ImageBlock(el: Element) {
     val src = el.attr("src").ifBlank { el.attr("data-src") }
     if (src.isBlank()) return
     // HTML width/height are CSS px, not dp -- honouring them as dp overflowed the
     // column (a width="660" banner blew past the content), so they are ignored.
-    // The image takes its own size and the column's width is its ceiling, which is
-    // what `max-width: 100%` means: stretching every image to the full column blew
-    // a 64-pixel badge up to banner size and made a screenshot of a menu look like
-    // a screenshot of a wall.
-    AsyncImage(
-        model = src,
-        contentDescription = el.attr("alt").ifBlank { null },
-        contentScale = ContentScale.Fit,
-        modifier = Modifier.heightIn(max = 360.dp),
-    )
+    SizedImage(src, el.attr("alt").ifBlank { null }, FIGURE_MAX_HEIGHT)
 }
 
 /** A still image and its optional wrapping link. */
@@ -478,9 +511,37 @@ private fun imgSrc(img: Element): String = img.attr("src").ifBlank { img.attr("d
 /**
  * A row of images (badges, video thumbnails). Each opens its link via [onLink];
  * a video link gets a play badge and is routed to the in-app player upstream.
+ *
+ * A run of ONE is not a row -- it is a figure, and it is what a description means
+ * by `![a screenshot](url)` on a line of its own. Held to the same height as a
+ * strip of badges, every screenshot in a description came out a few hundred
+ * pixels wide however large it really was, which is the only reason this
+ * distinction exists.
  */
 @Composable
 private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center: Boolean = false) {
+    val lone = items.singleOrNull()
+    if (lone != null) {
+        val href = lone.href
+        Box(
+            modifier         = Modifier
+                .then(if (center) Modifier.fillMaxWidth() else Modifier)
+                .then(if (href != null) Modifier.clickable { onLink(href) } else Modifier),
+            contentAlignment = if (center) Alignment.TopCenter else Alignment.TopStart,
+        ) {
+            SizedImage(lone.src, lone.alt.ifBlank { null }, FIGURE_MAX_HEIGHT)
+            if (href != null && isPlayableVideoUrl(href)) {
+                Box(
+                    modifier         = Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+            }
+        }
+        return
+    }
     FlowRow(
         modifier              = if (center) Modifier.fillMaxWidth() else Modifier,
         horizontalArrangement = if (center) Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
@@ -497,7 +558,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                     model              = item.src.ifBlank { null },
                     contentDescription = item.alt.ifBlank { null },
                     contentScale       = ContentScale.Fit,
-                    modifier           = Modifier.heightIn(max = 220.dp),
+                    modifier           = Modifier.heightIn(max = BADGE_MAX_HEIGHT),
                 )
                 if (href != null && isPlayableVideoUrl(href)) {
                     Box(
