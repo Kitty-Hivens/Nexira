@@ -15,6 +15,7 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.core.update.PackUpdater
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
 import hivens.ui.theme.BrutStyle
@@ -67,6 +68,27 @@ class PackSettingsWindowRenderTest {
         override suspend fun fetchDiff(packId: String, from: String, to: String): SmrtBuildDiff = throw IOException("offline")
     }
 
+    /**
+     * The rail asks the updater whether this instance has other builds to manage;
+     * nothing past that question composes here, so the rest of the contract is
+     * left unreachable rather than faked into something the test would imply.
+     */
+    private object VersionedSource : PackUpdater {
+        override fun handles(instance: PackInstance) = true
+        override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean) = unreachable()
+        override suspend fun previewSwitch(instance: PackInstance, targetVersion: String) = unreachable()
+        override suspend fun applyUpdate(
+            instance: PackInstance,
+            targetVersion: String?,
+            progress: ((Int, Int, String) -> Unit)?,
+        ) = unreachable()
+        override suspend fun availableBuilds(instance: PackInstance) = unreachable()
+        override fun availableBuildsStream(instance: PackInstance) = unreachable()
+        override fun listSnapshots(instance: PackInstance) = unreachable()
+        override suspend fun rollback(instance: PackInstance, snapshotId: String) = unreachable()
+        private fun unreachable(): Nothing = error("the version section does not compose in this test")
+    }
+
     private val pack = PackInstance(
         id = "1",
         packRef = PackReference(PackOrigin.Mirror, "industrial", "5"),
@@ -87,6 +109,7 @@ class PackSettingsWindowRenderTest {
                 // to hold one -- a write must outlive the window that made it.
                 single<CoroutineScope> { scope }
                 single { PackOperationService(scope = scope, sizes = get()) }
+                single<PackUpdater> { VersionedSource }
             })
         }
         val out = Path.of("build/render", name)
