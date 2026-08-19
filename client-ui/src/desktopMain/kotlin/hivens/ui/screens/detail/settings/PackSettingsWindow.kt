@@ -115,6 +115,8 @@ fun PackSettingsWindow(
     instanceDir: Path,
     onDismiss: () -> Unit,
     onOpenVersions: () -> Unit = {},
+    /** Section to open on, or null for the default. Set when returning from the version screen. */
+    initialCategory: PackSettingsCategory? = null,
 ) {
     val s = LocalStrings.current
     val style = LocalStyle.current
@@ -168,7 +170,7 @@ fun PackSettingsWindow(
     val categories = remember(isMirror) {
         PackSettingsCategory.entries.filter { isMirror || !it.mirrorOnly }
     }
-    var selected by remember(pack.id) { mutableStateOf(PackSettingsCategory.General) }
+    var selected by remember(pack.id) { mutableStateOf(initialCategory ?: PackSettingsCategory.General) }
     // A detach mid-session drops the Version section; fall back so the pane never
     // dispatches a category the rail no longer shows.
     if (selected !in categories) selected = PackSettingsCategory.General

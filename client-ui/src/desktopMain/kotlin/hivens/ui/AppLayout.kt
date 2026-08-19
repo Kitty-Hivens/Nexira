@@ -34,6 +34,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
@@ -255,12 +256,24 @@ fun AppLayout(
                             instanceId          = screen.instanceId,
                             appState            = appState,
                             onBack              = onBack,
-                            initialShowSettings = screen.openSettings,
-                            onOpenVersions      = { fromSettings ->
+                            initialShowSettings    = screen.openSettings,
+                            initialSettingsSection = screen.settingsSection,
+                            onOpenVersions         = { fromSettings ->
                                 // Coming from the settings overlay: stamp the current
-                                // stack entry so Back restores the overlay, not the
-                                // bare pack page.
-                                if (fromSettings) onReplaceScreen(Screen.PackDetail(screen.instanceId, openSettings = true))
+                                // stack entry so Back restores the overlay, and the
+                                // section it was standing on. Without the section the
+                                // overlay came back on its first one, which is not
+                                // where anybody left it -- the version screen is only
+                                // reachable from Version.
+                                if (fromSettings) {
+                                    onReplaceScreen(
+                                        Screen.PackDetail(
+                                            screen.instanceId,
+                                            openSettings = true,
+                                            settingsSection = PackSettingsCategory.Version,
+                                        ),
+                                    )
+                                }
                                 onScreenChange(Screen.PackVersions(screen.instanceId))
                             },
                         )
