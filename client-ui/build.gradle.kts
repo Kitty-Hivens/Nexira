@@ -71,6 +71,12 @@ kotlin {
                 val coilV     = libs.versions.coil.get()
                 implementation("$coilCoord:coil-compose:$coilV")        { exclude(group = "org.jetbrains.skiko") }
                 implementation("$coilCoord:coil-network-okhttp:$coilV") { exclude(group = "org.jetbrains.skiko") }
+                // Pack descriptions are full of shields.io badges, and shields.io
+                // answers with SVG. Without this they do not appear at all.
+                // Animation is NOT here: coil-gif is an Android-only artifact and
+                // does not resolve for this target, so moving images go through
+                // skinema below, which is what replaced the Skia animation path.
+                implementation("$coilCoord:coil-svg:$coilV")            { exclude(group = "org.jetbrains.skiko") }
                 implementation(libs.ktor.serialization.json)
             }
         }
