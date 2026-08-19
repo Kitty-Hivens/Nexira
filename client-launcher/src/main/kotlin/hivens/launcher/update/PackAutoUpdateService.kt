@@ -2,7 +2,6 @@ package hivens.launcher.update
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.AmberUpdatePolicy
-import hivens.core.data.PackOrigin
 import hivens.core.data.SettingsData
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
@@ -17,8 +16,8 @@ import kotlinx.coroutines.flow.update
 import org.slf4j.LoggerFactory
 
 /**
- * Background auto-updater over installed mirror instances, a sibling of the
- * SC-server-side AutoSyncService. On a trigger (startup, or a manual "check
+ * Background auto-updater over every installed instance whose source can offer
+ * other builds, a sibling of the SC-server-side AutoSyncService. On a trigger (startup, or a manual "check
  * all") it visits each mirror instance that follows latest and updates it per
  * policy: a green (safe re-sync) update applies automatically; an amber
  * (structural MC / loader) update applies only under
@@ -47,7 +46,11 @@ class PackAutoUpdateService(
         val settings = settingsProvider()
         if (!settings.autoUpdatePacks) return
         for (instance in repository.list()) {
-            if (instance.packRef.origin != PackOrigin.Mirror || !instance.followLatest) continue
+            // A capability question, not a question about where the pack came
+            // from. Asking by origin meant every source that learned to update
+            // had to be added here by hand, and one that had not been was
+            // silently never checked.
+            if (!updater.handles(instance) || !instance.followLatest) continue
             setStatus(instance.id, PackUpdateStatus.Checking)
             try {
                 when (val check = updater.checkForUpdate(instance)) {

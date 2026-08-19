@@ -81,6 +81,7 @@ import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
 import hivens.core.security.SslBypassStore
+import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentScanCache
@@ -103,6 +104,8 @@ import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.PackUpdateService
+import hivens.launcher.update.RoutingPackUpdater
+import hivens.launcher.update.ModrinthPackUpdater
 import hivens.update.DesktopIntegration
 import hivens.update.UpdateApplicators
 import hivens.update.UpdateService
@@ -584,8 +587,6 @@ val mirrorModule = module {
     single { ApplyJournal(dataDir = get(), json = get()) }
     // Startup rollback for updates a hard crash interrupted (journal + snapshot).
     single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get()) }
-    // Also bound as the PackUpdater contract: the UI injects the interface so
-    // render tests can substitute a fake; the auto-updater keeps the concrete type.
     single {
         PackUpdateService(
             client = get<SmrtPackClient>(),
@@ -595,7 +596,28 @@ val mirrorModule = module {
             journal = get(),
             dataDir = get(),
         )
-    } bind PackUpdater::class
+    }
+    single {
+        ModrinthPackUpdater(
+            client = get(),
+            installer = get(),
+            repository = get(),
+            snapshotService = get(),
+            dataDir = get(),
+        )
+    }
+    // One PackUpdater above, routing to the source each instance came from. The
+    // UI injects the interface and knows nothing of the split -- which is the
+    // point, since the alternative was every caller testing the origin itself.
+    // An origin absent from this map has no version feed and says so.
+    single<PackUpdater> {
+        RoutingPackUpdater(
+            mapOf(
+                PackOrigin.Mirror to get<PackUpdateService>(),
+                PackOrigin.Modrinth to get<ModrinthPackUpdater>(),
+            ),
+        )
+    }
     // Background auto-updater over installed mirror instances. Reads the current
     // auto-update policy each pass via the settings service. Also bound as the
     // status hub so UI badges and manual flows share one state.
@@ -603,7 +625,7 @@ val mirrorModule = module {
         val settings = get<ISettingsService>()
         PackAutoUpdateService(
             repository = get(),
-            updater = get<PackUpdateService>(),
+            updater = get<PackUpdater>(),
             settingsProvider = { settings.getSettings() },
         )
     } bind PackUpdateStatusHub::class
