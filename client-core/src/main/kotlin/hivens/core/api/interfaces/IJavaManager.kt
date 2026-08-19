@@ -36,15 +36,43 @@ interface IJavaManager {
     suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit = {}): Path
 
     /**
-     * Fallback Java major for a Minecraft version (8 / 17 / 21), used only when
-     * nothing more authoritative declares it (Mojang's per-version `javaVersion`
-     * absent + no loader override). Also drives launch-arg choices that depend
-     * on the JVM generation (e.g. `-noverify`, deprecated since 13).
+     * Fallback Java major for a Minecraft version, used only when nothing more
+     * authoritative declares it (Mojang's per-version `javaVersion` absent + no
+     * loader override). Also drives launch-arg choices that depend on the JVM
+     * generation (e.g. `-noverify`, deprecated since 13).
+     *
+     * The version is read as numbers rather than matched by its leading text.
+     * Minecraft left the 1.x line behind, and a table of prefixes has no branch
+     * for a release numbered by year -- every one of them fell through to the
+     * oldest answer in the table, so a current pack was told it needed Java 8.
+     * A version above the 1.x line is newer than anything the table describes
+     * and is given the newest runtime instead.
+     *
+     * Unreadable input keeps the old answer. It is what a pre-1.0 or otherwise
+     * unnumbered build is, and guessing modern for something that cannot say
+     * what it is would break the packs this fallback exists for.
      */
-    fun detectJavaVersion(mcVersion: String): Int = when {
-        mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6") -> 21
-        mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") ||
-            mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20") -> 17
-        else -> 8
+    fun detectJavaVersion(mcVersion: String): Int {
+        val parts = mcVersion.trim().split('.').map { part -> part.takeWhile(Char::isDigit) }
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: return LEGACY_JAVA
+        if (major != 1) return NEWEST_JAVA
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: return LEGACY_JAVA
+        val patch = parts.getOrNull(2)?.toIntOrNull() ?: 0
+        return when {
+            minor > 20 -> 21
+            // 1.20.5 is where the 1.20 line moved up, so the patch decides here
+            // and nowhere else on it.
+            minor == 20 && patch >= 5 -> 21
+            minor >= 17 -> 17
+            else -> LEGACY_JAVA
+        }
+    }
+
+    companion object {
+        /** What Minecraft ran on before the 1.17 rewrite, and the answer for anything older. */
+        const val LEGACY_JAVA = 8
+
+        /** The runtime for a release numbered past the 1.x line. */
+        const val NEWEST_JAVA = 25
     }
 }
