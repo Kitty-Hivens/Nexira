@@ -317,7 +317,9 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
             body         = s.packVersionsConfirmBody(installedVersion ?: "?", preview.toVersion) + planLines,
             confirmLabel = s.packVersionSwitch,
             onConfirm    = {
-                val target = preview.toVersion
+                // The identity, not the label: two builds can share a number and
+                // the one applied must be the one the row stood for.
+                val target = preview.targetKey
                 confirmTarget = null
                 // Two gates in sequence, because they answer different questions:
                 // this one asked whether a structural change is wanted at all, the
@@ -517,7 +519,7 @@ private fun BuildDetailPane(
     val preview by produceState<UpdateCheck?>(null, build.versionNumber, installedVersion) {
         value = null
         if (!isInstalled) {
-            value = runCatching { updater.previewSwitch(pack, build.versionNumber) }.getOrNull()
+            value = runCatching { updater.previewSwitch(pack, build.key) }.getOrNull()
         }
     }
 

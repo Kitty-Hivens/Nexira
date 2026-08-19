@@ -6,6 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -329,7 +330,7 @@ internal class ContentTabState(
                         gate.withPermit {
                             val file = fileOf(c)
                             val embedded = c.iconBytes
-                            iconCache[key] = runCatching {
+                            val resolved = runCatching {
                                 when {
                                     embedded != null -> ContentIconState.Bytes(embedded)
                                     else -> iconResolver.resolveByFile(file)?.let { ContentIconState.Url(it) }
@@ -337,6 +338,12 @@ internal class ContentTabState(
                                         ?: ContentIconState.None
                                 }
                             }.getOrDefault(ContentIconState.None)
+                            // Snapshot state written from a worker needs a snapshot
+                            // of its own. Assigning directly used whatever snapshot
+                            // the coroutine inherited, and once that one had been
+                            // left behind the write threw out of the render pass and
+                            // took the shell down with it.
+                            Snapshot.withMutableSnapshot { iconCache[key] = resolved }
                         }
                     }
                 }

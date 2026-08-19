@@ -89,8 +89,7 @@ class ModrinthPackUpdater(
         withContext(Dispatchers.IO) {
             if (currentVersionOf(instance) == targetVersion) return@withContext UpdateCheck.UpToDate
             val ordered = versionsNewestFirst(instance)
-            val target = ordered.firstOrNull { it.versionNumber == targetVersion }
-                ?: return@withContext UpdateCheck.UpToDate
+            val target = ordered.resolve(targetVersion) ?: return@withContext UpdateCheck.UpToDate
             // Direction by the listing's own order, never by comparing version
             // strings: a pack numbering its builds by date, or by anything else
             // that does not tuple-compare, would rank backwards.
@@ -111,7 +110,7 @@ class ModrinthPackUpdater(
     ): UpdateOutcome {
         val ordered = versionsNewestFirst(instance)
         val target = if (targetVersion != null) {
-            ordered.firstOrNull { it.versionNumber == targetVersion }
+            ordered.resolve(targetVersion)
                 ?: throw IOException("Modrinth has no version '$targetVersion' of pack ${instance.packRef.id}")
         } else {
             ordered.firstOrNull() ?: throw IOException("Modrinth lists no versions of pack ${instance.packRef.id}")
@@ -207,6 +206,14 @@ class ModrinthPackUpdater(
         }
     }
 
+    /**
+     * By id first, by version number second. The id is what the screen hands back
+     * after a click; the number is what a caller with only a label can offer, and
+     * it picks the first match because that is all it can do.
+     */
+    private fun List<ModrinthVersion>.resolve(target: String): ModrinthVersion? =
+        firstOrNull { it.id == target } ?: firstOrNull { it.versionNumber == target }
+
     private suspend fun versionsNewestFirst(instance: PackInstance): List<ModrinthVersion> =
         client.listVersions(instance.packRef.id).sortedByDescending { it.datePublished }
 
@@ -220,6 +227,7 @@ class ModrinthPackUpdater(
             // archive, so producing one would mean downloading the pack in order
             // to decide whether to offer downloading the pack.
             plan = null,
+            targetKey = target.id,
         )
 
     /**
