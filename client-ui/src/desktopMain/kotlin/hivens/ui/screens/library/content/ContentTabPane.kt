@@ -171,10 +171,10 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
             // Adding mods is gated behind detach; resource / shader packs can be added
             // any time (switch to their filter to target that folder). "Find projects"
             // is the Modrinth MOD browser, so it stays mod-gated.
-            canAdd         = state.isLocal ||
+            canAdd         = state.canAddContent ||
                 state.filter.kind == ContentKind.ResourcePack ||
                 state.filter.kind == ContentKind.ShaderPack,
-            canFindProjects = state.isLocal,
+            canFindProjects = state.canAddContent,
             onAddFiles     = { state.addFiles(addDialogSettings) },
             onFindProjects = state::startBrowsing,
         )
