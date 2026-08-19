@@ -37,6 +37,10 @@ Every item names a file and a line so it can be picked up without re-deriving it
 
 ## 2. Bugs that are visual
 
+Items struck through were fixed on 2026-08-19; they are kept because the reasoning
+is what stops them coming back.
+
+
 - **The depth ladder inverts between themes.** `NxCard` defaults to
   `SurfaceContainer` and `NxSection` to `SurfaceContainerHigh`
   (`NxSurface.kt:36-37`). On dark that puts the card at `0xFF222222` inside a
@@ -49,21 +53,21 @@ Every item names a file and a line so it can be picked up without re-deriving it
   switch on the light palette is about 1.5:1. Settings alone draws sixteen of
   them. Same class of problem in the drag ghost (`PaletteItem.kt:180-214`) and
   `NxButton.kt:78`.
-- **One scroll position shared by six settings categories.**
+- DONE. **One scroll position shared by six settings categories.**
   `SettingsScreen.kt:85` remembers the state against the Column, which survives a
   category change. Scroll to the bottom of Console, click Advanced, land
   part-way down it.
-- **The last section is clipped flush.** The scroll Column
+- DONE. **The last section is clipped flush.** The scroll Column
   (`SettingsScreen.kt:81-86`) has no bottom padding and no arrangement, so the
   final plane's bevel hairline is cut mid-stroke on every category.
-- **Editor panels can be dragged off-screen and not brought back.** The offsets
+- DONE. **Editor panels can be dragged off-screen and not brought back.** The offsets
   are unclamped and unpersisted `remember`s (`WidgetPalettePanel.kt:73`,
   `SurfacePropertiesPanel.kt:90`); the only recovery is toggling the panel shut
   and open.
-- **`Instant.parse` runs unguarded inside composition.**
+- DONE. **`Instant.parse` runs unguarded inside composition.**
   `NetworkSection.kt:61`. A malformed stored timestamp throws out of the render
   pass; there is no fallback text and no `runCatching`.
-- **Diagnostics fails silently.** `DiagnosticsSection.kt:153-160` and `:192-197`
+- DONE. **Diagnostics fails silently.** `DiagnosticsSection.kt:153-160` and `:192-197`
   swallow failure with `runCatching { }.getOrNull()` and draw nothing. The button
   re-enables and the user sees a control that visibly did nothing.
 
@@ -73,7 +77,7 @@ Every item names a file and a line so it can be picked up without re-deriving it
   (`TopBarBreadcrumbWidget.kt:40`). Removed from the theme picker; still present
   in `ServerSettingsScreen.kt:98` and `ServerDetailsSurface.kt:118`, where they
   are place-based and acceptable.
-- `cubeResizeSpan` -- see section 1.
+- DONE (the comment now says the gesture does not exist). `cubeResizeSpan` -- see section 1.
 - Two zip readers in one tree: `ZipUtils` on commons-compress,
   `MrpackInstaller` on `java.util.zip`. The latter cannot take a channel, so it
   has to move if partial archive reads ever land.
@@ -94,7 +98,8 @@ Every item names a file and a line so it can be picked up without re-deriving it
   they are the target; slot chrome strokes only when already selected
   (`SlotLayoutChrome.kt:94-106`); canvas and cube slots get no indicator at all
   (`EditableWidgetChrome.kt:427`).
-- **An empty canvas slot's drop target is only its top 80dp**, and offset 6dp
+- PARTLY DONE (the offset is fixed; the 80dp height still under-reports a tall
+  canvas, which needs the renderer to report the slot itself). **An empty canvas slot's drop target is only its top 80dp**, and offset 6dp
   low because the padding is applied before `onGloballyPositioned`
   (`EmptySlotPlaceholder.kt:71-77`). Dropping lower hit-tests to null and is
   discarded in silence (`PaletteItem.kt:103`).
@@ -183,3 +188,73 @@ not; these are the parts that survive the toolkit change.
 - One flag bag holding preferences, panel collapse memory, one-shot dismissals
   and unfinished-feature gates as peers. Nothing distinguishes the kinds, so
   "reset preferences" would also forget which warnings were dismissed.
+
+---
+
+## 6. What a wide window does to the layout
+
+Measured at 1920 and 2560 logical pixels, which is what the maintainer's screen
+actually reports: nothing in the repo sets a UI scale, so on this desktop 2560
+physical is 2560 logical.
+
+**The geometry that causes all of it.** The shell frame is a Row of three: a
+65dp rail, a weighted centre, a 265dp rail. Both rails are fixed, so the centre
+is the only child that grows and **every pixel a wider window gains lands
+there** -- 1586dp of content at 1920, 2226dp at 2560.
+
+**There is no breakpoint above 1100dp anywhere in the app.** Every width
+comparison in the tree is a floor protecting the 960dp minimum window, and the
+widest branch of each is already entered by about 1100dp. The 2K layout is not a
+layout for a wide screen; it is the same layout with one column stretched.
+
+What that produces, as proportions rather than opinions:
+
+| | 1920 | 2560 |
+|---|---|---|
+| pack row (Library, Browse) | 1538x132, 11.7:1 | 2178x132, **16.5:1** |
+| Play button, classic Home | 30:1 | **43:1** |
+| Browse search field | 40:1 | **52:1** |
+| pack name field, settings | 1399dp | 1690dp |
+| notes field, settings | | 1690x72, **23:1** |
+
+The pack row draws the pack's banner behind it with `ContentScale.Crop`, so a
+16:9 image inside a 16.5:1 frame is a horizontal slice about six percent of its
+own height. The card stops showing which pack it is.
+
+Two more, both of which use less space the more they are given: the recent-packs
+row on the new Home is five tiles of a fixed 180dp, so 940dp of a 2178dp row,
+and the tile count is a stored prop rather than anything derived from the
+measured width. And the free canvas positions widgets by absolute offset with no
+clamp at render, so an arrangement made at 2560 is clipped at 1920 and one made
+at 1920 leaves 640dp of dead margin at 2560. That has shipped.
+
+**The correction worth keeping.** Line length is not the problem on these
+surfaces -- there is almost no body copy, and what exists is either capped or
+single-line with an ellipsis. The defect is object proportion: things whose
+height is a constant while their width tracks the window. The one real
+line-length case is the changelog in the version window, at roughly 155
+characters a line at FHD and 250 at 2K.
+
+**What already does it right**, and is the pattern to copy: the server grid uses
+`GridCells.Adaptive(minSize = 200.dp)` and answers a wider window with more
+columns -- seven at FHD, ten at 2K -- instead of wider cells. It is the only
+surface in the set that uses the width rather than being stretched by it.
+
+**And the reason none of this was caught.** The render tests already capture
+these screens at 2560x1440. Their only assertion is that more than ten percent of
+the frame is not the backdrop, so they cannot fail on a layout that has come
+apart -- they answer "did it draw", never "did it draw well". Every finding in
+this section was found by reading or by looking at a PNG by hand.
+
+### The order I would take these in
+
+1. A content-width ceiling in `nx-ui`, applied at the roots of the new Home,
+   Library and Browse. One change bounds the Play button, the hero, the welcome
+   banner, the search field and everything anyone writes with `fillMaxWidth`
+   tomorrow, and turns the surplus into symmetric margin over the wallpaper --
+   which is what the transparent centre region exists to show. Landed for Browse
+   on 2026-08-19 as `Dimens.contentMaxWidth`; the other two are a line each.
+2. A real adaptive grid for Library and Browse, after the server grid. This is
+   also what fixes the banner crop, since a card near 3:1 shows artwork.
+3. A width ceiling on the pack settings panel, whose KDoc currently records
+   "no dp caps" as a decision.
