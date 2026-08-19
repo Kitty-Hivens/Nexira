@@ -175,12 +175,20 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
 @Composable
 private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
+    // The surface draws the hover state itself, inside its own clip. Left to the
+    // clickable it was painted on the node above, which is not clipped to the
+    // shape, so a rounded cell lit up as a square with its corners filled in.
+    val interaction = remember { MutableInteractionSource() }
     NxSurface(
         level    = NxSurfaceLevel.Raised,
         shape    = shape,
         // No blur behind a cell that is about to be covered by a photograph.
         glass    = false,
-        modifier = modifier.aspectRatio(CELL_ASPECT).clickable(onClick = onClick),
+        interactionSource = interaction,
+        modifier = modifier
+            .aspectRatio(CELL_ASPECT)
+            .clip(shape)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     ) {
         when (item) {
             is GalleryMedia.Image -> AsyncImage(
