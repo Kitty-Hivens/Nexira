@@ -56,11 +56,15 @@ enum class UpdateDirection {
  * fail-loud sync path; callers catch and surface them.
  */
 sealed interface UpdateOutcome {
-    /** The plan was applied and the instance committed at [toVersion]. */
+    /**
+     * The change was applied and the instance committed at [toVersion]. [plan] is
+     * null for the same reason it can be null on a check: a source that does not
+     * list its files with hashes cannot describe what it did in those terms.
+     */
     data class Applied(
         val toVersion: String,
         val compat: CompatChange,
-        val plan: UpdatePlan,
+        val plan: UpdatePlan?,
     ) : UpdateOutcome
 
     /** The requested target equals the installed build; nothing was fetched or written. */

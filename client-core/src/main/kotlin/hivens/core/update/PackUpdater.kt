@@ -12,6 +12,16 @@ import kotlinx.coroutines.flow.Flow
  */
 interface PackUpdater {
     /**
+     * Whether anything can offer other builds of [instance] at all.
+     *
+     * A capability, deliberately not a test of where the pack came from. A local
+     * instance and one synced from a game server have no version feed and answer
+     * false; asking by origin instead spread the same question across the tree
+     * and had to be widened by hand every time a source was added.
+     */
+    fun handles(instance: PackInstance): Boolean = true
+
+    /**
      * Read-only: is a different build available for [instance], and what would it
      * change? [forceRefresh] bypasses the read cache and belongs to a check the
      * user asked for -- a background pass leaves it false, since answering from a

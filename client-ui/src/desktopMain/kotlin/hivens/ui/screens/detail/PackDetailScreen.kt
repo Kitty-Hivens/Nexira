@@ -188,7 +188,10 @@ fun PackDetailScreen(
             onAbort        = { state.abortLaunch() },
             onOpenSettings = { showSettings = true },
             onOpenFolder   = { state.openFolder() },
-            versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
+            // Any source that pins a version has one worth naming; this used to
+            // ask whether the pack came from the mirror, which hid the version of
+            // a Modrinth instance that had one all along.
+            versionLabel   = pack.pinnedPackVersion ?: pack.packRef.version,
             pending        = autoUpdateStatuses[pack.id] as? PackUpdateStatus.Pending,
             onOpenVersions = { onOpenVersions(false) },
         )
