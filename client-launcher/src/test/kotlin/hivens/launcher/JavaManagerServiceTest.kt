@@ -57,6 +57,28 @@ class JavaManagerServiceTest {
         }
     }
 
+    @Test
+    fun `detectJavaVersion gives a release past the 1_x line the newest runtime`() {
+        assertEquals(25, svc.detectJavaVersion("26.2"))
+        assertEquals(25, svc.detectJavaVersion("26.1.2"))
+    }
+
+    @Test
+    fun `detectJavaVersion keeps the 1_x line where it was`() {
+        assertEquals(21, svc.detectJavaVersion("1.21.11"))
+        assertEquals(21, svc.detectJavaVersion("1.20.5"))
+        assertEquals(21, svc.detectJavaVersion("1.20.6"))
+        assertEquals(17, svc.detectJavaVersion("1.20"))
+        assertEquals(17, svc.detectJavaVersion("1.20.4"))
+        assertEquals(8, svc.detectJavaVersion("1.16.5"))
+    }
+
+    @Test
+    fun `detectJavaVersion leaves a version it cannot read on the old runtime`() {
+        assertEquals(8, svc.detectJavaVersion("b1.7.3"))
+        assertEquals(8, svc.detectJavaVersion(""))
+    }
+
     // ── detectJavaVersion: MC version -> Java major ───────────────────────
 
     @Test

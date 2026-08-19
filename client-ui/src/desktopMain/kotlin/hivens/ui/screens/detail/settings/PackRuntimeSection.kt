@@ -17,10 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.RuntimePrefs
 import hivens.core.data.PackInstance
+import hivens.core.data.PackOrigin
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.JvmArgsPresets
 import hivens.core.jvm.JvmConfig
@@ -59,6 +61,7 @@ internal fun PackRuntimeSection(
     val colors = NxTheme.colors
     val profilerStore: ProfilerProfileStore = koinInject()
     val settingsService: ISettingsService = koinInject()
+    val javaManager: IJavaManager = koinInject()
     val scope = rememberCoroutineScope()
     val runtime = pack.runtime
 
@@ -91,7 +94,7 @@ internal fun PackRuntimeSection(
     }
 
     NxSection(s.packSettingsEnvironment) {
-        val major = pack.cachedManifest?.javaMajor
+        val major = requiredJavaMajor(pack, javaManager)
         Column(Modifier.fillMaxWidth()) {
             Text(s.packSettingsJava, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             NxField(
@@ -190,7 +193,7 @@ internal fun PackRuntimeSection(
                 ?: JvmArgsPresets.default.config,
             // The runtime the args will be handed to, so the builder does not
             // compose a flag this pack's JDK no longer recognises.
-            javaMajor = pack.cachedManifest?.javaMajor,
+            javaMajor = requiredJavaMajor(pack, javaManager),
             onDismiss = { showJvmBuilder = false },
             onApply = { newArgs ->
                 commit(runtime.copy(jvmArgs = newArgs.ifBlank { null }))
@@ -198,4 +201,20 @@ internal fun PackRuntimeSection(
             },
         )
     }
+}
+
+/**
+ * The Java the next launch would pick for this instance.
+ *
+ * The mirror declares the runtime in its manifest and is taken at its word. No
+ * other source does: what is stored for them is the launcher's own reading of
+ * the Minecraft version, taken once at install and never revisited -- so an
+ * instance installed while that reading was wrong went on reporting the wrong
+ * runtime long after it was corrected. Reading it again here costs nothing and
+ * cannot go stale.
+ */
+private fun requiredJavaMajor(pack: PackInstance, javaManager: IJavaManager): Int? {
+    val manifest = pack.cachedManifest ?: return null
+    if (pack.packRef.origin == PackOrigin.Mirror) return manifest.javaMajor
+    return javaManager.detectJavaVersion(manifest.minecraftVersion)
 }
