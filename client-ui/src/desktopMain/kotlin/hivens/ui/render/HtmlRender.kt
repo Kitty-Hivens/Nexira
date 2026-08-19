@@ -267,15 +267,21 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
             // Image-only paragraph (badges / a banner / a video thumbnail, however
             // wrapped) -> clickable images. A paragraph that (invalidly, but as
             // Modrinth emits) holds block children -> flow them. Otherwise inline text.
+            //
+            // The element's OWN alignment counts, not just the one it inherited.
+            // `<p align="center">` around a row of badges is how a description
+            // centres them, and reading only the inherited flag left every one of
+            // those rows hard against the left edge.
+            val centred = center || align == TextAlign.Center
             val imgs = imageRunOf(el)
             when {
-                imgs != null -> ImageRunBlock(imgs, onLink, center = center)
+                imgs != null -> ImageRunBlock(imgs, onLink, center = centred)
                 el.children().any { it.tagName().lowercase() in BLOCK_TAGS || it.tagName().equals("img", true) } ->
-                    blocks(el, ctx, onLink, center)
+                    blocks(el, ctx, onLink, centred)
                 else -> Text(
                     buildInline(el.childNodes(), ctx, onLink),
-                    style    = TextStyle(color = ctx.baseColor, textAlign = align),
-                    modifier = if (center) Modifier.fillMaxWidth() else Modifier,
+                    style    = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT, textAlign = align),
+                    modifier = if (centred) Modifier.fillMaxWidth() else Modifier,
                 )
             }
         }
