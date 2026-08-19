@@ -105,6 +105,10 @@ internal fun DiagnosticsSection(
     // only after a bundle exists this session.
     var lastBundlePath by remember { mutableStateOf<Path?>(null) }
     var bundleBusy     by remember { mutableStateOf(false) }
+    // Why the bundle could not be made. Swallowing it left a button that visibly
+    // did nothing: it re-enabled, no file opened, and the reason -- a full disk,
+    // a read-only data dir -- was known and thrown away.
+    var bundleError    by remember { mutableStateOf<String?>(null) }
     val bundleScope    = rememberCoroutineScope()
 
     NxSection(s.settingsSectionDiagnostics, titleModifier = titleModifier) {
@@ -149,14 +153,15 @@ internal fun DiagnosticsSection(
                             onClick  = {
                                 if (bundleBusy) return@NxButton
                                 bundleBusy = true
+                                bundleError = null
                                 bundleScope.launch {
-                                    val zip = withContext(Dispatchers.IO) {
-                                        runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }.getOrNull()
+                                    val made = withContext(Dispatchers.IO) {
+                                        runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }
                                     }
-                                    if (zip != null) {
+                                    made.onSuccess { zip ->
                                         lastBundlePath = zip
                                         SystemActions.openFile(zip.parent.toFile())
-                                    }
+                                    }.onFailure { bundleError = it.message ?: it::class.simpleName }
                                     bundleBusy = false
                                 }
                             },
@@ -212,6 +217,14 @@ internal fun DiagnosticsSection(
                 color    = NxTheme.colors.textSecondary,
                 modifier = Modifier.padding(start = 8.dp),
             )
+            bundleError?.let { reason ->
+                Text(
+                    text     = reason,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = NxTheme.colors.error,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
 
         // Restart into the boot recovery surface -- disable a broken module or
