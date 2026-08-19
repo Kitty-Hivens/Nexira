@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +31,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,18 +92,54 @@ fun BrowseScreen(
         submittedQuery = query
     }
 
+    // Paging state. The catalogue takes a page and only some of them honour it:
+    // the mirror answers with its whole list every time. So a page is accepted by
+    // what is NEW in it, and a page that adds nothing is the end -- which is
+    // correct for a catalogue that pages and for one that does not, and keeps a
+    // repeat from reaching the list as a duplicate key.
+    var page by remember { mutableIntStateOf(0) }
+    var endReached by remember { mutableStateOf(false) }
+    var loadingMore by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+
     LaunchedEffect(origin, submittedQuery, retryTick) {
         state = BrowseState.Loading
+        page = 0
+        endReached = false
         state = try {
             val catalogue = registry.forOrigin(origin)
                 ?: return@LaunchedEffect run { state = BrowseState.Empty }
-            val packs = withContext(Dispatchers.IO) { catalogue.search(submittedQuery) }
+            val packs = withContext(Dispatchers.IO) { catalogue.search(submittedQuery, page = 0) }
             if (packs.isEmpty()) BrowseState.Empty else BrowseState.Loaded(packs)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             BrowseState.Error(e.message ?: s.browseErrorMessage)
         }
+    }
+
+    // Only the first page was ever asked for, so a catalogue with more to give
+    // simply stopped at twenty results with nothing saying there were more.
+    LaunchedEffect(listState, state, endReached) {
+        if (state !is BrowseState.Loaded || endReached) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+            .collect { last ->
+                val current = (state as? BrowseState.Loaded)?.packs ?: return@collect
+                if (loadingMore || endReached || last < current.size - 3) return@collect
+                loadingMore = true
+                runCatching {
+                    val catalogue = registry.forOrigin(origin)
+                    val next = if (catalogue == null) emptyList()
+                    else withContext(Dispatchers.IO) { catalogue.search(submittedQuery, page = page + 1) }
+                    val seen = current.mapTo(HashSet()) { "${'$'}{it.origin}:${'$'}{it.id}" }
+                    val fresh = next.filterNot { "${'$'}{it.origin}:${'$'}{it.id}" in seen }
+                    if (fresh.isEmpty()) endReached = true else {
+                        page += 1
+                        state = BrowseState.Loaded(current + fresh)
+                    }
+                }.onFailure { endReached = true }
+                loadingMore = false
+            }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -141,7 +180,7 @@ fun BrowseScreen(
                 BrowseState.Loading -> BrowseLoading()
                 BrowseState.Empty   -> BrowseEmpty(onRetry = { retryTick++ })
                 is BrowseState.Error -> BrowseError(message = st.message, onRetry = { retryTick++ })
-                is BrowseState.Loaded -> BrowseList(packs = st.packs, onOpenPack = onOpenPack)
+                is BrowseState.Loaded -> BrowseList(packs = st.packs, listState = listState, onOpenPack = onOpenPack)
             }
         }
         }
@@ -264,8 +303,13 @@ private fun BrowseError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun BrowseList(packs: List<CataloguePack>, onOpenPack: (CataloguePack) -> Unit) {
+private fun BrowseList(
+    packs: List<CataloguePack>,
+    listState: LazyListState,
+    onOpenPack: (CataloguePack) -> Unit,
+) {
     LazyColumn(
+        state               = listState,
         modifier            = Modifier.fillMaxSize(),
         contentPadding      = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
