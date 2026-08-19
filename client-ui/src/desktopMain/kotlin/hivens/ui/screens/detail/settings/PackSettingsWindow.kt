@@ -51,6 +51,7 @@ import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.update.PackUpdater
 import hivens.core.update.VersionChannel
 import hivens.launcher.PackOperation
 import hivens.launcher.PackOperationKind
@@ -167,8 +168,12 @@ fun PackSettingsWindow(
     val adopt: (PackInstance) -> Unit = { updated -> edit = Edit(updated, persist = false) }
 
     val isMirror = pack.packRef.origin == PackOrigin.Mirror
-    val categories = remember(isMirror) {
-        PackSettingsCategory.entries.filter { isMirror || !it.mirrorOnly }
+    // Whether anything can offer this instance other builds, asked of the updater
+    // rather than inferred from where the pack came from.
+    val updater: PackUpdater = koinInject()
+    val hasVersionFeed = remember(pack.packRef.origin) { updater.handles(pack) }
+    val categories = remember(hasVersionFeed) {
+        PackSettingsCategory.entries.filter { hasVersionFeed || !it.needsVersionFeed }
     }
     var selected by remember(pack.id) { mutableStateOf(initialCategory ?: PackSettingsCategory.General) }
     // A detach mid-session drops the Version section; fall back so the pane never
