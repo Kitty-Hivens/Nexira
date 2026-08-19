@@ -80,6 +80,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
+import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.settings.PackSettingsWindow
 import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.content.ContentTabPane
@@ -119,6 +120,7 @@ fun PackDetailScreen(
     appState: AppState,
     onBack: () -> Unit,
     initialShowSettings: Boolean = false,
+    initialSettingsSection: PackSettingsCategory? = null,
     onOpenVersions: (fromSettings: Boolean) -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
@@ -221,10 +223,11 @@ fun PackDetailScreen(
 
     if (showSettings) {
         PackSettingsWindow(
-            pack           = pack,
-            instanceDir    = instanceDir,
-            onDismiss      = { showSettings = false },
-            onOpenVersions = { onOpenVersions(true) },
+            pack            = pack,
+            instanceDir     = instanceDir,
+            onDismiss       = { showSettings = false },
+            onOpenVersions  = { onOpenVersions(true) },
+            initialCategory = initialSettingsSection,
         )
     }
 }

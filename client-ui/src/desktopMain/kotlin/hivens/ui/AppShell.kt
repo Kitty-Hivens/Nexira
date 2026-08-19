@@ -31,6 +31,7 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
+import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.notifications.TwoFactorLaunchGate
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.data.PackOrigin
@@ -214,7 +215,16 @@ sealed class Screen {
      * settings window into the versions screen, so Back lands them in
      * the settings they left, not on the bare pack page.
      */
-    data class PackDetail    (val instanceId: String, val openSettings: Boolean = false) : Screen()
+    data class PackDetail    (
+        val instanceId: String,
+        val openSettings: Boolean = false,
+        /**
+         * Which section the settings panel reopens on. Null means the one it
+         * opens on by default; leaving the version screen names Version, because
+         * that is where the user was standing when they left.
+         */
+        val settingsSection: PackSettingsCategory? = null,
+    ) : Screen()
 
     /**
      * Version manager for an installed mirror pack: the retained build list,

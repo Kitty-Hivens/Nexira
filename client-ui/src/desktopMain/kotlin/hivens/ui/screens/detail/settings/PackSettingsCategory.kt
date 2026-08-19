@@ -12,7 +12,7 @@ import hivens.ui.icons.NxIcon
  * [mirrorOnly] hides a section for non-mirror instances -- Version/updates has
  * no meaning for a Local or imported pack, so it is absent from the rail there.
  */
-internal enum class PackSettingsCategory(
+enum class PackSettingsCategory(
     val icon: IconKey,
     val label: (AppStrings) -> String,
     val mirrorOnly: Boolean = false,
