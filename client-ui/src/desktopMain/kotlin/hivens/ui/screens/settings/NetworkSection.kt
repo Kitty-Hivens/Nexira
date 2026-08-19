@@ -57,8 +57,16 @@ internal fun NetworkSection() {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(entry.host, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                        // Parsing a stored string during composition: a damaged
+                        // timestamp threw out of the render pass and took the
+                        // settings screen with it, over one unreadable field of
+                        // one row. The raw value is shown instead -- it is what
+                        // the file says, and it can be read by whoever has to fix
+                        // it.
+                        val expires = runCatching { dateFormatter.format(java.time.Instant.parse(entry.expiresAt)) }
+                            .getOrDefault(entry.expiresAt)
                         Text(
-                            text  = s.sslBypassExpiresAt(dateFormatter.format(java.time.Instant.parse(entry.expiresAt))),
+                            text  = s.sslBypassExpiresAt(expires),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxTheme.colors.textSecondary,
                         )
