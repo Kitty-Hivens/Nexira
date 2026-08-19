@@ -221,6 +221,10 @@ class MrpackInstallerTest {
 
     private val modV2Bytes = "COOL-MOD-V2".toByteArray()
     private val stableBytes = "NEVER-CHANGES".toByteArray()
+    // A mod whose FILENAME carries its version, which is how packs actually ship
+    // them: the update has to retire the old file, not just add the new one.
+    private val libV1Bytes = "LIB-1".toByteArray()
+    private val libV2Bytes = "LIB-2".toByteArray()
 
     /**
      * Requests the mock actually served, so a test can assert what was NOT
@@ -247,6 +251,8 @@ class MrpackInstallerTest {
             MOD_URL -> respond(ByteReadChannel(modBytes), HttpStatusCode.OK)
             MOD_V2_URL -> respond(ByteReadChannel(modV2Bytes), HttpStatusCode.OK)
             STABLE_URL -> respond(ByteReadChannel(stableBytes), HttpStatusCode.OK)
+            LIB_V1_URL -> respond(ByteReadChannel(libV1Bytes), HttpStatusCode.OK)
+            LIB_V2_URL -> respond(ByteReadChannel(libV2Bytes), HttpStatusCode.OK)
             else -> respond("missing $url", HttpStatusCode.NotFound)
         }
     }
@@ -255,12 +261,14 @@ class MrpackInstallerTest {
     private fun buildVersionedPack(second: Boolean): Path {
         val file = Files.createTempFile("test-v", ".mrpack").also { tempDirs.add(it) }
         val cool = if (second) modV2Bytes to MOD_V2_URL else modBytes to MOD_URL
+        val lib = if (second) Triple("mods/lib-2.0.jar", libV2Bytes, LIB_V2_URL) else Triple("mods/lib-1.0.jar", libV1Bytes, LIB_V1_URL)
         val index = """
             {"formatVersion":1,"game":"minecraft","versionId":"${if (second) "2.0.0" else "1.0.0"}","name":"Test Pack",
              "dependencies":{"minecraft":"1.20.1"},
              "files":[
                {"path":"mods/cool.jar","hashes":{"sha1":"${sha1(cool.first)}"},"downloads":["${cool.second}"],"fileSize":${cool.first.size}},
-               {"path":"mods/stable.jar","hashes":{"sha1":"${sha1(stableBytes)}"},"downloads":["$STABLE_URL"],"fileSize":${stableBytes.size}}
+               {"path":"mods/stable.jar","hashes":{"sha1":"${sha1(stableBytes)}"},"downloads":["$STABLE_URL"],"fileSize":${stableBytes.size}},
+               {"path":"${lib.first}","hashes":{"sha1":"${sha1(lib.second)}"},"downloads":["${lib.third}"],"fileSize":${lib.second.size}}
              ]}
         """.trimIndent()
         ZipOutputStream(Files.newOutputStream(file)).use { zos ->
@@ -352,7 +360,7 @@ class MrpackInstallerTest {
         installer.update(instance, buildVersionedPack(second = true))
 
         assertEquals(
-            setOf("mods/cool.jar", "mods/stable.jar", "config/foo.txt", "config/keep.txt"),
+            setOf("mods/cool.jar", "mods/stable.jar", "mods/lib-2.0.jar", "config/foo.txt", "config/keep.txt"),
             PackFileRecord.read(clientDir).keys,
         )
     }
@@ -390,6 +398,39 @@ class MrpackInstallerTest {
         assertEquals("2.0.0", updated.packRef.version)
     }
 
+
+    @Test
+    fun `an instance with no record retires the old files once given the version it has`() = runTest {
+        // The shape that reached a real launcher: instances installed before
+        // records existed updated without retiring anything, so a mod whose
+        // filename carries its version ended up on disk twice and the game
+        // would not start. The installed version's own archive is the baseline.
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val v1 = buildVersionedPack(second = false)
+        val instance = installer.install(v1)
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        Files.delete(clientDir.resolve(PackFileRecord.FILE_NAME))
+
+        installer.update(instance, buildVersionedPack(second = true), installedArchive = v1)
+
+        assertTrue(Files.exists(clientDir.resolve("mods/lib-2.0.jar")), "the new file arrived")
+        assertFalse(Files.exists(clientDir.resolve("mods/lib-1.0.jar")), "the old file was retired, not left beside it")
+    }
+
+    @Test
+    fun `without a baseline the old file survives, which is why one is fetched`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        Files.delete(clientDir.resolve(PackFileRecord.FILE_NAME))
+
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertTrue(Files.exists(clientDir.resolve("mods/lib-1.0.jar")), "nothing knew this file was the pack's")
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://piston-meta.test/manifest.json"
         const val VERSION_URL = "https://piston-meta.test/1.20.1.json"
@@ -400,5 +441,7 @@ class MrpackInstallerTest {
         const val BAD_URL = "https://cdn.test/nope.jar"
         const val MOD_V2_URL = "https://cdn.test/cool-v2.jar"
         const val STABLE_URL = "https://cdn.test/stable.jar"
+        const val LIB_V1_URL = "https://cdn.test/lib-1.0.jar"
+        const val LIB_V2_URL = "https://cdn.test/lib-2.0.jar"
     }
 }
