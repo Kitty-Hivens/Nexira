@@ -192,5 +192,5 @@ kotlin-serialization            = { id = "org.jetbrains.kotlin.plugin.serializat
 kotlin-compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
 compose                         = { id = "org.jetbrains.compose",                     version.ref = "compose" }
 buildconfig                     = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
-versions                        = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
+versions                        = { id = "io.github.ben-manes.versions",              version.ref = "versionsPlugin" }
 ksp                             = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }
