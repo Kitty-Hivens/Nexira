@@ -461,9 +461,16 @@ private fun BuildRow(
                 // Counts are omitted rather than zeroed when the source does not
                 // publish them: a pack that says "0 mods" reads as broken, and
                 // Modrinth cannot answer without handing over the whole archive.
+                // What the build runs on, where the source says so. It is the one
+                // fact that decides whether a switch strands a world, and it lands
+                // in the gap left by a source that publishes no file counts, so
+                // those rows stop reading as though something were missing.
                 text  = listOfNotNull(
                     formatBuildTimestamp(build.datePublished),
                     build.modsCount?.let { mods -> build.assetsCount?.let { assets -> s.packVersionsCounts(mods, assets) } },
+                    listOfNotNull(build.minecraftVersion, build.loaderName)
+                        .takeIf { it.isNotEmpty() }
+                        ?.joinToString(" "),
                 ).joinToString("   "),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textSecondary,
