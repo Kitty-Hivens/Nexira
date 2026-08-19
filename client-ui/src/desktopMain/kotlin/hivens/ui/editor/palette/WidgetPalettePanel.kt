@@ -50,6 +50,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
+import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalWidgetRegistry
 
@@ -70,7 +71,7 @@ fun WidgetPalettePanel(
     val style = LocalStyle.current
     val registry0 = LocalWidgetRegistry.current
     // Draggable dock: the header drags this offset (session-scoped).
-    var paletteOffset by remember { mutableStateOf(Offset.Zero) }
+    val paletteOffset = rememberDockOffset()
     // Only removable descriptors enter the palette. Non-removable
     // widgets (the auth panel, the three shell regions) are
     // surface-essential: shipping a default layout pins exactly one
@@ -99,8 +100,8 @@ fun WidgetPalettePanel(
         Column(
             modifier = Modifier
                 .graphicsLayer {
-                    translationX = paletteOffset.x
-                    translationY = paletteOffset.y
+                    translationX = paletteOffset.value.x
+                    translationY = paletteOffset.value.y
                     // Fade out of the way while a widget is dragged so the drop
                     // zone under the dock stays visible. Folded into this one
                     // layer (not a separate .alpha modifier) so the glass
@@ -125,7 +126,7 @@ fun WidgetPalettePanel(
                     .pointerInput(Unit) {
                         detectDragGestures { change, drag ->
                             change.consume()
-                            paletteOffset += drag
+                            paletteOffset.drag(drag)
                         }
                     }
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),

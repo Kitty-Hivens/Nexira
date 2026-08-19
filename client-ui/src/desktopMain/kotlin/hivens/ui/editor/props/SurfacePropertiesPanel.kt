@@ -56,6 +56,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
 import hivens.ui.nx.NxSwitch
+import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.customization.HexField
@@ -87,10 +88,10 @@ fun SurfacePropertiesPanel(
         val style = LocalStyle.current
         // Draggable dock: the header drags this offset (session-scoped), like the
         // widget palette, so the panel can be pulled off the right edge.
-        var offset by remember { mutableStateOf(Offset.Zero) }
+        val offset = rememberDockOffset()
         Column(
             modifier = Modifier
-                .graphicsLayer { translationX = offset.x; translationY = offset.y }
+                .graphicsLayer { translationX = offset.value.x; translationY = offset.value.y }
                 .width(320.dp)
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
@@ -108,7 +109,7 @@ fun SurfacePropertiesPanel(
                     .pointerInput(Unit) {
                         detectDragGestures { change, drag ->
                             change.consume()
-                            offset += drag
+                            offset.drag(drag)
                         }
                     }
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
