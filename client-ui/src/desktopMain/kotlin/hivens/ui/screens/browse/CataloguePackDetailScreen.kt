@@ -266,7 +266,11 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Column(modifier = Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // The description takes what is left rather than a fixed share of the row.
+        // Split two-to-one, a sidebar holding one short block still claimed a third
+        // of the page, and the description wrapped a line of prose two hundred
+        // pixels early to pay for space nothing was using.
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (details.galleryUrls.isNotEmpty()) {
                 ImageGallery(media = galleryMedia(details.galleryUrls, details.galleryThumbUrls))
             }
@@ -287,7 +291,9 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             // surface was built to end.
         }
 
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        // A column of label-and-value rows needs a column's worth of width and no
+        // more; what it does not need is to grow with the window.
+        Column(modifier = Modifier.width(SIDEBAR_WIDTH), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             val v = details.versions.firstOrNull()
             SidebarBlock(title = s.browseDetailCompatTitle) {
                 v?.mcVersions?.firstOrNull()?.let { MetaRow(s.browseDetailCompatMc, it) }
@@ -345,6 +351,9 @@ private fun Chip(text: String) {
         border  = null,
     )
 }
+
+/** Enough for a label and its value on one line, and no more. */
+private val SIDEBAR_WIDTH = 300.dp
 
 private data class InstallProgress(val versionId: String, val current: Int, val total: Int, val filename: String)
 
