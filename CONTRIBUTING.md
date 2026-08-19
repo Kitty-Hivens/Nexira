@@ -87,4 +87,4 @@ Kotlin · Compose Multiplatform · Ktor · Koin · Skiko · libtray · Logback
 
 ## ── License ──
 
-By contributing, you agree that your work will be licensed under [GPL-3.0](LICENSE).
+By contributing, you agree that your work will be licensed under [GPL-3.0-or-later](LICENSE).
