@@ -1,6 +1,9 @@
 package hivens.ui.render
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import java.util.Locale
 import org.slf4j.LoggerFactory
 import androidx.compose.foundation.clickable
@@ -23,7 +26,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,11 +49,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import coil3.compose.AsyncImage
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.bevelHairline
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.CancellationToken
@@ -136,12 +144,22 @@ fun HtmlBody(
         baseColor = baseColor,
         codeBg = NxTheme.colors.surface,
     )
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(BLOCK_GAP)) {
         blocks(body, ctx, onLink)
     }
 }
 
 private data class InlineCtx(val linkColor: Color, val baseColor: Color, val codeBg: Color)
+
+/**
+ * Air between two blocks of prose. A description is paragraphs, lists and code
+ * with headings over them, and at the old eight it read as one column of text
+ * with the headings floating in it rather than as sections.
+ */
+private val BLOCK_GAP = 14.dp
+
+/** Prose leading. Compose's default is tight for a body of running text. */
+private val PROSE_LINE_HEIGHT = 1.5.em
 
 private val BLOCK_TAGS = setOf(
     "p", "div", "section", "article", "header", "footer", "main", "aside", "figure", "center",
@@ -178,7 +196,11 @@ private fun ColumnScope.blocks(parent: Element, ctx: InlineCtx, onLink: (String)
                 val ann = buildInline(frag.nodes, ctx, onLink)
                 if (ann.text.isNotBlank()) Text(
                     ann,
-                    style    = TextStyle(color = ctx.baseColor, textAlign = if (center) TextAlign.Center else TextAlign.Unspecified),
+                    style    = TextStyle(
+                        color = ctx.baseColor,
+                        lineHeight = PROSE_LINE_HEIGHT,
+                        textAlign = if (center) TextAlign.Center else TextAlign.Unspecified,
+                    ),
                     modifier = if (center) Modifier.fillMaxWidth() else Modifier,
                 )
             }
@@ -214,11 +236,21 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
             }
             // Extra air above a heading so sections read as sections, not one wall.
             val top = if (tag == "h1" || tag == "h2") 10.dp else 4.dp
-            Text(
-                buildInline(el.childNodes(), ctx, onLink),
-                style    = base.copy(color = ctx.baseColor, textAlign = align, fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(top = top).then(if (center) Modifier.fillMaxWidth() else Modifier),
-            )
+            val ruled = tag == "h1" || tag == "h2"
+            Column(Modifier.padding(top = top)) {
+                Text(
+                    buildInline(el.childNodes(), ctx, onLink),
+                    style    = base.copy(color = ctx.baseColor, textAlign = align, fontWeight = FontWeight.Bold),
+                    modifier = if (center) Modifier.fillMaxWidth() else Modifier,
+                )
+                // A rule under the top two levels. Bold alone does not separate a
+                // section from the paragraph above it once a description runs long
+                // enough to have sections at all.
+                if (ruled) HorizontalDivider(
+                    color = NxTheme.colors.outline.copy(alpha = 0.35f),
+                    modifier = Modifier.padding(top = 5.dp),
+                )
+            }
         }
         "p", "figure" -> {
             // Image-only paragraph (badges / a banner / a video thumbnail, however
@@ -237,20 +269,40 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
             }
         }
         "ul", "ol" -> ListBlock(el, ctx, onLink, ordered = el.tagName().equals("ol", true))
-        "blockquote" -> Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(MaterialTheme.shapes.small).background(NxTheme.colors.surface)) {
-            // Left accent bar so a quote reads as a quote, not a generic box.
-            Box(Modifier.width(3.dp).fillMaxHeight().background(NxTheme.colors.primary.copy(alpha = 0.7f)))
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { blocks(el, ctx, onLink) }
+        // A bar and indentation, no fill. A filled box reads as a callout -- a thing
+        // the author marked as important -- and a quote is not that; it is the same
+        // prose, set aside. The fill also stacked with a code block or a table
+        // inside the quote, putting a surface on a surface.
+        "blockquote" -> Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(Modifier.width(3.dp).fillMaxHeight().background(NxTheme.colors.primary.copy(alpha = 0.55f)))
+            Column(
+                Modifier.padding(start = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(BLOCK_GAP),
+            ) { blocks(el, ctx, onLink) }
         }
-        "pre" -> Text(
-            el.wholeText().trimEnd(),
-            style = TextStyle(color = ctx.baseColor, fontFamily = FontFamily.Monospace),
-            modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
-                .background(NxTheme.colors.surface).padding(12.dp),
+        // Scrolls sideways rather than wrapping. Wrapped code is code with its
+        // structure taken out, and a line long enough to wrap is usually the one
+        // being copied.
+        "pre" -> Box(
+            Modifier.fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .background(NxTheme.colors.surface)
+                .border(1.dp, bevelHairline(NxTheme.colors.surface), MaterialTheme.shapes.small)
+                .horizontalScroll(rememberScrollState())
+                .padding(12.dp),
+        ) {
+            Text(
+                el.wholeText().trimEnd(),
+                style = TextStyle(color = ctx.baseColor, fontFamily = FontFamily.Monospace),
+            )
+        }
+        "hr" -> HorizontalDivider(
+            color = NxTheme.colors.outline.copy(alpha = 0.4f),
+            modifier = Modifier.padding(vertical = 6.dp),
         )
-        "hr" -> HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.4f))
         "img" -> ImageBlock(el)
         "table" -> TableBlock(el, ctx, onLink)
+        "details" -> DetailsBlock(el, ctx, onLink)
         // div / section / li / summary / details / unknown container -> flow children (propagating center).
         else -> blocks(el, ctx, onLink, center)
     }
@@ -273,30 +325,95 @@ private fun ListBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, ord
 
 @Composable
 private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
-    // Bare Text-in-columns read as loose text, not a table. Give it a surface
-    // container plus per-row hairline separators and cell padding so the grid
-    // reads. No column borders (block-flow renderer) -- rows carry the structure.
+    // Bare Text-in-columns read as loose text. What makes a grid legible is the
+    // grid: an outer edge that says where the table ends, a header that is not
+    // just bold text, banded rows so the eye holds a line across, and a rule
+    // between columns -- without that last one two short cells beside each other
+    // are indistinguishable from one cell with a space in it.
     val rows = el.select("tr")
-    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(NxTheme.colors.surface)) {
+    val shape = MaterialTheme.shapes.small
+    val body = NxTheme.colors.surface
+    val line = bevelHairline(body, 0.14f)
+    val banded = bevelHairline(body, 0.05f)
+    val headerBg = bevelHairline(body, 0.10f)
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(shape)
+            .background(body)
+            .border(1.dp, line, shape),
+    ) {
         rows.forEachIndexed { rowIdx, tr ->
             val cells = tr.children().filter { it.tagName().equals("td", true) || it.tagName().equals("th", true) }
             val header = cells.any { it.tagName().equals("th", true) }
             Row(
-                modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (header) headerBg else if (rowIdx % 2 == 0) body else banded)
+                    .height(IntrinsicSize.Min),
             ) {
-                cells.forEach { cell ->
+                cells.forEachIndexed { cellIdx, cell ->
                     Text(
                         buildInline(cell.childNodes(), ctx, onLink),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 7.dp),
                         style = TextStyle(
                             color = ctx.baseColor,
+                            lineHeight = PROSE_LINE_HEIGHT,
                             fontWeight = if (header) FontWeight.Bold else FontWeight.Normal,
                         ),
                     )
+                    if (cellIdx < cells.lastIndex) Box(Modifier.width(1.dp).fillMaxHeight().background(line))
                 }
             }
-            if (rowIdx < rows.size - 1) HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.2f))
+            if (rowIdx < rows.size - 1) HorizontalDivider(color = line)
+        }
+    }
+}
+
+/**
+ * A `<details>` that actually folds.
+ *
+ * Both halves of it were rendered unconditionally before: the summary came out as
+ * a stray line of text and the body it was meant to hide sat open underneath, so
+ * a description that put its long tables and its spoilers behind a fold showed
+ * all of them at once and the fold's label read as a heading nobody had styled.
+ */
+@Composable
+private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
+    val summary = remember(el) { el.children().firstOrNull { it.tagName().equals("summary", true) } }
+    // The summary is the control, so it must not also be rendered as content. A
+    // detached copy keeps the parse tree untouched for anything else reading it.
+    val inner = remember(el) { el.clone().also { it.select("summary").remove() } }
+    var open by remember(el) { mutableStateOf(el.hasAttr("open")) }
+    val shape = MaterialTheme.shapes.small
+    val line = bevelHairline(NxTheme.colors.surface, 0.14f)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).border(1.dp, line, shape),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(bevelHairline(NxTheme.colors.surface, 0.10f))
+                .clickable { open = !open }
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Symbol(
+                if (open) NxIcon.ExpandMore else NxIcon.ChevronRight,
+                contentDescription = null,
+                tint = ctx.baseColor,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                summary?.let { buildInline(it.childNodes(), ctx, onLink) } ?: AnnotatedString(""),
+                style = TextStyle(color = ctx.baseColor, fontWeight = FontWeight.Bold),
+            )
+        }
+        if (open) {
+            Column(
+                Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(BLOCK_GAP),
+            ) { blocks(inner, ctx, onLink) }
         }
     }
 }
@@ -306,13 +423,16 @@ private fun ImageBlock(el: Element) {
     val src = el.attr("src").ifBlank { el.attr("data-src") }
     if (src.isBlank()) return
     // HTML width/height are CSS px, not dp -- honouring them as dp overflowed the
-    // column (a width="660" banner blew past the content). Scale to the column
-    // width, capped so a very tall image stays sane.
+    // column (a width="660" banner blew past the content), so they are ignored.
+    // The image takes its own size and the column's width is its ceiling, which is
+    // what `max-width: 100%` means: stretching every image to the full column blew
+    // a 64-pixel badge up to banner size and made a screenshot of a menu look like
+    // a screenshot of a wall.
     AsyncImage(
         model = src,
         contentDescription = el.attr("alt").ifBlank { null },
         contentScale = ContentScale.Fit,
-        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+        modifier = Modifier.heightIn(max = 360.dp),
     )
 }
 
