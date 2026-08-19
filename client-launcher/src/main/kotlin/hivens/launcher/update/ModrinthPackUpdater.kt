@@ -132,9 +132,25 @@ class ModrinthPackUpdater(
                     snapshotService.capture(clientDir, current, managed, UUID.randomUUID().toString(), Instant.now().epochSecond)
                 }
 
-                val archive = Files.createTempFile("mrpack-update-", ".mrpack")
+                // A directory, so the archive path does not exist yet: downloadTo
+                // skips a target that is already on disk, and createTempFile
+                // creates one, so handing it a temp FILE downloaded nothing and
+                // left an empty archive to be opened as a zip.
+                val scratch = Files.createTempDirectory("mrpack-update-")
+                val archive = scratch.resolve("pack.mrpack")
                 try {
                     client.downloadTo(target.primaryFile().url, archive)
+                    // Say what went wrong here rather than let a zero-byte file
+                    // reach the zip reader, which reports only "zip file is empty"
+                    // and names neither the pack nor where the bytes should have
+                    // come from.
+                    val bytes = runCatching { Files.size(archive) }.getOrDefault(0L)
+                    if (bytes == 0L) {
+                        throw IOException(
+                            "downloaded nothing for ${instance.packRef.id} ${target.versionNumber} " +
+                                "from ${target.primaryFile().url}",
+                        )
+                    }
                     installer.update(
                         instance = current,
                         mrpack = archive,
@@ -143,6 +159,7 @@ class ModrinthPackUpdater(
                     )
                 } finally {
                     runCatching { Files.deleteIfExists(archive) }
+                    runCatching { Files.deleteIfExists(scratch) }
                 }
                 log.info("modrinth update: {} -> {}", instance.instanceDirName, target.versionNumber)
                 UpdateOutcome.Applied(target.versionNumber, compat, plan = null)

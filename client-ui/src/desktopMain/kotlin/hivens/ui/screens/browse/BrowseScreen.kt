@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -110,8 +111,12 @@ fun BrowseScreen(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
         Column(
-            Modifier.fillMaxSize()
+            // Height only. fillMaxSize would pin the minimum width to the full
+            // width as well, and a ceiling cannot take the maximum below the
+            // minimum -- the cap was there and did nothing.
+            Modifier.fillMaxHeight()
                 .widthIn(max = Dimens.contentMaxWidth)
+                .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             // Source switcher -- one chip per registered catalogue origin.
