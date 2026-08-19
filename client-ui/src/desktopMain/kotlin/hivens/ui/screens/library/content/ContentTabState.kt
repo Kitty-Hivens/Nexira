@@ -6,7 +6,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -327,10 +326,10 @@ internal class ContentTabState(
                     val key = c.selectionKey()
                     if (iconCache.containsKey(key)) continue
                     launch {
-                        gate.withPermit {
+                        val resolved = gate.withPermit {
                             val file = fileOf(c)
                             val embedded = c.iconBytes
-                            val resolved = runCatching {
+                            runCatching {
                                 when {
                                     embedded != null -> ContentIconState.Bytes(embedded)
                                     else -> iconResolver.resolveByFile(file)?.let { ContentIconState.Url(it) }
@@ -338,13 +337,15 @@ internal class ContentTabState(
                                         ?: ContentIconState.None
                                 }
                             }.getOrDefault(ContentIconState.None)
-                            // Snapshot state written from a worker needs a snapshot
-                            // of its own. Assigning directly used whatever snapshot
-                            // the coroutine inherited, and once that one had been
-                            // left behind the write threw out of the render pass and
-                            // took the shell down with it.
-                            Snapshot.withMutableSnapshot { iconCache[key] = resolved }
                         }
+                        // Resolved off-thread, written on the composition's own
+                        // thread. Assigning straight from a worker used whatever
+                        // snapshot the coroutine had inherited and threw once that
+                        // one had been left behind; giving each worker a snapshot
+                        // of its own only moved the failure, since a dozen of them
+                        // then applied against each other and conflicted. There is
+                        // one thread this map may be written from and this is it.
+                        withContext(Dispatchers.Main) { iconCache[key] = resolved }
                     }
                 }
             }
