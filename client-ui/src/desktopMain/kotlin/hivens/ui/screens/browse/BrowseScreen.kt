@@ -48,6 +48,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Dimens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -102,8 +103,17 @@ fun BrowseScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
+        // Centred under a width ceiling: past a point the extra width of a wide
+        // monitor stops being room and starts stretching the search field and the
+        // cards, which keep their height while their width tracks the window. The
+        // cap sits above a 1920 window's centre, so nothing moves at or below FHD.
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
+        Column(
+            Modifier.fillMaxSize()
+                .widthIn(max = Dimens.contentMaxWidth)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+        ) {
             // Source switcher -- one chip per registered catalogue origin.
             if (origins.size > 1) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -128,6 +138,7 @@ fun BrowseScreen(
                 is BrowseState.Error -> BrowseError(message = st.message, onRetry = { retryTick++ })
                 is BrowseState.Loaded -> BrowseList(packs = st.packs, onOpenPack = onOpenPack)
             }
+        }
         }
     }
 }
