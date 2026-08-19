@@ -4,7 +4,7 @@ import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtDisplay
 import hivens.core.api.dto.smrt.SmrtJava
 import hivens.core.api.dto.smrt.SmrtLoader
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtMinecraft
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -156,7 +156,7 @@ class PackVersionDiffTest {
 
     @Test
     fun `rebuild runs group only consecutive equal non-null fingerprints`() {
-        fun build(v: String, fp: String?) = SmrtManifestBuild(versionNumber = v, fingerprint = fp)
+        fun build(v: String, fp: String?) = PackBuild(versionNumber = v, fingerprint = fp)
         val runs = groupRebuildRuns(listOf(
             build("0.1.2", "b1"), build("0.1.1", "b1"), build("0.1.0", "b1"),
             build("s8", "724a"), build("s7", "ed4a"), build("s6", "ed4a"),

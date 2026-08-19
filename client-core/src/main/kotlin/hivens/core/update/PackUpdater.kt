@@ -1,6 +1,6 @@
 package hivens.core.update
 
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.data.PackInstance
 import kotlinx.coroutines.flow.Flow
 
@@ -37,7 +37,7 @@ interface PackUpdater {
     ): UpdateOutcome
 
     /** The mirror's retained builds for [instance], newest first (server order is canonical). */
-    suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild>
+    suspend fun availableBuilds(instance: PackInstance): List<PackBuild>
 
     /**
      * The same listing as a stale-then-fresh stream: the cached one arrives at
@@ -46,7 +46,7 @@ interface PackUpdater {
      * the refresh that read triggered, which is how the newest builds go missing
      * until the screen is reopened.
      */
-    fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>>
+    fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>>
 
     /** Snapshots [instance] can be rolled back to, newest first. */
     fun listSnapshots(instance: PackInstance): List<PackSnapshot>

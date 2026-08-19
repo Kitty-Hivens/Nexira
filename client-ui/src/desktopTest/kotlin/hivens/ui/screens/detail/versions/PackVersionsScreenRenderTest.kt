@@ -12,7 +12,7 @@ import hivens.core.api.dto.smrt.SmrtLoader
 import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.api.dto.smrt.SmrtDiffEntry
 import hivens.core.api.dto.smrt.SmrtDiffUpdate
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtMinecraft
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -89,13 +89,13 @@ class PackVersionsScreenRenderTest {
 
     private object FakeUpdater : PackUpdater {
         val builds = listOf(
-            SmrtManifestBuild("0.1.2", "beta", "2026-07-19T02:14:01Z", fingerprint = "ff", modsCount = 3, assetsCount = 1),
-            SmrtManifestBuild(
+            PackBuild("0.1.2", "beta", "2026-07-19T02:14:01Z", fingerprint = "ff", modsCount = 3, assetsCount = 1),
+            PackBuild(
                 "0.1.1", "beta", "2026-07-19T02:12:58Z", fingerprint = "ff",
                 changelog = "Куратор объясняет: обновлены рендер-моды, добавлен Iris.",
                 modsCount = 3, assetsCount = 1,
             ),
-            SmrtManifestBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", fingerprint = "aa", modsCount = 2, assetsCount = 0),
+            PackBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", fingerprint = "aa", modsCount = 2, assetsCount = 0),
         )
         override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck = UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
@@ -108,8 +108,8 @@ class PackVersionsScreenRenderTest {
             targetVersion: String?,
             progress: ((Int, Int, String) -> Unit)?,
         ): UpdateOutcome = UpdateOutcome.AlreadyCurrent
-        override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = builds
-        override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> = flowOf(builds)
+        override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = builds
+        override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> = flowOf(builds)
         override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
             listOf(PackSnapshot("snap-1", 1_752_900_000_000L, "0.1.0"))
         override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance

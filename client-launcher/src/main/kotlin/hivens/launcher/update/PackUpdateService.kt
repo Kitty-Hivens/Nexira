@@ -1,6 +1,6 @@
 package hivens.launcher.update
 
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.toBaselineManifest
@@ -365,12 +365,12 @@ class PackUpdateService(
      * kept as-is: publish date is the only ranking that holds across channels,
      * and the listing already arrives sorted by it.
      */
-    override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = withContext(Dispatchers.IO) {
+    override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = withContext(Dispatchers.IO) {
         client.listBuilds(instance.packRef.id).builds
     }
 
     /** The same listing, stale-then-fresh, for a screen that must not miss a build the cache predates. */
-    override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> =
+    override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> =
         client.buildsStream(instance.packRef.id).map { it.builds }.flowOn(Dispatchers.IO)
 
     /** Snapshots [instance] can be rolled back to, newest first. */
