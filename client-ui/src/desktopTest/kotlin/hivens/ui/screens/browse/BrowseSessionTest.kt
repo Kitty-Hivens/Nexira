@@ -25,6 +25,13 @@ class BrowseSessionTest {
         assertEquals(2, back.nextPage, "coming back to twenty results after scrolling to eighty is its own loss")
     }
 
+    @Test fun `the browsed source outlives the screen`() {
+        val session = BrowseSession()
+        session.origin = PackOrigin.Modrinth
+
+        assertEquals(PackOrigin.Modrinth, session.origin, "opening a pack and coming back must not reset the switcher")
+    }
+
     @Test fun `two sources do not share a list`() {
         val session = BrowseSession()
         session.put(PackOrigin.Modrinth, "", snapshot("create"))

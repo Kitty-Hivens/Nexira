@@ -84,8 +84,13 @@ fun BrowseScreen(
 
     val session: BrowseSession = koinInject()
     val imageContext = LocalPlatformContext.current
-
-    var origin by remember { mutableStateOf(origins.firstOrNull() ?: PackOrigin.Mirror) }
+    // Seeded from the session, so returning from a pack comes back to the source
+    // that pack was found on. A remembered source that is no longer registered
+    // falls back to the first, rather than selecting a tab that is not there.
+    var origin by remember {
+        mutableStateOf(session.origin?.takeIf { it in origins } ?: origins.firstOrNull() ?: PackOrigin.Mirror)
+    }
+    LaunchedEffect(origin) { session.origin = origin }
     var query by remember { mutableStateOf("") }
     var submittedQuery by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<BrowseState>(BrowseState.Loading) }

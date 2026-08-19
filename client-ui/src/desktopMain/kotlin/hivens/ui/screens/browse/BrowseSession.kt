@@ -31,6 +31,14 @@ class BrowseSession {
         val endReached: Boolean,
     )
 
+    /**
+     * The source that was being browsed. Kept beside the lists because it is the
+     * same question one level up: opening a pack and coming back put the switcher
+     * on the first registered source rather than the one the pack came from, so a
+     * look at anything outside the mirror was undone by looking at it.
+     */
+    var origin: PackOrigin? = null
+
     private val byKey = LinkedHashMap<String, Snapshot>()
 
     fun get(origin: PackOrigin, query: String): Snapshot? = byKey[key(origin, query)]
