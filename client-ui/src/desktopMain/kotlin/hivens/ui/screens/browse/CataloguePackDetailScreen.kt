@@ -1,42 +1,28 @@
 package hivens.ui.screens.browse
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -52,8 +38,6 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.render.MarkdownHtml
@@ -61,6 +45,7 @@ import hivens.ui.render.openInBrowser
 import hivens.ui.screens.versions.PickerIntent
 import hivens.ui.screens.versions.PickerVersion
 import hivens.ui.screens.versions.VersionPickerWindow
+import hivens.ui.theme.Dimens
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
@@ -80,9 +65,9 @@ import org.koin.compose.koinInject
  * cancels the download, and re-entering while it runs re-attaches to the live
  * progress instead of showing an idle button.
  *
- * The compat metadata (MC / loader / runtime / tags) renders in the in-page sidebar
- * for now; per the shell rule it will move into the contextual right rail once that
- * surface becomes screen-aware.
+ * Tags render in the flow of the description. The compatibility block that used to
+ * sit beside it is gone: it cost a column's width down the whole page to say four
+ * things, and those four are on the version picker, where they bear on a choice.
  */
 @Composable
 fun CataloguePackDetailScreen(
@@ -265,9 +250,19 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
     // The description sits on a plane rather than directly on the page. It is a
     // long document over a wallpaper, and without an edge there is nothing saying
     // where the page ends and the text begins.
+    // Centred under the same ceiling the other content screens use. The side
+    // column that was removed had been the only thing holding the description to
+    // a readable measure, and without it a line of prose ran the full width of a
+    // wide monitor -- past the point where the eye can find the start of the next
+    // one. Height only on the fill, since fillMaxWidth would pin the minimum to
+    // the full width and a ceiling cannot take the maximum below the minimum.
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     NxSurface(
         level    = NxSurfaceLevel.Raised,
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
+        modifier = Modifier
+            .widthIn(max = Dimens.contentMaxWidth)
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
     ) {
         Column(
             modifier            = Modifier.fillMaxWidth().padding(20.dp),
@@ -302,6 +297,7 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             // the screen cannot. Two of them on one install was the state the
             // surface was built to end.
         }
+    }
     }
     videoLink?.let { url ->
         FullscreenVideo(url = url, onDismiss = { videoLink = null })
