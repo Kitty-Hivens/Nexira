@@ -719,6 +719,8 @@ object GermanStrings : AppStrings {
         else           -> humanizeCategory(id)
     }
 
+    override val browseDetailTabDescription = "Beschreibung"
+    override val browseDetailTabGallery     = "Galerie"
     override val browseDetailErrorTitle    = "Pack konnte nicht geladen werden"
     override val browseDetailErrorMessage  = "Manifest konnte nicht geladen werden. Verbindung prüfen und erneut versuchen."
     override val browseDetailInstallReady  = "Bereit zur Installation"

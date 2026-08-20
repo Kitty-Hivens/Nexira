@@ -42,6 +42,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.NxMetaChipTone
@@ -264,9 +265,12 @@ private fun runtimeLineOf(v: CataloguePackVersion): String? = listOfNotNull(
 
 @Composable
 private fun DetailBody(details: CataloguePackDetails, installing: InstallProgress?, installError: String?) {
+    val s = LocalStrings.current
     // A body link to a video (direct file or a service page) opens in-app; the
     // rest go to the browser as before.
     var videoLink by remember { mutableStateOf<String?>(null) }
+    val hasGallery = details.gallery.isNotEmpty()
+    var tab by remember(details.id) { mutableStateOf(DetailTab.Description) }
     // The description sits on a plane rather than directly on the page. It is a
     // long document over a wallpaper, and without an edge there is nothing saying
     // where the page ends and the text begins.
@@ -310,15 +314,32 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
                     verticalArrangement   = Arrangement.spacedBy(6.dp),
                 ) { details.tags.forEach { Chip(it) } }
             }
-            if (details.gallery.isNotEmpty()) {
-                ImageGallery(media = galleryMedia(details.gallery))
+            // The gallery is a place of its own, not a strip at the head of the
+            // description. Screenshots and prose want opposite widths, and a grid
+            // of them above the text pushes the text off the first screen of a
+            // page whose text is the point. The tab is offered only when there
+            // are shots -- a lone tab is not a choice, it is a label.
+            if (hasGallery) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    NxChoiceChip(s.browseDetailTabDescription, selected = tab == DetailTab.Description) {
+                        tab = DetailTab.Description
+                    }
+                    NxChoiceChip(s.browseDetailTabGallery, selected = tab == DetailTab.Gallery) {
+                        tab = DetailTab.Gallery
+                    }
+                }
+                PuppetClick("catalogue.detail.tab.description") { tab = DetailTab.Description }
+                PuppetClick("catalogue.detail.tab.gallery") { tab = DetailTab.Gallery }
             }
-            details.bodyMarkdown?.let {
-                MarkdownHtml(
-                    markdown = it,
-                    modifier = Modifier.fillMaxWidth(),
-                    onLink   = { url -> if (isPlayableVideoUrl(url)) videoLink = url else openInBrowser(url) },
-                )
+            when {
+                hasGallery && tab == DetailTab.Gallery -> ImageGallery(media = remember(details) { galleryMedia(details.gallery) })
+                else -> details.bodyMarkdown?.let {
+                    MarkdownHtml(
+                        markdown = it,
+                        modifier = Modifier.fillMaxWidth(),
+                        onLink   = { url -> if (isPlayableVideoUrl(url)) videoLink = url else openInBrowser(url) },
+                    )
+                }
             }
 
             if (installError != null) {
@@ -369,6 +390,9 @@ internal fun compatFacts(details: CataloguePackDetails): List<String> {
         details.runtimeLabel?.takeIf { it.isNotBlank() },
     )
 }
+
+/** The two halves of a pack page: what it says about itself, and what it looks like. */
+private enum class DetailTab { Description, Gallery }
 
 private data class InstallProgress(val versionId: String, val current: Int, val total: Int, val filename: String)
 

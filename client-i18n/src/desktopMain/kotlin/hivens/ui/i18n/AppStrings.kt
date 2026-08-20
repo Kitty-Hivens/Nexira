@@ -773,6 +773,9 @@ interface AppStrings {
     fun modrinthCategory(id: String): String
 
     // --- Browse pack detail ---
+    /** Tabs on a catalogue pack page. The gallery tab is offered only when the pack has shots. */
+    val browseDetailTabDescription: String
+    val browseDetailTabGallery: String
     val browseDetailErrorTitle: String
     val browseDetailErrorMessage: String
     val browseDetailInstallReady: String
