@@ -1,5 +1,6 @@
 package hivens.launcher.catalogue
 
+import hivens.core.api.catalogue.CatalogueGalleryItem
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -71,7 +72,9 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
             tagline = s.tagline,
             iconUrl = s.iconUrl,
             bannerUrl = s.bannerUrl,
-            galleryUrls = s.galleryUrls,
+            // The mirror publishes URLs and no captions, so one size serves both
+            // the grid and the lightbox and the shots go uncaptioned.
+            gallery = s.galleryUrls.map { CatalogueGalleryItem(full = it, thumb = it) },
             bodyMarkdown = s.descriptionMd,
             tags = s.tags,
             runtimeLabel = "Java ${m.java.major}",

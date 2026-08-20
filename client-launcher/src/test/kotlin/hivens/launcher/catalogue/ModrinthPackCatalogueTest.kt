@@ -13,6 +13,7 @@ import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ModrinthPackCatalogueTest {
@@ -24,7 +25,9 @@ class ModrinthPackCatalogueTest {
     private val projectJson =
         """{"id":"AABBCCDD","slug":"cobblemon","title":"Cobblemon","description":"Catch and battle",""" +
             """"body":"# Cobblemon\n\nA long body.","categories":["adventure"],"icon_url":"https://cdn/icon.png",""" +
-            """"gallery":[{"url":"https://cdn/g1.png","featured":false},{"url":"https://cdn/hero.png","featured":true}]}"""
+            """"gallery":[{"url":"https://cdn/g1.png","raw_url":"https://cdn/g1_raw.png","featured":false,""" +
+            """"title":"The starter","description":"Where the run begins"},""" +
+            """{"url":"https://cdn/hero.png","featured":true}]}"""
     private val versionsJson =
         """[{"id":"ver1","project_id":"AABBCCDD","name":"Cobblemon 1.5","version_number":"1.5.0",""" +
             """"version_type":"release","game_versions":["1.21.1"],"loaders":["fabric"],"date_published":"2024-01-01",""" +
@@ -67,8 +70,26 @@ class ModrinthPackCatalogueTest {
         assertEquals("Cobblemon", d.title)
         assertTrue(d.bodyMarkdown!!.contains("long body"))
         assertEquals("https://cdn/hero.png", d.bannerUrl, "featured gallery image is the hero")
-        assertEquals(listOf("https://cdn/g1.png", "https://cdn/hero.png"), d.galleryUrls)
+        assertEquals(listOf("https://cdn/g1_raw.png", "https://cdn/hero.png"), d.gallery.map { it.full }, "the lightbox gets the original")
+        assertEquals(listOf("https://cdn/g1.png", "https://cdn/hero.png"), d.gallery.map { it.thumb }, "the grid gets the preview")
         assertEquals(1, d.versions.size)
+    }
+
+    @Test
+    fun `a gallery shot carries the caption its author wrote`() = runTest {
+        val shot = catalogue().details("AABBCCDD").gallery.first()
+
+        assertEquals("The starter", shot.title)
+        assertEquals("Where the run begins", shot.description)
+    }
+
+    @Test
+    fun `a shot with no caption carries none rather than an empty one`() = runTest {
+        val shot = catalogue().details("AABBCCDD").gallery.last()
+
+        assertNull(shot.title)
+        assertNull(shot.description)
+        assertEquals("https://cdn/hero.png", shot.full, "an entry without an original falls back to its preview")
     }
 
     @Test

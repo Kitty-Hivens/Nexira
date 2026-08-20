@@ -29,19 +29,30 @@ import kotlin.test.assertTrue
  */
 class ImageGalleryRenderTest {
 
+    /** Uncaptioned, so a cell is exactly its frame and the geometry below is the frame's. */
     private val media = List(5) {
         GalleryMedia.Image(thumb = "https://example.invalid/$it.png", full = "https://example.invalid/$it.png")
     }
 
+    /** The same five with the captions a source publishes, for the caption test. */
+    private val captioned = List(5) {
+        GalleryMedia.Image(
+            thumb = "https://example.invalid/$it.png",
+            full = "https://example.invalid/$it.png",
+            title = "Shot $it",
+            description = "What this screenshot is showing you",
+        )
+    }
+
     private val pad = 24
 
-    private fun render(width: Int, name: String): Bitmap {
+    private fun render(width: Int, name: String, items: List<GalleryMedia> = media): Bitmap {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, 700, density = Density(1f)) {
             NxTheme(useDarkTheme = true, style = CelestiaStyle) {
                 Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(pad.dp)) {
-                    ImageGallery(media = media)
+                    ImageGallery(media = items)
                 }
             }
         }
@@ -102,6 +113,22 @@ class ImageGalleryRenderTest {
             !bmp.isCell(pad + 2 * (cell + gap) + cell / 2, secondRowY),
             "the last row stretched to fill instead of keeping the cell width",
         )
+    }
+
+    @Test
+    fun `a captioned shot is taller than its frame, an uncaptioned one is not`() {
+        val width = 1100
+        val bare = render(width, "gallery-wide.png")
+        val withText = render(width, "gallery-captioned.png", captioned)
+        val avail = width - 2 * 24
+        val gap = 12
+        val cell = (avail - gap * 2) / 3
+        // Just below where an uncaptioned frame ends. Bare, the page shows through;
+        // captioned, the cell continues into its caption band.
+        val y = 24 + cell / 2 + 6
+
+        assertTrue(!bare.isCell(24 + cell / 2, y), "an uncaptioned cell must end with its frame")
+        assertTrue(withText.isCell(24 + cell / 2, y), "the caption band did not render under the shot")
     }
 
     @Test
