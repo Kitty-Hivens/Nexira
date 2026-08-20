@@ -24,11 +24,22 @@ import hivens.core.data.PackOrigin
  */
 class BrowseSession {
 
-    /** One source+query's list as it stood, with the paging that produced it. */
+    /**
+     * One source+query's list as it stood, with the paging that produced it and
+     * the place in it the reader had got to.
+     *
+     * The position is here because the list and the position are the same
+     * memory: restoring eighty results and dropping the reader at the top of them
+     * is most of the loss the restore exists to avoid, and a scroll state shared
+     * across queries is worse still -- it lands them wherever the previous list
+     * had been, which for a shorter one is the end.
+     */
     data class Snapshot(
         val packs: List<CataloguePack>,
         val nextPage: Int,
         val endReached: Boolean,
+        val firstVisibleIndex: Int = 0,
+        val firstVisibleOffset: Int = 0,
     )
 
     /**
