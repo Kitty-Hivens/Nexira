@@ -720,6 +720,8 @@ object EnglishStrings : AppStrings {
         else           -> humanizeCategory(id)
     }
 
+    override val browseDetailTabDescription = "Description"
+    override val browseDetailTabGallery     = "Gallery"
     override val browseDetailErrorTitle    = "Could not load pack"
     override val browseDetailErrorMessage  = "Could not fetch the manifest. Check your connection and retry."
     override val browseDetailInstallReady  = "Ready to install"

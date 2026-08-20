@@ -720,6 +720,8 @@ object RussianStrings : AppStrings {
         else           -> humanizeCategory(id)
     }
 
+    override val browseDetailTabDescription = "Описание"
+    override val browseDetailTabGallery     = "Галерея"
     override val browseDetailErrorTitle    = "Не удалось загрузить сборку"
     override val browseDetailErrorMessage  = "Не удалось получить manifest. Проверь соединение и повтори."
     override val browseDetailInstallReady  = "Готово к установке"
