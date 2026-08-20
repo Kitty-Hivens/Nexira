@@ -70,9 +70,7 @@ internal class SvgImageDecoder(
         /** An inlined document may inline documents of its own; this is where that stops. */
         private const val MAX_NESTING = 3
 
-        /** How much larger than its box an icon is drawn before being let down into it. */
-        private const val ICON_SUPERSAMPLE = 4f
-
+        /** A guard on the box an inlined icon claims, in the same spirit as [MAX_EDGE]. */
         private const val MAX_ICON_EDGE = 512
 
         private const val SVG_DATA_URI = "data:image/svg+xml"
@@ -141,12 +139,16 @@ internal class SvgImageDecoder(
                 val href = image.attr(attr)
                 if (!href.startsWith(SVG_DATA_URI, ignoreCase = true)) continue
                 val inner = decodeDataUri(href) ?: continue
-                // Drawn into a box the outer document sizes, so it is rasterised
-                // larger than that box and let down again -- a fourteen-pixel icon
-                // rendered at fourteen pixels is a smear.
-                val box = maxOf(image.attr("width").toFloatOrNull() ?: 0f, image.attr("height").toFloatOrNull() ?: 0f)
-                val edge = (box * ICON_SUPERSAMPLE).toInt().coerceIn(0, MAX_ICON_EDGE)
-                val raster = rasterise(inlineNestedSvg(inner, depth + 1), edge, edge) ?: continue
+                // Rasterised at exactly the box the outer document gives it, so
+                // nothing resamples it afterwards. Rendering larger and letting the
+                // outer draw shrink it is worse, not better: that scaling is done
+                // by nearest neighbour and no rendering hint reaches it, which is
+                // what turned a smooth mark into a handful of hard squares. A
+                // vector drawn straight at fourteen pixels is antialiased there.
+                val boxW = image.attr("width").toFloatOrNull()?.let { ceilOrZero(it) } ?: 0
+                val boxH = image.attr("height").toFloatOrNull()?.let { ceilOrZero(it) } ?: 0
+                if (boxW <= 0 || boxH <= 0 || boxW > MAX_ICON_EDGE || boxH > MAX_ICON_EDGE) continue
+                val raster = rasterise(inlineNestedSvg(inner, depth + 1), boxW, boxH) ?: continue
                 val png = ByteArrayOutputStream().also { ImageIO.write(raster, "png", it) }.toByteArray()
                 image.attr(attr, "data:image/png;base64," + Base64.getEncoder().encodeToString(png))
                 rewritten = true
