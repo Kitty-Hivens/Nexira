@@ -191,8 +191,7 @@ fun BrowseScreen(
                     val catalogue = registry.forOrigin(origin)
                     val next = if (catalogue == null) emptyList()
                     else withContext(Dispatchers.IO) { catalogue.search(submittedQuery, page = page + 1) }
-                    val seen = current.mapTo(HashSet()) { "${'$'}{it.origin}:${'$'}{it.id}" }
-                    val fresh = next.filterNot { "${'$'}{it.origin}:${'$'}{it.id}" in seen }
+                    val fresh = newIn(next, current)
                     if (fresh.isEmpty()) endReached = true else {
                         page += 1
                         val grown = current + fresh
@@ -392,12 +391,34 @@ private fun BrowseList(
         contentPadding      = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        items(items = packs, key = { "${it.origin}:${it.id}" }) { pack ->
+        items(items = packs, key = { packKey(it) }) { pack ->
             BrowsePackCard(pack = pack, onClick = { onOpenPack(pack) })
             PuppetClick("browse.open.${pack.origin}.${pack.id}") { onOpenPack(pack) }
         }
     }
 }
+
+/**
+ * The entries of [page] that are not already in [shown], in the page's own order.
+ *
+ * A catalogue takes a page number and only some of them honour it -- the mirror
+ * answers with its whole listing every time -- so a page is accepted by what is
+ * new in it, and a page that adds nothing is the end. That reading is correct for
+ * a source that pages and for one that does not, and it keeps a repeat from
+ * reaching a keyed list twice.
+ *
+ * Named, and tested, because it was written inline once and the identity it
+ * compared by was a constant: every entry answered "already seen", every page
+ * after the first was empty, and the list stopped at twenty with nothing saying
+ * so.
+ */
+internal fun newIn(page: List<CataloguePack>, shown: List<CataloguePack>): List<CataloguePack> {
+    val seen = shown.mapTo(HashSet(shown.size)) { packKey(it) }
+    return page.filterNot { packKey(it) in seen }
+}
+
+/** A pack's identity across sources: two catalogues may both have an id "1". */
+internal fun packKey(pack: CataloguePack): String = "${pack.origin}:${pack.id}"
 
 sealed class BrowseState {
     object Loading : BrowseState()
