@@ -173,9 +173,14 @@ fun BrowseScreen(
     // than as a card scrolls into view. They are all going to be fetched anyway
     // -- the list is already paged -- and fetching them on sight is what makes a
     // card change under the eye a moment after it is read.
+    var prefetched by remember(origin, submittedQuery, retryTick) { mutableStateOf(0) }
     LaunchedEffect(state) {
         val packs = (state as? BrowseState.Loaded)?.packs ?: return@LaunchedEffect
-        prefetchCardArt(imageContext, packs)
+        // Only what the page just added. Re-enqueueing the whole list on every
+        // growth asks the loader for page one's images again on page five.
+        if (packs.size <= prefetched) return@LaunchedEffect
+        prefetchCardArt(imageContext, packs.subList(prefetched, packs.size))
+        prefetched = packs.size
     }
 
     // Only the first page was ever asked for, so a catalogue with more to give
@@ -198,7 +203,10 @@ fun BrowseScreen(
                         state = BrowseState.Loaded(grown)
                         session.put(origin, submittedQuery, BrowseSession.Snapshot(grown, nextPage = page, endReached = false))
                     }
-                }.onFailure { endReached = true }
+                    // A failure is not an ending. Marking the listing finished on
+                    // one refused request means a moment without a network takes
+                    // the rest of the catalogue away until the query is retyped.
+                }.onFailure { /* the next scroll asks again */ }
                 loadingMore = false
             }
     }
