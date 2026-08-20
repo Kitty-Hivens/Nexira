@@ -38,6 +38,8 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.render.MarkdownHtml
@@ -268,6 +270,18 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             modifier            = Modifier.fillMaxWidth().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val facts = remember(details) { compatFacts(details) }
+            if (facts.isNotEmpty()) {
+                // What the pack runs on, in the flow of the page. It used to be a
+                // column of label-and-value rows beside the description, which
+                // reserved a column's width down the whole page to say three
+                // things and pushed the reading of it into a narrower measure than
+                // it deserved. Three facts are a line, not a panel.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement   = Arrangement.spacedBy(6.dp),
+                ) { facts.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
+            }
             if (details.tags.isNotEmpty()) {
                 // In the flow of the page rather than in a column of their own. The
                 // side column this used to share was carrying one short block down
@@ -316,6 +330,25 @@ private fun Chip(text: String) {
             disabledLabelColor     = NxTheme.colors.textPrimary,
         ),
         border  = null,
+    )
+}
+
+/**
+ * What the pack runs on, as short phrases, in the order a person asks for them:
+ * the game first, then what loads the mods into it, then the runtime under both.
+ *
+ * Read off the newest version rather than off the pack, because a pack does not
+ * have a Minecraft version -- its builds do, and the newest is the one the
+ * install button reaches for. A source silent on any of the three contributes
+ * nothing rather than a placeholder: "Loader: unknown" is worse than a line that
+ * does not mention loaders.
+ */
+internal fun compatFacts(details: CataloguePackDetails): List<String> {
+    val newest = details.versions.firstOrNull()
+    return listOfNotNull(
+        newest?.mcVersions?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { "Minecraft $it" },
+        newest?.loaders?.firstOrNull()?.takeIf { it.isNotBlank() }?.replaceFirstChar(Char::uppercase),
+        details.runtimeLabel?.takeIf { it.isNotBlank() },
     )
 }
 
