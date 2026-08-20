@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -47,6 +49,9 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -57,12 +62,14 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.size.Size
 import hivens.ui.icons.IconKey
+import hivens.core.api.catalogue.CatalogueGalleryItem
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -73,25 +80,49 @@ import kotlin.math.roundToInt
  * previews, not a dozen multi-MB originals.
  */
 sealed interface GalleryMedia {
-    /** Light preview URL for the strip; null for a video with no image poster. */
+    /** Light preview URL for the grid; null for a video with no image poster. */
     val thumb: String?
 
-    data class Image(override val thumb: String, val full: String) : GalleryMedia
-    data class Video(override val thumb: String?, val url: String) : GalleryMedia
+    /** The author's caption. A wall of screenshots says nothing about what any of them is of. */
+    val title: String?
+    val description: String?
+
+    data class Image(
+        override val thumb: String,
+        val full: String,
+        override val title: String? = null,
+        override val description: String? = null,
+    ) : GalleryMedia
+
+    data class Video(
+        override val thumb: String?,
+        val url: String,
+        override val title: String? = null,
+        override val description: String? = null,
+    ) : GalleryMedia
 }
 
 /**
- * Zip parallel full + thumbnail URL lists into [GalleryMedia], classifying each
- * by extension ([isVideoUrl]). A video's poster is the thumb only when that thumb
- * is itself an image (else null -> a placeholder with a play badge).
+ * Catalogue gallery items as [GalleryMedia], classified by extension
+ * ([isVideoUrl]). A video's poster is its thumbnail only when that thumbnail is
+ * itself an image (else null -> a placeholder with a play badge).
  */
-fun galleryMedia(full: List<String>, thumbs: List<String>): List<GalleryMedia> =
-    full.mapIndexed { i, f ->
-        val thumb = thumbs.getOrNull(i) ?: f
-        if (isVideoUrl(f)) {
-            GalleryMedia.Video(thumb = thumb.takeUnless { isVideoUrl(it) }, url = f)
+fun galleryMedia(items: List<CatalogueGalleryItem>): List<GalleryMedia> =
+    items.map { item ->
+        if (isVideoUrl(item.full)) {
+            GalleryMedia.Video(
+                thumb = item.thumb.takeUnless { isVideoUrl(it) },
+                url = item.full,
+                title = item.title,
+                description = item.description,
+            )
         } else {
-            GalleryMedia.Image(thumb = thumb, full = f)
+            GalleryMedia.Image(
+                thumb = item.thumb,
+                full = item.full,
+                title = item.title,
+                description = item.description,
+            )
         }
     }
 
@@ -135,7 +166,13 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
         val columns = (((maxWidth + CELL_GAP) / (MIN_CELL + CELL_GAP)).toInt()).coerceAtLeast(1)
         Column(verticalArrangement = Arrangement.spacedBy(CELL_GAP)) {
             media.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(CELL_GAP)) {
+                // Intrinsic height so every cell in a row matches the tallest of
+                // them: a caption of two lines beside one of none would otherwise
+                // leave the shorter cell's frame ending in mid-air.
+                Row(
+                    modifier              = Modifier.height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(CELL_GAP),
+                ) {
                     row.forEach { item ->
                         GalleryCell(
                             item     = item,
@@ -171,7 +208,13 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
     }
 }
 
-/** One framed shot: the image at [CELL_ASPECT], on a plane with the library's own edge. */
+/**
+ * One framed shot with its caption, on a plane with the library's own edge.
+ *
+ * The caption is drawn only where there is one. A source that publishes none --
+ * the mirror does not -- gets the bare frame rather than an empty band under
+ * every shot.
+ */
 @Composable
 private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
@@ -186,32 +229,64 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
         glass    = false,
         interactionSource = interaction,
         modifier = modifier
-            .aspectRatio(CELL_ASPECT)
+            .fillMaxHeight()
             .clip(shape)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     ) {
-        when (item) {
-            is GalleryMedia.Image -> AsyncImage(
-                model              = item.thumb,
-                contentDescription = null,
-                contentScale       = ContentScale.Crop,
-                modifier           = Modifier.fillMaxSize().clip(shape),
-            )
-            is GalleryMedia.Video -> {
-                if (item.thumb != null) {
-                    AsyncImage(
+        Column(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().aspectRatio(CELL_ASPECT)) {
+                when (item) {
+                    is GalleryMedia.Image -> AsyncImage(
                         model              = item.thumb,
-                        contentDescription = null,
+                        contentDescription = item.title,
                         contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.fillMaxSize().clip(shape),
+                        modifier           = Modifier.fillMaxSize(),
                     )
+                    is GalleryMedia.Video -> {
+                        if (item.thumb != null) {
+                            AsyncImage(
+                                model              = item.thumb,
+                                contentDescription = item.title,
+                                contentScale       = ContentScale.Crop,
+                                modifier           = Modifier.fillMaxSize(),
+                            )
+                        }
+                        Box(
+                            modifier         = Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                        }
+                    }
                 }
-                Box(
-                    modifier         = Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center,
+            }
+            val title = item.title
+            val description = item.description
+            if (title != null || description != null) {
+                Column(
+                    modifier            = Modifier.fillMaxWidth().padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    title?.let {
+                        Text(
+                            it,
+                            style      = MaterialTheme.typography.titleSmall,
+                            color      = NxTheme.colors.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines   = 1,
+                            overflow   = TextOverflow.Ellipsis,
+                        )
+                    }
+                    description?.let {
+                        Text(
+                            it,
+                            style    = MaterialTheme.typography.bodySmall,
+                            color    = NxTheme.colors.textSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -332,13 +407,39 @@ private fun GalleryLightbox(
                     modifier = Modifier.align(Alignment.CenterEnd).padding(12.dp))
             }
 
-            if (images.size > 1) {
-                Text(
-                    text     = "${index + 1} / ${images.size}",
-                    style    = MaterialTheme.typography.labelMedium,
-                    color    = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp),
-                )
+            // The caption and the counter, together at the foot. A shot opened
+            // full-window is the one moment there is room for the whole caption,
+            // and the grid can only afford two lines of it.
+            val shot = images[index]
+            Column(
+                modifier            = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp, start = 96.dp, end = 96.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                shot.title?.let {
+                    Text(
+                        text       = it,
+                        style      = MaterialTheme.typography.titleMedium,
+                        color      = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign  = TextAlign.Center,
+                    )
+                }
+                shot.description?.let {
+                    Text(
+                        text      = it,
+                        style     = MaterialTheme.typography.bodyMedium,
+                        color     = Color.White.copy(alpha = 0.8f),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                if (images.size > 1) {
+                    Text(
+                        text  = "${index + 1} / ${images.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.85f),
+                    )
+                }
             }
         }
         LaunchedEffect(Unit) { focus.requestFocus() }

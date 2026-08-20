@@ -292,8 +292,8 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
                     verticalArrangement   = Arrangement.spacedBy(6.dp),
                 ) { details.tags.forEach { Chip(it) } }
             }
-            if (details.galleryUrls.isNotEmpty()) {
-                ImageGallery(media = galleryMedia(details.galleryUrls, details.galleryThumbUrls))
+            if (details.gallery.isNotEmpty()) {
+                ImageGallery(media = galleryMedia(details.gallery))
             }
             details.bodyMarkdown?.let {
                 MarkdownHtml(

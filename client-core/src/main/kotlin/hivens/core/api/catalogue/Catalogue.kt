@@ -24,6 +24,25 @@ data class CataloguePack(
     val mcVersion: String? = null,
 )
 
+/**
+ * One screenshot of a pack.
+ *
+ * [thumb] and [full] are separate because they cost differently: opening a pack
+ * pulls a grid of previews, and pulling a dozen multi-megabyte originals to show
+ * them at a third of their size is the difference between a page that appears
+ * and one that arrives. A source with only one size puts it in both.
+ *
+ * [title] and [description] are the author's caption. Without them a gallery is a
+ * wall of screenshots with nothing saying what any of them is of, which is what
+ * the source went to the trouble of writing.
+ */
+data class CatalogueGalleryItem(
+    val full: String,
+    val thumb: String,
+    val title: String? = null,
+    val description: String? = null,
+)
+
 /** Full pack page: hero + long body + gallery + installable versions. */
 data class CataloguePackDetails(
     val origin: PackOrigin,
@@ -32,11 +51,8 @@ data class CataloguePackDetails(
     val tagline: String,
     val iconUrl: String? = null,
     val bannerUrl: String? = null,
-    /** Full-resolution gallery image URLs (for the lightbox). */
-    val galleryUrls: List<String> = emptyList(),
-    /** Light preview URLs for the strip, index-aligned with [galleryUrls]; empty
-     *  means the source has no separate thumbnails (the strip falls back to full). */
-    val galleryThumbUrls: List<String> = emptyList(),
+    /** Screenshots, in the order the source lists them. */
+    val gallery: List<CatalogueGalleryItem> = emptyList(),
     /** Long-form CommonMark description; null when the source has none. */
     val bodyMarkdown: String? = null,
     val versions: List<CataloguePackVersion> = emptyList(),
