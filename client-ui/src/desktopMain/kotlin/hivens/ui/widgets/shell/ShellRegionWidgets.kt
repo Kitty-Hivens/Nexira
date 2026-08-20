@@ -249,6 +249,15 @@ private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width -- it i
 private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-collapses the right rail
 
 /**
+ * The right rail's width when nothing overrides it.
+ *
+ * Public because the shell insets its editor chrome by the same amount, and the
+ * two were separate literals that happened to agree: a rail given another width
+ * left the overlay measuring against a number nobody had updated.
+ */
+val RAIL_DEFAULT_WIDTH = 265.dp
+
+/**
  * Right region: the divider plus the news panel. removable=false. No handles or
  * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
  * pointer and snaps on release; vertical scrolls and taps still reach the news).
@@ -300,7 +309,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // Edit mode: static, no swipe/animation.
     if (editing) {
         if (props.collapsed) { CollapsedRegionStrip(); return }
-        val sized = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier.width(265.dp)
+        val sized = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH)
         NxSurface(NxSurfaceLevel.Floating, sized.fillMaxHeight(), RectangleShape, tier = props.frostTier) {
             rightPanelMovable()
         }
@@ -315,7 +324,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
     val windowWidthDp = with(density) { LocalWindowInfo.current.containerSize.width.toDp() }
     val autoCollapsed = windowWidthDp < AUTO_COLLAPSE_BELOW
     val effectiveCollapsed = props.collapsed || autoCollapsed
-    val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else 265.dp
+    val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH
     val expandedPx  = with(density) { expandedWidth.toPx() }
     // Collapsed keeps a slim transparent swipe-catch at the screen edge so the
     // rail can be dragged back open; the drag then ranges over the full width.

@@ -18,6 +18,7 @@ import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
 import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.widgets.shell.RAIL_DEFAULT_WIDTH
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
@@ -316,7 +317,10 @@ fun AppLayout(
         uiStyle                = uiStyle,
         onUiStyleChanged       = onUiStyleChanged,
         centerStartInset       = 65.dp,
-        centerEndInset         = 265.dp,
+        // The rail's own default, not a copy of the number it happens to be. A
+        // rail widened in the editor used to leave this behind, and the overlay
+        // then sat over the rail it was meant to stop short of.
+        centerEndInset         = RAIL_DEFAULT_WIDTH,
     ) {
         CompositionLocalProvider(LocalShellContext provides shellCtx) {
             SlotRenderer(
