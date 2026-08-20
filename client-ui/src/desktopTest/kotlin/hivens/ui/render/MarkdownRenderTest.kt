@@ -87,7 +87,7 @@ class MarkdownRenderTest {
 
         ---
 
-        Licensed under LGPL. Report issues on the tracker.
+        Licensed under LGPL. Report issues on [the tracker](https://example.invalid/issues).
     """.trimIndent()
 
     private fun render(style: StyleSpec, name: String) {
