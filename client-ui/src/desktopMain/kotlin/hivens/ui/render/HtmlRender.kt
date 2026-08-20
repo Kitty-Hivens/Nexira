@@ -1,6 +1,8 @@
 package hivens.ui.render
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -8,6 +10,9 @@ import androidx.compose.foundation.rememberScrollState
 import java.util.Locale
 import org.slf4j.LoggerFactory
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -588,20 +593,43 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
     val lone = items.singleOrNull()
     if (lone != null) {
         val href = lone.href
+        val shape = MaterialTheme.shapes.small
+        // Hover belongs to the picture, not to the line it sits on. Centred, the
+        // clickable was stretched across the full width, so the cursor lit the
+        // link up while nowhere near the image and the image itself never
+        // answered. The inner box wraps its content, so it is exactly the photo.
+        val interaction = remember { MutableInteractionSource() }
+        val hovered by interaction.collectIsHoveredAsState()
+        val ring by animateColorAsState(
+            targetValue = if (hovered && href != null) NxTheme.colors.primary else Color.Transparent,
+            animationSpec = tween(140),
+            label = "figure-hover",
+        )
         Box(
-            modifier         = Modifier
-                .then(if (center) Modifier.fillMaxWidth() else Modifier)
-                .then(if (href != null) Modifier.clickable { onLink(href) } else Modifier),
+            modifier         = if (center) Modifier.fillMaxWidth() else Modifier,
             contentAlignment = if (center) Alignment.TopCenter else Alignment.TopStart,
         ) {
-            SizedImage(lone.src, lone.alt.ifBlank { null }, maxHeight = null)
-            if (href != null && isPlayableVideoUrl(href)) {
-                Box(
-                    modifier         = Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+            Box(
+                modifier = Modifier
+                    .clip(shape)
+                    .border(2.dp, ring, shape)
+                    .then(
+                        if (href != null) Modifier
+                            .hoverable(interaction)
+                            .clickable(interactionSource = interaction, indication = null) { onLink(href) }
+                        else Modifier,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                SizedImage(lone.src, lone.alt.ifBlank { null }, maxHeight = null)
+                if (href != null && isPlayableVideoUrl(href)) {
+                    Box(
+                        modifier         = Modifier.size(48.dp).clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    }
                 }
             }
         }
