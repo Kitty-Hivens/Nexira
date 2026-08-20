@@ -1,8 +1,6 @@
 package hivens.ui.screens.browse
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -73,9 +71,9 @@ import org.koin.compose.koinInject
  * cancels the download, and re-entering while it runs re-attaches to the live
  * progress instead of showing an idle button.
  *
- * Tags render in the flow of the description. The compatibility block that used to
- * sit beside it is gone: it cost a column's width down the whole page to say four
- * things, and those four are on the version picker, where they bear on a choice.
+ * Tags and what the pack runs on render in the flow of the description. The
+ * column that used to hold the latter is gone: it cost a column's width down the
+ * whole page to say three things, and a line says them without one.
  */
 @Composable
 fun CataloguePackDetailScreen(
@@ -102,9 +100,7 @@ fun CataloguePackDetailScreen(
     val installs by installService.installs.collectAsState()
     val active = installs.values.firstOrNull { it.origin == origin && it.packId == packId }
     val installing = active?.let { snap ->
-        (snap.phase as? InstallPhase.Running)?.let { r ->
-            InstallProgress(snap.versionId, r.current, r.total, r.filename)
-        }
+        (snap.phase as? InstallPhase.Running)?.let { InstallProgress(snap.versionId) }
     }
     val installError = (active?.phase as? InstallPhase.Failed)?.message
 
@@ -151,11 +147,16 @@ fun CataloguePackDetailScreen(
 
     // A bar to take hold of. A page this long is otherwise reachable only by the
     // wheel: there is nothing to drag, and nothing showing how far down it goes.
-    // It fades in on hover or while scrolling, like every other list in the app.
+    //
+    // Revealed while scrolling, and by the cursor reaching the edge it lives on
+    // -- not by the cursor being anywhere on the page. The other lists in the app
+    // put this on a pane with something beside it, so leaving the pane hides the
+    // bar; here the pane is the whole window, and hover over all of it means the
+    // bar never idles away at all.
     val scroll = rememberScrollState()
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
-    Box(Modifier.fillMaxSize().hoverable(hover)) {
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
         val loaded = state as? DetailState.Loaded
         CatalogueHero(
@@ -205,14 +206,23 @@ fun CataloguePackDetailScreen(
                 onRetry    = { retryTick++ },
                 modifier   = Modifier.fillMaxWidth().padding(32.dp),
             )
-            is DetailState.Loaded -> DetailBody(details = st.details, installing = installing, installError = installError)
+            is DetailState.Loaded -> DetailBody(details = st.details, installError = installError)
         }
     }
-        NxVerticalScrollbar(
-            adapter  = rememberScrollbarAdapter(scroll),
-            revealed = hovered || scroll.isScrollInProgress,
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp),
-        )
+        Box(
+            modifier         = Modifier
+                .align(Alignment.CenterEnd)
+                .width(SCROLLBAR_GUTTER)
+                .fillMaxHeight()
+                .hoverable(hover),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            NxVerticalScrollbar(
+                adapter  = rememberScrollbarAdapter(scroll),
+                revealed = hovered || scroll.isScrollInProgress,
+                modifier = Modifier.fillMaxHeight().padding(vertical = 4.dp),
+            )
+        }
     }
 
     (state as? DetailState.Loaded)?.let { ld ->
@@ -257,20 +267,20 @@ fun CataloguePackDetailScreen(
     }
 }
 
-/** "Minecraft 1.12.2 . Forge", skipping whichever half the source did not declare. */
+/** "Minecraft 1.12.2  Forge", skipping whichever half the source did not declare. */
 private fun runtimeLineOf(v: CataloguePackVersion): String? = listOfNotNull(
     v.mcVersions.firstOrNull()?.let { "Minecraft $it" },
     v.loaders.firstOrNull()?.replaceFirstChar(Char::uppercase),
 ).joinToString("  ").takeIf { it.isNotBlank() }
 
 @Composable
-private fun DetailBody(details: CataloguePackDetails, installing: InstallProgress?, installError: String?) {
+private fun DetailBody(details: CataloguePackDetails, installError: String?) {
     val s = LocalStrings.current
     // A body link to a video (direct file or a service page) opens in-app; the
     // rest go to the browser as before.
     var videoLink by remember { mutableStateOf<String?>(null) }
     val hasGallery = details.gallery.isNotEmpty()
-    var tab by remember(details.id) { mutableStateOf(DetailTab.Description) }
+    var tab by remember(details.origin, details.id) { mutableStateOf(DetailTab.Description) }
     // The description sits on a plane rather than directly on the page. It is a
     // long document over a wallpaper, and without an edge there is nothing saying
     // where the page ends and the text begins.
@@ -278,8 +288,8 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
     // column that was removed had been the only thing holding the description to
     // a readable measure, and without it a line of prose ran the full width of a
     // wide monitor -- past the point where the eye can find the start of the next
-    // one. Height only on the fill, since fillMaxWidth would pin the minimum to
-    // the full width and a ceiling cannot take the maximum below the minimum.
+    // one. The ceiling goes before the fill: fillMaxWidth first would pin the
+    // minimum to the full width, and a ceiling cannot take the maximum below it.
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     NxSurface(
         level    = NxSurfaceLevel.Raised,
@@ -391,10 +401,18 @@ internal fun compatFacts(details: CataloguePackDetails): List<String> {
     )
 }
 
+/** How near the edge the cursor has to come to call the scrollbar up. */
+private val SCROLLBAR_GUTTER = 28.dp
+
 /** The two halves of a pack page: what it says about itself, and what it looks like. */
 private enum class DetailTab { Description, Gallery }
 
-private data class InstallProgress(val versionId: String, val current: Int, val total: Int, val filename: String)
+/**
+ * Which version is being installed. Only the identity is read: the activity
+ * surface narrates the progress, and the counters this used to carry were being
+ * rebuilt every frame for a block that no longer exists.
+ */
+private data class InstallProgress(val versionId: String)
 
 private sealed class DetailState {
     object Loading : DetailState()

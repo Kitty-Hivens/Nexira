@@ -723,25 +723,14 @@ object GermanStrings : AppStrings {
     override val browseDetailTabGallery     = "Galerie"
     override val browseDetailErrorTitle    = "Pack konnte nicht geladen werden"
     override val browseDetailErrorMessage  = "Manifest konnte nicht geladen werden. Verbindung prüfen und erneut versuchen."
-    override val browseDetailInstallReady  = "Bereit zur Installation"
-    override val browseDetailInstallHint   = "Erstellt eine neue Instanz in deinem Datenverzeichnis."
     override val browseDetailInstallButton = "Installieren"
     override val contentInstallRetry       = "Erneut versuchen"
     override val contentInstallFailed      = "Der Download wurde nicht abgeschlossen"
-    override val browseDetailAboutTitle       = "Über dieses Pack"
     override fun browseDetailAbout(mods: Int, assets: Int) =
         "Dieses Pack enthält $mods ${twoFormPlural(mods, "Mod", "Mods")} und $assets ${twoFormPlural(assets, "Asset", "Assets")}."
-    override val browseDetailAboutNote        = "Eine ausführliche Beschreibung erscheint hier, sobald der Mirror sie zum Manifest hinzufügt."
-    override val browseDetailVersionTitle     = "Version"
 
-    override val browseDetailInstallRunningTitle  = "Installation läuft..."
     override fun browseDetailInstallProgress(filename: String, current: Int, total: Int) =
         "$filename  ($current / $total)"
-    override val browseDetailInstallStarting      = "Wird gestartet..."
-    override val browseDetailInstallDoneTitle     = "Installiert"
-    override val browseDetailInstallDoneHint      = "Zur Library hinzugefügt."
-    override val browseDetailInstallOpenLibrary   = "In Library öffnen"
-    override val browseDetailInstallFailedTitle   = "Installation fehlgeschlagen"
     override val browseDetailInstallFailedGeneric = "Installation aus unbekanntem Grund fehlgeschlagen."
 
     override val fileBrowserNoRoot          = "Diese Instanz hat noch keine Dateien auf der Festplatte."

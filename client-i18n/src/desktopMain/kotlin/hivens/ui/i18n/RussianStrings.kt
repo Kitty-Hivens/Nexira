@@ -724,25 +724,14 @@ object RussianStrings : AppStrings {
     override val browseDetailTabGallery     = "Галерея"
     override val browseDetailErrorTitle    = "Не удалось загрузить сборку"
     override val browseDetailErrorMessage  = "Не удалось получить manifest. Проверь соединение и повтори."
-    override val browseDetailInstallReady  = "Готово к установке"
-    override val browseDetailInstallHint   = "Создаст новый instance в твоей data-папке."
     override val browseDetailInstallButton = "Установить"
     override val contentInstallRetry       = "Повторить"
     override val contentInstallFailed      = "Загрузка не завершилась"
-    override val browseDetailAboutTitle       = "О сборке"
     override fun browseDetailAbout(mods: Int, assets: Int) =
         "Сборка включает $mods ${russianPlural(mods, "мод", "мода", "модов")} и $assets ${russianPlural(assets, "ассет", "ассета", "ассетов")}."
-    override val browseDetailAboutNote        = "Развёрнутое описание появится здесь когда зеркало начнёт заполнять его в manifest."
-    override val browseDetailVersionTitle     = "Версия"
 
-    override val browseDetailInstallRunningTitle  = "Установка..."
     override fun browseDetailInstallProgress(filename: String, current: Int, total: Int) =
         "$filename  ($current / $total)"
-    override val browseDetailInstallStarting      = "Запуск..."
-    override val browseDetailInstallDoneTitle     = "Установлено"
-    override val browseDetailInstallDoneHint      = "Добавлено в Library."
-    override val browseDetailInstallOpenLibrary   = "Открыть в Library"
-    override val browseDetailInstallFailedTitle   = "Ошибка установки"
     override val browseDetailInstallFailedGeneric = "Установка не удалась по неизвестной причине."
 
     override val fileBrowserNoRoot          = "У этого экземпляра ещё нет файлов на диске."

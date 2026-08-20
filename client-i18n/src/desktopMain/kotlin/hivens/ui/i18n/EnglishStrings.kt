@@ -724,25 +724,14 @@ object EnglishStrings : AppStrings {
     override val browseDetailTabGallery     = "Gallery"
     override val browseDetailErrorTitle    = "Could not load pack"
     override val browseDetailErrorMessage  = "Could not fetch the manifest. Check your connection and retry."
-    override val browseDetailInstallReady  = "Ready to install"
-    override val browseDetailInstallHint   = "Creates a new instance under your data directory."
     override val browseDetailInstallButton = "Install"
     override val contentInstallRetry       = "Retry"
     override val contentInstallFailed      = "The download did not finish"
-    override val browseDetailAboutTitle       = "About this pack"
     override fun browseDetailAbout(mods: Int, assets: Int) =
         "This pack ships $mods ${twoFormPlural(mods, "mod", "mods")} and $assets ${twoFormPlural(assets, "asset", "assets")}."
-    override val browseDetailAboutNote        = "A long-form description appears here once the mirror starts populating it on the manifest."
-    override val browseDetailVersionTitle     = "Version"
 
-    override val browseDetailInstallRunningTitle  = "Installing..."
     override fun browseDetailInstallProgress(filename: String, current: Int, total: Int) =
         "$filename  ($current / $total)"
-    override val browseDetailInstallStarting      = "Starting..."
-    override val browseDetailInstallDoneTitle     = "Installed"
-    override val browseDetailInstallDoneHint      = "Added to your Library."
-    override val browseDetailInstallOpenLibrary   = "Open in Library"
-    override val browseDetailInstallFailedTitle   = "Install failed"
     override val browseDetailInstallFailedGeneric = "Install failed for an unknown reason."
 
     override val fileBrowserNoRoot          = "This instance has no files on disk yet."
