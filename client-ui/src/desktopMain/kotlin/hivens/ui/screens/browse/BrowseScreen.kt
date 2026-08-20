@@ -25,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -110,9 +111,13 @@ fun BrowseScreen(
     // what is NEW in it, and a page that adds nothing is the end -- which is
     // correct for a catalogue that pages and for one that does not, and keeps a
     // repeat from reaching the list as a duplicate key.
-    var page by remember { mutableIntStateOf(0) }
-    var endReached by remember { mutableStateOf(false) }
-    var loadingMore by remember { mutableStateOf(false) }
+    // Keyed on the question being asked, all of them. Unkeyed, a request still in
+    // flight when the source changes came back and wrote its answer under the new
+    // source's name, and a flag left true by a cancelled load stayed true for the
+    // life of the screen.
+    var page by remember(origin, submittedQuery, retryTick) { mutableIntStateOf(0) }
+    var endReached by remember(origin, submittedQuery, retryTick) { mutableStateOf(false) }
+    var loadingMore by remember(origin, submittedQuery, retryTick) { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     // What this source and query were last showing goes up first, before anything
@@ -126,13 +131,20 @@ fun BrowseScreen(
             state = BrowseState.Loaded(remembered.packs)
             page = remembered.nextPage
             endReached = remembered.endReached
+            listState.scrollToItem(remembered.firstVisibleIndex, remembered.firstVisibleOffset)
         } else {
             state = BrowseState.Loading
             page = 0
             endReached = false
+            // A different question deserves the top of its answer. The scroll
+            // state is one object across every query and source, so without this
+            // a search made while scrolled opens at whatever offset the previous
+            // list had reached -- past the end of a shorter one, which the paging
+            // watcher then reads as "near the bottom" and pages on.
+            listState.scrollToItem(0)
         }
         val catalogue = registry.forOrigin(origin)
-            ?: return@LaunchedEffect run { state = BrowseState.Empty }
+            ?: return@LaunchedEffect run { if (state !is BrowseState.Loaded) state = BrowseState.Empty }
         try {
             // Stale first, fresh behind it. Assigning an equal list is not a
             // repaint -- the state is compared, not trusted -- so a refresh that
@@ -140,8 +152,12 @@ fun BrowseScreen(
             catalogue.searchStream(submittedQuery, page = 0)
                 .flowOn(Dispatchers.IO)
                 .collect { packs ->
+                    // An empty answer is an answer. Keeping a restored list over
+                    // it left packs on screen that the source had stopped
+                    // listing, with nothing saying so.
                     if (packs.isEmpty()) {
-                        if (state !is BrowseState.Loaded) state = BrowseState.Empty
+                        state = BrowseState.Empty
+                        session.put(origin, submittedQuery, BrowseSession.Snapshot(emptyList(), nextPage = 0, endReached = true))
                         return@collect
                     }
                     // The fresh page is compared against the front of what is
@@ -150,14 +166,19 @@ fun BrowseScreen(
                     // from it and must survive -- replacing the list wholesale
                     // would take a player back to the first twenty results a
                     // second after they scrolled past them.
+                    // Membership, not order. A catalogue re-ranks constantly, and
+                    // treating a shuffled first page as new content threw away
+                    // every page scrolled onto the end of it -- and overwrote the
+                    // remembered depth with zero, so leaving and returning could
+                    // not get them back either. Only entries the list does not
+                    // already hold are a reason to start again.
                     val shown = (state as? BrowseState.Loaded)?.packs
-                    if (shown != null && shown.size >= packs.size && shown.subList(0, packs.size) == packs) {
-                        return@collect
-                    }
+                    if (shown != null && newIn(packs, shown).isEmpty()) return@collect
                     page = 0
                     endReached = false
                     state = BrowseState.Loaded(packs)
                     session.put(origin, submittedQuery, BrowseSession.Snapshot(packs, nextPage = 0, endReached = false))
+                    listState.scrollToItem(0)
                 }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -187,28 +208,75 @@ fun BrowseScreen(
     // simply stopped at twenty results with nothing saying there were more.
     LaunchedEffect(listState, state, endReached) {
         if (state !is BrowseState.Loaded || endReached) return@LaunchedEffect
+        // The question this effect is answering, taken once. The request suspends,
+        // and reading the live source and query when it returns is how an answer
+        // to the previous question got written under the name of the current one.
+        val forOrigin = origin
+        val forQuery = submittedQuery
+        // A source that is not registered has no pages, which is not the same as
+        // having reached the last of them: the flag suppresses every later attempt,
+        // and the state that put it there is not one a scroll can leave.
+        val catalogue = registry.forOrigin(forOrigin) ?: return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
             .collect { last ->
                 val current = (state as? BrowseState.Loaded)?.packs ?: return@collect
                 if (loadingMore || endReached || last < current.size - 3) return@collect
                 loadingMore = true
-                runCatching {
-                    val catalogue = registry.forOrigin(origin)
-                    val next = if (catalogue == null) emptyList()
-                    else withContext(Dispatchers.IO) { catalogue.search(submittedQuery, page = page + 1) }
+                try {
+                    val next = withContext(Dispatchers.IO) { catalogue.search(forQuery, page = page + 1) }
                     val fresh = newIn(next, current)
                     if (fresh.isEmpty()) endReached = true else {
                         page += 1
                         val grown = current + fresh
                         state = BrowseState.Loaded(grown)
-                        session.put(origin, submittedQuery, BrowseSession.Snapshot(grown, nextPage = page, endReached = false))
+                        session.put(
+                            forOrigin,
+                            forQuery,
+                            BrowseSession.Snapshot(
+                                packs = grown,
+                                nextPage = page,
+                                endReached = false,
+                                firstVisibleIndex = listState.firstVisibleItemIndex,
+                                firstVisibleOffset = listState.firstVisibleItemScrollOffset,
+                            ),
+                        )
                     }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    // Leaving the screen is not a failure and must not be swallowed:
+                    // a cancellation caught here would leave the coroutine running
+                    // on past the disposal that asked it to stop.
+                    throw e
+                } catch (_: Exception) {
                     // A failure is not an ending. Marking the listing finished on
                     // one refused request means a moment without a network takes
                     // the rest of the catalogue away until the query is retyped.
-                }.onFailure { /* the next scroll asks again */ }
-                loadingMore = false
+                    // The next scroll asks again.
+                } finally {
+                    loadingMore = false
+                }
             }
+    }
+
+    // Where the reader had got to, kept with the list it belongs to. Written on
+    // the way out rather than on every scroll: the position only matters to a
+    // return, and a write per frame of scrolling is a write per frame.
+    DisposableEffect(origin, submittedQuery) {
+        val forOrigin = origin
+        val forQuery = submittedQuery
+        onDispose {
+            val packs = (state as? BrowseState.Loaded)?.packs ?: return@onDispose
+            session.put(
+                forOrigin,
+                forQuery,
+                BrowseSession.Snapshot(
+                    packs = packs,
+                    nextPage = page,
+                    endReached = endReached,
+                    firstVisibleIndex = listState.firstVisibleItemIndex,
+                    firstVisibleOffset = listState.firstVisibleItemScrollOffset,
+                ),
+            )
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
