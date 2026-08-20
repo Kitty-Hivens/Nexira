@@ -43,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.geometry.isSpecified
@@ -82,6 +84,7 @@ import org.intellij.markdown.parser.CancellationToken
 import org.intellij.markdown.parser.MarkdownParser
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.Entities
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import java.awt.Desktop
@@ -100,7 +103,17 @@ import java.net.URI
  */
 
 /** Convert GitHub-flavoured markdown to an HTML string for [HtmlBody]. */
-fun markdownToHtml(markdown: String): String {
+fun markdownToHtml(markdown: String): String = runCatching { parseMarkdown(markdown) }
+    .getOrElse { failure ->
+        // A description nested deeply enough overflows the parser's stack, and an
+        // error thrown out of the parse leaves the body permanently blank with
+        // nothing said about it. The source is shown as text instead: unformatted
+        // is a poor reading of a document, but it is a reading.
+        LoggerFactory.getLogger("HtmlRender").warn("Could not parse a description; showing it as text", failure)
+        "<pre>" + Entities.escape(markdown) + "</pre>"
+    }
+
+private fun parseMarkdown(markdown: String): String {
     val flavour = GFMFlavourDescriptor()
     // The explicit CancellationToken and the CharSequence-typed input select the
     // non-deprecated MarkdownParser API; the bare-flavour constructor and the
@@ -166,10 +179,13 @@ fun MarkdownHtml(
     modifier: Modifier = Modifier,
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
-    val html by produceState<String?>(null, markdown) {
-        value = withContext(Dispatchers.Default) { markdownToHtml(markdown) }
+    // Carried with the source it was parsed from. produceState keeps its last
+    // value across a key change, so switching packs left the previous pack's
+    // description on screen for as long as the new one took to parse.
+    val parsed by produceState<Pair<String, String>?>(null, markdown) {
+        value = markdown to withContext(Dispatchers.Default) { markdownToHtml(markdown) }
     }
-    html?.let { HtmlBody(it, modifier, onLink = onLink) }
+    parsed?.takeIf { it.first == markdown }?.let { HtmlBody(it.second, modifier, onLink = onLink) }
 }
 
 @Composable
@@ -179,10 +195,10 @@ fun HtmlBody(
     baseColor: Color = NxTheme.colors.textPrimary,
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
-    val parsed by produceState<Element?>(null, html) {
-        value = withContext(Dispatchers.Default) { Jsoup.parse(html).body() }
+    val parsed by produceState<Pair<String, Element>?>(null, html) {
+        value = html to withContext(Dispatchers.Default) { Jsoup.parse(html).body() }
     }
-    val body = parsed ?: return
+    val body = parsed?.takeIf { it.first == html }?.second ?: return
     val ctx = InlineCtx(
         linkColor = linkColor(baseColor),
         baseColor = baseColor,
@@ -223,6 +239,19 @@ private val BLOCK_GAP = 14.dp
 /** Prose leading. Compose's default is tight for a body of running text. */
 private val PROSE_LINE_HEIGHT = 1.5.em
 
+/** Width of the quote bar, in pixels because it is drawn rather than measured. */
+private const val QUOTE_BAR_PX = 3f
+
+/**
+ * How deep the walk will follow a document before it stops.
+ *
+ * Nesting in a description is a handful of levels; anything past that is either a
+ * mistake or someone finding out what happens. What happens, without this, is
+ * that the walk recurses as deep as the markup goes and takes the thread that
+ * draws with it.
+ */
+private const val MAX_BLOCK_DEPTH = 32
+
 private val BLOCK_TAGS = setOf(
     "p", "div", "section", "article", "header", "footer", "main", "aside", "figure", "center",
     "h1", "h2", "h3", "h4", "h5", "h6",
@@ -251,12 +280,34 @@ private fun group(parent: Element): List<Frag> {
 }
 
 @Composable
-private fun ColumnScope.blocks(parent: Element, ctx: InlineCtx, onLink: (String) -> Unit, center: Boolean = false) {
+private fun ColumnScope.blocks(
+    parent: Element,
+    ctx: InlineCtx,
+    onLink: (String) -> Unit,
+    center: Boolean = false,
+    depth: Int = 0,
+) {
+    // Past the floor, the document is rendered as the text it contains rather
+    // than descended into. Every block here recurses, and a few of them measure
+    // their subtree as well as laying it out, so a document nested deeply enough
+    // does not merely render badly -- it does not return.
+    if (depth >= MAX_BLOCK_DEPTH) {
+        val text = parent.wholeText().trim()
+        if (text.isNotEmpty()) Text(text, style = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT))
+        return
+    }
     for (frag in remember(parent) { group(parent) }) {
         when (frag) {
             is InlineRun -> {
-                val ann = buildInline(frag.nodes, ctx, onLink)
-                if (ann.text.isNotBlank()) Text(
+                // A link wrapping a picture is inline markup, so a run of them
+                // reaches here rather than the paragraph branch -- and only the
+                // paragraph branch used to look for pictures, which is why
+                // `<div align="center"><a><img></a></div>`, the ordinary banner,
+                // came out as its alt text.
+                val imgs = imageRunOfNodes(frag.nodes)
+                val ann = if (imgs == null) buildInline(frag.nodes, ctx, onLink) else null
+                if (imgs != null) ImageRunBlock(imgs, onLink, center = center)
+                else if (ann != null && ann.text.isNotBlank()) Text(
                     ann,
                     style    = TextStyle(
                         color = ctx.baseColor,
@@ -266,14 +317,24 @@ private fun ColumnScope.blocks(parent: Element, ctx: InlineCtx, onLink: (String)
                     modifier = if (center) Modifier.fillMaxWidth() else Modifier,
                 )
             }
-            is BlockEl -> block(frag.el, ctx, onLink, center)
+            is BlockEl -> block(frag.el, ctx, onLink, center, depth)
         }
     }
 }
 
 @Composable
-private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, center: Boolean = false) {
+private fun ColumnScope.block(
+    el: Element,
+    ctx: InlineCtx,
+    onLink: (String) -> Unit,
+    center: Boolean = false,
+    depth: Int = 0,
+) {
     val align = cssTextAlign(el).let { if (it == TextAlign.Unspecified && center) TextAlign.Center else it }
+    // An element's own alignment, folded with the one it inherited, read once. It
+    // used to be worked out inside the paragraph branch alone, so a div, a
+    // section, a heading, a quote and a list each dropped it on the floor.
+    val centred = align == TextAlign.Center
     when (el.tagName().lowercase()) {
         // <center> (and align=center containers): center BOTH text and images.
         // A centered image-only run (a banner wrapped in center>a>img) renders as
@@ -285,7 +346,7 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
                 Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) { blocks(el, ctx, onLink, center = true) }
+            ) { blocks(el, ctx, onLink, center = true, depth = depth + 1) }
         }
         "h1", "h2", "h3", "h4", "h5", "h6" -> {
             val tag = el.tagName().lowercase()
@@ -303,7 +364,7 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
                 Text(
                     buildInline(el.childNodes(), ctx, onLink),
                     style    = base.copy(color = ctx.baseColor, textAlign = align, fontWeight = FontWeight.Bold),
-                    modifier = if (center) Modifier.fillMaxWidth() else Modifier,
+                    modifier = if (centred) Modifier.fillMaxWidth() else Modifier,
                 )
                 // A rule under the top two levels. Bold alone does not separate a
                 // section from the paragraph above it once a description runs long
@@ -323,30 +384,46 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
             // `<p align="center">` around a row of badges is how a description
             // centres them, and reading only the inherited flag left every one of
             // those rows hard against the left edge.
-            val centred = center || align == TextAlign.Center
             val imgs = imageRunOf(el)
             when {
                 imgs != null -> ImageRunBlock(imgs, onLink, center = centred)
                 el.children().any { it.tagName().lowercase() in BLOCK_TAGS || it.tagName().equals("img", true) } ->
-                    blocks(el, ctx, onLink, centred)
-                else -> Text(
-                    buildInline(el.childNodes(), ctx, onLink),
-                    style    = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT, textAlign = align),
-                    modifier = if (centred) Modifier.fillMaxWidth() else Modifier,
-                )
+                    blocks(el, ctx, onLink, centred, depth + 1)
+                else -> {
+                    // An empty paragraph is markup, not content. Drawn anyway it
+                    // took a full line plus the gap between blocks, and a run of
+                    // them -- which is how some descriptions space themselves --
+                    // opened holes down the page.
+                    val ann = buildInline(el.childNodes(), ctx, onLink)
+                    if (ann.text.isNotBlank()) Text(
+                        ann,
+                        style    = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT, textAlign = align),
+                        modifier = if (centred) Modifier.fillMaxWidth() else Modifier,
+                    )
+                }
             }
         }
-        "ul", "ol" -> ListBlock(el, ctx, onLink, ordered = el.tagName().equals("ol", true))
+        "ul", "ol" -> ListBlock(el, ctx, onLink, ordered = el.tagName().equals("ol", true), center = centred, depth = depth)
         // A bar and indentation, no fill. A filled box reads as a callout -- a thing
         // the author marked as important -- and a quote is not that; it is the same
         // prose, set aside. The fill also stacked with a code block or a table
         // inside the quote, putting a surface on a surface.
-        "blockquote" -> Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(Modifier.width(3.dp).fillMaxHeight().background(NxTheme.colors.primary.copy(alpha = 0.55f)))
+        //
+        // The bar is DRAWN, not laid out. As a sibling stretched to the row's
+        // height it forced an intrinsic measurement of the quote's whole subtree
+        // on top of the real one, and quotes nest: each level multiplied the work
+        // of the level inside it by about three, so sixteen levels -- thirty-six
+        // characters of markdown -- took over a minute to lay out one line, on the
+        // thread that draws. Drawing it behind the content costs one rectangle.
+        "blockquote" -> {
+            val bar = NxTheme.colors.primary.copy(alpha = 0.55f)
             Column(
-                Modifier.padding(start = 14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind { drawRect(color = bar, size = Size(QUOTE_BAR_PX, size.height)) }
+                    .padding(start = 17.dp),
                 verticalArrangement = Arrangement.spacedBy(BLOCK_GAP),
-            ) { blocks(el, ctx, onLink) }
+            ) { blocks(el, ctx, onLink, centred, depth + 1) }
         }
         // Scrolls sideways rather than wrapping. Wrapped code is code with its
         // structure taken out, and a line long enough to wrap is usually the one
@@ -369,22 +446,31 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
             modifier = Modifier.padding(vertical = 6.dp),
         )
         "img" -> ImageBlock(el)
-        "table" -> TableBlock(el, ctx, onLink)
-        "details" -> DetailsBlock(el, ctx, onLink)
+        "table" -> TableBlock(el, ctx, onLink, depth)
+        "details" -> DetailsBlock(el, ctx, onLink, depth)
         // div / section / li / summary / details / unknown container -> flow children (propagating center).
-        else -> blocks(el, ctx, onLink, center)
+        else -> blocks(el, ctx, onLink, centred, depth + 1)
     }
 }
 
 @Composable
-private fun ListBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, ordered: Boolean) {
+private fun ListBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, ordered: Boolean, center: Boolean, depth: Int) {
     val items = el.children().filter { it.tagName().equals("li", true) }
+    // Text that is not in an item is still text. Rendering only the items dropped
+    // it silently, which is the one thing this renderer is not supposed to do.
+    val stray = remember(el) {
+        el.childNodes().filterNot { it is Element && it.tagName().equals("li", true) }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val loose = buildInline(stray, ctx, onLink)
+        if (loose.text.isNotBlank()) {
+            Text(loose, style = TextStyle(color = ctx.baseColor, lineHeight = PROSE_LINE_HEIGHT))
+        }
         items.forEachIndexed { i, li ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(if (ordered) "${i + 1}." else "•", style = TextStyle(color = ctx.baseColor))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    blocks(li, ctx, onLink)
+                    blocks(li, ctx, onLink, center, depth + 1)
                 }
             }
         }
@@ -392,7 +478,7 @@ private fun ListBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, ord
 }
 
 @Composable
-private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
+private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, depth: Int) {
     // Bare Text-in-columns read as loose text. What makes a grid legible is the
     // grid: an outer edge that says where the table ends, a header that is not
     // just bold text, banded rows so the eye holds a line across, and a rule
@@ -451,7 +537,7 @@ private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
  * all of them at once and the fold's label read as a heading nobody had styled.
  */
 @Composable
-private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
+private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, depth: Int) {
     val summary = remember(el) { el.children().firstOrNull { it.tagName().equals("summary", true) } }
     // The summary is the control, so it must not also be rendered as content. A
     // detached copy keeps the parse tree untouched for anything else reading it.
@@ -494,7 +580,7 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) 
             Column(
                 Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(BLOCK_GAP),
-            ) { blocks(inner, ctx, onLink) }
+            ) { blocks(inner, ctx, onLink, depth = depth + 1) }
         }
     }
 }
@@ -548,7 +634,10 @@ private data class ImgItem(val src: String, val alt: String, val href: String?)
  * `[![alt](img)](href)`. Returns null when the paragraph carries real text too,
  * so prose paragraphs keep their normal inline rendering.
  */
-private fun imageRunOf(el: Element): List<ImgItem>? {
+private fun imageRunOf(el: Element): List<ImgItem>? = imageRunOfNodes(el.childNodes())
+
+/** The same question asked of a run of sibling nodes rather than of an element. */
+private fun imageRunOfNodes(nodes: List<Node>): List<ImgItem>? {
     val items = ArrayList<ImgItem>()
     // Walk the subtree; bail (null) the moment real text shows up, so a prose
     // paragraph keeps normal rendering. Descends through the inline / alignment
@@ -572,7 +661,7 @@ private fun imageRunOf(el: Element): List<ImgItem>? {
         }
         return true
     }
-    for (c in el.childNodes()) if (!walk(c, null)) return null
+    for (c in nodes) if (!walk(c, null)) return null
     return items.takeIf { it.isNotEmpty() }
 }
 
@@ -647,12 +736,10 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                 modifier         = if (href != null) Modifier.clickable { onLink(href) } else Modifier,
                 contentAlignment = Alignment.Center,
             ) {
-                AsyncImage(
-                    model              = item.src.ifBlank { null },
-                    contentDescription = item.alt.ifBlank { null },
-                    contentScale       = ContentScale.Fit,
-                    modifier           = Modifier.heightIn(max = BADGE_MAX_HEIGHT),
-                )
+                // Through the same gate a lone image goes through. Reached
+                // directly, this branch fetched whatever a description named --
+                // one image was refused and two were not.
+                SizedImage(item.src, item.alt.ifBlank { null }, BADGE_MAX_HEIGHT)
                 if (href != null && isPlayableVideoUrl(href)) {
                     Box(
                         modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
@@ -715,7 +802,7 @@ private fun AnnotatedString.Builder.appendInline(node: Node, ctx: InlineCtx, onL
 /** `text-align` / legacy `align` -> Compose [TextAlign]; [TextAlign.Unspecified] when unset. */
 private fun cssTextAlign(el: Element): TextAlign {
     val v = el.attr("align").lowercase().ifBlank {
-        Regex("(?:^|;)\\s*text-align\\s*:\\s*([^;]+)")
+        Regex("(?:^|;)\\s*text-align\\s*:\\s*([^;]+)", RegexOption.IGNORE_CASE)
             .find(el.attr("style"))?.groupValues?.getOrNull(1)?.trim()?.lowercase().orEmpty()
     }
     return when (v) {
@@ -729,7 +816,7 @@ private fun cssTextAlign(el: Element): TextAlign {
 
 /** Inline `style="color: ..."` or legacy `color=` -> Compose [Color]; hex (#rgb/#rrggbb) + a few names. */
 private fun cssColor(el: Element): Color? {
-    val raw = Regex("(?:^|;)\\s*color\\s*:\\s*([^;]+)")
+    val raw = Regex("(?:^|;)\\s*color\\s*:\\s*([^;]+)", RegexOption.IGNORE_CASE)
         .find(el.attr("style"))?.groupValues?.getOrNull(1)?.trim()
         ?: el.attr("color").ifBlank { null }
         ?: return null
