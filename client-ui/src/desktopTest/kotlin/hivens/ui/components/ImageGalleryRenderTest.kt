@@ -34,15 +34,30 @@ class ImageGalleryRenderTest {
         GalleryMedia.Image(thumb = "https://example.invalid/$it.png", full = "https://example.invalid/$it.png")
     }
 
-    /** The same five with the captions a source publishes, for the caption test. */
-    private val captioned = List(5) {
-        GalleryMedia.Image(
-            thumb = "https://example.invalid/$it.png",
-            full = "https://example.invalid/$it.png",
-            title = "Shot $it",
-            description = "What this screenshot is showing you",
-        )
-    }
+    /**
+     * Five shots captioned unevenly, which is how a real gallery arrives: one
+     * with nothing, one with a name only, one with a sentence long enough to
+     * wrap. A fixture of five identical cells cannot tell a row that matches its
+     * tallest member from one that does not.
+     */
+    private val captioned = listOf(
+        image(0),
+        image(1, title = "The starter"),
+        image(
+            2,
+            title = "Where the run begins",
+            description = "A long enough sentence about this screenshot that it has to take a second line to finish itself",
+        ),
+        image(3, title = "Later on"),
+        image(4, description = "No name, only a note"),
+    )
+
+    private fun image(i: Int, title: String? = null, description: String? = null) = GalleryMedia.Image(
+        thumb = "https://example.invalid/$i.png",
+        full = "https://example.invalid/$i.png",
+        title = title,
+        description = description,
+    )
 
     private val pad = 24
 
@@ -78,8 +93,7 @@ class ImageGalleryRenderTest {
         val bmp = render(width, "gallery-wide.png")
         val avail = width - 2 * pad
         val gap = 12
-        val columns = (avail + gap) / (300 + gap)
-        assertEquals(3, columns, "the arithmetic under test")
+        val columns = 3
         val cell = (avail - gap * (columns - 1)) / columns
 
         // Inside each of the three cells of the first row.
@@ -132,12 +146,55 @@ class ImageGalleryRenderTest {
     }
 
     @Test
+    fun `cells in a row end together however unevenly they are captioned`() {
+        val width = 1100
+        val bmp = render(width, "gallery-captioned.png", captioned)
+        val avail = width - 2 * pad
+        val gap = 12
+        val cell = (avail - gap * 2) / 3
+        // The tallest caption in the first row is the wrapping one, in column
+        // three. Just above where it ends, all three columns must still be cell.
+        // Without a row that matches its tallest member, the first two stop with
+        // their own captions and the page shows through beside the third.
+        val deepest = (0 until 3).maxOf { i -> firstRowBottom(bmp, pad + i * (cell + gap) + cell / 2) }
+        repeat(3) { i ->
+            val cx = pad + i * (cell + gap) + cell / 2
+            assertTrue(
+                bmp.isCell(cx, deepest - 2),
+                "column $i ended before the row did -- the cells do not share the tallest height",
+            )
+        }
+    }
+
+    /**
+     * Where the FIRST row's cell ends at [x] -- the last cell pixel before a run
+     * of page ground at least as deep as the gap between rows. Scanning to the
+     * bottom of the image instead would find the second row's cell and report a
+     * column that has one as deeper than a column that does not.
+     */
+    private fun firstRowBottom(bmp: Bitmap, x: Int): Int {
+        val gap = 12
+        var last = pad
+        var y = pad
+        while (y < bmp.height) {
+            if (bmp.isCell(x, y)) {
+                last = y
+            } else if ((y until minOf(y + gap, bmp.height)).none { bmp.isCell(x, it) }) {
+                return last
+            }
+            y++
+        }
+        return last
+    }
+
+    @Test
     fun `a narrow pane drops to one column rather than to none`() {
         val width = 560
         val bmp = render(width, "gallery-narrow.png")
         val avail = width - 2 * pad
-        assertEquals(1, (avail + 12) / (300 + 12), "the arithmetic under test")
 
         assertTrue(bmp.isCell(pad + avail / 2, pad + avail / 8), "the single column did not render")
+        // Two columns would put a gap through the middle of the pane.
+        assertTrue(bmp.isCell(pad + avail / 2, pad + avail / 4), "the pane was split into columns it has no room for")
     }
 }

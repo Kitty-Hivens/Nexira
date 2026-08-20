@@ -3,7 +3,6 @@ package hivens.ui.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -83,7 +82,11 @@ sealed interface GalleryMedia {
     /** Light preview URL for the grid; null for a video with no image poster. */
     val thumb: String?
 
-    /** The author's caption. A wall of screenshots says nothing about what any of them is of. */
+    /**
+     * The author's caption: a short name for the shot and, where they wrote one, a
+     * sentence about it. Without them a gallery is a wall of pictures with nothing
+     * saying what any of them is of.
+     */
     val title: String?
     val description: String?
 
@@ -157,6 +160,12 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
     // The lightbox pages images only; videos open in the player. The image index
     // a cell click sets is into this filtered list.
     val images = remember(media) { media.filterIsInstance<GalleryMedia.Image>() }
+    // Where each entry of the whole list sits within the images-only list the
+    // lightbox pages through. -1 for a video, which the lightbox never opens.
+    val imageIndices = remember(media) {
+        var seen = 0
+        media.map { if (it is GalleryMedia.Image) seen++ else -1 }
+    }
     var lightbox by remember(media) { mutableStateOf<Int?>(null) }
     var video by remember(media) { mutableStateOf<GalleryMedia.Video?>(null) }
 
@@ -165,7 +174,11 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
         // them. One column always, however narrow the pane gets.
         val columns = (((maxWidth + CELL_GAP) / (MIN_CELL + CELL_GAP)).toInt()).coerceAtLeast(1)
         Column(verticalArrangement = Arrangement.spacedBy(CELL_GAP)) {
-            media.chunked(columns).forEach { row ->
+            // Carried with its place in the list. A data class compares by value,
+            // so looking a cell up by its content opened the FIRST shot that
+            // matched -- and a pack listing one URL twice, which the mirror passes
+            // through unchecked, then had a cell that opened someone else.
+            media.withIndex().chunked(columns).forEach { row ->
                 // Intrinsic height so every cell in a row matches the tallest of
                 // them: a caption of two lines beside one of none would otherwise
                 // leave the shorter cell's frame ending in mid-air.
@@ -173,13 +186,13 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
                     modifier              = Modifier.height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(CELL_GAP),
                 ) {
-                    row.forEach { item ->
+                    row.forEach { (index, item) ->
                         GalleryCell(
                             item     = item,
                             modifier = Modifier.weight(1f),
                             onClick  = {
                                 when (item) {
-                                    is GalleryMedia.Image -> lightbox = images.indexOf(item)
+                                    is GalleryMedia.Image -> lightbox = imageIndices[index]
                                     is GalleryMedia.Video -> video = item
                                 }
                             },
