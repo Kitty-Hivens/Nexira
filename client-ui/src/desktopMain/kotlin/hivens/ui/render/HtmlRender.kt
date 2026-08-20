@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +63,8 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import coil3.size.Size as CoilSize
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.icons.NxIcon
@@ -119,6 +122,17 @@ fun isBrowsableUrl(url: String): Boolean {
     return scheme == "http" || scheme == "https"
 }
 
+/**
+ * True when [url] is safe for the page to fetch by itself.
+ *
+ * The same http/https restriction [isBrowsableUrl] applies to a link, plus the
+ * `data:` form, which carries its own bytes and reaches nothing. An image source
+ * differs from a link in that nobody clicks it -- the fetch happens because the
+ * description said so -- which is the argument for the gate, not against it.
+ */
+fun isFetchableUrl(url: String): Boolean =
+    isBrowsableUrl(url) || url.startsWith("data:", ignoreCase = true)
+
 /** Open a link in the system browser; best-effort, never throws into the UI. */
 fun openInBrowser(url: String) {
     if (!isBrowsableUrl(url)) {
@@ -132,15 +146,25 @@ fun openInBrowser(url: String) {
     }
 }
 
-/** Markdown -> HTML -> [HtmlBody], one path (Modrinth bodies are md with embedded HTML). */
+/**
+ * Markdown -> HTML -> [HtmlBody], one path (Modrinth bodies are md with embedded
+ * HTML).
+ *
+ * Both parses happen off the composition. A `remember` calculation runs inside
+ * composition, which here is the UI thread, and a hundred-kilobyte description
+ * pays a markdown tree build, an HTML generation and a second full HTML parse
+ * there before the first frame of the page can be drawn.
+ */
 @Composable
 fun MarkdownHtml(
     markdown: String,
     modifier: Modifier = Modifier,
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
-    val html = remember(markdown) { markdownToHtml(markdown) }
-    HtmlBody(html, modifier, onLink = onLink)
+    val html by produceState<String?>(null, markdown) {
+        value = withContext(Dispatchers.Default) { markdownToHtml(markdown) }
+    }
+    html?.let { HtmlBody(it, modifier, onLink = onLink) }
 }
 
 @Composable
@@ -150,7 +174,10 @@ fun HtmlBody(
     baseColor: Color = NxTheme.colors.textPrimary,
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
-    val body = remember(html) { Jsoup.parse(html).body() }
+    val parsed by produceState<Element?>(null, html) {
+        value = withContext(Dispatchers.Default) { Jsoup.parse(html).body() }
+    }
+    val body = parsed ?: return
     val ctx = InlineCtx(
         linkColor = linkColor(baseColor),
         baseColor = baseColor,
@@ -481,6 +508,10 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) 
  */
 @Composable
 private fun SizedImage(src: String, alt: String?, maxHeight: Dp?, modifier: Modifier = Modifier) {
+    // Same gate the links get, for the same reason: a description is written by a
+    // third party, and an image source is a fetch the page performs on its own.
+    // A `file:` source would make remote text drive a local read.
+    if (!isFetchableUrl(src)) return
     AsyncImage(
         model              = src,
         contentDescription = alt,

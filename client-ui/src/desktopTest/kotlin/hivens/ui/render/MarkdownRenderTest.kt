@@ -105,9 +105,13 @@ class MarkdownRenderTest {
         val painted: Double
         try {
             var frameNanos = 0L
-            repeat(10) {
+            // With a pause between frames, because the markdown and HTML parses
+            // run off the composition now and the page has nothing to draw until
+            // they land.
+            repeat(30) {
                 scene.render(frameNanos)
                 frameNanos += 16_000_000L
+                Thread.sleep(20)
             }
             val frame = scene.render(frameNanos)
             Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
