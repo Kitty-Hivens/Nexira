@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -151,7 +152,7 @@ fun HtmlBody(
 ) {
     val body = remember(html) { Jsoup.parse(html).body() }
     val ctx = InlineCtx(
-        linkColor = NxTheme.colors.primary,
+        linkColor = linkColor(baseColor),
         baseColor = baseColor,
         codeBg = NxTheme.colors.surface,
     )
@@ -161,6 +162,24 @@ fun HtmlBody(
 }
 
 private data class InlineCtx(val linkColor: Color, val baseColor: Color, val codeBg: Color)
+
+/**
+ * What a link in a description is drawn in.
+ *
+ * Deliberately not the theme's accent. A description is not part of the app's
+ * chrome and its links are not app controls: on the default palette the accent
+ * is violet, which is the colour a browser has meant "you have already been
+ * there" for thirty years, so every link in every pack read as visited. Blue is
+ * what a link is, and it stays blue whatever the palette is set to -- the one
+ * thing here that has to be recognisable before it is read.
+ *
+ * The two shades are for the ground it sits on, not for the theme.
+ */
+private fun linkColor(onBase: Color): Color =
+    if (onBase.luminance() > 0.5f) LINK_ON_DARK else LINK_ON_LIGHT
+
+private val LINK_ON_DARK = Color(0xFF63A9FF)
+private val LINK_ON_LIGHT = Color(0xFF1A62CC)
 
 /**
  * Air between two blocks of prose. A description is paragraphs, lists and code
@@ -592,10 +611,19 @@ private fun AnnotatedString.Builder.appendInline(node: Node, ctx: InlineCtx, onL
                 "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = ctx.codeBg)) { kids() }
                 "a" -> {
                     val href = node.attr("href")
+                    // Underlined on hover, not at rest. A page of prose whose every
+                    // link is permanently ruled reads as a page of corrections, and
+                    // the underline is worth more as the answer to "is this the thing
+                    // under my cursor" than as decoration that is always on.
                     if (href.isBlank()) kids() else withLink(
                         LinkAnnotation.Clickable(
                             tag = href,
-                            styles = TextLinkStyles(SpanStyle(color = ctx.linkColor, textDecoration = TextDecoration.Underline)),
+                            styles = TextLinkStyles(
+                                style = SpanStyle(color = ctx.linkColor),
+                                focusedStyle = SpanStyle(color = ctx.linkColor, textDecoration = TextDecoration.Underline),
+                                hoveredStyle = SpanStyle(color = ctx.linkColor, textDecoration = TextDecoration.Underline),
+                                pressedStyle = SpanStyle(color = ctx.linkColor.copy(alpha = 0.75f), textDecoration = TextDecoration.Underline),
+                            ),
                         ) { onLink(href) },
                     ) { kids() }
                 }
