@@ -156,14 +156,7 @@ fun CataloguePackDetailScreen(
         }
     }
 
-    // The page scrolls, the side column does not. Laid out as siblings rather
-    // than as two columns inside one scroll: a side column that scrolls away
-    // leaves its width reserved and empty for the rest of the page, which on a
-    // long description is most of it -- a dead band down the right of the screen
-    // wider than the gap on the left. Standing still, it is never empty and never
-    // has to be paid for twice.
-    Row(Modifier.fillMaxSize()) {
-    Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         val loaded = state as? DetailState.Loaded
         CatalogueHero(
             // Same floated-card rounding as the Library detail hero.
@@ -214,8 +207,6 @@ fun CataloguePackDetailScreen(
             )
             is DetailState.Loaded -> DetailBody(details = st.details, installing = installing, installError = installError)
         }
-    }
-        (state as? DetailState.Loaded)?.let { DetailSidebar(it.details) }
     }
 
     (state as? DetailState.Loaded)?.let { ld ->
@@ -282,6 +273,16 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             modifier            = Modifier.fillMaxWidth().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (details.tags.isNotEmpty()) {
+                // In the flow of the page rather than in a column of their own. The
+                // side column this used to share was carrying one short block down
+                // the height of a long description, and reserving that width did
+                // more damage to the reading of the page than the block was worth.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement   = Arrangement.spacedBy(6.dp),
+                ) { details.tags.forEach { Chip(it) } }
+            }
             if (details.galleryUrls.isNotEmpty()) {
                 ImageGallery(media = galleryMedia(details.galleryUrls, details.galleryThumbUrls))
             }
@@ -307,63 +308,6 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
     }
 }
 
-/**
- * The compatibility and tags column, held still while the description scrolls
- * past it. Scrolls on its own only when it outgrows the window, which the blocks
- * it holds today never do.
- */
-@Composable
-private fun DetailSidebar(details: CataloguePackDetails) {
-    val s = LocalStrings.current
-    Column(
-        modifier            = Modifier
-            .width(SIDEBAR_WIDTH)
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-            .padding(end = 24.dp, top = 24.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        val v = details.versions.firstOrNull()
-        SidebarBlock(title = s.browseDetailCompatTitle) {
-            v?.mcVersions?.firstOrNull()?.let { MetaRow(s.browseDetailCompatMc, it) }
-            v?.loaders?.firstOrNull()?.let { MetaRow(s.browseDetailCompatLoader, it.replaceFirstChar { c -> c.uppercase() }) }
-            details.runtimeLabel?.let { MetaRow(s.browseDetailCompatJava, it) }
-        }
-        if (details.tags.isNotEmpty()) {
-            SidebarBlock(title = s.browseDetailTagsTitle) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    details.tags.forEach { Chip(it) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SidebarBlock(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-        // The library's plane, not a hand-rolled one. A bare tinted box has no
-        // edge, so on a page whose background is a wallpaper the block had
-        // nothing telling the eye where it started -- and it disagreed with every
-        // other card in the app, which all carry the bevel hairline.
-        NxSurface(level = NxSurfaceLevel.Raised, modifier = Modifier.fillMaxWidth()) {
-            Column(
-                Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) { content() }
-        }
-    }
-}
-
-@Composable
-private fun MetaRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
-    }
-}
-
 @Composable
 private fun Chip(text: String) {
     AssistChip(
@@ -378,9 +322,6 @@ private fun Chip(text: String) {
         border  = null,
     )
 }
-
-/** Enough for a label and its value on one line, and no more. */
-private val SIDEBAR_WIDTH = 300.dp
 
 private data class InstallProgress(val versionId: String, val current: Int, val total: Int, val filename: String)
 

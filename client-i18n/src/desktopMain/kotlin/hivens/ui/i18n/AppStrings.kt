@@ -782,15 +782,10 @@ interface AppStrings {
     val contentInstallRetry: String
     /** Tooltip on that retry, saying why it is offered. */
     val contentInstallFailed: String
-    val browseDetailTagsTitle: String
     val browseDetailAboutTitle: String
     /** Placeholder pack blurb shown until the mirror ships a real description. Receives the mod and asset counts. */
     fun browseDetailAbout(mods: Int, assets: Int): String
     val browseDetailAboutNote: String
-    val browseDetailCompatTitle: String
-    val browseDetailCompatMc: String
-    val browseDetailCompatLoader: String
-    val browseDetailCompatJava: String
     val browseDetailVersionTitle: String
 
     val browseDetailInstallRunningTitle: String

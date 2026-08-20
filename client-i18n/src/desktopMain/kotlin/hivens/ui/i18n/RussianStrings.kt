@@ -727,15 +727,10 @@ object RussianStrings : AppStrings {
     override val browseDetailInstallButton = "Установить"
     override val contentInstallRetry       = "Повторить"
     override val contentInstallFailed      = "Загрузка не завершилась"
-    override val browseDetailTagsTitle     = "Теги"
     override val browseDetailAboutTitle       = "О сборке"
     override fun browseDetailAbout(mods: Int, assets: Int) =
         "Сборка включает $mods ${russianPlural(mods, "мод", "мода", "модов")} и $assets ${russianPlural(assets, "ассет", "ассета", "ассетов")}."
     override val browseDetailAboutNote        = "Развёрнутое описание появится здесь когда зеркало начнёт заполнять его в manifest."
-    override val browseDetailCompatTitle      = "Совместимость"
-    override val browseDetailCompatMc         = "Minecraft"
-    override val browseDetailCompatLoader     = "Лоадер"
-    override val browseDetailCompatJava       = "Runtime"
     override val browseDetailVersionTitle     = "Версия"
 
     override val browseDetailInstallRunningTitle  = "Установка..."

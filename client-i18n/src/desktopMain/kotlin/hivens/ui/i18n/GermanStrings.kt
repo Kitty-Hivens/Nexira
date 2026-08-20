@@ -726,15 +726,10 @@ object GermanStrings : AppStrings {
     override val browseDetailInstallButton = "Installieren"
     override val contentInstallRetry       = "Erneut versuchen"
     override val contentInstallFailed      = "Der Download wurde nicht abgeschlossen"
-    override val browseDetailTagsTitle     = "Tags"
     override val browseDetailAboutTitle       = "Über dieses Pack"
     override fun browseDetailAbout(mods: Int, assets: Int) =
         "Dieses Pack enthält $mods ${twoFormPlural(mods, "Mod", "Mods")} und $assets ${twoFormPlural(assets, "Asset", "Assets")}."
     override val browseDetailAboutNote        = "Eine ausführliche Beschreibung erscheint hier, sobald der Mirror sie zum Manifest hinzufügt."
-    override val browseDetailCompatTitle      = "Kompatibilität"
-    override val browseDetailCompatMc         = "Minecraft"
-    override val browseDetailCompatLoader     = "Loader"
-    override val browseDetailCompatJava       = "Runtime"
     override val browseDetailVersionTitle     = "Version"
 
     override val browseDetailInstallRunningTitle  = "Installation läuft..."
