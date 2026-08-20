@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -155,7 +156,14 @@ fun CataloguePackDetailScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    // The page scrolls, the side column does not. Laid out as siblings rather
+    // than as two columns inside one scroll: a side column that scrolls away
+    // leaves its width reserved and empty for the rest of the page, which on a
+    // long description is most of it -- a dead band down the right of the screen
+    // wider than the gap on the left. Standing still, it is never empty and never
+    // has to be paid for twice.
+    Row(Modifier.fillMaxSize()) {
+    Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
         val loaded = state as? DetailState.Loaded
         CatalogueHero(
             // Same floated-card rounding as the Library detail hero.
@@ -206,6 +214,8 @@ fun CataloguePackDetailScreen(
             )
             is DetailState.Loaded -> DetailBody(details = st.details, installing = installing, installError = installError)
         }
+    }
+        (state as? DetailState.Loaded)?.let { DetailSidebar(it.details) }
     }
 
     (state as? DetailState.Loaded)?.let { ld ->
@@ -258,19 +268,20 @@ private fun runtimeLineOf(v: CataloguePackVersion): String? = listOfNotNull(
 
 @Composable
 private fun DetailBody(details: CataloguePackDetails, installing: InstallProgress?, installError: String?) {
-    val s = LocalStrings.current
     // A body link to a video (direct file or a service page) opens in-app; the
     // rest go to the browser as before.
     var videoLink by remember { mutableStateOf<String?>(null) }
-    Row(
-        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    // The description sits on a plane rather than directly on the page. It is a
+    // long document over a wallpaper, and without an edge there is nothing saying
+    // where the page ends and the text begins.
+    NxSurface(
+        level    = NxSurfaceLevel.Raised,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
     ) {
-        // The description takes what is left rather than a fixed share of the row.
-        // Split two-to-one, a sidebar holding one short block still claimed a third
-        // of the page, and the description wrapped a line of prose two hundred
-        // pixels early to pay for space nothing was using.
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(
+            modifier            = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             if (details.galleryUrls.isNotEmpty()) {
                 ImageGallery(media = galleryMedia(details.galleryUrls, details.galleryThumbUrls))
             }
@@ -290,25 +301,41 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             // the screen cannot. Two of them on one install was the state the
             // surface was built to end.
         }
-
-        // A column of label-and-value rows needs a column's worth of width and no
-        // more; what it does not need is to grow with the window.
-        Column(modifier = Modifier.width(SIDEBAR_WIDTH), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            val v = details.versions.firstOrNull()
-            SidebarBlock(title = s.browseDetailCompatTitle) {
-                v?.mcVersions?.firstOrNull()?.let { MetaRow(s.browseDetailCompatMc, it) }
-                v?.loaders?.firstOrNull()?.let { MetaRow(s.browseDetailCompatLoader, it.replaceFirstChar { c -> c.uppercase() }) }
-                details.runtimeLabel?.let { MetaRow(s.browseDetailCompatJava, it) }
-            }
-            if (details.tags.isNotEmpty()) {
-                SidebarBlock(title = s.browseDetailTagsTitle) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { details.tags.forEach { Chip(it) } }
-                }
-            }
-        }
     }
     videoLink?.let { url ->
         FullscreenVideo(url = url, onDismiss = { videoLink = null })
+    }
+}
+
+/**
+ * The compatibility and tags column, held still while the description scrolls
+ * past it. Scrolls on its own only when it outgrows the window, which the blocks
+ * it holds today never do.
+ */
+@Composable
+private fun DetailSidebar(details: CataloguePackDetails) {
+    val s = LocalStrings.current
+    Column(
+        modifier            = Modifier
+            .width(SIDEBAR_WIDTH)
+            .fillMaxHeight()
+            .verticalScroll(rememberScrollState())
+            .padding(end = 24.dp, top = 24.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        val v = details.versions.firstOrNull()
+        SidebarBlock(title = s.browseDetailCompatTitle) {
+            v?.mcVersions?.firstOrNull()?.let { MetaRow(s.browseDetailCompatMc, it) }
+            v?.loaders?.firstOrNull()?.let { MetaRow(s.browseDetailCompatLoader, it.replaceFirstChar { c -> c.uppercase() }) }
+            details.runtimeLabel?.let { MetaRow(s.browseDetailCompatJava, it) }
+        }
+        if (details.tags.isNotEmpty()) {
+            SidebarBlock(title = s.browseDetailTagsTitle) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    details.tags.forEach { Chip(it) }
+                }
+            }
+        }
     }
 }
 
