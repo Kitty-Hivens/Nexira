@@ -778,27 +778,16 @@ interface AppStrings {
     val browseDetailTabGallery: String
     val browseDetailErrorTitle: String
     val browseDetailErrorMessage: String
-    val browseDetailInstallReady: String
-    val browseDetailInstallHint: String
     val browseDetailInstallButton: String
     /** Retry label on a mod whose install did not land. */
     val contentInstallRetry: String
     /** Tooltip on that retry, saying why it is offered. */
     val contentInstallFailed: String
-    val browseDetailAboutTitle: String
     /** Placeholder pack blurb shown until the mirror ships a real description. Receives the mod and asset counts. */
     fun browseDetailAbout(mods: Int, assets: Int): String
-    val browseDetailAboutNote: String
-    val browseDetailVersionTitle: String
 
-    val browseDetailInstallRunningTitle: String
     /** Per-file install progress line. Receives the current filename and the file counter. */
     fun browseDetailInstallProgress(filename: String, current: Int, total: Int): String
-    val browseDetailInstallStarting: String
-    val browseDetailInstallDoneTitle: String
-    val browseDetailInstallDoneHint: String
-    val browseDetailInstallOpenLibrary: String
-    val browseDetailInstallFailedTitle: String
     val browseDetailInstallFailedGeneric: String
 
     // ── Library / PackDetail / Files tab ────────────────────────────────
