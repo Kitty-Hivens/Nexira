@@ -4,6 +4,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
@@ -39,6 +43,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
@@ -143,7 +148,14 @@ fun CataloguePackDetailScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    // A bar to take hold of. A page this long is otherwise reachable only by the
+    // wheel: there is nothing to drag, and nothing showing how far down it goes.
+    // It fades in on hover or while scrolling, like every other list in the app.
+    val scroll = rememberScrollState()
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    Box(Modifier.fillMaxSize().hoverable(hover)) {
+    Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
         val loaded = state as? DetailState.Loaded
         CatalogueHero(
             // Same floated-card rounding as the Library detail hero.
@@ -194,6 +206,12 @@ fun CataloguePackDetailScreen(
             )
             is DetailState.Loaded -> DetailBody(details = st.details, installing = installing, installError = installError)
         }
+    }
+        NxVerticalScrollbar(
+            adapter  = rememberScrollbarAdapter(scroll),
+            revealed = hovered || scroll.isScrollInProgress,
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp),
+        )
     }
 
     (state as? DetailState.Loaded)?.let { ld ->
