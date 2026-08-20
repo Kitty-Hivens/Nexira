@@ -366,7 +366,12 @@ private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
     // just bold text, banded rows so the eye holds a line across, and a rule
     // between columns -- without that last one two short cells beside each other
     // are indistinguishable from one cell with a space in it.
-    val rows = el.select("tr")
+    // The rows of THIS table. A descendant query hoists a nested table's rows
+    // into the outer one, where they are drawn as extra rows and again inside the
+    // cell that holds the nested table -- the same content twice, in two shapes.
+    val rows = remember(el) {
+        el.select("tr").filter { row -> row.parents().firstOrNull { it.tagName().equals("table", true) } === el }
+    }
     val shape = MaterialTheme.shapes.small
     val body = NxTheme.colors.surface
     val line = bevelHairline(body, 0.14f)
@@ -418,7 +423,15 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) 
     val summary = remember(el) { el.children().firstOrNull { it.tagName().equals("summary", true) } }
     // The summary is the control, so it must not also be rendered as content. A
     // detached copy keeps the parse tree untouched for anything else reading it.
-    val inner = remember(el) { el.clone().also { it.select("summary").remove() } }
+    //
+    // Its OWN summary, not every summary beneath it: a fold inside a fold is
+    // ordinary in a description, and a descendant query strips the inner one's
+    // label too, leaving it with a blank header.
+    val inner = remember(el) {
+        el.clone().also { copy ->
+            copy.children().filter { it.tagName().equals("summary", true) }.forEach { it.remove() }
+        }
+    }
     var open by remember(el) { mutableStateOf(el.hasAttr("open")) }
     val shape = MaterialTheme.shapes.small
     val line = bevelHairline(NxTheme.colors.surface, 0.14f)
