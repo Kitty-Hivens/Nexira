@@ -18,9 +18,15 @@ import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.ImageInfo
+import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.net.URLDecoder
+import java.util.Base64
+import javax.imageio.ImageIO
 import kotlin.math.ceil
 
 /**
@@ -55,16 +61,41 @@ internal class SvgImageDecoder(
     internal companion object {
 
         /**
+         * A guard on a scalable format: an SVG can declare any size at all, and a
+         * document claiming tens of thousands of pixels a side would ask for a
+         * gigabyte of raster before anything looked at it.
+         */
+        const val MAX_EDGE = 4096
+
+        /** An inlined document may inline documents of its own; this is where that stops. */
+        private const val MAX_NESTING = 3
+
+        /** How much larger than its box an icon is drawn before being let down into it. */
+        private const val ICON_SUPERSAMPLE = 4f
+
+        private const val MAX_ICON_EDGE = 512
+
+        private const val SVG_DATA_URI = "data:image/svg+xml"
+
+        /** Both spellings occur; the plain one is current, the namespaced one is older. */
+        private val HREF_ATTRS = listOf("href", "xlink:href")
+
+        private val LOADER_CONTEXT: LoaderContext = LoaderContext.builder()
+            .externalResourcePolicy(ResourcePolicy.DENY_EXTERNAL)
+            .build()
+
+        /**
          * Rasterises [bytes] at the size the document declares, or null when it
          * declares nothing usable -- inventing a size would put us back to
          * guessing, and there is nothing to guess from.
          */
-        fun renderSvg(bytes: ByteArray): Bitmap? {
+        fun renderSvg(bytes: ByteArray): Bitmap? = rasterise(inlineNestedSvg(bytes, depth = 0))?.toSkiaBitmap()
+
+        private fun rasterise(bytes: ByteArray, forcedWidth: Int = 0, forcedHeight: Int = 0): BufferedImage? {
             val document = SVGLoader().load(ByteArrayInputStream(bytes), null, LOADER_CONTEXT) ?: return null
             val declared = document.size()
-            if (!declared.width.isFinite() || !declared.height.isFinite()) return null
-            val width = ceil(declared.width.toDouble()).toInt()
-            val height = ceil(declared.height.toDouble()).toInt()
+            val width = if (forcedWidth > 0) forcedWidth else ceilOrZero(declared.width)
+            val height = if (forcedHeight > 0) forcedHeight else ceilOrZero(declared.height)
             if (width <= 0 || height <= 0 || width > MAX_EDGE || height > MAX_EDGE) return null
 
             val raster = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
@@ -75,23 +106,65 @@ internal class SvgImageDecoder(
                 g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
                 g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
                 g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON)
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
                 document.render(null, g, ViewBox(0f, 0f, width.toFloat(), height.toFloat()))
             } finally {
                 g.dispose()
             }
-            return raster.toSkiaBitmap()
+            return raster
         }
 
-        /**
-         * A guard on a scalable format: an SVG can declare any size at all, and a
-         * document claiming tens of thousands of pixels a side would ask for a
-         * gigabyte of raster before anything looked at it.
-         */
-        const val MAX_EDGE = 4096
+        private fun ceilOrZero(v: Float): Int = if (!v.isFinite() || v <= 0f) 0 else ceil(v.toDouble()).toInt()
 
-        private val LOADER_CONTEXT: LoaderContext = LoaderContext.builder()
-            .externalResourcePolicy(ResourcePolicy.DENY_EXTERNAL)
-            .build()
+        /**
+         * Replaces every `<image>` whose source is an inline SVG with the same
+         * image rasterised.
+         *
+         * The renderer draws an `<image>` through a raster path, so a nested SVG
+         * lands as nothing at all: a shields.io badge names its logo that way, and
+         * every badge in a description came out with a blank square where its icon
+         * belongs. Rasterising the inner document first is the whole fix, and it
+         * stays inside the file -- a `data:` source carries its own bytes, so this
+         * reaches for nothing.
+         *
+         * [depth] bounds the recursion, since an inlined document may name inlined
+         * documents of its own.
+         */
+        private fun inlineNestedSvg(bytes: ByteArray, depth: Int): ByteArray {
+            if (depth >= MAX_NESTING) return bytes
+            val text = bytes.toString(Charsets.UTF_8)
+            if (!text.contains(SVG_DATA_URI, ignoreCase = true)) return bytes
+            val doc = runCatching { Jsoup.parse(text, "", Parser.xmlParser()) }.getOrNull() ?: return bytes
+            var rewritten = false
+            for (image in doc.select("image")) {
+                val attr = HREF_ATTRS.firstOrNull { image.hasAttr(it) } ?: continue
+                val href = image.attr(attr)
+                if (!href.startsWith(SVG_DATA_URI, ignoreCase = true)) continue
+                val inner = decodeDataUri(href) ?: continue
+                // Drawn into a box the outer document sizes, so it is rasterised
+                // larger than that box and let down again -- a fourteen-pixel icon
+                // rendered at fourteen pixels is a smear.
+                val box = maxOf(image.attr("width").toFloatOrNull() ?: 0f, image.attr("height").toFloatOrNull() ?: 0f)
+                val edge = (box * ICON_SUPERSAMPLE).toInt().coerceIn(0, MAX_ICON_EDGE)
+                val raster = rasterise(inlineNestedSvg(inner, depth + 1), edge, edge) ?: continue
+                val png = ByteArrayOutputStream().also { ImageIO.write(raster, "png", it) }.toByteArray()
+                image.attr(attr, "data:image/png;base64," + Base64.getEncoder().encodeToString(png))
+                rewritten = true
+            }
+            return if (rewritten) doc.outerHtml().toByteArray(Charsets.UTF_8) else bytes
+        }
+
+        /** Base64 or percent-encoded; both spellings are ordinary in the wild. */
+        private fun decodeDataUri(uri: String): ByteArray? {
+            val comma = uri.indexOf(',')
+            if (comma < 0) return null
+            val payload = uri.substring(comma + 1)
+            val meta = uri.substring(0, comma)
+            return runCatching {
+                if (meta.contains(";base64", ignoreCase = true)) Base64.getMimeDecoder().decode(payload)
+                else URLDecoder.decode(payload, Charsets.UTF_8).toByteArray(Charsets.UTF_8)
+            }.getOrNull()
+        }
 
         /**
          * Whether this response is SVG. The declared type is believed where there

@@ -57,6 +57,27 @@ class SvgImageDecoderTest {
     }
 
     @Test
+    fun `the badge's logo is drawn`() {
+        val bitmap = assertNotNull(SvgImageDecoder.renderSvg(badge))
+
+        // The logo is an <image> whose source is an inline SVG, which the renderer
+        // draws through a raster path and so drops entirely -- a blank square on
+        // the label where the icon belongs. It sits at x=9..23, y=7..21 and is
+        // white on the orange block.
+        var white = 0
+        for (y in 7 until 21) {
+            for (x in 9 until 23) {
+                val c = bitmap.getColor(x, y)
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                if (r > 200 && g > 200 && b > 200) white++
+            }
+        }
+        assertTrue(white > 20, "only $white lit pixels where the logo goes -- it was dropped, not drawn")
+    }
+
+    @Test
     fun `the label block keeps its own colour`() {
         val bitmap = assertNotNull(SvgImageDecoder.renderSvg(badge))
         // A point inside the left rect, clear of the logo and the lettering.
