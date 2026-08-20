@@ -14,6 +14,7 @@ import com.github.weisj.jsvg.parser.resources.ResourcePolicy
 import com.github.weisj.jsvg.view.ViewBox
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okio.BufferedSource
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -48,7 +49,14 @@ internal class SvgImageDecoder(
 ) : Decoder {
 
     override suspend fun decode(): DecodeResult? = withContext(Dispatchers.IO) {
-        val bytes = source.source().use { it.readByteArray() }
+        val bytes = source.source().use { s ->
+            // One byte past the ceiling, so a document that sits exactly on it is
+            // still read and one that exceeds it is recognised without the whole
+            // of it being pulled into memory first.
+            s.request(MAX_SOURCE_BYTES + 1)
+            s.readByteArray(minOf(s.buffer.size, MAX_SOURCE_BYTES + 1))
+        }
+        if (bytes.size > MAX_SOURCE_BYTES) return@withContext null
         val bitmap = renderSvg(bytes) ?: return@withContext null
         DecodeResult(image = bitmap.asImage(shareable = true), isSampled = false)
     }
@@ -69,6 +77,16 @@ internal class SvgImageDecoder(
 
         /** An inlined document may inline documents of its own; this is where that stops. */
         private const val MAX_NESTING = 3
+
+        /** How many inlined images one document may carry. A badge has one. */
+        private const val MAX_INLINED_IMAGES = 32
+
+        /**
+         * A ceiling on the source itself. The bytes arrive from wherever a pack
+         * description points, and a size check on the parsed document is no help
+         * to the read that has already happened.
+         */
+        private const val MAX_SOURCE_BYTES = 8L * 1024 * 1024
 
         /** A guard on the box an inlined icon claims, in the same spirit as [MAX_EDGE]. */
         private const val MAX_ICON_EDGE = 512
@@ -115,6 +133,30 @@ internal class SvgImageDecoder(
         private fun ceilOrZero(v: Float): Int = if (!v.isFinite() || v <= 0f) 0 else ceil(v.toDouble()).toInt()
 
         /**
+         * An SVG length as whole pixels, or zero for one that does not resolve to
+         * pixels on its own.
+         *
+         * A bare number and an absolute unit are the two forms that mean a size
+         * without knowing anything else. A percentage or a font-relative unit is
+         * a fraction of something this does not have, so it reads as zero and the
+         * caller falls back to the document's own size rather than inventing one.
+         */
+        @VisibleForTesting
+        fun lengthPx(raw: String): Int {
+            val v = raw.trim().lowercase()
+            if (v.isEmpty() || v.endsWith("%")) return 0
+            val unit = ABSOLUTE_UNITS.keys.firstOrNull { v.endsWith(it) }
+            val number = (if (unit != null) v.dropLast(unit.length) else v).trim().toFloatOrNull() ?: return 0
+            val px = number * (unit?.let { ABSOLUTE_UNITS.getValue(it) } ?: 1f)
+            return ceilOrZero(px).coerceAtMost(MAX_ICON_EDGE)
+        }
+
+        /** CSS absolute units, in pixels. The relative ones are deliberately absent. */
+        private val ABSOLUTE_UNITS = mapOf(
+            "px" to 1f, "pt" to 4f / 3f, "pc" to 16f, "in" to 96f, "cm" to 96f / 2.54f, "mm" to 96f / 25.4f,
+        )
+
+        /**
          * Replaces every `<image>` whose source is an inline SVG with the same
          * image rasterised.
          *
@@ -134,7 +176,13 @@ internal class SvgImageDecoder(
             if (!text.contains(SVG_DATA_URI, ignoreCase = true)) return bytes
             val doc = runCatching { Jsoup.parse(text, "", Parser.xmlParser()) }.getOrNull() ?: return bytes
             var rewritten = false
+            var inlined = 0
             for (image in doc.select("image")) {
+                // Depth alone bounds nothing: a document naming a hundred icons,
+                // each naming a hundred of its own, is a million rasterisations
+                // from one line of a description. Breadth is bounded here and the
+                // depth bound above stops it compounding.
+                if (inlined >= MAX_INLINED_IMAGES) break
                 val attr = HREF_ATTRS.firstOrNull { image.hasAttr(it) } ?: continue
                 val href = image.attr(attr)
                 if (!href.startsWith(SVG_DATA_URI, ignoreCase = true)) continue
@@ -145,13 +193,18 @@ internal class SvgImageDecoder(
                 // by nearest neighbour and no rendering hint reaches it, which is
                 // what turned a smooth mark into a handful of hard squares. A
                 // vector drawn straight at fourteen pixels is antialiased there.
-                val boxW = image.attr("width").toFloatOrNull()?.let { ceilOrZero(it) } ?: 0
-                val boxH = image.attr("height").toFloatOrNull()?.let { ceilOrZero(it) } ?: 0
-                if (boxW <= 0 || boxH <= 0 || boxW > MAX_ICON_EDGE || boxH > MAX_ICON_EDGE) continue
+                // Clamped, never refused. A box this cannot read -- absent, given
+                // in units, given as a percentage -- means "use the inner
+                // document's own size", which is what rasterise does with a zero;
+                // refusing there would put the blank square back, which is the
+                // whole thing this exists to remove.
+                val boxW = lengthPx(image.attr("width"))
+                val boxH = lengthPx(image.attr("height"))
                 val raster = rasterise(inlineNestedSvg(inner, depth + 1), boxW, boxH) ?: continue
                 val png = ByteArrayOutputStream().also { ImageIO.write(raster, "png", it) }.toByteArray()
                 image.attr(attr, "data:image/png;base64," + Base64.getEncoder().encodeToString(png))
                 rewritten = true
+                inlined++
             }
             return if (rewritten) doc.outerHtml().toByteArray(Charsets.UTF_8) else bytes
         }
@@ -169,19 +222,34 @@ internal class SvgImageDecoder(
         }
 
         /**
-         * Whether this response is SVG. The declared type is believed where there
-         * is one; where there is not, the head of the document is read, since a
-         * plain file and a CDN that answers `application/octet-stream` are both
-         * ordinary.
+         * Whether this response is SVG.
+         *
+         * A declared image type is believed in both directions -- a response that
+         * says it is a PNG is not read at all. Anything vaguer than that (a plain
+         * file, a CDN answering `application/octet-stream`, no type at all) has
+         * its head looked at.
+         *
+         * This runs for every image the app loads, not only for descriptions, so
+         * it must not be able to fail: reading a fixed number of bytes demands
+         * that many exist, and a favicon or a one-pixel spacer is shorter than
+         * that. It takes what is there.
          */
         @VisibleForTesting
         fun isSvg(result: SourceFetchResult): Boolean {
-            if (result.mimeType?.startsWith("image/svg") == true) return true
-            val head = result.source.source().peek().readByteArray(SNIFF_BYTES.toLong().coerceAtMost(Long.MAX_VALUE))
-            return looksLikeSvg(head)
+            val mime = result.mimeType
+            if (mime != null && mime.startsWith("image/")) return mime.startsWith("image/svg")
+            return looksLikeSvg(sniffHead(result.source.source()))
         }
 
-        private const val SNIFF_BYTES = 1024
+        /** Up to [SNIFF_BYTES] from the front of [source], without consuming it and without demanding they exist. */
+        @VisibleForTesting
+        fun sniffHead(source: BufferedSource): ByteArray {
+            val peek = source.peek()
+            peek.request(SNIFF_BYTES)
+            return peek.readByteArray(minOf(SNIFF_BYTES, peek.buffer.size))
+        }
+
+        private const val SNIFF_BYTES = 1024L
 
         /**
          * A root `<svg` within the head of the document. An XML prolog, a comment
