@@ -19,6 +19,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from _modules import source_dirs
+
 ROOT = Path(__file__).resolve().parent.parent
 
 SCAN_EXTS = {".kt"}
@@ -78,7 +80,7 @@ RULES = (
 def scan_dirs() -> list[Path]:
     # Derived rather than listed, so a module added tomorrow is covered the day
     # it lands instead of when someone remembers this file.
-    return [p for p in sorted(ROOT.iterdir()) if p.is_dir() and (p / "src").is_dir()]
+    return source_dirs(ROOT)
 
 
 def exempt_keys(rel: str) -> set[str]:

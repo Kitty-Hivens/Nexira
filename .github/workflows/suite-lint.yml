@@ -1,0 +1,51 @@
+name: suite-lint
+
+# Gradle runs the tasks it is given and says nothing about the ones it is not, so
+# a module left out of the test matrix is a module whose tests have never run.
+# This is the check that notices -- the same shape as the other three scanners,
+# pointed at the workflow beside it rather than at the source.
+
+on:
+  pull_request:
+    branches: [stable, dev]
+    paths:
+      - "**/*.kt"
+      - "**/*.java"
+      - "**/build.gradle.kts"
+      - "settings.gradle.kts"
+      - ".github/workflows/tests.yml"
+      - "scripts/check-ci-suites.py"
+      - "scripts/_modules.py"
+      - ".github/workflows/suite-lint.yml"
+  push:
+    branches: [dev, stable]
+    paths:
+      - "**/*.kt"
+      - "**/*.java"
+      - "**/build.gradle.kts"
+      - "settings.gradle.kts"
+      - ".github/workflows/tests.yml"
+      - "scripts/check-ci-suites.py"
+      - "scripts/_modules.py"
+      - ".github/workflows/suite-lint.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Test suites reach the matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Strict both ways: a module with tests that the matrix does not name, and
+      # a task the matrix names whose module has no tests. The second is the one
+      # that would otherwise fail the whole test step on a rename.
+      - name: Check every test suite is in the matrix
+        run: python3 scripts/check-ci-suites.py --strict

@@ -33,6 +33,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from _modules import source_dirs
+
 ROOT = Path(__file__).resolve().parent.parent
 SCAN_EXT = ".kt"
 EXCLUDE_DIR_PARTS = {"build", "i18n"}
@@ -52,11 +54,10 @@ def _is_main_source_set(path: Path) -> bool:
 
 def scan_roots() -> list[Path]:
     roots: list[Path] = []
-    for module in sorted(ROOT.iterdir()):
-        build_file = module / "build.gradle.kts"
-        src = module / "src"
-        if not src.is_dir() or not build_file.is_file():
+    for module in source_dirs(ROOT):
+        if not (module / "build.gradle.kts").is_file():
             continue
+        src = module / "src"
         roots.extend(p for p in sorted(src.iterdir()) if p.is_dir() and _is_main_source_set(p))
     return roots
 
