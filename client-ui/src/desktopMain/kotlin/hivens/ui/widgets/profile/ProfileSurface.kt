@@ -93,7 +93,7 @@ fun ProfileSurface(
     // only, so they no-op without a session.
     PuppetScreen("Profile")
     PuppetClick("profile.refreshSkin") { session?.let { skinManager.invalidate(it.playerName) } }
-    PuppetClick("profile.topUp")       { SystemActions.openUrl("http://smartycraft.ru/cabinet") }
+    PuppetClick("profile.topUp")       { SystemActions.openUrl("https://smartycraft.ru/cabinet") }
 
     CompositionLocalProvider(LocalProfileContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {

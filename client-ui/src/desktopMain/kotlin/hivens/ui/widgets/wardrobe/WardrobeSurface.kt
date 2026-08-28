@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -96,7 +95,7 @@ import org.koin.compose.koinInject
 import java.io.File
 import java.nio.file.Files
 
-private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
+private const val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
 // Caption strip under every card. Fixed so a card with a delete button (an
 // IconButton is taller than a bare label) lines up with the "+" import tile and
@@ -111,6 +110,10 @@ private val CardCaptionHeight = 24.dp
 fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
     val s = LocalStrings.current
     PuppetScreen("Wardrobe")
+    // The window frame carries the visible back arrow, so the screen draws none.
+    // Automation has no frame to click, and without this the wardrobe was the one
+    // screen a driver could enter and not leave.
+    PuppetClick("wardrobe.back") { onBack() }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
@@ -215,7 +218,7 @@ private fun Wardrobe(session: SessionData) {
 
     // Default skins are extracted from a provisioned client jar on the IO pool; the
     // grid stays empty until that resolves (or no client jar carries them yet).
-    val defaults by produceState(emptyList<DefaultSkinProvider.DefaultSkin>()) {
+    val defaults by produceState(emptyList()) {
         value = withContext(Dispatchers.IO) { defaultSkinProvider.list() }
     }
     val defaultBitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
@@ -239,11 +242,10 @@ private fun Wardrobe(session: SessionData) {
     // never resolve their clan flag).
     var capeRole by remember { mutableStateOf(ClanRole.Unknown) }
     LaunchedEffect(scSession?.playerName, scSession?.clan, scSession?.clanResolved) {
-        val sc = scSession
         capeRole = when {
-            sc == null -> ClanRole.Unknown
-            sc.clanResolved && sc.clan == null -> ClanRole.NoClan
-            else -> clanRoles.eligibility(sc.playerName)
+            scSession == null -> ClanRole.Unknown
+            scSession.clanResolved && scSession.clan == null -> ClanRole.NoClan
+            else -> clanRoles.eligibility(scSession.playerName)
         }
     }
     val showCapes = capeSectionVisible(scSession != null, capeRole)

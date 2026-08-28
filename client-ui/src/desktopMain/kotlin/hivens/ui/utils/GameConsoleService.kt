@@ -124,7 +124,7 @@ class GameConsoleService(
     private sealed interface Msg {
         data class Append(val text: String, val type: LogType) : Msg
         data class AppendOrUpdate(val slotId: String, val text: String, val type: LogType) : Msg
-        data class StartSession(val packId: String?) : Msg
+        data class StartSession(val packId: String?, val packLabel: String?) : Msg
         data object Clear : Msg
         data class LoadHistory(val count: Int, val result: CompletableDeferred<List<LogEntry>>) : Msg
         data class Close(val done: CompletableDeferred<Unit>) : Msg
@@ -188,7 +188,7 @@ class GameConsoleService(
                 }
                 slotEntries[msg.slotId] = entry
             }
-            is Msg.StartSession -> openSession(msg.packId)
+            is Msg.StartSession -> openSession(msg.packId, msg.packLabel)
             is Msg.Clear -> {
                 buffer.clear()
                 slotEntries.clear()
@@ -243,11 +243,17 @@ class GameConsoleService(
         channel.trySend(Msg.AppendOrUpdate(slotId, text, type))
     }
 
+    /**
+     * Open a new session. [packId] names the file, [packLabel] names the pack in
+     * the divider -- the launch event carries both, and the console used to print
+     * neither, so a console showing two sessions could not say which pack either
+     * one was.
+     */
     fun startSession(packId: String? = null, packLabel: String? = null) {
         // Bump on the caller thread (Main) so the observable Compose state write
         // stays off the drainer; the file open happens in the drainer.
         sessionStartCount += 1
-        channel.trySend(Msg.StartSession(packId))
+        channel.trySend(Msg.StartSession(packId, packLabel))
     }
 
     fun clear() {
@@ -298,7 +304,7 @@ class GameConsoleService(
 
     // ── Drainer-thread implementation ────────────────────────────────────────
 
-    private fun openSession(packId: String?) {
+    private fun openSession(packId: String?, packLabel: String?) {
         slotEntries.clear()
         closeWriter()
         historyOffset = 0
@@ -318,7 +324,8 @@ class GameConsoleService(
         // Session-start divider goes into BOTH buffer and file so a history
         // reload reconstructs the marker on the same line index as the live view.
         val time = SimpleDateFormat("HH:mm:ss").format(Date())
-        val entry = LogEntry("--------- Session started $time ---------", LogType.DIVIDER, time)
+        val named = packLabel?.takeIf { it.isNotBlank() }?.let { " -- $it" }.orEmpty()
+        val entry = LogEntry("--------- Session started $time$named ---------", LogType.DIVIDER, time)
         buffer.addLast(entry)
         writeLine(entry)
     }
@@ -362,9 +369,6 @@ class GameConsoleService(
     }
 
     private fun writeLine(entry: LogEntry) {
-        if (entry.type == LogType.DIVIDER && entry.text.startsWith("---")) {
-            // dividers write verbatim
-        }
         try {
             sessionWriter?.apply {
                 write(formatFileLine(entry))
@@ -424,9 +428,6 @@ class GameConsoleService(
         }
         return LogEntry(line, LogType.INFO, "")
     }
-
-    /** Export the live buffer (current snapshot). */
-    fun saveToFile(): File? = exportEntries(snapshot.value.entries)
 
     /**
      * Write [entries] to a fresh `console-export-*.log` in the on-disk format.

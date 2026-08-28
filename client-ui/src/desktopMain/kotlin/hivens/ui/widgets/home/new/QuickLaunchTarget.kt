@@ -21,7 +21,6 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
-import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.nx.PlayButton

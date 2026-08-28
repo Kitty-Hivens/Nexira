@@ -57,7 +57,7 @@ fun LoginPanel(
 ) {
     val authService: AuthProvider              = koinInject()
     val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
-    val credentialsManager: AccountStore = koinInject()
+    val credentialsManager: AccountStore       = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val certificateGate: CertificateTrustGate  = koinInject()

@@ -54,11 +54,10 @@ fun ThemePickerSurface(
     // an explicit Apply commits the selection upstream.
     val selectedTheme = remember { mutableStateOf(currentTheme) }
 
-    val ctx = remember(themes, selectedTheme, onThemeSelected, onBack) {
+    val ctx = remember(themes, selectedTheme, onBack) {
         ThemePickerContext(
             themes        = themes,
             selectedTheme = selectedTheme,
-            onApply       = onThemeSelected,
             onBack        = onBack,
         )
     }

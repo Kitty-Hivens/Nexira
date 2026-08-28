@@ -76,7 +76,7 @@ data class StyleSpec(
 enum class CardSurface { Glass, Flat }
 
 /**
- * Skinnable geometry of the toggle primitive ([hivens.ui.components.NxSwitch]).
+ * Skinnable geometry of the toggle primitive ([hivens.ui.nx.NxSwitch]).
  * Colours come from the palette (theme primary / outline), so a skin only swaps the
  * track/thumb dimensions + corners -- pill, square, or anything in between. First
  * component pulled into the component-style ("skin") layer; more follow.

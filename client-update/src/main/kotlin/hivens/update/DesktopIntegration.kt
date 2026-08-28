@@ -60,7 +60,7 @@ class DesktopIntegration {
     private fun installIcon(home: String): Result<String> = runCatching {
         val appDir = System.getenv("APPDIR")?.takeIf { it.isNotBlank() }
             ?: error("APPDIR unset")
-        val source = sequenceOf(ICON_NAME + ".png", ".DirIcon")
+        val source = sequenceOf("$ICON_NAME.png", ".DirIcon")
             .map { Paths.get(appDir, it) }
             .firstOrNull { Files.isRegularFile(it) }
             ?: error("No embedded icon found under APPDIR")

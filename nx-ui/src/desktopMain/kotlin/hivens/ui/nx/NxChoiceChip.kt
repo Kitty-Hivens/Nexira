@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
