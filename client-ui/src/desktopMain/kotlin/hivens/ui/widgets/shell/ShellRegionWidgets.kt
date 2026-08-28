@@ -534,6 +534,6 @@ private fun BarDivider() {
  */
 @Widget(id = "appshell.region.body", displayName = "widget.appshell.region.body", removable = false)
 @Composable
-fun ShellBodyRegion(instance: WidgetInstance) {
+fun ShellBodyRegion() {
     SlotRenderer(SurfaceId("appshell.body"), SlotId("content"), Modifier.fillMaxSize())
 }

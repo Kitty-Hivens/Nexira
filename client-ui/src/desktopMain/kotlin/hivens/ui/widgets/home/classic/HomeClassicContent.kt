@@ -48,7 +48,6 @@ import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,7 +63,7 @@ import org.koin.compose.koinInject
 // code that's going away.
 @Widget(id = "home.classic.content", displayName = "widget.home.classic.content")
 @Composable
-fun HomeClassicContent(instance: WidgetInstance) {
+fun HomeClassicContent() {
     val ctx = LocalHomeClassicContext.current
     val serverListService: IServerListService = koinInject()
     val profileManager: ProfileManager = koinInject()

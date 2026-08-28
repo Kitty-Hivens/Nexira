@@ -190,15 +190,7 @@ fun LayoutGraph.updateWidgetProps(
     path: SlotPath,
     instanceId: String,
     props: JsonObject,
-): LayoutGraph =
-    mutate(path) { content ->
-        if (content.widgets.none { it.instanceId == instanceId }) content
-        else content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(props = props) else it
-            },
-        )
-    }
+): LayoutGraph = updateInstance(path, instanceId) { it.copy(props = props) }
 
 // Sets (or clears, with null) the per-instance backing chrome. Same no-op /
 // missing-instance contract as updateWidgetProps. A no-backing chrome
@@ -209,15 +201,27 @@ fun LayoutGraph.updateWidgetChrome(
     chrome: WidgetChrome?,
 ): LayoutGraph {
     val normalized = chrome?.takeUnless { it == WidgetChrome() }
-    return mutate(path) { content ->
-        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-        if (target.chrome == normalized) return@mutate content
-        content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(chrome = normalized) else it
-            },
-        )
-    }
+    return updateInstance(path, instanceId) { it.copy(chrome = normalized) }
+}
+
+// Every per-instance transform is the same three steps: find the instance in the
+// slot, leave the graph alone when [edit] returns what was already there, and
+// otherwise rebuild the list with that one widget replaced. Written out five
+// times, it was five chances for the no-op contract to be spelled differently --
+// and one of them did not check at all.
+//
+// Returning the same SlotContent is what makes a no-op a real one: [mutate]
+// decides by reference identity, so an edit that changes nothing has to hand the
+// same object back rather than an equal copy.
+private fun LayoutGraph.updateInstance(
+    path: SlotPath,
+    instanceId: String,
+    edit: (WidgetInstance) -> WidgetInstance,
+): LayoutGraph = mutate(path) { content ->
+    val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
+    val next = edit(target)
+    if (next == target) return@mutate content
+    content.copy(widgets = content.widgets.map { if (it.instanceId == instanceId) next else it })
 }
 
 // Phase G layout transforms. Slot orientation + grid column count are
@@ -363,7 +367,7 @@ private fun fitCubeSpan(col: Int, row: Int, colSpan: Int, rowSpan: Int, others: 
     var c = colSpan.coerceAtLeast(1)
     var r = rowSpan.coerceAtLeast(1)
     fun free() = others.none { cubeOverlap(col, row, c, r, it) }
-    while ((c > 1 || r > 1) && !free()) { if (c >= r && c > 1) c-- else if (r > 1) r-- else c-- }
+    while ((c > 1 || r > 1) && !free()) { if (c >= r) c-- else r-- }
     return c to r
 }
 
@@ -379,29 +383,12 @@ private fun applyCubeCell(content: SlotContent, seeded: List<WidgetInstance>, mo
 }
 
 fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Float): LayoutGraph =
-    mutate(path) { content ->
-        val w = weight.coerceAtLeast(0f)
-        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-        if (target.weight == w) return@mutate content
-        content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(weight = w) else it
-            },
-        )
-    }
+    updateInstance(path, instanceId) { it.copy(weight = weight.coerceAtLeast(0f)) }
 
 // Canvas placement transforms (used when the slot is Canvas). Same no-op /
 // missing-instance identity contract as the Phase G transforms above.
 fun LayoutGraph.setCanvasPlacement(path: SlotPath, instanceId: String, placement: CanvasPlacement): LayoutGraph =
-    mutate(path) { content ->
-        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-        if (target.canvas == placement) return@mutate content
-        content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(canvas = placement) else it
-            },
-        )
-    }
+    updateInstance(path, instanceId) { it.copy(canvas = placement) }
 
 fun LayoutGraph.setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float): LayoutGraph =
     updateCanvas(path, instanceId) { it.copy(x = x, y = y) }
@@ -419,17 +406,7 @@ private fun LayoutGraph.updateCanvas(
     path: SlotPath,
     instanceId: String,
     edit: (CanvasPlacement) -> CanvasPlacement,
-): LayoutGraph = mutate(path) { content ->
-    val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-    val current = target.canvas ?: CanvasPlacement()
-    val next = edit(current)
-    if (next == target.canvas) return@mutate content
-    content.copy(
-        widgets = content.widgets.map {
-            if (it.instanceId == instanceId) it.copy(canvas = next) else it
-        },
-    )
-}
+): LayoutGraph = updateInstance(path, instanceId) { it.copy(canvas = edit(it.canvas ?: CanvasPlacement())) }
 
 // Walks the path and returns the SlotContent at the leaf, or null if
 // any intermediate surface / slot / parent widget is missing.

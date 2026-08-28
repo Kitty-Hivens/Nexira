@@ -15,6 +15,13 @@ internal data class WidgetModel(
     /** FQN of the @Serializable props class, or null for a propless widget. */
     val propsClassFqn: String?,
     val functionFqn: String,
+    /**
+     * Whether the declaration takes the instance. A widget that reads neither
+     * props nor per-instance state declares `fun Name()`, and the registry calls
+     * it with no argument; the descriptor's own Render still receives the
+     * instance, so nothing above the call site changes.
+     */
+    val takesInstance: Boolean = true,
     /** Service contracts from @ProvidesService, by FQN. */
     val provides: List<String> = emptyList(),
     /** Service contracts from @InjectService, by FQN. */
@@ -113,7 +120,7 @@ internal fun renderRegistry(
             appendLine("                propsJson.encodeToJsonElement($fqn.serializer(), $fqn()).jsonObject")
         }
         appendLine("            @Composable override fun Render(instance: WidgetInstance) {")
-        appendLine("                ${entry.functionFqn}(instance)")
+        appendLine("                ${entry.functionFqn}(${if (entry.takesInstance) "instance" else ""})")
         appendLine("            }")
         appendLine("        })")
     }

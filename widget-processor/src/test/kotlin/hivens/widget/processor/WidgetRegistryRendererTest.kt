@@ -21,7 +21,8 @@ class WidgetRegistryRendererTest {
         slots: List<String> = emptyList(),
         propsClassFqn: String? = null,
         functionFqn: String = "hivens.ui.widgets.Sample",
-    ) = WidgetModel(id, displayName, removable, slots, propsClassFqn, functionFqn)
+        takesInstance: Boolean = true,
+    ) = WidgetModel(id, displayName, removable, slots, propsClassFqn, functionFqn, takesInstance)
 
     // --- duplicate ids ---
 
@@ -66,6 +67,41 @@ class WidgetRegistryRendererTest {
     fun `the render call targets the annotated function`() {
         val src = renderRegistry(listOf(widget("x", functionFqn = "hivens.ui.widgets.bgsettings.BgTintWidget")))
         assertContains(src, "hivens.ui.widgets.bgsettings.BgTintWidget(instance)")
+    }
+
+    @Test
+    fun `a widget that takes no instance is called with no argument`() {
+        // Passing one to a `fun Name()` would not compile, and the whole point of
+        // allowing the shorter signature is that the author never writes a
+        // parameter they cannot read.
+        val src = renderRegistry(
+            listOf(widget("x", functionFqn = "hivens.ui.widgets.bgsettings.BgTintWidget", takesInstance = false)),
+        )
+        assertContains(src, "hivens.ui.widgets.bgsettings.BgTintWidget()")
+        assertFalse(src.contains("BgTintWidget(instance)"))
+    }
+
+    @Test
+    fun `the descriptor still receives the instance either way`() {
+        // Only the call inside Render changes. The override's own signature is
+        // the registry's contract with the slot renderer and does not move.
+        val bare = renderRegistry(listOf(widget("x", takesInstance = false)))
+        val full = renderRegistry(listOf(widget("x", takesInstance = true)))
+        val signature = "@Composable override fun Render(instance: WidgetInstance) {"
+        assertContains(bare, signature)
+        assertContains(full, signature)
+    }
+
+    @Test
+    fun `both signatures coexist in one registry`() {
+        val src = renderRegistry(
+            listOf(
+                widget("a", functionFqn = "p.Bare", takesInstance = false),
+                widget("b", functionFqn = "p.Full", propsClassFqn = "p.Props"),
+            ),
+        )
+        assertContains(src, "p.Bare()")
+        assertContains(src, "p.Full(instance)")
     }
 
     @Test

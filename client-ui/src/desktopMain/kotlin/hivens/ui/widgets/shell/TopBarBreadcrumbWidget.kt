@@ -15,14 +15,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.Screen
 import hivens.ui.chrome.rememberCrumbLabel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 /**
  * Clickable breadcrumb of the current location (Modrinth-style). Back button +
@@ -31,7 +29,7 @@ import hivens.widget.model.WidgetInstance
  */
 @Widget(id = "appshell.topbar.breadcrumb", displayName = "widget.appshell.topbar.breadcrumb")
 @Composable
-fun TopBarBreadcrumbWidget(instance: WidgetInstance) {
+fun TopBarBreadcrumbWidget() {
     val ctx = LocalShellContext.current
     val s = LocalStrings.current
     Row(verticalAlignment = Alignment.CenterVertically) {

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.GridCell
+import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
@@ -116,28 +117,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
 
     when (content.orientation) {
         SlotOrientation.Row -> Row(slotChrome(path, content).then(modifier).animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            content.widgets.forEachIndexed { index, instance ->
-                key(instance.instanceId) {
-                    val descriptor = registry[instance.kind]
-                    if (descriptor != null) {
-                        val movable = rememberWidgetMovable(descriptor, instance)
-                        // Precedence lives on the model as flowPlacement(), so the
-                        // two flow branches cannot drift apart and the rule is
-                        // testable without a composition.
-                        when (val placement = instance.flowPlacement()) {
-                            is FlowPlacement.Weighted -> Box(Modifier.weight(placement.weight)) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            is FlowPlacement.Bounded -> Box(boundedModifier(placement)) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
-                        }
-                    } else {
-                        unknownDecorator(address, index, instance)
-                    }
-                }
-            }
+            FlowWidgets(address, content, registry, decorator, unknownDecorator) { Modifier.weight(it) }
         }
         SlotOrientation.Grid -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
             // Non-lazy chunked grid: a Column of equal-width Rows. Reuses the
@@ -259,27 +239,44 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         }
         // Column.
         else -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            content.widgets.forEachIndexed { index, instance ->
-                key(instance.instanceId) {
-                    val descriptor = registry[instance.kind]
-                    if (descriptor != null) {
-                        val movable = rememberWidgetMovable(descriptor, instance)
-                        // Precedence lives on the model as flowPlacement(), so the
-                        // two flow branches cannot drift apart and the rule is
-                        // testable without a composition.
-                        when (val placement = instance.flowPlacement()) {
-                            is FlowPlacement.Weighted -> Box(Modifier.weight(placement.weight)) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            is FlowPlacement.Bounded -> Box(boundedModifier(placement)) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
-                        }
-                    } else {
-                        unknownDecorator(address, index, instance)
+            FlowWidgets(address, content, registry, decorator, unknownDecorator) { Modifier.weight(it) }
+        }
+    }
+}
+
+// The Row and Column branches differ in exactly one thing: which axis a weighted
+// widget takes its share of. Modifier.weight is scope-typed, so the two cannot
+// share a body by one calling the other -- the layout passes its own weight in
+// instead, and the rest (placement precedence, the decorator, the unknown-kind
+// fallback) is written once. It was written twice, line for line, and the comment
+// on both copies said they must not drift.
+@Composable
+private fun FlowWidgets(
+    address: SlotAddress,
+    content: SlotContent,
+    registry: WidgetRegistry,
+    decorator: WidgetDecorator,
+    unknownDecorator: UnknownWidgetDecorator,
+    weight: (Float) -> Modifier,
+) {
+    content.widgets.forEachIndexed { index, instance ->
+        key(instance.instanceId) {
+            val descriptor = registry[instance.kind]
+            if (descriptor != null) {
+                val movable = rememberWidgetMovable(descriptor, instance)
+                // Precedence lives on the model as flowPlacement(), so the rule is
+                // testable without a composition.
+                when (val placement = instance.flowPlacement()) {
+                    is FlowPlacement.Weighted -> Box(weight(placement.weight)) {
+                        decorator(address, index, descriptor, instance) { movable() }
                     }
+                    is FlowPlacement.Bounded -> Box(boundedModifier(placement)) {
+                        decorator(address, index, descriptor, instance) { movable() }
+                    }
+                    FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
                 }
+            } else {
+                unknownDecorator(address, index, instance)
             }
         }
     }

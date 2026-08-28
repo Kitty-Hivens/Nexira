@@ -44,7 +44,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 // Grid of every preset CustomTheme. Tapping a card writes
 // `selectedTheme.value` on the surface context; the preview widget
@@ -53,7 +52,7 @@ import hivens.widget.model.WidgetInstance
 // and must restore-to-default to see the grid again.
 @Widget(id = "theme.picker.grid", displayName = "widget.theme.picker.grid")
 @Composable
-fun ThemePickerGridWidget(instance: WidgetInstance) {
+fun ThemePickerGridWidget() {
     val ctx = LocalThemePickerContext.current
     val s = LocalStrings.current
     val selectedTheme by ctx.selectedTheme

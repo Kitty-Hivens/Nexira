@@ -6,13 +6,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 // Big display headline. Reads server.title (display string) or
 // falls back to server.name (technical id) when title is unset.
 @Widget(id = "server.details.title", displayName = "widget.server.details.title")
 @Composable
-fun ServerDetailsTitleWidget(instance: WidgetInstance) {
+fun ServerDetailsTitleWidget() {
     val ctx = LocalServerDetailsContext.current
     Text(
         text       = ctx.server.title ?: ctx.server.name,
