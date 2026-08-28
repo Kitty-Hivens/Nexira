@@ -103,6 +103,7 @@ import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.SystemTheme
@@ -124,6 +125,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import hivens.ui.widgets.WidgetBacking
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -876,43 +878,14 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
             val layoutGraph by layoutGraphRepo.observe().collectAsState()
-            // Production renderer for per-widget backing (WidgetChrome): glass
-            // card (follows the active style via glassSurfaceAlpha), rounded
-            // corners, inner padding. Invoked by the kernel only when a widget
-            // carries chrome, so default-styled widgets pay nothing.
-            // Remembered so its identity stays stable across AppShell
-            // recomposes. It is provided through the *static*
-            // LocalWidgetChromeRenderer, so a fresh identity each recompose
-            // would invalidate the whole content subtree, not just chrome
-            // consumers. The lambda captures nothing mutable -- glassSurfaceAlpha
-            // reads its CompositionLocals at invoke time, inside composition.
-            val chromeRenderer: WidgetChromeRenderer = remember {
-                { chrome, content ->
-                    val glass = glassSurfaceAlpha(chrome.glassAlphaPct / 100f)
-                    androidx.compose.foundation.layout.Box(
-                        Modifier
-                            // Padding is an OUTER inset, applied before the backing, so
-                            // the rounded glass hugs the widget's own view -- the corner
-                            // radius describes the widget, not the padded footprint.
-                            // Padding the right panel insets it from the edges without
-                            // the rounding detaching onto the padded box.
-                            .padding(
-                                PaddingValues(
-                                    start  = chrome.effectiveStart.dp,
-                                    top    = chrome.effectiveTop.dp,
-                                    end    = chrome.effectiveEnd.dp,
-                                    bottom = chrome.effectiveBottom.dp,
-                                ),
-                            )
-                            .then(
-                                if (chrome.cornerRadiusDp > 0)
-                                    Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
-                                else Modifier,
-                            )
-                            .background(glass),
-                    ) { content() }
-                }
-            }
+            // Production renderer for per-widget backing (WidgetChrome), see
+            // [hivens.ui.widgets.WidgetBacking]. Invoked by the kernel only when a
+            // widget carries chrome, so default-styled widgets pay nothing.
+            // Remembered so its identity stays stable across AppShell recomposes:
+            // it is provided through the *static* LocalWidgetChromeRenderer, and a
+            // fresh identity each recompose would invalidate the whole content
+            // subtree rather than just chrome consumers.
+            val chromeRenderer: WidgetChromeRenderer = remember { { chrome, content -> WidgetBacking(chrome, content) } }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 LocalDensity provides scaledDensity,

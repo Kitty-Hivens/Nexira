@@ -239,9 +239,12 @@ private fun PropPanelBody(
                     color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                 )
             }
+            // An untouched backing follows the style's card corner, so the slider
+            // opens on that rather than on a negative sentinel; moving it writes an
+            // explicit value, and zero stays reachable as a deliberate square.
             LabeledSlider(
                 label         = s.editorBackingCorner,
-                value         = chrome.cornerRadiusDp.toFloat(),
+                value         = (chrome.explicitCornerDp?.toFloat() ?: LocalStyle.current.cardCorner.value),
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
