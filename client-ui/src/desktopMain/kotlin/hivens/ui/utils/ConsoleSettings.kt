@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Persisted console preferences. Mirrors the `BackgroundManager` /
@@ -171,7 +172,7 @@ class ConsoleSettingsStore(
         unwritten = coerced
         writer?.cancel()
         writer = scope.launch {
-            delay(WRITE_DEBOUNCE_MS)
+            delay(WRITE_DEBOUNCE_MS.milliseconds)
             withContext(writeDispatcher) { save(coerced) }
             if (unwritten == coerced) unwritten = null
         }

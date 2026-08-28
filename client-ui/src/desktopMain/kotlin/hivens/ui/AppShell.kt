@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -33,7 +32,6 @@ import hivens.core.data.HomeView
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.ui.screens.detail.settings.PackSettingsCategory
-import hivens.ui.notifications.TwoFactorLaunchGate
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
@@ -144,7 +142,6 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
@@ -596,7 +593,7 @@ fun FrameWindowScope.AppShellContent(
         // point by construction. Staying up is the evidence, so the crash guard
         // hears about it only once the session has lasted.
         LaunchedEffect(Unit) {
-            delay(UiRecoverySignal.HEALTHY_SESSION_MS)
+            delay(UiRecoverySignal.HEALTHY_SESSION_MS.milliseconds)
             UiRecoverySignal.noteShellHealthy()
         }
 
@@ -874,7 +871,7 @@ fun FrameWindowScope.AppShellContent(
                 }
             }
 
-            val baseDensity   = androidx.compose.ui.platform.LocalDensity.current
+            val baseDensity   = LocalDensity.current
             val scaledDensity = remember(baseDensity, customization.densityScale) {
                 androidx.compose.ui.unit.Density(
                     baseDensity.density * customization.densityScale.coerceIn(0.5f, 2f),
@@ -921,7 +918,7 @@ fun FrameWindowScope.AppShellContent(
             }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
-                androidx.compose.ui.platform.LocalDensity provides scaledDensity,
+                LocalDensity provides scaledDensity,
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
@@ -947,7 +944,6 @@ fun FrameWindowScope.AppShellContent(
                 LocalWindowHide                          provides { isWindowVisible = false },
                 LocalUseCustomChrome                     provides settings.useCustomChrome,
             ) {
-            val effectiveStyle = styleSpec
 
             // Console runs as its own OS window but is composed from here so
             // it inherits LocalCustomization + LocalNxColors via the
@@ -961,7 +957,7 @@ fun FrameWindowScope.AppShellContent(
                     isDarkTheme    = isDarkTheme,
                     onClose        = { gameConsole.hide() },
                     customTheme    = customTheme,
-                    style          = effectiveStyle,
+                    style          = styleSpec,
                 )
             }
 
@@ -970,7 +966,7 @@ fun FrameWindowScope.AppShellContent(
             NxTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
-                style        = effectiveStyle,
+                style        = styleSpec,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
             ) {
@@ -1067,7 +1063,7 @@ fun FrameWindowScope.AppShellContent(
             NxTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
-                style        = effectiveStyle,
+                style        = styleSpec,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
             ) {
@@ -1129,8 +1125,6 @@ fun AppRoot(
     val settingsService: ISettingsService      = koinInject()
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
-    val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
-    val protocolConfig: ServerProtocolConfig   = koinInject()
     val authRegistry: AuthProviderRegistry     = koinInject()
     val bypassStore: SslBypassStore            = koinInject()
     // Present only when a Microsoft client id is configured -- the registry holds

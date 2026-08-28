@@ -42,7 +42,7 @@ private const val SURFACE = "about"
 // screen.
 //
 // Surface owns the per-screen state (updateState, showUpdateDialog)
-// and the asynchronous triggerUpdateCheck closure; widgets observe
+// and the asynchronous check it runs on a timer; widgets observe the
 // MutableState holders in the context and re-render. The full
 // UpdateDialog modal lives at the surface level so it survives even
 // if the user removes the update.panel widget via the editor.
@@ -114,11 +114,10 @@ fun AboutSurface(onBack: () -> Unit) {
         }
     }
 
-    val ctx = remember(updateState, showUpdateDialog, triggerUpdateCheck, systemRam, swapMb, cpu, displayInfo, renderer) {
+    val ctx = remember(updateState, showUpdateDialog, systemRam, swapMb, cpu, displayInfo, renderer) {
         AboutContext(
             updateState        = updateState,
             showUpdateDialog   = showUpdateDialog,
-            triggerUpdateCheck = triggerUpdateCheck,
             systemRam          = systemRam,
             swapMb             = swapMb,
             cpu                = cpu,

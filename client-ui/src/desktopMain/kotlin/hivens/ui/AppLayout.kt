@@ -1,6 +1,5 @@
 package hivens.ui
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -8,7 +7,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
@@ -22,10 +20,8 @@ import hivens.ui.widgets.shell.RAIL_DEFAULT_WIDTH
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
-import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -41,7 +37,6 @@ import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface

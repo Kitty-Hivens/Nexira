@@ -18,7 +18,6 @@ import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.unit.Dp
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**

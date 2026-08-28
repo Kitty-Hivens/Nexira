@@ -50,10 +50,9 @@ import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
-private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
+private const val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
 // SmartyCraft profile section (slot "account"). Signed into SmartyCraft it is the
 // skin-forward account view -- name + status, balance + top-up, the 3D skin and
@@ -63,7 +62,7 @@ private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 // face may belong to a different provider; Microsoft lives in its own section.
 @Widget(id = "profile.account.section", displayName = "widget.profile.account.section")
 @Composable
-fun ProfileAccountSectionWidget(instance: WidgetInstance) {
+fun ProfileAccountSectionWidget() {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
     val settingsService: ISettingsService = koinInject()
@@ -191,7 +190,7 @@ private fun AccountPanel(session: SessionData) {
             Flexible("profile_topup_btn", FlexibleKind.Button) {
                 NxButton(
                     label = s.profileTopUp,
-                    onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
+                    onClick = { SystemActions.openUrl("https://smartycraft.ru/cabinet") },
                     modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
                     style = NxButtonStyle.Secondary,
                 )

@@ -94,8 +94,8 @@ fun PlayButton(
     val fillTarget = when {
         !enabled               -> Color.Transparent
         busy                   -> ink.copy(alpha = 0.78f)
-        pressed && interactive -> lerp(ink, inkContent, 0.16f)
-        hovered && interactive -> lerp(ink, inkContent, 0.10f)
+        pressed                -> lerp(ink, inkContent, 0.16f)
+        hovered                -> lerp(ink, inkContent, 0.10f)
         else                   -> ink
     }
     val fill by animateColorAsState(fillTarget, Motion.tap.of(), label = "playFill")

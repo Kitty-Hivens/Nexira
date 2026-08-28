@@ -70,8 +70,8 @@ fun ProgressWidget(instance: WidgetInstance) {
         )
         Spacer(Modifier.height(8.dp))
 
-        when (val state = overall) {
-            is AutoSyncService.OverallState.InProgress -> InProgressBody(state)
+        when (overall) {
+            is AutoSyncService.OverallState.InProgress -> InProgressBody(overall)
             else                                       -> IdleBody(p.idleText.ifBlank { s.widgetProgressIdle })
         }
     }
