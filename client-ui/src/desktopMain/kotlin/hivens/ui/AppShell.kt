@@ -66,12 +66,9 @@ import hivens.ui.chrome.computeSafeWindowMinSize
 import hivens.launcher.ProfileManager
 import hivens.tray.TrayController
 import hivens.tray.TrayStrings
-import hivens.ui.background.BackdropState
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
-import hivens.ui.background.LocalBackdrop
-import hivens.ui.background.FrostBackdrop
-import hivens.ui.surface.LocalBackdropPainter
+import hivens.ui.theme.WallpaperTone
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.LocalWindowHide
@@ -1286,14 +1283,13 @@ fun AppRoot(
     val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
     val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
-    // Wallpaper recipe published by CustomBackground so frosted surfaces can
-    // redraw a blurred slice of it. EMPTY until an image is set.
-    var backdrop   by remember { mutableStateOf(BackdropState.EMPTY) }
+    // What the wallpaper tells the palette: its seed colour and its overall
+    // brightness. Nothing else about the image leaves CustomBackground now that a
+    // frosted surface blurs the canvas beneath it instead of reproducing the image.
+    var tone by remember { mutableStateOf(WallpaperTone(null, null)) }
 
-    // Material You: forward the wallpaper palette seed (computed in CustomBackground
-    // from the static bitmap or the first video frame) up to NxTheme.
-    LaunchedEffect(backdrop.seedArgb) { onWallpaperSeed(backdrop.seedArgb) }
-    LaunchedEffect(backdrop.avgLuminance) { onWallpaperLuminance(backdrop.avgLuminance) }
+    LaunchedEffect(tone.seedArgb) { onWallpaperSeed(tone.seedArgb) }
+    LaunchedEffect(tone.avgLuminance) { onWallpaperLuminance(tone.avgLuminance) }
 
     Box(
         Modifier
@@ -1319,71 +1315,66 @@ fun AppRoot(
                 }
             }
     ) {
-      CompositionLocalProvider(
-        LocalBackdrop provides backdrop,
-        LocalBackdropPainter provides { blur, mod -> FrostBackdrop(extraBlurDp = blur, modifier = mod) },
+      CustomBackground(
+          settings         = backgroundSettings,
+          mousePosProvider = { mousePos.value },
+          onTone           = { tone = it },
+      )
+
+      af.WrapContent(
+          pixelCursorState = mousePxPos,
+          windowSize       = windowSize,
+          onRealClose      = onRealExit,
+          onHideTray       = onHideToTray,
       ) {
-        CustomBackground(
-            settings         = backgroundSettings,
-            mousePosProvider = { mousePos.value },
-            onBackdrop       = { backdrop = it },
-        )
+          AppLayout(
+              appState = appState,
+              currentScreen = backStack.current,
+              onScreenChange = backStack::navigate,
+              onReplaceScreen = backStack::replaceCurrent,
+              onBack = { backStack.back() },
+              canGoBack = backStack.canGoBack,
+              canGoForward = backStack.canGoForward,
+              onForward = { backStack.forward() },
+              trail = backStack.trail,
+              onPopTo = backStack::popTo,
+              onLogin = { session -> appState = AppState.Authenticated(session) },
+              onLogout = { pendingLogout = true },
+              isDarkTheme = isDarkTheme,
+              onToggleDarkTheme = onToggleDarkTheme,
+              themeMode = themeMode,
+              onThemeModeChanged = onThemeModeChanged,
+              systemThemeAvailable = systemThemeAvailable,
+              paletteFromWallpaper = paletteFromWallpaper,
+              onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
+              customTheme = customTheme,
+              onCustomThemeChanged = onCustomThemeChanged,
+              currentLocale = currentLocale,
+              onLocaleChanged = onLocaleChanged,
+              homeView = homeView,
+              onHomeViewChanged = onHomeViewChanged,
+              uiStyle = uiStyle,
+              onUiStyleChanged = onUiStyleChanged,
+              backgroundSettings = backgroundSettings,
+              onBackgroundSettingsChanged = { backgroundSettings = it },
+              customization              = customization,
+              onCustomizationChanged     = onCustomizationChanged,
+          )
 
-        af.WrapContent(
-            pixelCursorState = mousePxPos,
-            windowSize       = windowSize,
-            onRealClose      = onRealExit,
-            onHideTray       = onHideToTray,
-        ) {
-            AppLayout(
-                appState = appState,
-                currentScreen = backStack.current,
-                onScreenChange = backStack::navigate,
-                onReplaceScreen = backStack::replaceCurrent,
-                onBack = { backStack.back() },
-                canGoBack = backStack.canGoBack,
-                canGoForward = backStack.canGoForward,
-                onForward = { backStack.forward() },
-                trail = backStack.trail,
-                onPopTo = backStack::popTo,
-                onLogin = { session -> appState = AppState.Authenticated(session) },
-                onLogout = { pendingLogout = true },
-                isDarkTheme = isDarkTheme,
-                onToggleDarkTheme = onToggleDarkTheme,
-                themeMode = themeMode,
-                onThemeModeChanged = onThemeModeChanged,
-                systemThemeAvailable = systemThemeAvailable,
-                paletteFromWallpaper = paletteFromWallpaper,
-                onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
-                customTheme = customTheme,
-                onCustomThemeChanged = onCustomThemeChanged,
-                currentLocale = currentLocale,
-                onLocaleChanged = onLocaleChanged,
-                homeView = homeView,
-                onHomeViewChanged = onHomeViewChanged,
-                uiStyle = uiStyle,
-                onUiStyleChanged = onUiStyleChanged,
-                backgroundSettings = backgroundSettings,
-                onBackgroundSettingsChanged = { backgroundSettings = it },
-                customization              = customization,
-                onCustomizationChanged     = onCustomizationChanged,
-            )
+          NotificationStack()
 
-            NotificationStack()
-
-            if (pendingLogout) {
-                val s = LocalStrings.current
-                DestructiveConfirmDialog(
-                    title        = s.logoutConfirmTitle,
-                    body         = s.logoutConfirmBody,
-                    confirmLabel = s.navLogout,
-                    onConfirm    = doLogout,
-                    onDismiss    = { pendingLogout = false },
-                )
-            }
-            // Automation bypass for the now two-step logout (request -> confirm).
-            PuppetClick("logout.confirm") { doLogout() }
-        }
-      } // end CompositionLocalProvider(LocalBackdrop)
+          if (pendingLogout) {
+              val s = LocalStrings.current
+              DestructiveConfirmDialog(
+                  title        = s.logoutConfirmTitle,
+                  body         = s.logoutConfirmBody,
+                  confirmLabel = s.navLogout,
+                  onConfirm    = doLogout,
+                  onDismiss    = { pendingLogout = false },
+              )
+          }
+          // Automation bypass for the now two-step logout (request -> confirm).
+          PuppetClick("logout.confirm") { doLogout() }
+      }
     }
 }

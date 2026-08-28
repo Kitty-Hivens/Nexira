@@ -42,7 +42,8 @@ import hivens.ui.theme.LocalStyle
  */
 sealed interface SurfaceLayer
 
-/** Blurred slice of the active wallpaper, clipped to the surface. */
+/** Blurs whatever lies beneath the surface, clipped to its shape. See [BackdropBlur]
+ *  for what "beneath" can and cannot see. */
 data class Backdrop(val blurRadiusDp: Float = 18f) : SurfaceLayer
 
 /** The "solid panel": a managed-alpha color fill that gives the surface body
@@ -239,7 +240,7 @@ fun FrostSurface(
         Box(Modifier.matchParentSize().clip(shape)) {
             atoms.forEach { layer ->
                 when (layer) {
-                    is Backdrop -> LocalBackdropPainter.current?.invoke(layer.blurRadiusDp, Modifier.matchParentSize())
+                    is Backdrop -> BackdropBlur(layer.blurRadiusDp, Modifier.matchParentSize())
 
                     is Fill -> {
                         val base = colors.frost(layer.role)

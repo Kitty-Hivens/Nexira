@@ -58,10 +58,10 @@ fun CustomBackground(
     settings: BackgroundSettings,
     modifier: Modifier = Modifier,
     mousePosProvider: () -> Offset = { Offset(0.5f, 0.5f) },
-    onBackdrop: (BackdropState) -> Unit = {},
+    onTone: (WallpaperTone) -> Unit = {},
 ) {
     if (!settings.hasUsableImage()) {
-        LaunchedEffect(Unit) { onBackdrop(BackdropState.EMPTY) }
+        LaunchedEffect(Unit) { onTone(WallpaperTone(null, null)) }
         return
     }
     val file = File(settings.imagePath!!)
@@ -71,7 +71,7 @@ fun CustomBackground(
             file             = file,
             settings         = settings,
             mousePosProvider = mousePosProvider,
-            onBackdrop       = onBackdrop,
+            onTone           = onTone,
         )
 
         // Darkening overlay
@@ -122,10 +122,10 @@ private fun AnimatedParallaxImage(
     file: File,
     settings: BackgroundSettings,
     mousePosProvider: () -> Offset,
-    onBackdrop: (BackdropState) -> Unit,
+    onTone: (WallpaperTone) -> Unit,
 ) {
-    // Shared helpers (Backdrop.kt) so a frosted surface reproduces this exact
-    // transform when it redraws a blurred slice -- no drift between the two.
+    // Scale mode and alignment (Backdrop.kt) decide where every pixel of the
+    // wallpaper lands.
     val contentScale = bgContentScale(settings.scaleMode)
     val alignment = bgAlignment(settings.alignX, settings.alignY)
 
@@ -142,7 +142,7 @@ private fun AnimatedParallaxImage(
     // down the other's decode/player state.
     val staticBitmap = if (mediaKind == BackgroundMediaKind.Static) rememberStaticImage(file) else null
     // Material-You seed: static from the decoded bitmap (off-thread); video from its
-    // first decoded frame (via the player's onSeed). Either feeds BackdropState.seedArgb.
+    // first decoded frame (via the player's onSeed). Either feeds the palette seed.
     var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
     val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased)
         rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, settings.hardwareDecode, onSeed = { videoSeed = it }) else null
@@ -160,39 +160,15 @@ private fun AnimatedParallaxImage(
     }
     if (painter == null) return
 
-    val isAnimated = mediaKind == BackgroundMediaKind.TimeBased
-    val tint = remember(settings.tintColor) {
-        settings.tintColor?.let {
-            try { Color(("FF" + it.removePrefix("#")).toLong(16)) } catch (_: Exception) { null }
-        }
-    }
     // Saturation applies at the Image, so it covers the static painter and every
-    // video frame alike; the frost slice mirrors it via BackdropState.saturation.
+    // video frame alike.
     val saturationFilter = remember(settings.saturation) { bgSaturationFilter(settings.saturation) }
-    // Publish the wallpaper recipe for frosted surfaces. A still carries its
-    // bitmap so the frost redraws a real blurred slice; time-based publishes a
-    // null bitmap + isAnimated so the frost falls back to a scrim (per-frame
-    // reblur of video is too costly). Live parallax is read through
-    // mousePosProvider so mouse movement does not churn this.
-    LaunchedEffect(staticBitmap, settings, isAnimated, seedArgb, avgLuminance) {
-        onBackdrop(
-            BackdropState(
-                bitmap            = staticBitmap,
-                contentScale      = contentScale,
-                alignment         = alignment,
-                opacity           = settings.opacity,
-                bgBlurRadiusDp    = settings.blurRadius,
-                darken            = settings.darkenAmount,
-                tint              = tint,
-                tintOpacity       = settings.tintOpacity,
-                saturation        = settings.saturation,
-                parallaxIntensity = settings.parallaxIntensity,
-                isAnimated        = isAnimated,
-                seedArgb          = seedArgb,
-                avgLuminance      = avgLuminance,
-                mouse             = mousePosProvider,
-            ),
-        )
+    // The palette's two inputs, and nothing else. A frosted surface used to need the
+    // whole wallpaper recipe here so it could reproduce the image under itself; it
+    // blurs the canvas beneath it now, so the recipe has no second reader and the
+    // effect no longer re-fires on every slider tick.
+    LaunchedEffect(seedArgb, avgLuminance) {
+        onTone(WallpaperTone(seedArgb = seedArgb, avgLuminance = avgLuminance))
     }
 
     val useParallax = settings.parallaxIntensity > 0f

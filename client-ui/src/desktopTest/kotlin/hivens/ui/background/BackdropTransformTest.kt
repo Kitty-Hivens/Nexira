@@ -10,10 +10,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The shared wallpaper transform helpers used by BOTH [AnimatedParallaxImage]
- * (the real draw) and [FrostBackdrop] (the blurred slice). They are the single
- * source of truth that keeps the frost aligned with the wallpaper -- so they are
- * worth pinning.
+ * The wallpaper transform helpers: scale mode, alignment, saturation and the
+ * parallax pair. One reader left now that the frost blurs the canvas beneath it
+ * rather than reproducing the wallpaper, but they decide where every pixel of the
+ * background lands, so they are worth pinning.
  */
 class BackdropTransformTest {
 
