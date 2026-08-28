@@ -12,12 +12,21 @@ import java.util.jar.JarFile
 /** What one jar in the directory turned out to be. */
 sealed interface WidgetModuleResult
 
-/** A module that loaded, with the registry it contributed. */
+/**
+ * A module that loaded, with the registry it contributed.
+ *
+ * [loader] stays open for as long as the module does -- the registry's classes
+ * come out of it -- and is exposed so a caller that wants the jar back can let
+ * it go first. Windows refuses to delete or move a file that is still open, so
+ * an unreleased loader there is the difference between a module the user can
+ * replace and one they cannot.
+ */
 data class LoadedWidgetModule(
     val id: String,
     val name: String,
     val file: Path,
     val registry: WidgetRegistry,
+    val loader: URLClassLoader,
 ) : WidgetModuleResult
 
 /** A jar in the directory that did not become a module, and why. */
@@ -115,6 +124,10 @@ class WidgetModuleLoader(
             ?: return RejectedWidgetModule(jar, "no ${WidgetApi.MANIFEST_ID} in the manifest")
         val name = attributes.getValue(WidgetApi.MANIFEST_NAME)?.trim()?.takeIf { it.isNotEmpty() } ?: id
 
+        // From here the jar is held open by the loader. Every path that does not
+        // hand it to a LoadedWidgetModule has to let it go again: a rejected jar
+        // whose loader outlives the scan is a file the user cannot delete for the
+        // rest of the session, and on Windows cannot replace either.
         val loader = URLClassLoader(arrayOf(jar.toUri().toURL()), parent)
         val registries = runCatching {
             ServiceLoader.load(WidgetRegistry::class.java, loader)
@@ -122,16 +135,30 @@ class WidgetModuleLoader(
                 // every module would also "find" the launcher's own built-in
                 // registry and contribute a second copy of it.
                 .filter { it.javaClass.classLoader === loader }
-        }.getOrElse { return RejectedWidgetModule(jar, "could not instantiate its registry: ${it.message}") }
+        }.getOrElse {
+            loader.release()
+            return RejectedWidgetModule(jar, "could not instantiate its registry: ${it.message}")
+        }
 
         return when (registries.size) {
-            0 -> RejectedWidgetModule(jar, "declares the widget API but carries no registry service")
-            1 -> LoadedWidgetModule(id = id, name = name, file = jar, registry = registries.single())
+            0 -> {
+                loader.release()
+                RejectedWidgetModule(jar, "declares the widget API but carries no registry service")
+            }
+            1 -> LoadedWidgetModule(id, name, jar, registries.single(), loader)
             // The processor emits exactly one per module. More than one means a
             // hand-assembled or merged jar, where which registry wins is not
             // something this can decide for the author.
-            else -> RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
+            else -> {
+                loader.release()
+                RejectedWidgetModule(jar, "carries ${registries.size} registries; a module must carry one")
+            }
         }
+    }
+
+    /** Closing a loader can throw; a jar we have already refused is not worth a failed scan. */
+    private fun URLClassLoader.release() {
+        runCatching { close() }.onFailure { log.debug("could not close a refused module's loader", it) }
     }
 
     private fun report(loaded: List<LoadedWidgetModule>, rejected: List<RejectedWidgetModule>) {
