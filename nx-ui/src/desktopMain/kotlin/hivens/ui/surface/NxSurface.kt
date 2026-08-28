@@ -36,8 +36,16 @@ fun NxSurfaceLevel.role(): FrostRole = when (this) {
     NxSurfaceLevel.Floating -> FrostRole.SurfaceContainerHigh
 }
 
-/** The slider-independent body floor. Light theme is fully opaque, so a translucent
- *  surface can never muddy over a wallpaper; dark keeps a hair of bleed-through. */
+/**
+ * The body opacity a surface gets when it asks for none.
+ *
+ * A translucent light plane over a wallpaper lands in mud, so light defaults to
+ * solid and dark keeps a hair of bleed-through. This is a DEFAULT, not a clamp: a
+ * caller that names an opacity gets the one it named on either theme. It stopped
+ * being a clamp because as one it silently overrode every knob above it -- the
+ * glass slider moved nothing, and the layer that was supposed to show the
+ * wallpaper through was covered by 92% of solid body before it ever drew.
+ */
 internal fun bodyFloor(dark: Boolean): Float = if (dark) 0.92f else 1.0f
 
 /** A tier's glass coat: its decorative layers minus the body [Fill] (the [Body] owns
@@ -78,6 +86,14 @@ fun NxSurface(
      * flat form takes it to nothing.
      */
     elevated: Boolean = false,
+    /**
+     * Body opacity, 0..1. Null takes [bodyFloor], which is what an unconfigured
+     * surface has always drawn. A named value reaches the body unchanged on both
+     * themes -- including values light used to refuse, because whether a light
+     * plane can afford to be translucent depends on what is behind it and on what
+     * the widget buys legibility with, and neither is knowable here.
+     */
+    opacity: Float? = null,
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -111,7 +127,11 @@ fun NxSurface(
     val dark = bodyColor.luminance() < 0.5f
     val coat = if (glass) tier.coatLayers() else emptyList()
 
-    val bodyAlpha = if (opaque) 1f else bodyFloor(dark)
+    val bodyAlpha = when {
+        opaque          -> 1f
+        opacity != null -> opacity.coerceIn(0f, 1f)
+        else            -> bodyFloor(dark)
+    }
     val layers = buildList {
         // A blur under a body nothing can see through is work thrown away: the
         // wallpaper slice gets sampled and blurred every frame and is then

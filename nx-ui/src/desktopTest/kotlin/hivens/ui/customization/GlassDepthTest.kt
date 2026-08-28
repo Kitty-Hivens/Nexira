@@ -77,6 +77,19 @@ class GlassDepthTest {
     }
 
     @Test
+    fun `light can be asked for a real alpha instead of a rung`() {
+        // The rung substitution is the default answer to mud on a light ground, not a
+        // rule: a caller that blurs what is behind it, or knows nothing busy is there,
+        // has its own answer and must be able to spend the number as an alpha.
+        val rung = resolve(0.45f, LightColorPalette)
+        val alpha = resolve(0.45f, LightColorPalette, translucentOnLight = true)
+        assertEquals(1f, rung.alpha, "the default light plane must stay opaque")
+        // Color packs alpha into 8 bits, so 0.45 comes back as 115/255.
+        assertEquals(0.45f, alpha.alpha, absoluteTolerance = 0.01f)
+        assertEquals(LightColorPalette.surface, alpha.copy(alpha = 1f))
+    }
+
+    @Test
     fun `dark still composites and still honours the glass knob`() {
         // The light branch must not have taken the dark one with it: there the
         // number is an alpha over the page, and that is what the intensity scales.
@@ -87,10 +100,12 @@ class GlassDepthTest {
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun resolve(alpha: Float, palette: NxColors): Color {
+    private fun resolve(alpha: Float, palette: NxColors, translucentOnLight: Boolean = false): Color {
         var out = Color.Unspecified
         val scene = ImageComposeScene(1, 1, density = Density(1f)) {
-            CompositionLocalProvider(LocalNxColors provides palette) { Probe { out = glassSurfaceAlpha(alpha) } }
+            CompositionLocalProvider(LocalNxColors provides palette) {
+                Probe { out = glassSurfaceAlpha(alpha, translucentOnLight) }
+            }
         }
         scene.render()
         scene.close()
