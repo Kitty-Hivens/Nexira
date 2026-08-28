@@ -49,13 +49,22 @@ data class WidgetInstance(
 @Serializable
 data class WidgetChrome(
     val glassAlphaPct: Int = 0,
-    val cornerRadiusDp: Int = 0,
+    /**
+     * -1 takes the active style's card corner, like the padding fields below take
+     * [paddingDp]. It defaulted to 0, and 0 meant the backing was not clipped at
+     * all: raising the glass on a widget that rounds its own corners put a hard
+     * square behind it. Zero is still square, but now only when it is asked for.
+     */
+    val cornerRadiusDp: Int = -1,
     val paddingDp: Int = 0,
     val paddingTopDp: Int = -1,
     val paddingEndDp: Int = -1,
     val paddingBottomDp: Int = -1,
     val paddingStartDp: Int = -1,
 ) {
+    /** The corner this backing was told to use, or null to follow the active style. */
+    val explicitCornerDp: Int? get() = cornerRadiusDp.takeIf { it >= 0 }
+
     val effectiveTop: Int    get() = if (paddingTopDp    >= 0) paddingTopDp    else paddingDp
     val effectiveEnd: Int    get() = if (paddingEndDp    >= 0) paddingEndDp    else paddingDp
     val effectiveBottom: Int get() = if (paddingBottomDp >= 0) paddingBottomDp else paddingDp
