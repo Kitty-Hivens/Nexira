@@ -15,9 +15,9 @@ The recurring shape is not bad code. It is good code that was never connected to
 
 A primitive gets designed carefully, documented well, and then adopted by nobody. A guard gets written and wired to a task nothing runs. A feature gets built end to end and given no entry point. Each instance looks like an oversight; together they are a systemic gap, because the project has no mechanism that notices when something built stops being used, or was never used at all.
 
-The previous measurement said exactly that and then something happened worth recording: the gap narrowed everywhere a machine was pointed at it, and nowhere else. Motion got a scanner and has seventy-two call sites and one bypass. Spacing got a rewrite and no scanner, and has zero call sites in the application module. Continuous integration got every module's test task spelled out and now runs 98% of the suite. The design system got no such list and its own module's tests are the ones still not running.
+The gap narrows everywhere a machine is pointed at it, and nowhere else. Motion got a scanner and has seventy-three call sites and no bypasses. Spacing got a rewrite and no scanner, and has zero call sites in the application module -- the rewrite fixed the rung list, which was never what was wrong. The test matrix was hand-kept and had three modules missing from it; it now has a scanner and has none.
 
-The lesson is not "write more scanners". It is that adoption is a property of enforcement, not of documentation, and this codebase now has the A/B test to prove it.
+The lesson is not "write more scanners". It is that adoption is a property of enforcement, not of documentation, and the pairs above are the A/B test. A finding in this document is worth a scanner exactly when it can be stated mechanically; the ones below that cannot be are the ones that keep coming back.
 
 ## Closed since the last measurement
 
@@ -36,9 +36,16 @@ Recorded because a census that only grows teaches nothing about which interventi
 | `NxPanel`, `NxHorizontalScrollbar`, `NoOpIndication` unreferenced | deleted |
 | `AssetRowPanel`, `DisintegrateBox`, `RoleGroupSection` unreferenced | deleted |
 | `verifyRuntimeModules` wired to a `check` nothing ran | run explicitly in the pull-request test workflow |
-| Two scanners covering five modules | three scanners deriving their roots from the module list, so a new module is covered the day it lands |
-| CI ran three suites, ~1065 of 1780 tests | CI runs twenty module test tasks, 2474 of 2516 |
+| Two scanners covering five modules | four scanners taking their roots from `settings.gradle.kts`, so a module is covered wherever it is nested |
+| CI ran three suites, ~1065 of 1780 tests | the matrix names every module suite: 23 of them, 2519 tests |
 | Nine render tests, one asserting anything drawn | seventeen render classes, thirty-nine tests, sixteen classes reading pixels |
+| Three module suites absent from the matrix, 42 tests never run | in the matrix, and `check-ci-suites.py` fails the build if that stops being true |
+| Two of the three scanners red on `dev` | all four green |
+| 27 of 59 widgets declared an instance parameter the kernel forced on them and could not use | the kernel accepts `fun Name()` too, and a props class on a declaration without the instance is now a build error |
+| `saveToFile`, the About and theme-picker context callbacks, `commit`'s version parameter, the dead divider branch in `writeLine` | removed |
+| The console divider never named the pack | it carries the label the launch event was already handing it |
+| The wardrobe could be entered by automation and not left | `wardrobe.back`, bound like the other three surfaces |
+| `SlotRenderer`'s two flow branches, `LayoutGraph`'s four instance transforms, nine identical background sliders | one implementation each |
 
 ## Built, not adopted
 
@@ -72,7 +79,7 @@ The result is unchanged and now measured twice: rendering one screen under both 
 python3 -c "from PIL import Image; import numpy as np; a=np.asarray(Image.open('client-ui/build/render/version-picker-fhd.png').convert('RGB')).astype(int); b=np.asarray(Image.open('client-ui/build/render/version-picker-fhd-brut.png').convert('RGB')).astype(int); m=(abs(a-b).sum(2)>8); print(f'{100*m.mean():.4f}%')"
 ```
 
-**The motion scale is the counter-example.** Eight roles, 72 call sites outside its own file, and exactly one site bypassing it. It is the only token layer in the tree with a scanner behind it. Cause and effect are not provable from one pair, but the pair is worth keeping in view whenever the next primitive is proposed.
+**The motion scale is the counter-example.** Eight roles, 73 call sites outside its own file, and no site bypassing it. It is the only token layer in the tree with a scanner behind it, and the one bypass it did carry -- a literal `tween` in the description renderer -- was found by that scanner rather than by reading. Cause and effect are not provable from one pair, but the pair is worth keeping in view whenever the next primitive is proposed.
 
 **Foreign-launcher import is built and unreachable.** A root locator spanning native, Flatpak and Snap layouts, four discovery sources (Minecraft Launcher, Modrinth App, Prism, FTB), and an importer that copies an instance and deduplicates its runtime into the shared roots. `LauncherImportService` and `ForeignInstanceImporter` appear only in the DI module. Nothing injects them, no screen calls them, and no localised strings exist for the flow. Unchanged since the last measurement; the pack importer next to it (`PackImportService`) is wired to the Library screen and works.
 
@@ -87,12 +94,9 @@ Declared and referenced nowhere else.
 | What | Where |
 |---|---|
 | `ActiveSessionsSection` | `notifications/render/SessionChip.kt` |
-| `GameConsoleService.saveToFile` | superseded by `exportEntries`, which the console window calls instead |
-| `AboutContext.triggerUpdateCheck` | the surface builds the lambda, puts it in the context, and calls its own copy |
-| `ThemePickerContext.onApply` | same shape; the context's own KDoc records that the apply button stayed in surface chrome |
-| `LayoutApplier.commit(newVersion)` | the parameter; `commitFrom` reads the version back out of the marker |
-| `GameConsoleService.writeLine`'s divider branch | an `if` with a comment and no body |
 | 114 localisation keys | across the interface and three locale files |
+
+Both survive for the same reason: neither is a mistake to delete. The section is a working panel with no host, and the keys are features named in three languages and then not finished. Removing either throws away the work; the entry stays until someone decides which.
 
 `ActiveSessionsSection` deserves its own note, still. It is a ready composable listing running games with uptime, an open-console button and an abort button, and it is mounted nowhere. The registry behind it is live -- the launch driver registers every session and the shell reads it for the tray tooltip -- and the title string exists in all three locales. Only the panel is missing. Its abort no longer has the old defect: terminate escalates and kills the process tree, so mounting it would ship a Stop button that works.
 
@@ -104,19 +108,11 @@ grep -rn 'ActiveSessionsSection' --include=*.kt --exclude-dir=build .
 
 A value that is produced, threaded through two or three layers, and dropped on the last one. Distinct from dead code: every link but the last is live, so nothing looks unused from either end.
 
-- **The console never learns the pack's name.** `LauncherController` emits `SessionStarted(targetId, targetLabel)`, the UI collector passes both to `GameConsoleService.startSession(packId, packLabel)`, and the service drops the label. The session divider reads `--------- Session started HH:MM:SS ---------` with no pack in it. The command-line front end, which reads the same event, prints the label.
-- **The wardrobe cannot be left by automation.** `AppLayout` passes `onBack` to `WardrobeSurface`, which ignores it. About, the theme picker and the profile all bind theirs to a puppet click; the wardrobe has no `wardrobe.back`.
-- **The top-up URL is written twice.** The button in the profile account widget and its puppet mirror in the profile surface each carry a literal `smartycraft.ru/cabinet`, while `ServerProtocolConfig.baseUrl` exists precisely so a mirror operator can point the launcher elsewhere. Two literals, one configurable value, and nothing keeps the pair in step.
+- **The top-up URL is written twice.** The button in the profile account widget and its puppet mirror in the profile surface each carry a literal `smartycraft.ru/cabinet`, while `ServerProtocolConfig.baseUrl` exists precisely so a mirror operator can point the launcher elsewhere. The two agree on the scheme again, which is the second time they have had to be brought back into step; nothing keeps them there.
 
-The puppet layer generalises that last one: every automated click re-implements the body of the control it drives, so a control and its mirror are two copies of one decision with no compiler relation between them.
+The puppet layer generalises that: every automated click re-implements the body of the control it drives, so a control and its mirror are two copies of one decision with no compiler relation between them. It is the one duplication in the tree that cannot be factored away, because the point of the mirror is to reach the action without the widget.
 
-## Duplicated by construction
-
-Not style duplication -- shapes the code cannot factor without a deliberate abstraction, so they get copied instead.
-
-- **`SlotRenderer`'s flow branches.** The `Row` orientation and the `else ->` `Column` fallback are identical line for line except for the composable and the arrangement axis, about twenty-two lines each. `Modifier.weight` is scope-typed, which is what blocked the obvious extraction; passing the weight modifier in as a lambda unblocks it.
-- **`LayoutGraph`'s instance transforms.** `updateWidgetProps`, `updateWidgetChrome`, `setWidgetWeight` and `setCanvasPlacement` are four copies of "find the instance, return unchanged if it already matches, otherwise rebuild the list".
-- **`BgPositionXWidget` and `BgPositionYWidget`.** Eleven identical lines with one axis swapped, in a package of nineteen files that are each a single slider bound to one background field.
+Two entries left this section by being connected rather than deleted -- the pack label the console divider now prints, and the wardrobe's back -- which is the distinction worth keeping: an unread value is usually a missing wire, not a dead one. What made both hard to see is that every link except the last was live.
 
 ## Unreachable
 
@@ -135,27 +131,28 @@ for k in glassIntensity densityScale hardwareDecode; do grep -rn "$k *=" --inclu
 
 ## What is enforced, and what is not
 
-The enforcement infrastructure grew and it works. Three custom scanners run on pull requests: one fails on a user-facing string hardcoded outside the localisation layer, one on process metadata and other Style-D comment anti-patterns, one on a duration literal written past the motion scale. All three now derive their scan roots from the module layout rather than a hand-kept list, so `nx-ui` and the widget modules -- previously covered by nothing -- are covered.
+Four custom scanners run on pull requests: one fails on a user-facing string hardcoded outside the localisation layer, one on process metadata and other Style-D comment anti-patterns, one on a duration literal written past the motion scale, and one on a module whose tests the CI matrix does not name. All four take their module list from `settings.gradle.kts`, which matters more than it sounds: the three older ones derived their roots by listing directories one level below the repository root, and that silently skipped `experimental/client-boot` and `examples/widget-pixelplayer` -- fourteen files that read as covered and were not.
 
-Two of the three are red on `dev` right now.
+All four are green.
 
 ```sh
-python3 scripts/check-i18n.py     --strict   # 0 hits across 716 files
-python3 scripts/check-comments.py --strict   # 4 hits across 1081 files, exit 1
-python3 scripts/check-motion.py   --strict   # 1 hit, exit 1
+python3 scripts/check-i18n.py      --strict   # 0 hits across 723 files
+python3 scripts/check-comments.py  --strict   # 0 hits across 1095 files
+python3 scripts/check-motion.py    --strict   # no call site steps around the scale
+python3 scripts/check-ci-suites.py --strict   # 23 module suites, 2519 tests, all in the matrix
 ```
 
-The comment scanner's four hits are two version-tied references and two parenthesized issue refs, all in comments about the legacy server path's retirement. The motion scanner's one hit is a literal `tween()` duration in the description renderer. Neither gate blocks the branch today -- `comment-lint` runs on pull requests and on pushes to `stable`, not on pushes to `dev` -- so both will surface as a red check on the next pull request rather than at the commit that introduced them.
+Green is not the same as blocking. `comment-lint` runs on pull requests and on pushes to `stable`, not on pushes to `dev`, so a violation committed straight to `dev` surfaces as a red check on the next pull request rather than at the commit that made it. That is a deliberate trade and worth knowing when reading a clean `dev`.
 
 What the infrastructure still does not cover:
 
-- **Form.** Nothing checks that a new surface uses the floored primitive, that a spacing value is on the scale, that a corner radius goes through a style token, or that a new badge is not a fourth implementation. The motion scanner is the proof that this class of rule is enforceable; spacing is the same rule with a different vocabulary.
-- **Adoption.** No check notices that a primitive has zero readers. Every entry in "Built, not adopted" above would have been caught at the commit that failed to use it.
+- **Form.** Nothing checks that a new surface uses the floored primitive, that a spacing value is on the scale, that a corner radius goes through a style token, or that a new badge is not a fourth implementation. The motion scanner is the proof that this class of rule is enforceable; spacing is the same rule with a different vocabulary and no scanner.
+- **Adoption.** No check notices that a primitive has zero readers. Every entry in "Built, not adopted" above would have been caught at the commit that failed to use it. The suite scanner is the narrow case of this rule -- a test nobody runs -- and the general one is the same query asked of a symbol.
 
-Test coverage improved sharply. 2516 test methods exist; the pull-request matrix runs twenty module test tasks covering 2474 of them on all three operating systems. The 42 that never run are `:widget-loader:test` (12), `:experimental:client-boot:test` (9) and `:examples:widget-pixelplayer:test` (21). The workflow comment above that task list claims every module with tests is listed, which is now three modules out of date -- the widget loader is the one that matters, since it is the runtime half of the same validator the KSP processor enforces at compile time.
+Test coverage is no longer the gap. The pull-request matrix names every module suite: 23 of them, 2519 tests, on all three operating systems, with the suite scanner failing the build if a module's tests ever stop being named. The three that used to be missing were the widget loader -- the runtime half of the validator the KSP processor enforces at compile time -- the parked boot module, and the worked example, which is the only thing in the tree that compiles against the widget ABI from outside and therefore the only test that notices an ABI change from a consumer's side.
 
 ```sh
-grep -rh '@Test' --include=*.kt --include=*.java */src */*/src | wc -l
+python3 scripts/check-ci-suites.py
 grep -n 'gradlew' .github/workflows/tests.yml
 ```
 
