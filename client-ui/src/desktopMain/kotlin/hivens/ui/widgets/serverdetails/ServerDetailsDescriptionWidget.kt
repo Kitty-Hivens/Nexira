@@ -15,7 +15,6 @@ import hivens.ui.nx.NxCalloutTone
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 // Long-form description text or a warning callout when the
 // description.txt file is missing on disk. Self-scrolls inside a
@@ -23,7 +22,7 @@ import hivens.widget.model.WidgetInstance
 // the surface does not wrap the slot itself in scroll.
 @Widget(id = "server.details.description", displayName = "widget.server.details.description")
 @Composable
-fun ServerDetailsDescriptionWidget(instance: WidgetInstance) {
+fun ServerDetailsDescriptionWidget() {
     val ctx = LocalServerDetailsContext.current
     val s = LocalStrings.current
     val description by ctx.description

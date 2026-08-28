@@ -1,24 +1,18 @@
 package hivens.ui.widgets.bgsettings
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.nx.NxSlider
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 @Widget(id = "bg.fx.vignette", displayName = "widget.bg.fx.vignette")
 @Composable
-fun BgFxVignetteWidget(instance: WidgetInstance) {
-    val ctx = LocalBgSettingsContext.current
+fun BgFxVignetteWidget() {
     val s = LocalStrings.current
-    val settings by ctx.settings
-    val v = settings.vignetteIntensity
-    NxSlider(
-        label = s.backgroundVignette,
-        value = v,
-        range = 0f..1f,
-        valueText = "%.0f%%".format(v * 100),
-        onValueChange = { ctx.update { copy(vignetteIntensity = it) } },
+    BgSlider(
+        label  = s.backgroundVignette,
+        range  = 0f..1f,
+        read   = { vignetteIntensity },
+        format = { "%.0f%%".format(it * 100) },
+        write  = { copy(vignetteIntensity = it) },
     )
 }

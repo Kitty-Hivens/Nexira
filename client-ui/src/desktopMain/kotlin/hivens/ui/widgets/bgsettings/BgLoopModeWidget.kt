@@ -6,11 +6,10 @@ import hivens.ui.background.BackgroundLoopMode
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 @Widget(id = "bg.loop.mode", displayName = "widget.bg.loop.mode")
 @Composable
-fun BgLoopModeWidget(instance: WidgetInstance) {
+fun BgLoopModeWidget() {
     val ctx = LocalBgSettingsContext.current
     val s = LocalStrings.current
     val settings by ctx.settings

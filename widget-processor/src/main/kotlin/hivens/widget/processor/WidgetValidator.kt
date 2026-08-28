@@ -9,9 +9,17 @@ import com.google.devtools.ksp.symbol.Modifier
 // Shared rule-set for what a @Widget composable must look like. The KSP
 // processor validates Kotlin sources at compile time; Phase E's plugin
 // loader will validate java.lang.reflect.Method at runtime. The rules
-// are the same: top-level + @Composable + single WidgetInstance param
-// + no inline/suspend/extension + non-blank id. Centralising them here
-// keeps the two entry points consistent.
+// are the same: top-level + @Composable + at most one WidgetInstance
+// param + no inline/suspend/extension + non-blank id. Centralising them
+// here keeps the two entry points consistent.
+//
+// The parameter is optional because most widgets never read it. A widget
+// draws from its surface context and its own state; the instance carries
+// props and the instance id, which only a widget that declares props or
+// keeps per-instance state needs. Forcing every declaration to name a
+// value it cannot use made almost half of them carry a parameter for the
+// registry's convenience, and taught an author that the warning on it is
+// noise to be ignored.
 internal object WidgetValidator {
 
     private const val WIDGET_ANNOTATION_FQN = "hivens.widget.model.Widget"
@@ -31,6 +39,8 @@ internal object WidgetValidator {
         // FQN of the @Serializable props class, or null for Unit::class
         // (a propless widget).
         val propsClassFqn: String?,
+        /** Whether the declaration takes the instance; false for a bare `fun Name()`. */
+        val takesInstance: Boolean,
         /** Contracts declared via @ProvidesService, by FQN. */
         val provides: List<String>,
         /** Contracts declared via @InjectService, by FQN. */
@@ -64,20 +74,23 @@ internal object WidgetValidator {
         }
 
         val params = symbol.parameters
-        if (params.size != 1) {
+        if (params.size > 1) {
             env.logger.error(
-                "@Widget composables must take exactly one parameter (instance: WidgetInstance)",
+                "@Widget composables take at most one parameter (instance: WidgetInstance)",
                 symbol,
             )
             return null
         }
-        val paramType = params[0].type.resolve().declaration.qualifiedName?.asString()
-        if (paramType != WIDGET_INSTANCE_FQN) {
-            env.logger.error(
-                "@Widget composable parameter must be hivens.widget.model.WidgetInstance, got $paramType",
-                symbol,
-            )
-            return null
+        val takesInstance = params.isNotEmpty()
+        if (takesInstance) {
+            val paramType = params[0].type.resolve().declaration.qualifiedName?.asString()
+            if (paramType != WIDGET_INSTANCE_FQN) {
+                env.logger.error(
+                    "@Widget composable parameter must be hivens.widget.model.WidgetInstance, got $paramType",
+                    symbol,
+                )
+                return null
+            }
         }
 
         if (Modifier.INLINE in symbol.modifiers || Modifier.SUSPEND in symbol.modifiers) {
@@ -155,6 +168,17 @@ internal object WidgetValidator {
                 )
                 return null
             }
+            // Props reach the body through the instance and nowhere else, so a
+            // props class on a declaration that does not take one is a form the
+            // author can fill in and never read.
+            if (!takesInstance) {
+                env.logger.error(
+                    "@Widget '$id' declares propsClass '$propsClassFqn' but takes no instance " +
+                        "-- add `instance: WidgetInstance` to read them",
+                    symbol,
+                )
+                return null
+            }
         }
 
         // Until now nothing in the processor referenced the two service
@@ -167,6 +191,7 @@ internal object WidgetValidator {
             removable = removable,
             slots = sanitized,
             propsClassFqn = propsClassFqn,
+            takesInstance = takesInstance,
             provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
             injects = symbol.serviceContracts(INJECT_SERVICE_FQN, "services"),
         )

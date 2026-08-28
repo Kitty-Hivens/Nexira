@@ -14,11 +14,10 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 @Widget(id = "bg.reset", displayName = "widget.bg.reset")
 @Composable
-fun BgResetWidget(instance: WidgetInstance) {
+fun BgResetWidget() {
     val ctx = LocalBgSettingsContext.current
     val s = LocalStrings.current
     var confirming by remember { mutableStateOf(false) }

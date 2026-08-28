@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxColorSurface
@@ -35,7 +34,6 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 // Preview panel mirroring the current selectedTheme. Reads only,
 // never writes. Safe to remove from the surface: the user keeps
@@ -43,7 +41,7 @@ import hivens.widget.model.WidgetInstance
 // still commits.
 @Widget(id = "theme.picker.preview", displayName = "widget.theme.picker.preview")
 @Composable
-fun ThemePickerPreviewWidget(instance: WidgetInstance) {
+fun ThemePickerPreviewWidget() {
     val ctx = LocalThemePickerContext.current
     val s = LocalStrings.current
     val theme by ctx.selectedTheme

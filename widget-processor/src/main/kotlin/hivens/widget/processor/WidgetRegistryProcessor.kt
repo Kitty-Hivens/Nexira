@@ -44,6 +44,7 @@ class WidgetRegistryProcessor(
                     slots = extracted.slots,
                     propsClassFqn = extracted.propsClassFqn,
                     functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",
+                    takesInstance = extracted.takesInstance,
                     provides = extracted.provides,
                     injects = extracted.injects,
                 ),

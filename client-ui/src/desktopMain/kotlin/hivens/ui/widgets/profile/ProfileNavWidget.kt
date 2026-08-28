@@ -24,7 +24,6 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
 // Vertical category nav for the profile surface. Writes
@@ -34,7 +33,7 @@ import org.koin.compose.koinInject
 // surface to bring nav back.
 @Widget(id = "profile.nav", displayName = "widget.profile.nav")
 @Composable
-fun ProfileNavWidget(instance: WidgetInstance) {
+fun ProfileNavWidget() {
     val ctx = LocalProfileContext.current
     val s = LocalStrings.current
     val style = LocalStyle.current

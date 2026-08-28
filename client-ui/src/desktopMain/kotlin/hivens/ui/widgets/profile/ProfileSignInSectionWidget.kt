@@ -12,15 +12,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,7 +29,6 @@ import hivens.core.data.releasingFace
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
 import hivens.ui.components.MicrosoftSignInButton
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -48,10 +43,9 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
-private val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
+private const val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 
 // Microsoft profile section (slot "signin"). Signed into Microsoft it shows the
 // licensed identity -- Minecraft name, UUID, the live skin -- with a sign-out.
@@ -63,7 +57,7 @@ private val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 // next, deeper pass -- this section is the identity + auth foundation.
 @Widget(id = "profile.signin", displayName = "widget.profile.signin", removable = false)
 @Composable
-fun ProfileSignInSectionWidget(instance: WidgetInstance) {
+fun ProfileSignInSectionWidget() {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()

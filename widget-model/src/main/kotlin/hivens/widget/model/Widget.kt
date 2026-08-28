@@ -4,8 +4,12 @@ import kotlin.reflect.KClass
 
 // Marker annotation scanned by the KSP processor in :widget-processor.
 // Apply to top-level @Composable functions with signature
-//   fun Name(instance: WidgetInstance)
-// Wrong signatures fail the build with a KSP diagnostic.
+//   fun Name(instance: WidgetInstance)   -- reads props or per-instance state
+//   fun Name()                           -- reads neither
+// The instance is what carries props and the instance id, so a widget that
+// declares [propsClass] or keeps state under its instance id has to take it
+// and the build says so; one that draws from its surface context alone takes
+// nothing. Any other signature fails the build with a KSP diagnostic.
 //
 // id MUST be unique across the whole runtime. Convention:
 //   "<surface>.<role>"        for kernel widgets ("home.classic.header")
