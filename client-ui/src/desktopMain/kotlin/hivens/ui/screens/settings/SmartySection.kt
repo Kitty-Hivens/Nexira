@@ -48,7 +48,7 @@ internal fun SmartySection(
         // mechanism end to end. Its two standing limits are in the copy rather than
         // in a warning icon -- a two-factor account is never logged in from a
         // background pass (the login would revoke the code-confirmed session), and
-        // the raw-server path is retired in 2.5.0, so neither is a defect awaiting
+        // the raw-server path is on its way out, so neither is a defect awaiting
         // a fix.
         //
         // No compat grading either: `classifyCompat` reads an installed manifest

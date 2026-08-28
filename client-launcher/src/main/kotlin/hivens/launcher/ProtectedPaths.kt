@@ -16,7 +16,7 @@ import java.nio.file.Path
  * downloads whatever the server lists and keeps no record of what it wrote last
  * time, so a list of names to leave alone is the only thing standing between an
  * update and the player's settings -- a workaround for how that path behaves,
- * not a design. It retires with it (#318).
+ * not a design. It retires when that path does.
  *
  * Mirror packs do not use this and must not: they keep the installed version's
  * manifest as a baseline, so the reconciler distinguishes a file the pack

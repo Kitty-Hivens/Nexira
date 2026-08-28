@@ -244,8 +244,8 @@ data class SettingsData(
      *    would revoke the session the player just unlocked with a code. Such an
      *    account therefore syncs only against a manifest cached by an earlier
      *    manual login, and a server without one is skipped.
-     *  * The whole raw-server path is deprecated since 2.4.0 and removed in
-     *    2.5.0 at the latest (#318), so its defects are not being fixed.
+     *  * The whole raw-server path is on its way out, so its defects are being
+     *    left alone rather than worked around here.
      *
      * Off by default: most users play 1-2 servers; this is maintainer-
      * grade convenience for users with many servers installed.

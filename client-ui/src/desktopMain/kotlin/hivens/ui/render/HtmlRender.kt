@@ -2,7 +2,6 @@ package hivens.ui.render
 
 import androidx.compose.foundation.background
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -76,6 +75,7 @@ import coil3.size.Size as CoilSize
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.bevelHairline
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
@@ -691,7 +691,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
         val hovered by interaction.collectIsHoveredAsState()
         val ring by animateColorAsState(
             targetValue = if (hovered && href != null) NxTheme.colors.primary else Color.Transparent,
-            animationSpec = tween(140),
+            animationSpec = Motion.tap.of(),
             label = "figure-hover",
         )
         Box(
