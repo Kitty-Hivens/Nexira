@@ -18,16 +18,21 @@ import hivens.ui.theme.NxTheme
  * of an alpha -- see [lightPlaneFor]. Dark glass (src <= backdrop everywhere, a safe
  * floor) keeps its translucency and the glass-intensity knob.
  *
+ * That substitution is the DEFAULT, not the rule. [translucentOnLight] spends the
+ * number as an alpha on light too, for a caller that has its own answer to the mud --
+ * blurring what is behind it, or knowing that nothing busy is. The library cannot see
+ * either, so it must not decide for everyone: as an unconditional substitution this
+ * made the light branch ignore every alpha it was handed.
+ *
  * Still a stopgap: a call site that says `0.45` is guessing at a depth it could simply
- * name, and the ladder is what `NxSurface(level = ...)` already takes by name. What this
- * fixes is that the guess used to be discarded entirely on light.
+ * name, and the ladder is what `NxSurface(level = ...)` already takes by name.
  *
  * Use this anywhere that currently does `NxTheme.colors.surface.copy(alpha = X)`.
  */
 @Composable
-fun glassSurfaceAlpha(baseAlpha: Float): Color {
+fun glassSurfaceAlpha(baseAlpha: Float, translucentOnLight: Boolean = false): Color {
     val colors = NxTheme.colors
-    if (colors.surface.luminance() > 0.5f) return lightPlaneFor(baseAlpha, colors)
+    if (colors.surface.luminance() > 0.5f && !translucentOnLight) return lightPlaneFor(baseAlpha, colors)
     val multiplier = LocalCustomization.current.glassIntensity
     return colors.surface.copy(alpha = (baseAlpha * multiplier).coerceIn(0f, 1f))
 }
@@ -62,12 +67,13 @@ private fun lightPlaneFor(baseAlpha: Float, colors: NxColors): Color = when {
 
 /**
  * Same as [glassSurfaceAlpha] but takes a pre-resolved base color instead of pulling from
- * the palette. A light base returns opaque for the same Rule 4 reason; a dark base honours
- * the glass-intensity knob.
+ * the palette. A light base returns opaque for the same Rule 4 reason, and
+ * [translucentOnLight] opts out of that for the same reason it does there; a dark base
+ * honours the glass-intensity knob.
  */
 @Composable
-fun scaledAlpha(baseColor: Color, baseAlpha: Float): Color {
-    if (baseColor.luminance() > 0.5f) return baseColor
+fun scaledAlpha(baseColor: Color, baseAlpha: Float, translucentOnLight: Boolean = false): Color {
+    if (baseColor.luminance() > 0.5f && !translucentOnLight) return baseColor
     val multiplier = LocalCustomization.current.glassIntensity
     return baseColor.copy(alpha = (baseAlpha * multiplier).coerceIn(0f, 1f))
 }
