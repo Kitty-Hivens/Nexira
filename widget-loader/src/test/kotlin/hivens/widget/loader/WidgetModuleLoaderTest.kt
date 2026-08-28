@@ -29,6 +29,9 @@ class WidgetModuleLoaderTest {
     private lateinit var tmp: Path
     private lateinit var modules: Path
 
+    /** Every module a scan in this test opened, so teardown can let its jar go. */
+    private val opened = mutableListOf<LoadedWidgetModule>()
+
     private val fixtureJar: Path =
         Path.of(requireNotNull(System.getProperty("nexira.test.fixtureModuleJar")) {
             "the fixture module jar was not passed to the test JVM"
@@ -42,16 +45,25 @@ class WidgetModuleLoaderTest {
 
     @AfterTest
     fun tearDown() {
+        // A loaded module holds its jar open. Two of the three hosts will unlink an
+        // open file and the third will not, so releasing first is what makes this
+        // teardown mean the same thing everywhere.
+        opened.forEach { runCatching { it.loader.close() } }
+        opened.clear()
         Files.walk(tmp).use { walk ->
             walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
         }
     }
 
+    /** Scans, remembering what it opened. */
+    private fun scan(dir: Path = modules): WidgetModuleScan =
+        WidgetModuleLoader(dir).scan().also { opened += it.loaded }
+
     @Test
     fun `a well-formed module is loaded, named, and brings its widgets`() {
         install("good.jar")
 
-        val scan = WidgetModuleLoader(modules).scan()
+        val scan = scan()
 
         assertEquals(emptyList(), scan.rejected)
         val module = scan.loaded.single()
@@ -64,7 +76,7 @@ class WidgetModuleLoaderTest {
     fun `the registry comes out of the jar, not off the test classpath`() {
         install("good.jar")
 
-        val registry = WidgetModuleLoader(modules).scan().loaded.single().registry
+        val registry = scan().loaded.single().registry
 
         assertEquals("fixture.FixtureRegistry", registry.javaClass.name)
         assertTrue(
@@ -78,7 +90,7 @@ class WidgetModuleLoaderTest {
         install("a.jar", id = "first")
         install("b.jar", id = "second")
 
-        val loaded = WidgetModuleLoader(modules).scan().loaded
+        val loaded = scan().loaded
 
         assertEquals(listOf("first", "second"), loaded.map { it.id })
         assertTrue(
@@ -91,7 +103,7 @@ class WidgetModuleLoaderTest {
     fun `a module built for another ABI is refused, and the reason names both versions`() {
         install("old.jar", api = WidgetApi.VERSION + 1)
 
-        val scan = WidgetModuleLoader(modules).scan()
+        val scan = scan()
 
         assertEquals(emptyList(), scan.loaded)
         val reason = scan.rejected.single().reason
@@ -102,7 +114,7 @@ class WidgetModuleLoaderTest {
     fun `a jar that is not a widget module at all is refused as such`() {
         install("plain.jar", api = null)
 
-        val rejected = WidgetModuleLoader(modules).scan().rejected.single()
+        val rejected = scan().rejected.single()
 
         assertTrue(WidgetApi.MANIFEST_VERSION in rejected.reason, rejected.reason)
     }
@@ -111,7 +123,7 @@ class WidgetModuleLoaderTest {
     fun `a version that is not a number is refused rather than defaulted`() {
         install("weird.jar", apiText = "1.0-SNAPSHOT")
 
-        val rejected = WidgetModuleLoader(modules).scan().rejected.single()
+        val rejected = scan().rejected.single()
 
         assertTrue("1.0-SNAPSHOT" in rejected.reason, rejected.reason)
     }
@@ -120,7 +132,7 @@ class WidgetModuleLoaderTest {
     fun `a module with no id is refused`() {
         install("anonymous.jar", id = null)
 
-        val rejected = WidgetModuleLoader(modules).scan().rejected.single()
+        val rejected = scan().rejected.single()
 
         assertTrue(WidgetApi.MANIFEST_ID in rejected.reason, rejected.reason)
     }
@@ -129,14 +141,14 @@ class WidgetModuleLoaderTest {
     fun `a module with no name is known by its id`() {
         install("plain-name.jar", name = null)
 
-        assertEquals("fixture", WidgetModuleLoader(modules).scan().loaded.single().name)
+        assertEquals("fixture", scan().loaded.single().name)
     }
 
     @Test
     fun `a module declaring the API but carrying no registry is refused`() {
         install("empty.jar", withService = false)
 
-        val rejected = WidgetModuleLoader(modules).scan().rejected.single()
+        val rejected = scan().rejected.single()
 
         assertTrue("no registry" in rejected.reason, rejected.reason)
     }
@@ -146,10 +158,22 @@ class WidgetModuleLoaderTest {
         modules.resolve("broken.jar").writeText("this is not a zip")
         install("good.jar")
 
-        val scan = WidgetModuleLoader(modules).scan()
+        val scan = scan()
 
         assertEquals(1, scan.loaded.size, "one bad file must not cost the others")
         assertEquals(1, scan.rejected.size)
+    }
+
+    @Test
+    fun `a refused module leaves its jar closed`() {
+        // Vacuous on a host that will unlink an open file; the point is the host
+        // that will not, where a loader left behind by a refused jar makes that
+        // file undeletable for the rest of the session.
+        install("empty.jar", withService = false)
+
+        assertEquals(1, scan().rejected.size)
+
+        Files.delete(modules.resolve("empty.jar"))
     }
 
     @Test
@@ -157,12 +181,12 @@ class WidgetModuleLoaderTest {
         modules.resolve("notes.txt").writeText("hello")
         modules.resolve("subdir").createDirectories()
 
-        assertEquals(WidgetModuleScan(), WidgetModuleLoader(modules).scan())
+        assertEquals(WidgetModuleScan(), scan())
     }
 
     @Test
     fun `a missing directory is a launcher with no modules, not an error`() {
-        assertEquals(WidgetModuleScan(), WidgetModuleLoader(tmp.resolve("nothing-here")).scan())
+        assertEquals(WidgetModuleScan(), scan(tmp.resolve("nothing-here")))
     }
 
     // -- fixture ------------------------------------------------------------
