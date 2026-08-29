@@ -90,14 +90,29 @@ private fun parseHexFill(v: String): FillSource.Literal? {
  *
  * [smoothing] is the squircle amount rather than a rounding radius: continuous
  * curvature, available to every kind.
+ *
+ * [points], [innerRadius] and [pointRounding] belong to the star and polygon kinds and
+ * are ignored by the rest -- which is the flatness working as intended. They are
+ * fractions rather than lengths because a star has no straight edge to measure a
+ * corner against: it is stretched to whatever footprint it lands in.
  */
 @Serializable
 data class SurfaceShape(
-    /** "" | rect | round | circle | pill. The polygon family lands with the
-     *  shapes library; a kind a renderer does not answer falls back to the card shape. */
+    /** "" | rect | round | circle | pill | star | polygon. A kind a renderer does not
+     *  answer falls back to the card shape, so a newer file read by an older build
+     *  loses the outline rather than the plane. */
     val kind: String = "",
     val corners: SurfaceCorners = SurfaceCorners(),
     val smoothing: Float? = null,
+    /** Spikes on a star, sides on a polygon. Below three there is no shape; the
+     *  renderer holds it there rather than refusing to draw. */
+    val points: Int? = null,
+    /** How far a star's notches fall in, as a fraction of its reach. Ignored by
+     *  polygon, which has no notches. */
+    val innerRadius: Float? = null,
+    /** Rounding on a star's or polygon's corners, as a fraction. Separate from
+     *  [corners] because those are dp against a straight edge and this is not. */
+    val pointRounding: Float? = null,
 )
 
 /**

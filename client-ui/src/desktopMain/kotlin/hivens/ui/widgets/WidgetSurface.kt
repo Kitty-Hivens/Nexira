@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
+import hivens.ui.surface.PolygonShape
+import hivens.ui.surface.SmoothedRectShape
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
@@ -101,18 +103,46 @@ private fun borderColor(spec: SurfaceSpec): Color? {
  * and rounded on the other without a second set of fields. A kind this does not answer
  * lands on the same card shape rather than on a rectangle, because an unknown kind is
  * a newer file being read by an older build and the card shape is the safer guess.
+ *
+ * A named smoothing switches the rounded rect to a squircle. It is a different curve,
+ * not a different radius, so it needs an outline `RoundedCornerShape` cannot cut --
+ * which is why smoothing sat in the record unread until the shapes library arrived
+ * with it. Zero keeps the cheaper shape.
  */
 private fun SurfaceShape.toShape(style: StyleSpec): Shape {
     val fallback = style.cardCorner.value
+    val smooth = smoothing ?: 0f
     return when (kind.trim().lowercase()) {
         "circle" -> CircleShape
         "pill" -> RoundedCornerShape(percent = 50)
         "rect" -> RoundedCornerShape(0.dp)
-        else -> RoundedCornerShape(
-            topStart = corners.topStart(fallback).dp,
-            topEnd = corners.topEnd(fallback).dp,
-            bottomEnd = corners.bottomEnd(fallback).dp,
-            bottomStart = corners.bottomStart(fallback).dp,
+        "star" -> PolygonShape(
+            points = points ?: 5,
+            innerRadius = innerRadius ?: 0.5f,
+            rounding = pointRounding ?: 0f,
+            smoothing = smooth,
         )
+        "polygon" -> PolygonShape(
+            points = points ?: 6,
+            innerRadius = 1f,
+            rounding = pointRounding ?: 0f,
+            smoothing = smooth,
+        )
+        else -> if (smooth > 0f) {
+            SmoothedRectShape(
+                topStartDp = corners.topStart(fallback),
+                topEndDp = corners.topEnd(fallback),
+                bottomEndDp = corners.bottomEnd(fallback),
+                bottomStartDp = corners.bottomStart(fallback),
+                smoothing = smooth,
+            )
+        } else {
+            RoundedCornerShape(
+                topStart = corners.topStart(fallback).dp,
+                topEnd = corners.topEnd(fallback).dp,
+                bottomEnd = corners.bottomEnd(fallback).dp,
+                bottomStart = corners.bottomStart(fallback).dp,
+            )
+        }
     }
 }

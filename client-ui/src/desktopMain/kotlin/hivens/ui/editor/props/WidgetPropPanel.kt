@@ -287,6 +287,11 @@ private fun PropPanelBody(
                 StringRow(s.editorSurfaceShapeKind, surface.shape.kind) {
                     write(surface.copy(shape = surface.shape.copy(kind = it)))
                 }
+                Text(
+                    text  = s.editorSurfaceShapeKindHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                )
                 LabeledSlider(
                     label         = s.editorSurfaceSmoothing,
                     value         = (surface.shape.smoothing ?: 0f) * 100f,
@@ -295,6 +300,38 @@ private fun PropPanelBody(
                     keyStep       = 1f,
                     onValueChange = { write(surface.copy(shape = surface.shape.copy(smoothing = it / 100f))) },
                 )
+                // A star's three values, and only where they mean something. Offering
+                // them under a rounded rectangle would put back the thing this panel
+                // was collapsed to remove: rows that move nothing.
+                val kind = surface.shape.kind.trim().lowercase()
+                if (kind == "star" || kind == "polygon") {
+                    LabeledSlider(
+                        label         = s.editorSurfaceShapePoints,
+                        value         = (surface.shape.points ?: if (kind == "star") 5 else 6).toFloat(),
+                        range         = 3f..16f,
+                        format        = "%.0f",
+                        keyStep       = 1f,
+                        onValueChange = { write(surface.copy(shape = surface.shape.copy(points = it.roundToInt()))) },
+                    )
+                    if (kind == "star") {
+                        LabeledSlider(
+                            label         = s.editorSurfaceShapeInnerRadius,
+                            value         = (surface.shape.innerRadius ?: 0.5f) * 100f,
+                            range         = 5f..95f,
+                            format        = "%.0f%%",
+                            keyStep       = 1f,
+                            onValueChange = { write(surface.copy(shape = surface.shape.copy(innerRadius = it / 100f))) },
+                        )
+                    }
+                    LabeledSlider(
+                        label         = s.editorSurfaceShapePointRounding,
+                        value         = (surface.shape.pointRounding ?: 0f) * 100f,
+                        range         = 0f..100f,
+                        format        = "%.0f%%",
+                        keyStep       = 1f,
+                        onValueChange = { write(surface.copy(shape = surface.shape.copy(pointRounding = it / 100f))) },
+                    )
+                }
                 // Each corner opens at whatever the baseline resolves to and, once
                 // moved, pins that corner independently -- which is what makes a plane
                 // square on one side and round on the other.

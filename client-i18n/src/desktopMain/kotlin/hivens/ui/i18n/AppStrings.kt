@@ -1264,6 +1264,10 @@ interface AppStrings {
     val editorSurfaceBorderColor: String
     val editorSurfaceBorderOpacity: String
     val editorSurfaceMore: String
+    val editorSurfaceShapeKindHint: String
+    val editorSurfaceShapePoints: String
+    val editorSurfaceShapeInnerRadius: String
+    val editorSurfaceShapePointRounding: String
 
     // --- Layout editor: presets ---
     val editorPresetsTitle: String

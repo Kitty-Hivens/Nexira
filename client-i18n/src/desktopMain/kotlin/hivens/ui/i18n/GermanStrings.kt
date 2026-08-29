@@ -1292,6 +1292,10 @@ object GermanStrings : AppStrings {
     override val editorSurfaceBorderColor      = "Randfarbe"
     override val editorSurfaceBorderOpacity    = "Randdeckkraft"
     override val editorSurfaceMore             = "Mehr"
+    override val editorSurfaceShapeKindHint    = "Leer oder round nutzt die Ecken unten; rect, circle, pill, star und polygon ignorieren sie."
+    override val editorSurfaceShapePoints      = "Zacken"
+    override val editorSurfaceShapeInnerRadius = "Einbuchtungstiefe"
+    override val editorSurfaceShapePointRounding = "Zackenrundung"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

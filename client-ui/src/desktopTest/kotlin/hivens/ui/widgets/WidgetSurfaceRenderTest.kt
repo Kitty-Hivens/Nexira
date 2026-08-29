@@ -105,6 +105,67 @@ class WidgetSurfaceRenderTest {
         assertTrue(!large.isPage, "the corner grew with the footprint: $large")
     }
 
+    /**
+     * Smoothing was the one value in the record nothing read: the panel wrote it and
+     * `RoundedCornerShape` had nowhere to put it, because a squircle is a different
+     * curve rather than a different radius.
+     *
+     * Measured as the area the corner cuts away, not as one pixel. The two curves
+     * share their endpoints and cross somewhere in between, so any single sample can
+     * land where they agree -- which is what a first attempt at this test did.
+     */
+    @Test
+    fun `smoothing changes the corner it is written on`() {
+        fun cut(smoothing: Float?) = cornerCut(
+            SurfaceSpec(
+                fill = "#FF000000",
+                opacity = 1f,
+                shape = SurfaceShape(corners = SurfaceCorners(all = CUT.toFloat()), smoothing = smoothing),
+            ),
+        )
+        val plain = cut(null)
+        val squircle = cut(1f)
+        assertTrue(plain > 0, "the control corner cut nothing away, so the test proves nothing: $plain")
+        assertTrue(plain != squircle, "smoothing did not reach the outline: both cut $plain px")
+    }
+
+    @Test
+    fun `a star is cut out of the plane`() {
+        val spec = SurfaceSpec(
+            fill = "#FF000000",
+            opacity = 1f,
+            shape = SurfaceShape(kind = "star", points = 5, innerRadius = 0.4f),
+        )
+        // Dead centre is inside every star; a corner of the box is outside all of them.
+        val middle = pixel(spec, X + W / 2, Y + H / 2)
+        val corner = pixel(spec, X + 2, Y + 2)
+        assertTrue(!middle.isPage, "the star did not draw: $middle")
+        assertTrue(corner.isPage, "the star filled its bounding box: $corner")
+    }
+
+    @Test
+    fun `a polygon has no notches where a star does`() {
+        fun spec(kind: String) = SurfaceSpec(
+            fill = "#FF000000",
+            opacity = 1f,
+            shape = SurfaceShape(kind = kind, points = 6, innerRadius = 0.3f),
+        )
+        // Straight up from the centre. Six points put a spike on the horizontal and a
+        // notch on the vertical, so this is where the two shapes differ: a hexagon's
+        // flat top reaches the box, a star's notch pulls in to 30% of it. Halfway up
+        // is past the notch and short of the edge.
+        val up = Y + H / 4
+        assertTrue(!pixel(spec("polygon"), X + W / 2, up).isPage, "the polygon lost its edge")
+        assertTrue(pixel(spec("star"), X + W / 2, up).isPage, "the star's notch did not cut in")
+    }
+
+    /** An unknown kind is a newer file in an older build: it keeps the plane. */
+    @Test
+    fun `a kind the renderer does not know falls back to the card shape`() {
+        val spec = SurfaceSpec(fill = "#FF000000", opacity = 1f, shape = SurfaceShape(kind = "dodecahedron"))
+        assertTrue(!pixel(spec, X + W / 2, Y + H / 2).isPage, "an unknown kind drew nothing at all")
+    }
+
     @Test
     fun `padding insets the plane from the widget's box`() {
         val spec = SurfaceSpec(fill = "#FF000000", opacity = 1f, padding = hivens.widget.model.SurfaceInsets(all = 12f))
@@ -133,7 +194,7 @@ class WidgetSurfaceRenderTest {
         scene.close()
         File(OUT).mkdirs()
         image.encodeToData(EncodedImageFormat.PNG)?.bytes
-            ?.let { File(OUT, "widget-surface-${spec.hashCode()}.png").writeBytes(it) }
+            ?.let { File(OUT, "widget-surface-${spec.hashCode()}-$px-$py.png").writeBytes(it) }
         val c = Bitmap.makeFromImage(image).getColor(px, py)
         val out = Px((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF)
         println("WidgetSurfaceRenderTest: $spec at ($px,$py) -> $out")
@@ -169,7 +230,35 @@ class WidgetSurfaceRenderTest {
         return out
     }
 
+    // How many pixels of the top-start corner box the outline cuts away.
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun cornerCut(spec: SurfaceSpec): Int {
+        val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
+            NxTheme(useDarkTheme = true) {
+                Box(Modifier.fillMaxSize().background(PAGE)) {
+                    Box(Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp)) {
+                        WidgetSurface(spec) { Box(Modifier.fillMaxSize()) }
+                    }
+                }
+            }
+        }
+        val image = scene.render()
+        scene.close()
+        File(OUT).mkdirs()
+        image.encodeToData(EncodedImageFormat.PNG)?.bytes
+            ?.let { File(OUT, "widget-surface-corner-${spec.shape.smoothing}.png").writeBytes(it) }
+        val bmp = Bitmap.makeFromImage(image)
+        var cut = 0
+        for (dy in 0 until CUT) for (dx in 0 until CUT) {
+            val c = bmp.getColor(X + dx, Y + dy)
+            if (Px((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF).isPage) cut++
+        }
+        println("WidgetSurfaceRenderTest: corner smoothing=${spec.shape.smoothing} -> $cut px cut")
+        return cut
+    }
+
     private companion object {
+        const val CUT = 40
         const val M = 20
         const val CORNER = 20f
         const val DIAG = 9
