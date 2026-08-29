@@ -112,7 +112,7 @@ private fun NxContextMenuPopup(
                 blurDp   = 0f,
                 // Opaque: a menu floats over arbitrary content, so the dark-theme
                 // body bleed-through (0.92) would read the rows underneath through it.
-                opaque   = true,
+                opacity   = 1f,
                 shape    = MaterialTheme.shapes.medium,
                 modifier = Modifier.width(IntrinsicSize.Max),
             ) {

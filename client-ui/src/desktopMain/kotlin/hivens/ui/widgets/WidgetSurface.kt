@@ -53,12 +53,14 @@ fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
         NxSurface(
             level = fill.level(),
             shape = spec.shape.toShape(style),
-            hairline = false,
             opacity = spec.opacity,
             blurDp = spec.blurDp,
-            borderWidthDp = spec.border.widthDp,
+            // A spec that names no border has none: a widget's plane is described
+            // entirely by what is in it, so an unnamed value is nothing rather than
+            // the library's default edge.
+            borderWidthDp = spec.border.widthDp ?: 0f,
             borderColor = borderColor(spec),
-            shadowDp = spec.shadowDp,
+            shadowDp = spec.shadowDp ?: 0f,
             fillColor = (fill as? FillSource.Literal)?.let { Color(it.argb) },
         ) { content() }
     }

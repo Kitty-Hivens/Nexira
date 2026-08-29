@@ -28,7 +28,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Isolated (no window / no compositor / no GPU) proof that `opaque = true` -- the
+ * Isolated (no window / no compositor / no GPU) proof that `opacity = 1f` -- the
  * treatment [hivens.ui.nx.NxContextMenu] uses -- lets NOTHING bleed through the
  * surface body, on the dark palette (where the default body floor is 0.92). Renders
  * two Floating surfaces over a bright magenta ground and samples the centre of each:
@@ -49,12 +49,12 @@ class MenuOpacityRenderTest {
                 Box(Modifier.fillMaxSize().background(Color(0xFFFF00FF))) { // bright magenta ground
                     Column(Modifier.padding(20.dp)) {
                         // Default dark body (floor 0.92) -- background bleeds through.
-                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, opaque = false, shape = RoundedCornerShape(12.dp)) {
+                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                         Spacer(Modifier.height(20.dp))
                         // Opaque body (the menu's treatment) -- no bleed.
-                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, opaque = true, shape = RoundedCornerShape(12.dp)) {
+                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, opacity = 1f, shape = RoundedCornerShape(12.dp)) {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                     }

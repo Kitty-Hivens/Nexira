@@ -160,7 +160,7 @@ class BackdropBlurRenderTest {
             modifier = Modifier.offset(SX.dp, SY.dp).size(SW.dp, SH.dp),
             shape = RoundedCornerShape(12.dp),
             blurDp = blurDp,
-            hairline = false,
+            borderWidthDp = 0f,
             opacity = 0.15f,
         ) {}
     }

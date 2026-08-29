@@ -160,7 +160,7 @@ fun VersionPickerWindow(
         NxSurface(
             level = NxSurfaceLevel.Raised,
             blurDp = 0f,
-            opaque = true,
+            opacity = 1f,
             // Fraction of the app window with no dp ceiling: a bigger screen gets a
             // bigger window, not the same island floating in more emptiness.
             modifier = Modifier

@@ -106,7 +106,7 @@ class SurfaceOpacityRenderTest {
             modifier = Modifier.offset(PAD.dp, PAD.dp).size((W - 2 * PAD).dp, (H - 2 * PAD).dp),
             shape = RoundedCornerShape(12.dp),
             blurDp = 0f,
-            hairline = false,
+            borderWidthDp = 0f,
             opacity = opacity,
         ) {}
     }

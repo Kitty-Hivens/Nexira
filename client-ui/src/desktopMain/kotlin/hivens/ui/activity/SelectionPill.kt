@@ -79,8 +79,8 @@ internal fun SelectionPill(
             .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        elevated = true,
-        opaque = true,
+        shadowDp = style.panelElevation.value,
+        opacity = 1f,
     ) {
         Row(
             // No fillMaxWidth: it stretched the object to the ceiling and, once

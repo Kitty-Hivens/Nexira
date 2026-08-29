@@ -258,13 +258,14 @@ internal fun Pill(
             .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        // It floats over the page, so it casts. Missing here while the selection
-        // body set it meant the same object gained a shadow the moment a selection
-        // took over and lost it again afterwards.
-        elevated = true,
+        // It floats over the page, so it casts, at whatever depth the style gives a
+        // floating panel -- nothing under a flat form. Missing here while the
+        // selection body set it meant the same object gained a shadow the moment a
+        // selection took over and lost it again afterwards.
+        shadowDp = style.panelElevation.value,
         // Opaque body: the object floats over arbitrary content, so the
         // legibility floor cannot depend on what happens to be behind it.
-        opaque = true,
+        opacity = 1f,
     ) {
         // Rule 5: the measure is a property of the object, not a widget parked
         // inside it. Both overlays measure against the surface's OWN bounds via

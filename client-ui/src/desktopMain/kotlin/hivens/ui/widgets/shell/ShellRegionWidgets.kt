@@ -192,7 +192,7 @@ private fun RowScope.RegionDivider(show: Boolean) {
 private fun CollapsedRegionStrip() {
     NxSurface(
         NxSurfaceLevel.Base, Modifier.width(22.dp).fillMaxHeight(), RectangleShape,
-        hairline = false, opacity = 0.4f,
+        borderWidthDp = 0f, opacity = 0.4f,
     ) {}
 }
 
@@ -217,7 +217,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         // opaque here: a named opacity is a named opacity on either theme now.
         NxSurface(
             NxSurfaceLevel.Base, Modifier.weight(1f).fillMaxHeight(), RectangleShape,
-            hairline = false,
+            borderWidthDp = 0f,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             AppSidebar(
@@ -247,7 +247,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     val cornerDp = LocalStyle.current.cardCorner
     NxSurface(
         NxSurfaceLevel.Base, Modifier.fillMaxSize(), RectangleShape,
-        hairline = false,
+        borderWidthDp = 0f,
         opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
     ) {
         LocalShellContext.current.centerBody()
@@ -516,7 +516,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
     when (props.groupStyle) {
         GroupStyle.LineSeparated -> NxSurface(
             NxSurfaceLevel.Base, barModifier, shape,
-            hairline = false,
+            borderWidthDp = 0f,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             Row(
@@ -539,12 +539,12 @@ fun ShellTopRegion(instance: WidgetInstance) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, hairline = false, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
+                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, borderWidthDp = 0f, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
             AppGlyph()
             NxSurface(
                 NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
-                hairline = false,
+                borderWidthDp = 0f,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -554,7 +554,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
             DragLane()
             NxSurface(
                 NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
-                hairline = false,
+                borderWidthDp = 0f,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -562,7 +562,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
                 }
             }
             if (!HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, hairline = false, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
+                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, borderWidthDp = 0f, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
         }
     }
