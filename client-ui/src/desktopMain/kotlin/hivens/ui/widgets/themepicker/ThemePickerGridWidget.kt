@@ -37,7 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxColorSurface
-import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -90,7 +89,7 @@ private fun ThemeCard(
 
     Box(modifier = Modifier.aspectRatio(1.2f).scale(scale)) {
         NxColorSurface(
-            color    = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
+            color    = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f),
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(onClick = onClick)

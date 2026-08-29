@@ -36,7 +36,6 @@ import hivens.core.data.MultiplayerServerEntry
 import hivens.core.data.WorldEntry
 import hivens.launcher.instance.ServersDatReader
 import hivens.launcher.instance.WorldScanner
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -147,7 +146,7 @@ private fun EmptyHint(text: String) {
         modifier         = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.4f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.4f))
             .padding(20.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -166,7 +165,7 @@ private fun WorldCard(world: WorldEntry) {
         modifier              = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.5f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.5f))
             .padding(12.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -238,7 +237,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
         modifier              = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.45f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.45f))
             .padding(12.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

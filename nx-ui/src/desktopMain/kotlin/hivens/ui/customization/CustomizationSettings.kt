@@ -10,12 +10,16 @@ import kotlinx.serialization.Serializable
  * unconfigured user sees the same UI as before customization existed.
  *
  * [accentOverride] re-seeds the primary accent; the remaining fields
- * tune density, glass intensity, and the nav-rail selection.
+ * tune density, whether surfaces blur, and the nav-rail selection.
+ *
+ * A glass-intensity multiplier used to live here too. It scaled the tint helper
+ * every screen mixed its own planes with -- so it moved thirty places and none of
+ * the library's own surfaces -- and no screen ever wrote it: it was reachable only
+ * by hand-editing this file. Those thirty places name their colour directly now.
  */
 @Serializable
 data class CustomizationSettings(
     val densityScale: Float = 1.0f,
-    val glassIntensity: Float = 1.0f,
     val accentOverride: String? = null,
 
     /**

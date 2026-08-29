@@ -34,7 +34,7 @@ import hivens.ui.theme.Spacing
 /**
  * A clickable navigation row: icon + title (+ optional [subtitle]) + a trailing
  * chevron, on a library-owned opaque body plane. The one "tap to go somewhere" row
- * for settings shortcuts, replacing per-screen `glassSurfaceAlpha` + raw `clickable`
+ * for settings shortcuts, replacing the per-screen hand-mixed fill + raw `clickable`
  * rows (Rule 0/5). Its hover/press uses the same soft NEUTRAL overlay as the in-plane
  * [NxRow] ([softHoverAlpha]) so a navigable row reads the same on its own plane or in
  * one. The [icon] keeps its [iconTint] accent.

@@ -44,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
@@ -236,7 +235,7 @@ private fun PillButton(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (active) palette.primary.copy(alpha = 0.18f) else glassSurfaceAlpha(0.45f))
+            .background(if (active) palette.primary.copy(alpha = 0.18f) else palette.surface.copy(alpha = 0.45f))
             .border(1.dp, if (active) palette.primary.copy(alpha = 0.6f) else outline, RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .padding(6.dp),
@@ -255,7 +254,7 @@ private fun CountPill(text: String, outline: Color, modifier: Modifier = Modifie
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(glassSurfaceAlpha(0.35f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.35f))
             .border(1.dp, outline, RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {

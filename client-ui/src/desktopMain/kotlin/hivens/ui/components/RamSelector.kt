@@ -22,7 +22,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.core.jvm.SystemMemory
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
@@ -157,7 +156,7 @@ fun RamSelector(
 @Composable
 private fun RamChip(selected: Boolean, label: String, modifier: Modifier, onClick: () -> Unit) {
     val bg by animateColorAsState(
-        if (selected) NxTheme.colors.primary else glassSurfaceAlpha(0.5f),
+        if (selected) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f),
         Motion.fade.of(),
     )
     val fg by animateColorAsState(

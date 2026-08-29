@@ -49,8 +49,8 @@ import kotlin.math.roundToInt
 
 /**
  * Themed context menu -- replaces Material's `DropdownMenu`. An opaque rounded
- * surface (legible under any style, including Brut / glassIntensity 0) that scales
- * + fades in. Declare it inside the `Box` that wraps the trigger; it anchors under
+ * surface (legible under any style, Brut's unblurred flat planes included) that
+ * scales + fades in. Declare it inside the `Box` that wraps the trigger; it anchors under
  * that box and flips above near the window bottom. [content] is a column of
  * [NxMenuItem]s.
  */

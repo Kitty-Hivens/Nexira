@@ -40,7 +40,6 @@ import hivens.launcher.launch.LauncherController
 import hivens.core.security.SslBypassStore
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -235,7 +234,7 @@ fun HomeClassicContent() {
                     shape = MaterialTheme.shapes.medium,
                 )
                 .background(
-                    color = glassSurfaceAlpha(0.45f),
+                    color = NxTheme.colors.surface.copy(alpha = 0.45f),
                     shape = MaterialTheme.shapes.medium,
                 )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -277,7 +276,7 @@ private fun AutoSyncProgressStrip(
                 shape = MaterialTheme.shapes.medium,
             )
             .background(
-                color = glassSurfaceAlpha(0.35f),
+                color = NxTheme.colors.surface.copy(alpha = 0.35f),
                 shape = MaterialTheme.shapes.medium,
             )
             .padding(horizontal = 14.dp, vertical = 8.dp),

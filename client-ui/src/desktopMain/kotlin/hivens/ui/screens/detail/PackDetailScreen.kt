@@ -53,7 +53,6 @@ import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isVideoUrl
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -295,7 +294,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
         // aesthetic and left a hard seam against the right panel. The
         // wallpaper stays softly visible while the tint keeps dense
         // monospace readable.
-        color    = glassSurfaceAlpha(0.85f),
+        color    = NxTheme.colors.surface.copy(alpha = 0.85f),
     ) {
         Column(Modifier.fillMaxSize()) {
             LogSessionPicker(
@@ -563,7 +562,7 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
             Row(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
-                    .background(if (active) NxTheme.colors.primary else glassSurfaceAlpha(0.5f))
+                    .background(if (active) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f))
                     .clickable { onSelect(i) }
                     .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment     = Alignment.CenterVertically,

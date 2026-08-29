@@ -103,12 +103,13 @@ class TextContrastTest {
 
     @Test
     fun `the surface roles a plane can take are all distinguishable from each other`() {
-        // The failure this catches is not a contrast one: `glassSurfaceAlpha` returned
-        // the SAME opaque colour for every requested depth on a light palette, so all
-        // ninety of its call sites drew one flat white and a card, its page and a
-        // nested panel were literally the same colour. A ladder whose rungs collapse
-        // has the same effect, so measure that the rungs are apart -- in perceptual
-        // lightness, which is what "can I see the difference" actually asks.
+        // The failure this catches is not a contrast one. The helper that used to
+        // resolve a plane's tint returned the SAME opaque colour for every requested
+        // depth on a light palette, so all ninety of its call sites drew one flat
+        // white and a card, its page and a nested panel were literally the same
+        // colour. A ladder whose rungs collapse has the same effect, so measure that
+        // the rungs are apart -- in perceptual lightness, which is what "can I see
+        // the difference" actually asks.
         for ((name, palette) in palettes()) {
             val floor = ladderStep(dark = name == "dark")
             val rungs = listOf("background" to palette.background) + ladder(palette)

@@ -384,9 +384,10 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
 
 @Composable
 private fun NewsSkeleton() {
-    // Two distinct tonal roles rather than one surface at two alphas: on a light
-    // palette glassSurfaceAlpha returns the same opaque colour for every alpha, so
-    // all three stops were identical and the skeleton did not shimmer at all.
+    // Two distinct tonal roles rather than one surface at two alphas: the helper
+    // that resolved a tint returned the same opaque colour for every alpha on a
+    // light palette, so all three stops were identical and the skeleton did not
+    // shimmer at all.
     val colors = NxTheme.colors
     val shimmerColors = listOf(
         colors.surfaceContainer,

@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxColorSurface
-import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
@@ -47,7 +46,7 @@ fun ThemePickerPreviewWidget() {
     val theme by ctx.selectedTheme
 
     NxColorSurface(
-        color    = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
+        color    = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f),
         modifier = Modifier.fillMaxSize(),
         shape    = MaterialTheme.shapes.large,
         border   = BorderStroke(1.dp, NxTheme.colors.outline),

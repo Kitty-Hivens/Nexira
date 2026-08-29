@@ -73,7 +73,6 @@ import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxVerticalScrollbar
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -452,7 +451,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (selected) NxTheme.colors.primary else glassSurfaceAlpha(0.5f))
+            .background(if (selected) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
@@ -497,7 +496,7 @@ private fun ContentRow(
             .clip(MaterialTheme.shapes.small)
             .background(
                 if (selected) NxTheme.colors.primary.copy(alpha = 0.14f)
-                else glassSurfaceAlpha(0.4f),
+                else NxTheme.colors.surface.copy(alpha = 0.4f),
             )
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -657,7 +656,7 @@ private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Bo
     val s = LocalStrings.current
     val shape = RoundedCornerShape(7.dp)
     Row(
-        modifier              = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(glassSurfaceAlpha(0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
+        modifier              = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(NxTheme.colors.surface.copy(alpha = 0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {

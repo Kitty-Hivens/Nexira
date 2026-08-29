@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
@@ -99,7 +98,7 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clip(MaterialTheme.shapes.small)
             .background(
                 if (selected) NxTheme.colors.primary.copy(alpha = 0.16f)
-                else glassSurfaceAlpha(0.4f),
+                else NxTheme.colors.surface.copy(alpha = 0.4f),
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
