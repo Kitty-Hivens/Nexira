@@ -50,7 +50,6 @@ import hivens.ui.render.openInBrowser
 import hivens.ui.screens.versions.PickerIntent
 import hivens.ui.screens.versions.PickerVersion
 import hivens.ui.screens.versions.VersionPickerWindow
-import hivens.ui.theme.Dimens
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
@@ -295,20 +294,15 @@ private fun DetailBody(details: CataloguePackDetails, installError: String?) {
     var videoLink by remember { mutableStateOf<String?>(null) }
     val hasGallery = details.gallery.isNotEmpty()
     var tab by remember(details.origin, details.id) { mutableStateOf(DetailTab.Description) }
-    // The description sits on a plane rather than directly on the page. It is a
-    // long document over a wallpaper, and without an edge there is nothing saying
-    // where the page ends and the text begins.
-    // Centred under the same ceiling the other content screens use. The side
-    // column that was removed had been the only thing holding the description to
-    // a readable measure, and without it a line of prose ran the full width of a
-    // wide monitor -- past the point where the eye can find the start of the next
-    // one. The ceiling goes before the fill: fillMaxWidth first would pin the
-    // minimum to the full width, and a ceiling cannot take the maximum below it.
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    // Full width, sharing the hero's edges. It was briefly centred under a ceiling,
+    // which was not a decision about this page: the side column had been removed
+    // twenty minutes earlier, the description was left running edge to edge, and the
+    // ceiling went in to compensate for that. What it actually did was split the page
+    // -- the hero above spans the window, so the block under it hung in the middle
+    // with neither edge lining up with anything. One page, one measure.
     NxSurface(
         level    = NxSurfaceLevel.Raised,
         modifier = Modifier
-            .widthIn(max = Dimens.contentMaxWidth)
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
     ) {
@@ -374,7 +368,6 @@ private fun DetailBody(details: CataloguePackDetails, installError: String?) {
             // the screen cannot. Two of them on one install was the state the
             // surface was built to end.
         }
-    }
     }
     videoLink?.let { url ->
         FullscreenVideo(url = url, onDismiss = { videoLink = null })
