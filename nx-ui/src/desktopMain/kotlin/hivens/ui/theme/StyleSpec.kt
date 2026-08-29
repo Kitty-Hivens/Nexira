@@ -34,6 +34,14 @@ data class StyleSpec(
     val animationMultiplier: Float,
     /** Whether decorative effects (pulsating glow, soft shadow) render at all. */
     val softGlowEnabled: Boolean,
+    /**
+     * How far a plane blurs what is behind it when it names no radius of its own.
+     *
+     * It was a constant inside a preset before, so the form axis could not reach it:
+     * a sharp, flat variant still blurred like a soft one. Zero here is a style that
+     * does not blur at all, which is what Brut is for.
+     */
+    val surfaceBlur: Dp,
     /** Drop-shadow depth on floating panels (editor palette, prop and preset
      *  panels). Celestia lifts them off the canvas; Brut keeps everything flat
      *  at 0.dp, so the whole surface stack reads as one plane. */
@@ -148,6 +156,7 @@ val CelestiaStyle = StyleSpec(
     buttonCorner        = 8.dp,
     animationMultiplier = 1.0f,
     softGlowEnabled     = true,
+    surfaceBlur         = 18.dp,
     panelElevation      = 18.dp,
     panelCorner         = 14.dp,
 )
@@ -164,6 +173,9 @@ val BrutStyle = StyleSpec(
     buttonCorner        = 0.dp,
     animationMultiplier = 0.0f,
     softGlowEnabled     = false,
+    // Brut does not blur. The form axis owns this now, so a sharp, flat variant
+    // is sharp and flat all the way down rather than soft behind every plane.
+    surfaceBlur         = 0.dp,
     panelElevation      = 0.dp,
     panelCorner         = 2.dp,
     switchStyle         = SwitchStyleSpec.Square,

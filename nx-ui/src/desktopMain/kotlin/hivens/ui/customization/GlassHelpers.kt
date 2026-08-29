@@ -49,11 +49,11 @@ fun glassSurfaceAlpha(baseAlpha: Float, translucentOnLight: Boolean = false): Co
  * and a continuous blend would put shades between them that nothing else in the
  * system knows about and no test can hold to a separation rule.
  *
- * The shallow end has to land on `surface`, not a rung above it. `FrostTier.Clear`
- * tints from its own Surface role at 0.35 and the shell's corner wedge is drawn
- * with `glassSurfaceAlpha(0.35)` precisely so the two agree -- the wedge exists to
- * carry the content's corner into the chrome, and it can only do that while it is
- * the same colour. Splitting them put a visible patch where the join had been.
+ * The shallow end has to land on `surface`, not a rung above it. The shell's corner
+ * wedge is drawn with `glassSurfaceAlpha(0.35)` so it agrees with the chrome plane
+ * beside it -- the wedge exists to carry the content's corner into the chrome, and
+ * it can only do that while it is the same colour. Splitting them put a visible
+ * patch where the join had been.
  *
  * This used to return `surface` for every value. Eight distinct depths across
  * forty-odd call sites all came out as one pixel, which is why a card, the page it

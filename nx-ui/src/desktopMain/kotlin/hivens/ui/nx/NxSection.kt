@@ -51,7 +51,7 @@ fun NxSection(
             overflow   = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(Spacing.s8))
-        NxSurface(level = level, glass = false, modifier = Modifier.fillMaxWidth()) {
+        NxSurface(level = level, blurDp = 0f, modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier            = Modifier.fillMaxWidth().padding(Spacing.s16),
                 verticalArrangement = Arrangement.spacedBy(spacing),

@@ -159,7 +159,7 @@ fun VersionPickerWindow(
     ) {
         NxSurface(
             level = NxSurfaceLevel.Raised,
-            glass = false,
+            blurDp = 0f,
             opaque = true,
             // Fraction of the app window with no dp ceiling: a bigger screen gets a
             // bigger window, not the same island floating in more emptiness.
@@ -270,7 +270,7 @@ private fun ListPanel(
     val colors = NxTheme.colors
     // Its own sunken plane: the list and the detail must read as two places, not
     // as one field with a gap down the middle.
-    NxSurface(level = NxSurfaceLevel.Sunken, glass = false, modifier = modifier) {
+    NxSurface(level = NxSurfaceLevel.Sunken, blurDp = 0f, modifier = modifier) {
         Column(Modifier.fillMaxSize()) {
             // Search earns its place at 39 builds; without it the only way to a
             // year-old version is scrolling.
@@ -422,7 +422,7 @@ private fun Footer(
     val s = LocalStrings.current
     val colors = NxTheme.colors
     HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
-    NxSurface(level = NxSurfaceLevel.Sunken, glass = false, modifier = Modifier.fillMaxWidth()) {
+    NxSurface(level = NxSurfaceLevel.Sunken, blurDp = 0f, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,

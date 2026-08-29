@@ -77,7 +77,7 @@ class SurfaceOpacityRenderTest {
     }
 
     // Renders one surface at [opacity] over magenta and returns the green channel at
-    // its centre. glass = false so nothing but the body is under test.
+    // its centre. blurDp = 0f so nothing but the body is under test.
     @OptIn(ExperimentalComposeUiApi::class)
     private fun greenAt(palette: NxColors, opacity: Float?): Int {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
@@ -105,7 +105,7 @@ class SurfaceOpacityRenderTest {
             level = NxSurfaceLevel.Floating,
             modifier = Modifier.offset(PAD.dp, PAD.dp).size((W - 2 * PAD).dp, (H - 2 * PAD).dp),
             shape = RoundedCornerShape(12.dp),
-            glass = false,
+            blurDp = 0f,
             hairline = false,
             opacity = opacity,
         ) {}

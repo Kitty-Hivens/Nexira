@@ -27,11 +27,10 @@ class NxSurfaceTest {
         assertEquals(roles.size, roles.toSet().size)
     }
 
-    // --- Rule 2: body floor is independent of the glass-intensity knob ---
+    // --- an opacity reaches the pixel unscaled ---
 
     @Test
-    fun `body alpha ignores glass intensity`() {
-        // bodyAlpha has no intensity term by construction; it returns the floor verbatim.
+    fun `body alpha is returned verbatim`() {
         for (floor in listOf(0f, 0.5f, 0.92f, 1f)) {
             assertEquals(floor, bodyAlpha(floor))
         }
@@ -43,14 +42,7 @@ class NxSurfaceTest {
         assertEquals(1f, bodyAlpha(1.4f))
     }
 
-    @Test
-    fun `coat alpha scales with glass intensity`() {
-        assertEquals(0f, coatAlpha(0.6f, 0f))
-        assertEquals(0.3f, coatAlpha(0.6f, 0.5f))
-        assertEquals(0.6f, coatAlpha(0.6f, 1f))
-    }
-
-    // --- body floor per theme (Rule 4 phase 1: light is opaque) ---
+    // --- the per-theme default a surface that names no opacity gets ---
 
     @Test
     fun `light body floor is opaque`() {

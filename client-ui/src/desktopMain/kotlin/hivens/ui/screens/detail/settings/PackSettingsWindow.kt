@@ -223,7 +223,7 @@ fun PackSettingsWindow(
             // Clear + fully opaque: no frost coat (glass off) and a solid body
             // (opaque forces alpha 1 instead of the 0.92 dark bleed-through), so
             // the scrim never reads through the window.
-            glass = false,
+            blurDp = 0f,
             opaque = true,
             modifier = Modifier
                 .fillMaxWidth(0.88f)

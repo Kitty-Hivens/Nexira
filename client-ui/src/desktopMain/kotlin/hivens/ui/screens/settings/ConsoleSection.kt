@@ -173,7 +173,7 @@ private fun ConsoleColorRow(label: String, hex: String?, autoLabel: String, onCh
 @Composable
 private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> Unit, onDelete: () -> Unit) {
     val s = LocalStrings.current
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Column(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -195,7 +195,7 @@ private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> 
 @Composable
 private fun FilterRuleCard(rule: FilterRule, onChange: (FilterRule) -> Unit, onDelete: () -> Unit) {
     val s = LocalStrings.current
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment     = Alignment.CenterVertically,
@@ -221,7 +221,7 @@ private fun EmptyRulesHint(text: String) {
 
 @Composable
 private fun ArtCard(art: String, onDelete: () -> Unit) {
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment     = Alignment.Top,
@@ -251,7 +251,7 @@ private fun ArtAdder(
     addLabel: String,
     placeholder: String,
 ) {
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Column(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

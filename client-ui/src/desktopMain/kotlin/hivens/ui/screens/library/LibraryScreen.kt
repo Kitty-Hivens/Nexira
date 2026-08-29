@@ -273,7 +273,7 @@ private fun NewLocalPackDialog(
                 // Opaque, not glass: a modal sits over a dark scrim, so there is
                 // nothing behind it to frost -- glass would read as a flat muddy
                 // panel.
-                glass = false,
+                blurDp = 0f,
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),

@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import hivens.ui.surface.FrostTier
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
@@ -54,10 +53,6 @@ fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
         NxSurface(
             level = fill.level(),
             shape = spec.shape.toShape(style),
-            // Tiers are gone from this path: every value the surface draws with arrives
-            // named. Flat carries no blur of its own, so a null radius here means none
-            // rather than a preset's constant.
-            tier = FrostTier.Flat,
             hairline = false,
             opacity = spec.opacity,
             blurDp = spec.blurDp,

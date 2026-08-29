@@ -35,7 +35,7 @@ fun NxField(
     val ts = textStyle ?: MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary)
     NxSurface(
         level    = NxSurfaceLevel.Sunken,
-        glass    = false,
+        blurDp   = 0f,
         shape    = RoundedCornerShape(LocalStyle.current.buttonCorner),
         modifier = modifier,
     ) {
