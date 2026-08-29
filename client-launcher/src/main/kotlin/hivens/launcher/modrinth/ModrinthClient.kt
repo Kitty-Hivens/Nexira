@@ -8,6 +8,7 @@ import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -121,6 +122,7 @@ class ModrinthClient(
         val resp: HttpResponse = httpProvider.current.get(url) {
             headers.append("User-Agent", USER_AGENT)
             headers.append("Accept", "application/json")
+            timeout { requestTimeoutMillis = METADATA_TIMEOUT_MS }
         }
         if (!resp.status.isSuccess()) {
             val body = runCatching { resp.bodyAsText() }.getOrDefault("")
@@ -130,6 +132,17 @@ class ModrinthClient(
     }
 
     companion object {
+    /**
+     * Metadata reads are bounded far tighter than the shared client's own timeout.
+     *
+     * That one is sized for a download -- ten minutes, correctly, for a runtime or a
+     * pack archive. A catalogue listing is what a person is looking at while it runs,
+     * so the same ceiling turns a stall into a spinner that outlasts anyone's
+     * patience with no error, no log line and nothing to retry. Past this a stall is
+     * an ordinary failure: it throws, it is written down, and the screen offers the
+     * retry it already has.
+     */
+    private const val METADATA_TIMEOUT_MS = 20_000L
         const val API_BASE = "https://api.modrinth.com"
         private const val USER_AGENT = "Nexira-modrinth-client"
 
