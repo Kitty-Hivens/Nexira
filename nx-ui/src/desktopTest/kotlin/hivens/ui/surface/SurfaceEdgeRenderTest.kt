@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  *
  * Both were booleans before, decided together with the blur by a tier, so a plane
  * could not be lifted without also being frosted nor edged without being lifted. They
- * are numbers now, and a named zero has to be a decision rather than an absence.
+ * are numbers now, and a zero has to be a decision rather than an absence.
  *
  * Measured as differences against the same scene without them, because a hairline is
  * one pixel wide and a cast shadow is a gradient: an absolute threshold on either
@@ -48,16 +48,16 @@ class SurfaceEdgeRenderTest {
 
     @Test
     fun `a hairline shows on the edge, and a named zero removes it`() {
-        val edged = edgeDelta(borderWidthDp = null, hairline = true)
-        val bare = edgeDelta(borderWidthDp = 0f, hairline = true)
+        val edged = edgeDelta(borderWidthDp = 1f)
+        val bare = edgeDelta(borderWidthDp = 0f)
         println("SurfaceEdgeRenderTest: hairline -> $edged, named zero -> $bare")
         assertTrue(edged > bare + 2, "the hairline did not draw: $edged against $bare")
     }
 
     @Test
     fun `a named width draws a thicker hairline than the default`() {
-        val thin = edgeDelta(borderWidthDp = 1f, hairline = true)
-        val thick = edgeDelta(borderWidthDp = 4f, hairline = true)
+        val thin = edgeDelta(borderWidthDp = 1f)
+        val thick = edgeDelta(borderWidthDp = 4f)
         println("SurfaceEdgeRenderTest: 1dp -> $thin, 4dp -> $thick")
         assertTrue(thick > thin, "width made no difference: $thin against $thick")
     }
@@ -76,9 +76,9 @@ class SurfaceEdgeRenderTest {
     }
 
     /** How far the plane's own edge departs from its interior. */
-    private fun edgeDelta(borderWidthDp: Float?, hairline: Boolean): Double {
-        val px = render("edge-${borderWidthDp ?: "default"}") {
-            plate(shadowDp = 0f, borderWidthDp = borderWidthDp, hairline = hairline)
+    private fun edgeDelta(borderWidthDp: Float): Double {
+        val px = render("edge-$borderWidthDp") {
+            plate(shadowDp = 0f, borderWidthDp = borderWidthDp)
         }
         val inside = luminance(px, X + W / 2, Y + H / 2)
         var worst = 0.0
@@ -108,13 +108,12 @@ class SurfaceEdgeRenderTest {
     }
 
     @androidx.compose.runtime.Composable
-    private fun plate(shadowDp: Float, borderWidthDp: Float?, hairline: Boolean = true) {
+    private fun plate(shadowDp: Float, borderWidthDp: Float) {
         NxSurface(
             level = NxSurfaceLevel.Floating,
             modifier = Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp),
             shape = RoundedCornerShape(10.dp),
             blurDp = 0f,
-            hairline = hairline,
             borderWidthDp = borderWidthDp,
             shadowDp = shadowDp,
         ) {}

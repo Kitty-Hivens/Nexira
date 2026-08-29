@@ -53,35 +53,26 @@ internal fun bodyFloor(dark: Boolean): Float = if (dark) 0.92f else 1.0f
  * A library-owned surface: a tonal body for [level], an optional blur of what is
  * behind it, and a luminance-derived bevel hairline -- composited via [FrostSurface].
  *
- * Every value it draws with is named. It used to take a preset as well, which moved
- * the body's opacity, the blur radius and the cast shadow together, so no one of the
- * three could be set without the other two. They are separate parameters now.
- *
- * [opaque] forces a fully solid body on every theme (dark otherwise keeps a hair of
- * bleed-through, [bodyFloor]) -- for overlays like [hivens.ui.nx.NxContextMenu] that
- * float over arbitrary content and must not let it read through.
+ * Every value it draws with is a number. It used to take a preset as well, which
+ * moved the body's opacity, the blur radius and the cast shadow together, so no one
+ * of the three could be set without the other two; and three booleans beside them
+ * that each stood for a number the caller could not otherwise write -- solid, lifted,
+ * edged. A plane's appearance is the numbers now, with nothing that says the same
+ * thing twice.
  */
 @Composable
 fun NxSurface(
     level: NxSurfaceLevel,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(LocalStyle.current.cardCorner),
-    hairline: Boolean = true,
-    opaque: Boolean = false,
-    /**
-     * Whether the plane sits above the page and casts a shadow for it. A separate
-     * question from how much it blurs, which one preset used to answer for both:
-     * a chrome rail could not be plain without also being flat on the page, nor
-     * lifted without also being frosted. The elevation itself comes from the active
-     * style, so a flat form takes it to nothing.
-     */
-    elevated: Boolean = false,
     /**
      * Body opacity, 0..1. Null takes [bodyFloor], which is what an unconfigured
-     * surface has always drawn. A named value reaches the body unchanged on both
-     * themes -- including values light used to refuse, because whether a light
-     * plane can afford to be translucent depends on what is behind it and on what
-     * the widget buys legibility with, and neither is knowable here.
+     * surface has always drawn; 1 is a plane nothing reads through, which is what an
+     * overlay like [hivens.ui.nx.NxContextMenu] needs over arbitrary content. A named
+     * value reaches the body unchanged on both themes -- including values light used
+     * to refuse, because whether a light plane can afford to be translucent depends
+     * on what is behind it and on what the widget buys legibility with, and neither
+     * is knowable here.
      */
     opacity: Float? = null,
     /**
@@ -91,13 +82,18 @@ fun NxSurface(
      * anywhere and indistinguishable from each other on screen.
      */
     blurDp: Float? = null,
-    /** Hairline width. Null defers to [hairline], zero removes it. */
-    borderWidthDp: Float? = null,
+    /** Hairline width. Zero removes it. */
+    borderWidthDp: Float = 1f,
     /** Hairline colour. Null derives one from the body's own luminance, which reads as
      *  a bevelled edge of the same material rather than a frame in a foreign colour. */
     borderColor: Color? = null,
-    /** Cast-shadow elevation. Null defers to [elevated], zero flattens the plane. */
-    shadowDp: Float? = null,
+    /**
+     * Cast-shadow elevation. Zero is a plane flat on the page, which is what most
+     * of them are. A caller that wants the depth its style chose for floating panels
+     * passes [hivens.ui.theme.StyleSpec.panelElevation], so a flat form still takes
+     * it to nothing without a second switch to keep in step.
+     */
+    shadowDp: Float = 0f,
     /**
      * An explicit body colour, for a colour that is DATA rather than a guess.
      *
@@ -114,11 +110,7 @@ fun NxSurface(
     val role = level.role()
     val bodyColor = fillColor ?: frostColor(role)
     val dark = bodyColor.luminance() < 0.5f
-    val bodyAlpha = when {
-        opaque          -> 1f
-        opacity != null -> opacity.coerceIn(0f, 1f)
-        else            -> bodyFloor(dark)
-    }
+    val bodyAlpha = opacity?.coerceIn(0f, 1f) ?: bodyFloor(dark)
     // A named radius wins; absent one, the active style decides.
     val blur = blurDp ?: LocalStyle.current.surfaceBlur.value
     val layers = buildList {
@@ -127,16 +119,9 @@ fun NxSurface(
         // surface skips it.
         if (bodyAlpha < 1f && blur > 0f) add(Backdrop(blur))
         if (fillColor != null) add(BodyColor(fillColor, bodyAlpha)) else add(Body(role, bodyAlpha))
-        when {
-            shadowDp != null && shadowDp > 0f -> add(DropShadow(shadowDp))
-            shadowDp != null                  -> Unit // a named zero is a flat plane
-            elevated                          -> add(DropShadow())
-        }
-        when {
-            borderWidthDp != null && borderWidthDp > 0f ->
-                add(EdgeBorder(widthDp = borderWidthDp, explicitColor = borderColor ?: bevelHairline(bodyColor)))
-            borderWidthDp != null -> Unit // a named zero is an edgeless plane
-            hairline              -> add(EdgeBorder(explicitColor = borderColor ?: bevelHairline(bodyColor)))
+        if (shadowDp > 0f) add(DropShadow(shadowDp))
+        if (borderWidthDp > 0f) {
+            add(EdgeBorder(widthDp = borderWidthDp, explicitColor = borderColor ?: bevelHairline(bodyColor)))
         }
         if (interactionSource != null) add(StateOverlay())
     }
@@ -162,7 +147,6 @@ fun NxCard(
     level = level,
     modifier = modifier,
     shape = shape,
-    hairline = true,
     opacity = opacity,
     blurDp = blurDp,
     interactionSource = interactionSource,

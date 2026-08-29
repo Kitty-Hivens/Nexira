@@ -109,7 +109,7 @@ fun NxPopoverPanel(
                 // Opaque for the same reason a menu is: it floats over arbitrary
                 // content, and the dark-theme body bleed would read the list
                 // underneath through the panel.
-                opaque   = true,
+                opacity   = 1f,
                 shape    = MaterialTheme.shapes.medium,
                 modifier = modifier.width(width),
             ) {

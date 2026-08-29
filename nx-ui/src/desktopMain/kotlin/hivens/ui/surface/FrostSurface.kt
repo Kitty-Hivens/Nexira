@@ -66,14 +66,9 @@ data class EdgeBorder(
     val explicitColor: Color? = null,
 ) : SurfaceLayer
 
-/**
- * A cast shadow: neutral, outside the clip, under the whole plane.
- *
- * [elevationDp] null takes the active style's panel elevation, which is how the
- * form axis gets to decide: Brut sets it to zero and the plane sits flat, with
- * no separate switch to keep in sync.
- */
-data class DropShadow(val elevationDp: Float? = null) : SurfaceLayer
+/** A cast shadow: neutral, outside the clip, under the whole plane. Zero draws
+ *  nothing, which is what a flat form asks for. */
+data class DropShadow(val elevationDp: Float) : SurfaceLayer
 
 /** A [Body] whose colour is given rather than resolved from a role. For a colour that
  *  arrives as data -- a person's own choice in their own layout -- which no palette
@@ -120,17 +115,12 @@ fun FrostSurface(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = NxTheme.colors
-    val panelElevation = LocalStyle.current.panelElevation
     val cast = remember(layers) { layers.filterIsInstance<DropShadow>().firstOrNull() }
 
     var outer = modifier
-    if (cast != null) {
-        // Ungated and neutral: this is the plane being above the page, not an
-        // emphasis effect. Zero elevation draws nothing, which is what a flat
-        // style asks for.
-        val elevation = cast.elevationDp?.dp ?: panelElevation
-        if (elevation > 0.dp) outer = outer.shadow(elevation, shape, clip = false)
-    }
+    // Ungated and neutral: this is the plane being above the page, not an emphasis
+    // effect.
+    if (cast != null && cast.elevationDp > 0f) outer = outer.shadow(cast.elevationDp.dp, shape, clip = false)
 
     Box(outer) {
         // Body + emphasis coat, clipped to the shape. matchParentSize so it fills the

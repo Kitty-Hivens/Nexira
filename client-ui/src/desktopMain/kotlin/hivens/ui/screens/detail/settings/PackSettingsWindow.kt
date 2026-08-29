@@ -224,7 +224,7 @@ fun PackSettingsWindow(
             // (opaque forces alpha 1 instead of the 0.92 dark bleed-through), so
             // the scrim never reads through the window.
             blurDp = 0f,
-            opaque = true,
+            opacity = 1f,
             modifier = Modifier
                 .fillMaxWidth(0.88f)
                 .fillMaxHeight(0.90f)
