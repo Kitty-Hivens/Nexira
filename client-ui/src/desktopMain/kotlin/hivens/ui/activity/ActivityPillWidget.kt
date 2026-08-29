@@ -66,7 +66,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
-import hivens.ui.surface.FrostTier
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalStyle
@@ -99,7 +98,6 @@ data class PillProps(
     // floats over arbitrary content so it cannot let anything read through, and
     // once it cannot, every coat above the body is either invisible or a second
     // fill shifting a tone the ladder already chose.
-    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Clear,
     @PropLabel("widget.activity.pill.heightDp") @PropRange(40.0, 76.0) val heightDp: Int = 56,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.activity.pill.showActions") val showActions: Boolean = true,
@@ -260,7 +258,6 @@ internal fun Pill(
             .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        tier = props.frostTier,
         // It floats over the page, so it casts. Missing here while the selection
         // body set it meant the same object gained a shadow the moment a selection
         // took over and lost it again afterwards.

@@ -79,7 +79,6 @@ internal fun SelectionPill(
             .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        tier = props.frostTier,
         elevated = true,
         opaque = true,
     ) {

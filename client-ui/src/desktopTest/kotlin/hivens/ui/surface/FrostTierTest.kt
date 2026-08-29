@@ -34,7 +34,7 @@ class FrostTierTest {
     @Test
     fun heavyKeepsLayerOrder() {
         assertEquals(
-            listOf(Backdrop::class, Fill::class, DropShadow::class, Texture::class),
+            listOf(Backdrop::class, Fill::class, DropShadow::class),
             FrostTier.Heavy.toLayers().map { it::class },
         )
     }
@@ -49,7 +49,7 @@ class FrostTierTest {
      */
     @Test
     fun presetsCarryOnlyBodyBlurAndCastShadow() {
-        val allowed = setOf(Backdrop::class, Fill::class, DropShadow::class, Texture::class)
+        val allowed = setOf(Backdrop::class, Fill::class, DropShadow::class)
         for (tier in FrostTier.entries) {
             val kinds = tier.toLayers().map { it::class }
             assertTrue(

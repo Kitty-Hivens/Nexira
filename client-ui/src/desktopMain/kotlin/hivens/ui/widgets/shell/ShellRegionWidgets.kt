@@ -60,7 +60,6 @@ import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.surface.FrostTier
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
@@ -83,7 +82,10 @@ import org.koin.compose.koinInject
 /**
  * Editable frame of one shell region. [widthDp] 0 means flex (the region's
  * per-instance weight drives its share of the Row); > 0 pins a fixed width.
- * [glassAlpha] 0 means no backing. The defaults reproduce the pre-widget shell.
+ * [glassAlpha] 0 means no fill. The defaults reproduce the pre-widget shell.
+ *
+ * The centre carried a frost tier that it never read -- the comment beside it said
+ * so -- so it is gone rather than kept as a knob that moves nothing.
  */
 @Serializable
 data class ShellRegionProps(
@@ -92,42 +94,52 @@ data class ShellRegionProps(
     @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = false,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.appshell.region.swipeToCollapse") val swipeToCollapse: Boolean = true,
-    // Surface depth for the right panel (the only region that renders a FrostSurface
-    // today): Heavy = blur + scrim + tint + edge, so it reads as a distinct plane
-    // and stays legible over any wallpaper. Left/center ignore it for now.
-    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Heavy,
 ) {
     val glassAlpha: Float get() = glassAlphaPct / 100f
 }
 
 /**
- * Props for the RIGHT region only. It renders its own [NxSurface] (frost coat via
- * [frostTier]) instead of the flat glass backing the rails use, and it draws no
+ * A region's plane, as the two numbers it actually has.
+ *
+ * They were one name before -- a tier -- and the name moved both at once, in
+ * opposite directions: Frosted was blur 18 at 55% fill, Heavy blur 28 at 45%, so
+ * asking for more blur quietly asked for less fill. Two of the four values a tier
+ * carried never reached a pixel at all.
+ *
+ * -1 means "the theme's own floor", which is what an unnamed opacity has always
+ * drawn: 92% on dark, solid on light.
+ */
+internal fun Int.regionOpacity(): Float? = takeIf { it >= 0 }?.let { it / 100f }
+
+/**
+ * Props for the RIGHT region only. It renders its own [NxSurface] and draws no
  * divider -- so [ShellRegionProps.glassAlphaPct] and `showDivider` are inert here
  * and simply do not exist on this class (the prop panel shows only what works).
- * Defaults are the panel's shipped look: a flat matte, swipe-to-collapse off.
+ * Defaults are the panel's shipped look: the theme's own floor, no blur,
+ * swipe-to-collapse off.
  */
 @Serializable
 data class ShellRightRegionProps(
     @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.appshell.region.swipeToCollapse") val swipeToCollapse: Boolean = false,
-    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Flat,
+    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = -1,
+    @PropLabel("widget.appshell.region.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
 )
 
 /**
- * Props for the LEFT region (the navigation rail). Like the right panel it renders its own
- * [NxSurface] whose matte is the editable [frostTier] (default [FrostTier.Clear] -- a
- * transparent chrome that prioritises see-through over a wallpaper). The flat-glass knob
- * [ShellRegionProps.glassAlphaPct] has no place here and does not exist on this class -- the
- * prop panel shows only what works.
+ * Props for the LEFT region (the navigation rail). Like the right panel it renders its
+ * own [NxSurface], at 35% by default -- a see-through chrome that prioritises the
+ * wallpaper behind it. The page-fill knob [ShellRegionProps.glassAlphaPct] has no place
+ * here and does not exist on this class; the prop panel shows only what works.
  */
 @Serializable
 data class ShellLeftRegionProps(
     @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
     @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = false,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
-    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Clear,
+    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = 35,
+    @PropLabel("widget.appshell.region.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
 )
 
 /**
@@ -190,11 +202,15 @@ fun ShellLeftRegion(instance: WidgetInstance) {
     val ctx = LocalShellContext.current
     val sized = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier
     Row(sized.fillMaxHeight()) {
-        // The rail is an NxSurface: its matte is frostTier (default Clear = transparent).
-        // AppSidebar's NavigationRail is transparent so this owns the background. The
-        // divider stays OUTSIDE the surface, so the tinted area matches the old
-        // glassSurfaceAlpha(0.35) rail exactly.
-        NxSurface(NxSurfaceLevel.Floating, Modifier.weight(1f).fillMaxHeight(), RectangleShape, tier = props.frostTier) {
+        // The rail is an NxSurface at 35% by default. AppSidebar's NavigationRail is
+        // transparent so this owns the background, and the divider stays OUTSIDE the
+        // surface so the tinted area is exactly the rail. Light stops being forced
+        // opaque here: a named opacity is a named opacity on either theme now.
+        NxSurface(
+            NxSurfaceLevel.Base, Modifier.weight(1f).fillMaxHeight(), RectangleShape,
+            glass = false, hairline = false,
+            opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
+        ) {
             AppSidebar(
                 currentScreen   = ctx.currentScreen,
                 isAuthenticated = ctx.isAuthenticated,
@@ -270,8 +286,8 @@ fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRightRegionProps>()
     // The panel is an NxSurface at Floating depth: a SurfaceContainerHigh body (a step
     // up the tonal ladder from the page) plus a luminance-derived bevel, so it reads
-    // as a distinct plane over any wallpaper and with none. The editable frostTier
-    // prop still drives the glass coat's richness.
+    // as a distinct plane over any wallpaper and with none. Its opacity and blur are
+    // the editable pair.
     val editing = LocalEditMode.current is EditModeState.On
     val path = LocalSlotPath.current
     val controller: EditModeController = koinInject()
@@ -310,7 +326,11 @@ fun ShellRightRegion(instance: WidgetInstance) {
     if (editing) {
         if (props.collapsed) { CollapsedRegionStrip(); return }
         val sized = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH)
-        NxSurface(NxSurfaceLevel.Floating, sized.fillMaxHeight(), RectangleShape, tier = props.frostTier) {
+        NxSurface(
+            NxSurfaceLevel.Floating, sized.fillMaxHeight(), RectangleShape,
+            glass = false,
+            opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
+        ) {
             rightPanelMovable()
         }
         return
@@ -371,7 +391,11 @@ fun ShellRightRegion(instance: WidgetInstance) {
         // clipped sliver; it wipes in (at full width, requiredWidth -- no reflow)
         // as the rail widens.
         if (widthAnim.value > collapsedPx + 1f) {
-            NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxSize(), RectangleShape, tier = props.frostTier) {
+            NxSurface(
+                NxSurfaceLevel.Floating, Modifier.fillMaxSize(), RectangleShape,
+                glass = false,
+                opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
+            ) {
                 Row(modifier = Modifier.requiredWidth(expandedWidth).fillMaxHeight()) {
                     Box(Modifier.weight(1f).fillMaxHeight()) { rightPanelMovable() }
                 }
@@ -397,7 +421,8 @@ data class ShellTopRegionProps(
     @PropLabel("widget.appshell.topbar.heightDp") @PropRange(36.0, 72.0) val heightDp: Int = 44,
     @PropLabel("widget.appshell.topbar.cornerStyle") val cornerStyle: CornerStyle = CornerStyle.Rect,
     @PropLabel("widget.appshell.topbar.groupStyle") val groupStyle: GroupStyle = GroupStyle.LineSeparated,
-    @PropLabel("widget.appshell.topbar.frostTier") val frostTier: FrostTier = FrostTier.Clear,
+    @PropLabel("widget.appshell.topbar.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = 35,
+    @PropLabel("widget.appshell.topbar.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
     @PropLabel("widget.appshell.topbar.controls") val controls: WindowControlsMode = WindowControlsMode.Auto,
 )
 
@@ -459,7 +484,11 @@ fun ShellTopRegion(instance: WidgetInstance) {
     val barModifier = Modifier.fillMaxWidth().height(props.heightDp.dp).padding(outerPad)
 
     when (props.groupStyle) {
-        GroupStyle.LineSeparated -> NxSurface(NxSurfaceLevel.Floating, barModifier, shape, tier = props.frostTier) {
+        GroupStyle.LineSeparated -> NxSurface(
+            NxSurfaceLevel.Base, barModifier, shape,
+            glass = false, hairline = false,
+            opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
+        ) {
             Row(
                 Modifier.fillMaxSize().padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -480,22 +509,30 @@ fun ShellTopRegion(instance: WidgetInstance) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) { Caption() }
+                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, glass = false, hairline = false, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
             AppGlyph()
-            NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) {
+            NxSurface(
+                NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
+                glass = false, hairline = false,
+                opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
+            ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("left"), spacing = 4.dp)
                 }
             }
             DragLane()
-            NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) {
+            NxSurface(
+                NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
+                glass = false, hairline = false,
+                opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
+            ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("right"), spacing = 4.dp)
                 }
             }
             if (!HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) { Caption() }
+                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, glass = false, hairline = false, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
         }
     }
