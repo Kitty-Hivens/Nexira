@@ -15,6 +15,7 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +30,7 @@ class PackAutoUpdateServiceTest {
     private class FakeRepo(initial: List<PackInstance>) : IPackRepository {
         private val map = LinkedHashMap<String, PackInstance>().apply { initial.forEach { put(it.id, it) } }
         private val flow = MutableStateFlow(map.values.toList())
-        override fun observe(): Flow<List<PackInstance>> = flow.asStateFlow()
+        override fun observe(): StateFlow<List<PackInstance>> = flow.asStateFlow()
         override suspend fun list() = map.values.toList()
         override suspend fun get(id: String) = map[id]
         override suspend fun put(instance: PackInstance) { map[instance.id] = instance; flow.value = map.values.toList() }

@@ -17,9 +17,16 @@ import hivens.ui.platform.SystemActions
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
-/** Where the screen is in resolving the instance it was navigated to. */
+/**
+ * Which instance the screen was navigated to, or that there is none.
+ *
+ * There is no loading arm. The registry is a value that always has one, so the
+ * answer exists the moment the screen is constructed; a Loading state only ever
+ * described the gap between composing and the effect that started collecting, and
+ * spending a frame on a spinner over a record already in memory is the whole of
+ * "installed packs are empty when I open them".
+ */
 internal sealed interface PackResolution {
-    data object Loading : PackResolution
     data object NotFound : PackResolution
     data class Ready(val pack: PackInstance) : PackResolution
 }
@@ -47,7 +54,7 @@ internal class PackDetailState(
     private val abort: () -> Unit,
     private val openInFileManager: (Path) -> Unit,
 ) {
-    var resolution by mutableStateOf<PackResolution>(PackResolution.Loading)
+    var resolution by mutableStateOf(resolve(repo.observe().value))
         private set
 
     val pack: PackInstance? get() = (resolution as? PackResolution.Ready)?.pack
@@ -62,18 +69,21 @@ internal class PackDetailState(
      * settings window, a build applied on the app scope, the auto-updater at
      * startup, the playtime the launch writes back when the game exits -- so the
      * screen is one of the readers of the record rather than the holder of a copy
-     * taken when it opened. The store's first emission is its snapshot, so an
-     * instance missing from a later one has been deleted, which is a dead end and
-     * says so.
+     * taken when it opened. The first answer is taken at construction rather than
+     * from this collector, so the screen opens on the pack instead of on a spinner;
+     * an instance missing from a later emission has been deleted, which is a dead
+     * end and says so.
      *
      * Never returns: the effect that starts it is what bounds it.
      */
     suspend fun observe() {
-        repo.observe().collect { instances ->
-            val found = instances.firstOrNull { it.id == instanceId }
-            resolution = if (found == null) PackResolution.NotFound else PackResolution.Ready(found)
-        }
+        repo.observe().collect { resolution = resolve(it) }
     }
+
+    private fun resolve(instances: List<PackInstance>): PackResolution =
+        instances.firstOrNull { it.id == instanceId }
+            ?.let { PackResolution.Ready(it) }
+            ?: PackResolution.NotFound
 
     fun play(session: SessionData) {
         val target = pack ?: return

@@ -5,6 +5,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.SessionData
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -41,7 +42,7 @@ class PackDetailStateTest {
     private class FakeRepo(initial: List<PackInstance> = emptyList()) : IPackRepository {
         private val instances = MutableStateFlow(initial)
 
-        override fun observe(): Flow<List<PackInstance>> = instances
+        override fun observe(): StateFlow<List<PackInstance>> = instances
         override suspend fun list(): List<PackInstance> = instances.value
         override suspend fun get(id: String): PackInstance? = instances.value.firstOrNull { it.id == id }
         override suspend fun put(instance: PackInstance) {
@@ -125,28 +126,31 @@ class PackDetailStateTest {
         assertEquals(PackResolution.Ready(pack()), state.resolution)
     }
 
+    /**
+     * These three used to assert a gap: nothing resolved until the collector was
+     * started, so the screen spent a frame on a spinner over a record already in
+     * memory. The registry is a value that always has one, so the answer is there at
+     * construction and the gap is gone -- what is left to hold is that a pack the
+     * registry does not have still leads nowhere.
+     */
     @Test
-    fun `the instance directory follows the resolved pack`() = runTest {
-        val state = state(FakeRepo(listOf(pack())))
-        assertNull(state.instanceDir, "nothing is resolved yet")
-
-        observing(state)
-
-        assertEquals(Path.of("/data", "instances", "industrial"), state.instanceDir)
+    fun `the instance directory is known before anything collects`() = runTest {
+        assertEquals(
+            Path.of("/data", "instances", "industrial"),
+            state(FakeRepo(listOf(pack()))).instanceDir,
+        )
+        assertNull(state(FakeRepo()).instanceDir, "a pack the registry does not have has no directory")
     }
 
     @Test
-    fun `play launches the resolved pack and nothing before that`() = runTest {
+    fun `play launches without waiting to be collected`() = runTest {
         var launched: PackInstance? = null
-        val state = state(FakeRepo(listOf(pack())), onLaunch = { _, p -> launched = p })
-        val session = SessionData()
-
-        state.play(session)
-        assertNull(launched, "there is no pack to launch until it resolves")
-
-        observing(state)
-        state.play(session)
+        state(FakeRepo(listOf(pack())), onLaunch = { _, p -> launched = p }).play(SessionData())
         assertEquals("inst-1", launched?.id)
+
+        var fromNothing: PackInstance? = null
+        state(FakeRepo(), onLaunch = { _, p -> fromNothing = p }).play(SessionData())
+        assertNull(fromNothing, "a pack the registry does not have is not launchable")
     }
 
     @Test
@@ -166,16 +170,14 @@ class PackDetailStateTest {
     }
 
     @Test
-    fun `opening the folder waits for a resolved pack`() = runTest {
+    fun `opening the folder does not wait to be collected either`() = runTest {
         var opened: Path? = null
-        val state = state(FakeRepo(listOf(pack())), onOpenFolder = { opened = it })
-
-        state.openFolder()
-        assertNull(opened, "there is no directory to open before the pack resolves")
-
-        observing(state)
-        state.openFolder()
+        state(FakeRepo(listOf(pack())), onOpenFolder = { opened = it }).openFolder()
         assertEquals(Path.of("/data", "instances", "industrial"), opened)
+
+        var fromNothing: Path? = null
+        state(FakeRepo(), onOpenFolder = { fromNothing = it }).openFolder()
+        assertNull(fromNothing, "a pack the registry does not have has no folder to open")
     }
 
     @Test

@@ -16,6 +16,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.http.HttpHeaders
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -51,7 +53,7 @@ class MrpackInstallerTest {
 
     private class FakeRepository : IPackRepository {
         val stored = mutableListOf<PackInstance>()
-        override fun observe(): Flow<List<PackInstance>> = flowOf(stored)
+        override fun observe(): StateFlow<List<PackInstance>> = MutableStateFlow(stored)
         override suspend fun list(): List<PackInstance> = stored
         override suspend fun get(id: String): PackInstance? = stored.firstOrNull { it.id == id }
         override suspend fun put(instance: PackInstance) { stored.add(instance) }

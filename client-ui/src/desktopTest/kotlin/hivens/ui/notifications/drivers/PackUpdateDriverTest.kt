@@ -41,7 +41,7 @@ class PackUpdateDriverTest {
     }
 
     private class FakeRepo(private val instance: PackInstance) : IPackRepository {
-        override fun observe(): Flow<List<PackInstance>> = MutableStateFlow(listOf(instance)).asStateFlow()
+        override fun observe(): StateFlow<List<PackInstance>> = MutableStateFlow(listOf(instance)).asStateFlow()
         override suspend fun list() = listOf(instance)
         override suspend fun get(id: String) = instance.takeIf { it.id == id }
         override suspend fun put(instance: PackInstance) = Unit

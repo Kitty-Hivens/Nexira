@@ -74,7 +74,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
     val ctx = LocalHomeNewContext.current
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
-    val all by remember { repo.observe() }.collectAsState(initial = emptyList())
+    val all by remember { repo.observe() }.collectAsState()
 
     if (all.isEmpty()) {
         EmptyPacksCta(onBrowse = { ctx.onScreenChange(Screen.Browse) })

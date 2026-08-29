@@ -196,6 +196,18 @@ fun EditorSurfaceHost(
         slotMenuCursor = null
         handleMenuOpen = false
     }
+
+    // One Escape backs out one step: an open slot menu first, then the slot
+    // selection, then edit mode itself. Named because two paths run it -- the
+    // Box's own key handler for when focus happens to be inside, and the
+    // window-level chord for every other time, which is most of them.
+    fun backOutOneStep() {
+        when {
+            handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
+            selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
+            else                                     -> editing = false
+        }
+    }
     // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, the surface
     // settings panel, and any slot selection, so re-entering does not silently reopen
     // the last panel with the palette still hidden.
@@ -237,6 +249,27 @@ fun EditorSurfaceHost(
     // (its Crossfade swaps screen content *inside* the host, not the
     // host itself) -- there is never a second, hidden host to flip into
     // edit mode behind the user's back.
+    // The window's key handler claims Escape only while this is true, so it has to
+    // be reported rather than inferred; cleared on dispose so a host that leaves the
+    // tree while editing does not leave Escape claimed behind it.
+    DisposableEffect(editing) {
+        controller.reportEditing(editing)
+        onDispose { controller.reportEditing(false) }
+    }
+
+    // Window-level Escape (AppShell onPreviewKeyEvent, gated on the flag above)
+    // bumps the signal; the same staged back-out runs here. `seen` initialises to
+    // the current tick for the same reason the toggle observer does.
+    LaunchedEffect(availableSurfaces) {
+        var seen = controller.editorEscapeSignal.value
+        snapshotFlow { controller.editorEscapeSignal.value }.collect { tick ->
+            if (tick != seen) {
+                seen = tick
+                if (editing) backOutOneStep()
+            }
+        }
+    }
+
     LaunchedEffect(availableSurfaces) {
         var seen = controller.editToggleSignal.value
         snapshotFlow { controller.editToggleSignal.value }.collect { tick ->
@@ -474,14 +507,7 @@ fun EditorSurfaceHost(
                     // Box-level handler misses the chord when the side
                     // rails own focus.
                     if (editing && ev.type == KeyEventType.KeyUp && ev.key == Key.Escape) {
-                        // Staged: close an open slot menu, then drop the slot
-                        // selection, then exit edit mode (edit-exit stays the final
-                        // stage, matching the documented Ctrl+E / Escape contract).
-                        when {
-                            handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
-                            selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
-                            else                                     -> editing = false
-                        }
+                        backOutOneStep()
                         true
                     } else false
                 },

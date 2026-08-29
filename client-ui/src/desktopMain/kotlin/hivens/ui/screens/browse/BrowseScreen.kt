@@ -154,7 +154,10 @@ fun BrowseScreen(
                 .collect { packs ->
                     // An empty answer is an answer. Keeping a restored list over
                     // it left packs on screen that the source had stopped
-                    // listing, with nothing saying so.
+                    // listing, with nothing saying so. The put FORGETS rather than
+                    // stores -- the session refuses an empty snapshot -- so the
+                    // screen shows the empty state, with its retry, and the next
+                    // entry asks again instead of restoring the blank.
                     if (packs.isEmpty()) {
                         state = BrowseState.Empty
                         session.put(origin, submittedQuery, BrowseSession.Snapshot(emptyList(), nextPage = 0, endReached = true))

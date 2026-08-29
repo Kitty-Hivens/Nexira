@@ -134,9 +134,9 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     // settings window this screen was opened from lands underneath it, and so does
     // the auto-update pass at startup. Both used to leave the "current" marker,
     // the switch banner and the restore points describing the build before them.
-    val instances by remember { repo.observe() }.collectAsState(initial = null)
+    val instances by remember { repo.observe() }.collectAsState()
     val inFlight by operations.operations.collectAsState()
-    val pack = instances?.firstOrNull { it.id == instanceId }
+    val pack = instances.firstOrNull { it.id == instanceId }
 
     // A finished outcome is read here and nowhere else once the screen goes; a
     // running operation is left alone, since leaving is not what ends it.
@@ -144,10 +144,6 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
         onDispose { operations.dismiss(instanceId) }
     }
 
-    if (instances == null) {
-        CenteredProgress(Modifier.fillMaxSize())
-        return
-    }
     if (pack == null) {
         // Deleted from under the screen: leave rather than paint a version manager
         // for an instance that is gone.

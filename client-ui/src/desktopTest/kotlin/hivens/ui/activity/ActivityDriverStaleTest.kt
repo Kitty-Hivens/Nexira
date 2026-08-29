@@ -44,7 +44,7 @@ class ActivityDriverStaleTest {
     }
 
     private class FakeRepo : IPackRepository {
-        override fun observe() = emptyFlow<List<PackInstance>>()
+        override fun observe() = MutableStateFlow(emptyList<PackInstance>())
         override suspend fun list(): List<PackInstance> = emptyList()
         override suspend fun get(id: String): PackInstance? = null
         override suspend fun put(instance: PackInstance) = Unit

@@ -7,6 +7,7 @@ import hivens.core.data.PackOrigin
 import hivens.launcher.runtime.RuntimeProvisioner
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -34,7 +35,7 @@ class ForeignInstanceImporterTest {
     private class FakeRepo : IPackRepository {
         val stored = mutableListOf<PackInstance>()
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
-        override fun observe(): Flow<List<PackInstance>> = flow
+        override fun observe(): StateFlow<List<PackInstance>> = flow
         override suspend fun list() = stored.toList()
         override suspend fun get(id: String) = stored.firstOrNull { it.id == id }
         override suspend fun put(instance: PackInstance) { stored.add(instance); flow.value = stored.toList() }

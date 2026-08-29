@@ -930,7 +930,14 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
     val hour = 60 * min
     val day = 24 * hour
     return SmrtPackCaches(
-        listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
+        // An empty listing is not stored. This one is on disk, so a mirror that
+        // answered once with nothing would otherwise serve that nothing for a day,
+        // across restarts -- the case shouldStore is documented for.
+        listing = f.create(
+            "pack-listing",
+            SmrtPackListing.serializer(),
+            CacheConfig(ttlMs = 5 * min, staleTtlMs = day, shouldStore = { it.packs.isNotEmpty() }),
+        ),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
         versions = f.create("pack-versions", SmrtManifestVersions.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),

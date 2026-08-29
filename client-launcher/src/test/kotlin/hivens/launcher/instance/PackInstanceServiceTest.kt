@@ -4,6 +4,7 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -19,7 +20,7 @@ class PackInstanceServiceTest {
     private class FakeRepo : IPackRepository {
         val map = LinkedHashMap<String, PackInstance>()
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
-        override fun observe(): Flow<List<PackInstance>> = flow
+        override fun observe(): StateFlow<List<PackInstance>> = flow
         override suspend fun list(): List<PackInstance> = map.values.toList()
         override suspend fun get(id: String): PackInstance? = map[id]
         override suspend fun put(instance: PackInstance) {

@@ -55,13 +55,12 @@ fun rememberCrumbLabel(screen: Screen): String {
             // Read once, this crumb kept the name the pack had when it was first
             // shown: the rename happens in place, without navigating, and the top
             // bar is chrome that is never disposed, so only visiting a different
-            // pack could ever fix it. Collecting the registry is also what puts the
-            // loading placeholder back on a key change -- the flow re-emits for the
-            // new id rather than leaving the previous pack's name up.
-            val instances by remember { repo.observe() }.collectAsState(initial = null)
-            instances?.firstOrNull { it.id == screen.instanceId }?.displayName
-                ?: instances?.let { screen.instanceId }
-                ?: s.crumbLoading
+            // pack could ever fix it. The registry always has a value, so there is
+            // no loading state to pass through -- an id the registry does not hold
+            // is a pack that is gone, and the id itself is the honest label for it.
+            val instances by remember { repo.observe() }.collectAsState()
+            instances.firstOrNull { it.id == screen.instanceId }?.displayName
+                ?: screen.instanceId
         }
         is Screen.ServerSettings      -> serverCrumb(screen.serverId)
         is Screen.ServerDetails       -> serverCrumb(screen.serverId)

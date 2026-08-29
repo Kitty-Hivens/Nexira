@@ -799,11 +799,12 @@ fun FrameWindowScope.AppShellContent(
             // what was pressed and whether to swallow it; the observers of these
             // signals gate on their own state (EditorSurfaceHost on the surface
             // being editable, ShellRightRegion on the rail).
-            val resolved = resolveShellChord(ev, debugOverlay.available)
+            val resolved = resolveShellChord(ev, debugOverlay.available, editModeController.isEditing)
             when (resolved.chord) {
                 ShellChord.ToggleEditMode     -> editModeController.requestEditToggle()
                 ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()
                 ShellChord.ToggleDebugOverlay -> debugOverlay.toggle()
+                ShellChord.ExitEditor         -> editModeController.requestEditorEscape()
                 null                          -> Unit
             }
             resolved.consume

@@ -80,7 +80,7 @@ class PackVersionsScreenRenderTest {
 
     private class FakeRepo(private val pack: PackInstance) : IPackRepository {
         private val flow = MutableStateFlow(listOf(pack))
-        override fun observe(): Flow<List<PackInstance>> = flow
+        override fun observe(): StateFlow<List<PackInstance>> = flow
         override suspend fun list(): List<PackInstance> = listOf(pack)
         override suspend fun get(id: String): PackInstance? = pack.takeIf { it.id == id }
         override suspend fun put(instance: PackInstance) {}

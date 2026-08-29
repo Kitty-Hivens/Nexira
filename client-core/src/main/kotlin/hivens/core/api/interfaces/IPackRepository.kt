@@ -2,6 +2,7 @@ package hivens.core.api.interfaces
 
 import hivens.core.data.PackInstance
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Local store of installed [PackInstance]s. Library screen consumes
@@ -18,10 +19,19 @@ import kotlinx.coroutines.flow.Flow
  */
 interface IPackRepository {
     /**
-     * Cold-start snapshot, then re-emits the full list on any
-     * mutation. Library / Home screens collect this directly.
+     * The registry, as a value that always has one. Re-emits the full list on any
+     * mutation; Library / Home screens collect this directly.
+     *
+     * A [StateFlow] rather than a [Flow], because the distinction is the whole of
+     * whether the list is there on the first frame. The registry is materialised in
+     * memory at construction, but declaring it as a plain Flow forced every consumer
+     * onto `collectAsState(initial = ...)`, which paints the initial value until a
+     * LaunchedEffect starts collecting -- and since the router disposes a screen on
+     * every navigation, that frame happened on every entry. It read as "installed
+     * packs are fetched each time"; nothing was fetched, the value was thrown away
+     * at the type.
      */
-    fun observe(): Flow<List<PackInstance>>
+    fun observe(): StateFlow<List<PackInstance>>
 
     /** One-shot snapshot. Useful for non-Compose call sites. */
     suspend fun list(): List<PackInstance>

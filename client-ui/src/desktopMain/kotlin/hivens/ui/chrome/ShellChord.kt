@@ -17,6 +17,10 @@ enum class ShellChord {
 
     /** F9 -- the dev UI-debug overlay. Only claimed on a build that has one. */
     ToggleDebugOverlay,
+
+    /** Escape -- back out of widget edit mode. Only claimed while an editor is open,
+     *  so every dialog and popup keeps its own Escape the rest of the time. */
+    ExitEditor,
 }
 
 /**
@@ -44,29 +48,36 @@ data class ChordResolution(val chord: ShellChord?, val consume: Boolean) {
  * the decision itself is [resolveChord], which takes no Compose types so it can
  * be tested without fabricating a native key event.
  */
-fun resolveShellChord(event: KeyEvent, debugOverlayAvailable: Boolean): ChordResolution =
+fun resolveShellChord(event: KeyEvent, debugOverlayAvailable: Boolean, editing: Boolean): ChordResolution =
     resolveChord(
         key = event.key,
         ctrl = event.isCtrlPressed,
         released = event.type == KeyEventType.KeyUp,
         debugOverlayAvailable = debugOverlayAvailable,
+        editing = editing,
     )
 
 /**
  * The decision behind [resolveShellChord].
  *
  * [debugOverlayAvailable] gates F9: a release build has no overlay, so the key
- * is left to whoever else wants it rather than silently eaten.
+ * is left to whoever else wants it rather than silently eaten. [editing] gates
+ * Escape the same way, and it matters far more there: Escape is how every dialog,
+ * popup and overlay in the launcher closes, so claiming it at window scope while
+ * no editor is open would take it from all of them.
  */
 internal fun resolveChord(
     key: Key,
     ctrl: Boolean,
     released: Boolean,
     debugOverlayAvailable: Boolean,
+    editing: Boolean,
 ): ChordResolution = when {
     ctrl && key == Key.E -> ChordResolution(ShellChord.ToggleEditMode.takeIf { released }, consume = true)
     ctrl && key == Key.N -> ChordResolution(ShellChord.ToggleRightRail.takeIf { released }, consume = true)
     debugOverlayAvailable && key == Key.F9 ->
         ChordResolution(ShellChord.ToggleDebugOverlay.takeIf { released }, consume = true)
+    editing && !ctrl && key == Key.Escape ->
+        ChordResolution(ShellChord.ExitEditor.takeIf { released }, consume = true)
     else -> ChordResolution.Ignored
 }

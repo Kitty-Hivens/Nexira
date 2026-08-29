@@ -32,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,16 +43,19 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.surface.bodyFloor
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.resolveSurface
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
+import hivens.widget.model.FillSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceSpec
+import hivens.widget.model.parseFill
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 import kotlin.math.roundToInt
@@ -238,9 +243,14 @@ private fun PropPanelBody(
                 style = MaterialTheme.typography.bodySmall,
                 color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
             )
+            // Both open on what the plane DRAWS at, not on a zero. A value the record
+            // does not name is filled in by the style or by the theme, so a slider
+            // reading its own null reported no blur under a style that blurs at 18dp
+            // and full opacity under a body that draws at 0.92. Moving either one
+            // writes it down, which is what makes the number true from then on.
             LabeledSlider(
                 label         = s.editorSurfaceOpacity,
-                value         = (surface.opacity ?: 1f) * 100f,
+                value         = (surface.opacity ?: bodyFloor(surfaceBodyIsDark(surface))) * 100f,
                 range         = 0f..100f,
                 format        = "%.0f%%",
                 keyStep       = 1f,
@@ -248,7 +258,7 @@ private fun PropPanelBody(
             )
             LabeledSlider(
                 label         = s.editorSurfaceBlur,
-                value         = surface.blurDp ?: 0f,
+                value         = surface.blurDp ?: style.surfaceBlur.value,
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
@@ -404,3 +414,18 @@ private fun PropPanelBody(
         }
     }
 }
+
+/**
+ * Whether the body a spec resolves to is dark, which is what decides the opacity a
+ * surface that names none draws at.
+ *
+ * A rung follows the palette and every rung of one palette sits on the same side of
+ * mid grey, so the page's own tone answers for all of them; a literal colour answers
+ * for itself.
+ */
+@Composable
+private fun surfaceBodyIsDark(spec: SurfaceSpec): Boolean =
+    when (val fill = parseFill(spec.fill)) {
+        is FillSource.Literal -> Color(fill.argb).luminance() < 0.5f
+        else -> NxTheme.colors.surface.luminance() < 0.5f
+    }

@@ -25,6 +25,7 @@ import hivens.ui.theme.StyleSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.skia.Bitmap
@@ -54,7 +55,7 @@ class PackSettingsWindowRenderTest {
 
     private class FakeRepo : IPackRepository {
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
-        override fun observe(): Flow<List<PackInstance>> = flow
+        override fun observe(): StateFlow<List<PackInstance>> = flow
         override suspend fun list(): List<PackInstance> = emptyList()
         override suspend fun get(id: String): PackInstance? = null
         override suspend fun put(instance: PackInstance) {}
