@@ -36,7 +36,6 @@ import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.ui.Screen
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -63,7 +62,12 @@ data class RecentProps(
 // launches still shows the tiles (sorted by createdAt), so the new
 // home reads as populated rather than blank. Empty repo shows a CTA
 // pointing at Browse.
-@Widget(id = "home.new.recent", displayName = "widget.home.new.recent", propsClass = RecentProps::class)
+@Widget(
+    id = "home.new.recent",
+    displayName = "widget.home.new.recent",
+    propsClass = RecentProps::class,
+    surface = """{"fill":"base","opacity":0.4,"padding":{"top":12.0}}""",
+)
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()

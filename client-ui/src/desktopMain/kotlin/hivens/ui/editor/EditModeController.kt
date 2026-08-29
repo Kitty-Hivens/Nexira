@@ -101,6 +101,7 @@ class EditModeController(
         slots: List<SlotId>,
         index: Int,
         canvas: CanvasPlacement? = null,
+        surface: SurfaceSpec? = null,
     ) {
         scope.launch(writeDispatcher) {
             val children = if (slots.isEmpty()) {
@@ -113,6 +114,11 @@ class EditModeController(
                 instanceId = newInstanceId(),
                 children   = children,
                 canvas     = canvas,
+                // The widget's own declared plane, so one dropped from the palette
+                // looks like the one the bundled layout places. Editable from the
+                // moment it lands, because it is written onto the instance rather
+                // than consulted behind it.
+                surface    = surface,
             )
             repo.update { it.insertWidget(path, widget, index) }
         }

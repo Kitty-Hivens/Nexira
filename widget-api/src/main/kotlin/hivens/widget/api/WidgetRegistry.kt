@@ -2,6 +2,7 @@ package hivens.widget.api
 
 import androidx.compose.runtime.Composable
 import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.serialization.KSerializer
@@ -22,6 +23,14 @@ interface WidgetDescriptor {
     // structural keys in WidgetInstance.children) to validate moves.
     val slots: List<SlotId>
         get() = emptyList()
+
+    // The plane this widget sits on when nothing has said otherwise. Populated by
+    // the KSP processor from @Widget(surface = ...); null means the widget draws
+    // no plane of its own. The editor seeds it onto a newly placed instance, so a
+    // widget dropped from the palette looks like the one in the bundled layout
+    // without either of them being the source of truth for the other.
+    val defaultSurface: SurfaceSpec?
+        get() = null
 
     // Typed-props support, populated by the KSP processor from
     // @Widget(propsClass = ...). A null serializer means the widget is
