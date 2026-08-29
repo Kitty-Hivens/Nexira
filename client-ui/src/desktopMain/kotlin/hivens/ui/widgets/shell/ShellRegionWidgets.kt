@@ -1,7 +1,6 @@
 package hivens.ui.widgets.shell
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.RectangleShape
@@ -54,7 +52,6 @@ import hivens.ui.chrome.WindowControls
 import hivens.ui.chrome.WindowControlsMode
 import hivens.ui.chrome.resolved
 import hivens.ui.chrome.windowDragArea
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
@@ -80,23 +77,34 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.koin.compose.koinInject
 
 /**
- * Editable frame of one shell region. [widthDp] 0 means flex (the region's
- * per-instance weight drives its share of the Row); > 0 pins a fixed width.
- * [glassAlpha] 0 means no fill. The defaults reproduce the pre-widget shell.
+ * The chrome's opacity when nothing overrides it.
  *
- * The centre carried a frost tier that it never read -- the comment beside it said
- * so -- so it is gone rather than kept as a knob that moves nothing.
+ * The rail, the top bar and the centre's corner wedge all draw at this number, and
+ * the wedge only does its job -- carrying the content's corner into the chrome --
+ * while it is exactly the colour of the plane it joins. They were three separate
+ * literals that happened to agree, which is how they came apart: a plane whose
+ * opacity was refused on light left a visible patch at the seam.
+ */
+private const val CHROME_OPACITY_PCT = 35
+
+/**
+ * Props for the CENTRE region: the page under every screen.
+ *
+ * It had five, of which it read one. The other four -- a width the weight decides, a
+ * divider the rails draw, a collapse it does not have and the swipe that would drive
+ * it -- were a props class shared with regions that do use them, so the panel offered
+ * the centre four knobs that moved nothing.
+ *
+ * The one it did read was a raw alpha handed to the tinting helper, which snaps to a
+ * tonal rung on light: two different numbers came out as one pixel there, and no
+ * amount of the slider made the page translucent. It is an [NxSurface] like its
+ * siblings now, so the same pair of values means the same thing in all four regions.
  */
 @Serializable
-data class ShellRegionProps(
-    @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
-    @PropLabel("widget.appshell.region.glassAlphaPct") @PropRange(0.0, 100.0) val glassAlphaPct: Int = 0,
-    @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = false,
-    @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
-    @PropLabel("widget.appshell.region.swipeToCollapse") val swipeToCollapse: Boolean = true,
-) {
-    val glassAlpha: Float get() = glassAlphaPct / 100f
-}
+data class ShellCenterRegionProps(
+    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = 0,
+    @PropLabel("widget.appshell.region.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
+)
 
 /**
  * A region's plane, as the two numbers it actually has.
@@ -112,11 +120,9 @@ data class ShellRegionProps(
 internal fun Int.regionOpacity(): Float? = takeIf { it >= 0 }?.let { it / 100f }
 
 /**
- * Props for the RIGHT region only. It renders its own [NxSurface] and draws no
- * divider -- so [ShellRegionProps.glassAlphaPct] and `showDivider` are inert here
- * and simply do not exist on this class (the prop panel shows only what works).
- * Defaults are the panel's shipped look: the theme's own floor, no blur,
- * swipe-to-collapse off.
+ * Props for the RIGHT region. It draws no divider, so no divider knob exists here --
+ * the prop panel shows only what works. Defaults are the panel's shipped look: the
+ * theme's own floor, no blur, swipe-to-collapse off.
  */
 @Serializable
 data class ShellRightRegionProps(
@@ -129,16 +135,15 @@ data class ShellRightRegionProps(
 
 /**
  * Props for the LEFT region (the navigation rail). Like the right panel it renders its
- * own [NxSurface], at 35% by default -- a see-through chrome that prioritises the
- * wallpaper behind it. The page-fill knob [ShellRegionProps.glassAlphaPct] has no place
- * here and does not exist on this class; the prop panel shows only what works.
+ * own [NxSurface], at [CHROME_OPACITY_PCT] by default -- a see-through chrome that
+ * prioritises the wallpaper behind it.
  */
 @Serializable
 data class ShellLeftRegionProps(
     @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
     @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = false,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
-    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = 35,
+    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = CHROME_OPACITY_PCT,
     @PropLabel("widget.appshell.region.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
 )
 
@@ -176,7 +181,7 @@ val LocalShellContext = compositionLocalOf<ShellContext> {
 
 @Composable
 private fun RowScope.RegionDivider(show: Boolean) {
-    if (show) VerticalDivider(Modifier.fillMaxHeight(), color = glassSurfaceAlpha(0.6f))
+    if (show) VerticalDivider(Modifier.fillMaxHeight(), color = NxTheme.colors.outline)
 }
 
 // Shown for a collapsed region while editing: thin but visible, so the region's
@@ -184,7 +189,10 @@ private fun RowScope.RegionDivider(show: Boolean) {
 // mode) stays hoverable. A fully-returned region leaves nothing to hover.
 @Composable
 private fun CollapsedRegionStrip() {
-    Box(Modifier.width(22.dp).fillMaxHeight().background(glassSurfaceAlpha(0.4f)))
+    NxSurface(
+        NxSurfaceLevel.Base, Modifier.width(22.dp).fillMaxHeight(), RectangleShape,
+        hairline = false, opacity = 0.4f,
+    ) {}
 }
 
 /**
@@ -228,14 +236,19 @@ fun ShellLeftRegion(instance: WidgetInstance) {
  * flexes between the two rails. removable=false and never collapsible -- without
  * it there is no content area.
  */
-@Widget(id = "appshell.region.center", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellRegionProps::class)
+@Widget(id = "appshell.region.center", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellCenterRegionProps::class)
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {
-    val props = instance.rememberProps<ShellRegionProps>()
-    val bg = if (props.glassAlpha > 0f) glassSurfaceAlpha(props.glassAlpha) else Color.Transparent
-    val chrome = glassSurfaceAlpha(0.35f)
+    val props = instance.rememberProps<ShellCenterRegionProps>()
+    // The wedge is the chrome reaching around the corner, so it takes the chrome's
+    // colour rather than one of its own -- see [CHROME_OPACITY_PCT].
+    val chrome = NxTheme.colors.surface.copy(alpha = CHROME_OPACITY_PCT / 100f)
     val cornerDp = LocalStyle.current.cardCorner
-    Box(Modifier.fillMaxSize().background(bg)) {
+    NxSurface(
+        NxSurfaceLevel.Base, Modifier.fillMaxSize(), RectangleShape,
+        hairline = false,
+        opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
+    ) {
         LocalShellContext.current.centerBody()
         // Nestle the content's top-start corner into the chrome (Modrinth-style).
         // A chrome-colored wedge, not a clip -- clipping the (transparent over a

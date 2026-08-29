@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
+import hivens.ui.widgets.AdaptiveWidget
 import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceShape
 import hivens.widget.model.SurfaceSpec
@@ -76,6 +77,34 @@ class WidgetSurfaceRenderTest {
         assertTrue(rounded.isPage, "the end corner should be rounded: $rounded")
     }
 
+    /**
+     * The plane is chrome, not content. A widget stretched on the canvas scales what
+     * it draws inside ([AdaptiveWidget]), and its corner radius is a number a person
+     * typed: doubling the footprint must not double the corner they asked for.
+     *
+     * This is what unblocked the widgets that used to draw their own card at
+     * `cardCorner * scale` -- a declared surface cannot see the scale, and does not
+     * need to, because the plane never had any business scaling.
+     */
+    @Test
+    fun `the plane does not scale with the widget's content`() {
+        val spec = SurfaceSpec(fill = "#FF000000", opacity = 1f, shape = SurfaceShape(corners = SurfaceCorners(all = CORNER)))
+        // A point on the corner diagonal falls outside a rounded rect while it is
+        // nearer the corner than r * (1 - 1/sqrt2) -- 5.9px at 20dp, 11.7px at 40dp.
+        // At 9px in it is body under the radius as written and page under a doubled
+        // one, so it tells the two apart. The control below renders the doubled
+        // radius directly, which is what stops this from passing on a plane that
+        // simply drew nothing.
+        val doubled = SurfaceSpec(fill = "#FF000000", opacity = 1f, shape = SurfaceShape(corners = SurfaceCorners(all = 2 * CORNER)))
+        val control = adaptive(doubled, w = 200, h = 120, px = DIAG, py = DIAG)
+        assertTrue(control.isPage, "the instrument cannot see a doubled corner: $control")
+
+        val small = adaptive(spec, w = 200, h = 120, px = DIAG, py = DIAG)
+        val large = adaptive(spec, w = 400, h = 240, px = DIAG, py = DIAG)
+        assertTrue(!small.isPage, "the corner ate the plane at 1x: $small")
+        assertTrue(!large.isPage, "the corner grew with the footprint: $large")
+    }
+
     @Test
     fun `padding insets the plane from the widget's box`() {
         val spec = SurfaceSpec(fill = "#FF000000", opacity = 1f, padding = hivens.widget.model.SurfaceInsets(all = 12f))
@@ -111,7 +140,39 @@ class WidgetSurfaceRenderTest {
         return out
     }
 
+    // The widget path as the kernel builds it: the declared plane outside, the
+    // content's own scale inside. [w] x [h] is the footprint; [px], [py] are read
+    // relative to the plane's top-left corner.
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun adaptive(spec: SurfaceSpec, w: Int, h: Int, px: Int, py: Int): Px {
+        val scene = ImageComposeScene(width = w + 2 * M, height = h + 2 * M, density = Density(1f)) {
+            NxTheme(useDarkTheme = true) {
+                Box(Modifier.fillMaxSize().background(PAGE)) {
+                    Box(Modifier.offset(M.dp, M.dp).size(w.dp, h.dp)) {
+                        WidgetSurface(spec) {
+                            AdaptiveWidget(referenceWidth = 200.dp, referenceHeight = 120.dp) {
+                                Box(Modifier.fillMaxSize())
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val image = scene.render()
+        scene.close()
+        File(OUT).mkdirs()
+        image.encodeToData(EncodedImageFormat.PNG)?.bytes
+            ?.let { File(OUT, "widget-surface-adaptive-${w}x$h-${spec.shape.corners.all}.png").writeBytes(it) }
+        val c = Bitmap.makeFromImage(image).getColor(M + px, M + py)
+        val out = Px((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF)
+        println("WidgetSurfaceRenderTest: ${w}x$h at ($px,$py) -> $out")
+        return out
+    }
+
     private companion object {
+        const val M = 20
+        const val CORNER = 20f
+        const val DIAG = 9
         const val SW = 320
         const val SH = 200
         const val X = 60
