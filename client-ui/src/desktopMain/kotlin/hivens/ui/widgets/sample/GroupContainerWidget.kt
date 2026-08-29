@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.Widget
@@ -30,14 +29,13 @@ import hivens.widget.model.WidgetInstance
     id          = "container.group",
     displayName = "widget.container.group",
     slots       = ["body"],
+    surface     = """{"fill":"base","opacity":0.55}""",
 )
 @Composable
 fun GroupContainerWidget(instance: WidgetInstance) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.55f))
             .padding(12.dp),
     ) {
         SlotRenderer(parent = instance, slot = SlotId("body"), modifier = Modifier.fillMaxWidth())
