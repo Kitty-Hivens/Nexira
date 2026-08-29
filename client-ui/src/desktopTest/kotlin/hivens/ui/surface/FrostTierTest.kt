@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Pure resolution of tiers -> layer lists and the Edge group -> atom expansion. */
+/** Pure resolution of a tier into its layer list. */
 class FrostTierTest {
 
     @Test
@@ -40,55 +40,22 @@ class FrostTierTest {
     }
 
     /**
-     * Depth is cast from outside the plane, not painted inside it. The inner
-     * bevel lightened a band along the top and darkened one along the bottom,
-     * which is the fill changing value rather than light behaving, and the accent
-     * wash tinted every heavy plane with a colour nothing asked for. Both types
-     * still exist for a caller that assembles its own list; neither is what a
-     * plane is by default.
+     * Depth is cast from outside the plane, not painted inside it. The inner bevel
+     * lightened a band along the top and darkened one along the bottom, which is
+     * the fill changing value rather than light behaving, and the accent wash
+     * tinted every heavy plane with a colour nothing asked for. Both kinds have
+     * since been deleted for want of a single caller, so what this now pins is
+     * that a preset carries nothing but a body, a blur and a cast shadow.
      */
     @Test
-    fun noPresetPaintsDepthInsideTheBody() {
+    fun presetsCarryOnlyBodyBlurAndCastShadow() {
+        val allowed = setOf(Backdrop::class, Fill::class, DropShadow::class, Texture::class)
         for (tier in FrostTier.entries) {
-            val atoms = tier.toLayers().flatMap { if (it is Edge) it.toAtoms() else listOf(it) }
+            val kinds = tier.toLayers().map { it::class }
             assertTrue(
-                atoms.none { it is EdgeHighlight || it is EdgeShadow || it is Wash },
-                "$tier still carries an inner bevel or wash: ${atoms.map { it::class.simpleName }}",
+                kinds.all { it in allowed },
+                "$tier carries something other than a body, a blur or a cast shadow: ${kinds.map { it.simpleName }}",
             )
         }
-    }
-
-    @Test
-    fun edgeExpandsBackToFront() {
-        val atoms = Edge(highlight = true, shadow = true, border = true, glow = true).toAtoms()
-        assertEquals(
-            listOf(EdgeGlow::class, EdgeShadow::class, EdgeHighlight::class, EdgeBorder::class),
-            atoms.map { it::class },
-        )
-    }
-
-    @Test
-    fun edgeDropsDisabledAtoms() {
-        assertEquals(
-            listOf(EdgeHighlight::class),
-            Edge(highlight = true, shadow = false, border = false, glow = false).toAtoms().map { it::class },
-        )
-    }
-
-    @Test
-    fun edgeDefaultIsHighlightPlusShadow() {
-        assertEquals(
-            listOf(EdgeShadow::class, EdgeHighlight::class),
-            Edge().toAtoms().map { it::class },
-        )
-    }
-
-    @Test
-    fun edgeAtomsCarryGroupParams() {
-        val border = Edge(border = true, borderWidthDp = 2f, borderAlpha = 0.3f, borderRole = FrostRole.Primary)
-            .toAtoms().filterIsInstance<EdgeBorder>().single()
-        assertEquals(2f, border.widthDp)
-        assertEquals(0.3f, border.alpha)
-        assertEquals(FrostRole.Primary, border.role)
     }
 }
