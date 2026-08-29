@@ -26,9 +26,7 @@ interface WidgetDescriptor {
 
     // The plane this widget sits on when nothing has said otherwise. Populated by
     // the KSP processor from @Widget(surface = ...); null means the widget draws
-    // no plane of its own. The editor seeds it onto a newly placed instance, so a
-    // widget dropped from the palette looks like the one in the bundled layout
-    // without either of them being the source of truth for the other.
+    // no plane of its own. See [resolveSurface] for how it meets an instance's.
     val defaultSurface: SurfaceSpec?
         get() = null
 
@@ -66,3 +64,21 @@ interface WidgetRegistry {
     fun all(): Map<WidgetKind, WidgetDescriptor>
     operator fun get(kind: WidgetKind): WidgetDescriptor?
 }
+
+/**
+ * The plane an instance draws: its own if it has one, otherwise its widget's
+ * declaration.
+ *
+ * The same order the props take -- declared defaults under the instance's
+ * overrides -- and for the same reason. Without it a widget's plane depended on
+ * how it reached the layout: seeded from the declaration when dropped from the
+ * palette, absent when shipped in the bundled layout, so every bundled entry had
+ * to repeat JSON its widget already carried and the two drifted apart the first
+ * time one of them changed.
+ *
+ * A widget that wants no plane at all names an opacity of zero. That is a value
+ * like any other, which "no surface record" is not: absence has to mean "nothing
+ * said" for the declaration to be reachable through it.
+ */
+fun WidgetDescriptor.resolveSurface(instance: WidgetInstance): SurfaceSpec? =
+    instance.surface ?: defaultSurface
