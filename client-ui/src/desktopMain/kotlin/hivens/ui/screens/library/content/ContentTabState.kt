@@ -104,6 +104,16 @@ internal class ContentTabState(
     private val modrinth: ModrinthClient,
     private val watch: ContentFolderWatch,
     private val scope: CoroutineScope,
+    /**
+     * Where a change to the files on disk runs.
+     *
+     * The app's scope, not the screen's. Enabling, disabling and deleting were
+     * launched on the composition, so leaving the tab part-way through cancelled
+     * them: a bulk delete of forty mods removed some and left the rest, and the list
+     * on the way back disagreed with what was asked for. What the tab reads may stop
+     * when the tab goes; what it has already told the disk to do may not.
+     */
+    private val writeScope: CoroutineScope,
 ) {
     /**
      * The record this tab is looking at. It is rewritten under the tab -- an
@@ -406,13 +416,14 @@ internal class ContentTabState(
      * Flip one row. An optional mod on a tracked pack goes through the pack's
      * optional-content path -- persisted and relabelled on the launcher scope, so
      * navigating away mid-flip still reaches disk, and the choice survives a pack
-     * update. A user-owned file is renamed on disk. A required mod does neither.
+     * update. A user-owned file is renamed on disk -- on the app's scope, for the
+     * same reason. A required mod does neither.
      */
     fun toggle(content: InstalledContent, enabled: Boolean) {
         val rules = rulesFor(content)
         when {
             rules.optional -> toggleOptional(content.fileName, enabled)
-            rules.showToggle -> scope.launch {
+            rules.showToggle -> writeScope.launch {
                 manager.setEnabled(instanceDir, content.kind, content.fileName, enabled)
                 rescan()
             }
@@ -457,7 +468,7 @@ internal class ContentTabState(
             publish(m, next)
         }
         if (onDisk.isNotEmpty()) {
-            scope.launch {
+            writeScope.launch {
                 onDisk.forEach { manager.setEnabled(instanceDir, it.kind, it.fileName, enable) }
                 rescan()
             }
@@ -519,7 +530,7 @@ internal class ContentTabState(
         pendingBulkDelete = emptyList()
         val targets = if (single != null) listOf(single) else bulk
         if (targets.isEmpty()) return
-        scope.launch {
+        writeScope.launch {
             targets.forEach { manager.delete(instanceDir, it.kind, it.fileName) }
             if (single == null) clearSelection()
             rescan()
@@ -582,6 +593,7 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
     val iconResolver: ModIconResolver = koinInject()
     val modrinth: ModrinthClient = koinInject()
     val scope = rememberCoroutineScope()
+    val writeScope: CoroutineScope = koinInject()
     val state = remember(instance.id) {
         ContentTabState(
             initialInstance = instance,
@@ -594,6 +606,7 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
             modrinth     = modrinth,
             watch        = ContentFolderWatch(),
             scope        = scope,
+            writeScope   = writeScope,
         )
     }
     // Keyed on the record, not on its id: the tab keeps its scan, its icons and
