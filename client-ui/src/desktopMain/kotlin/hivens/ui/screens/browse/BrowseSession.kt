@@ -54,9 +54,22 @@ class BrowseSession {
 
     fun get(origin: PackOrigin, query: String): Snapshot? = byKey[key(origin, query)]
 
+    /**
+     * Remembers a list, or forgets what was remembered when there is no list.
+     *
+     * Nothing is not a thing to restore, and storing it was self-reinforcing. An
+     * empty snapshot read back became a Loaded list, which paints a blank pane with
+     * neither the empty message nor its retry; the screen then treated every later
+     * failure as one it already had an answer for and stopped reporting them, paging
+     * was off because the snapshot said the end was reached, and the way out
+     * rewrote the same emptiness. One source briefly unreachable therefore left
+     * Browse blank and inert for the life of the process. The cache underneath
+     * states the same rule as `shouldStore`; this is the layer above it.
+     */
     fun put(origin: PackOrigin, query: String, snapshot: Snapshot) {
         val k = key(origin, query)
         byKey.remove(k)
+        if (snapshot.packs.isEmpty()) return
         byKey[k] = snapshot
         // Every query typed on the way to the intended one leaves a snapshot, so
         // the map is bounded by the oldest going out rather than by nothing.

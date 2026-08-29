@@ -72,6 +72,30 @@ class EditModeController(
         _editToggleSignal.value++
     }
 
+    // Whether a host is currently in edit mode. Reported by the host and read by the
+    // window's key handler, which is what lets Escape be claimed only while there is
+    // an editor to back out of -- every dialog keeps its own Escape the rest of the
+    // time. A boolean rather than a count because exactly one host is mounted (see
+    // EditorSurfaceHost: the screen crossfade swaps content inside it, not the host).
+    private val _editing = mutableStateOf(false)
+    val isEditing: Boolean get() = _editing.value
+
+    fun reportEditing(on: Boolean) {
+        _editing.value = on
+    }
+
+    // Escape (window-level, while editing) bumps this; the host observes it and runs
+    // its own staged back-out. Same focus-independent bridge as the edit toggle, and
+    // needed for the same reason: a Modifier.onKeyEvent on the host Box fires only
+    // while a descendant holds focus, and the rails and the prop panel's fields hold
+    // it instead -- so the "Esc -- exit" the editor bar promises did nothing.
+    private val _editorEscapeSignal = mutableStateOf(0)
+    val editorEscapeSignal: State<Int> = _editorEscapeSignal
+
+    fun requestEditorEscape() {
+        _editorEscapeSignal.value++
+    }
+
     // Ctrl+N (window-level) bumps this; ShellRightRegion observes it and flips
     // its own collapsed prop. Same focus-independent bridge as the edit toggle.
     private val _rightRailToggleSignal = mutableStateOf(0)

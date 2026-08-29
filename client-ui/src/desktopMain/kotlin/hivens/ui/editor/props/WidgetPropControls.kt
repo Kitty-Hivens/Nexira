@@ -235,7 +235,13 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
 @Composable
 internal fun DisclosureRow(label: String, expanded: Boolean, onToggle: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 6.dp),
+        // Hugs its label and takes a pill. Full width plus a default indication drew
+        // the press and focus states as a rectangle spanning the whole panel, which
+        // is neither the shape of the control nor the size of it.
+        Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Symbol(

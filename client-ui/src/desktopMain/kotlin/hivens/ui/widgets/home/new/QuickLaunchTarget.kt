@@ -73,7 +73,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
-    val all by remember { repo.observe() }.collectAsState(initial = emptyList())
+    val all by remember { repo.observe() }.collectAsState()
     val launchState by controller.state.collectAsState()
 
     val target: PackInstance = remember(all) {

@@ -64,7 +64,7 @@ fun LibraryBody(instance: WidgetInstance) {
     val packInstanceService: PackInstanceService = koinInject()
     val scope = rememberCoroutineScope()
     var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
-    val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
+    val instances by remember { repo.observe() }.collectAsState()
 
     if (instances.isEmpty()) {
         LibraryEmpty(

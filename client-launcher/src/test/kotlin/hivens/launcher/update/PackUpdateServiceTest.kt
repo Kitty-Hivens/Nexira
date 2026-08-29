@@ -25,6 +25,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,7 +55,7 @@ class PackUpdateServiceTest {
     private class FakeRepo : IPackRepository {
         private val map = LinkedHashMap<String, PackInstance>()
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
-        override fun observe(): Flow<List<PackInstance>> = flow.asStateFlow()
+        override fun observe(): StateFlow<List<PackInstance>> = flow.asStateFlow()
         override suspend fun list(): List<PackInstance> = map.values.toList()
         override suspend fun get(id: String): PackInstance? = map[id]
         override suspend fun put(instance: PackInstance) {

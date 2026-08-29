@@ -137,10 +137,6 @@ fun PackDetailScreen(
     LaunchedEffect(state) { state.observe() }
 
     when (val resolution = state.resolution) {
-        PackResolution.Loading -> {
-            CenteredProgress(Modifier.fillMaxSize())
-            return
-        }
         PackResolution.NotFound -> {
             NotFound(onBack = onBack)
             return

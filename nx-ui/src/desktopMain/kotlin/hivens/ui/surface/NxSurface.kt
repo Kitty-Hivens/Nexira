@@ -74,8 +74,12 @@ fun NxSurfaceLevel.color(colors: NxColors): Color = when (this) {
  * being a clamp because as one it silently overrode every knob above it -- the
  * glass slider moved nothing, and the layer that was supposed to show the
  * wallpaper through was covered by 92% of solid body before it ever drew.
+ *
+ * Public because an editor showing a surface's values has to show this one too. A
+ * control that opens at a number the renderer never used is the same defect as a
+ * control that moves nothing.
  */
-internal fun bodyFloor(dark: Boolean): Float = if (dark) 0.92f else 1.0f
+fun bodyFloor(dark: Boolean): Float = if (dark) 0.92f else 1.0f
 
 /**
  * A library-owned surface: a tonal body for [level], an optional blur of what is behind

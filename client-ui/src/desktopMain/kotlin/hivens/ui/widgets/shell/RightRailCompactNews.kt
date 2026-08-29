@@ -22,9 +22,12 @@ enum class NewsImageSource { Thumbnail, Full }
 
 @Serializable
 data class CompactNewsProps(
-    // 0 = show the whole feed; > 0 caps it (after the title filter).
+    // 0 = show the whole feed; > 0 caps it (after the title filter). The default is a
+    // handful rather than everything: the feed pages in the whole archive as the
+    // reader reaches the end of it, so "all" fills the rail with years of entries and
+    // keeps fetching pages nobody asked for.
     @PropLabel("widget.appshell.rightrail.compactnews.maxItems") @PropRange(0.0, 50.0)
-    val maxItems: Int = 0,
+    val maxItems: Int = 4,
     @PropLabel("widget.appshell.rightrail.compactnews.showTitle") val showTitle: Boolean = true,
     @PropLabel("widget.appshell.rightrail.compactnews.imageSource")
     val imageSource: NewsImageSource = NewsImageSource.Thumbnail,

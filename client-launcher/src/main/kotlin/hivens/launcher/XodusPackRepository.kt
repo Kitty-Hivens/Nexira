@@ -17,6 +17,7 @@ import jetbrains.exodus.env.Transaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
@@ -74,7 +75,7 @@ class XodusPackRepository(
         Runtime.getRuntime().addShutdownHook(shutdownHook)
     }
 
-    override fun observe(): Flow<List<PackInstance>> = state.asStateFlow()
+    override fun observe(): StateFlow<List<PackInstance>> = state.asStateFlow()
     override suspend fun list(): List<PackInstance> = state.value
     override suspend fun get(id: String): PackInstance? = state.value.firstOrNull { it.id == id }
 
