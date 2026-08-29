@@ -128,6 +128,24 @@ class SurfaceSpecTest {
         assertTrue(!SurfaceCorners(topStart = 0f, bottomStart = 0f, topEnd = 4f, bottomEnd = 4f).isUniform(12f))
     }
 
+    /**
+     * Moving the baseline must leave the per-corner overrides alone.
+     *
+     * The panel's corner slider used to write a fresh record, so dragging the one
+     * that means "all of them" silently discarded corners set one at a time. It
+     * writes the baseline onto the existing record now, and this is the property
+     * that makes that correct.
+     */
+    @Test
+    fun `changing the baseline leaves per-corner overrides alone`() {
+        val squareOnTheStartSide = SurfaceCorners(topStart = 0f, bottomStart = 0f)
+        val wider = squareOnTheStartSide.copy(all = 8f)
+        assertEquals(0f, wider.topStart(fallback = 12f))
+        assertEquals(0f, wider.bottomStart(fallback = 12f))
+        assertEquals(8f, wider.topEnd(fallback = 12f))
+        assertEquals(8f, wider.bottomEnd(fallback = 12f))
+    }
+
     @Test
     fun `insets follow the same rule as corners`() {
         assertEquals(6f, SurfaceInsets().top(fallback = 6f))

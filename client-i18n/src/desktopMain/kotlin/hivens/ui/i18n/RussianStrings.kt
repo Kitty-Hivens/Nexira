@@ -1298,6 +1298,15 @@ object RussianStrings : AppStrings {
     override val editorSurfaceBorder  = "Обводка"
     override val editorSurfaceShadow  = "Тень"
     override val editorSurfaceFillHint = "Пусто -- по теме; имя ступени (base, raised, floating, sunken) следует за палитрой; #RRGGBB или #AARRGGBB -- нет."
+    override val editorSurfaceShapeKind        = "Форма"
+    override val editorSurfaceSmoothing        = "Сглаживание"
+    override val editorSurfaceCornerTopStart   = "Угол, сверху слева"
+    override val editorSurfaceCornerTopEnd     = "Угол, сверху справа"
+    override val editorSurfaceCornerBottomEnd  = "Угол, снизу справа"
+    override val editorSurfaceCornerBottomStart = "Угол, снизу слева"
+    override val editorSurfaceBorderColor      = "Цвет обводки"
+    override val editorSurfaceBorderOpacity    = "Непрозрачность обводки"
+    override val editorSurfaceMore             = "Ещё"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Пресеты"

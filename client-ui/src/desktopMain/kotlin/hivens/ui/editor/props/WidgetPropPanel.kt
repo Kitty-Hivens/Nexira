@@ -224,6 +224,7 @@ private fun PropPanelBody(
             )
             val surface = instance.surface ?: SurfaceSpec()
             fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
+            val corner = style.cardCorner.value
 
             // One field, a value or a name. Blank follows the theme, a rung name
             // tracks the palette, a literal does not; a typo falls back to the theme
@@ -234,7 +235,6 @@ private fun PropPanelBody(
                 style = MaterialTheme.typography.bodySmall,
                 color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
             )
-            val style = LocalStyle.current
             LabeledSlider(
                 label         = s.editorSurfaceOpacity,
                 value         = (surface.opacity ?: 1f) * 100f,
@@ -251,33 +251,19 @@ private fun PropPanelBody(
                 keyStep       = 1f,
                 onValueChange = { write(surface.copy(blurDp = it)) },
             )
-            // Opens on the style's card corner rather than on a sentinel; moving it
-            // writes an explicit value, and zero stays reachable as a square.
+            // Opens on the style's card corner rather than on a sentinel, and writes
+            // the baseline WITHOUT clearing the per-corner overrides beside it: it
+            // used to replace the whole record, so moving this slider silently threw
+            // away corners set one at a time.
             LabeledSlider(
                 label         = s.editorBackingCorner,
-                value         = surface.shape.corners.topStart(style.cardCorner.value),
+                value         = surface.shape.corners.all ?: corner,
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
                 onValueChange = {
-                    write(surface.copy(shape = surface.shape.copy(corners = SurfaceCorners(all = it))))
+                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = it))))
                 },
-            )
-            LabeledSlider(
-                label         = s.editorSurfaceBorder,
-                value         = surface.border.widthDp ?: 0f,
-                range         = 0f..6f,
-                format        = "%.1f",
-                keyStep       = 0.5f,
-                onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
-            )
-            LabeledSlider(
-                label         = s.editorSurfaceShadow,
-                value         = surface.shadowDp ?: 0f,
-                range         = 0f..24f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { write(surface.copy(shadowDp = it)) },
             )
             LabeledSlider(
                 label         = s.editorBackingPadding,
@@ -287,40 +273,82 @@ private fun PropPanelBody(
                 keyStep       = 1f,
                 onValueChange = { write(surface.copy(padding = surface.padding.copy(all = it))) },
             )
-            // Per-side overrides. Each opens at the uniform value and, once moved,
-            // pins that side independently of it.
-            LabeledSlider(
-                label         = s.editorBackingPaddingTop,
-                value         = surface.padding.top(0f),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { write(surface.copy(padding = surface.padding.copy(top = it))) },
-            )
-            LabeledSlider(
-                label         = s.editorBackingPaddingEnd,
-                value         = surface.padding.end(0f),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { write(surface.copy(padding = surface.padding.copy(end = it))) },
-            )
-            LabeledSlider(
-                label         = s.editorBackingPaddingBottom,
-                value         = surface.padding.bottom(0f),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { write(surface.copy(padding = surface.padding.copy(bottom = it))) },
-            )
-            LabeledSlider(
-                label         = s.editorBackingPaddingStart,
-                value         = surface.padding.start(0f),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { write(surface.copy(padding = surface.padding.copy(start = it))) },
-            )
+
+            // Everything past this point is a refinement of one of the rows above.
+            // Shown on request rather than always: the panel had eleven rows for a
+            // plane most widgets set two of, and a wall of controls is its own way of
+            // hiding the ones that matter.
+            var showMore by remember { mutableStateOf(false) }
+            DisclosureRow(s.editorSurfaceMore, showMore) { showMore = !showMore }
+            if (showMore) {
+                StringRow(s.editorSurfaceShapeKind, surface.shape.kind) {
+                    write(surface.copy(shape = surface.shape.copy(kind = it)))
+                }
+                LabeledSlider(
+                    label         = s.editorSurfaceSmoothing,
+                    value         = (surface.shape.smoothing ?: 0f) * 100f,
+                    range         = 0f..100f,
+                    format        = "%.0f%%",
+                    keyStep       = 1f,
+                    onValueChange = { write(surface.copy(shape = surface.shape.copy(smoothing = it / 100f))) },
+                )
+                // Each corner opens at whatever the baseline resolves to and, once
+                // moved, pins that corner independently -- which is what makes a plane
+                // square on one side and round on the other.
+                CornerRow(s.editorSurfaceCornerTopStart, surface.shape.corners.topStart(corner)) {
+                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topStart = it))))
+                }
+                CornerRow(s.editorSurfaceCornerTopEnd, surface.shape.corners.topEnd(corner)) {
+                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topEnd = it))))
+                }
+                CornerRow(s.editorSurfaceCornerBottomEnd, surface.shape.corners.bottomEnd(corner)) {
+                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomEnd = it))))
+                }
+                CornerRow(s.editorSurfaceCornerBottomStart, surface.shape.corners.bottomStart(corner)) {
+                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomStart = it))))
+                }
+                LabeledSlider(
+                    label         = s.editorSurfaceBorder,
+                    value         = surface.border.widthDp ?: 0f,
+                    range         = 0f..6f,
+                    format        = "%.1f",
+                    keyStep       = 0.5f,
+                    onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
+                )
+                StringRow(s.editorSurfaceBorderColor, surface.border.color) {
+                    write(surface.copy(border = surface.border.copy(color = it)))
+                }
+                LabeledSlider(
+                    label         = s.editorSurfaceBorderOpacity,
+                    value         = (surface.border.opacity ?: 1f) * 100f,
+                    range         = 0f..100f,
+                    format        = "%.0f%%",
+                    keyStep       = 1f,
+                    onValueChange = { write(surface.copy(border = surface.border.copy(opacity = it / 100f))) },
+                )
+                LabeledSlider(
+                    label         = s.editorSurfaceShadow,
+                    value         = surface.shadowDp ?: 0f,
+                    range         = 0f..24f,
+                    format        = "%.0f",
+                    keyStep       = 1f,
+                    onValueChange = { write(surface.copy(shadowDp = it)) },
+                )
+                // Per-side padding. Each opens at the uniform value and, once moved,
+                // pins that side independently of it.
+                CornerRow(s.editorBackingPaddingTop, surface.padding.top(0f)) {
+                    write(surface.copy(padding = surface.padding.copy(top = it)))
+                }
+                CornerRow(s.editorBackingPaddingEnd, surface.padding.end(0f)) {
+                    write(surface.copy(padding = surface.padding.copy(end = it)))
+                }
+                CornerRow(s.editorBackingPaddingBottom, surface.padding.bottom(0f)) {
+                    write(surface.copy(padding = surface.padding.copy(bottom = it)))
+                }
+                CornerRow(s.editorBackingPaddingStart, surface.padding.start(0f)) {
+                    write(surface.copy(padding = surface.padding.copy(start = it)))
+                }
+            }
         }
 
         TextButton(
