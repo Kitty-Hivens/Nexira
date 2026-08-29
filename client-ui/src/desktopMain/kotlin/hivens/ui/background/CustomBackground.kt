@@ -21,6 +21,9 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.theme.luminanceOfArgb
@@ -171,7 +174,6 @@ private fun AnimatedParallaxImage(
         onTone(WallpaperTone(seedArgb = seedArgb, avgLuminance = avgLuminance))
     }
 
-    val useParallax = settings.parallaxIntensity > 0f
     // alpha OUTSIDE the blur (leftmost = outermost): an opacity tick then only
     // recomposites the cached blurred layer. With alpha inside, every tick of
     // the opacity slider invalidated the blur's input and re-blurred the whole
@@ -186,35 +188,57 @@ private fun AnimatedParallaxImage(
             else it
         }
 
-    if (useParallax) {
-        val target = parallaxTranslationFor(mousePosProvider(), settings.parallaxIntensity)
-        val parallaxX by animateFloatAsState(target.x, spring(stiffness = 50f, dampingRatio = 0.8f))
-        val parallaxY by animateFloatAsState(target.y, spring(stiffness = 50f, dampingRatio = 0.8f))
-        Image(
-            painter            = painter,
-            contentDescription = null,
-            contentScale       = contentScale,
-            alignment          = alignment,
-            colorFilter        = saturationFilter,
-            modifier           = baseModifier.graphicsLayer {
-                val extraScale = parallaxScaleFor(settings.parallaxIntensity)
-                scaleX       = extraScale
-                scaleY       = extraScale
-                translationX = parallaxX
-                translationY = parallaxY
-            }
-        )
-    } else {
-        Image(
-            painter            = painter,
-            contentDescription = null,
-            contentScale       = contentScale,
-            alignment          = alignment,
-            colorFilter        = saturationFilter,
-            modifier           = baseModifier
-        )
-    }
+    val parallax = rememberParallaxOffset(mousePosProvider, settings.parallaxIntensity)
+    Image(
+        painter            = painter,
+        contentDescription = null,
+        contentScale       = contentScale,
+        alignment          = alignment,
+        colorFilter        = saturationFilter,
+        modifier           = if (parallax == null) baseModifier else baseModifier.graphicsLayer {
+            val extraScale = parallaxScaleFor(settings.parallaxIntensity)
+            scaleX       = extraScale
+            scaleY       = extraScale
+            // Read here and nowhere else: graphicsLayer runs in the draw phase, so
+            // the pointer moving invalidates a draw rather than a composition.
+            translationX = parallax.x.value
+            translationY = parallax.y.value
+        },
+    )
 }
+
+internal class ParallaxOffset(val x: Animatable<Float, AnimationVector1D>, val y: Animatable<Float, AnimationVector1D>)
+
+/**
+ * The parallax translation, animated off-composition. Null when parallax is off.
+ *
+ * Parallax is a view transform over pixels that are already drawn, and
+ * [graphicsLayer] applies it at composite time for free. What was not free was
+ * asking the pointer for its position in the composable body: that is a snapshot
+ * read during composition, so every mouse move recomposed this whole subtree, the
+ * video player included. The spring runs in a coroutine now and the value is read
+ * only where it is used.
+ */
+@Composable
+internal fun rememberParallaxOffset(mouse: () -> Offset, intensity: Float): ParallaxOffset? {
+    if (intensity <= 0f) return null
+    val latestMouse by rememberUpdatedState(mouse)
+    val offset = remember { ParallaxOffset(Animatable(0f), Animatable(0f)) }
+    LaunchedEffect(intensity) {
+        snapshotFlow { parallaxTranslationFor(latestMouse(), intensity) }
+            // collectLatest, so a new pointer position cancels the spring in flight
+            // and the next one starts from wherever it had reached.
+            .collectLatest { target ->
+                coroutineScope {
+                    launch { offset.x.animateTo(target.x, PARALLAX_SPRING) }
+                    launch { offset.y.animateTo(target.y, PARALLAX_SPRING) }
+                }
+            }
+    }
+    return offset
+}
+
+private val PARALLAX_SPRING = spring<Float>(stiffness = 50f, dampingRatio = 0.8f)
 
 @Composable
 private fun rememberStaticImage(file: File): ImageBitmap? {
