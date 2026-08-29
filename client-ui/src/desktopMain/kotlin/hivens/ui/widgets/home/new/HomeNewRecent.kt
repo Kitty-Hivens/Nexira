@@ -166,9 +166,6 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.40f))
             .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

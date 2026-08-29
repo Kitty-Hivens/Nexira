@@ -144,9 +144,6 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
         modifier = Modifier
             .fillMaxWidth()
             .onSizeChanged { panelWidthPx = it.width.toFloat().coerceAtLeast(1f) }
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.5f))
-            .border(1.dp, outline, MaterialTheme.shapes.medium)
             .padding(8.dp),
     ) {
         if (props.expandUp) {
