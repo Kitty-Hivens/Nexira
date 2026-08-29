@@ -9,10 +9,10 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * Per-widget backing (WidgetChrome): the updateWidgetChrome transform + the
+ * Per-widget surface: the updateWidgetSurface transform + the
  * serialization round-trip / back-compat that the v2->v3 schema bump rests on.
  */
-class LayoutGraphChromeTest {
+class LayoutGraphSurfaceTest {
 
     private val home = SurfaceId("home.new")
     private val main = SlotId("main")
@@ -20,39 +20,39 @@ class LayoutGraphChromeTest {
     private val w = WidgetInstance(WidgetKind("k"), "i1", JsonObject(emptyMap()))
     private val graph = LayoutGraph(mapOf(home to SurfaceLayout(mapOf(main to SlotContent(listOf(w))))))
 
-    private fun chromeOf(g: LayoutGraph): WidgetChrome? =
-        g.surfaces[home]!!.slots[main]!!.widgets.first().chrome
+    private fun surfaceOf(g: LayoutGraph): SurfaceSpec? =
+        g.surfaces[home]!!.slots[main]!!.widgets.first().surface
 
     @Test
-    fun `updateWidgetChrome sets the backing on the target`() {
-        val out = graph.updateWidgetChrome(path, "i1", WidgetChrome(glassAlphaPct = 40, cornerRadiusDp = 12))
-        assertEquals(WidgetChrome(glassAlphaPct = 40, cornerRadiusDp = 12), chromeOf(out))
+    fun `updateWidgetSurface sets the surface on the target`() {
+        val out = graph.updateWidgetSurface(path, "i1", SurfaceSpec(opacity = 0.4f, shape = SurfaceShape(corners = SurfaceCorners(all = 12f))))
+        assertEquals(SurfaceSpec(opacity = 0.4f, shape = SurfaceShape(corners = SurfaceCorners(all = 12f))), surfaceOf(out))
     }
 
     @Test
     fun `a default (no-backing) chrome normalizes to null so the field stays absent`() {
-        val out = graph.updateWidgetChrome(path, "i1", WidgetChrome())
-        assertNull(chromeOf(out), "an all-zero chrome must not be persisted")
+        val out = graph.updateWidgetSurface(path, "i1", SurfaceSpec())
+        assertNull(surfaceOf(out), "an all-zero chrome must not be persisted")
         assertSame(graph, out, "setting a no-op chrome on a null-chrome widget is identity")
     }
 
     @Test
-    fun `updateWidgetChrome with null clears an existing backing`() {
-        val withChrome = graph.updateWidgetChrome(path, "i1", WidgetChrome(glassAlphaPct = 50))
-        val cleared = withChrome.updateWidgetChrome(path, "i1", null)
-        assertNull(chromeOf(cleared))
+    fun `updateWidgetSurface with null clears an existing backing`() {
+        val withSurface = graph.updateWidgetSurface(path, "i1", SurfaceSpec(opacity = 0.5f))
+        val cleared = withSurface.updateWidgetSurface(path, "i1", null)
+        assertNull(surfaceOf(cleared))
     }
 
     @Test
-    fun `updateWidgetChrome on a missing instance is a no-op`() {
-        val out = graph.updateWidgetChrome(path, "does-not-exist", WidgetChrome(glassAlphaPct = 30))
+    fun `updateWidgetSurface on a missing instance is a no-op`() {
+        val out = graph.updateWidgetSurface(path, "does-not-exist", SurfaceSpec(opacity = 0.3f))
         assertSame(graph, out)
     }
 
     @Test
-    fun `a widget with chrome round-trips through json`() {
+    fun `a widget with a surface round-trips through json`() {
         val json = Json { encodeDefaults = false }
-        val instance = w.copy(chrome = WidgetChrome(glassAlphaPct = 25, cornerRadiusDp = 8, paddingDp = 6))
+        val instance = w.copy(surface = SurfaceSpec(opacity = 0.25f, shape = SurfaceShape(corners = SurfaceCorners(all = 8f)), padding = SurfaceInsets(all = 6f)))
         val text = json.encodeToString(WidgetInstance.serializer(), instance)
         assertEquals(instance, json.decodeFromString(WidgetInstance.serializer(), text))
     }
@@ -63,7 +63,7 @@ class LayoutGraphChromeTest {
         val json = Json { ignoreUnknownKeys = true }
         val v2 = """{"kind":"k","instance_id":"i1"}"""
         val decoded = json.decodeFromString(WidgetInstance.serializer(), v2)
-        assertNull(decoded.chrome)
+        assertNull(decoded.surface)
         assertTrue(decoded.props.isEmpty())
     }
 }

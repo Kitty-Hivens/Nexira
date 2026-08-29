@@ -1276,6 +1276,12 @@ object GermanStrings : AppStrings {
     override val editorBackingPaddingBottom = "Abstand unten"
     override val editorBackingPaddingStart  = "Abstand links"
     override val editorBackingNoGlassHint   = "Ohne Glas ist keine Unterlage sichtbar. Ecke und Abstand wirken weiterhin auf das Widget."
+    override val editorSurfaceFill    = "Füllung"
+    override val editorSurfaceOpacity = "Deckkraft"
+    override val editorSurfaceBlur    = "Unschärfe"
+    override val editorSurfaceBorder  = "Rand"
+    override val editorSurfaceShadow  = "Schatten"
+    override val editorSurfaceFillHint = "Leer folgt dem Design; ein Stufenname (base, raised, floating, sunken) folgt der Palette; #RRGGBB oder #AARRGGBB nicht."
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

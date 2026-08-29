@@ -48,7 +48,8 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.PropLabel
 import hivens.widget.model.SlotPath
-import hivens.widget.model.WidgetChrome
+import hivens.widget.model.SurfaceCorners
+import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 import kotlin.math.roundToInt
@@ -212,92 +213,120 @@ private fun PropPanelBody(
                 Spacer(Modifier.size(8.dp))
             }
 
-            // Universal "Backing" section: per-widget glass / corner / padding.
-            // Available on every widget, propless included.
+            // The widget's own surface, as the seven values it is. Available on
+            // every widget, propless included. Each row writes one field and leaves
+            // the rest alone, so nothing here can move something the eye is not on.
             Text(
                 text       = s.editorBackingTitle,
                 style      = MaterialTheme.typography.labelMedium,
                 color      = NxTheme.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
-            val chrome = instance.chrome ?: WidgetChrome()
+            val surface = instance.surface ?: SurfaceSpec()
+            fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
+
+            // One field, a value or a name. Blank follows the theme, a rung name
+            // tracks the palette, a literal does not; a typo falls back to the theme
+            // rather than to black, so a mistake never looks deliberate.
+            StringRow(s.editorSurfaceFill, surface.fill) { write(surface.copy(fill = it)) }
+            Text(
+                text  = s.editorSurfaceFillHint,
+                style = MaterialTheme.typography.bodySmall,
+                color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+            )
+            val style = LocalStyle.current
             LabeledSlider(
-                label         = s.editorBackingGlass,
-                value         = chrome.glassAlphaPct.toFloat(),
+                label         = s.editorSurfaceOpacity,
+                value         = (surface.opacity ?: 1f) * 100f,
                 range         = 0f..100f,
                 format        = "%.0f%%",
                 keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(glassAlphaPct = it.roundToInt())) },
+                onValueChange = { write(surface.copy(opacity = it / 100f)) },
             )
-            // Glass 0 = no visible card, but the renderer applies the corner clip
-            // and padding outside the glass, so both still shape the widget. Say so
-            // rather than letting the corner/padding controls read as inert.
-            if (chrome.glassAlphaPct == 0) {
-                Text(
-                    text  = s.editorBackingNoGlassHint,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
-                )
-            }
-            // An untouched backing follows the style's card corner, so the slider
-            // opens on that rather than on a negative sentinel; moving it writes an
-            // explicit value, and zero stays reachable as a deliberate square.
             LabeledSlider(
-                label         = s.editorBackingCorner,
-                value         = (chrome.explicitCornerDp?.toFloat() ?: LocalStyle.current.cardCorner.value),
+                label         = s.editorSurfaceBlur,
+                value         = surface.blurDp ?: 0f,
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(cornerRadiusDp = it.roundToInt())) },
+                onValueChange = { write(surface.copy(blurDp = it)) },
+            )
+            // Opens on the style's card corner rather than on a sentinel; moving it
+            // writes an explicit value, and zero stays reachable as a square.
+            LabeledSlider(
+                label         = s.editorBackingCorner,
+                value         = surface.shape.corners.topStart(style.cardCorner.value),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = {
+                    write(surface.copy(shape = surface.shape.copy(corners = SurfaceCorners(all = it))))
+                },
+            )
+            LabeledSlider(
+                label         = s.editorSurfaceBorder,
+                value         = surface.border.widthDp ?: 0f,
+                range         = 0f..6f,
+                format        = "%.1f",
+                keyStep       = 0.5f,
+                onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
+            )
+            LabeledSlider(
+                label         = s.editorSurfaceShadow,
+                value         = surface.shadowDp ?: 0f,
+                range         = 0f..24f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { write(surface.copy(shadowDp = it)) },
             )
             LabeledSlider(
                 label         = s.editorBackingPadding,
-                value         = chrome.paddingDp.toFloat(),
+                value         = surface.padding.all ?: 0f,
                 range         = 0f..32f,
                 format        = "%.0f",
                 keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingDp = it.roundToInt())) },
+                onValueChange = { write(surface.copy(padding = surface.padding.copy(all = it))) },
             )
-            // Per-side overrides. Each starts at the uniform value (effective*)
-            // and, once moved, pins that side independently of the uniform one.
+            // Per-side overrides. Each opens at the uniform value and, once moved,
+            // pins that side independently of it.
             LabeledSlider(
                 label         = s.editorBackingPaddingTop,
-                value         = chrome.effectiveTop.toFloat(),
+                value         = surface.padding.top(0f),
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingTopDp = it.roundToInt())) },
+                onValueChange = { write(surface.copy(padding = surface.padding.copy(top = it))) },
             )
             LabeledSlider(
                 label         = s.editorBackingPaddingEnd,
-                value         = chrome.effectiveEnd.toFloat(),
+                value         = surface.padding.end(0f),
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingEndDp = it.roundToInt())) },
+                onValueChange = { write(surface.copy(padding = surface.padding.copy(end = it))) },
             )
             LabeledSlider(
                 label         = s.editorBackingPaddingBottom,
-                value         = chrome.effectiveBottom.toFloat(),
+                value         = surface.padding.bottom(0f),
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingBottomDp = it.roundToInt())) },
+                onValueChange = { write(surface.copy(padding = surface.padding.copy(bottom = it))) },
             )
             LabeledSlider(
                 label         = s.editorBackingPaddingStart,
-                value         = chrome.effectiveStart.toFloat(),
+                value         = surface.padding.start(0f),
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingStartDp = it.roundToInt())) },
+                onValueChange = { write(surface.copy(padding = surface.padding.copy(start = it))) },
             )
         }
 
         TextButton(
             onClick  = {
                 if (sd != null) controller.updateProps(path, instanceId, JsonObject(emptyMap()))
-                controller.updateChrome(path, instanceId, null)
+                controller.updateSurface(path, instanceId, null)
             },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {

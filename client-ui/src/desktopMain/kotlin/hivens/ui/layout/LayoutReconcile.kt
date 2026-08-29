@@ -17,7 +17,23 @@ object LayoutReconcile {
     private val log = LoggerFactory.getLogger(LayoutReconcile::class.java)
 
     /** Schema version this build writes and migrates up to. Single source of truth. */
-    const val CURRENT_SCHEMA: Int = 7
+    const val CURRENT_SCHEMA: Int = 8
+
+    /**
+     * The first schema whose widget surfaces are describable.
+     *
+     * A layout below this is discarded rather than migrated. Every earlier file
+     * describes a widget's plane as a glass percentage, a single corner and a tier
+     * name, and none of those has a faithful reading in seven values: the tier stood
+     * for numbers that were discarded before they drew, the corner had one value where
+     * a shape has four, and the glass percentage was overridden by a constant, so what
+     * a person saw was never what their file said. Inventing a translation would be
+     * inventing intent.
+     *
+     * This is the one reset. The replacement format is built so a second is never
+     * needed: every field defaulted, unknown keys ignored, nothing on the wire an enum.
+     */
+    const val SURFACE_SCHEMA: Int = 8
 
     sealed interface Result {
         data class Ok(val graph: LayoutGraph) : Result

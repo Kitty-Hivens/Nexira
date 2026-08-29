@@ -7,7 +7,9 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
-import hivens.widget.model.WidgetChrome
+import hivens.widget.model.SurfaceCorners
+import hivens.widget.model.SurfaceShape
+import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
@@ -322,52 +324,7 @@ class LayoutGraphRepositoryTest {
         )
     }
 
-    // ── Schema v1 -> v2 migration ─────────────────────────────────────
 
-    @Test
-    fun `v1 envelope without children parses cleanly under v2`() = runBlocking {
-        // Hand-write a v1 envelope (no `children` field on widgets).
-        val widget = WidgetInstance(WidgetKind("legacy"), "i1", JsonObject(emptyMap()))
-        val v1 = LayoutGraph(surfaces = mapOf(
-            SurfaceId("s") to SurfaceLayout(slots = mapOf(
-                SlotId("a") to SlotContent(listOf(widget)),
-            )),
-        ))
-        Files.writeString(
-            file,
-            """{"schema_version":1,"graph":${json.encodeToString(LayoutGraph.serializer(), v1)}}""",
-        )
-
-        val repo = repo()
-        val loaded = repo.value()
-        val loadedWidget = loaded
-            .surfaces[SurfaceId("s")]!!
-            .slots[SlotId("a")]!!
-            .widgets.first()
-        assertEquals("i1", loadedWidget.instanceId)
-        assertEquals(emptyMap(), loadedWidget.children)
-    }
-
-    @Test
-    fun `v2 envelope without chrome parses cleanly under v3`() = runBlocking {
-        // A v2 file pre-dates the chrome field; it must load with null chrome
-        // (the v2 -> v3 migration is identity, deserialization fills the default).
-        val widget = WidgetInstance(WidgetKind("legacy"), "i1", JsonObject(emptyMap()))
-        val v2 = LayoutGraph(surfaces = mapOf(
-            SurfaceId("s") to SurfaceLayout(slots = mapOf(
-                SlotId("a") to SlotContent(listOf(widget)),
-            )),
-        ))
-        Files.writeString(
-            file,
-            """{"schema_version":2,"graph":${json.encodeToString(LayoutGraph.serializer(), v2)}}""",
-        )
-
-        val loaded = repo().value()
-            .surfaces[SurfaceId("s")]!!.slots[SlotId("a")]!!.widgets.first()
-        assertEquals("i1", loaded.instanceId)
-        assertEquals(null, loaded.chrome)
-    }
 
     @Test
     fun `widget chrome survives a write + reload`() = runBlocking {
@@ -377,7 +334,7 @@ class LayoutGraphRepositoryTest {
             kind = WidgetKind("k"),
             instanceId = "chrome-1",
             props = JsonObject(emptyMap()),
-            chrome = WidgetChrome(glassAlphaPct = 45, cornerRadiusDp = 10, paddingDp = 4),
+            surface = SurfaceSpec(opacity = 0.45f, shape = SurfaceShape(corners = SurfaceCorners(all = 10f))),
         )
         repo.update {
             it.copy(surfaces = it.surfaces + (SurfaceId("cx") to SurfaceLayout(
@@ -388,7 +345,7 @@ class LayoutGraphRepositoryTest {
 
         val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
         val w = reloaded.value().surfaces[SurfaceId("cx")]!!.slots[SlotId("o")]!!.widgets.first()
-        assertEquals(WidgetChrome(glassAlphaPct = 45, cornerRadiusDp = 10, paddingDp = 4), w.chrome)
+        assertEquals(SurfaceSpec(opacity = 0.45f, shape = SurfaceShape(corners = SurfaceCorners(all = 10f))), w.surface)
     }
 
     @Test
@@ -420,6 +377,42 @@ class LayoutGraphRepositoryTest {
 
     // ── Schema v3 -> v4 nav migration ─────────────────────────────────
 
+    /**
+     * A layout below the surface schema is discarded rather than migrated.
+     *
+     * Every earlier file describes a widget's plane as a glass percentage, one corner
+     * and a tier name, and none of those has a faithful reading in seven values: the
+     * tier stood for numbers discarded before they drew, one corner where a shape has
+     * four, and a percentage a constant overrode. Translating that would be inventing
+     * intent. This is the one reset the format is allowed.
+     */
+    @Test
+    fun `a layout from before the surface schema is discarded, not migrated`() {
+        val theirs = LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
+                SlotId("main") to SlotContent(listOf(WidgetInstance(WidgetKind("their.widget"), "theirs"))),
+            )),
+        ))
+        for (version in 1 until LayoutReconcile.SURFACE_SCHEMA) {
+            assertEquals(sampleDefault, loadFrom(version, theirs), "schema $version was not discarded")
+        }
+    }
+
+    @Test
+    fun `a layout at the surface schema is read as it is`() {
+        val theirs = LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
+                SlotId("main") to SlotContent(listOf(
+                    WidgetInstance(WidgetKind("their.widget"), "theirs", surface = SurfaceSpec(opacity = 0.4f)),
+                )),
+            )),
+        ))
+        val loaded = loadFrom(LayoutReconcile.SURFACE_SCHEMA, theirs, default = theirs)
+        val w = loaded.surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.single()
+        assertEquals("theirs", w.instanceId)
+        assertEquals(0.4f, w.surface?.opacity)
+    }
+
     private fun loadFrom(version: Int, graph: LayoutGraph, default: LayoutGraph = sampleDefault): LayoutGraph {
         Files.writeString(
             file,
@@ -436,165 +429,23 @@ class LayoutGraphRepositoryTest {
             )),
         ))
 
-    private fun navKind(kind: String, id: String, chrome: WidgetChrome? = null, weight: Float = 0f) =
-        WidgetInstance(WidgetKind(kind), id, JsonObject(emptyMap()), chrome = chrome, weight = weight)
+    private fun navKind(kind: String, id: String, surface: SurfaceSpec? = null, weight: Float = 0f) =
+        WidgetInstance(WidgetKind(kind), id, JsonObject(emptyMap()), surface = surface, weight = weight)
 
     private fun LayoutGraph.leftrailSlot(slot: String) =
         surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId(slot)]!!.widgets
 
     private fun WidgetInstance.target() = props["target"]?.jsonPrimitive?.content
 
-    @Test
-    fun `v3 -- navbuttons expands to six nav-entry in declared order, siblings preserved`() {
-        val v3 = leftrailGraph(
-            top = listOf(navKind("appshell.leftrail.navbuttons", "nb"), navKind("home.new.spacer", "sp")),
-        )
-        val top = loadFrom(3, v3).leftrailSlot("top")
-        assertEquals(8, top.size, "six nav entries, the v5 Wardrobe insert, plus the preserved sibling")
-        assertEquals(List(7) { "nav.entry" } + "home.new.spacer", top.map { it.kind.value })
-        assertEquals(
-            listOf("Home", "Library", "Browse", "Profile", "Wardrobe", "Settings", "About"),
-            top.take(7).map { it.target() },
-        )
-        assertEquals("sp", top[7].instanceId)
-    }
 
-    @Test
-    fun `v3 -- console and logout become nav-entry keeping their ids`() {
-        val v3 = leftrailGraph(
-            top = listOf(navKind("appshell.leftrail.navbuttons", "nb")),
-            bottom = listOf(
-                navKind("appshell.leftrail.consoletoggle", "console-id"),
-                navKind("appshell.leftrail.logout", "logout-id"),
-            ),
-        )
-        val bottom = loadFrom(3, v3).leftrailSlot("bottom")
-        assertEquals(
-            listOf("console-id" to "Console", "logout-id" to "Logout"),
-            bottom.map { it.instanceId to it.target() },
-        )
-        bottom.forEach { assertEquals("nav.entry", it.kind.value) }
-    }
 
-    @Test
-    fun `v3 -- a stray nav widget on any surface is converted in place`() {
-        val v3 = LayoutGraph(surfaces = mapOf(
-            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
-                SlotId("main") to SlotContent(listOf(navKind("nav.home", "stray"))),
-            )),
-        ))
-        val w = loadFrom(3, v3).surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.first()
-        assertEquals("nav.entry", w.kind.value)
-        assertEquals("Home", w.target())
-        assertEquals("stray", w.instanceId)
-    }
 
-    @Test
-    fun `v4 graph passes through the nav migration untouched`() {
-        val entry = WidgetInstance(
-            WidgetKind("nav.entry"), "e1", JsonObject(mapOf("target" to JsonPrimitive("Home"))),
-        )
-        val top = loadFrom(4, leftrailGraph(top = listOf(entry))).leftrailSlot("top")
-        assertEquals(listOf(entry), top)
-    }
 
-    @Test
-    fun `v3 -- chrome on a non-nav widget survives the migration`() {
-        val styled = WidgetInstance(
-            WidgetKind("home.new.clock"), "clock", JsonObject(emptyMap()),
-            chrome = WidgetChrome(glassAlphaPct = 30),
-        )
-        val v3 = LayoutGraph(surfaces = mapOf(
-            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(listOf(styled)))),
-        ))
-        val w = loadFrom(3, v3).surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.first()
-        assertEquals(styled, w)
-    }
 
-    @Test
-    fun `v3 -- 1to1 nav conversion preserves chrome and weight`() {
-        val v3 = LayoutGraph(surfaces = mapOf(
-            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(listOf(
-                navKind("nav.profile", "p", chrome = WidgetChrome(cornerRadiusDp = 8), weight = 2f),
-            )))),
-        ))
-        val w = loadFrom(3, v3).surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.first()
-        assertEquals("nav.entry", w.kind.value)
-        assertEquals("Profile", w.target())
-        assertEquals(WidgetChrome(cornerRadiusDp = 8), w.chrome)
-        assertEquals(2f, w.weight)
-    }
 
-    @Test
-    fun `v3 -- navbuttons expansion drops block chrome, weight, and canvas`() {
-        val v3 = leftrailGraph(top = listOf(
-            WidgetInstance(
-                WidgetKind("appshell.leftrail.navbuttons"), "nb", JsonObject(emptyMap()),
-                chrome = WidgetChrome(glassAlphaPct = 50),
-                weight = 3f,
-                canvas = CanvasPlacement(x = 10f, y = 20f, z = 5),
-            ),
-        ))
-        val top = loadFrom(3, v3).leftrailSlot("top")
-        assertEquals(7, top.size, "six expanded nav entries plus the v5 Wardrobe insert")
-        // The monolith's single block frame cannot map onto six items, so the
-        // expansion intentionally resets these to defaults; the Wardrobe insert is
-        // likewise a clean entry.
-        top.forEach {
-            assertEquals(null, it.chrome)
-            assertEquals(0f, it.weight)
-            assertEquals(null, it.canvas)
-        }
-    }
 
-    @Test
-    fun `v3 -- migrated graph has unique instance ids tree-wide`() {
-        val v3 = leftrailGraph(
-            top = listOf(navKind("appshell.leftrail.navbuttons", "nb")),
-            bottom = listOf(
-                navKind("appshell.leftrail.consoletoggle", "c"),
-                navKind("appshell.leftrail.logout", "l"),
-            ),
-        )
-        val loaded = loadFrom(3, v3)
-        val ids = loaded.surfaces.values.flatMap { it.slots.values }.flatMap { it.widgets }.map { it.instanceId }
-        assertEquals(ids.toSet().size, ids.size, "migration must not produce duplicate ids")
-    }
 
-    @Test
-    fun `v3 -- a migration-minted id colliding with an existing id falls back to default`() {
-        // navbuttons "nb" expands to nb-home / nb-library / ...; a widget already
-        // named "nb-home" on another surface turns the mint into a tree-wide
-        // collision the load sweep must reject in favour of the bundled default.
-        val v3 = LayoutGraph(surfaces = mapOf(
-            SurfaceId("appshell.leftrail") to SurfaceLayout(slots = mapOf(
-                SlotId("top") to SlotContent(listOf(navKind("appshell.leftrail.navbuttons", "nb"))),
-            )),
-            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
-                SlotId("main") to SlotContent(listOf(navKind("home.new.clock", "nb-home"))),
-            )),
-        ))
-        assertEquals(
-            sampleDefault,
-            loadFrom(3, v3),
-            "a migration that mints a colliding instanceId must fall back to the bundled default",
-        )
-    }
 
-    @Test
-    fun `v3 -- user without the leftrail surface gets the bundled default seeded`() {
-        val defaultWithRail = leftrailGraph(top = listOf(
-            WidgetInstance(WidgetKind("nav.entry"), "d-home", JsonObject(mapOf("target" to JsonPrimitive("Home")))),
-        ))
-        val v3 = LayoutGraph(surfaces = mapOf(
-            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(emptyList()))),
-        ))
-        val loaded = loadFrom(3, v3, default = defaultWithRail)
-        assertEquals(
-            defaultWithRail.surfaces[SurfaceId("appshell.leftrail")],
-            loaded.surfaces[SurfaceId("appshell.leftrail")],
-        )
-    }
 
     // ── Surface reset ─────────────────────────────────────────────────
 

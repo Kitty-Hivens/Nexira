@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import hivens.ui.theme.LocalStyle
@@ -97,8 +98,21 @@ fun NxSurface(
     blurDp: Float? = null,
     /** Hairline width. Null defers to [hairline], zero removes it. */
     borderWidthDp: Float? = null,
+    /** Hairline colour. Null derives one from the body's own luminance, which reads as
+     *  a bevelled edge of the same material rather than a frame in a foreign colour. */
+    borderColor: Color? = null,
     /** Cast-shadow elevation. Null defers to [elevated], zero flattens the plane. */
     shadowDp: Float? = null,
+    /**
+     * An explicit body colour, for a colour that is DATA rather than a guess.
+     *
+     * [NxColorSurface] withholds this and says why: a screen picking its own tone is
+     * the per-screen drift #351 closed, and it stays withheld for that. What arrives
+     * here is a colour a person typed into their own layout, which no palette can
+     * supply and no tonal ladder should override. Null keeps [level] deciding, which
+     * is what every call site inside the app does.
+     */
+    fillColor: Color? = null,
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -132,7 +146,7 @@ fun NxSurface(
     }
 
     val role = level.role()
-    val bodyColor = frostColor(role)
+    val bodyColor = fillColor ?: frostColor(role)
     val dark = bodyColor.luminance() < 0.5f
     val coat = if (glass) tier.coatLayers() else emptyList()
 
@@ -148,7 +162,7 @@ fun NxSurface(
         // filter runs every frame and is then covered completely. An opaque
         // surface skips it.
         if (bodyAlpha < 1f && blur != null && blur > 0f) add(Backdrop(blur))
-        add(Body(role, bodyAlpha))
+        if (fillColor != null) add(BodyColor(fillColor, bodyAlpha)) else add(Body(role, bodyAlpha))
         // A translucent coat over a solid body is a second fill doing nothing the
         // first did not: it only shifts the tone the ladder already chose.
         if (bodyAlpha < 1f) addAll(coat.filterNot { it is Backdrop })
@@ -165,9 +179,9 @@ fun NxSurface(
         }
         when {
             borderWidthDp != null && borderWidthDp > 0f ->
-                add(EdgeBorder(widthDp = borderWidthDp, explicitColor = bevelHairline(bodyColor)))
+                add(EdgeBorder(widthDp = borderWidthDp, explicitColor = borderColor ?: bevelHairline(bodyColor)))
             borderWidthDp != null -> Unit // a named zero is an edgeless plane
-            hairline              -> add(EdgeBorder(explicitColor = bevelHairline(bodyColor)))
+            hairline              -> add(EdgeBorder(explicitColor = borderColor ?: bevelHairline(bodyColor)))
         }
         if (interactionSource != null) add(StateOverlay())
     }

@@ -10,7 +10,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
-import hivens.widget.model.WidgetChrome
+import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
@@ -25,7 +25,7 @@ import hivens.widget.model.setWidgetOffset
 import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetZ
 import hivens.widget.model.traverse
-import hivens.widget.model.updateWidgetChrome
+import hivens.widget.model.updateWidgetSurface
 import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -134,11 +134,11 @@ class EditModeController(
         }
     }
 
-    // Per-instance backing chrome (glass / corner / padding). A no-backing
-    // chrome normalizes to null in the transform, so it never bloats the file.
-    fun updateChrome(path: SlotPath, instanceId: String, chrome: WidgetChrome?) {
+    // The widget's own surface. An all-default one normalizes to null in the
+    // transform, so it never bloats the file.
+    fun updateSurface(path: SlotPath, instanceId: String, surface: SurfaceSpec?) {
         scope.launch(writeDispatcher) {
-            repo.update { it.updateWidgetChrome(path, instanceId, chrome) }
+            repo.update { it.updateWidgetSurface(path, instanceId, surface) }
         }
     }
 

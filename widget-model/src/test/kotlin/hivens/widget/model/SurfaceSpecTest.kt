@@ -50,7 +50,7 @@ class SurfaceSpecTest {
             fill = "#CC1E1E1E",
             opacity = 0.42f,
             blurDp = 18f,
-            shape = SurfaceShape(kind = "star", points = 5, innerRatio = 0.6f, smoothing = 0.3f),
+            shape = SurfaceShape(kind = "pill", corners = SurfaceCorners(topStart = 2f), smoothing = 0.3f),
             border = SurfaceBorder(widthDp = 1f, color = "outline", opacity = 0.5f),
             shadowDp = 4f,
             padding = SurfaceInsets(all = 8f, top = 12f),
@@ -63,8 +63,8 @@ class SurfaceSpecTest {
         // An enum constant renamed upstream breaks every file that named it; a string
         // is a parser change. LenientEnumSerializer exists in this module because that
         // lesson was already paid for once.
-        val encoded = json.encodeToString(SurfaceSpec(shape = SurfaceShape(kind = "star")))
-        assertTrue(""""kind":"star"""" in encoded, encoded)
+        val encoded = json.encodeToString(SurfaceSpec(shape = SurfaceShape(kind = "pill")))
+        assertTrue(""""kind":"pill"""" in encoded, encoded)
     }
 
     // --- the fill grammar ---

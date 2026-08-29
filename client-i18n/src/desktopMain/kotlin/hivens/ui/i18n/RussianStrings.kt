@@ -1290,6 +1290,12 @@ object RussianStrings : AppStrings {
     override val editorBackingPaddingBottom = "Отступ снизу"
     override val editorBackingPaddingStart  = "Отступ слева"
     override val editorBackingNoGlassHint   = "Без стекла подложка не видна. Скругление и отступ всё равно применяются к виджету."
+    override val editorSurfaceFill    = "Заливка"
+    override val editorSurfaceOpacity = "Непрозрачность"
+    override val editorSurfaceBlur    = "Размытие"
+    override val editorSurfaceBorder  = "Обводка"
+    override val editorSurfaceShadow  = "Тень"
+    override val editorSurfaceFillHint = "Пусто -- по теме; имя ступени (base, raised, floating, sunken) следует за палитрой; #RRGGBB или #AARRGGBB -- нет."
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Пресеты"

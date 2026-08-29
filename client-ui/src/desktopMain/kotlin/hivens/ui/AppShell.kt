@@ -117,15 +117,15 @@ import hivens.ui.logic.PostLaunchGate
 import hivens.ui.logic.PostLaunchMove
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.api.LocalWidgetChromeRenderer
-import hivens.widget.api.WidgetChromeRenderer
+import hivens.widget.api.LocalWidgetSurfaceRenderer
+import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.ui.customization.glassSurfaceAlpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
-import hivens.ui.widgets.WidgetBacking
+import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -878,14 +878,14 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
             val layoutGraph by layoutGraphRepo.observe().collectAsState()
-            // Production renderer for per-widget backing (WidgetChrome), see
-            // [hivens.ui.widgets.WidgetBacking]. Invoked by the kernel only when a
-            // widget carries chrome, so default-styled widgets pay nothing.
+            // Production renderer for a widget's own surface, see
+            // [hivens.ui.widgets.WidgetSurface]. Invoked by the kernel only when a
+            // widget carries one, so a widget without a plane pays nothing.
             // Remembered so its identity stays stable across AppShell recomposes:
-            // it is provided through the *static* LocalWidgetChromeRenderer, and a
+            // it is provided through the *static* LocalWidgetSurfaceRenderer, and a
             // fresh identity each recompose would invalidate the whole content
-            // subtree rather than just chrome consumers.
-            val chromeRenderer: WidgetChromeRenderer = remember { { chrome, content -> WidgetBacking(chrome, content) } }
+            // subtree rather than just the widgets that have a surface.
+            val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 LocalDensity provides scaledDensity,
@@ -906,7 +906,7 @@ fun FrameWindowScope.AppShellContent(
                 LocalSlotChromeModifier                  provides
                     if (debugOverlay.available && debugOverlay.enabled && debugOverlay.needsDecorators)
                         debugOverlay.slotChrome else IdentitySlotChromeModifier,
-                LocalWidgetChromeRenderer                provides chromeRenderer,
+                LocalWidgetSurfaceRenderer               provides surfaceRenderer,
                 LocalWindowState                         provides windowState,
                 LocalWindowMaximizer                     provides maximizer,
                 LocalComposeWindow                       provides window,
