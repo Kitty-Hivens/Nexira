@@ -239,7 +239,7 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
         level    = NxSurfaceLevel.Raised,
         shape    = shape,
         // No blur behind a cell that is about to be covered by a photograph.
-        glass    = false,
+        blurDp   = 0f,
         interactionSource = interaction,
         modifier = modifier
             .fillMaxHeight()

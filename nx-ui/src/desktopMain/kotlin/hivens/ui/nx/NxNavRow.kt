@@ -56,7 +56,7 @@ fun NxNavRow(
         // Same level as an NxSection plane so a standalone nav card reads as the same
         // material as the section planes around it, not a step-darker odd one out.
         level    = NxSurfaceLevel.Floating,
-        glass    = false,
+        blurDp   = 0f,
         shape    = shape,
         modifier = modifier
             .fillMaxWidth()

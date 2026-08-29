@@ -80,17 +80,29 @@ class BackdropBlurRenderTest {
     }
 
     /**
-     * The radius was a tier's private constant: 18 on Frosted, 28 on Heavy, and no
-     * way to reach either. Naming one has to win in both directions.
+     * The radius was a preset's private constant: 18 on one, 28 on another, and no
+     * way to reach either. It is the form axis that decides now, and a surface that
+     * names its own radius has to win over it in both directions.
      */
     @Test
-    fun `a named radius overrides the tier in both directions`() {
-        // Flat carries no blur at all; naming one turns it on.
-        val flatWithBlur = scanline(blurDp = 0f, namedBlurDp = 18f)
-        // Frosted carries 18; naming zero turns it off.
-        val frostedWithout = scanline(blurDp = 18f, namedBlurDp = 0f)
-        assertTrue(flatWithBlur.spread < 10, "a named radius did not reach a tier without one: ${flatWithBlur.spread}")
-        assertTrue(frostedWithout.spread > 60, "a named zero did not turn the tier's blur off: ${frostedWithout.spread}")
+    fun `a named radius overrides the style in both directions`() {
+        val sharpStyleNamedBlur = scanline(blurDp = 18f, styleBlurDp = 0f)
+        val softStyleNamedZero = scanline(blurDp = 0f, styleBlurDp = 18f)
+        assertTrue(sharpStyleNamedBlur.spread < 10, "a named radius did not reach a style without one: ${sharpStyleNamedBlur.spread}")
+        assertTrue(softStyleNamedZero.spread > 60, "a named zero did not turn the style's blur off: ${softStyleNamedZero.spread}")
+    }
+
+    /**
+     * What a surface that names nothing gets. This is the whole of the form axis
+     * owning the radius: the same call blurs under a soft style and does not under
+     * a sharp one, with no switch at the call site to keep in step with it.
+     */
+    @Test
+    fun `the style supplies the radius when the surface names none`() {
+        val soft = scanline(blurDp = null, styleBlurDp = 18f)
+        val sharp = scanline(blurDp = null, styleBlurDp = 0f)
+        assertTrue(soft.spread < 10, "a soft style did not blur: ${soft.spread}")
+        assertTrue(sharp.spread > 60, "a sharp style blurred anyway: ${sharp.spread}")
     }
 
     private data class Sample(val spread: Double, val red: Int, val green: Int) {
@@ -99,29 +111,30 @@ class BackdropBlurRenderTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
     private fun scanline(
-        blurDp: Float,
+        blurDp: Float?,
+        styleBlurDp: Float = 18f,
         plate: Color? = null,
         blurEnabled: Boolean = true,
-        namedBlurDp: Float? = null,
     ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
             CompositionLocalProvider(
                 LocalNxColors provides DarkColorPalette,
-                LocalStyle provides CelestiaStyle,
+                LocalStyle provides CelestiaStyle.copy(surfaceBlur = styleBlurDp.dp),
                 LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled),
             ) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
                     if (plate != null) {
                         Box(Modifier.fillMaxSize().drawBehind { drawRect(plate) })
                     }
-                    Plate(blurDp, namedBlurDp)
+                    Plate(blurDp)
                 }
             }
         }
         val image = scene.render()
         scene.close()
         File(OUT).mkdirs()
-        val name = "backdrop-blur-${blurDp.toInt()}${if (plate != null) "-over-plate" else ""}${if (blurEnabled) "" else "-off"}.png"
+        val named = blurDp?.toInt()?.toString() ?: "style${styleBlurDp.toInt()}"
+        val name = "backdrop-blur-$named${if (plate != null) "-over-plate" else ""}${if (blurEnabled) "" else "-off"}.png"
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(OUT, name).writeBytes(it) }
 
         val bmp = Bitmap.makeFromImage(image)
@@ -135,21 +148,20 @@ class BackdropBlurRenderTest {
         val spread = sqrt(lum.sumOf { (it - mean) * (it - mean) } / lum.size)
         val mid = bmp.getColor(SX + SW / 2, y)
         val s = Sample(spread, (mid shr 16) and 0xFF, (mid shr 8) and 0xFF)
-        println("BackdropBlurRenderTest: blur=$blurDp plate=${plate != null} enabled=$blurEnabled -> $s")
+        println("BackdropBlurRenderTest: blur=$blurDp style=$styleBlurDp plate=${plate != null} enabled=$blurEnabled -> $s")
         return s
     }
 
     /** A translucent body so whatever the backdrop produced is visible through it. */
     @Composable
-    private fun Plate(blurDp: Float, namedBlurDp: Float?) {
+    private fun Plate(blurDp: Float?) {
         NxSurface(
             level = NxSurfaceLevel.Base,
             modifier = Modifier.offset(SX.dp, SY.dp).size(SW.dp, SH.dp),
             shape = RoundedCornerShape(12.dp),
-            tier = if (blurDp > 0f) FrostTier.Frosted else FrostTier.Flat,
+            blurDp = blurDp,
             hairline = false,
             opacity = 0.15f,
-            blurDp = namedBlurDp,
         ) {}
     }
 

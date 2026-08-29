@@ -181,7 +181,7 @@ private fun SlotSelectionHandle(onClick: () -> Unit) {
     val s = LocalStrings.current
     NxSurface(
         level = NxSurfaceLevel.Floating,
-        glass = false,
+        blurDp = 0f,
         shape = RoundedCornerShape(LocalStyle.current.buttonCorner),
     ) {
         Box(

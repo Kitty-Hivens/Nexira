@@ -221,7 +221,7 @@ private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
             val isNext = index == code.length
             NxSurface(
                 level = NxSurfaceLevel.Sunken,
-                glass = false,
+                blurDp = 0f,
                 shape = shape,
                 modifier = Modifier.weight(1f).height(56.dp),
             ) {

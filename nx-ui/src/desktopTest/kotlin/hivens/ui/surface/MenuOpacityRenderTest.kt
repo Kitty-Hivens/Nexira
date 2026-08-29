@@ -49,12 +49,12 @@ class MenuOpacityRenderTest {
                 Box(Modifier.fillMaxSize().background(Color(0xFFFF00FF))) { // bright magenta ground
                     Column(Modifier.padding(20.dp)) {
                         // Default dark body (floor 0.92) -- background bleeds through.
-                        NxSurface(NxSurfaceLevel.Floating, glass = false, opaque = false, shape = RoundedCornerShape(12.dp)) {
+                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, opaque = false, shape = RoundedCornerShape(12.dp)) {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                         Spacer(Modifier.height(20.dp))
                         // Opaque body (the menu's treatment) -- no bleed.
-                        NxSurface(NxSurfaceLevel.Floating, glass = false, opaque = true, shape = RoundedCornerShape(12.dp)) {
+                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, opaque = true, shape = RoundedCornerShape(12.dp)) {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                     }
