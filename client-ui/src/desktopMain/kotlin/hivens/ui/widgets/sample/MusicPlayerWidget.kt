@@ -159,8 +159,8 @@ internal fun MusicPlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    // A plane from the library rather than a hand-mixed fill: the tonal body, the
-    // legibility floor over a wallpaper and the frost tier come with the level.
+    // A plane from the library rather than a hand-mixed fill: the tonal body and the
+    // legibility floor over a wallpaper come with the level.
     NxSurface(NxSurfaceLevel.Floating, modifier.fillMaxWidth().padding(top = 12.dp)) {
         Column(
             modifier = Modifier

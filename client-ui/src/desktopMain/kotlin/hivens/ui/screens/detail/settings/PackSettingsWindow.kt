@@ -220,9 +220,8 @@ fun PackSettingsWindow(
     ) {
         NxSurface(
             level = NxSurfaceLevel.Raised,
-            // Clear + fully opaque: no frost coat (glass off) and a solid body
-            // (opaque forces alpha 1 instead of the 0.92 dark bleed-through), so
-            // the scrim never reads through the window.
+            // No blur and a solid body -- 1 rather than the 0.92 dark bleed-through
+            // -- so the scrim never reads through the window.
             blurDp = 0f,
             opacity = 1f,
             modifier = Modifier
