@@ -1306,6 +1306,10 @@ object RussianStrings : AppStrings {
     override val editorSurfaceBorderColor      = "Цвет обводки"
     override val editorSurfaceBorderOpacity    = "Непрозрачность обводки"
     override val editorSurfaceMore             = "Ещё"
+    override val editorSurfaceShapeKindHint    = "Пустое значение или round берут углы ниже; rect, circle, pill, star и polygon их не читают."
+    override val editorSurfaceShapePoints      = "Лучи"
+    override val editorSurfaceShapeInnerRadius = "Глубина впадин"
+    override val editorSurfaceShapePointRounding = "Скругление лучей"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Пресеты"

@@ -34,6 +34,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.material.color.utilities)
+                implementation(libs.androidx.graphics.shapes)
                 implementation(libs.slf4j.api)
             }
         }

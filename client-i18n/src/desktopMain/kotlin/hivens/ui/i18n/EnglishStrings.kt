@@ -1290,6 +1290,10 @@ object EnglishStrings : AppStrings {
     override val editorSurfaceBorderColor      = "Border colour"
     override val editorSurfaceBorderOpacity    = "Border opacity"
     override val editorSurfaceMore             = "More"
+    override val editorSurfaceShapeKindHint    = "Blank or round takes the corners below; rect, circle, pill, star and polygon ignore them."
+    override val editorSurfaceShapePoints      = "Points"
+    override val editorSurfaceShapeInnerRadius = "Notch depth"
+    override val editorSurfaceShapePointRounding = "Point rounding"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

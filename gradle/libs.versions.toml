@@ -32,6 +32,12 @@ coroutines        = "1.11.0"
 # alpha for the 1.11 line. 1.12.0-alpha03 exists but pairs with compose 1.12-beta,
 # so it stays parked until compose core moves to 1.12 stable.
 composeMaterial3  = "1.11.0-alpha07"
+# androidx graphics-shapes -- rounded polygons with corner SMOOTHING (squircles)
+# and star/polygon outlines, which RoundedCornerShape cannot express. Already on
+# the classpath transitively; declared so the source depends on it deliberately.
+# The desktop artifact has no Compose-Path bridge, so nx-ui builds the path from
+# the cubics itself (see PolygonShape).
+graphicsShapes    = "1.1.0"
 markdownRenderer  = "0.43.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
 markdown          = "0.7.8"
@@ -160,6 +166,7 @@ compose-ui                      = { group = "org.jetbrains.compose.ui",         
 compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
 
 # UI add-ons
+androidx-graphics-shapes        = { group = "androidx.graphics", name = "graphics-shapes",        version.ref = "graphicsShapes" }
 multiplatform-markdown-m3       = { group = "com.mikepenz",        name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 markdown-core                   = { group = "org.jetbrains",       name = "markdown",            version.ref = "markdown" }
 jsoup                           = { group = "org.jsoup",           name = "jsoup",               version.ref = "jsoup" }
