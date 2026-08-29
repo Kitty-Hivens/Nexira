@@ -32,20 +32,22 @@ import hivens.ui.theme.LocalStyle
  * it is an ordered stack of atomic layers drawn behind content, so transparency
  * always has separation and the surface reads as a distinct plane:
  *
- *   Backdrop (blur of what is beneath) -> Body / Fill -> Texture -> State ->
- *   content -> EdgeBorder, with DropShadow cast outside the clip.
+ *   Backdrop (blur of what is beneath) -> Body / Fill -> State -> content ->
+ *   EdgeBorder, with DropShadow cast outside the clip.
  *
  * Structure (the layer list) is orthogonal to color (resolved from theme roles),
  * so a seeded palette and a chosen depth compose independently. The old
  * [hivens.ui.customization.glassSurfaceAlpha] is just a single [Fill] of the
  * surface role -- call sites migrate to [FrostSurface] over time, not at once.
  *
- * Five further layer kinds used to live here: an accent Wash, an Edge group and
- * the three atoms it expanded into. Nothing constructed any of them, in this
- * module or any other, and the presets had already stopped carrying them. They
- * were removed rather than kept as options nobody could reach, which is also why
- * their drawing quirks (bands drawn straight across a rounded corner, an accent
- * every nested plane multiplied) are recorded here and not in live code.
+ * Six further layer kinds used to live here. Five -- an accent Wash, an Edge group
+ * and the three atoms it expanded into -- were constructed nowhere at all. The
+ * sixth was Texture, which was not one: a white-to-black diagonal gradient at four
+ * percent, documented as keeping large glass areas from banding, which a gradient
+ * cannot do. Banding IS a quantised gradient; only noise breaks it, and the shader
+ * that does (DitherVeil, in client-ui) was already written and in use elsewhere.
+ * All six are gone rather than kept as options nobody could reach or that did not
+ * do what they said.
  */
 sealed interface SurfaceLayer
 
@@ -81,9 +83,6 @@ data class EdgeBorder(
  * no separate switch to keep in sync.
  */
 data class DropShadow(val elevationDp: Float? = null) : SurfaceLayer
-
-/** Subtle texture so large glass areas do not band. */
-data class Texture(val grainAlpha: Float = 0.04f) : SurfaceLayer
 
 /** A [Body] whose colour is given rather than resolved from a role. For a colour that
  *  arrives as data -- a person's own choice in their own layout -- which no palette
@@ -126,7 +125,7 @@ fun FrostTier.toLayers(): List<SurfaceLayer> = when (this) {
     FrostTier.Clear   -> listOf(Fill(alpha = 0.35f))
     FrostTier.Flat    -> listOf(Fill(alpha = 0.35f)) // matches the rail's glassSurfaceAlpha(0.35) for a seamless chrome
     FrostTier.Frosted -> listOf(Backdrop(), Fill(alpha = 0.55f), DropShadow())
-    FrostTier.Heavy   -> listOf(Backdrop(blurRadiusDp = 28f), Fill(alpha = 0.45f), DropShadow(), Texture())
+    FrostTier.Heavy   -> listOf(Backdrop(blurRadiusDp = 28f), Fill(alpha = 0.45f), DropShadow())
 }
 
 /** A [Body]'s alpha is the slider-independent floor (Rule 2): the plane must read
@@ -201,16 +200,6 @@ fun FrostSurface(
                     // clip's rounded-corner AA ate the thin stroke at the corners.
                     is EdgeBorder -> Unit
                     is DropShadow -> Unit // cast outside the clip, above
-
-                    is Texture -> Box(Modifier.matchParentSize().drawBehind {
-                        // Stand-in depth break: a faint diagonal wash. True film grain
-                        // wants a Skia RuntimeShader -- a localized future swap.
-                        drawRect(
-                            Brush.linearGradient(
-                                listOf(Color.White.copy(alpha = layer.grainAlpha), Color.Transparent, Color.Black.copy(alpha = layer.grainAlpha)),
-                            ),
-                        )
-                    })
 
                     is StateOverlay -> if (interactionSource != null) {
                         val hovered by interactionSource.collectIsHoveredAsState()

@@ -371,7 +371,7 @@ fun AppSidebar(
         NavigationRail(
             modifier       = modifier,
             // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
-            // background now, so its frostTier drives the matte.
+            // background now, so its own opacity and blur drive the matte.
             containerColor = Color.Transparent,
             contentColor   = NxTheme.colors.textSecondary
         ) {
