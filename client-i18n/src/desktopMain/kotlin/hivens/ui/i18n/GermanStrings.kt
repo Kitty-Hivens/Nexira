@@ -179,6 +179,7 @@ object GermanStrings : AppStrings {
         "Vom Upstream-Protokoll erforderlich: $reason"
     override val updateChangelog       = "Vollständiger Änderungsverlauf"
     override val updateHighlights      = "Was ist neu"
+    override val updateNoChangelog     = "Dieses Release hat keine Notizen veröffentlicht."
     override val updateViewOnGitHub    = "Auf GitHub öffnen"
     override val updateLater           = "Später"
     override val updateExit            = "Beenden"

@@ -194,6 +194,7 @@ interface AppStrings {
     fun updateMandatoryBannerWithReason(reason: String): String
     val updateChangelog: String
     val updateHighlights: String
+    val updateNoChangelog: String
     val updateViewOnGitHub: String
     val updateLater: String
     val updateExit: String

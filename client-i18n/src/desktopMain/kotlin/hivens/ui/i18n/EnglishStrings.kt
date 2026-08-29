@@ -181,6 +181,7 @@ object EnglishStrings : AppStrings {
         "Required by the upstream protocol: $reason"
     override val updateChangelog       = "Full changelog"
     override val updateHighlights      = "What's new"
+    override val updateNoChangelog     = "This release published no notes."
     override val updateViewOnGitHub    = "View on GitHub"
     override val updateLater           = "Later"
     override val updateExit            = "Quit"

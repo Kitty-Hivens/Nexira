@@ -179,6 +179,7 @@ object RussianStrings : AppStrings {
         "Требуется по протоколу: $reason"
     override val updateChangelog       = "Полный список изменений"
     override val updateHighlights      = "Что нового"
+    override val updateNoChangelog     = "У этого выпуска нет описания."
     override val updateViewOnGitHub    = "Открыть на GitHub"
     override val updateLater           = "Позже"
     override val updateExit            = "Выйти"
