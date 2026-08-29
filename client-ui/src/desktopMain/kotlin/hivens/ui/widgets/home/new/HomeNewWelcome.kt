@@ -31,7 +31,12 @@ data class WelcomeProps(
 // Greeting banner. Personalizes with the authenticated player name;
 // in unauthenticated / loading states the welcome stays generic so the
 // banner does not flicker between greetings during login.
-@Widget(id = "home.new.welcome", displayName = "widget.home.new.welcome", propsClass = WelcomeProps::class)
+@Widget(
+    id = "home.new.welcome",
+    displayName = "widget.home.new.welcome",
+    propsClass = WelcomeProps::class,
+    surface = """{"fill":"base","opacity":0.45}""",
+)
 @Composable
 fun HomeNewWelcome(instance: WidgetInstance) {
     val p = instance.rememberProps<WelcomeProps>()

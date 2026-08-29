@@ -45,6 +45,8 @@ internal object WidgetValidator {
         val provides: List<String>,
         /** Contracts declared via @InjectService, by FQN. */
         val injects: List<String>,
+        /** The default plane as JSON, already checked to parse. Null for none. */
+        val surfaceJson: String?,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -108,6 +110,7 @@ internal object WidgetValidator {
         val removable = (args["removable"] as? Boolean) ?: true
         // KSP reports Array<String> annotation values as List<*>.
         val rawSlots = (args["slots"] as? List<*>).orEmpty().filterIsInstance<String>()
+        val rawSurface = (args["surface"] as? String).orEmpty().trim()
 
         if (id.isBlank()) {
             env.logger.error("@Widget id must be non-blank", symbol)
@@ -182,6 +185,24 @@ internal object WidgetValidator {
         }
 
         // Until now nothing in the processor referenced the two service
+        // A malformed default plane is a build error rather than a widget that
+        // quietly draws none: it is a literal in source, so the author is right here
+        // and the cost of telling them is one line.
+        val surface = if (rawSurface.isEmpty()) null else {
+            val parsed = runCatching {
+                kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    .decodeFromString(hivens.widget.model.SurfaceSpec.serializer(), rawSurface)
+            }
+            if (parsed.isFailure) {
+                env.logger.error(
+                    "@Widget surface is not a SurfaceSpec: ${parsed.exceptionOrNull()?.message}",
+                    symbol,
+                )
+                return null
+            }
+            rawSurface
+        }
+
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
         // way. Carrying them through is what lets the mismatch be seen.
@@ -194,6 +215,7 @@ internal object WidgetValidator {
             takesInstance = takesInstance,
             provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
             injects = symbol.serviceContracts(INJECT_SERVICE_FQN, "services"),
+            surfaceJson = surface,
         )
     }
 

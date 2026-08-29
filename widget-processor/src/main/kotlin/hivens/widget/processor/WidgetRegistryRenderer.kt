@@ -26,6 +26,8 @@ internal data class WidgetModel(
     val provides: List<String> = emptyList(),
     /** Service contracts from @InjectService, by FQN. */
     val injects: List<String> = emptyList(),
+    /** The default plane as JSON, or null for a widget that draws none. */
+    val surfaceJson: String? = null,
 )
 
 /**
@@ -83,12 +85,14 @@ internal fun renderRegistry(
     appendLine("import hivens.widget.model.WidgetInstance")
     appendLine("import hivens.widget.model.WidgetKind")
     // Serialization imports + the shared Json only when at least one widget
-    // declares props -- otherwise they would be unused and warn on a
-    // props-free build.
+    // declares props or a default plane -- otherwise they would be unused and
+    // warn on a build that has neither.
     val hasProps = widgets.any { it.propsClassFqn != null }
+    val hasSurface = widgets.any { it.surfaceJson != null }
+    if (hasSurface) appendLine("import hivens.widget.model.SurfaceSpec")
+    if (hasProps || hasSurface) appendLine("import kotlinx.serialization.json.Json")
     if (hasProps) {
         appendLine("import kotlinx.serialization.KSerializer")
-        appendLine("import kotlinx.serialization.json.Json")
         appendLine("import kotlinx.serialization.json.JsonObject")
         appendLine("import kotlinx.serialization.json.jsonObject")
     }
@@ -98,6 +102,11 @@ internal fun renderRegistry(
         // encodeDefaults so the default-props baseline carries every field;
         // the editor overlays the instance's stored overrides.
         appendLine("    private val propsJson: Json = Json { encodeDefaults = true; ignoreUnknownKeys = true }")
+    }
+    if (hasSurface) {
+        // The literals were decoded once at build time to check them; this decodes
+        // them again at class-init, which is where a descriptor's constants belong.
+        appendLine("    private val surfaceJson: Json = Json { ignoreUnknownKeys = true }")
     }
     appendLine("    private val map: Map<WidgetKind, WidgetDescriptor> = buildMap {")
     widgets.forEach { entry ->
@@ -112,6 +121,10 @@ internal fun renderRegistry(
         }
         if (entry.injects.isNotEmpty()) {
             appendLine("            override val injects: Set<String> = ${entry.injects.toStringSetLiteral()}")
+        }
+        if (entry.surfaceJson != null) {
+            appendLine("            override val defaultSurface: SurfaceSpec? =")
+            appendLine("                surfaceJson.decodeFromString(SurfaceSpec.serializer(), \"${entry.surfaceJson.kotlinEscape()}\")")
         }
         if (entry.propsClassFqn != null) {
             val fqn = entry.propsClassFqn

@@ -100,7 +100,12 @@ private val PILL_BUTTON_SIZE = 28.dp
  * the whole list out before wiping it. Consecutive identical entries fold into
  * one row with a count, mirroring the live stack's progress coalescing.
  */
-@Widget(id = "notifications.history", displayName = "widget.notifications.history", propsClass = NotificationHistoryProps::class)
+@Widget(
+    id = "notifications.history",
+    displayName = "widget.notifications.history",
+    propsClass = NotificationHistoryProps::class,
+    surface = """{"fill":"base","opacity":0.5,"border":{"widthDp":1.0,"color":"outline"}}""",
+)
 @Composable
 fun NotificationHistoryWidget(instance: WidgetInstance) {
     val props = instance.rememberProps<NotificationHistoryProps>()

@@ -117,13 +117,14 @@ fun PaletteItem(
                         }
                         editController.addWidget(
                             targetPath, descriptor.kind, descriptor.slots,
-                            index  = target.widgets.size,
-                            canvas = placement,
+                            index   = target.widgets.size,
+                            canvas  = placement,
+                            surface = descriptor.defaultSurface,
                         )
                     } else {
                         val orientation = target?.orientation ?: SlotOrientation.Column
                         val index = registry.insertionIndexInSlot(targetPath, pointer, orientation)
-                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
+                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index, surface = descriptor.defaultSurface)
                     }
                 },
             )

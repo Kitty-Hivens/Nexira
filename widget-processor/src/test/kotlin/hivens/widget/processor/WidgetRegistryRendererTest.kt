@@ -22,7 +22,30 @@ class WidgetRegistryRendererTest {
         propsClassFqn: String? = null,
         functionFqn: String = "hivens.ui.widgets.Sample",
         takesInstance: Boolean = true,
-    ) = WidgetModel(id, displayName, removable, slots, propsClassFqn, functionFqn, takesInstance)
+        surfaceJson: String? = null,
+    ) = WidgetModel(
+        id, displayName, removable, slots, propsClassFqn, functionFqn, takesInstance,
+        surfaceJson = surfaceJson,
+    )
+
+    // --- the declared default plane ---
+
+    @Test
+    fun `a declared plane is emitted as a decoded constant`() {
+        val src = renderRegistry(listOf(widget("home.card", surfaceJson = """{"fill":"base","opacity":0.45}""")))
+        assertContains(src, "import hivens.widget.model.SurfaceSpec")
+        assertContains(src, "override val defaultSurface: SurfaceSpec?")
+        // Escaped into a Kotlin literal, not pasted raw: an unescaped quote here
+        // would not compile, and the failure would be in generated code.
+        assertContains(src, """decodeFromString(SurfaceSpec.serializer(), "{\"fill\":\"base\",\"opacity\":0.45}")""")
+    }
+
+    @Test
+    fun `a widget without a plane emits neither the import nor the field`() {
+        val src = renderRegistry(listOf(widget("home.card")))
+        assertFalse("SurfaceSpec" in src, "an unused import warns on a build that declares no plane")
+        assertFalse("defaultSurface" in src, src)
+    }
 
     // --- duplicate ids ---
 

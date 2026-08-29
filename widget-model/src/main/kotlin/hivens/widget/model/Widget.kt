@@ -42,4 +42,15 @@ annotation class Widget(
     // values via instance.rememberProps<T>(), the editor builds its
     // form from the serializer's descriptor.
     val propsClass: KClass<*> = Unit::class,
+    // The plane this widget sits on when nothing has said otherwise, as a
+    // [SurfaceSpec] in the same JSON the layout file carries. Blank (the default)
+    // means no plane: the widget draws its content and nothing behind it.
+    //
+    // A string rather than an object because an annotation cannot hold one, and the
+    // layout's own grammar rather than a second set of arguments because there is
+    // then one thing to learn and one parser to trust. The processor decodes it at
+    // build time and fails the build on a malformed value, which is the whole reason
+    // it lives here instead of in a table of kinds somewhere central: a widget
+    // declares its own plane, beside itself, and a mistake is caught before it ships.
+    val surface: String = "",
 )
