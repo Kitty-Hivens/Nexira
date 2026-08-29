@@ -145,11 +145,19 @@ fun BrowseScreen(
             submittedQuery,
             remembered?.let { "showing ${it.packs.size} remembered pack(s) meanwhile" } ?: "nothing remembered",
         )
+        // Both scrolls are REQUESTED, not awaited. scrollToItem suspends until an
+        // attached, laid-out list has carried it out -- and the line above it puts
+        // the screen on a state that composes no list at all, so in the branch that
+        // has nothing to restore it never returned. Everything below is downstream
+        // of it, which is why a catalogue that could not be shown made no request,
+        // logged nothing, timed out on nothing and held no thread: the fetch was
+        // parked behind a scroll that could not happen. requestScrollToItem records
+        // the position and the next layout applies it, list or no list.
         if (remembered != null) {
             state = BrowseState.Loaded(remembered.packs)
             page = remembered.nextPage
             endReached = remembered.endReached
-            listState.scrollToItem(remembered.firstVisibleIndex, remembered.firstVisibleOffset)
+            listState.requestScrollToItem(remembered.firstVisibleIndex, remembered.firstVisibleOffset)
         } else {
             state = BrowseState.Loading
             page = 0
@@ -159,7 +167,7 @@ fun BrowseScreen(
             // a search made while scrolled opens at whatever offset the previous
             // list had reached -- past the end of a shorter one, which the paging
             // watcher then reads as "near the bottom" and pages on.
-            listState.scrollToItem(0)
+            listState.requestScrollToItem(0)
         }
         val catalogue = registry.forOrigin(origin)
             ?: return@LaunchedEffect run {
@@ -210,7 +218,11 @@ fun BrowseScreen(
                     endReached = false
                     state = BrowseState.Loaded(packs)
                     session.put(origin, submittedQuery, BrowseSession.Snapshot(packs, nextPage = 0, endReached = false))
-                    listState.scrollToItem(0)
+                    // Requested for the same reason as the two above: the list this
+                    // would scroll is composed by the line before it, and awaiting a
+                    // scroll from inside the collect would hold the rest of the
+                    // stream behind it.
+                    listState.requestScrollToItem(0)
                 }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
