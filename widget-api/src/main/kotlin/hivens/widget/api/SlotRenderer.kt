@@ -321,16 +321,16 @@ private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: Widget
     return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
 }
 
-// Renders a widget, wrapped in its per-instance backing when it has one. The
-// chrome wrap is inside the editor decorator (the drag handle / remove button
-// surround the glass card) but is PRODUCTION styling -- it paints whenever
-// instance.chrome != null, editor mounted or not.
+// Renders a widget, wrapped in its per-instance surface when it has one. The
+// wrap is inside the editor decorator (the drag handle and remove button
+// surround the plane) but is PRODUCTION styling -- it paints whenever
+// instance.surface != null, editor mounted or not.
 @Composable
 private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
-    val chrome = instance.chrome
-    if (chrome == null) {
+    val surface = instance.surface
+    if (surface == null) {
         descriptor.Render(instance)
     } else {
-        LocalWidgetChromeRenderer.current(chrome) { descriptor.Render(instance) }
+        LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
     }
 }

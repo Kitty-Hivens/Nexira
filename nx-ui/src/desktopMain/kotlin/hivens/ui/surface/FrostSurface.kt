@@ -85,6 +85,11 @@ data class DropShadow(val elevationDp: Float? = null) : SurfaceLayer
 /** Subtle texture so large glass areas do not band. */
 data class Texture(val grainAlpha: Float = 0.04f) : SurfaceLayer
 
+/** A [Body] whose colour is given rather than resolved from a role. For a colour that
+ *  arrives as data -- a person's own choice in their own layout -- which no palette
+ *  can supply. Everything else about the plane behaves the same. */
+data class BodyColor(val color: Color, val alpha: Float = 1f) : SurfaceLayer
+
 /** Hover / press state tint; rendered only when an interaction source is given. */
 data class StateOverlay(val role: FrostRole = FrostRole.Primary, val hoverAlpha: Float = 0.06f, val pressAlpha: Float = 0.12f) : SurfaceLayer
 
@@ -153,7 +158,7 @@ fun FrostSurface(
     // A Fill with nothing opaque or blurred beneath it is a bare glass coat; over a
     // wallpaper on a light palette that lands in mud (Rule 4). "Unbacked" marks that
     // case so such a Fill draws opaque on light -- see the Fill branch below.
-    val unbacked = remember(layers) { layers.none { it is Backdrop || it is Body } }
+    val unbacked = remember(layers) { layers.none { it is Backdrop || it is Body || it is BodyColor } }
 
     var outer = modifier
     if (cast != null) {
@@ -184,6 +189,11 @@ fun FrostSurface(
 
                     is Body -> {
                         val c = colors.frost(layer.role).copy(alpha = bodyAlpha(layer.floorAlpha))
+                        Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
+                    }
+
+                    is BodyColor -> {
+                        val c = layer.color.copy(alpha = bodyAlpha(layer.alpha))
                         Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
                     }
 

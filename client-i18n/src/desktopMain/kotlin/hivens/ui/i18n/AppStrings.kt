@@ -1249,6 +1249,12 @@ interface AppStrings {
     /** Caption under the backing controls when glass is 0: the card is not drawn,
      *  but corner still clips the widget and padding still insets it. */
     val editorBackingNoGlassHint: String
+    val editorSurfaceFill: String
+    val editorSurfaceOpacity: String
+    val editorSurfaceBlur: String
+    val editorSurfaceBorder: String
+    val editorSurfaceShadow: String
+    val editorSurfaceFillHint: String
 
     // --- Layout editor: presets ---
     val editorPresetsTitle: String

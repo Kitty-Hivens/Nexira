@@ -83,29 +83,21 @@ private fun parseHexFill(v: String): FillSource.Literal? {
 /**
  * The outline of a surface.
  *
- * [kind] blank takes the style's card shape. The remaining fields belong to one kind
- * each and are ignored by the others, which keeps the whole thing flat: a discriminated
- * union would need a serializer per arm and would make adding a kind a format change
- * rather than a new string.
+ * [kind] blank takes the style's card shape. Fields that belong to one kind are
+ * ignored by the others, which keeps the whole thing flat: a discriminated union would
+ * need a serializer per arm and would make adding a kind a format change rather than a
+ * new string.
  *
  * [smoothing] is the squircle amount rather than a rounding radius: continuous
  * curvature, available to every kind.
  */
 @Serializable
 data class SurfaceShape(
-    /** "" | rect | round | circle | pill | poly | star | pillstar */
+    /** "" | rect | round | circle | pill. The polygon family lands with the
+     *  shapes library; a kind a renderer does not answer falls back to the card shape. */
     val kind: String = "",
     val corners: SurfaceCorners = SurfaceCorners(),
     val smoothing: Float? = null,
-    /** poly: how many sides. */
-    val vertices: Int? = null,
-    /** star and pillstar: how many points. */
-    val points: Int? = null,
-    /** star: how deep the notches cut, 0..1 of the outer radius. */
-    val innerRatio: Float? = null,
-    /** star: the notches round separately from the points. */
-    val innerRounding: Float? = null,
-    val rotationDeg: Float? = null,
 )
 
 /**

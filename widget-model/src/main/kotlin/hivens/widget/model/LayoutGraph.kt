@@ -32,44 +32,12 @@ data class WidgetInstance(
     // Cell placement when the enclosing slot is CubeGrid (col/row + span in cells).
     // Null for non-grid slots -- back-compat default for old layouts.
     val cell: GridCell? = null,
-    // Per-instance backing the kernel paints around the widget (glass card,
-    // corner, padding). Null = no backing -- back-compat default for old
-    // layouts. The editor's "Backing" section sets it on ANY widget, propless
-    // included. Rendered in production via LocalWidgetChromeRenderer.
-    val chrome: WidgetChrome? = null,
+    // Per-instance surface the kernel paints around the widget. Null = none --
+    // back-compat default for a widget that wants no plane of its own. The
+    // editor's "Surface" section sets it on ANY widget, propless included.
+    // Rendered in production via LocalWidgetSurfaceRenderer.
+    val surface: SurfaceSpec? = null,
 )
-
-// Optional backing painted around a widget by the kernel: a glass card behind
-// it ([glassAlphaPct] 0 = none), rounded corners ([cornerRadiusDp]), and inner
-// padding. [paddingDp] is the uniform baseline; each side may override it via
-// [paddingTopDp] / [paddingEndDp] / [paddingBottomDp] / [paddingStartDp], where
-// -1 means "inherit the uniform value". Compose-free (widget-model carries no
-// Compose); the kernel turns these scalars into a Modifier via the injected
-// LocalWidgetChromeRenderer.
-@Serializable
-data class WidgetChrome(
-    val glassAlphaPct: Int = 0,
-    /**
-     * -1 takes the active style's card corner, like the padding fields below take
-     * [paddingDp]. It defaulted to 0, and 0 meant the backing was not clipped at
-     * all: raising the glass on a widget that rounds its own corners put a hard
-     * square behind it. Zero is still square, but now only when it is asked for.
-     */
-    val cornerRadiusDp: Int = -1,
-    val paddingDp: Int = 0,
-    val paddingTopDp: Int = -1,
-    val paddingEndDp: Int = -1,
-    val paddingBottomDp: Int = -1,
-    val paddingStartDp: Int = -1,
-) {
-    /** The corner this backing was told to use, or null to follow the active style. */
-    val explicitCornerDp: Int? get() = cornerRadiusDp.takeIf { it >= 0 }
-
-    val effectiveTop: Int    get() = if (paddingTopDp    >= 0) paddingTopDp    else paddingDp
-    val effectiveEnd: Int    get() = if (paddingEndDp    >= 0) paddingEndDp    else paddingDp
-    val effectiveBottom: Int get() = if (paddingBottomDp >= 0) paddingBottomDp else paddingDp
-    val effectiveStart: Int  get() = if (paddingStartDp  >= 0) paddingStartDp  else paddingDp
-}
 
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
 // the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows
@@ -135,7 +103,7 @@ data class LayoutGraph(val surfaces: Map<SurfaceId, SurfaceLayout> = emptyMap())
     }
 }
 
-// (SurfaceId, SlotId) pair. Retained for chrome-level callers that
+// (SurfaceId, SlotId) pair. Retained for surface-level callers that
 // only care about the leaf coordinates and do not navigate the path.
 // Internal transforms operate on SlotPath; SlotAddress.toPath() bridges
 // when needed.
@@ -201,16 +169,16 @@ fun LayoutGraph.updateWidgetProps(
     props: JsonObject,
 ): LayoutGraph = updateInstance(path, instanceId) { it.copy(props = props) }
 
-// Sets (or clears, with null) the per-instance backing chrome. Same no-op /
-// missing-instance contract as updateWidgetProps. A no-backing chrome
+// Sets (or clears, with null) the per-instance surface. Same no-op /
+// missing-instance contract as updateWidgetProps. An all-default surface
 // normalizes to null so the field stays absent for default-styled widgets.
-fun LayoutGraph.updateWidgetChrome(
+fun LayoutGraph.updateWidgetSurface(
     path: SlotPath,
     instanceId: String,
-    chrome: WidgetChrome?,
+    surface: SurfaceSpec?,
 ): LayoutGraph {
-    val normalized = chrome?.takeUnless { it == WidgetChrome() }
-    return updateInstance(path, instanceId) { it.copy(chrome = normalized) }
+    val normalized = surface?.takeUnless { it == SurfaceSpec() }
+    return updateInstance(path, instanceId) { it.copy(surface = normalized) }
 }
 
 // Every per-instance transform is the same three steps: find the instance in the

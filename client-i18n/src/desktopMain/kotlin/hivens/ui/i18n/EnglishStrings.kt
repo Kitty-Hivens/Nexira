@@ -1274,6 +1274,12 @@ object EnglishStrings : AppStrings {
     override val editorBackingPaddingBottom = "Padding bottom"
     override val editorBackingPaddingStart  = "Padding left"
     override val editorBackingNoGlassHint   = "No glass means no visible backing. Corner and padding still apply to the widget."
+    override val editorSurfaceFill    = "Fill"
+    override val editorSurfaceOpacity = "Opacity"
+    override val editorSurfaceBlur    = "Blur"
+    override val editorSurfaceBorder  = "Border"
+    override val editorSurfaceShadow  = "Shadow"
+    override val editorSurfaceFillHint = "Blank follows the theme; a rung name (base, raised, floating, sunken) tracks the palette; #RRGGBB or #AARRGGBB does not."
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

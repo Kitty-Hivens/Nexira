@@ -143,8 +143,9 @@ private fun ColorRow(label: String, hex: String, onChange: (String) -> Unit) {
     }
 }
 
+/** A free-text row. Also the fill control: one field carrying a value or a name. */
 @Composable
-private fun StringRow(label: String, value: String, onChange: (String) -> Unit) {
+internal fun StringRow(label: String, value: String, onChange: (String) -> Unit) {
     var text by remember(value) { mutableStateOf(value) }
     Row(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
