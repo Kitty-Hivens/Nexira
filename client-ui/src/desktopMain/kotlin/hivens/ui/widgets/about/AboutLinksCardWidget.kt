@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.surface.NxCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.widget.api.rememberProps
@@ -27,23 +26,26 @@ data class AboutLinksProps(
 // configuration. Per-button atomization would be the same shape as
 // system rows -- one card per button or floating buttons. Single
 // card matches the legacy visual.
-@Widget(id = "about.links.card", displayName = "widget.about.links.card", propsClass = AboutLinksProps::class)
+@Widget(
+    id = "about.links.card",
+    displayName = "widget.about.links.card",
+    propsClass = AboutLinksProps::class,
+    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+)
 @Composable
 fun AboutLinksCardWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutLinksProps>()
     val s = LocalStrings.current
 
-    NxCard(Modifier.fillMaxWidth()) {
-        // No inner scroll: the surface already scrolls the right slot in narrow
-        // layouts, and nesting a second scroll crashes (unbounded height).
-        Column(Modifier.padding(20.dp)) {
-            SectionLabel(p.title.ifBlank { s.aboutSectionLinks })
-            Spacer(Modifier.height(12.dp))
-            LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Nexira",         NxIcon.Code)
-            Spacer(Modifier.height(8.dp))
-            LinkButton(s.aboutLinkBugReport, "https://github.com/Kitty-Hivens/Nexira/issues",  NxIcon.BugReport)
-            Spacer(Modifier.height(8.dp))
-            LinkButton(s.aboutLinkReleases,  "https://github.com/Kitty-Hivens/Nexira/releases", NxIcon.Download)
-        }
+    // No inner scroll: the surface already scrolls the right slot in narrow
+    // layouts, and nesting a second scroll crashes (unbounded height).
+    Column(Modifier.fillMaxWidth().padding(20.dp)) {
+        SectionLabel(p.title.ifBlank { s.aboutSectionLinks })
+        Spacer(Modifier.height(12.dp))
+        LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Nexira",         NxIcon.Code)
+        Spacer(Modifier.height(8.dp))
+        LinkButton(s.aboutLinkBugReport, "https://github.com/Kitty-Hivens/Nexira/issues",  NxIcon.BugReport)
+        Spacer(Modifier.height(8.dp))
+        LinkButton(s.aboutLinkReleases,  "https://github.com/Kitty-Hivens/Nexira/releases", NxIcon.Download)
     }
 }

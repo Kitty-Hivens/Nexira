@@ -321,13 +321,15 @@ private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: Widget
     return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
 }
 
-// Renders a widget, wrapped in its per-instance surface when it has one. The
-// wrap is inside the editor decorator (the drag handle and remove button
-// surround the plane) but is PRODUCTION styling -- it paints whenever
-// instance.surface != null, editor mounted or not.
+// Renders a widget, wrapped in the plane it resolves to. The wrap is inside the
+// editor decorator (the drag handle and remove button surround the plane) but is
+// PRODUCTION styling -- it paints whether the editor is mounted or not.
+//
+// Which plane it draws is [resolveSurface]'s answer, so the renderer and the
+// editor's panel read the same one.
 @Composable
 private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
-    val surface = instance.surface
+    val surface = descriptor.resolveSurface(instance)
     if (surface == null) {
         descriptor.Render(instance)
     } else {

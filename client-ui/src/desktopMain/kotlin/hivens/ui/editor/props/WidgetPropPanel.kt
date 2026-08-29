@@ -44,6 +44,7 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.resolveSurface
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.PropLabel
@@ -222,7 +223,9 @@ private fun PropPanelBody(
                 color      = NxTheme.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
-            val surface = instance.surface ?: SurfaceSpec()
+            // Seeded through the same resolution the renderer uses, so the sliders
+            // open where the plane on screen actually is.
+            val surface = descriptor.resolveSurface(instance) ?: SurfaceSpec()
             fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
             val corner = style.cardCorner.value
 

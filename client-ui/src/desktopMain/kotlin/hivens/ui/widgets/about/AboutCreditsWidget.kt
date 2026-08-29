@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import hivens.ui.BuildConfig
-import hivens.ui.surface.NxCard
 import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
@@ -47,93 +46,97 @@ data class AboutCreditsProps(
     @PropLabel("widget.about.credits.title") val title: String = "",
 )
 
-@Widget(id = "about.credits", displayName = "widget.about.credits", propsClass = AboutCreditsProps::class)
+@Widget(
+    id = "about.credits",
+    displayName = "widget.about.credits",
+    propsClass = AboutCreditsProps::class,
+    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+)
 @Composable
 fun AboutCreditsWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutCreditsProps>()
     val af = LocalAprilFools.current
     val s = LocalStrings.current
 
-    NxCard(Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .padding(20.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            SectionLabel(p.title.ifBlank { s.aboutSectionCreator })
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
-                    model              = "https://github.com/Kitty-Hivens.png?size=256",
-                    contentDescription = "Haru",
-                    modifier           = Modifier.size(46.dp).clip(CircleShape),
-                    contentScale       = ContentScale.Crop,
-                    filterQuality      = FilterQuality.High,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        SectionLabel(p.title.ifBlank { s.aboutSectionCreator })
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model              = "https://github.com/Kitty-Hivens.png?size=256",
+                contentDescription = "Haru",
+                modifier           = Modifier.size(46.dp).clip(CircleShape),
+                contentScale       = ContentScale.Crop,
+                filterQuality      = FilterQuality.High,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text       = "Haru (Hivens)",
+                    fontWeight = FontWeight.Bold,
+                    color      = NxTheme.colors.textPrimary,
                 )
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text       = "Haru (Hivens)",
-                        fontWeight = FontWeight.Bold,
-                        color      = NxTheme.colors.textPrimary,
-                    )
-                    Text(
-                        text  = af.maybeGibberish(
-                            "Architect & Developer",
-                            probability = 0.35f,
-                            mode        = GibberishMode.SCRAMBLED,
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = NxTheme.colors.primary,
-                    )
-                }
+                Text(
+                    text  = af.maybeGibberish(
+                        "Architect & Developer",
+                        probability = 0.35f,
+                        mode        = GibberishMode.SCRAMBLED,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxTheme.colors.primary,
+                )
             }
-
-            Spacer(Modifier.height(20.dp))
-            SectionLabel(s.aboutSectionTechnologies)
-            Spacer(Modifier.height(8.dp))
-
-            val techs = listOf(
-                "Kotlin ${KotlinVersion.CURRENT}"      to s.techKotlinDesc,
-                "Compose ${BuildConfig.COMPOSE_VERSION}" to s.techComposeDesc,
-                "Ktor ${BuildConfig.KTOR_VERSION}"     to s.techKtorDesc,
-                "Koin ${BuildConfig.KOIN_VERSION}"     to s.techKoinDesc,
-                "Coil ${BuildConfig.COIL_VERSION}"     to s.techCoilDesc,
-                "Skia (Skiko)"                          to s.techSkiaDesc,
-            )
-
-            techs.forEach { (name, desc) ->
-                Row(Modifier.padding(vertical = 3.dp)) {
-                    Text("•", color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text       = af.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
-                        fontWeight = FontWeight.Medium,
-                        color      = NxTheme.colors.textPrimary,
-                        fontSize   = 13.sp,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text     = "— ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
-                        color    = NxTheme.colors.textSecondary,
-                        fontSize = 13.sp,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-            SectionLabel(s.aboutSectionLicense)
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text  = af.maybeGibberish(
-                    s.aboutLicenseText,
-                    probability = 0.45f,
-                    mode        = GibberishMode.LOREM,
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
-            )
         }
+
+        Spacer(Modifier.height(20.dp))
+        SectionLabel(s.aboutSectionTechnologies)
+        Spacer(Modifier.height(8.dp))
+
+        val techs = listOf(
+            "Kotlin ${KotlinVersion.CURRENT}"      to s.techKotlinDesc,
+            "Compose ${BuildConfig.COMPOSE_VERSION}" to s.techComposeDesc,
+            "Ktor ${BuildConfig.KTOR_VERSION}"     to s.techKtorDesc,
+            "Koin ${BuildConfig.KOIN_VERSION}"     to s.techKoinDesc,
+            "Coil ${BuildConfig.COIL_VERSION}"     to s.techCoilDesc,
+            "Skia (Skiko)"                          to s.techSkiaDesc,
+        )
+
+        techs.forEach { (name, desc) ->
+            Row(Modifier.padding(vertical = 3.dp)) {
+                Text("•", color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text       = af.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
+                    fontWeight = FontWeight.Medium,
+                    color      = NxTheme.colors.textPrimary,
+                    fontSize   = 13.sp,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text     = "— ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
+                    color    = NxTheme.colors.textSecondary,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+        SectionLabel(s.aboutSectionLicense)
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text  = af.maybeGibberish(
+                s.aboutLicenseText,
+                probability = 0.45f,
+                mode        = GibberishMode.LOREM,
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = NxTheme.colors.textSecondary,
+        )
     }
 }
