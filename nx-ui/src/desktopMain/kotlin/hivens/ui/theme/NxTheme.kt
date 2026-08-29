@@ -27,8 +27,6 @@ data class NxColors(
     val onSurface: Color,
     val textPrimary: Color,
     val textSecondary: Color,
-    val glassBackground: Color,
-    val glassAlpha: Float,
     val success: Color,
     val outline: Color,
     // Severity accents for notifications. `success` already doubles as
@@ -81,8 +79,6 @@ internal val DarkColorPalette = NxColors(
     onSurface = Color.White,
     textPrimary = Color(0xFFEEEEEE),
     textSecondary = Color(0xFFB0B0B0),
-    glassBackground = Color(0xFF000000), // Base for glass
-    glassAlpha = 0.60f, // Glass transparency (dark)
     success = Color(0xFF4CAF50),
     outline = Color(0xFF444444),
     progressAccent = Color(0xFF6A84FF),
@@ -136,8 +132,6 @@ internal val LightColorPalette = NxColors(
     // everywhere and under the large-text one on half the ladder. Same hue and
     // saturation, lower lightness.
     textSecondary = Color(0xFF4F626B),
-    glassBackground = Color(0xFFFFFFFF),
-    glassAlpha = 0.65f,                // Slightly more opacity for readability
     // Darker than the dark theme's #4CAF50, like every other severity accent
     // here. Lightening it for a light ground put it at 1.9:1 against the
     // container plane -- under even the large-text floor -- while the same token

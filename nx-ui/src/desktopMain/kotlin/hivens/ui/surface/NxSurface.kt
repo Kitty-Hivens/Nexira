@@ -48,15 +48,9 @@ fun NxSurfaceLevel.role(): FrostRole = when (this) {
  */
 internal fun bodyFloor(dark: Boolean): Float = if (dark) 0.92f else 1.0f
 
-/** A tier's glass coat: its decorative layers minus the body [Fill] (the [Body] owns
- *  the fill) and with any [Edge] border off (the bevel hairline owns the border). */
-private fun FrostTier.coatLayers(): List<SurfaceLayer> = toLayers().mapNotNull { layer ->
-    when (layer) {
-        is Fill -> null
-        is Edge -> layer.copy(border = false)
-        else    -> layer
-    }
-}
+/** A tier's glass coat: its decorative layers minus the body [Fill], because [Body]
+ *  owns the fill here and a second one over it only shifts the tone the ladder chose. */
+private fun FrostTier.coatLayers(): List<SurfaceLayer> = toLayers().filterNot { it is Fill }
 
 /**
  * A library-owned surface: an opaque tonal body for [level], an optional glass coat,
