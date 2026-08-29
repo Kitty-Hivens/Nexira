@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.nx.ThemeStateLayer
 
@@ -182,15 +183,23 @@ val LocalNxColors = staticCompositionLocalOf<NxColors> {
 // --- THEME WITH ANIMATION AND SUPPORT FOR CUSTOM THEMES ---
 
 /**
- * The palette a theme starts from, before presets, accent overrides and the tonal
- * expansion land on top. Wallpaper seeding (Monet) applies only when it is switched
- * on AND a seed was extracted; either half missing falls back to the fixed palette,
- * which is what the off state of the switch has to mean -- a preset then reads as it
- * was designed instead of tinted by whatever is behind the window.
+ * The palette a theme starts from, before accent overrides and the tonal expansion
+ * land on top.
+ *
+ * One seed, two places it can come from. The wallpaper supplies it while seeding is
+ * switched on and an image actually yielded one; otherwise the active preset does,
+ * through its own lead colour. Neither is a wholesale replacement: [generatedNxColors]
+ * keeps every plane's tone and spends the seed on hue and chroma, so a ground stays
+ * exactly as light or dark as it was and only changes colour.
+ *
+ * The preset used to reach no further than five accent fields. With no wallpaper --
+ * the state a fresh install is in -- nothing seeded anything, so every preset drew
+ * the same near-black ground and choosing one changed almost nothing on screen.
  */
-internal fun resolveBasePalette(dark: Boolean, seed: Int?, fromWallpaper: Boolean): NxColors {
+internal fun resolveBasePalette(dark: Boolean, seed: Int?, fromWallpaper: Boolean, themeSeed: Int?): NxColors {
     val fixed = if (dark) DarkColorPalette else LightColorPalette
-    return if (fromWallpaper && seed != null) seededNxColors(fixed, seed, dark) else fixed
+    val effective = seed.takeIf { fromWallpaper } ?: themeSeed ?: return fixed
+    return seededNxColors(fixed, effective, dark)
 }
 
 @Composable
@@ -208,8 +217,12 @@ fun NxTheme(
 ) {
     val customization = LocalCustomization.current
 
-    // Base palette: fixed Celestia, or wallpaper-seeded (Monet) when enabled.
-    val baseColors = resolveBasePalette(useDarkTheme, paletteSeed, paletteFromWallpaper)
+    // Base palette: seeded from the wallpaper when that is on and an image gave a
+    // seed, otherwise from the preset's own lead colour, otherwise fixed.
+    val themeSeed = remember(customTheme?.primary) {
+        customTheme?.primary?.let { CustomTheme.parseHexColor(it).toArgb() }
+    }
+    val baseColors = resolveBasePalette(useDarkTheme, paletteSeed, paletteFromWallpaper, themeSeed)
 
     val themedColors = if (customTheme != null) {
         baseColors.copy(

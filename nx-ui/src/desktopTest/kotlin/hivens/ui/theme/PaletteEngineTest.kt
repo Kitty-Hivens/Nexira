@@ -41,23 +41,26 @@ class PaletteEngineTest {
 
     private val seed = 0xFF3B82F6.toInt()
 
+    // A preset supplies a seed of its own; these pin the wallpaper half in
+    // isolation, so they pass themeSeed = null. ThemeGroundTest covers the rest.
+
     @Test
-    fun seedingOffKeepsTheFixedPalette() {
-        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = seed, fromWallpaper = false))
-        assertEquals(LightColorPalette, resolveBasePalette(dark = false, seed = seed, fromWallpaper = false))
+    fun seedingOffIgnoresTheWallpaper() {
+        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = seed, fromWallpaper = false, themeSeed = null))
+        assertEquals(LightColorPalette, resolveBasePalette(dark = false, seed = seed, fromWallpaper = false, themeSeed = null))
     }
 
     @Test
     fun seedingOnDerivesFromTheSeed() {
         assertEquals(
             seededNxColors(DarkColorPalette, seed, dark = true),
-            resolveBasePalette(dark = true, seed = seed, fromWallpaper = true),
+            resolveBasePalette(dark = true, seed = seed, fromWallpaper = true, themeSeed = null),
         )
     }
 
     @Test
-    fun seedingOnWithoutASeedKeepsTheFixedPalette() {
-        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = null, fromWallpaper = true))
+    fun withNeitherSeedThePaletteIsTheFixedOne() {
+        assertEquals(DarkColorPalette, resolveBasePalette(dark = true, seed = null, fromWallpaper = true, themeSeed = null))
     }
 
     @Test
