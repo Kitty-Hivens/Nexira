@@ -1284,6 +1284,15 @@ object GermanStrings : AppStrings {
     override val editorSurfaceBorder  = "Rand"
     override val editorSurfaceShadow  = "Schatten"
     override val editorSurfaceFillHint = "Leer folgt dem Design; ein Stufenname (base, raised, floating, sunken) folgt der Palette; #RRGGBB oder #AARRGGBB nicht."
+    override val editorSurfaceShapeKind        = "Form"
+    override val editorSurfaceSmoothing        = "Glättung"
+    override val editorSurfaceCornerTopStart   = "Ecke, oben Anfang"
+    override val editorSurfaceCornerTopEnd     = "Ecke, oben Ende"
+    override val editorSurfaceCornerBottomEnd  = "Ecke, unten Ende"
+    override val editorSurfaceCornerBottomStart = "Ecke, unten Anfang"
+    override val editorSurfaceBorderColor      = "Randfarbe"
+    override val editorSurfaceBorderOpacity    = "Randdeckkraft"
+    override val editorSurfaceMore             = "Mehr"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

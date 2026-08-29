@@ -1282,6 +1282,15 @@ object EnglishStrings : AppStrings {
     override val editorSurfaceBorder  = "Border"
     override val editorSurfaceShadow  = "Shadow"
     override val editorSurfaceFillHint = "Blank follows the theme; a rung name (base, raised, floating, sunken) tracks the palette; #RRGGBB or #AARRGGBB does not."
+    override val editorSurfaceShapeKind        = "Shape"
+    override val editorSurfaceSmoothing        = "Smoothing"
+    override val editorSurfaceCornerTopStart   = "Corner, top start"
+    override val editorSurfaceCornerTopEnd     = "Corner, top end"
+    override val editorSurfaceCornerBottomEnd  = "Corner, bottom end"
+    override val editorSurfaceCornerBottomStart = "Corner, bottom start"
+    override val editorSurfaceBorderColor      = "Border colour"
+    override val editorSurfaceBorderOpacity    = "Border opacity"
+    override val editorSurfaceMore             = "More"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

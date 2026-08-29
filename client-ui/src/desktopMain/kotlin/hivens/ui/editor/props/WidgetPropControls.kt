@@ -30,6 +30,10 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxSwitch
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
 import hivens.ui.widgets.customization.LabeledSlider
@@ -220,4 +224,45 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
             }
         }
     }
+}
+
+/**
+ * A row that opens a group of refinements.
+ *
+ * Local to the prop panel rather than a design-system primitive: it has one caller,
+ * and a disclosure row moves to nx-ui when a second one wants it rather than on the
+ * guess that one will.
+ */
+@Composable
+internal fun DisclosureRow(label: String, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Symbol(
+            icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
+            contentDescription = null,
+            tint = NxTheme.colors.textSecondary,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = NxTheme.colors.textSecondary,
+        )
+    }
+}
+
+/** A whole-dp slider for one corner or one side, in the range both share. */
+@Composable
+internal fun CornerRow(label: String, value: Float, onChange: (Float) -> Unit) {
+    LabeledSlider(
+        label         = label,
+        value         = value,
+        range         = 0f..40f,
+        format        = "%.0f",
+        keyStep       = 1f,
+        onValueChange = onChange,
+    )
 }
