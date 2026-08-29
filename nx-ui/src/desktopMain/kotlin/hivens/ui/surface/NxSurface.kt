@@ -1,25 +1,48 @@
 package hivens.ui.surface
 
 import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.NxColors
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.bevelHairline
+import org.jetbrains.skia.FilterTileMode
+import org.jetbrains.skia.ImageFilter
+import org.jetbrains.skia.Rect
+import org.jetbrains.skia.Canvas as SkCanvas
 
 /**
  * Depth of a plane relative to the page. A caller assigns a level; nx-ui maps it to a
- * tonal role, a luminance-derived bevel hairline, and the body floor. A screen never
- * picks an alpha or a color -- only a level.
+ * tonal colour, a luminance-derived bevel hairline, and the body floor. A screen never
+ * picks an alpha or a colour -- only a level.
  */
 enum class NxSurfaceLevel { Sunken, Base, Raised, Floating }
 
 /**
- * Tonal-ladder role per level. Adjacent levels always carry a tone step; the bevel
+ * Tonal-ladder colour per level. Adjacent levels always carry a tone step; the bevel
  * hairline supplies the second separation signal regardless of its size.
  *
  * Monotonic on dark only (L* 8.3 / 11.3 / 13.2 / 17.1 -- deeper reads darker all the
@@ -29,12 +52,17 @@ enum class NxSurfaceLevel { Sunken, Base, Raised, Floating }
  * plane and a lifted one therefore land within 2 L* of each other and are told apart
  * by the hairline rather than by tone. Nesting still steps correctly, which is what
  * the ladder is mostly asked for; two sibling planes at different depths do not.
+ *
+ * A level names a colour directly. There used to be an enum of theme ROLES in between,
+ * so a level resolved to a role and a role to a field -- two hops and a vocabulary of
+ * nine roles, of which the five that were not ladder rungs existed only for layer
+ * kinds that no longer exist.
  */
-fun NxSurfaceLevel.role(): FrostRole = when (this) {
-    NxSurfaceLevel.Sunken   -> FrostRole.SurfaceContainerLow
-    NxSurfaceLevel.Base     -> FrostRole.Surface
-    NxSurfaceLevel.Raised   -> FrostRole.SurfaceContainer
-    NxSurfaceLevel.Floating -> FrostRole.SurfaceContainerHigh
+fun NxSurfaceLevel.color(colors: NxColors): Color = when (this) {
+    NxSurfaceLevel.Sunken   -> colors.surfaceContainerLow
+    NxSurfaceLevel.Base     -> colors.surface
+    NxSurfaceLevel.Raised   -> colors.surfaceContainer
+    NxSurfaceLevel.Floating -> colors.surfaceContainerHigh
 }
 
 /**
@@ -50,15 +78,27 @@ fun NxSurfaceLevel.role(): FrostRole = when (this) {
 internal fun bodyFloor(dark: Boolean): Float = if (dark) 0.92f else 1.0f
 
 /**
- * A library-owned surface: a tonal body for [level], an optional blur of what is
- * behind it, and a luminance-derived bevel hairline -- composited via [FrostSurface].
+ * A library-owned surface: a tonal body for [level], an optional blur of what is behind
+ * it, a cast shadow and a luminance-derived bevel hairline.
  *
- * Every value it draws with is a number. It used to take a preset as well, which
- * moved the body's opacity, the blur radius and the cast shadow together, so no one
- * of the three could be set without the other two; and three booleans beside them
- * that each stood for a number the caller could not otherwise write -- solid, lifted,
- * edged. A plane's appearance is the numbers now, with nothing that says the same
- * thing twice.
+ * Every value it draws with is a number. It used to take a preset as well, which moved
+ * the body's opacity, the blur radius and the cast shadow together, so no one of the
+ * three could be set without the other two; and three booleans beside them that each
+ * stood for a number the caller could not otherwise write -- solid, lifted, edged.
+ *
+ * ONE layout node. It used to be five: a compositor took a `List<SurfaceLayer>` and
+ * gave every layer a `Box(matchParentSize().drawBehind {})` of its own -- an Android
+ * layer-list drawable transliterated into Compose. The list was a private handshake
+ * between this function and that one, allocated per recomposition, and nothing else
+ * ever built a layer. What it cost was not only the nodes: content had to be a SIBLING
+ * of the box that carried the clip, so a surface clipped its own fill to its shape and
+ * let the widget inside it overflow the corners. Drawing it here in order -- backdrop,
+ * body, state, content, edge -- puts content inside the clip, which is what a rounded
+ * plane means.
+ *
+ * The hairline is stroked outside that clip, over everything. A stroke is centred on
+ * the outline, so half of it falls outside the shape; clipping it leaves a half-width
+ * line that the corner antialiasing then eats entirely.
  */
 @Composable
 fun NxSurface(
@@ -107,27 +147,58 @@ fun NxSurface(
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val role = level.role()
-    val bodyColor = fillColor ?: frostColor(role)
+    val colors = NxTheme.colors
+    val bodyColor = fillColor ?: level.color(colors)
     val dark = bodyColor.luminance() < 0.5f
-    val bodyAlpha = opacity?.coerceIn(0f, 1f) ?: bodyFloor(dark)
-    // A named radius wins; absent one, the active style decides.
+    val body = bodyColor.copy(alpha = opacity?.coerceIn(0f, 1f) ?: bodyFloor(dark))
+    // A named radius wins; absent one, the active style decides. A blur under a body
+    // nothing can see through is work thrown away -- the filter runs every frame and
+    // is then covered completely -- so an opaque surface asks for none.
     val blur = blurDp ?: LocalStyle.current.surfaceBlur.value
-    val layers = buildList {
-        // A blur under a body nothing can see through is work thrown away: the
-        // filter runs every frame and is then covered completely. An opaque
-        // surface skips it.
-        if (bodyAlpha < 1f && blur > 0f) add(Backdrop(blur))
-        if (fillColor != null) add(BodyColor(fillColor, bodyAlpha)) else add(Body(role, bodyAlpha))
-        if (shadowDp > 0f) add(DropShadow(shadowDp))
-        if (borderWidthDp > 0f) {
-            add(EdgeBorder(widthDp = borderWidthDp, explicitColor = borderColor ?: bevelHairline(bodyColor)))
-        }
-        if (interactionSource != null) add(StateOverlay())
-    }
+    val backdrop = rememberBackdropFilter(if (body.alpha < 1f) blur else 0f)
+    val edge = if (borderWidthDp > 0f) borderColor ?: bevelHairline(bodyColor) else null
 
-    FrostSurface(layers, modifier, shape, interactionSource, content)
+    // Held as state and read in the draw lambda, not here: hovering a card would
+    // otherwise recompose it and everything it contains, to change one rectangle.
+    val hovered = interactionSource?.collectIsHoveredAsState()
+    val pressed = interactionSource?.collectIsPressedAsState()
+    val stateTint = colors.primary
+
+    Box(
+        modifier
+            .then(if (shadowDp > 0f) Modifier.shadow(shadowDp.dp, shape, clip = false) else Modifier)
+            // Outside the clip, above the content: see the note on the hairline above.
+            .then(
+                if (edge == null) {
+                    Modifier
+                } else {
+                    Modifier.drawWithContent {
+                        drawContent()
+                        drawOutline(
+                            outline = shape.createOutline(size, layoutDirection, this),
+                            color = edge,
+                            style = Stroke(width = borderWidthDp.dp.toPx()),
+                        )
+                    }
+                },
+            )
+            .clip(shape)
+            .drawBehind {
+                if (backdrop != null) drawBackdrop(backdrop)
+                drawRect(body)
+                val alpha = when {
+                    pressed?.value == true -> PRESS_ALPHA
+                    hovered?.value == true -> HOVER_ALPHA
+                    else -> 0f
+                }
+                if (alpha > 0f) drawRect(stateTint.copy(alpha = alpha))
+            },
+        content = content,
+    )
 }
+
+private const val HOVER_ALPHA = 0.06f
+private const val PRESS_ALPHA = 0.12f
 
 /** Card-shaped plane (defaults to [NxSurfaceLevel.Raised] + the card-corner token).
  *  The default surface for content cards. */
@@ -152,3 +223,52 @@ fun NxCard(
     interactionSource = interactionSource,
     content = content,
 )
+
+/**
+ * The Skia filter that blurs whatever is already on the canvas beneath the surface.
+ *
+ * `saveLayer` with a backdrop filter seeds a new layer with a filtered copy of the
+ * destination, then composites it straight back. Compose has no modifier for this;
+ * Skia does, and skiko exposes it, so the whole operation is one call in the draw phase
+ * and needs no knowledge of what it is blurring. That last part is the point: it used
+ * to be answered by redrawing the wallpaper at the surface's offset, an answer narrower
+ * than the question, which is why a plane over another plane showed the wallpaper it
+ * could not see rather than the plane it covered.
+ *
+ * Two things are worth knowing before relying on it.
+ *
+ * A backdrop filter reads the CURRENT layer. Any ancestor with alpha below 1 puts the
+ * surface in an offscreen layer of its own, and the filter then finds it empty and
+ * draws nothing. Alpha exactly 1 creates no layer, and scale, rotation and clipping do
+ * not isolate; only alpha does. In this shell that means chrome always blurs, and
+ * content inside a screen being swapped loses its blur for the length of the fade it is
+ * already disappearing into.
+ *
+ * The result is not cacheable, because the destination it filters can change every
+ * frame and Skia has no way to know that it did not. That is inherent to the operation
+ * rather than a property of this implementation, which is why
+ * [hivens.ui.customization.CustomizationSettings.surfaceBlur] switches the whole thing
+ * off in one place instead of per surface.
+ */
+@Composable
+private fun rememberBackdropFilter(radiusDp: Float): ImageFilter? {
+    if (radiusDp <= 0f || !LocalCustomization.current.surfaceBlur) return null
+    val density = LocalDensity.current
+    // One native filter per radius per surface, not one per frame: building it inside
+    // the draw lambda allocates a Skia object on every pass and charges the technique
+    // for the caller's mistake.
+    val filter = remember(radiusDp, density) {
+        val sigma = with(density) { radiusDp.dp.toPx() }
+        ImageFilter.makeBlur(sigma, sigma, FilterTileMode.CLAMP)
+    }
+    DisposableEffect(filter) { onDispose { filter.close() } }
+    return filter
+}
+
+private fun DrawScope.drawBackdrop(filter: ImageFilter) {
+    drawIntoCanvas { canvas ->
+        val native = canvas.nativeCanvas
+        native.saveLayer(SkCanvas.SaveLayerRec(bounds = Rect.makeWH(size.width, size.height), backdrop = filter))
+        native.restore()
+    }
+}
