@@ -63,6 +63,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -125,6 +126,14 @@ fun BrowseScreen(
     // a list the user was reading a moment ago and is about to get back nearly
     // unchanged -- which is every flip of the source switcher and every trip out
     // of the screen and back.
+    // Every outcome of a browse is written down. None of them were: the catalogue
+    // path holds no logger at all, and this effect turned a failure into UI state
+    // and nothing else -- so a catalogue that stopped working left no line in the
+    // log or in the diagnostic bundle, and the swallowed branch below left no trace
+    // anywhere at all. The client throws with the status and the body, so what the
+    // source actually answered is in the message.
+    val logger = remember { LoggerFactory.getLogger("Browse") }
+
     LaunchedEffect(origin, submittedQuery, retryTick) {
         val remembered = session.get(origin, submittedQuery)
         if (remembered != null) {
@@ -144,7 +153,10 @@ fun BrowseScreen(
             listState.scrollToItem(0)
         }
         val catalogue = registry.forOrigin(origin)
-            ?: return@LaunchedEffect run { if (state !is BrowseState.Loaded) state = BrowseState.Empty }
+            ?: return@LaunchedEffect run {
+                logger.warn("browse: no catalogue is registered for {}", origin)
+                if (state !is BrowseState.Loaded) state = BrowseState.Empty
+            }
         try {
             // Stale first, fresh behind it. Assigning an equal list is not a
             // repaint -- the state is compared, not trusted -- so a refresh that
@@ -159,6 +171,10 @@ fun BrowseScreen(
                     // screen shows the empty state, with its retry, and the next
                     // entry asks again instead of restoring the blank.
                     if (packs.isEmpty()) {
+                        // Answered, with nothing in it. Recorded separately from a
+                        // failure because that is the distinction a report needs and
+                        // the two look identical on screen.
+                        logger.info("browse: {} listed no packs for query \"{}\"", origin, submittedQuery)
                         state = BrowseState.Empty
                         session.put(origin, submittedQuery, BrowseSession.Snapshot(emptyList(), nextPage = 0, endReached = true))
                         return@collect
@@ -186,6 +202,9 @@ fun BrowseScreen(
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
+            // Logged before it is decided what to show, because the branch that shows
+            // nothing is the one that most needs a record.
+            logger.warn("browse: {} failed for query \"{}\"", origin, submittedQuery, e)
             // A source that failed while something of its own is on screen keeps
             // showing it. Replacing a readable list with an error page loses more
             // than the error explains.
