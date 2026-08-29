@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,10 +30,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.ui.widgets.toWidgetColorOrNull
@@ -72,7 +68,12 @@ data class ClockProps(
 // the accent prop or falls back to primary. Per-second tick recomposes
 // only the Canvas + the digital time line; the surrounding card stays
 // still.
-@Widget(id = "home.new.clock", displayName = "widget.home.new.clock", propsClass = ClockProps::class)
+@Widget(
+    id = "home.new.clock",
+    displayName = "widget.home.new.clock",
+    propsClass = ClockProps::class,
+    surface = """{"fill":"base","opacity":0.65,"padding":{"top":12.0}}""",
+)
 @Composable
 fun ClockWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ClockProps>()
@@ -109,9 +110,6 @@ fun ClockWidget(instance: WidgetInstance) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 12.dp * scale)
-                .clip(RoundedCornerShape(LocalStyle.current.cardCorner * scale))
-                .background(glassSurfaceAlpha(0.65f))
                 .padding(horizontal = 16.dp * scale, vertical = 14.dp * scale),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,

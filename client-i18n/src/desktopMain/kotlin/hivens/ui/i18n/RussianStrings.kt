@@ -1128,7 +1128,6 @@ object RussianStrings : AppStrings {
         "widget.appshell.region.swipeToCollapse" to "Сворачивать свайпом",
         "widget.appshell.region.opacityPct" to "Непрозрачность, %",
         "widget.appshell.region.blurDp" to "Размытие",
-        "widget.appshell.region.glassAlphaPct" to "Непрозрачность фона, %",
         "widget.appshell.region.left" to "Левая панель",
         "widget.appshell.region.top" to "Шапка окна",
         "widget.appshell.region.body" to "Основная область",

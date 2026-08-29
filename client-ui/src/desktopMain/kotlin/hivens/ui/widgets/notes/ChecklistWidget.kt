@@ -1,6 +1,5 @@
 package hivens.ui.widgets.notes
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,12 +34,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.widget.api.rememberProps
@@ -72,7 +69,12 @@ data class ChecklistState(val items: List<ChecklistItem> = emptyList(), val next
  * hide-completed are editor [ChecklistProps]. Two instances keep independent lists
  * across restarts.
  */
-@Widget(id = "checklist", displayName = "widget.checklist", propsClass = ChecklistProps::class)
+@Widget(
+    id = "checklist",
+    displayName = "widget.checklist",
+    propsClass = ChecklistProps::class,
+    surface = """{"fill":"base","opacity":0.55}""",
+)
 @Composable
 fun ChecklistWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ChecklistProps>()
@@ -99,8 +101,6 @@ fun ChecklistWidget(instance: WidgetInstance) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(LocalStyle.current.cardCorner * scale))
-                .background(glassSurfaceAlpha(0.55f))
                 .padding(14.dp * scale),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

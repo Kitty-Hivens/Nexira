@@ -1,6 +1,5 @@
 package hivens.ui.widgets.notes
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -20,14 +18,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.widget.api.rememberProps
@@ -56,7 +51,12 @@ data class NotesState(
  * two instances stay independent; survives restart -- and that editor props
  * ([rememberProps], the title) and runtime state (the body) coexist and are distinct.
  */
-@Widget(id = "notes.scratch", displayName = "widget.notes.scratch", propsClass = NotesProps::class)
+@Widget(
+    id = "notes.scratch",
+    displayName = "widget.notes.scratch",
+    propsClass = NotesProps::class,
+    surface = """{"fill":"base","opacity":0.55}""",
+)
 @Composable
 fun NotesWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<NotesProps>()
@@ -68,8 +68,6 @@ fun NotesWidget(instance: WidgetInstance) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(LocalStyle.current.cardCorner * scale))
-                .background(glassSurfaceAlpha(0.55f))
                 .padding(14.dp * scale),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {

@@ -1114,7 +1114,6 @@ object GermanStrings : AppStrings {
         "widget.appshell.region.swipeToCollapse" to "Mit Wischen einklappen",
         "widget.appshell.region.opacityPct" to "Deckkraft, %",
         "widget.appshell.region.blurDp" to "Unschärfe",
-        "widget.appshell.region.glassAlphaPct" to "Seitenfüllung, %",
         "widget.appshell.region.left" to "Linke Leiste",
         "widget.appshell.region.top" to "Titelleiste",
         "widget.appshell.region.body" to "Hauptbereich",

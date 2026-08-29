@@ -1112,7 +1112,6 @@ object EnglishStrings : AppStrings {
         "widget.appshell.region.swipeToCollapse" to "Swipe to collapse",
         "widget.appshell.region.opacityPct" to "Opacity, %",
         "widget.appshell.region.blurDp" to "Blur",
-        "widget.appshell.region.glassAlphaPct" to "Page fill, %",
         "widget.appshell.region.left" to "Left rail",
         "widget.appshell.region.top" to "Title bar",
         "widget.appshell.region.body" to "Main area",
