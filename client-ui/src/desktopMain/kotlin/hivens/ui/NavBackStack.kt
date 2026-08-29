@@ -8,12 +8,19 @@ import androidx.compose.runtime.mutableStateListOf
  * `mutableStateOf<Screen>` so a Back action pops to wherever the user actually
  * came from instead of each screen routing back to a hardcoded literal.
  *
- * Invariant: the stack is never empty -- entry 0 is always a top-level root.
- * Top-level destinations ([TOP_LEVEL], the nav-rail entries) reset the stack to
- * that single root: switching tabs is a fresh context, not an ever-growing push
- * history. Every other (detail) screen pushes, so Back unwinds the exact path
- * that opened it -- Browse -> pack detail -> installed detail backs out the same
- * way it was entered, rather than jumping to a fixed screen.
+ * Invariant: the stack is never empty -- entry 0 is always a root.
+ *
+ * Resetting belongs to the ACTION, not to the destination. [switchTo] is what the
+ * nav rail does: it clears the history and makes the target the new root, because
+ * switching tabs is a fresh context rather than an ever-growing push history.
+ * [navigate] pushes, so Back unwinds the exact path that opened a screen -- Browse
+ * -> pack detail -> installed detail backs out the way it was entered.
+ *
+ * They used to be one call deciding by a set of destinations, which worked until a
+ * screen appeared in both roles. About is a rail entry AND a link inside Settings;
+ * reaching it from Settings therefore wiped the history, so its Back arrow greyed
+ * out and the only way on was the rail, which also lost the settings category the
+ * reader had been in. A destination cannot know which of the two it was.
  */
 @Stable
 class NavBackStack(root: Screen) {
@@ -41,15 +48,25 @@ class NavBackStack(root: Screen) {
     val canGoForward: Boolean get() = forwardStack.isNotEmpty()
 
     /**
-     * Show [screen]. Re-selecting the current screen is a no-op. A top-level
-     * destination clears history and becomes the new root; any other screen is
-     * pushed onto the stack. Either way the forward path is discarded -- moving
-     * somewhere new branches off it.
+     * Go to [screen], keeping the way back. Re-selecting the current screen is a
+     * no-op; the forward path is discarded, because moving somewhere new branches
+     * off it.
      */
     fun navigate(screen: Screen) {
         if (screen == current) return
         forwardStack.clear()
-        if (isTopLevel(screen)) entries.clear()
+        entries.add(screen)
+    }
+
+    /**
+     * Switch to [screen] as a fresh context: history cleared, [screen] the new root.
+     * What the nav rail does, so hopping among its entries cannot pile up a
+     * "Profile > Wardrobe > About > Wardrobe" trail.
+     */
+    fun switchTo(screen: Screen) {
+        if (screen == current && entries.size == 1) return
+        forwardStack.clear()
+        entries.clear()
         entries.add(screen)
     }
 
@@ -91,23 +108,4 @@ class NavBackStack(root: Screen) {
         while (entries.lastIndex > idx) forwardStack.add(entries.removeAt(entries.lastIndex))
     }
 
-    companion object {
-        // Nav-rail destinations. Switching among these resets the stack instead
-        // of stacking, so the history can't grow without bound from tab hopping.
-        // Wardrobe and About are nav-rail siblings too -- they reset, not stack.
-        // Detail screens (ServerSettings, PackDetail, ...) and the Settings
-        // drill-downs (ThemePicker, BackgroundSettings)
-        // are absent by design -- they push and are unwound by Back.
-        private val TOP_LEVEL: Set<Screen> = setOf(
-            Screen.Home,
-            Screen.Library,
-            Screen.Browse,
-            Screen.Profile,
-            Screen.Wardrobe,
-            Screen.Settings,
-            Screen.About,
-        )
-
-        private fun isTopLevel(screen: Screen): Boolean = screen in TOP_LEVEL
-    }
 }

@@ -1304,6 +1304,7 @@ fun AppRoot(
               appState = appState,
               currentScreen = backStack.current,
               onScreenChange = backStack::navigate,
+              onSwitchTab = backStack::switchTo,
               onReplaceScreen = backStack::replaceCurrent,
               onBack = { backStack.back() },
               canGoBack = backStack.canGoBack,

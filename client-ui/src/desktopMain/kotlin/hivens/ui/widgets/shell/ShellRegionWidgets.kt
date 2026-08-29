@@ -161,6 +161,8 @@ class ShellContext(
     val currentScreen: Screen,
     val isAuthenticated: Boolean,
     val onScreenChange: (Screen) -> Unit,
+    /** What the nav rail does: a fresh context rather than a push. See NavBackStack. */
+    val onSwitchTab: (Screen) -> Unit,
     val onLogout: () -> Unit,
     val appState: AppState,
     val onLogin: (SessionData) -> Unit,
@@ -224,6 +226,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
                 currentScreen   = ctx.currentScreen,
                 isAuthenticated = ctx.isAuthenticated,
                 onScreenChange  = ctx.onScreenChange,
+                onSwitchTab     = ctx.onSwitchTab,
                 onLogout        = ctx.onLogout,
                 modifier        = Modifier.fillMaxSize(),
             )

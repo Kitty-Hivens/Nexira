@@ -76,35 +76,35 @@ fun NavEntry(instance: WidgetInstance) {
             outlineSwap  = true,
             phase        = 0.0f,
             active       = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
-            onClick      = { ctx.onScreenChange(Screen.Home) },
+            onClick      = { ctx.onSwitchTab(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
             outlineSwap  = true,
             phase        = 0.55f,
             active       = screen is Screen.Library || screen is Screen.PackDetail || screen is Screen.PackVersions,
-            onClick      = { ctx.onScreenChange(Screen.Library) },
+            onClick      = { ctx.onSwitchTab(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(
             icon         = NxIcon.Search,
             outlineSwap  = true,
             phase        = 1.65f,
             active       = screen is Screen.Browse || screen is Screen.CataloguePackDetail,
-            onClick      = { ctx.onScreenChange(Screen.Browse) },
+            onClick      = { ctx.onSwitchTab(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
             icon         = NxIcon.Person,
             outlineSwap  = true,
             phase        = 1.1f,
             active       = screen is Screen.Profile,
-            onClick      = { ctx.onScreenChange(Screen.Profile) },
+            onClick      = { ctx.onSwitchTab(Screen.Profile) },
         )
         NavTarget.Wardrobe -> NavSlot(
             icon         = NxIcon.Palette,
             outlineSwap  = true,
             phase        = 1.6f,
             active       = screen is Screen.Wardrobe,
-            onClick      = { ctx.onScreenChange(Screen.Wardrobe) },
+            onClick      = { ctx.onSwitchTab(Screen.Wardrobe) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,
@@ -112,14 +112,14 @@ fun NavEntry(instance: WidgetInstance) {
             phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
                 screen is Screen.BackgroundSettings,
-            onClick      = { ctx.onScreenChange(Screen.Settings) },
+            onClick      = { ctx.onSwitchTab(Screen.Settings) },
         )
         NavTarget.About -> NavSlot(
             icon         = NxIcon.Info,
             outlineSwap  = true,
             phase        = 3.3f,
             active       = screen is Screen.About,
-            onClick      = { ctx.onScreenChange(Screen.About) },
+            onClick      = { ctx.onSwitchTab(Screen.About) },
         )
         NavTarget.Console -> {
             val gameConsole: GameConsoleService = koinInject()
