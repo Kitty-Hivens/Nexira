@@ -42,6 +42,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.surface.bodyFloor
 import hivens.ui.widgets.customization.LabeledSlider
@@ -293,111 +294,120 @@ private fun PropPanelBody(
             // hiding the ones that matter.
             var showMore by remember { mutableStateOf(false) }
             DisclosureRow(s.editorSurfaceMore, showMore) { showMore = !showMore }
-            if (showMore) {
-                StringRow(s.editorSurfaceShapeKind, surface.shape.kind) {
-                    write(surface.copy(shape = surface.shape.copy(kind = it)))
-                }
-                Text(
-                    text  = s.editorSurfaceShapeKindHint,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
-                )
-                LabeledSlider(
-                    label         = s.editorSurfaceSmoothing,
-                    value         = (surface.shape.smoothing ?: 0f) * 100f,
-                    range         = 0f..100f,
-                    format        = "%.0f%%",
-                    keyStep       = 1f,
-                    onValueChange = { write(surface.copy(shape = surface.shape.copy(smoothing = it / 100f))) },
-                )
-                // A star's three values, and only where they mean something. Offering
-                // them under a rounded rectangle would put back the thing this panel
-                // was collapsed to remove: rows that move nothing.
-                val kind = surface.shape.kind.trim().lowercase()
-                if (kind == "star" || kind == "polygon") {
-                    LabeledSlider(
-                        label         = s.editorSurfaceShapePoints,
-                        value         = (surface.shape.points ?: if (kind == "star") 5 else 6).toFloat(),
-                        range         = 3f..16f,
-                        format        = "%.0f",
-                        keyStep       = 1f,
-                        onValueChange = { write(surface.copy(shape = surface.shape.copy(points = it.roundToInt()))) },
-                    )
-                    if (kind == "star") {
-                        LabeledSlider(
-                            label         = s.editorSurfaceShapeInnerRadius,
-                            value         = (surface.shape.innerRadius ?: 0.5f) * 100f,
-                            range         = 5f..95f,
-                            format        = "%.0f%%",
-                            keyStep       = 1f,
-                            onValueChange = { write(surface.copy(shape = surface.shape.copy(innerRadius = it / 100f))) },
-                        )
-                    }
-                    LabeledSlider(
-                        label         = s.editorSurfaceShapePointRounding,
-                        value         = (surface.shape.pointRounding ?: 0f) * 100f,
-                        range         = 0f..100f,
-                        format        = "%.0f%%",
-                        keyStep       = 1f,
-                        onValueChange = { write(surface.copy(shape = surface.shape.copy(pointRounding = it / 100f))) },
-                    )
-                }
-                // Each corner opens at whatever the baseline resolves to and, once
-                // moved, pins that corner independently -- which is what makes a plane
-                // square on one side and round on the other.
-                CornerRow(s.editorSurfaceCornerTopStart, surface.shape.corners.topStart(corner)) {
-                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topStart = it))))
-                }
-                CornerRow(s.editorSurfaceCornerTopEnd, surface.shape.corners.topEnd(corner)) {
-                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topEnd = it))))
-                }
-                CornerRow(s.editorSurfaceCornerBottomEnd, surface.shape.corners.bottomEnd(corner)) {
-                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomEnd = it))))
-                }
-                CornerRow(s.editorSurfaceCornerBottomStart, surface.shape.corners.bottomStart(corner)) {
-                    write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomStart = it))))
-                }
-                LabeledSlider(
-                    label         = s.editorSurfaceBorder,
-                    value         = surface.border.widthDp ?: 0f,
-                    range         = 0f..6f,
-                    format        = "%.1f",
-                    keyStep       = 0.5f,
-                    onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
-                )
-                StringRow(s.editorSurfaceBorderColor, surface.border.color) {
-                    write(surface.copy(border = surface.border.copy(color = it)))
-                }
-                LabeledSlider(
-                    label         = s.editorSurfaceBorderOpacity,
-                    value         = (surface.border.opacity ?: 1f) * 100f,
-                    range         = 0f..100f,
-                    format        = "%.0f%%",
-                    keyStep       = 1f,
-                    onValueChange = { write(surface.copy(border = surface.border.copy(opacity = it / 100f))) },
-                )
-                LabeledSlider(
-                    label         = s.editorSurfaceShadow,
-                    value         = surface.shadowDp ?: 0f,
-                    range         = 0f..24f,
-                    format        = "%.0f",
-                    keyStep       = 1f,
-                    onValueChange = { write(surface.copy(shadowDp = it)) },
-                )
-                // Per-side padding. Each opens at the uniform value and, once moved,
-                // pins that side independently of it.
-                CornerRow(s.editorBackingPaddingTop, surface.padding.top(0f)) {
-                    write(surface.copy(padding = surface.padding.copy(top = it)))
-                }
-                CornerRow(s.editorBackingPaddingEnd, surface.padding.end(0f)) {
-                    write(surface.copy(padding = surface.padding.copy(end = it)))
-                }
-                CornerRow(s.editorBackingPaddingBottom, surface.padding.bottom(0f)) {
-                    write(surface.copy(padding = surface.padding.copy(bottom = it)))
-                }
-                CornerRow(s.editorBackingPaddingStart, surface.padding.start(0f)) {
-                    write(surface.copy(padding = surface.padding.copy(start = it)))
-                }
+            // Revealed rather than switched on. Twelve rows appearing between two
+            // frames reads as the panel having been replaced; the same rows growing
+            // out of the row that asked for them reads as one panel with more in it.
+            AnimatedVisibility(
+                visible = showMore,
+                enter = Motion.reveal.enter,
+                exit = Motion.reveal.exit,
+            ) {
+              Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                  StringRow(s.editorSurfaceShapeKind, surface.shape.kind) {
+                      write(surface.copy(shape = surface.shape.copy(kind = it)))
+                  }
+                  Text(
+                      text  = s.editorSurfaceShapeKindHint,
+                      style = MaterialTheme.typography.bodySmall,
+                      color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                  )
+                  LabeledSlider(
+                      label         = s.editorSurfaceSmoothing,
+                      value         = (surface.shape.smoothing ?: 0f) * 100f,
+                      range         = 0f..100f,
+                      format        = "%.0f%%",
+                      keyStep       = 1f,
+                      onValueChange = { write(surface.copy(shape = surface.shape.copy(smoothing = it / 100f))) },
+                  )
+                  // A star's three values, and only where they mean something. Offering
+                  // them under a rounded rectangle would put back the thing this panel
+                  // was collapsed to remove: rows that move nothing.
+                  val kind = surface.shape.kind.trim().lowercase()
+                  if (kind == "star" || kind == "polygon") {
+                      LabeledSlider(
+                          label         = s.editorSurfaceShapePoints,
+                          value         = (surface.shape.points ?: if (kind == "star") 5 else 6).toFloat(),
+                          range         = 3f..16f,
+                          format        = "%.0f",
+                          keyStep       = 1f,
+                          onValueChange = { write(surface.copy(shape = surface.shape.copy(points = it.roundToInt()))) },
+                      )
+                      if (kind == "star") {
+                          LabeledSlider(
+                              label         = s.editorSurfaceShapeInnerRadius,
+                              value         = (surface.shape.innerRadius ?: 0.5f) * 100f,
+                              range         = 5f..95f,
+                              format        = "%.0f%%",
+                              keyStep       = 1f,
+                              onValueChange = { write(surface.copy(shape = surface.shape.copy(innerRadius = it / 100f))) },
+                          )
+                      }
+                      LabeledSlider(
+                          label         = s.editorSurfaceShapePointRounding,
+                          value         = (surface.shape.pointRounding ?: 0f) * 100f,
+                          range         = 0f..100f,
+                          format        = "%.0f%%",
+                          keyStep       = 1f,
+                          onValueChange = { write(surface.copy(shape = surface.shape.copy(pointRounding = it / 100f))) },
+                      )
+                  }
+                  // Each corner opens at whatever the baseline resolves to and, once
+                  // moved, pins that corner independently -- which is what makes a plane
+                  // square on one side and round on the other.
+                  CornerRow(s.editorSurfaceCornerTopStart, surface.shape.corners.topStart(corner)) {
+                      write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topStart = it))))
+                  }
+                  CornerRow(s.editorSurfaceCornerTopEnd, surface.shape.corners.topEnd(corner)) {
+                      write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topEnd = it))))
+                  }
+                  CornerRow(s.editorSurfaceCornerBottomEnd, surface.shape.corners.bottomEnd(corner)) {
+                      write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomEnd = it))))
+                  }
+                  CornerRow(s.editorSurfaceCornerBottomStart, surface.shape.corners.bottomStart(corner)) {
+                      write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomStart = it))))
+                  }
+                  LabeledSlider(
+                      label         = s.editorSurfaceBorder,
+                      value         = surface.border.widthDp ?: 0f,
+                      range         = 0f..6f,
+                      format        = "%.1f",
+                      keyStep       = 0.5f,
+                      onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
+                  )
+                  StringRow(s.editorSurfaceBorderColor, surface.border.color) {
+                      write(surface.copy(border = surface.border.copy(color = it)))
+                  }
+                  LabeledSlider(
+                      label         = s.editorSurfaceBorderOpacity,
+                      value         = (surface.border.opacity ?: 1f) * 100f,
+                      range         = 0f..100f,
+                      format        = "%.0f%%",
+                      keyStep       = 1f,
+                      onValueChange = { write(surface.copy(border = surface.border.copy(opacity = it / 100f))) },
+                  )
+                  LabeledSlider(
+                      label         = s.editorSurfaceShadow,
+                      value         = surface.shadowDp ?: 0f,
+                      range         = 0f..24f,
+                      format        = "%.0f",
+                      keyStep       = 1f,
+                      onValueChange = { write(surface.copy(shadowDp = it)) },
+                  )
+                  // Per-side padding. Each opens at the uniform value and, once moved,
+                  // pins that side independently of it.
+                  CornerRow(s.editorBackingPaddingTop, surface.padding.top(0f)) {
+                      write(surface.copy(padding = surface.padding.copy(top = it)))
+                  }
+                  CornerRow(s.editorBackingPaddingEnd, surface.padding.end(0f)) {
+                      write(surface.copy(padding = surface.padding.copy(end = it)))
+                  }
+                  CornerRow(s.editorBackingPaddingBottom, surface.padding.bottom(0f)) {
+                      write(surface.copy(padding = surface.padding.copy(bottom = it)))
+                  }
+                  CornerRow(s.editorBackingPaddingStart, surface.padding.start(0f)) {
+                      write(surface.copy(padding = surface.padding.copy(start = it)))
+                  }
+              }
             }
         }
 
