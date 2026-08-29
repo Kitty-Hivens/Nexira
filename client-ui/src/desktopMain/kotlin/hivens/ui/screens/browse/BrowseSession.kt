@@ -1,6 +1,7 @@
 package hivens.ui.screens.browse
 
 import hivens.core.api.catalogue.CataloguePack
+import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.data.PackOrigin
 
 /**
@@ -51,6 +52,27 @@ class BrowseSession {
     var origin: PackOrigin? = null
 
     private val byKey = LinkedHashMap<String, Snapshot>()
+
+    /**
+     * The last page read for a pack, so returning to it paints what was there.
+     *
+     * Same reason as the lists above and the same shape: the catalogue underneath
+     * answers a repeated read without the network, but it answers from a coroutine,
+     * and the screen blanked itself to a spinner before asking. Opening a pack,
+     * going back and opening it again therefore rebuilt a page that had not changed
+     * -- every time, including the pack just looked at.
+     */
+    private val detailsByKey = LinkedHashMap<String, CataloguePackDetails>()
+
+    fun details(origin: PackOrigin, packId: String): CataloguePackDetails? =
+        detailsByKey["$origin|$packId"]
+
+    fun putDetails(origin: PackOrigin, packId: String, details: CataloguePackDetails) {
+        val k = "$origin|$packId"
+        detailsByKey.remove(k)
+        detailsByKey[k] = details
+        while (detailsByKey.size > MAX_KEYS) detailsByKey.remove(detailsByKey.keys.first())
+    }
 
     fun get(origin: PackOrigin, query: String): Snapshot? = byKey[key(origin, query)]
 
