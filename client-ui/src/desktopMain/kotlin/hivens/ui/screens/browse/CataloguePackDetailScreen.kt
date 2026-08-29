@@ -84,12 +84,21 @@ fun CataloguePackDetailScreen(
     val s = LocalStrings.current
     val registry: PackCatalogueRegistry = koinInject()
     val installService: PackInstallService = koinInject()
+    val session: BrowseSession = koinInject()
 
     // Back is the top-bar breadcrumb's job now (no hero arrow), but automation
     // still needs a handle on it.
     PuppetClick("catalogue.detail.back") { onBack() }
 
-    var state by remember(origin, packId) { mutableStateOf<DetailState>(DetailState.Loading) }
+    // Opens on the page as it was last read, not on a spinner. The details are the
+    // same on the way back as they were on the way in, so rebuilding them from
+    // nothing meant the page a reader had just closed came back empty and filled in
+    // again in front of them.
+    var state by remember(origin, packId) {
+        mutableStateOf<DetailState>(
+            session.details(origin, packId)?.let { DetailState.Loaded(it) } ?: DetailState.Loading,
+        )
+    }
     var retryTick by remember(origin, packId) { mutableIntStateOf(0) }
     var showPicker by remember(origin, packId) { mutableStateOf(false) }
 
@@ -129,18 +138,24 @@ fun CataloguePackDetailScreen(
     }
 
     LaunchedEffect(origin, packId, retryTick) {
-        state = DetailState.Loading
+        // Only a page with nothing on it says so. A refresh behind a page already
+        // read replaces it when it lands, the way the catalogue list does.
+        if (state !is DetailState.Loaded) state = DetailState.Loading
         state = try {
             val catalogue = registry.forOrigin(origin)
             if (catalogue == null) {
                 DetailState.Error(s.browseDetailErrorMessage)
             } else {
-                DetailState.Loaded(withContext(Dispatchers.IO) { catalogue.details(packId) })
+                val details = withContext(Dispatchers.IO) { catalogue.details(packId) }
+                session.putDetails(origin, packId, details)
+                DetailState.Loaded(details)
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            DetailState.Error(e.message ?: s.browseDetailErrorMessage)
+            // A source that failed while a page of its own is on screen keeps
+            // showing it: an error page loses more than the error explains.
+            (state as? DetailState.Loaded) ?: DetailState.Error(e.message ?: s.browseDetailErrorMessage)
         }
     }
 
