@@ -110,9 +110,9 @@ data class ShellCenterRegionProps(
 /**
  * A region's plane, as the two numbers it actually has.
  *
- * They were one name before -- a tier -- and the name moved both at once, in
- * opposite directions: Frosted was blur 18 at 55% fill, Heavy blur 28 at 45%, so
- * asking for more blur quietly asked for less fill. Two of the four values a tier
+ * They were one name before -- a preset -- and the name moved both at once, in
+ * opposite directions: one step was blur 18 at 55% fill, the next blur 28 at 45%, so
+ * asking for more blur quietly asked for less fill. Two of the four values the preset
  * carried never reached a pixel at all.
  *
  * -1 means "the theme's own floor", which is what an unnamed opacity has always

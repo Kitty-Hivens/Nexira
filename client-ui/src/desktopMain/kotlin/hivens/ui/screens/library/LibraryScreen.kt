@@ -270,9 +270,9 @@ private fun NewLocalPackDialog(
           ) {
             NxSurface(
                 level = NxSurfaceLevel.Floating,
-                // Opaque, not glass: a modal sits over a dark scrim, so there is
-                // nothing behind it to frost -- glass would read as a flat muddy
-                // panel.
+                // A modal sits over a dark scrim, so there is nothing behind it
+                // worth blurring: the filter would cost a frame to produce a flat
+                // muddy panel.
                 blurDp = 0f,
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)

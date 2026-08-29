@@ -193,11 +193,11 @@ class WidgetRegistryConsistencyTest {
             "profile.skin.section",
             // tab container (tabCount + labels)
             "container.tabs",
-            // shell regions (width / glass / divider / collapse frame props)
+            // shell regions (width / opacity / blur / divider / collapse frame props)
             "appshell.region.left",
             "appshell.region.center",
             "appshell.region.right",
-            // title bar (height / corner / group / frost / controls props)
+            // title bar (height / corner / group / opacity / blur / controls props)
             "appshell.region.top",
             // unified nav rail item (target prop)
             "nav.entry",
@@ -206,7 +206,7 @@ class WidgetRegistryConsistencyTest {
             // per-instance state widgets (props alongside their runtime state)
             "notes.scratch",
             "checklist",
-            // floating activity account (measure / anchor / frost / height props)
+            // floating activity account (measure / anchor / height props)
             "appshell.activity.pill",
         )
         assertEquals(
