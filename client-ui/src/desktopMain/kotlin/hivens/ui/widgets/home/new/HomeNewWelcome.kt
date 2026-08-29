@@ -1,6 +1,5 @@
 package hivens.ui.widgets.home.new
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,11 +9,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.AppState
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
@@ -42,12 +39,11 @@ fun HomeNewWelcome(instance: WidgetInstance) {
     val s = LocalStrings.current
     val playerName = (ctx.appState as? AppState.Authenticated)?.session?.playerName
 
+    // No plane of its own. The widget's surface is declared in the layout and painted
+    // by the kernel, so the editor's surface rows move THIS card rather than adding a
+    // second one behind it.
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.45f))
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
     ) {
         Text(
             text       = when {
