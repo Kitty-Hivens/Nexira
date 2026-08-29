@@ -136,6 +136,13 @@ fun BrowseScreen(
 
     LaunchedEffect(origin, submittedQuery, retryTick) {
         val remembered = session.get(origin, submittedQuery)
+        // Where a browse got to, not only how it ended. A screen stuck on its
+        // spinner produced no line at all, so there was no way to tell an effect
+        // that never started from one waiting on a source that never answered.
+        logger.info(
+            "browse: asking {} for \"{}\" (restored={} packs)",
+            origin, submittedQuery, remembered?.packs?.size ?: -1,
+        )
         if (remembered != null) {
             state = BrowseState.Loaded(remembered.packs)
             page = remembered.nextPage
@@ -192,7 +199,11 @@ fun BrowseScreen(
                     // not get them back either. Only entries the list does not
                     // already hold are a reason to start again.
                     val shown = (state as? BrowseState.Loaded)?.packs
-                    if (shown != null && newIn(packs, shown).isEmpty()) return@collect
+                    if (shown != null && newIn(packs, shown).isEmpty()) {
+                        logger.info("browse: {} re-listed the same {} pack(s)", origin, packs.size)
+                        return@collect
+                    }
+                    logger.info("browse: {} listed {} pack(s)", origin, packs.size)
                     page = 0
                     endReached = false
                     state = BrowseState.Loaded(packs)
