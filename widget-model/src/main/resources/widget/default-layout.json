@@ -54,12 +54,6 @@
                 "instance_id": "appshell-region-right-default",
                 "props": {
                   "widthDp": 265
-                },
-                "chrome": {
-                  "cornerRadiusDp": 14,
-                  "paddingTopDp": 4,
-                  "paddingBottomDp": 4,
-                  "paddingStartDp": 4
                 }
               }
             ]

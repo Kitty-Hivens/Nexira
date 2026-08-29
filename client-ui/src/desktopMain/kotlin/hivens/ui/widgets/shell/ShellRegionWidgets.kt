@@ -27,6 +27,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
@@ -287,6 +288,18 @@ private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-col
 val RAIL_DEFAULT_WIDTH = 265.dp
 
 /**
+ * How far the panel sits off the window's edges: clear of the top bar, the bottom
+ * and the content, flush to the right where the window ends.
+ *
+ * The inset and the rounding used to be a second plane the kernel drew around the
+ * region, so the panel was a rounded card containing a square full-bleed one. One
+ * plane draws both now. The radius is the style's panel corner rather than a number,
+ * which is what it always was -- the old record stored 14, the value that token has
+ * under Celestia, and a flat form had no way to square it.
+ */
+private val RAIL_INSET = 4.dp
+
+/**
  * Right region: the divider plus the news panel. removable=false. No handles or
  * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
  * pointer and snaps on release; vertical scrolls and taps still reach the news).
@@ -335,12 +348,16 @@ fun ShellRightRegion(instance: WidgetInstance) {
         }
     }
 
+    val panelShape = RoundedCornerShape(LocalStyle.current.panelCorner)
+
     // Edit mode: static, no swipe/animation.
     if (editing) {
         if (props.collapsed) { CollapsedRegionStrip(); return }
         val sized = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH)
         NxSurface(
-            NxSurfaceLevel.Floating, sized.fillMaxHeight(), RectangleShape,
+            NxSurfaceLevel.Floating,
+            sized.fillMaxHeight().padding(start = RAIL_INSET, top = RAIL_INSET, bottom = RAIL_INSET).clip(panelShape),
+            panelShape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             rightPanelMovable()
@@ -404,7 +421,9 @@ fun ShellRightRegion(instance: WidgetInstance) {
         // as the rail widens.
         if (widthAnim.value > collapsedPx + 1f) {
             NxSurface(
-                NxSurfaceLevel.Floating, Modifier.fillMaxSize(), RectangleShape,
+                NxSurfaceLevel.Floating,
+                Modifier.fillMaxSize().padding(start = RAIL_INSET, top = RAIL_INSET, bottom = RAIL_INSET).clip(panelShape),
+                panelShape,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(modifier = Modifier.requiredWidth(expandedWidth).fillMaxHeight()) {

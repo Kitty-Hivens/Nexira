@@ -1,5 +1,6 @@
 package hivens.widget.model
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -7,6 +8,21 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DefaultLayoutTest {
+
+    /**
+     * The bundled file is read leniently, because a file on a user's disk may carry
+     * keys a newer build wrote. That tolerance has no place here: this one ships in
+     * the jar, so a key nothing reads is dead weight rather than forward
+     * compatibility.
+     *
+     * It went unread once. A per-instance frame -- a corner and three insets on the
+     * right panel -- outlived the record that carried it, and the panel quietly lost
+     * both while the JSON still described them.
+     */
+    @Test
+    fun `the bundled layout carries no key the model does not read`() {
+        DefaultLayout.load(Json)
+    }
 
     @Test
     fun `bundled default decodes to the kernel-3 + B-series surface set`() {
