@@ -207,6 +207,8 @@ fun AppLayout(
                             systemThemeAvailable = systemThemeAvailable,
                             paletteFromWallpaper = paletteFromWallpaper,
                             onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
+                            surfaceBlur       = customization.surfaceBlur,
+                            onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
                             uiStyle           = uiStyle,
                             onUiStyleChanged  = onUiStyleChanged,
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },

@@ -42,6 +42,8 @@ internal fun AppearanceThemeIsland(
     systemThemeAvailable: Boolean,
     paletteFromWallpaper: Boolean,
     onPaletteFromWallpaperChanged: (Boolean) -> Unit,
+    surfaceBlur: Boolean,
+    onSurfaceBlurChanged: (Boolean) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
@@ -95,6 +97,17 @@ internal fun AppearanceThemeIsland(
                 icon            = NxIcon.Palette,
                 accent          = NxTheme.colors.primary,
                 onCheckedChange = onPaletteFromWallpaperChanged,
+            )
+
+            // A backdrop filter is recomputed every frame by construction, so the
+            // one place it can be spent or saved is here rather than per surface.
+            NxToggle(
+                label           = s.settingsSurfaceBlur,
+                checked         = surfaceBlur,
+                description     = s.settingsSurfaceBlurDesc,
+                icon            = NxIcon.Layers,
+                accent          = NxTheme.colors.primary,
+                onCheckedChange = onSurfaceBlurChanged,
             )
 
             BgPicker(s.settingsUiStyleTitle) {
