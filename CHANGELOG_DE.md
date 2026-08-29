@@ -14,6 +14,37 @@ vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
 - **Beenden beendet.** Bisher ging ein hoefliches Signal hinaus und mehr nicht; ein Spiel, das es ignoriert, wird nun samt seiner Kindprozesse hart beendet.
 - **Nichts geht verloren.** Ein abgebrochener Schreibvorgang konnte die gesamte Skin-Bibliothek loeschen, und ein kyrillisch benanntes Preset ueberschrieb das zuvor gespeicherte.
 
+## [2.4.0-beta4] - 2026-08-03
+
+2.4.0-beta4 schließt die Wege, auf denen Code in einen Start gelangen konnte, den das Pack nie benannt hat. Ein installiertes Pack wird an seinen eigenen Bytes gemessen statt an seinen Dateinamen, die Prüfung wird unmittelbar vor dem Start noch einmal gestellt, und der Launcher trägt nichts mehr in den Prozess, was ihm nebenbei zugereicht wurde: seine Umgebung, die Argumente aus den Pack-Einstellungen, die nativen Bibliotheken in der Instanz und den Interpreter, den er ausführen soll. Die SmartyCraft-Serverliste gilt ab diesem Release als veraltet.
+
+### Highlights
+- **Ein Pack startet als das Pack, nach Inhalt.** Installierte Mods werden gegen die Bytes geprüft, die das Pack deklariert hat, nicht gegen ihre Dateinamen; eine unter einem bekannten Namen ausgetauschte Datei kommt nicht mehr durch.
+- **Die Prüfung läuft beim Start erneut.** Sie lief bisher vor der Anmeldung, Minuten bevor der Prozess überhaupt existierte; ein dazwischen verändertes Pack wird jetzt bemerkt.
+- **Nichts fährt nebenbei mit.** Einstellungen, die auf fremden Code zeigen, aus der Desktop-Sitzung geerbte Variablen und eine Laufzeitumgebung, die kein echtes Programm ist, werden bei einem Start mit Serveranmeldung abgewiesen.
+- **Ein verändertes Pack sagt es.** Der Start bricht mit einer Meldung ab, statt ein Spiel zu starten, das dem Server ohnehin nicht beitreten kann.
+- **Die SmartyCraft-Serverliste läuft aus.** In diesem Release gilt sie als veraltet, in 2.5.0 verschwindet sie -- an ihre Stelle treten Packs.
+
+## [2.4.0-beta3] - 2026-08-02
+
+2.4.0-beta3 macht Konten mit Zwei-Faktor-Schutz spielbar und schließt die Wege, auf denen ein Mod ungebeten in ein Pack gelangt. Die Anmeldung mit einem Code funktioniert durchgehend: Der Code wird einmal beim Druck auf Spielen abgefragt, und das Spiel startet auf einer Sitzung, die für genau diesen Start ausgestellt wurde. Auf der Inhaltsseite wird ein Pack vor jedem Start an seine eigene Dateiliste gehalten, Dateien, die sich nicht löschen lassen, gelten als das Hindernis, das sie sind, und der Durchgang berührt nur, was ein Loader tatsächlich ausführt -- Caches, Konfigurationen und die Buchführung des Launchers bleiben unangetastet.
+
+### Highlights
+- **Konten mit Zwei-Faktor-Schutz können spielen.** Die Anmeldung per Code funktioniert und wird einmal pro Start abgefragt statt immer wieder. Jede Hintergrundanmeldung, die die eben bestätigte Sitzung unbemerkt entwertet hat, ist entfernt.
+- **Ein Pack startet als das Pack.** Von Hand hinzugefügte JARs werden vor dem Start entfernt, und eine Datei, die sich nicht entfernen lässt, führt zu einem Start ohne Anmeldung, statt so zu tun, als wäre alles in Ordnung.
+- **Nur Mods werden aufgeräumt.** Mod-Caches, Konfigurationen und Reste werden nicht mehr mitgelöscht -- zuvor konnte ein Start den Cache umgeschriebener JARs eines Loaders leeren und einen vollständigen Neuaufbau kosten.
+- **Packs installieren wieder, wo eine Plattformbibliothek fehlt.** Ein Pack, dessen Loader eine nur für macOS gedachte Bibliothek auflistet, scheitert unter Windows und Linux nicht mehr an der Installation.
+
+## [2.4.0-beta2] - 2026-08-02
+
+2.4.0-beta2 schließt die Lücke zwischen dem, was ein Pack zu sein behauptet, und dem, was tatsächlich startet. Eine Instanz wird vor jedem Start an die Liste der Dateien gehalten, aus denen das Pack besteht, nicht nur beim Synchronisieren; eine zwischen zwei Synchronisationen von Hand hinzugefügte JAR fährt nicht mehr mit. Ein Start trägt außerdem nur eine Sitzung, die er sich verdient hat: offline, eine ungeprüfte Instanz und eine fehlgeschlagene Auffrischung starten das Spiel ohne Token. Daneben meldet eine fehlgeschlagene Auffrischung vor dem Start das endlich selbst, statt als "Failed to verify username" aus Minecraft heraus aufzutauchen, und die mitgelieferte Laufzeitumgebung meldet nicht mehr bei jedem Start einen nicht passenden Klassenarchiv-Stand.
+
+### Highlights
+- **Ein Pack startet als das Pack.** Dateien, die in `mods/` eines installierten Packs gelegt wurden, werden vor dem Start entfernt, und der Launcher benennt, was er entfernt hat. Es lädt nur, was das Pack selbst deklariert.
+- **Der Token bleibt aus Starts heraus, die ihn nicht verdient haben.** Ein Offline-Start, eine Instanz, für die der Launcher nicht einstehen kann, und ein Start, der den Anmeldeserver nicht erreicht hat, starten das Spiel ohne Sitzungstoken.
+- **Der Launcher sagt, wenn die Sitzung veraltet ist.** Statt dass das Spiel den Serverbeitritt mit "Failed to verify username" verweigert, sagt der Launcher vorab, dass er die Sitzung nicht auffrischen konnte und was dagegen hilft.
+- **Ein ruhigerer, leichterer Start.** Die mitgelieferte Laufzeitumgebung druckt nicht mehr bei jedem Start Klassenarchiv-Fehler, und ein nach einem Update veraltetes Archiv deaktiviert die Klassenteilung nicht mehr stillschweigend.
+
 ## [2.4.0-beta] - 2026-07-30
 
 2.4.0-beta setzt die Vorschau fort und baut neu, was der Launcher mit dem Netzwerk tut. Jede Datei, die er auf die Platte holt -- eine Laufzeitumgebung, ein JDK, ein Pack, eine Mod, ein Loader-Installer, sein eigenes Update -- läuft jetzt über eine einzige Transfer-Engine, die erneut versucht, dort weitermacht, wo die Verbindung abriss, und auf einen Mirror ausweicht; eine geprüfte Datei behält eine Blockkarte, sodass ein beschädigtes Pack über seine beschädigten Blöcke repariert statt neu geladen wird. Die Builds eines Packs bekommen einen eigenen Bildschirm mit Änderungen je Build, Wechsel und Rückrollen, und Pack-Updates melden sich selbst im Benachrichtigungszentrum. Nightly-Builds und ein Vorabversionen-Schalter ersetzen das Update-Manager-Fenster. Ein Härtungs-Durchgang hält Sitzungs-Tokens aus Logs und Diagnosepaketen heraus, begrenzt eine akzeptierte Zertifikatsausnahme auf den Host, für den sie erteilt wurde, und beschränkt jeden Pfad und jedes Archiv, das ein Server-Dokument wählen darf. ProGuard ist weg, und das Linux-AppImage sinkt auf ~74 MB.
