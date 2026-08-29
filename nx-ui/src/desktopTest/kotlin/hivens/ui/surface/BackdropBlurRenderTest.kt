@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LocalNxColors
@@ -68,16 +70,26 @@ class BackdropBlurRenderTest {
         assertTrue(over.spread < 20, "the plate should read flat under a blur: ${over.spread}")
     }
 
+    /** The switch has to reach the pixels, not just the settings file. */
+    @Test
+    fun `the blur switch turns it off`() {
+        val on = scanline(blurDp = 18f)
+        val off = scanline(blurDp = 18f, blurEnabled = false)
+        assertTrue(off.spread > 60, "switched off, the stripes should survive: ${off.spread}")
+        assertTrue(on.spread < off.spread / 4, "switched on, they should not: ${on.spread} against ${off.spread}")
+    }
+
     private data class Sample(val spread: Double, val red: Int, val green: Int) {
         override fun toString() = "spread %.1f r=%d g=%d".format(spread, red, green)
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun scanline(blurDp: Float, plate: Color? = null): Sample {
+    private fun scanline(blurDp: Float, plate: Color? = null, blurEnabled: Boolean = true): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
             CompositionLocalProvider(
                 LocalNxColors provides DarkColorPalette,
                 LocalStyle provides CelestiaStyle,
+                LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled),
             ) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
                     if (plate != null) {
@@ -90,7 +102,7 @@ class BackdropBlurRenderTest {
         val image = scene.render()
         scene.close()
         File(OUT).mkdirs()
-        val name = "backdrop-blur-${blurDp.toInt()}${if (plate != null) "-over-plate" else ""}.png"
+        val name = "backdrop-blur-${blurDp.toInt()}${if (plate != null) "-over-plate" else ""}${if (blurEnabled) "" else "-off"}.png"
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(OUT, name).writeBytes(it) }
 
         val bmp = Bitmap.makeFromImage(image)
@@ -104,7 +116,7 @@ class BackdropBlurRenderTest {
         val spread = sqrt(lum.sumOf { (it - mean) * (it - mean) } / lum.size)
         val mid = bmp.getColor(SX + SW / 2, y)
         val s = Sample(spread, (mid shr 16) and 0xFF, (mid shr 8) and 0xFF)
-        println("BackdropBlurRenderTest: blur=$blurDp plate=${plate != null} -> $s")
+        println("BackdropBlurRenderTest: blur=$blurDp plate=${plate != null} enabled=$blurEnabled -> $s")
         return s
     }
 

@@ -98,6 +98,8 @@ object GermanStrings : AppStrings {
     override val settingsThemeModeSystemUnavailable = "Systemschema ist in dieser Umgebung nicht verfügbar"
     override val settingsPaletteFromWallpaper       = "Farben aus dem Bild"
     override val settingsPaletteFromWallpaperDesc   = "Aus: Design behält eigene Farben"
+    override val settingsSurfaceBlur                = "Unschärfe hinter Flächen"
+    override val settingsSurfaceBlurDesc            = "Kostet pro Bild etwas; ohne sie behalten Flächen Form und Deckkraft"
     override val settingsCustomChrome               = "Eigene Titelleiste"
     override val settingsCustomChromeDesc           = "Ersetzt die Titelleiste des Fensters durch die eigene obere Leiste. Wirkt ab dem nächsten Start."
     override val settingsCustomChromeTiling         = "Dein Fenstermanager zeichnet keine Titelleiste, hier ändert das nichts."

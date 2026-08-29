@@ -58,6 +58,8 @@ fun BgSettingsSurface(
     systemThemeAvailable: Boolean,
     paletteFromWallpaper: Boolean,
     onPaletteFromWallpaperChanged: (Boolean) -> Unit,
+    surfaceBlur: Boolean,
+    onSurfaceBlurChanged: (Boolean) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
@@ -80,6 +82,7 @@ fun BgSettingsSurface(
         update { copy(imagePath = null, enabled = false) }
     }
     PuppetToggle("background.paletteFromWallpaper", paletteFromWallpaper, onValueChange = onPaletteFromWallpaperChanged)
+    PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
     PuppetClick("background.reset") {
         settings.value = BackgroundSettings()
         onSettingsChanged(settings.value)
@@ -109,6 +112,8 @@ fun BgSettingsSurface(
                 systemThemeAvailable = systemThemeAvailable,
                 paletteFromWallpaper = paletteFromWallpaper,
                 onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
+                surfaceBlur          = surfaceBlur,
+                onSurfaceBlurChanged = onSurfaceBlurChanged,
                 uiStyle              = uiStyle,
                 onUiStyleChanged     = onUiStyleChanged,
                 onOpenThemePicker    = onOpenThemePicker,

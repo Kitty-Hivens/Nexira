@@ -19,6 +19,17 @@ data class CustomizationSettings(
     val accentOverride: String? = null,
 
     /**
+     * Whether a surface blurs what is behind it at all.
+     *
+     * A backdrop filter cannot be cached: the destination it reads may change on any
+     * frame and Skia has no way to know that it did not. That is cheap on a GPU and
+     * measurably not free without one, so it is worth being able to switch off in one
+     * place rather than per surface. Off leaves every other surface property alone --
+     * the plane keeps its body, its opacity and its shape, it just stops filtering.
+     */
+    val surfaceBlur: Boolean = true,
+
+    /**
      * How the active item in the left navigation rail is highlighted.
      * [NavSelectionStyle.Pill] (default) keeps the original Material capsule
      * behind the icon; the other variants change only the selection

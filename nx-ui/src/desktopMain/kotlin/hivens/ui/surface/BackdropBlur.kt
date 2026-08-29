@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import hivens.ui.customization.LocalCustomization
 import org.jetbrains.skia.FilterTileMode
 import org.jetbrains.skia.ImageFilter
 import org.jetbrains.skia.Rect
@@ -41,13 +42,17 @@ import org.jetbrains.skia.Canvas as SkCanvas
  * frame and Skia has no way to know that it did not. That is inherent to the
  * operation rather than a property of this implementation.
  *
+ * [hivens.ui.customization.CustomizationSettings.surfaceBlur] switches the whole
+ * thing off in one place, because the cost is per surface per frame and cannot be
+ * cached away.
+ *
  * Bleed past the element is left to the caller's clip: [FrostSurface] draws this
  * inside a box clipped to the surface's shape, so the blur ends where the shape
  * does rather than at its bounding box.
  */
 @Composable
 internal fun BackdropBlur(radiusDp: Float, modifier: Modifier) {
-    if (radiusDp <= 0f) return
+    if (radiusDp <= 0f || !LocalCustomization.current.surfaceBlur) return
     val density = LocalDensity.current
     // One native filter per radius per surface, not one per frame: building it
     // inside the draw lambda allocates a Skia object on every pass and charges the
