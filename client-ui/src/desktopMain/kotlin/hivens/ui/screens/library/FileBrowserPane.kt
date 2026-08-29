@@ -42,7 +42,6 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
@@ -126,7 +125,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.medium)
-                .background(glassSurfaceAlpha(0.55f))
+                .background(NxTheme.colors.surface.copy(alpha = 0.55f))
                 .hoverable(hover),
         ) {
             val listState = rememberLazyListState()
@@ -170,7 +169,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                 .weight(2f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.medium)
-                .background(glassSurfaceAlpha(0.55f))
+                .background(NxTheme.colors.surface.copy(alpha = 0.55f))
                 .padding(16.dp),
         ) {
             val picked = selected
@@ -414,7 +413,7 @@ private fun BinaryPreview(file: Path) {
         PreviewHeader(file = file, sizeLabel = file.fileSizeLabel())
         Spacer(Modifier.height(8.dp))
         Box(
-            modifier         = Modifier.fillMaxWidth().height(140.dp).clip(MaterialTheme.shapes.medium).background(glassSurfaceAlpha(0.35f)),
+            modifier         = Modifier.fillMaxWidth().height(140.dp).clip(MaterialTheme.shapes.medium).background(NxTheme.colors.surface.copy(alpha = 0.35f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(

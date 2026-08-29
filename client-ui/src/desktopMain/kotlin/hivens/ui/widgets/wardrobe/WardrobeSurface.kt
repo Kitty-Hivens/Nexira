@@ -60,7 +60,6 @@ import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -572,7 +571,7 @@ private fun AddTile(onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(glassSurfaceAlpha(0.4f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

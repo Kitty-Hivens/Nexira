@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
@@ -49,7 +48,7 @@ fun ServerDetailsBannerWidget(instance: WidgetInstance) {
         modifier = Modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(p.cornerRadius.dp))
-            .background(glassSurfaceAlpha(0.5f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.5f))
             .border(
                 width = 1.dp,
                 color = NxTheme.colors.outline.copy(alpha = 0.2f),

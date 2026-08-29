@@ -119,7 +119,6 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.WidgetSurfaceRenderer
-import hivens.ui.customization.glassSurfaceAlpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -643,10 +642,10 @@ fun FrameWindowScope.AppShellContent(
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
         var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
-        // Customization extension: persisted overrides for accent /
-        // density / glass intensity / full color overrides. Provided
-        // via [LocalCustomization] so NxTheme and the glass surfaces
-        // can read without prop-drilling.
+        // Customization extension: persisted overrides for accent, density,
+        // whether surfaces blur, and the nav rail's selection. Provided via
+        // [LocalCustomization] so NxTheme and the surfaces can read them
+        // without prop-drilling.
         val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }

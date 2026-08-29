@@ -26,7 +26,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxSwitch
@@ -168,7 +167,7 @@ internal fun StringRow(label: String, value: String, onChange: (String) -> Unit)
                 .weight(1f)
                 .height(36.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(glassSurfaceAlpha(0.4f))
+                .background(NxTheme.colors.surface.copy(alpha = 0.4f))
                 .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.CenterStart,
@@ -208,7 +207,7 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .background(glassSurfaceAlpha(0.4f))
+                    .background(NxTheme.colors.surface.copy(alpha = 0.4f))
                     .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                     .clickable { expanded = true }
                     .padding(horizontal = 10.dp, vertical = 8.dp),

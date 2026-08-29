@@ -47,7 +47,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.NavSelectionStyle
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -193,7 +192,7 @@ private fun NavSelectionControl(
                         .clip(RoundedCornerShape(style.buttonCorner))
                         .background(
                             if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
-                            else glassSurfaceAlpha(0.4f),
+                            else NxTheme.colors.surface.copy(alpha = 0.4f),
                         )
                         .border(
                             width = 1.dp,

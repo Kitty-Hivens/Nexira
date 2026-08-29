@@ -36,7 +36,6 @@ import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.ImageGallery
 import hivens.ui.components.galleryMedia
 import hivens.ui.components.isPlayableVideoUrl
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
@@ -375,7 +374,7 @@ private fun Chip(text: String) {
         shape   = MaterialTheme.shapes.extraSmall,
         label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textPrimary) },
         colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = glassSurfaceAlpha(0.4f),
+            disabledContainerColor = NxTheme.colors.surface.copy(alpha = 0.4f),
             disabledLabelColor     = NxTheme.colors.textPrimary,
         ),
         border  = null,

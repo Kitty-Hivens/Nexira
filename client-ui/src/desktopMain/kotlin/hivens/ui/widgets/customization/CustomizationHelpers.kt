@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.toWidgetColorOrNull
@@ -109,7 +108,7 @@ internal fun HexField(
                 .weight(1f)
                 .height(36.dp)
                 .clip(MaterialTheme.shapes.small)
-                .background(glassSurfaceAlpha(0.4f))
+                .background(NxTheme.colors.surface.copy(alpha = 0.4f))
                 .border(
                     width = 1.dp,
                     color = if (valid) NxTheme.colors.outline.copy(alpha = 0.3f) else NxTheme.colors.error,

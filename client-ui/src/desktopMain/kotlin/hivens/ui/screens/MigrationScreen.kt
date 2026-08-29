@@ -17,7 +17,6 @@ import hivens.launcher.platform.DataDirMigration
 import hivens.ui.surface.NxCard
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
@@ -126,7 +125,7 @@ private fun ReadyContent(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.4f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.4f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
