@@ -79,12 +79,31 @@ class BackdropBlurRenderTest {
         assertTrue(on.spread < off.spread / 4, "switched on, they should not: ${on.spread} against ${off.spread}")
     }
 
+    /**
+     * The radius was a tier's private constant: 18 on Frosted, 28 on Heavy, and no
+     * way to reach either. Naming one has to win in both directions.
+     */
+    @Test
+    fun `a named radius overrides the tier in both directions`() {
+        // Flat carries no blur at all; naming one turns it on.
+        val flatWithBlur = scanline(blurDp = 0f, namedBlurDp = 18f)
+        // Frosted carries 18; naming zero turns it off.
+        val frostedWithout = scanline(blurDp = 18f, namedBlurDp = 0f)
+        assertTrue(flatWithBlur.spread < 10, "a named radius did not reach a tier without one: ${flatWithBlur.spread}")
+        assertTrue(frostedWithout.spread > 60, "a named zero did not turn the tier's blur off: ${frostedWithout.spread}")
+    }
+
     private data class Sample(val spread: Double, val red: Int, val green: Int) {
         override fun toString() = "spread %.1f r=%d g=%d".format(spread, red, green)
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun scanline(blurDp: Float, plate: Color? = null, blurEnabled: Boolean = true): Sample {
+    private fun scanline(
+        blurDp: Float,
+        plate: Color? = null,
+        blurEnabled: Boolean = true,
+        namedBlurDp: Float? = null,
+    ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
             CompositionLocalProvider(
                 LocalNxColors provides DarkColorPalette,
@@ -95,7 +114,7 @@ class BackdropBlurRenderTest {
                     if (plate != null) {
                         Box(Modifier.fillMaxSize().drawBehind { drawRect(plate) })
                     }
-                    Plate(blurDp)
+                    Plate(blurDp, namedBlurDp)
                 }
             }
         }
@@ -122,7 +141,7 @@ class BackdropBlurRenderTest {
 
     /** A translucent body so whatever the backdrop produced is visible through it. */
     @Composable
-    private fun Plate(blurDp: Float) {
+    private fun Plate(blurDp: Float, namedBlurDp: Float?) {
         NxSurface(
             level = NxSurfaceLevel.Base,
             modifier = Modifier.offset(SX.dp, SY.dp).size(SW.dp, SH.dp),
@@ -130,6 +149,7 @@ class BackdropBlurRenderTest {
             tier = if (blurDp > 0f) FrostTier.Frosted else FrostTier.Flat,
             hairline = false,
             opacity = 0.15f,
+            blurDp = namedBlurDp,
         ) {}
     }
 

@@ -88,6 +88,17 @@ fun NxSurface(
      * the widget buys legibility with, and neither is knowable here.
      */
     opacity: Float? = null,
+    /**
+     * How far the plane blurs what is behind it. Null takes the tier's radius, zero
+     * turns it off. It was only ever a tier's private constant before, so the two
+     * values in use were unreachable from anywhere and indistinguishable from each
+     * other on screen.
+     */
+    blurDp: Float? = null,
+    /** Hairline width. Null defers to [hairline], zero removes it. */
+    borderWidthDp: Float? = null,
+    /** Cast-shadow elevation. Null defers to [elevated], zero flattens the plane. */
+    shadowDp: Float? = null,
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -105,7 +116,11 @@ fun NxSurface(
     if (tier == FrostTier.Clear && !opaque) {
         val bare = buildList {
             if (glass) addAll(tier.toLayers())
-            if (elevated) add(DropShadow())
+            when {
+                shadowDp != null && shadowDp > 0f -> add(DropShadow(shadowDp))
+                shadowDp != null                  -> Unit
+                elevated                          -> add(DropShadow())
+            }
             // No bevel, deliberately. This tier backs the shell chrome -- the rail
             // and the top bar -- which are full-height rectangles, so an edge here
             // is a hard line down the window rather than the lip of a card. They
@@ -126,11 +141,13 @@ fun NxSurface(
         opacity != null -> opacity.coerceIn(0f, 1f)
         else            -> bodyFloor(dark)
     }
+    // A named radius wins over the tier's; absent one, the tier still decides.
+    val blur = blurDp ?: coat.filterIsInstance<Backdrop>().firstOrNull()?.blurRadiusDp
     val layers = buildList {
         // A blur under a body nothing can see through is work thrown away: the
-        // wallpaper slice gets sampled and blurred every frame and is then
-        // covered completely. An opaque surface skips it.
-        if (bodyAlpha < 1f) addAll(coat.filterIsInstance<Backdrop>())
+        // filter runs every frame and is then covered completely. An opaque
+        // surface skips it.
+        if (bodyAlpha < 1f && blur != null && blur > 0f) add(Backdrop(blur))
         add(Body(role, bodyAlpha))
         // A translucent coat over a solid body is a second fill doing nothing the
         // first did not: it only shifts the tone the ladder already chose.
@@ -141,8 +158,17 @@ fun NxSurface(
         // the flag could add a shadow but never remove one -- half of the split it
         // exists to make.
         removeAll { it is DropShadow }
-        if (elevated) add(DropShadow())
-        if (hairline) add(EdgeBorder(explicitColor = bevelHairline(bodyColor)))
+        when {
+            shadowDp != null && shadowDp > 0f -> add(DropShadow(shadowDp))
+            shadowDp != null                  -> Unit // a named zero is a flat plane
+            elevated                          -> add(DropShadow())
+        }
+        when {
+            borderWidthDp != null && borderWidthDp > 0f ->
+                add(EdgeBorder(widthDp = borderWidthDp, explicitColor = bevelHairline(bodyColor)))
+            borderWidthDp != null -> Unit // a named zero is an edgeless plane
+            hairline              -> add(EdgeBorder(explicitColor = bevelHairline(bodyColor)))
+        }
         if (interactionSource != null) add(StateOverlay())
     }
 
