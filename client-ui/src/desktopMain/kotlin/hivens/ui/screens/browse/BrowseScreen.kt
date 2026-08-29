@@ -140,8 +140,10 @@ fun BrowseScreen(
         // spinner produced no line at all, so there was no way to tell an effect
         // that never started from one waiting on a source that never answered.
         logger.info(
-            "browse: asking {} for \"{}\" (restored={} packs)",
-            origin, submittedQuery, remembered?.packs?.size ?: -1,
+            "browse: asking {} for \"{}\", {}",
+            origin,
+            submittedQuery,
+            remembered?.let { "showing ${it.packs.size} remembered pack(s) meanwhile" } ?: "nothing remembered",
         )
         if (remembered != null) {
             state = BrowseState.Loaded(remembered.packs)
