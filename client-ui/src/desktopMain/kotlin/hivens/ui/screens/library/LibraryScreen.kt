@@ -106,16 +106,18 @@ fun LibraryScreen(
     val creator: LocalPackCreator = koinInject()
     val scope = rememberCoroutineScope()
 
-    var importing by remember { mutableStateOf(false) }
-    var importError by remember { mutableStateOf<String?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var showCreate by remember { mutableStateOf(false) }
     var createKey by remember { mutableStateOf<String?>(null) }
+    var importKey by remember { mutableStateOf<String?>(null) }
 
     val installs by installService.installs.collectAsState()
     val createSnap = createKey?.let { installs[it] }
     val creating = createSnap?.phase is InstallPhase.Running
     val createError = (createSnap?.phase as? InstallPhase.Failed)?.message
+    val importSnap = importKey?.let { installs[it] }
+    val importing = importSnap?.phase is InstallPhase.Running
+    val importError = (importSnap?.phase as? InstallPhase.Failed)?.message
 
     // A finished create opens the new instance's detail (Content tab), then
     // evicts the snapshot.
@@ -129,24 +131,39 @@ fun LibraryScreen(
         }
     }
 
+    // Same for a finished import, which now takes the same road.
+    LaunchedEffect(importSnap?.phase) {
+        val phase = importSnap?.phase
+        val key = importKey
+        if (key != null && phase is InstallPhase.Succeeded) {
+            installService.dismiss(key)
+            importKey = null
+            onScreenChange(Screen.PackDetail(phase.instanceId))
+        }
+    }
+
     val importDialogSettings = rememberFileDialogSettings(s.browseImport)
 
+    // The picker is UI and stays on the composition; the unpacking does not. It ran
+    // on rememberCoroutineScope, which is the screen's own scope, so leaving the
+    // Library while a .mrpack was being extracted cancelled it mid-way and left a
+    // half-written instance directory with nothing said about it -- and an import is
+    // slow enough that clicking away is the ordinary thing to do. The file's own
+    // KDoc already claimed both paths ran app-scoped; only create did.
+    //
+    // Going through the same service as create also gives the import the progress it
+    // could always report: import() takes a progress lambda that no caller passed.
     fun startImport() {
         scope.launch {
             val picked = pickFile(
                 type     = FileKitType.File(extensions = listOf("mrpack", "zip")),
                 settings = importDialogSettings,
             )
-            val path = picked?.path ?: return@launch
-            importing = true
-            importError = null
-            try {
-                onScreenChange(Screen.PackDetail(importService.import(Path.of(path)).id))
-            } catch (e: Exception) {
-                importError = e.message ?: s.browseDetailInstallFailedGeneric
-            } finally {
-                importing = false
-            }
+            val file = Path.of(picked?.path ?: return@launch)
+            importKey = installService.run(
+                key   = "import:${file.fileName}:${UUID.randomUUID().toString().take(8)}",
+                title = file.fileName.toString(),
+            ) { _, progress -> importService.import(file, progress) }
         }
     }
 
