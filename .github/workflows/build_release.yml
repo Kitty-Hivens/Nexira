@@ -278,6 +278,22 @@ jobs:
             found { print }
           ' CHANGELOG.md | sed '/./,$!d' | sed 's/[[:space:]]*$//')
 
+          # A nightly is cut from the dev tip and never has a section of its own,
+          # so the Unreleased one IS its notes -- it describes exactly the work the
+          # build contains. Without this every nightly published the same
+          # placeholder, and the launcher stitches one per release it is behind, so
+          # a tester twelve nightlies back was handed twelve copies of "see the
+          # changelog" and nothing else.
+          if [ -z "$NOTES" ]; then
+            NOTES=$(awk '
+              /^## \[/ {
+                if (found) exit
+                if (index($0, "[Unreleased]") > 0) { found=1; next }
+              }
+              found { print }
+            ' CHANGELOG.md | sed '/./,$!d' | sed 's/[[:space:]]*$//')
+          fi
+
           if [ -z "$NOTES" ]; then
             NOTES="No changelog entry for v${VERSION}. See [CHANGELOG.md](./CHANGELOG.md)."
           fi

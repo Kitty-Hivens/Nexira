@@ -239,8 +239,15 @@ fun UpdateDialog(
                 Spacer(Modifier.height(16.dp))
 
                 // ── Highlights or full changelog ──────────────────────────────
+                // The highlights are the target release's notes in the reader's own
+                // language where a translation exists, so this is the panel the
+                // localized changelogs were written for. The stitched changelog
+                // behind it stays English: it is assembled from release bodies,
+                // which are the engineering log.
                 val hasHighlights = !update.highlights.isNullOrBlank()
-                val bodyContent = update.highlights?.takeIf { it.isNotBlank() } ?: update.changelog
+                val bodyContent = update.highlights?.takeIf { it.isNotBlank() }
+                    ?: update.changelog.takeIf { it.isNotBlank() }
+                    ?: s.updateNoChangelog
 
                 Text(
                     if (hasHighlights) s.updateHighlights else s.updateChangelog,

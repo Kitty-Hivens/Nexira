@@ -37,12 +37,14 @@ class UpdateServiceTest {
     private fun fakeSettings(
         mandatoryUpdatesEnabled: Boolean = true,
         updateChannel: ReleaseChannel = ReleaseChannel.Release,  // Release so existing /releases/latest mocks work
-        nightlyChannel: Boolean = false
+        nightlyChannel: Boolean = false,
+        locale: String = "en"
     ): ISettingsService = FakeSettingsService(
         SettingsData(
             mandatoryUpdatesEnabled = mandatoryUpdatesEnabled,
             updateChannel = updateChannel,
-            nightlyChannel = nightlyChannel
+            nightlyChannel = nightlyChannel,
+            locale = locale
         )
     )
 
@@ -187,6 +189,148 @@ class UpdateServiceTest {
             "assets": [${assets.joinToString(",")}]
         }
     """.trimIndent()
+
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // release notes in the reader's language, and notes that stack
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private val russianChangelog = """
+        # Изменения
+
+        ## [2.4.0-beta5] - 2026-08-05
+
+        Сводка выпуска.
+
+        ### Главное
+        - Первое.
+        - Второе.
+
+        ## [2.4.0-beta] - 2026-07-30
+
+        Более старая сводка.
+    """.trimIndent()
+
+    @Test
+    fun `a version section is the body under its header`() {
+        val service = createService("{}")
+        val section = service.extractVersionSection(russianChangelog, "2.4.0-beta5")
+        assertNotNull(section)
+        assertTrue(section.startsWith("Сводка выпуска."), "the header line leaked into the body: $section")
+        assertTrue("### Главное" in section, "the highlights subsection was cut off: $section")
+        assertFalse("Более старая" in section, "the next version's section bled in: $section")
+    }
+
+    /**
+     * The bracket is what separates them. Matching on the version text alone,
+     * a reader on 2.4.0-beta would be shown 2.4.0-beta5's notes, which is worse
+     * than showing none.
+     */
+    @Test
+    fun `a shorter version tag does not select a longer one`() {
+        val service = createService("{}")
+        val section = service.extractVersionSection(russianChangelog, "2.4.0-beta")
+        assertNotNull(section)
+        assertTrue(section.startsWith("Более старая сводка."), "matched the wrong section: $section")
+    }
+
+    @Test
+    fun `a version nobody translated resolves to nothing`() {
+        val service = createService("{}")
+        assertNull(service.extractVersionSection(russianChangelog, "2.4.0-beta3"))
+    }
+
+    /**
+     * English costs no request: the manifest the check already fetched carries it.
+     * The staged response would answer any URL, so a non-null return here would
+     * mean a read that should not have happened.
+     */
+    @Test
+    fun `English notes are answered without reading a localized file`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG", body = russianChangelog),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        assertNull(service.fetchLocalizedNotes("v2.4.0-beta5", "en"))
+    }
+
+    @Test
+    fun `a translated release reads its own tag`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_RU.md", body = russianChangelog),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        val notes = service.fetchLocalizedNotes("v2.4.0-beta5", "ru")
+        assertNotNull(notes)
+        assertTrue("Первое." in notes, "the localized notes did not arrive: $notes")
+    }
+
+    @Test
+    fun `a language with no changelog falls back rather than failing`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_FR.md", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        assertNull(service.fetchLocalizedNotes("v2.4.0-beta5", "fr"))
+    }
+
+    /**
+     * A nightly's notes are the development section as it stood, so consecutive
+     * nightlies carry the same text. Repeating it once per release is what a
+     * reader twelve builds behind was handed.
+     */
+    @Test
+    fun `releases that repeat one set of notes collapse into a span`() = runTest {
+        val service = createService("{}")
+        val same = "## What's Changed\n\n- The same work, still unreleased."
+        val stitched = service.fetchChangelogBetween(
+            currentVersion = "2.4.0",
+            latestVersion = "2.4.1-nightly1221",
+            releases = listOf(
+                releaseFor("v2.4.1-nightly1221", same),
+                releaseFor("v2.4.1-nightly1220", same),
+                releaseFor("v2.4.1-nightly1219", same),
+            ),
+        )
+        assertEquals(1, Regex("The same work").findAll(stitched).count(), "the notes repeated: $stitched")
+        assertTrue("v2.4.1-nightly1221 .. v2.4.1-nightly1219" in stitched, "the span was not named: $stitched")
+    }
+
+    @Test
+    fun `releases with their own notes stay separate and in version order`() = runTest {
+        val service = createService("{}")
+        val stitched = service.fetchChangelogBetween(
+            currentVersion = "2.4.0",
+            latestVersion = "2.4.1-nightly1221",
+            releases = listOf(
+                releaseFor("v2.4.1-nightly99", "## What's Changed\n\n- Older work."),
+                releaseFor("v2.4.1-nightly1221", "## What's Changed\n\n- Newer work."),
+            ),
+        )
+        assertTrue("Older work." in stitched && "Newer work." in stitched, "a section went missing: $stitched")
+        assertTrue(
+            stitched.indexOf("Newer work.") < stitched.indexOf("Older work."),
+            "nightly99 sorted above nightly1221 -- tags compared as text: $stitched",
+        )
+    }
+
+    @Test
+    fun `nothing to stitch is empty, not an English sentence`() = runTest {
+        val service = createService("{}")
+        val stitched = service.fetchChangelogBetween(
+            currentVersion = "2.4.0",
+            latestVersion = "2.4.1",
+            releases = listOf(releaseFor("v2.4.1", "no section here")),
+        )
+        assertTrue(stitched.isBlank(), "a fallback sentence would reach the dialog untranslated: $stitched")
+    }
+
+    private fun releaseFor(tag: String, body: String) = GitHubRelease(
+        tagName = tag,
+        name = tag,
+        body = body,
+        assets = emptyList(),
+    )
 
     // ═══════════════════════════════════════════════════════════════════════════
     // compareVersions
@@ -874,12 +1018,15 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `checkForUpdate uses fallback changelog when body is null`() = runTest {
+    fun `a release with no notes leaves the changelog empty rather than filling it in English`() = runTest {
+        // The sentinel that used to live here reached the dialog verbatim, so a
+        // reader in any other language was told "No changelog available" in one
+        // they had not chosen. Empty is a state the dialog can phrase itself.
         val svc = createService(githubReleaseJson(tagName = "v99.0.0", body = null))
         val update = svc.checkForUpdate()
 
         assertNotNull(update)
-        assertEquals("No changelog available", update.changelog)
+        assertTrue(update.changelog.isBlank(), "expected no notes, got: ${update.changelog}")
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
