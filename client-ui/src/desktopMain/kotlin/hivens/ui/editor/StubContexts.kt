@@ -48,6 +48,7 @@ internal val STUB_LEFTRAIL = LeftRailContext(
     currentScreen   = Screen.Home,
     isAuthenticated = false,
     onScreenChange  = {},
+    onSwitchTab     = {},
     onLogout        = {},
 )
 

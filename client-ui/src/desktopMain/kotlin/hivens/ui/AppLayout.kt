@@ -60,6 +60,7 @@ fun AppLayout(
     appState: AppState,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
+    onSwitchTab: (Screen) -> Unit,
     onReplaceScreen: (Screen) -> Unit = {},
     onBack: () -> Unit,
     canGoBack: Boolean,
@@ -289,6 +290,7 @@ fun AppLayout(
         currentScreen   = currentScreen,
         isAuthenticated = appState is AppState.Authenticated,
         onScreenChange  = onScreenChange,
+        onSwitchTab     = onSwitchTab,
         onLogout        = onLogout,
         appState        = appState,
         onLogin         = onLogin,
@@ -336,6 +338,7 @@ fun AppSidebar(
     currentScreen: Screen,
     isAuthenticated: Boolean,
     onScreenChange: (Screen) -> Unit,
+    onSwitchTab: (Screen) -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
 ) {
@@ -344,13 +347,13 @@ fun AppSidebar(
     // Puppet: sidebar navigation. Direct onScreenChange calls keep
     // test runs deterministic regardless of the AprilFools chaos
     // wrapper inside the nav-buttons widget.
-    PuppetClick("nav.home")     { onScreenChange(Screen.Home) }
-    PuppetClick("nav.library")  { onScreenChange(Screen.Library) }
-    PuppetClick("nav.browse")   { onScreenChange(Screen.Browse) }
-    PuppetClick("nav.profile") { onScreenChange(Screen.Profile) }
-    PuppetClick("nav.wardrobe") { onScreenChange(Screen.Wardrobe) }
-    PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
-    PuppetClick("nav.about")    { onScreenChange(Screen.About) }
+    PuppetClick("nav.home")     { onSwitchTab(Screen.Home) }
+    PuppetClick("nav.library")  { onSwitchTab(Screen.Library) }
+    PuppetClick("nav.browse")   { onSwitchTab(Screen.Browse) }
+    PuppetClick("nav.profile") { onSwitchTab(Screen.Profile) }
+    PuppetClick("nav.wardrobe") { onSwitchTab(Screen.Wardrobe) }
+    PuppetClick("nav.settings") { onSwitchTab(Screen.Settings) }
+    PuppetClick("nav.about")    { onSwitchTab(Screen.About) }
     PuppetClick("nav.console")  {
         if (gameConsole.shouldShowConsole) gameConsole.hide()
         else gameConsole.show()
@@ -359,11 +362,12 @@ fun AppSidebar(
         PuppetClick("nav.logout") { onLogout() }
     }
 
-    val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onLogout) {
+    val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onSwitchTab, onLogout) {
         LeftRailContext(
             currentScreen   = currentScreen,
             isAuthenticated = isAuthenticated,
             onScreenChange  = onScreenChange,
+            onSwitchTab     = onSwitchTab,
             onLogout        = onLogout,
         )
     }
