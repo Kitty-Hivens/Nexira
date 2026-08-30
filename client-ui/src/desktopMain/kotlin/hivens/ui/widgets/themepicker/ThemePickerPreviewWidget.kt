@@ -26,11 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxColorSurface
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.widget.model.Widget
 
@@ -45,11 +45,20 @@ fun ThemePickerPreviewWidget() {
     val s = LocalStrings.current
     val theme by ctx.selectedTheme
 
+    // The panel is painted in the theme being previewed, so everything on it has
+    // to come from that theme. Text and the frame came from the LIVE one, which
+    // rendered a light theme previewed from a dark one as pale grey on near-white
+    // -- illegible, on the one surface whose whole job is showing whether a theme
+    // reads. Opaque for the same reason: at 0.8 the current surface showed through
+    // and tinted the colour being judged.
+    val ground   = CustomTheme.parseHexColor(theme.background)
+    val onGround = if (ground.luminance() > 0.5f) Color(0xFF1A1A1A) else Color(0xFFF2F2F2)
+
     NxColorSurface(
-        color    = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f),
+        color    = ground,
         modifier = Modifier.fillMaxSize(),
         shape    = MaterialTheme.shapes.large,
-        border   = BorderStroke(1.dp, NxTheme.colors.outline),
+        border   = BorderStroke(1.dp, onGround.copy(alpha = 0.25f)),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             Text(
@@ -60,13 +69,13 @@ fun ThemePickerPreviewWidget() {
             )
             Spacer(Modifier.height(24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ColorRow(s.themePickerColorPrimary,    theme.primary)
-                ColorRow(s.themePickerColorSecondary,  theme.secondary)
-                ColorRow(s.themePickerColorBackground, theme.background)
-                ColorRow(s.themePickerColorSurface,    theme.surface)
-                ColorRow(s.themePickerColorAccent,     theme.accent)
-                ColorRow(s.themePickerColorSuccess,    theme.success)
-                ColorRow(s.themePickerColorError,      theme.error)
+                ColorRow(s.themePickerColorPrimary,    theme.primary,    onGround)
+                ColorRow(s.themePickerColorSecondary,  theme.secondary,  onGround)
+                ColorRow(s.themePickerColorBackground, theme.background, onGround)
+                ColorRow(s.themePickerColorSurface,    theme.surface,    onGround)
+                ColorRow(s.themePickerColorAccent,     theme.accent,     onGround)
+                ColorRow(s.themePickerColorSuccess,    theme.success,    onGround)
+                ColorRow(s.themePickerColorError,      theme.error,      onGround)
             }
             Spacer(Modifier.height(24.dp))
             // Visual sample buttons. enabled = false so the
@@ -106,7 +115,7 @@ fun ThemePickerPreviewWidget() {
 }
 
 @Composable
-private fun ColorRow(label: String, hexColor: String) {
+private fun ColorRow(label: String, hexColor: String, onGround: Color) {
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -115,7 +124,7 @@ private fun ColorRow(label: String, hexColor: String) {
         Text(
             text  = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = NxTheme.colors.textSecondary,
+            color = onGround.copy(alpha = 0.72f),
         )
         Row(
             verticalAlignment     = Alignment.CenterVertically,
@@ -126,12 +135,12 @@ private fun ColorRow(label: String, hexColor: String) {
                     .size(20.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(CustomTheme.parseHexColor(hexColor))
-                    .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)), RoundedCornerShape(4.dp)),
+                    .border(BorderStroke(1.dp, onGround.copy(alpha = 0.3f)), RoundedCornerShape(4.dp)),
             )
             Text(
                 text       = hexColor,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = NxTheme.colors.textPrimary,
+                color      = onGround,
                 fontFamily = LocalMonoFamily.current,
             )
         }
