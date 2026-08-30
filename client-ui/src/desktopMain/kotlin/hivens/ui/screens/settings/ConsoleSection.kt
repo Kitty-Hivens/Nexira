@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +61,7 @@ internal fun ConsoleSection() {
     val s = LocalStrings.current
     val store: ConsoleSettingsStore = koinInject()
     val settings by store.settings.collectAsState()
-    var artDraft by remember { mutableStateOf("") }
+    var artDraft by rememberSaveable { mutableStateOf("") }
     fun update(next: ConsoleSettings) = store.update(next)
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {

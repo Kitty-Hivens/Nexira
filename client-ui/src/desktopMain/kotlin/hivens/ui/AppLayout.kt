@@ -26,6 +26,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.icons.Symbol
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
@@ -112,12 +113,17 @@ fun AppLayout(
     // because navigation is not yet a widget surface; the center region widget
     // invokes it. Reads currentSession/selectedServer live on each recompose.
     val centerBody: @Composable () -> Unit = {
+        // Screens are disposed when they are swapped out, so everything a reader had
+        // arranged -- a scroll position, an open tab, a chosen category -- died with
+        // the visit and came back at its default. Held per destination here instead.
+        val retention = rememberSaveableStateHolder()
         // How a screen replaces another is the swap primitive's business, not the
         // router's. A still style collapses it without this site knowing.
         NxSwap(
             target = currentScreen,
             label  = "screen",
         ) { screen ->
+            retention.SaveableStateProvider(screen.retentionKey) {
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
@@ -284,6 +290,7 @@ fun AppLayout(
                         )
                 }
             }
+        }
     } // end centerBody
 
     val shellCtx = ShellContext(

@@ -237,6 +237,25 @@ sealed class Screen {
      * resolves an already-installed [hivens.core.data.PackInstance].
      */
     data class CataloguePackDetail(val origin: PackOrigin, val packId: String) : Screen()
+
+    /**
+     * Identity for state that outlives a visit, stable across the fields a screen
+     * stamps onto its own back-stack entry.
+     *
+     * Not the entry itself: [PackDetail] re-describes itself with [PackDetail.openSettings]
+     * before pushing the versions screen, and keying on the whole entry would throw
+     * away the tab, the file tree and the scroll every time that note was taken.
+     * Two visits to the same pack are the same place; two visits to different packs
+     * are not, which is why the ids are in the key and nothing else is.
+     */
+    val retentionKey: String get() = when (this) {
+        is PackDetail          -> "PackDetail:$instanceId"
+        is PackVersions        -> "PackVersions:$instanceId"
+        is CataloguePackDetail -> "CataloguePackDetail:$origin:$packId"
+        is ServerSettings      -> "ServerSettings:$serverId"
+        is ServerDetails       -> "ServerDetails:$serverId"
+        else                   -> this::class.simpleName.orEmpty()
+    }
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
