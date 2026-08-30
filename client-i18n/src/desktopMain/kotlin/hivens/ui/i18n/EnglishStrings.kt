@@ -785,6 +785,8 @@ object EnglishStrings : AppStrings {
     override val contentTabFetchErrorTitle      = "Could not load pack content"
     override val contentTabFetchErrorGeneric    = "The mirror manifest failed to load."
     override val contentTabRetry                = "Retry"
+    override val modBrowserErrorTitle           = "Search failed"
+    override val modBrowserErrorMessage         = "Could not reach Modrinth. Check your connection and retry."
     override val contentTabRoleSection          = "Role slots"
     override fun contentTabOptionalSection(count: Int) = "Optional mods ($count)"
     override fun contentTabIncompatibleWith(name: String) = "Incompatible with $name"

@@ -673,9 +673,10 @@ internal fun ConsoleContent(
             // session the user is actually looking at.
             onSave        = { gameConsole.exportEntries(entries) },
             // Clear only acts on the live buffer; a file-backed view is
-            // read-only, so the button no-ops there rather than wiping
-            // the running session's buffer behind the user's back.
+            // read-only. The control is disabled there rather than looking
+            // live and doing nothing when it is pressed.
             onClear       = { if (isLive) gameConsole.clear() },
+            canClear      = isLive,
         )
 
         HorizontalDivider(thickness = 1.dp, color = themeColors.outline.copy(alpha = 0.4f))
@@ -926,11 +927,14 @@ private fun Toolbar(
     onCopyAll: () -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
+    /** A file-backed view has no buffer to wipe, and the control says so. */
+    canClear: Boolean,
 ) {
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -1007,8 +1011,12 @@ private fun Toolbar(
             IconButton(onClick = onCopyAll, modifier = Modifier.size(32.dp)) {
                 Symbol(NxIcon.ContentCopy, strings.consoleCopyAll, tint = colors.textSecondary)
             }
-            IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                Symbol(NxIcon.Delete, strings.consoleClear, tint = colors.textSecondary)
+            IconButton(onClick = onClear, enabled = canClear, modifier = Modifier.size(32.dp)) {
+                Symbol(
+                    NxIcon.Delete,
+                    strings.consoleClear,
+                    tint = colors.textSecondary.copy(alpha = if (canClear) 1f else 0.38f),
+                )
             }
 
             // In-window gear: quick-access menu for the persisted toggles
@@ -1111,7 +1119,8 @@ private fun SearchPrompt(
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -1244,7 +1253,8 @@ private fun CommandInputRow(
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Right-arrow prompt glyph reads as "you type here, it goes
@@ -1316,7 +1326,8 @@ private fun StatusFooter(
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // When the sliding window has dropped entries to disk, report

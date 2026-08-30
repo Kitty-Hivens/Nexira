@@ -56,10 +56,23 @@ internal class ModBrowserState(
     var failed by mutableStateOf(emptySet<String>())
         private set
 
+    /**
+     * True when the last search could not be run at all. Distinct from an empty
+     * result, which is an answer: offline, both read as "no content" and the
+     * reader had nothing to tell them the query never left the machine.
+     */
+    var searchFailed by mutableStateOf(false)
+        private set
+
     suspend fun runSearch(settled: String) {
         results = null
+        searchFailed = false
         results = runCatching { search(settled) }
-            .onFailure { if (it is CancellationException) throw it else log.warn("Modrinth search failed", it) }
+            .onFailure {
+                if (it is CancellationException) throw it
+                log.warn("Modrinth search failed", it)
+                searchFailed = true
+            }
             .getOrDefault(emptyList())
     }
 

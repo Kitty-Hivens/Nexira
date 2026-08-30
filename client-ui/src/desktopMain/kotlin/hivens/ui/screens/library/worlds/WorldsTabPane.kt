@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.FilterQuality
 import coil3.compose.AsyncImage
 import hivens.core.data.GameMode
 import hivens.core.data.MultiplayerServerEntry
@@ -224,6 +225,7 @@ private fun WorldThumb(iconPath: String?) {
                 model              = File(iconPath),
                 contentDescription = null,
                 modifier           = Modifier.size(56.dp),
+                filterQuality      = FilterQuality.None,
             )
         } else {
             Symbol(icon = NxIcon.Public,
@@ -294,6 +296,7 @@ private fun ServerThumb(iconBase64: String?) {
                 model              = bytes,
                 contentDescription = null,
                 modifier           = Modifier.size(48.dp),
+                filterQuality      = FilterQuality.None,
             )
         } else {
             Symbol(icon = NxIcon.Computer,
