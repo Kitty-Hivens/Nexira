@@ -26,13 +26,14 @@ class PackImportService(
 
     suspend fun import(
         file: Path,
+        onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance {
         val kind = withContext(Dispatchers.IO) { detectPackArchiveKind(file) }
         log.info("import: {} detected as {}", file.fileName, kind)
         return when (kind) {
-            PackArchiveKind.Mrpack -> mrpackInstaller.install(file, source = null, progress = progress)
-            PackArchiveKind.CurseForge -> cfInstaller.install(file, progress)
+            PackArchiveKind.Mrpack -> mrpackInstaller.install(file, source = null, onReserveDir = onReserveDir, progress = progress)
+            PackArchiveKind.CurseForge -> cfInstaller.install(file, onReserveDir, progress)
             PackArchiveKind.Unknown -> throw IOException(
                 "Unrecognized pack archive '${file.fileName}': expected a Modrinth .mrpack " +
                     "(modrinth.index.json) or a CurseForge export (manifest.json)",

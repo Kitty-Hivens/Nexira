@@ -44,6 +44,7 @@ class CurseForgeZipInstaller(
 
     suspend fun install(
         zip: Path,
+        onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         ZipFile(zip.toFile()).use { z ->
@@ -63,6 +64,7 @@ class CurseForgeZipInstaller(
             val instanceDirName = sanitize("$displayName-$instanceId")
             val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
             Files.createDirectories(clientDir)
+            onReserveDir(clientDir)
 
             // Only the overrides tree installs (configs + any bundled jars); the
             // project/file-id mods need the CF API we deliberately don't use.

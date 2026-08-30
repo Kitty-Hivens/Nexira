@@ -103,7 +103,7 @@ private val PILL_BUTTON_SIZE = 28.dp
     id = "notifications.history",
     displayName = "widget.notifications.history",
     propsClass = NotificationHistoryProps::class,
-    surface = """{"fill":"base","opacity":0.5,"border":{"widthDp":1.0,"color":"outline"}}""",
+    surface = """{"fill":"base","opacity":0.5,"border":{"widthDp":1.0}}""",
 )
 @Composable
 fun NotificationHistoryWidget(instance: WidgetInstance) {
