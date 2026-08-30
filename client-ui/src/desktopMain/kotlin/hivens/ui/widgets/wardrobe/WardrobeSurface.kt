@@ -205,13 +205,17 @@ private fun Wardrobe(session: SessionData) {
     // decodes exactly once -- a refresh re-lists the index without re-decoding
     // or re-rasterizing anything already on screen, which is what used to
     // hitch the whole grid on every apply.
+    //
+    // Decoding is IO and the map is snapshot state: the read happens on the pool,
+    // the write on the composition's own thread. Assigning from inside the worker
+    // used whatever snapshot the coroutine had inherited and threw once that one
+    // had been left behind.
     val bitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
     LaunchedEffect(data) {
-        withContext(Dispatchers.IO) {
-            for (entry in data.skins + data.capes) {
-                if (bitmaps.containsKey(entry.id)) continue
-                library.bytes(entry.id)?.let(::decodeSkin)?.let { bitmaps[entry.id] = it }
-            }
+        for (entry in data.skins + data.capes) {
+            if (bitmaps.containsKey(entry.id)) continue
+            val decoded = withContext(Dispatchers.IO) { library.bytes(entry.id)?.let(::decodeSkin) } ?: continue
+            bitmaps[entry.id] = decoded
         }
     }
 
@@ -222,12 +226,12 @@ private fun Wardrobe(session: SessionData) {
     }
     val defaultBitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
     LaunchedEffect(defaults) {
-        withContext(Dispatchers.IO) {
-            for (def in defaults) {
-                if (defaultBitmaps.containsKey(def.name)) continue
-                runCatching { Files.readAllBytes(def.file) }.getOrNull()
-                    ?.let(::decodeSkin)?.let { defaultBitmaps[def.name] = it }
-            }
+        for (def in defaults) {
+            if (defaultBitmaps.containsKey(def.name)) continue
+            val decoded = withContext(Dispatchers.IO) {
+                runCatching { Files.readAllBytes(def.file) }.getOrNull()?.let(::decodeSkin)
+            } ?: continue
+            defaultBitmaps[def.name] = decoded
         }
     }
 
@@ -255,13 +259,14 @@ private fun Wardrobe(session: SessionData) {
     // skin change surfaces as a new entry on the next open, an identical one dedups.
     LaunchedEffect(session.playerName) {
         val bytes = skinManager.getRawSkinBytes(session.playerName) ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) {
+        val primed = withContext(Dispatchers.IO) {
             // No pixel hash -> no dedup, so skip rather than accumulate a copy per open.
-            val sha = skinContentHash(bytes) ?: return@withContext
+            val sha = skinContentHash(bytes) ?: return@withContext null
             val entry = library.addUnique(bytes, session.playerName, slim = false, now = System.currentTimeMillis(), sha = sha)
             library.markApplied(entry.id, System.currentTimeMillis())
-            decodeSkin(bytes)?.let { bitmaps[entry.id] = it }
+            decodeSkin(bytes)?.let { entry.id to it }
         }
+        primed?.let { (id, bitmap) -> bitmaps[id] = bitmap }
         refreshKey++
     }
 
@@ -278,7 +283,7 @@ private fun Wardrobe(session: SessionData) {
             }
             // Prime the decode cache from the bytes in hand so the preview
             // flips to the import without a placeholder frame.
-            withContext(Dispatchers.IO) { decodeSkin(bytes)?.let { bitmaps[entry.id] = it } }
+            withContext(Dispatchers.IO) { decodeSkin(bytes) }?.let { bitmaps[entry.id] = it }
             select(entry.id)
             refreshKey++
         }
