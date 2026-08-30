@@ -490,7 +490,7 @@ internal class ContentTabState(
 
     /** Drop files into the folder the active filter points at (mods by default). */
     fun addFiles(dialogSettings: FileKitDialogSettings) {
-        scope.launch {
+        writeScope.launch {
             val kind = filter.kind ?: ContentKind.Mod
             val extensions = if (kind == ContentKind.Mod) listOf("jar") else listOf("zip")
             val picked = pickFiles(

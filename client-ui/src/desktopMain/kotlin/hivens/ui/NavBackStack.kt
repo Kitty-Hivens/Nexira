@@ -64,8 +64,8 @@ class NavBackStack(root: Screen) {
      * "Profile > Wardrobe > About > Wardrobe" trail.
      */
     fun switchTo(screen: Screen) {
-        if (screen == current && entries.size == 1) return
         forwardStack.clear()
+        if (screen == current && entries.size == 1) return
         entries.clear()
         entries.add(screen)
     }

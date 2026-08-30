@@ -83,7 +83,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.nio.file.Path
-import java.util.UUID
 
 /**
  * Library = user's collection of installed packs. The bottom-right action opens
@@ -122,23 +121,36 @@ fun LibraryScreen(
     // A finished create opens the new instance's detail (Content tab), then
     // evicts the snapshot.
     LaunchedEffect(createSnap?.phase) {
-        val phase = createSnap?.phase
-        val key = createKey
-        if (key != null && phase is InstallPhase.Succeeded) {
-            installService.dismiss(key)
-            createKey = null
-            onScreenChange(Screen.PackDetail(phase.instanceId))
+        val key = createKey ?: return@LaunchedEffect
+        when (val phase = createSnap?.phase) {
+            is InstallPhase.Succeeded -> {
+                installService.dismiss(key)
+                createKey = null
+                onScreenChange(Screen.PackDetail(phase.instanceId))
+            }
+            // The user stopped it; there is nothing left to say about it.
+            InstallPhase.Cancelled -> {
+                installService.dismiss(key)
+                createKey = null
+            }
+            else -> Unit
         }
     }
 
     // Same for a finished import, which now takes the same road.
     LaunchedEffect(importSnap?.phase) {
-        val phase = importSnap?.phase
-        val key = importKey
-        if (key != null && phase is InstallPhase.Succeeded) {
-            installService.dismiss(key)
-            importKey = null
-            onScreenChange(Screen.PackDetail(phase.instanceId))
+        val key = importKey ?: return@LaunchedEffect
+        when (val phase = importSnap?.phase) {
+            is InstallPhase.Succeeded -> {
+                installService.dismiss(key)
+                importKey = null
+                onScreenChange(Screen.PackDetail(phase.instanceId))
+            }
+            InstallPhase.Cancelled -> {
+                installService.dismiss(key)
+                importKey = null
+            }
+            else -> Unit
         }
     }
 
@@ -161,15 +173,15 @@ fun LibraryScreen(
             )
             val file = Path.of(picked?.path ?: return@launch)
             importKey = installService.run(
-                key   = "import:${file.fileName}:${UUID.randomUUID().toString().take(8)}",
+                key   = "import:${file.fileName}",
                 title = file.fileName.toString(),
-            ) { _, progress -> importService.import(file, progress) }
+            ) { reserve, progress -> importService.import(file, reserve, progress) }
         }
     }
 
     fun startCreate(name: String, mc: String, loader: String?, loaderVersion: String) {
         showCreate = false
-        createKey = installService.run(key = "create:$name:${UUID.randomUUID().toString().take(8)}", title = name) { reserve, progress ->
+        createKey = installService.run(key = "create:$name", title = name) { reserve, progress ->
             creator.create(name, mc, loader, loaderVersion, reserve, progress)
         }
     }
@@ -200,7 +212,17 @@ fun LibraryScreen(
                     text = err,
                     style = MaterialTheme.typography.bodySmall,
                     color = NxTheme.colors.error,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, end = 96.dp, bottom = 34.dp),
+                    modifier = Modifier.align(Alignment.BottomStart)
+                        .padding(start = 24.dp, end = 96.dp, bottom = 34.dp)
+                        .clickable {
+                            if (importError != null) {
+                                importKey?.let(installService::dismiss)
+                                importKey = null
+                            } else {
+                                createKey?.let(installService::dismiss)
+                                createKey = null
+                            }
+                        },
                 )
             }
 
