@@ -38,7 +38,7 @@ composeMaterial3  = "1.11.0-alpha07"
 # The desktop artifact has no Compose-Path bridge, so nx-ui builds the path from
 # the cubics itself (see PolygonShape).
 graphicsShapes    = "1.1.0"
-markdownRenderer  = "0.43.0"
+markdownRenderer  = "0.44.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
 markdown          = "0.7.8"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
