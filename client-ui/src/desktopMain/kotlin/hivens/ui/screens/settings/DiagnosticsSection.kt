@@ -35,6 +35,7 @@ import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Path
 import kotlin.system.exitProcess
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -109,7 +110,30 @@ internal fun DiagnosticsSection(
     // did nothing: it re-enabled, no file opened, and the reason -- a full disk,
     // a read-only data dir -- was known and thrown away.
     var bundleError    by remember { mutableStateOf<String?>(null) }
-    val bundleScope    = rememberCoroutineScope()
+    // The app's scope, not the composition's. Writing the archive does not stop
+    // because the reader switched category, and on the composition's scope that
+    // switch cancelled it mid-ZIP and left a partial file with the flag raised.
+    val bundleScope: CoroutineScope = koinInject()
+
+    // One implementation for the button and the automation hook. They were two,
+    // and had already drifted: the hook reported no failure and revealed nothing.
+    fun createBundle(reveal: Boolean) {
+        if (bundleBusy) return
+        bundleBusy = true
+        bundleError = null
+        bundleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }
+                }.onSuccess { zip ->
+                    lastBundlePath = zip
+                    if (reveal) SystemActions.openFile(zip.parent.toFile())
+                }.onFailure { bundleError = it.message ?: it::class.simpleName }
+            } finally {
+                bundleBusy = false
+            }
+        }
+    }
 
     NxSection(s.settingsSectionDiagnostics, titleModifier = titleModifier) {
         if (af.providesDebugPanel && showAprilDebug) {
@@ -150,21 +174,7 @@ internal fun DiagnosticsSection(
                     Flexible("settings_create_diag_bundle_btn", FlexibleKind.Button) {
                         NxButton(
                             label    = s.settingsCreateDiagnosticBundle,
-                            onClick  = {
-                                if (bundleBusy) return@NxButton
-                                bundleBusy = true
-                                bundleError = null
-                                bundleScope.launch {
-                                    val made = withContext(Dispatchers.IO) {
-                                        runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }
-                                    }
-                                    made.onSuccess { zip ->
-                                        lastBundlePath = zip
-                                        SystemActions.openFile(zip.parent.toFile())
-                                    }.onFailure { bundleError = it.message ?: it::class.simpleName }
-                                    bundleBusy = false
-                                }
-                            },
+                            onClick  = { createBundle(reveal = true) },
                             modifier = Modifier.fillMaxWidth(),
                             style    = NxButtonStyle.Secondary,
                             enabled  = !bundleBusy,
@@ -191,16 +201,9 @@ internal fun DiagnosticsSection(
                         )
                     }
                 }
-                PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) {
-                    bundleBusy = true
-                    bundleScope.launch {
-                        val zip = withContext(Dispatchers.IO) {
-                            runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }.getOrNull()
-                        }
-                        if (zip != null) lastBundlePath = zip
-                        bundleBusy = false
-                    }
-                }
+                // No reveal under automation: a file manager opening on top of the
+                // window is not something a scripted run can dismiss.
+                PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) { createBundle(reveal = false) }
                 PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
                     val zip = lastBundlePath ?: return@PuppetClick
                     runCatching {

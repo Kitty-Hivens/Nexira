@@ -113,10 +113,23 @@ internal fun PackDataSection(
             }
         }
         if (pack.packRef.origin != PackOrigin.Local) {
+            // Detaching costs the instance its update source and cannot be undone
+            // from here. The browsing surface already refuses to carry the action
+            // for that reason; one click and no question was not much better.
+            var confirmDetach by remember { mutableStateOf(false) }
+            if (confirmDetach) {
+                DestructiveConfirmDialog(
+                    title        = s.packSettingsDetach,
+                    body         = s.packSettingsDetachDesc,
+                    confirmLabel = s.packSettingsDetachAction,
+                    onConfirm    = { scope.launch { service.detachToLocal(pack) } },
+                    onDismiss    = { confirmDetach = false },
+                )
+            }
             NxRow(title = s.packSettingsDetach, subtitle = s.packSettingsDetachDesc) {
                 NxButton(
                     s.packSettingsDetachAction,
-                    onClick = { scope.launch { service.detachToLocal(pack) } },
+                    onClick = { confirmDetach = true },
                     style = NxButtonStyle.Secondary,
                     compact = true,
                 )
