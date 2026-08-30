@@ -45,13 +45,17 @@ enum class NxSurfaceLevel { Sunken, Base, Raised, Floating }
  * Tonal-ladder colour per level. Adjacent levels always carry a tone step; the bevel
  * hairline supplies the second separation signal regardless of its size.
  *
- * Monotonic on dark only (L* 8.3 / 11.3 / 13.2 / 17.1 -- deeper reads darker all the
- * way up). The light ladder cannot be: its page IS the lightest surface there is
- * (Base is white, L* 100), so every other level descends from it and depth runs the
- * same direction on both sides -- Sunken 95.5, Raised 93.4, Floating 90.9. A recessed
- * plane and a lifted one therefore land within 2 L* of each other and are told apart
- * by the hairline rather than by tone. Nesting still steps correctly, which is what
- * the ladder is mostly asked for; two sibling planes at different depths do not.
+ * Monotonic on dark (L* 8.2 / 11.3 / 13.2 / 17.1 -- deeper reads darker all the way
+ * up) and monotonic on light in the same direction (97.0 / 94.1 / 91.3 / 87.8), which
+ * is the thing to know about it: the light page is white at L* 100 and every rung
+ * descends from it, so Sunken is the LIGHTEST plane there rather than the deepest.
+ * A field at Sunken inside a section at Floating is a well on dark and a plate on
+ * light. Nesting still steps -- each rung is 3 L* or so from the next, in one
+ * direction -- so a plane inside a plane reads correctly on both; what does not carry
+ * over is the word: on light the levels are rungs, not depths.
+ *
+ * The figures are the palette's, and they move when it does. They were carried
+ * forward once without being recomputed and were out by up to 3 L*.
  *
  * A level names a colour directly. There used to be an enum of theme ROLES in between,
  * so a level resolved to a role and a role to a field -- two hops and a vocabulary of
