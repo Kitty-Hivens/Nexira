@@ -265,10 +265,14 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
     // session counter, NOT the pack id -- relaunching the SAME pack
     // keeps the id but must still refresh the list.
     val sessionEpoch = gameConsole.sessionStartCount
-    val logFiles = remember(packId, instanceDir, sessionEpoch) {
-        // Instance's own logs first (latest.log pinned to the top), then
-        // the launcher's redacted captures for this pack.
-        listInstanceLogs(instanceDir) + gameConsole.capturedSessionFiles(packId)
+    // Instance's own logs first (latest.log pinned to the top), then the
+    // launcher's redacted captures for this pack. Off the composition thread:
+    // two directory listings and a lastModified sort dropped frames on a cold
+    // cache, and ran again on every launch.
+    val logFiles by produceState(emptyList<File>(), packId, instanceDir, sessionEpoch) {
+        value = withContext(Dispatchers.IO) {
+            listInstanceLogs(instanceDir) + gameConsole.capturedSessionFiles(packId)
+        }
     }
 
     // null = the "General" live launcher console; a File = a read-only view.
@@ -556,7 +560,7 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
         NxIcon.Description to s.packDetailTabLogs,
     )
     FlowRow(
-        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement   = Arrangement.spacedBy(6.dp),
     ) {

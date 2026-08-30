@@ -157,7 +157,7 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     }
 
     Column(
-        modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier            = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Toolbar(
@@ -621,7 +621,7 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
     LaunchedEffect(state, state.submitted, retryTick) { state.runSearch(state.submitted) }
 
     Column(
-        modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier            = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

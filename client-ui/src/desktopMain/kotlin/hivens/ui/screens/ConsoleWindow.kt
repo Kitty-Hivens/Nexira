@@ -123,6 +123,9 @@ import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import java.awt.datatransfer.StringSelection
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -483,23 +486,30 @@ internal fun ConsoleContent(
     // views load the whole tail-bounded file up front, so there is nothing to
     // page. loadHistoryBefore prepends to the buffer on the drainer and the next
     // snapshot carries the older entries; we only do the scroll-anchor shift.
-    LaunchedEffect(canvasState.scroll.offsetPx, historyOffset, isLive) {
-        if (!shouldPageHistory(isLive, historyLoading, historyOffset, canvasState.scroll.offsetPx)) {
-            return@LaunchedEffect
-        }
-        historyLoading = true
-        try {
-            val loaded = gameConsole.loadHistoryBefore(count = 500)
-            if (loaded.isNotEmpty()) {
-                // Shift by an approximate line height per prepended entry so the
-                // user's visual line stays put; exact for no-wrap, off by wrap
-                // reflow (sub-100 px) until those lines re-measure.
-                val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
-                canvasState.scroll.shiftBy(loaded.size * approxLineHeightPx)
+    LaunchedEffect(isLive) {
+        // Watched, not keyed on. With the scroll offset in the key this effect was
+        // cancelled and relaunched on every scroll frame, so holding the wheel at
+        // the top started and killed a 500-entry disk read dozens of times a
+        // second and the older lines only arrived once the scrolling stopped --
+        // the finally re-armed the guard each time for the next frame to try again.
+        snapshotFlow { shouldPageHistory(isLive, historyLoading, historyOffset, canvasState.scroll.offsetPx) }
+            .distinctUntilChanged()
+            .filter { it }
+            .collect {
+                historyLoading = true
+                try {
+                    val loaded = gameConsole.loadHistoryBefore(count = 500)
+                    if (loaded.isNotEmpty()) {
+                        // Shift by an approximate line height per prepended entry so the
+                        // user's visual line stays put; exact for no-wrap, off by wrap
+                        // reflow (sub-100 px) until those lines re-measure.
+                        val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
+                        canvasState.scroll.shiftBy(loaded.size * approxLineHeightPx)
+                    }
+                } finally {
+                    historyLoading = false
+                }
             }
-        } finally {
-            historyLoading = false
-        }
     }
 
     // Selection lives in `selection` (LogSelection); the canvas renders and
