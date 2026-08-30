@@ -95,7 +95,7 @@ fun WorldsTabPane(instanceDir: Path, modifier: Modifier = Modifier) {
             message    = s.worldsTabErrorMessage,
             retryLabel = s.contentTabRetry,
             onRetry    = { retryTick++ },
-            modifier   = modifier.fillMaxSize().padding(20.dp),
+            modifier   = modifier.fillMaxSize().padding(16.dp),
         )
         is WorldsState.Loaded -> WorldsList(worlds = st.worlds, servers = st.servers, modifier = modifier)
     }
@@ -118,7 +118,7 @@ private fun WorldsList(
 ) {
     val s = LocalStrings.current
     LazyColumn(
-        modifier            = modifier.fillMaxSize().padding(20.dp),
+        modifier            = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { NxSectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
