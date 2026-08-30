@@ -732,6 +732,8 @@ interface AppStrings {
     val wardrobeApplyCape: String
     val wardrobeCapeClanHint: String
     val wardrobeDefaults: String
+    val wardrobeDeleteTitle: String
+    val wardrobeDeleteBody: String
     val wardrobePoseStand: String
     val wardrobePoseWave: String
     val wardrobePoseSit: String

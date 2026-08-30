@@ -672,6 +672,8 @@ object GermanStrings : AppStrings {
     override val wardrobeApplyCape           = "Clan-Umhang setzen"
     override val wardrobeCapeClanHint        = "Umhänge gelten clanweit -- nur der Clan-Anführer kann einen setzen."
     override val wardrobeDefaults            = "Standard-Skins"
+    override val wardrobeDeleteTitle         = "Aus der Bibliothek löschen?"
+    override val wardrobeDeleteBody          = "Die Datei wird von diesem Rechner entfernt. Was bereits auf dem Server angewendet ist, bleibt bestehen."
     override val wardrobePoseStand           = "Stehend"
     override val wardrobePoseWave            = "Winken"
     override val wardrobePoseSit             = "Sitzend"
