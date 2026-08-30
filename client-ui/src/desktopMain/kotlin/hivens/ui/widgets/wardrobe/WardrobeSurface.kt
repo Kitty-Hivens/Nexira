@@ -50,6 +50,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
+import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.AppStrings
@@ -237,6 +238,28 @@ private fun Wardrobe(session: SessionData) {
 
     val selectedBitmap = selectedId?.let { bitmaps[it] }
     val defaultBitmap = selectedDefault?.let { defaultBitmaps[it.name] }
+
+    // A card's whole surface selects and the trash sits inside it, so a near-miss
+    // used to be the last thing that happened to an imported file: delete went
+    // straight to the library with no confirm and nothing to undo it with.
+    var pendingDelete by remember { mutableStateOf<String?>(null) }
+    pendingDelete?.let { id ->
+        DestructiveConfirmDialog(
+            title        = s.wardrobeDeleteTitle,
+            body         = s.wardrobeDeleteBody,
+            confirmLabel = s.editorDelete,
+            onConfirm    = {
+                scope.launch {
+                    withContext(Dispatchers.IO) { library.delete(id) }
+                    bitmaps.remove(id)
+                    if (selectedId == id) selectedId = null
+                    if (selectedCapeId == id) selectedCapeId = null
+                    refreshKey++
+                }
+            },
+            onDismiss    = { pendingDelete = null },
+        )
+    }
     val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
 
     // Cape capability. Fast path: a fresh login already said "no clan", no
@@ -433,14 +456,7 @@ private fun Wardrobe(session: SessionData) {
                         selected = entry.id == selectedId,
                         isActive = entry.id == data.activeSkinId,
                         onClick = { selectedId = entry.id; selectedDefault = null },
-                        onDelete = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) { library.delete(entry.id) }
-                                bitmaps.remove(entry.id)
-                                if (selectedId == entry.id) selectedId = null
-                                refreshKey++
-                            }
-                        },
+                        onDelete = { pendingDelete = entry.id },
                     )
                 }
 
@@ -466,14 +482,7 @@ private fun Wardrobe(session: SessionData) {
                             selected = entry.id == selectedCapeId,
                             isActive = entry.id == data.activeCapeId,
                             onClick = { selectedCapeId = entry.id },
-                            onDelete = {
-                                scope.launch {
-                                    withContext(Dispatchers.IO) { library.delete(entry.id) }
-                                    bitmaps.remove(entry.id)
-                                    if (selectedCapeId == entry.id) selectedCapeId = null
-                                    refreshKey++
-                                }
-                            },
+                            onDelete = { pendingDelete = entry.id },
                         )
                     }
                 }

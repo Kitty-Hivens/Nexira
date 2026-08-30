@@ -673,6 +673,8 @@ object EnglishStrings : AppStrings {
     override val wardrobeApplyCape           = "Set clan cape"
     override val wardrobeCapeClanHint        = "Capes are clan-wide -- only the clan leader can set one."
     override val wardrobeDefaults            = "Default skins"
+    override val wardrobeDeleteTitle         = "Delete from the library?"
+    override val wardrobeDeleteBody          = "The file is removed from this machine. What is already applied on the server stays as it is."
     override val wardrobePoseStand           = "Standing"
     override val wardrobePoseWave            = "Wave"
     override val wardrobePoseSit             = "Sitting"

@@ -673,6 +673,8 @@ object RussianStrings : AppStrings {
     override val wardrobeApplyCape           = "Задать плащ клана"
     override val wardrobeCapeClanHint        = "Плащ клановый — задаёт только глава клана."
     override val wardrobeDefaults            = "Стандартные скины"
+    override val wardrobeDeleteTitle         = "Удалить из библиотеки?"
+    override val wardrobeDeleteBody          = "Файл удалится с этого компьютера. То, что уже применено на сервере, останется как есть."
     override val wardrobePoseStand           = "Стоя"
     override val wardrobePoseWave            = "Приветствие"
     override val wardrobePoseSit             = "Сидя"
