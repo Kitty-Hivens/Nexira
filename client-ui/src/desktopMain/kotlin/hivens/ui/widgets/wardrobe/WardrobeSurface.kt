@@ -522,13 +522,15 @@ private fun SkinCard(
     val style = LocalStyle.current
     Column(
         modifier = Modifier
+            // Before the clip, not after: a stroke is centred on the outline, so
+            // half of it falls outside the shape and drawing it inside the clip
+            // left a half-width ring the corner antialiasing then ate.
+            .then(
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(style.cardCorner))
+                else Modifier
+            )
             .clip(RoundedCornerShape(style.cardCorner))
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
-            .border(
-                width = if (selected) 2.dp else 0.dp,
-                color = if (selected) NxTheme.colors.primary else NxTheme.colors.primary.copy(alpha = 0f),
-                shape = RoundedCornerShape(style.cardCorner),
-            )
             .clickable(onClick = onClick)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -613,13 +615,15 @@ private fun CapeCard(
     val style = LocalStyle.current
     Column(
         modifier = Modifier
+            // Before the clip, not after: a stroke is centred on the outline, so
+            // half of it falls outside the shape and drawing it inside the clip
+            // left a half-width ring the corner antialiasing then ate.
+            .then(
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(style.cardCorner))
+                else Modifier
+            )
             .clip(RoundedCornerShape(style.cardCorner))
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
-            .border(
-                width = if (selected) 2.dp else 0.dp,
-                color = if (selected) NxTheme.colors.primary else NxTheme.colors.primary.copy(alpha = 0f),
-                shape = RoundedCornerShape(style.cardCorner),
-            )
             .clickable(onClick = onClick)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

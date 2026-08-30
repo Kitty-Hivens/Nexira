@@ -785,6 +785,8 @@ object RussianStrings : AppStrings {
     override val contentTabFetchErrorTitle      = "Не удалось загрузить содержимое сборки"
     override val contentTabFetchErrorGeneric    = "Манифест с зеркала не загрузился."
     override val contentTabRetry                = "Повторить"
+    override val modBrowserErrorTitle           = "Поиск не удался"
+    override val modBrowserErrorMessage         = "Не удалось связаться с Modrinth. Проверьте соединение и повторите."
     override val contentTabRoleSection          = "Слоты по ролям"
     override fun contentTabOptionalSection(count: Int) = "Опциональные моды ($count)"
     override fun contentTabIncompatibleWith(name: String) = "Несовместим с $name"

@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -62,6 +65,7 @@ import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.RetryStateBlock
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxKebabButton
@@ -281,11 +285,16 @@ private fun Toolbar(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment     = Alignment.CenterVertically,
         ) {
-            FilterChip(s.contentFilterAll, filter == ContentFilter.All) { onFilter(ContentFilter.All) }
-            FilterChip(s.contentFilterMods, filter == ContentFilter.Mods) { onFilter(ContentFilter.Mods) }
-            FilterChip(s.contentFilterResourcePacks, filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
-            FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
-            Spacer(Modifier.weight(1f))
+            Row(
+                modifier              = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                FilterChip(s.contentFilterAll, filter == ContentFilter.All) { onFilter(ContentFilter.All) }
+                FilterChip(s.contentFilterMods, filter == ContentFilter.Mods) { onFilter(ContentFilter.Mods) }
+                FilterChip(s.contentFilterResourcePacks, filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
+                FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
+            }
             // The chips answer what kind of thing a row is; everything that
             // narrows WITHIN a section lives in one panel, so the row does not
             // grow a control per axis.
@@ -460,6 +469,8 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             style      = MaterialTheme.typography.labelLarge,
             color      = if (selected) Color.White else NxTheme.colors.textSecondary,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
         )
     }
 }
@@ -606,7 +617,8 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
     // composition concern; both halves of the query live on the holder, so a
     // rebuilt one cannot leave them disagreeing.
     LaunchedEffect(state, state.query) { delay(350.milliseconds); state.submitted = state.query }
-    LaunchedEffect(state, state.submitted) { state.runSearch(state.submitted) }
+    var retryTick by remember(state) { mutableIntStateOf(0) }
+    LaunchedEffect(state, state.submitted, retryTick) { state.runSearch(state.submitted) }
 
     Column(
         modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
@@ -625,6 +637,14 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
             r == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
+            state.searchFailed -> RetryStateBlock(
+                title      = s.modBrowserErrorTitle,
+                message    = s.modBrowserErrorMessage,
+                retryLabel = s.contentTabRetry,
+                onRetry    = { retryTick++ },
+                modifier   = Modifier.fillMaxSize().padding(20.dp),
+                titleStyle = MaterialTheme.typography.titleMedium,
+            )
             r.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
             }

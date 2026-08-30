@@ -843,6 +843,8 @@ interface AppStrings {
     val contentTabFetchErrorTitle: String
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String
+    val modBrowserErrorTitle: String
+    val modBrowserErrorMessage: String
     val contentTabRoleSection: String
     fun contentTabOptionalSection(count: Int): String
     fun contentTabIncompatibleWith(name: String): String

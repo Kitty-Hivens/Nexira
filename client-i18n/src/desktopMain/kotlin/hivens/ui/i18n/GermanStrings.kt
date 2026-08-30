@@ -784,6 +784,8 @@ object GermanStrings : AppStrings {
     override val contentTabFetchErrorTitle      = "Pack-Inhalt konnte nicht geladen werden"
     override val contentTabFetchErrorGeneric    = "Das Mirror-Manifest konnte nicht geladen werden."
     override val contentTabRetry                = "Erneut versuchen"
+    override val modBrowserErrorTitle           = "Suche fehlgeschlagen"
+    override val modBrowserErrorMessage         = "Modrinth ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut."
     override val contentTabRoleSection          = "Rollen-Slots"
     override fun contentTabOptionalSection(count: Int) = "Optionale Mods ($count)"
     override fun contentTabIncompatibleWith(name: String) = "Inkompatibel mit $name"
