@@ -5,6 +5,9 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
@@ -51,7 +54,13 @@ fun SettingsScreen(
 
     val initialSettings = remember { settingsService.getSettings() }
     val form            = remember { SettingsFormState(initialSettings) }
-    var selectedCategory by remember { mutableStateOf(SettingsCategory.Appearance) }
+    // Saved by name rather than ordinal: an ordinal would quietly point somewhere
+    // else the first time the enum is reordered.
+    var selectedCategory by rememberSaveable(
+        stateSaver = Saver(save = { it.name }, restore = { SettingsCategory.valueOf(it) }),
+    ) { mutableStateOf(SettingsCategory.Appearance) }
+
+    val sectionRetention = rememberSaveableStateHolder()
 
     fun save() {
         val toPersist = form.mergeInto(settingsService.getSettings())
@@ -93,6 +102,11 @@ fun SettingsScreen(
                         // ended flush against the clip with its bevel cut through.
                         .padding(bottom = 24.dp),
                 ) {
+                    // Section-local state -- a half-typed console art draft, a
+                    // filled-in field -- outlives a look at a neighbouring category.
+                    // The scroll above is deliberately NOT in here: a category opens
+                    // at its top, which is the whole point of keying it per category.
+                    sectionRetention.SaveableStateProvider(selectedCategory.name) {
                     when (selectedCategory) {
                         SettingsCategory.Appearance -> AppearanceSection(
                             form                         = form,
@@ -124,6 +138,7 @@ fun SettingsScreen(
                             paths       = paths,
                             onOpenAbout = onOpenAbout,
                         )
+                    }
                     }
                 }
             }

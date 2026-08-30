@@ -29,6 +29,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,7 +148,7 @@ fun PackDetailScreen(
     val pack = state.pack ?: return
     val instanceDir = state.instanceDir ?: return
 
-    var tabIndex by remember(pack.id) { mutableIntStateOf(0) }
+    var tabIndex by rememberSaveable(pack.id) { mutableIntStateOf(0) }
     val s = LocalStrings.current
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
@@ -206,12 +208,18 @@ fun PackDetailScreen(
 
         PackTabBar(selected = tabIndex, onSelect = { tabIndex = it })
 
+        // A tab body is disposed when another is selected, so an expanded file
+        // tree, a selected file and every scroll position in it were gone by the
+        // time the reader came back one click later.
+        val tabRetention = rememberSaveableStateHolder()
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
+            tabRetention.SaveableStateProvider(tabIndex) {
             when (tabIndex) {
                 0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)
+            }
             }
         }
     }
