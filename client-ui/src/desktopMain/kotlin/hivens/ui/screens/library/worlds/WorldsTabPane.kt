@@ -133,7 +133,12 @@ private fun WorldsList(
         if (servers.isEmpty()) {
             item { EmptyHint(text = s.worldsTabServersEmpty) }
         } else {
-            items(items = servers, key = { it.ip + it.name }) { srv -> ServerCard(entry = srv) }
+            // Keyed on position, because a server list has no identity of its own:
+            // Minecraft lets the same address be added twice, a blank name falls back
+            // to the address, and the concatenation had no separator either -- all
+            // three produce a duplicate key, which LazyColumn throws on. The file is
+            // an ordered list and is re-read whole, so the index is the identity.
+            items(count = servers.size, key = { it }) { i -> ServerCard(entry = servers[i]) }
         }
 
         item { Spacer(Modifier.height(8.dp)) }
