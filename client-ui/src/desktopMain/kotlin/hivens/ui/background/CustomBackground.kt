@@ -21,8 +21,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import hivens.ui.theme.WallpaperTone
@@ -225,13 +223,18 @@ internal fun rememberParallaxOffset(mouse: () -> Offset, intensity: Float): Para
     val offset = remember { ParallaxOffset(Animatable(0f), Animatable(0f)) }
     LaunchedEffect(intensity) {
         snapshotFlow { parallaxTranslationFor(latestMouse(), intensity) }
-            // collectLatest, so a new pointer position cancels the spring in flight
-            // and the next one starts from wherever it had reached.
-            .collectLatest { target ->
-                coroutineScope {
-                    launch { offset.x.animateTo(target.x, PARALLAX_SPRING) }
-                    launch { offset.y.animateTo(target.y, PARALLAX_SPRING) }
-                }
+            // Each target is launched, not awaited. Animatable retargets through its
+            // own mutex: the running animation is cancelled by the next animateTo and
+            // the next one continues from the current value AND velocity.
+            //
+            // collectLatest here instead cancelled the whole coroutine on every
+            // emission, and a moving pointer emits once a frame -- so the spring was
+            // cancelled before it was ever handed a frame and the offset stayed at
+            // zero for as long as the pointer kept moving. It only travelled once the
+            // pointer stopped, which is the opposite of what parallax is.
+            .collect { target ->
+                launch { offset.x.animateTo(target.x, PARALLAX_SPRING) }
+                launch { offset.y.animateTo(target.y, PARALLAX_SPRING) }
             }
     }
     return offset
