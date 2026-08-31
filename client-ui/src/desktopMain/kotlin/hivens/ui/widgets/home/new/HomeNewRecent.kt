@@ -62,11 +62,14 @@ data class RecentProps(
 // launches still shows the tiles (sorted by createdAt), so the new
 // home reads as populated rather than blank. Empty repo shows a CTA
 // pointing at Browse.
+// No surface. The tiles are the object here and they carry their own art; a plane
+// behind them fills the slot's whole width while they keep their own, so the row
+// ends up sitting on a bar several times longer than itself. It also declared a top
+// inset the column below already applies, so the two stacked.
 @Widget(
     id = "home.new.recent",
     displayName = "widget.home.new.recent",
     propsClass = RecentProps::class,
-    surface = """{"fill":"base","opacity":0.4,"padding":{"top":12.0}}""",
 )
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
