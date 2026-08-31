@@ -10,7 +10,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,9 +109,18 @@ fun SurfacePropertiesPanel(
                 modifier              = Modifier
                     .fillMaxWidth()
                     .pointerInput(Unit) {
-                        detectDragGestures { change, drag ->
-                            change.consume()
-                            offset.drag(drag)
+                        // No slop: a header is a handle. detectDragGestures holds the
+                        // first few pixels back before it reports anything, which on a
+                        // short strip reads as the panel refusing to be grabbed. The
+                        // editor's own widget drag starts on the press for this reason.
+                        // requireUnconsumed yields to the close button sitting in here.
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            drag(down.id) { change ->
+                                change.consume()
+                                offset.drag(change.positionChange())
+                            }
                         }
                     }
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
