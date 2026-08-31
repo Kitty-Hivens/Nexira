@@ -55,7 +55,7 @@ coil              = "3.5.0"
 # font manager. Chosen over Batik for being a fraction of the size and for having
 # no script engine and no external-entity resolution to switch off: description
 # markup is written by third parties.
-jsvg              = "2.0.0"
+jsvg              = "2.1.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
 materialColorUtils = "5.0.0"
