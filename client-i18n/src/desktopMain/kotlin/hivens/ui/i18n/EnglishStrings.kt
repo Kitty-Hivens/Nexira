@@ -727,6 +727,7 @@ object EnglishStrings : AppStrings {
 
     override val browseDetailTabDescription = "Description"
     override val browseDetailTabGallery     = "Gallery"
+    override val browseDetailNoDescription  = "Nothing is written about this pack."
     override val browseDetailErrorTitle    = "Could not load pack"
     override val browseDetailErrorMessage  = "Could not fetch the manifest. Check your connection and retry."
     override val browseDetailInstallButton = "Install"

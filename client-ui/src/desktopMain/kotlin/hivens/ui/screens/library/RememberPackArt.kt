@@ -3,6 +3,7 @@ package hivens.ui.screens.library
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import hivens.core.data.PackInstance
 import hivens.launcher.catalogue.PackArt
 import hivens.launcher.catalogue.PackArtResolver
@@ -24,16 +25,23 @@ import org.koin.compose.koinInject
 @Composable
 fun rememberPackArt(instance: PackInstance): PackArt {
     val resolver: PackArtResolver = koinInject()
+    // Seeded with what is already known, so a pack the resolver has answered once
+    // paints its cover on the first frame. It used to start from the instance's own
+    // (usually absent) urls and reach the cache only after a dispatcher hop, so
+    // arriving on a page always showed the placeholder first and swapped it out --
+    // the cover appearing after the navigation rather than with it.
+    val known = remember(instance.id, instance.iconUrl, instance.bannerUrl) { resolver.cached(instance) }
     val art by produceState(
-        initialValue = PackArt(instance.iconUrl, instance.bannerUrl),
+        initialValue = known ?: PackArt.NONE,
         key1         = instance.id,
         key2         = instance.iconUrl,
         key3         = instance.bannerUrl,
     ) {
-        value = PackArt(instance.iconUrl, instance.bannerUrl)
-        if (instance.iconUrl == null && instance.bannerUrl == null) {
-            value = withContext(Dispatchers.IO) { resolver.resolve(instance) }
+        if (known != null) {
+            value = known
+            return@produceState
         }
+        value = withContext(Dispatchers.IO) { resolver.resolve(instance) }
     }
     return art
 }

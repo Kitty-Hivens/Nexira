@@ -781,6 +781,7 @@ interface AppStrings {
     /** Tabs on a catalogue pack page. The gallery tab is offered only when the pack has shots. */
     val browseDetailTabDescription: String
     val browseDetailTabGallery: String
+    val browseDetailNoDescription: String
     val browseDetailErrorTitle: String
     val browseDetailErrorMessage: String
     val browseDetailInstallButton: String
