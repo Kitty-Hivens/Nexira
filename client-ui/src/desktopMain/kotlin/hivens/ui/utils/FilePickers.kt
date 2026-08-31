@@ -5,6 +5,7 @@ import androidx.compose.runtime.remember
 import hivens.ui.chrome.LocalComposeWindow
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitDialogParent
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -33,7 +34,9 @@ fun rememberFileDialogSettings(title: String? = null): FileKitDialogSettings {
     // A window that is not displayable has no native handle to hand over, and
     // FileKit reads that handle rather than falling back.
     val window = LocalComposeWindow.current?.takeIf { it.isDisplayable }
-    return remember(title, window) { FileKitDialogSettings(title = title, parentWindow = window) }
+    return remember(title, window) {
+        FileKitDialogSettings(title = title, parent = window?.let(FileKitDialogParent::awt))
+    }
 }
 
 /** One file, or null when the user cancelled or the dialog could not run. */
