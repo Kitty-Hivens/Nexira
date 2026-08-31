@@ -1,13 +1,10 @@
 package hivens.ui.widgets.sample
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
@@ -20,7 +17,7 @@ import hivens.widget.model.WidgetInstance
 // for nested drag&drop, schema_version=2's children field, and the
 // editor's smallest-area-first hit-test all converge here.
 //
-// Visually a tinted glass card with 12dp interior padding; the body
+// The plane comes from the declaration below, not from this body; the
 // slot stacks its children vertically. Nesting depth is communicated
 // only through EditableWidgetChrome's depth-aware border alpha;
 // containers themselves stay visually quiet so the user's own widgets
