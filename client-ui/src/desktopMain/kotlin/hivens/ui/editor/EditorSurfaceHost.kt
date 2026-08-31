@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
-import hivens.core.data.UiStyle
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
@@ -144,8 +143,6 @@ fun EditorSurfaceHost(
     homeView: HomeView,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
-    uiStyle: UiStyle = UiStyle.Celestia,
-    onUiStyleChanged: (UiStyle) -> Unit = {},
     // The host now wraps the WHOLE shell Row (rails included) so the editor's
     // decorators reach rail widgets. These insets keep the chrome overlays
     // (pill / palette / prop panel / vignette) anchored over the center pane,
@@ -584,7 +581,6 @@ fun EditorSurfaceHost(
                             createdAt     = System.currentTimeMillis(),
                             graph         = currentGraph,
                             customization = customization,
-                            uiStyle       = uiStyle,
                         )
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             presetRepo.save(envelope)
@@ -631,7 +627,6 @@ fun EditorSurfaceHost(
                                     }
                                     layoutRepo.update { seeded.graph }
                                     onCustomizationChanged(env.customization)
-                                    onUiStyleChanged(env.uiStyle)
                                     presetPanelOpen = false
                                 }
                                 is LayoutReconcile.Result.DuplicateId ->

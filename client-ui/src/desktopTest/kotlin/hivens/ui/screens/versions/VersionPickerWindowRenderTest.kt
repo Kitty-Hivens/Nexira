@@ -8,7 +8,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.core.update.VersionChannel
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
@@ -135,11 +134,5 @@ class VersionPickerWindowRenderTest {
         assertTrue(abs(twoK - 2253) <= 8, "2K card width $twoK, expected ~2253 (0.88 of 2560)")
         // The point of the rule: a bigger host is a bigger window, not more margin.
         assertTrue(twoK > fhd + 400, "card did not grow with the host: $fhd -> $twoK")
-    }
-
-    @Test
-    fun `renders under Brut`() {
-        val width = renderAndMeasureCard(1920, 1080, BrutStyle, "version-picker-fhd-brut.png")
-        assertTrue(abs(width - 1690) <= 8, "Brut card width $width, expected ~1690")
     }
 }

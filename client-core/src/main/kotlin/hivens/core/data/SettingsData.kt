@@ -20,21 +20,6 @@ enum class HomeView {
 }
 
 /**
- * Which visual style variant is active. Independent from palette
- * (themes live in `ThemeManager.CustomTheme`). Style governs form,
- * surface treatment, motion -- not color. See `hivens.ui.theme.StyleSpec`
- * for the token set and the two initial variants.
- *
- * - [Celestia] -- rounded corners, glass cards, soft glow, animations.
- *   Current default; matches the launcher's pre-Atelier feel.
- * - [Brut] -- hard corners, flat surfaces, no glow, no animations.
- *   Designed for the user's "жёсткий интерфейс" personal lean as one
- *   open direction under Atelier exploration.
- */
-@Serializable
-enum class UiStyle { Celestia, Brut }
-
-/**
  * Which source drives the dark/light choice. Exactly one is active:
  *
  * - [Manual] -- the user's own day/night toggle; [SettingsData.isDarkTheme] as set.
@@ -308,14 +293,6 @@ data class SettingsData(
      * for the option set.
      */
     val homeView: HomeView = HomeView.New,
-
-    /**
-     * Visual style variant. Independent from palette / color preset.
-     * Lets the user compare form/surface/motion approaches concretely
-     * rather than guessing in the abstract. Defaults to Celestia
-     * (current visual feel); see [UiStyle] for available variants.
-     */
-    val uiStyle: UiStyle = UiStyle.Celestia,
 
     /**
      * "Do not disturb": mute the live top-right notification popups. Events are

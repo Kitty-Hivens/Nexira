@@ -36,7 +36,6 @@ import hivens.core.launch.LaunchLogEvent
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
-import hivens.core.data.UiStyle
 import hivens.core.data.darkThemeFor
 import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.AutoSyncService
@@ -101,7 +100,6 @@ import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
@@ -408,12 +406,8 @@ fun FrameWindowScope.AppShellContent(
         mutableStateOf(AppLocale.fromTag(settings.locale))
     }
     var homeView      by remember { mutableStateOf(settings.homeView) }
-    var uiStyle       by remember { mutableStateOf(settings.uiStyle) }
 
-    val basePresetStyle = when (uiStyle) {
-        UiStyle.Celestia -> CelestiaStyle
-        UiStyle.Brut     -> BrutStyle
-    }
+    val basePresetStyle = CelestiaStyle
     // Preset-only spec at this level -- customization (and the
     // editor-4 style overrides) live inside AppRoot. AprilFools
     // tracks the preset value; the overridden value flows through
@@ -1030,12 +1024,6 @@ fun FrameWindowScope.AppShellContent(
                             val current = settingsService.getSettings()
                             settingsService.saveSettings(current.copy(homeView = newView))
                         },
-                        uiStyle           = uiStyle,
-                        onUiStyleChanged  = { newStyle ->
-                            uiStyle = newStyle
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(uiStyle = newStyle))
-                        },
                         customization              = customization,
                         onCustomizationChanged     = { newCustomization ->
                             customization = newCustomization
@@ -1103,8 +1091,6 @@ fun AppRoot(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
     customization: CustomizationSettings,
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
@@ -1346,8 +1332,6 @@ fun AppRoot(
               onLocaleChanged = onLocaleChanged,
               homeView = homeView,
               onHomeViewChanged = onHomeViewChanged,
-              uiStyle = uiStyle,
-              onUiStyleChanged = onUiStyleChanged,
               backgroundSettings = backgroundSettings,
               onBackgroundSettingsChanged = { backgroundSettings = it },
               customization              = customization,

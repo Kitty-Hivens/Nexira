@@ -21,7 +21,6 @@ import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
@@ -160,7 +159,6 @@ class ActivityPillRenderTest {
         // hardest case -- it is the default with no wallpaper.
         val cases = listOf(
             "celestia-dark" to (CelestiaStyle to true),
-            "brut-dark" to (BrutStyle to true),
             "celestia-light" to (CelestiaStyle to false),
         )
         for ((name, styling) in cases) {

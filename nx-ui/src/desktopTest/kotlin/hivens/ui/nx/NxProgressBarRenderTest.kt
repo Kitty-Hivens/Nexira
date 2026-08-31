@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.BrutStyle
+import hivens.ui.theme.BadgeStyleSpec
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LocalNxColors
@@ -21,6 +21,14 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+/** Square badge shell, which is what the corner assertions contrast against the
+ *  rounded default. */
+private val SquareStyle = CelestiaStyle.copy(badgeStyle = BadgeStyleSpec.Square)
+
+/** A style that asks for no motion -- the subject of the indeterminate-track test.
+ *  Both were one retired second style, for two unrelated reasons. */
+private val StillStyle = CelestiaStyle.copy(animationMultiplier = 0f)
 
 /**
  * Reads a measurement out of the frame rather than asserting the PNG is not
@@ -109,8 +117,8 @@ class NxProgressBarRenderTest {
         // drawn at all, which is the failure mode this whole file exists to
         // avoid. So measure two things that cannot both hold on an empty frame:
         // the busy row is uniform end to end, and it is not the bare track.
-        val busy = row(render(BrutStyle, null), mid)
-        val track = row(render(BrutStyle, 0f), mid)
+        val busy = row(render(StillStyle, null), mid)
+        val track = row(render(StillStyle, 0f), mid)
 
         val inset = 3 // skip the antialiased end pixels
         val sample = busy.slice(inset until width - inset)
@@ -131,8 +139,8 @@ class NxProgressBarRenderTest {
 
         val celestiaMid = accentRun(CelestiaStyle, 1f, mid)
         val celestiaTop = accentRun(CelestiaStyle, 1f, top)
-        val brutMid = accentRun(BrutStyle, 1f, mid)
-        val brutTop = accentRun(BrutStyle, 1f, top)
+        val squareMid = accentRun(SquareStyle, 1f, mid)
+        val squareTop = accentRun(SquareStyle, 1f, top)
 
         // Round: the top scanline clips the corners, so it is shorter than the middle.
         assertTrue(
@@ -141,8 +149,8 @@ class NxProgressBarRenderTest {
         )
         // Square: every scanline is the same length.
         assertTrue(
-            abs(brutTop - brutMid) <= 2,
-            "Brut should square the ends: top $brutTop vs middle $brutMid",
+            abs(squareTop - squareMid) <= 2,
+            "Brut should square the ends: top $squareTop vs middle $squareMid",
         )
     }
 }

@@ -10,7 +10,6 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
@@ -124,7 +123,6 @@ class MarkdownRenderTest {
 
     @Test fun `renders a pack description under Celestia`() = render(CelestiaStyle, "markdown-celestia.png")
 
-    @Test fun `renders a pack description under Brut`() = render(BrutStyle, "markdown-brut.png")
 
     /** Share of sampled pixels that are not the page ground -- text, rules, panels. */
     private fun inkFraction(frame: Image): Double {

@@ -654,10 +654,6 @@ interface AppStrings {
     val settingsHomeViewNew: String
 
     // --- UI style variant picker (in Settings -> Interface) ---
-    val settingsUiStyleTitle: String
-    val settingsUiStyleSub: String
-    val settingsUiStyleCelestia: String
-    val settingsUiStyleBrut: String
 
     // --- Settings: left-rail selection style ---
     /** Title of the nav-rail selection-style control. */

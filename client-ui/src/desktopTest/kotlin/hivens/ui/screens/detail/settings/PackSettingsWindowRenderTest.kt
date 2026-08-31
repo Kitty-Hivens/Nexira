@@ -18,7 +18,6 @@ import hivens.core.data.PackReference
 import hivens.core.update.PackUpdater
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.StyleSpec
@@ -146,7 +145,6 @@ class PackSettingsWindowRenderTest {
 
     @Test fun `renders at FHD 1920x1080 under Celestia`() = render(1920, 1080, CelestiaStyle, "pack-settings-fhd.png")
 
-    @Test fun `renders at FHD 1920x1080 under Brut`() = render(1920, 1080, BrutStyle, "pack-settings-fhd-brut.png")
 
     @Test fun `renders at 2K 2560x1440 under Celestia`() = render(2560, 1440, CelestiaStyle, "pack-settings-2k.png")
 

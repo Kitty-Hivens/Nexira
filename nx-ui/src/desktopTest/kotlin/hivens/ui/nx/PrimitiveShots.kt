@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
@@ -117,7 +116,5 @@ class PrimitiveShots {
     fun `every primitive composes in every style and palette`() {
         sheet("celestia-dark", CelestiaStyle, dark = true, ground = DarkColorPalette.background)
         sheet("celestia-light", CelestiaStyle, dark = false, ground = LightColorPalette.background)
-        sheet("brut-dark", BrutStyle, dark = true, ground = DarkColorPalette.background)
-        sheet("brut-light", BrutStyle, dark = false, ground = LightColorPalette.background)
     }
 }
