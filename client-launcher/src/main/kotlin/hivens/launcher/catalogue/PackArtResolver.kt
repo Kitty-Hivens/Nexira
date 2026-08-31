@@ -31,6 +31,22 @@ class PackArtResolver(
     private val log = LoggerFactory.getLogger(PackArtResolver::class.java)
     private val cache = ConcurrentHashMap<String, PackArt>()
 
+    /**
+     * The answer when it is already known: art captured at install, or a lookup
+     * this resolver has already made. Null means the source has not been asked.
+     *
+     * Exists so a reader can seed with it before suspending. [resolve] answers a
+     * warm pack immediately too, but only after a dispatcher hop, and a hop is a
+     * frame -- long enough to paint the pixel placeholder and replace it, on
+     * every mount, for art that was never in doubt.
+     */
+    fun cached(instance: PackInstance): PackArt? {
+        if (instance.iconUrl != null || instance.bannerUrl != null) {
+            return PackArt(instance.iconUrl, instance.bannerUrl)
+        }
+        return cache["${'$'}{instance.packRef.origin}:${'$'}{instance.packRef.id}"]
+    }
+
     suspend fun resolve(instance: PackInstance): PackArt {
         if (instance.iconUrl != null || instance.bannerUrl != null) {
             return PackArt(instance.iconUrl, instance.bannerUrl)

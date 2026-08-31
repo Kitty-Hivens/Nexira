@@ -727,6 +727,7 @@ object RussianStrings : AppStrings {
 
     override val browseDetailTabDescription = "Описание"
     override val browseDetailTabGallery     = "Галерея"
+    override val browseDetailNoDescription  = "Об этом паке ничего не написано."
     override val browseDetailErrorTitle    = "Не удалось загрузить сборку"
     override val browseDetailErrorMessage  = "Не удалось получить manifest. Проверь соединение и повтори."
     override val browseDetailInstallButton = "Установить"

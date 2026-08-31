@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -349,13 +350,27 @@ private fun DetailBody(details: CataloguePackDetails, installError: String?) {
                 PuppetClick("catalogue.detail.tab.description") { tab = DetailTab.Description }
                 PuppetClick("catalogue.detail.tab.gallery") { tab = DetailTab.Gallery }
             }
+            val body = details.bodyMarkdown
             when {
                 hasGallery && tab == DetailTab.Gallery -> ImageGallery(media = remember(details) { galleryMedia(details.gallery) })
-                else -> details.bodyMarkdown?.let {
-                    MarkdownHtml(
-                        markdown = it,
-                        modifier = Modifier.fillMaxWidth(),
-                        onLink   = { url -> if (isPlayableVideoUrl(url)) videoLink = url else openInBrowser(url) },
+                !body.isNullOrBlank() -> MarkdownHtml(
+                    markdown = body,
+                    modifier = Modifier.fillMaxWidth(),
+                    onLink   = { url -> if (isPlayableVideoUrl(url)) videoLink = url else openInBrowser(url) },
+                )
+                // A source that says nothing about its pack used to end the card at
+                // the tag row, so the page was two thin bars over the wallpaper and
+                // read as a page that had failed to load rather than as a pack with
+                // nothing written about it. A blank string did the same through a
+                // markdown block with no content in it.
+                else -> Box(
+                    modifier         = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text  = s.browseDetailNoDescription,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
             }
