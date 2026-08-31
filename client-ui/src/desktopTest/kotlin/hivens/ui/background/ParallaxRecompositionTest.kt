@@ -70,6 +70,51 @@ class ParallaxRecompositionTest {
         }
     }
 
+    /**
+     * The pointer moving is the only way parallax is ever used, and a single jump does
+     * not exercise it: one emission cannot be cancelled by a next one. Driven a frame
+     * at a time, the spring was cancelled by every emission before it was handed a
+     * frame, and the offset stayed at exactly zero for as long as the pointer moved.
+     */
+    @Test
+    fun `parallax keeps up with a pointer that is still moving`() = onAwtThread {
+        var mouse by mutableStateOf(Offset(0.5f, 0.5f))
+        var compositions = 0
+        var offset: ParallaxOffset? = null
+
+        @OptIn(ExperimentalComposeUiApi::class)
+        val scene = ImageComposeScene(64, 64, density = Density(1f)) {
+            compositions++
+            val p = rememberParallaxOffset({ mouse }, intensity = 1f)
+            offset = p
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    translationX = p?.x?.value ?: 0f
+                    translationY = p?.y?.value ?: 0f
+                },
+            )
+        }
+        try {
+            var t = 0L
+            fun frame() { scene.render(t); t += FRAME }
+            repeat(4) { frame() }
+            val settled = compositions
+
+            // A new position every frame, the way a pointer actually travels.
+            val steps = 60
+            repeat(steps) { i ->
+                mouse = Offset(0.5f - 0.5f * (i + 1) / steps, 0.5f)
+                frame()
+            }
+
+            assertEquals(settled, compositions, "pointer movement recomposed the wallpaper")
+            val moved = abs(offset!!.x.value) + abs(offset!!.y.value)
+            assertTrue(moved > 10f, "the spring did not follow a moving pointer: translation is $moved")
+        } finally {
+            scene.close()
+        }
+    }
+
     @Test
     fun `parallax off builds no spring at all`() = onAwtThread {
         var built = true
