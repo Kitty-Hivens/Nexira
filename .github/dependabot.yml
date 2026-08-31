@@ -31,13 +31,10 @@ updates:
         patterns:
           - "org.junit*"
           - "io.mockk*"
-    ignore:
-      # compose material3 is a JetBrains pre-release (1.11.0-alpha07) paired to
-      # the compose 1.11 core. Because it is already a pre-release, Dependabot
-      # would otherwise jump it to the 1.12 alpha line, which needs compose 1.12.
-      # Keep it on 1.11 (patch/alpha bumps only) until compose core moves to 1.12.
-      - dependency-name: "org.jetbrains.compose.material3:*"
-        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+    # No ignores. material3 was held on the 1.11 alpha line while compose core
+    # was 1.11: the alpha it would have jumped to needed a core that had not
+    # shipped. Core is on 1.12 now and the pair moved together, so the hold has
+    # nothing left to protect.
 
   # Docs site (Astro / Starlight) under docs/.
   - package-ecosystem: npm

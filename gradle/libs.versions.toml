@@ -5,7 +5,7 @@
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
 kotlin            = "2.4.10"
-compose           = "1.11.1"
+compose           = "1.12.0"
 buildconfigPlugin = "6.0.10"
 versionsPlugin    = "0.61.0"
 # ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
@@ -27,18 +27,17 @@ coroutines        = "1.11.0"
 
 # ── UI / Compose ecosystem ───────────────────────────────────────────────────
 # composeMaterial3 tracks JetBrains' separately-published material3 artifact,
-# which lags Compose-MP core by ~2 release lines. core 1.11.1 shipped but
-# material3 has no 1.10.x / 1.11.x stable; 1.11.0-alpha07 is the JetBrains-paired
-# alpha for the 1.11 line. 1.12.0-alpha03 exists but pairs with compose 1.12-beta,
-# so it stays parked until compose core moves to 1.12 stable.
-composeMaterial3  = "1.11.0-alpha07"
+# which has no stable release on any line the desktop target has used. The
+# version here is the alpha paired with the compose core above; the two move
+# together, and the pairing is the only thing that makes an alpha acceptable.
+composeMaterial3  = "1.12.0-alpha03"
 # androidx graphics-shapes -- rounded polygons with corner SMOOTHING (squircles)
 # and star/polygon outlines, which RoundedCornerShape cannot express. Already on
 # the classpath transitively; declared so the source depends on it deliberately.
 # The desktop artifact has no Compose-Path bridge, so nx-ui builds the path from
 # the cubics itself (see PolygonShape).
 graphicsShapes    = "1.1.0"
-markdownRenderer  = "0.44.0"
+markdownRenderer  = "0.45.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
 markdown          = "0.7.9"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
@@ -47,7 +46,7 @@ jsoup             = "1.23.1"
 # library aliases: the KMP source-set block has to exclude Coil's skiko copy, and
 # implementation(<catalog accessor>) { ... } is rejected there (Provider vs String),
 # so client-ui builds the coordinates off this version instead.
-coil              = "3.5.0"
+coil              = "3.6.0"
 
 # SVG rasteriser for pack descriptions. Skia's own SVG module is what the image
 # loader uses on this platform and it draws no text at all -- a shields.io badge
@@ -58,7 +57,7 @@ coil              = "3.5.0"
 jsvg              = "2.1.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
-materialColorUtils = "5.0.0"
+materialColorUtils = "5.0.1"
 filekit           = "0.14.2"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
