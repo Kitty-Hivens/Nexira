@@ -137,13 +137,12 @@ private fun AnimatedParallaxImage(
     // composition on file I/O. Kept in a state keyed on the file rather than in a
     // produceState, which holds the PREVIOUS file's answer until the new one lands
     // -- long enough to open the video player on a still image.
-    var mediaKind by remember(file) { mutableStateOf<BackgroundMediaKind?>(null) }
-    LaunchedEffect(file) { mediaKind = withContext(Dispatchers.IO) { backgroundMediaKind(file) } }
-
+    val resolved = rememberBackgroundMedia(file)
+    val mediaKind = resolved?.kind
     // Still image decodes through Skia; video + animated images play through
     // Skinema. Only the active branch composes, so switching media kind tears
     // down the other's decode/player state.
-    val staticBitmap = if (mediaKind == BackgroundMediaKind.Static) rememberStaticImage(file) else null
+    val staticBitmap = resolved?.bitmap
     // Material-You seed: static from the decoded bitmap (off-thread); video from its
     // first decoded frame (via the player's onSeed). Either feeds the palette seed.
     var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
@@ -240,20 +239,39 @@ internal fun rememberParallaxOffset(mouse: () -> Offset, intensity: Float): Para
 
 private val PARALLAX_SPRING = spring<Float>(stiffness = 50f, dampingRatio = 0.8f)
 
+/** What a wallpaper file turned out to be, and its pixels when it is a still. */
+private data class ResolvedMedia(val kind: BackgroundMediaKind, val bitmap: ImageBitmap?)
+
+/**
+ * Classifies the file and, when it is a still, decodes it -- in ONE pass off the UI
+ * thread.
+ *
+ * These were two effects with a composition round-trip between them: the decode could
+ * not start until the probe had returned and been recomposed. So a wallpaper arrived
+ * in two visible steps, and every translucent plane above it spent both of them
+ * sitting on nothing -- which is what made the blur look like it was applied late,
+ * on top of an already-drawn transparency, rather than with the rest of the frame.
+ */
 @Composable
-private fun rememberStaticImage(file: File): ImageBitmap? {
+private fun rememberBackgroundMedia(file: File): ResolvedMedia? {
     // A wallpaper re-decodes on every launch; a full-resolution source pays tens of
     // MB of Skia decode each time. Cache a display-height copy under the shared
     // background-cache dir and decode that on later launches instead.
     val dataDir = koinInject<Path>()
     val cacheDir = remember(dataDir) { dataDir.resolve("background-cache").toFile() }
     val maxHeight = remember { physicalScreenHeight() }
-    var bitmap by remember(file) { mutableStateOf<ImageBitmap?>(null) }
+    var resolved by remember(file) { mutableStateOf<ResolvedMedia?>(null) }
     LaunchedEffect(file, maxHeight) {
         if (!file.exists()) return@LaunchedEffect
-        withContext(Dispatchers.IO) { bitmap = loadStaticBackground(file, cacheDir, maxHeight) }
+        resolved = withContext(Dispatchers.IO) {
+            val kind = backgroundMediaKind(file)
+            ResolvedMedia(
+                kind   = kind,
+                bitmap = if (kind == BackgroundMediaKind.Static) loadStaticBackground(file, cacheDir, maxHeight) else null,
+            )
+        }
     }
-    return bitmap
+    return resolved
 }
 
 /**
