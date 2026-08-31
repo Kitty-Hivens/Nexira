@@ -7,7 +7,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 
 /**
  * Where a floating editor panel has been dragged to, kept inside the window.
@@ -47,6 +49,30 @@ class DockOffset internal constructor(private val windowSize: () -> IntSize) {
         const val MIN_VISIBLE_PX = 80
     }
 }
+
+/**
+ * How wide a floating editor panel has been pulled, session-scoped for the same
+ * reason as [DockOffset]: a working width is not a setting.
+ *
+ * Clamped at both ends -- narrow enough to be out of the way, wide enough that
+ * dragging past the bottom cannot leave a strip with nothing readable in it.
+ */
+class DockSize internal constructor(default: Dp) {
+    var width by mutableStateOf(default)
+        private set
+
+    fun resize(deltaDp: Dp) {
+        width = (width + deltaDp).coerceIn(MIN, MAX)
+    }
+
+    private companion object {
+        val MIN = 200.dp
+        val MAX = 560.dp
+    }
+}
+
+@Composable
+fun rememberDockSize(default: Dp): DockSize = remember { DockSize(default) }
 
 @Composable
 fun rememberDockOffset(): DockOffset {
