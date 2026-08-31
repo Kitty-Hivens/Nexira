@@ -259,7 +259,10 @@ private fun PropPanelBody(
             )
             LabeledSlider(
                 label         = s.editorSurfaceBlur,
-                value         = surface.blurDp ?: style.surfaceBlur.value,
+                // Zero when unset, because that is what the renderer draws for a
+                // widget that names no radius. It opened on the style's value, which
+                // the widget path does not use.
+                value         = surface.blurDp ?: 0f,
                 range         = 0f..40f,
                 format        = "%.0f",
                 keyStep       = 1f,
