@@ -34,6 +34,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.positionChange
+import hivens.ui.editor.rememberDockSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -72,6 +77,7 @@ fun WidgetPalettePanel(
     val registry0 = LocalWidgetRegistry.current
     // Draggable dock: the header drags this offset (session-scoped).
     val paletteOffset = rememberDockOffset()
+    val paletteSize   = rememberDockSize(default = 280.dp)
     // Only removable descriptors enter the palette. Non-removable
     // widgets (the auth panel, the three shell regions) are
     // surface-essential: shipping a default layout pins exactly one
@@ -108,7 +114,24 @@ fun WidgetPalettePanel(
                     // composites uniformly rather than as banded sub-layers.
                     alpha = if (dimmed) 0.12f else 1f
                 }
-                .width(280.dp)
+                .width(paletteSize.width)
+                // The panel is anchored to the right edge, so pulling left widens it.
+                // Secondary button, because the primary one is already the drag that
+                // moves the panel and the drag that lifts a widget out of it.
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type != PointerEventType.Press || !event.buttons.isSecondaryPressed) continue
+                            val id = event.changes.first().id
+                            event.changes.forEach { it.consume() }
+                            drag(id) { change ->
+                                paletteSize.resize(-change.positionChange().x.toDp())
+                                change.consume()
+                            }
+                        }
+                    }
+                }
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp, start = 0.dp)
                 .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
