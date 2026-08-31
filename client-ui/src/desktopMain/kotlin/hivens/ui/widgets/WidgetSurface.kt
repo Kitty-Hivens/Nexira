@@ -56,7 +56,13 @@ fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
             level = fill.level(),
             shape = spec.shape.toShape(style),
             opacity = spec.opacity,
-            blurDp = spec.blurDp,
+            // A widget that does not name a radius gets none. This call site used to
+            // say so by passing a preset that carried no backdrop, and when the presets
+            // went the null started meaning "ask the style" -- so every widget asking
+            // only for a translucent plate got 18dp of frosted glass it never
+            // requested, under the whole home surface. The style's radius is for the
+            // library's own planes, which have no other way to name one.
+            blurDp = spec.blurDp ?: 0f,
             // A spec that names no border has none: a widget's plane is described
             // entirely by what is in it, so an unnamed value is nothing rather than
             // the library's default edge.
