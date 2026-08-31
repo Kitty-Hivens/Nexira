@@ -211,14 +211,17 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         return
     }
     val ctx = LocalShellContext.current
-    val sized = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier
-    Row(sized.fillMaxHeight()) {
+    Row(Modifier.fillMaxHeight()) {
+        // The width lands on the rail, not on the row that also holds the divider.
+        // On the row, the surface's weight(1f) took whatever the divider left, so a
+        // named width came out a hairline short whenever the divider was on.
+        val railWidth = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier.weight(1f)
         // The rail is an NxSurface at 35% by default. AppSidebar's NavigationRail is
         // transparent so this owns the background, and the divider stays OUTSIDE the
         // surface so the tinted area is exactly the rail. Light stops being forced
         // opaque here: a named opacity is a named opacity on either theme now.
         NxSurface(
-            NxSurfaceLevel.Base, Modifier.weight(1f).fillMaxHeight(), RectangleShape,
+            NxSurfaceLevel.Base, railWidth.fillMaxHeight(), RectangleShape,
             borderWidthDp = 0f,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
@@ -306,8 +309,12 @@ private val RAIL_INSET = 4.dp
  * Right region: the divider plus the news panel. removable=false. No handles or
  * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
  * pointer and snaps on release; vertical scrolls and taps still reach the news).
- * Collapsed it keeps a slim transparent swipe-catch at the edge, so a swipe back
- * (or Ctrl+N) reopens it. Edit mode keeps the static prop-driven behaviour.
+ *
+ * Collapsed it reserves no width at all -- see [RAIL_COLLAPSED_GRAB] -- so there is
+ * nothing left on screen to swipe, and it reopens through Ctrl+N or, in edit mode,
+ * the region's own Tune. This used to describe a slim catch at the edge; the catch
+ * went to zero and the sentence outlived it. Edit mode keeps the static
+ * prop-driven behaviour.
  */
 @Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class)
 @Composable
@@ -514,7 +521,11 @@ fun ShellTopRegion(instance: WidgetInstance) {
         }
     }
 
-    val barModifier = Modifier.fillMaxWidth().height(props.heightDp.dp).padding(outerPad)
+    // Padding BEFORE height, so Float's inset is a margin around the bar rather
+    // than a bite out of it. After the height it was applied inside: a 44dp bar
+    // asked for under Float drew 32, and the minimum 36 drew 24, with the height
+    // control silently meaning two different things depending on the corner one.
+    val barModifier = Modifier.fillMaxWidth().padding(outerPad).height(props.heightDp.dp)
 
     when (props.groupStyle) {
         GroupStyle.LineSeparated -> NxSurface(
@@ -537,7 +548,10 @@ fun ShellTopRegion(instance: WidgetInstance) {
         }
 
         GroupStyle.Pills -> Row(
-            barModifier.padding(horizontal = 6.dp),
+            // The gutter exists to keep the pills off the window edge. Float already
+            // holds them off it, and applying both put the row 12dp in horizontally
+            // against 6dp vertically.
+            barModifier.padding(horizontal = if (props.cornerStyle == CornerStyle.Float) 0.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
