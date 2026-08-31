@@ -13,7 +13,6 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
-import hivens.core.data.UiStyle
 import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.widgets.shell.RAIL_DEFAULT_WIDTH
@@ -84,8 +83,6 @@ fun AppLayout(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
     onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {},
     customization: CustomizationSettings = CustomizationSettings(),
@@ -183,8 +180,6 @@ fun AppLayout(
                             onLocaleChanged              = onLocaleChanged,
                             homeView                     = homeView,
                             onHomeViewChanged            = onHomeViewChanged,
-                            uiStyle                      = uiStyle,
-                            onUiStyleChanged             = onUiStyleChanged,
                             onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
@@ -216,8 +211,6 @@ fun AppLayout(
                             onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
                             surfaceBlur       = customization.surfaceBlur,
                             onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
-                            uiStyle           = uiStyle,
-                            onUiStyleChanged  = onUiStyleChanged,
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
 
@@ -320,8 +313,6 @@ fun AppLayout(
         homeView               = homeView,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
-        uiStyle                = uiStyle,
-        onUiStyleChanged       = onUiStyleChanged,
         centerStartInset       = 65.dp,
         // The rail's own default, not a copy of the number it happens to be. A
         // rail widened in the editor used to leave this behind, and the overlay

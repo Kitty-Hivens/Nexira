@@ -604,10 +604,6 @@ object EnglishStrings : AppStrings {
     override val settingsHomeViewLibrary = "Library (alpha)"
     override val settingsHomeViewNew     = "Modern"
 
-    override val settingsUiStyleTitle    = "UI style"
-    override val settingsUiStyleSub      = "Switch the form / surface / motion approach independently from the color palette. Celestia is the current rounded-glass look; Brut is hard-edged and flat."
-    override val settingsUiStyleCelestia = "Celestia"
-    override val settingsUiStyleBrut     = "Brut"
 
     // --- Left-rail selection style ---
     override val navSelectionTitle        = "Selected item style"

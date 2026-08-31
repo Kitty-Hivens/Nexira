@@ -44,6 +44,10 @@ EXEMPT = {
     "client-ui/src/desktopMain/kotlin/hivens/ui/AppShell.kt": {"reads-multiplier"},
     # The easter engine scales its own set pieces through that mirrored value.
     "client-easter": {"reads-multiplier", "literal-duration", "hand-scaled"},
+    # These verify the stillness contract itself, so constructing a style that
+    # asks for no motion is the subject under test rather than a bypass of it.
+    "nx-ui/src/desktopTest/kotlin/hivens/ui/theme/MotionTest.kt": {"reads-multiplier"},
+    "nx-ui/src/desktopTest/kotlin/hivens/ui/nx/NxProgressBarRenderTest.kt": {"reads-multiplier"},
     # The 3D view drives its own scene clock, so it needs the multiplier itself
     # rather than the still/not question -- an idle spin slows with the style
     # before it stops. This is the bridge that hands it over.

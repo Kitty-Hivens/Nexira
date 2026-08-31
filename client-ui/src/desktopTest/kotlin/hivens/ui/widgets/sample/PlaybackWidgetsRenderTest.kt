@@ -17,7 +17,6 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
@@ -118,9 +117,7 @@ class PlaybackWidgetsRenderTest {
         // case: it is what the app shows with no wallpaper set.
         val cases = listOf(
             "celestia-dark" to (CelestiaStyle to true),
-            "brut-dark" to (BrutStyle to true),
             "celestia-light" to (CelestiaStyle to false),
-            "brut-light" to (BrutStyle to false),
         )
         for ((name, styling) in cases) {
             val (style, dark) = styling

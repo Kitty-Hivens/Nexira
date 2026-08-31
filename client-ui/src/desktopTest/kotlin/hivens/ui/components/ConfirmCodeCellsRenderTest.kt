@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
@@ -41,8 +40,6 @@ class ConfirmCodeCellsRenderTest {
         val cases = listOf(
             "celestia-dark" to (CelestiaStyle to true),
             "celestia-light" to (CelestiaStyle to false),
-            "brut-dark" to (BrutStyle to true),
-            "brut-light" to (BrutStyle to false),
         )
         for ((name, styleAndDark) in cases) {
             val (style, dark) = styleAndDark

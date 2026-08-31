@@ -1,14 +1,13 @@
 package hivens.ui.editor.presets
 
-import hivens.core.data.UiStyle
 import hivens.ui.customization.CustomizationSettings
 import hivens.widget.model.LayoutGraph
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// One named preset = a snapshot of (LayoutGraph + CustomizationSettings
-// + UiStyle). Save: capture current state. Load: restore all three at
-// once. Persisted as one file per preset under <dataDir>/presets/.
+// One named preset = a snapshot of (LayoutGraph + CustomizationSettings).
+// Save: capture current state. Load: restore both at once. Persisted as
+// one file per preset under <dataDir>/presets/.
 //
 // schema_version: bump when the shape changes. Forward-compat handled
 // by Json { ignoreUnknownKeys = true } in PresetRepository.
@@ -19,7 +18,6 @@ data class PresetEnvelope(
     @SerialName("created_at") val createdAt: Long,
     val graph: LayoutGraph,
     val customization: CustomizationSettings,
-    val uiStyle: UiStyle,
 )
 
 // Light metadata for listing without loading the full envelope. Useful

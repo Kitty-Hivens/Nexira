@@ -14,7 +14,6 @@ import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.HomeView
-import hivens.core.data.UiStyle
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
@@ -41,8 +40,6 @@ fun SettingsScreen(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
@@ -119,8 +116,6 @@ fun SettingsScreen(
                             onLocaleChanged              = onLocaleChanged,
                             homeView                     = homeView,
                             onHomeViewChanged            = onHomeViewChanged,
-                            uiStyle                      = uiStyle,
-                            onUiStyleChanged             = onUiStyleChanged,
                         )
                         SettingsCategory.Console -> ConsoleSection()
                         SettingsCategory.Network -> NetworkSection()

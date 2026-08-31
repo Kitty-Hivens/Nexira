@@ -27,7 +27,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
-import hivens.core.data.UiStyle
 import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
@@ -72,8 +71,6 @@ internal fun AppearanceSection(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
 ) {
     val s = LocalStrings.current
     var langExpanded by remember { mutableStateOf(false) }
@@ -156,15 +153,6 @@ internal fun AppearanceSection(
         PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
         PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
         PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
-
-        // UI style variant. Independent axis from palette -- governs form, surface
-        // treatment, motion. Celestia (current) and Brut (sharp / flat).
-        PickerBlock(s.settingsUiStyleTitle, s.settingsUiStyleSub) {
-            NxChoiceChip(s.settingsUiStyleCelestia, uiStyle == UiStyle.Celestia) { onUiStyleChanged(UiStyle.Celestia) }
-            NxChoiceChip(s.settingsUiStyleBrut,     uiStyle == UiStyle.Brut)     { onUiStyleChanged(UiStyle.Brut) }
-        }
-        PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
-        PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
 
         // Window chrome. `undecorated` is fixed when the window is created, so the flip
         // lands at the next launch and the row says so rather than looking inert. On a

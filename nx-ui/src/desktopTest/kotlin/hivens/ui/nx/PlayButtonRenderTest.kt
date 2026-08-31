@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
-import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LightColorPalette
@@ -85,7 +84,6 @@ class PlayButtonRenderTest {
 
     @Test fun `renders under Celestia light`() = render(CelestiaStyle, LightColorPalette, "celestia-light")
 
-    @Test fun `renders under Brut dark`() = render(BrutStyle, DarkColorPalette, "brut-dark")
 
     /** Share of sampled pixels that are not the bare backdrop the sheet sits on. */
     private fun paintedFraction(frame: Image): Double {

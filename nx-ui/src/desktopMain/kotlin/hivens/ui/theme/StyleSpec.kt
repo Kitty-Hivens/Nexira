@@ -8,18 +8,19 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Form and motion tokens that change WHEN the user picks a different UI
- * variant. Sits alongside [NxColors] -- colors travel through
- * palette presets, while shape / surface / motion travel through style.
+ * The form and motion tokens the interface is drawn with: corners, surface
+ * treatment, elevation, motion, and the geometry of the switch and badge
+ * primitives. Colour is [NxColors]; everything that is not colour is here.
  *
- * The split lets a single palette (say Celestia Dark) be rendered with
- * very different geometry (CelestiaStyle's soft glass-card look vs
- * BrutStyle's sharp-edged flat panels) without forcing the user to pick
- * one combined preset. Two axes, independent choice.
+ * It was a switchable axis with a second variant beside the default, on the
+ * argument that one palette should render under different geometry. What that
+ * bought was one alternative nobody chose, maintained across every render test,
+ * while the numbers it existed to vary stayed unreachable to anyone but us.
  *
- * Initial token set is intentionally small -- only the dimensions where
- * the Celestia <-> Brut visual difference is load-bearing. Add tokens
- * as the second variant pressures more of the component layer.
+ * What remains is a token set, not a switch, and that distinction is the point:
+ * these values are read from a hundred-odd call sites, and a token is the only
+ * reason they agree on what a corner is. Inlining them would end the axis by
+ * destroying the consistency it was carrying.
  */
 data class StyleSpec(
     /** Corner rounding on card-shaped surfaces (the dominant Compose shape). */
@@ -144,11 +145,7 @@ data class BadgeStyleSpec(
     }
 }
 
-/**
- * Default style -- matches the current NxTheme aesthetic: rounded
- * corners, glass cards with alpha, soft glow on focus / hover. This is
- * what existing code sees if it switches to LocalStyle.current.
- */
+/** Rounded corners, translucent planes, soft glow on focus and hover. */
 val CelestiaStyle = StyleSpec(
     cardCorner          = 12.dp,
     cardBorder          = 0.dp,
@@ -159,27 +156,6 @@ val CelestiaStyle = StyleSpec(
     surfaceBlur         = 18.dp,
     panelElevation      = 18.dp,
     panelCorner         = 14.dp,
-)
-
-/**
- * Sharp alternative to Celestia: near-square corners, opaque
- * surfaces, hard borders, motion off, glow off. Same palette, no
- * soft styling.
- */
-val BrutStyle = StyleSpec(
-    cardCorner          = 2.dp,
-    cardBorder          = 1.dp,
-    cardSurface         = CardSurface.Flat,
-    buttonCorner        = 0.dp,
-    animationMultiplier = 0.0f,
-    softGlowEnabled     = false,
-    // Brut does not blur. The form axis owns this now, so a sharp, flat variant
-    // is sharp and flat all the way down rather than soft behind every plane.
-    surfaceBlur         = 0.dp,
-    panelElevation      = 0.dp,
-    panelCorner         = 2.dp,
-    switchStyle         = SwitchStyleSpec.Square,
-    badgeStyle          = BadgeStyleSpec.Square,
 )
 
 val LocalStyle = staticCompositionLocalOf { CelestiaStyle }

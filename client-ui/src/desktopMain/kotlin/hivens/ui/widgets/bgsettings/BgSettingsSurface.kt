@@ -15,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.ThemeMode
-import hivens.core.data.UiStyle
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -60,8 +59,6 @@ fun BgSettingsSurface(
     onPaletteFromWallpaperChanged: (Boolean) -> Unit,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
 ) {
     val settings = remember { mutableStateOf(currentSettings) }
@@ -114,8 +111,6 @@ fun BgSettingsSurface(
                 onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
                 surfaceBlur          = surfaceBlur,
                 onSurfaceBlurChanged = onSurfaceBlurChanged,
-                uiStyle              = uiStyle,
-                onUiStyleChanged     = onUiStyleChanged,
                 onOpenThemePicker    = onOpenThemePicker,
                 modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
             )

@@ -44,7 +44,7 @@ class MotionTest {
 
     @Test
     fun `a still style leaves no role moving`() {
-        val roles = rolesUnder(BrutStyle)
+        val roles = rolesUnder(CelestiaStyle.copy(animationMultiplier = 0f))
 
         assertTrue(roles.isNotEmpty(), "no role was read -- the composition never ran")
         roles.forEach { (name, ms) ->

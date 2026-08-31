@@ -604,10 +604,6 @@ object RussianStrings : AppStrings {
     override val settingsHomeViewLibrary = "Library (alpha)"
     override val settingsHomeViewNew     = "Современный"
 
-    override val settingsUiStyleTitle    = "Стиль интерфейса"
-    override val settingsUiStyleSub      = "Переключай форму / поверхности / анимации независимо от цветовой палитры. Celestia — текущий вид с мягкими скруглениями и стеклом; Brut — жёсткий, без скруглений, без анимаций."
-    override val settingsUiStyleCelestia = "Celestia"
-    override val settingsUiStyleBrut     = "Brut"
 
     // --- Выделение в левой панели ---
     override val navSelectionTitle        = "Выделение пункта меню"

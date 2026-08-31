@@ -1,6 +1,5 @@
 package hivens.ui.editor.presets
 
-import hivens.core.data.UiStyle
 import hivens.ui.customization.CustomizationSettings
 import hivens.widget.model.LayoutGraph
 import kotlinx.serialization.json.Json
@@ -41,7 +40,6 @@ class PresetRepositoryTest {
         createdAt     = 1_700_000_000L,
         graph         = LayoutGraph.EMPTY,
         customization = CustomizationSettings(),
-        uiStyle       = UiStyle.Celestia,
     )
 
     @Test
@@ -101,7 +99,6 @@ class PresetRepositoryTest {
         val back = repo.load("Music mode")
         assertNotNull(back)
         assertEquals("Music mode", back.name)
-        assertEquals(UiStyle.Celestia, back.uiStyle)
     }
 
     @Test

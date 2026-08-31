@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.ThemeMode
-import hivens.core.data.UiStyle
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -44,8 +43,6 @@ internal fun AppearanceThemeIsland(
     onPaletteFromWallpaperChanged: (Boolean) -> Unit,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -109,11 +106,6 @@ internal fun AppearanceThemeIsland(
                 accent          = NxTheme.colors.primary,
                 onCheckedChange = onSurfaceBlurChanged,
             )
-
-            BgPicker(s.settingsUiStyleTitle) {
-                NxChoiceChip(s.settingsUiStyleCelestia, uiStyle == UiStyle.Celestia) { onUiStyleChanged(UiStyle.Celestia) }
-                NxChoiceChip(s.settingsUiStyleBrut,     uiStyle == UiStyle.Brut)     { onUiStyleChanged(UiStyle.Brut) }
-            }
 
             NxRow(
                 title    = s.settingsThemePicker,
