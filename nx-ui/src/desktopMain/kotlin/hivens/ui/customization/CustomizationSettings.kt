@@ -64,9 +64,8 @@ data class CustomizationSettings(
 /**
  * Decoration drawn behind / around the active left-rail icon. Shape-only --
  * the rail geometry and spacing are unchanged; each variant just renders the
- * selection differently. [Square] follows the active style's button corner
- * (soft under Celestia, square under Brut); [None] shows selection through the
- * icon tint alone.
+ * selection differently. [Square] follows [hivens.ui.theme.Form.buttonCorner];
+ * [None] shows selection through the icon tint alone.
  */
 @Serializable
 enum class NavSelectionStyle { Pill, Square, Circle, LeftBar, Dot, None }

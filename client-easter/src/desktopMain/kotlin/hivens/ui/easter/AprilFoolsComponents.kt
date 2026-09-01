@@ -171,8 +171,8 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
                     else
                         NxTheme.colors.primary,
                 ),
-                // Flat style drops elevation -- Brut surfaces don't lift,
-                // so a chaos button shouldn't either.
+                // A flat surface does not lift, so the chaos button does not
+                // cast a shadow either.
                 elevation = ButtonDefaults.buttonElevation(
                     defaultElevation = if (isGhost || AprilFools.useFlatSurface) 0.dp else 4.dp
                 ),

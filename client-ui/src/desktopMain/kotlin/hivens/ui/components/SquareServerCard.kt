@@ -176,9 +176,9 @@ fun SquareServerCard(
             .clip(MaterialTheme.shapes.medium)
             .let { m ->
                 when {
-                    // Under a no-glow style (Brut) the selection frame is a static
-                    // border, not an animated pulse -- decorative motion gates on
-                    // softGlowEnabled everywhere it appears.
+                    // With decorative motion off the selection frame is a static
+                    // border rather than an animated pulse, the same gate every
+                    // decorative effect takes.
                     isSelected && Form.softGlow ->
                         m.neonBorder(NxTheme.colors.primary, cornerRadius = Form.cardCorner, strokeWidth = 2.dp)
                     isSelected -> m.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
@@ -187,7 +187,7 @@ fun SquareServerCard(
                 }
             }
             // Shimmer on hover (not when already glowing with neon), and only
-            // where the active style renders decorative motion at all.
+            // where decorative motion renders at all.
             .shimmerOverlay(enabled = isHovered && !isSelected && Form.softGlow)
             // Track position for chaos engine. Tracker setter is a no-op
             // in production builds (NoOp impl), so no `if active` guard.

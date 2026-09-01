@@ -25,7 +25,7 @@ fun Modifier.pulsatingGlow(
     color: Color,
     enabled: Boolean = true,
     // No default on purpose: the caller passes its own shape token
-    // (LocalStyle cardCorner/buttonCorner), so the glow can't mismatch the host.
+    // (Form.cardCorner or Form.buttonCorner), so the glow can't mismatch the host.
     cornerRadius: Dp,
 ): Modifier = composed {
     if (!enabled) return@composed this
@@ -133,8 +133,8 @@ fun Modifier.neonBorder(
 }
 
 // Periods of the decorative effects above. Artistic choices rather than roles on
-// the motion scale, but still routed through it so a slower or still style
-// reaches them.
+// the motion scale, but declared through Motion.ownRhythm so the scale stays the
+// one place a duration is spelled.
 private const val PULSE_MS = 950
 private const val SHIMMER_MS = 3_200
 private const val SHIMMER_GAP_MS = 700

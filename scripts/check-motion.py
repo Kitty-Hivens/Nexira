@@ -2,11 +2,12 @@
 # Keeps the motion scale from becoming a scale nobody reads.
 #
 # Motion carries the duration scale, and a duration written at a call site is a
-# duration no style can reach: that is how Brut came to declare motion off while
-# most of the interface kept animating. Motion names the roles instead, so this
-# scan fails the build on the three ways of stepping around it -- a literal
-# duration, scaling one by hand, and reading the multiplier to decide whether to
-# animate at all.
+# duration nothing else can reach: it cannot be compared with its neighbours,
+# scaled, or found again. Motion names the roles instead, so this scan fails the
+# build on a literal duration handed to tween().
+#
+# Springs are outside what this can check. They carry stiffness and damping
+# rather than a duration, and the vocabulary has no spring role to point them at.
 #
 # Mechanical only. Whether a site picked the RIGHT role is a human question; that
 # a site picked a number is not.
@@ -34,9 +35,9 @@ VOCABULARY = ("nx-ui/src/desktopMain/kotlin/hivens/ui/theme/Motion.kt",)
 # Deliberate exemptions. Each names why the scale cannot reach it -- not a place
 # to park a site nobody wanted to move.
 EXEMPT = {
-    # A state holder, not a composable: LocalStyle does not exist where these
-    # defaults are declared, and console scrolling is navigation rather than
-    # interface motion.
+    # A state holder, not a composable: a role is a @Composable read and cannot
+    # be taken where these defaults are declared, and console scrolling is
+    # navigation rather than interface motion.
     "client-ui/src/desktopMain/kotlin/hivens/ui/screens/console/LogScrollState.kt": {"literal-duration"},
     # The easter engine scales its own set pieces through that mirrored value.
     "client-easter": {"literal-duration"},

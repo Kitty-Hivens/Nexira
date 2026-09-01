@@ -223,8 +223,8 @@ internal fun Pill(
     val height = props.heightDp.dp
     // A panel's corner, not a capsule's. A fully rounded object at this size
     // reads as a chip no matter what is in it; the radius is what makes it a
-    // container. It comes from the panel token so the form axis still decides --
-    // Brut takes it to near-square without a switch of its own.
+    // container. It comes from the panel token, so the pill keeps no radius of
+    // its own to drift out of step.
     //
     // While the object is opening it travels from a circle to that radius, which
     // is the second half of the arrival: one shape becoming another.
@@ -256,10 +256,10 @@ internal fun Pill(
             .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        // It floats over the page, so it casts, at whatever depth the style gives a
-        // floating panel -- nothing under a flat form. Missing here while the
-        // selection body set it meant the same object gained a shadow the moment a
-        // selection took over and lost it again afterwards.
+        // It floats over the page, so it casts, at the depth a floating panel is
+        // given. Missing here while the selection body set it meant the same object
+        // gained a shadow the moment a selection took over and lost it again
+        // afterwards.
         shadowDp = Form.panelElevation.value,
         // Opaque body: the object floats over arbitrary content, so the
         // legibility floor cannot depend on what happens to be behind it.

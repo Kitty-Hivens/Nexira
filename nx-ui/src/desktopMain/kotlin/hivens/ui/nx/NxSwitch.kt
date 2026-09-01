@@ -20,11 +20,11 @@ import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 
 /**
- * Skin-driven toggle. Geometry (track/thumb size + corners) comes from the active
- * [hivens.ui.theme.Form.Switch]; colours come from the palette. Swapping the
- * style preset (Celestia pill <-> Brut square) -- or, later, a user skin -- restyles
- * every toggle in the app at once, since all of them route through here instead of a
- * raw Material `Switch` + inline `SwitchDefaults.colors`.
+ * The toggle primitive. Geometry (track and thumb size, both corners) comes from
+ * [hivens.ui.theme.Form.Switch]; colours come from the palette.
+ *
+ * Every toggle in the app routes through here rather than a raw Material `Switch`
+ * with inline `SwitchDefaults.colors`, so the shell has one place to be changed.
  *
  * Drop-in for the call sites that need checked + onChange (+ optional enabled). A null
  * [onCheckedChange] renders a read-only switch (no interaction).

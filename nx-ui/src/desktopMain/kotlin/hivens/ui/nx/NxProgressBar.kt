@@ -24,22 +24,16 @@ import hivens.ui.theme.NxTheme
 /**
  * The measure primitive. A track and the part of it that is done.
  *
- * Deliberately not Material's `LinearProgressIndicator`, for two reasons that
- * are visible rather than architectural. It draws a stop indicator -- a dot
- * parked at the far end of the track -- which on a small panel reads as a speck
- * of dirt rather than as information. And its corner is fixed, so it stays
- * rounded under a style whose whole premise is hard edges.
+ * Deliberately not Material's `LinearProgressIndicator`. It draws a stop
+ * indicator, a dot parked at the far end of the track, which on a small panel
+ * reads as a speck of dirt rather than as information. Its corner is also fixed,
+ * so it cannot follow the rest of the interface.
  *
- * The corner here comes from the active style's badge spec, the same place every
- * other small shell in the app takes it: full round under Celestia, square under
- * Brut. That is why it follows the style axis without inventing a token of its
- * own.
+ * The corner here comes from [hivens.ui.theme.Form.Badge], the same place every
+ * other small shell takes it, so the bar carries no shape token of its own.
  *
  * [progress] outside 0..1 is clamped; null means the size of the job is not
- * known yet. An unknown job sweeps a segment along the track, except under a
- * style with motion off, where it settles into a dimmed full track instead --
- * a still bar that reads as busy, rather than an animation that ignores the
- * style or a frozen segment that reads as a stalled percentage.
+ * known yet, and an unknown job sweeps a segment along the track.
  */
 @Composable
 fun NxProgressBar(
@@ -58,7 +52,7 @@ fun NxProgressBar(
     val target = progress?.takeIf { !it.isNaN() }?.coerceIn(0f, 1f)
 
     // Eased so a coarse feed (a file finishing, a block landing) does not step
-    // the bar. Motion-off collapses the tween to 1ms, so the value still lands.
+    // the bar.
     val fraction by animateFloatAsState(
         targetValue    = target ?: 0f,
         animationSpec  = Motion.colorShift,

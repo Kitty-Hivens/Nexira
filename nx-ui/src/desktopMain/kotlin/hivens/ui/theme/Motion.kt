@@ -90,7 +90,7 @@ object Motion {
         @Composable @ReadOnlyComposable get() = role(SWEEP_MS, LinearEasing)
 
     /**
-     * A duration the vocabulary does not name, still scaled by the active style.
+     * A duration the vocabulary does not name.
      *
      * For decorative effects whose period belongs to the effect itself -- a
      * shimmer crossing a card, a glow breathing -- where the number is an artistic
@@ -111,7 +111,7 @@ object Motion {
         exit: (MotionRole) -> ExitTransition = Exit.fade,
     ): MotionRole = MotionRole(baseMs, easing, enter, exit)
 
-    // Base durations, before the style multiplier. Deliberately few and spaced far
+    // Base durations. Deliberately few and spaced far
     // enough apart to be told apart on sight -- the old set (90, 110, 120, 160,
     // 170, 180, 200, 220, 250, 260, 300, 380, 500, 700, 950) had rungs no eye
     // could separate and no rule to choose between.
@@ -149,8 +149,8 @@ object Motion {
 }
 
 /**
- * One resolved role: a duration the active style has already scaled, the curve
- * that belongs to it, and the enter/exit pair for visibility changes.
+ * One resolved role: a duration, the curve that belongs to it, and the enter/exit
+ * pair for visibility changes.
  *
  * Usable directly wherever a `FiniteAnimationSpec<Float>` is expected -- the
  * common case -- and through [of] for the typed variants (Dp, Color, IntOffset).

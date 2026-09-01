@@ -209,7 +209,7 @@ fun NxTheme(
     // Material You: when [paletteFromWallpaper] is on and a [paletteSeed] (ARGB,
     // extracted from the wallpaper) is available, the base palette is generated from
     // it -- tinted tonal surfaces seeded by the background. Otherwise the fixed
-    // Celestia palette. Defaulted so other call sites (the console window) are unaffected.
+    // palette. Defaulted so other call sites (the console window) are unaffected.
     paletteSeed: Int? = null,
     paletteFromWallpaper: Boolean = false,
     content: @Composable () -> Unit
@@ -266,8 +266,7 @@ fun NxTheme(
     // staticCompositionLocalOf) re-invalidated every reader of it ~30 times per
     // switch, recomposing + redrawing the whole tree on the single UI thread --
     // that was the freeze on toggle. The light<->dark transition is carried by
-    // the circular reveal instead (theme/ThemeReveal.kt); Brut had no color
-    // animation to begin with.
+    // the circular reveal instead (theme/ThemeReveal.kt).
     val activePalette = targetColors
 
     // M3 ColorScheme
