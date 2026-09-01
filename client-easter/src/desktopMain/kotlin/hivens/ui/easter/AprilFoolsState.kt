@@ -21,12 +21,11 @@ object AprilFools {
     var debugIntensity: Float? by mutableStateOf(null)
 
     // ── Style coupling ────────────────────────────────────────────────────────
-    // The chaos subsystem was designed under NxTheme assumptions
-    // (rounded corners, glass surfaces, lively animations). With the
-    // UiStyle axis live, chaos should follow the active style instead of
-    // sitting outside it. AppShell pushes these values whenever uiStyle
-    // changes; the engine reads styleAnimationMultiplier per tween, and
-    // components read useFlatSurface to drop elevation.
+    // The chaos subsystem is a plain singleton, so it cannot read the interface
+    // it decorates; it is told instead. AppShell pushes both values once at
+    // startup. The engine reads styleAnimationMultiplier per tween and the
+    // components read useFlatSurface to drop elevation, so a second form of the
+    // interface would reach the engine through these two and nothing else.
 
     /** Multiplier on every chaos animation duration. 1.0 = base motion,
      *  0.0 = instant snap. Nothing varies it since the style axis went; AppShell
