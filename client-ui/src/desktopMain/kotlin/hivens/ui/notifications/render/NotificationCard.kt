@@ -85,7 +85,7 @@ fun NotificationCard(
     // Read here, not inside the drag coroutine: a role needs composition.
     val swipeSpec = Motion.panelSlide.of<Float>()
     val accentColor = severityAccent(group.severity, group.kind, palette)
-    // Critical pulses only when the active style allows motion; Brut stays static.
+    // Critical pulses only while decorative effects are on (Form.softGlow).
     val accentAlpha = if (group.severity == Severity.Critical && Form.softGlow) criticalPulse() else 1f
 
     val scope = rememberCoroutineScope()
@@ -101,8 +101,8 @@ fun NotificationCard(
             .widthIn(min = 320.dp, max = 420.dp)
             .offset { IntOffset(offsetX.value.toInt(), 0) }
             .alpha(1f - 0.55f * swipeFrac)
-            // Glass styles float on a soft shadow; flat (Brut) styles lean on a
-            // hard border instead -- the shadow has no flat-style mapping.
+            // Lifted on a soft shadow while decorative effects are on; the border
+            // below is the flat alternative when they are not.
             .then(if (Form.softGlow) Modifier.shadow(8.dp, cardShape, clip = false) else Modifier)
             .clip(cardShape)
             // Toasts are transient alerts read against the live wallpaper -- even a

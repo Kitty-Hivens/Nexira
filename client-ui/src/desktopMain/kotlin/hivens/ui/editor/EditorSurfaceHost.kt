@@ -451,8 +451,8 @@ fun EditorSurfaceHost(
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotChromeModifier provides slotChromeFactory,
-        // Edit-mode reflow duration -- slot add / remove / resize animates while
-        // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
+        // Edit-mode reflow duration: slot add / remove / resize animates while
+        // editing, and nothing elsewhere.
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
             Motion.panelSlide.durationMs
         } else 0,

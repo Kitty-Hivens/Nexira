@@ -303,7 +303,7 @@ private fun boundedModifier(placement: FlowPlacement.Bounded): Modifier {
 // (UiRecoverySignal) at the composition root, not a per-widget catch.
 // Edit-mode reflow: animate the slot container's footprint as widgets are
 // added / removed / resized so the change reads as motion, not a jump. motionMs
-// 0 (production, and Brut) returns the modifier untouched -- zero cost.
+// 0, the production default, returns the modifier untouched at zero cost.
 private fun Modifier.animatedReflow(motionMs: Int): Modifier =
     if (motionMs > 0) this.then(Modifier.animateContentSize(tween(motionMs))) else this
 

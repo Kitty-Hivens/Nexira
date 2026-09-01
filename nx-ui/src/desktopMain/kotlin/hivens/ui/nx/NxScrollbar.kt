@@ -44,10 +44,8 @@ fun NxVerticalScrollbar(
 @Composable
 private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
     val base  = NxTheme.colors.textSecondary
-    // Reveal fades in at once; hiding waits out the idle pause, then fades. The fade and
-    // the thumb's hover crossfade route through the style so reduced-motion collapses
-    // them; the idle pause is fixed UX pacing, not motion, so it stays put. The corner
-    // follows buttonCorner so a Brut UI gets a square bar, not a lone rounded one.
+    // Reveal fades in at once; hiding waits out the idle pause, then fades. The corner
+    // follows buttonCorner so the bar agrees with the buttons beside it.
     val alpha by animateFloatAsState(
         targetValue   = if (revealed) 1f else 0f,
         // Duration and curve come from the fade role; the idle pause before
