@@ -3,8 +3,6 @@ package hivens.ui.effects
 import androidx.compose.animation.core.*
 import androidx.compose.runtime.getValue
 import hivens.ui.theme.Motion
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawBehind

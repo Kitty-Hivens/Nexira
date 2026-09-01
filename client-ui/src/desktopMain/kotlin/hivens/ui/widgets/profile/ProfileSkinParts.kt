@@ -77,8 +77,14 @@ fun SkinHero(
 
     LaunchedEffect(playerName, refreshKey) {
         resolved = false
-        skin = skinManager.getRawSkin(playerName)
-        resolved = true
+        // finally: a decode that throws -- a corrupt cached PNG reaches
+        // toComposeImageBitmap -- would otherwise leave the spinner running for
+        // good, which is the state this flag was added to end.
+        try {
+            skin = skinManager.getRawSkin(playerName)
+        } finally {
+            resolved = true
+        }
     }
 
     Box(modifier, contentAlignment = Alignment.Center) {

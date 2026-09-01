@@ -125,7 +125,7 @@ fun NxSurface(
     opacity: Float? = null,
     /**
      * How far the plane blurs what is behind it. Null takes the active style's
-     * [hivens.ui.theme.StyleSpec.surfaceBlur], zero turns it off. It was a preset's
+     * [hivens.ui.theme.Form.surfaceBlur], zero turns it off. It was a preset's
      * private constant before, so the two values in use were unreachable from
      * anywhere and indistinguishable from each other on screen.
      */
@@ -138,7 +138,7 @@ fun NxSurface(
     /**
      * Cast-shadow elevation. Zero is a plane flat on the page, which is what most
      * of them are. A caller that wants the depth its style chose for floating panels
-     * passes [hivens.ui.theme.StyleSpec.panelElevation], so a flat form still takes
+     * passes [hivens.ui.theme.Form.panelElevation], so a flat form still takes
      * it to nothing without a second switch to keep in step.
      */
     shadowDp: Float = 0f,

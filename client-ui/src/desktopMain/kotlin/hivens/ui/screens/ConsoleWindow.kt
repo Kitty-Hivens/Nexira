@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -478,6 +479,7 @@ internal fun ConsoleContent(
     // published snapshot carries them; we shift scrollState by the approximate
     // height of the loaded block so the user's visual line stays put.
     var historyLoading by remember { mutableStateOf(false) }
+    val latestHistoryOffset by rememberUpdatedState(historyOffset)
     // historyOffset comes from the published snapshot (live only); file-backed
     // views load the whole tail-bounded file up front, so there is nothing to
     // page. loadHistoryBefore prepends to the buffer on the drainer and the next
@@ -488,7 +490,13 @@ internal fun ConsoleContent(
         // the top started and killed a 500-entry disk read dozens of times a
         // second and the older lines only arrived once the scrolling stopped --
         // the finally re-armed the guard each time for the next frame to try again.
-        snapshotFlow { shouldPageHistory(isLive, historyLoading, historyOffset, canvasState.scroll.offsetPx) }
+        //
+        // historyOffset reaches the flow through a state holder rather than by
+        // being captured: it is a plain Int derived from the snapshot, and the
+        // effect only restarts when isLive changes, so the captured copy froze at
+        // whatever it was when the window opened -- usually zero, which is the one
+        // value shouldPageHistory refuses. Paging was dead for the whole session.
+        snapshotFlow { shouldPageHistory(isLive, historyLoading, latestHistoryOffset, canvasState.scroll.offsetPx) }
             .distinctUntilChanged()
             .filter { it }
             .collect {

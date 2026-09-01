@@ -5,6 +5,7 @@ import hivens.widget.model.DefaultLayout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 // Pins the kernel-3 contract: every widget kind referenced from the
 // bundled default layout must exist in the KSP-generated registry.
@@ -125,6 +126,32 @@ class WidgetRegistryConsistencyTest {
             "these widgets read a service contract no widget provides, so the registry hands them " +
                 "null on every frame -- indistinguishable from a widget that does nothing",
         )
+    }
+
+    /**
+     * Every lazy member of every descriptor, forced.
+     *
+     * These used to be computed in the registry's class initializer, so any test
+     * that touched the registry proved they could be computed at all: a props
+     * class whose default cannot be encoded, or a surface literal that no longer
+     * parses, failed the build. Deferring them to first read bought a launcher
+     * startup and took that proof away -- the failure moved to the first time
+     * someone opened that widget's properties, inside a composition, where it
+     * unwinds the shell. A lazy that throws does not reset either, so every retry
+     * throws again and the crash guard walks the shell into safe mode.
+     *
+     * This is where that proof lives now.
+     */
+    @Test
+    fun `every descriptor can build its plane, serializer and default props`() {
+        GeneratedWidgetRegistry.all().values.forEach { d ->
+            runCatching { d.defaultSurface }
+                .onFailure { fail("${'$'}{d.kind.value}: its declared plane does not decode -- ${'$'}{it.message}") }
+            runCatching { d.propsSerializer }
+                .onFailure { fail("${'$'}{d.kind.value}: its props serializer does not build -- ${'$'}{it.message}") }
+            runCatching { d.defaultPropsJson }
+                .onFailure { fail("${'$'}{d.kind.value}: its default props do not encode -- ${'$'}{it.message}") }
+        }
     }
 
     @Test
