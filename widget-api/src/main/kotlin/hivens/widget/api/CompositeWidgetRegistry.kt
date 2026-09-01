@@ -14,10 +14,10 @@ import hivens.widget.model.WidgetKind
  *
  * **Order is precedence, and the first source wins.** The caller passes the
  * built-in registry first, so a contributed widget cannot take over a kind the
- * application depends on -- the shell regions, the sign-in panel -- by declaring
- * the same id. Which is a different question from whether a person may remove one
- * from their own layout: they may, because the way back into the editor is a
- * window chord rather than anything in the graph.
+ * application depends on: the shell regions and the sign-in panel are
+ * `removable = false` because a layout without them has no navigation and no way
+ * to authenticate, and shadowing them by id would reintroduce exactly that
+ * through a side door.
  *
  * A shadowed kind is not silently dropped: [shadowed] reports every id a later
  * source offered and did not get, which is what a management surface needs to
