@@ -44,7 +44,7 @@ class SkinViewState(
      *  stopped on a settled pose. */
     internal var animationRevision: Int by mutableIntStateOf(0)
 
-    /** The style engine's animationMultiplier, pushed by the view each
+    /** Motion scale for the scene's own clock, pushed by the view each
      *  composition. 0 = motion off: retargets snap to their end state. */
     internal var motionMultiplier: Float = 1f
 

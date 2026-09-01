@@ -26,14 +26,15 @@ import androidx.compose.runtime.ReadOnlyComposable
  *
  * A call site asks for what is happening -- a panel arriving, content opening, a
  * press answering -- and gets the duration and curve that belong to it. It does
- * not pick 220ms, because a number picked at a call site is a number no style can
- * reach: that is how Brut came to declare `animationMultiplier = 0.0f` while most
- * of the interface kept animating at whatever each site had hardcoded.
+ * not pick 220ms, because a number picked at a call site is a number nothing else
+ * can reach: it cannot be scaled, compared with its neighbours, or found again.
+ * The old set -- 90, 110, 120, 160, 170, 180, 200, 220, 250, 260, 300, 380, 500,
+ * 700, 950 -- had rungs no eye could separate and no rule to choose between.
  *
- * Every role resolves through [StyleSpec.animationDurationMs], so a style that
- * asks for stillness gets stillness everywhere, and a style that wants to be
- * languid scales the whole vocabulary rather than the handful of sites that
- * happened to be routed.
+ * There is no multiplier over the scale any more. There was one, on the style
+ * axis, and it reached two call sites out of eighty: most of the interface
+ * animated at whatever each site had hardcoded, which is the state this vocabulary
+ * exists to end and has not ended yet.
  *
  * Reach for the nearest role. A genuinely new kind of movement is a new named
  * role here, not a literal at the call site.
