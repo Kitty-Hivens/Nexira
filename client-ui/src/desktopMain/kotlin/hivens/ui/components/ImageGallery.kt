@@ -66,7 +66,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
@@ -230,7 +230,7 @@ fun ImageGallery(media: List<GalleryMedia>, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
+    val shape = RoundedCornerShape(Form.cardCorner)
     // The surface draws the hover state itself, inside its own clip. Left to the
     // clickable it was painted on the node above, which is not clipped to the
     // shape, so a rounded cell lit up as a square with its corners filled in.
@@ -405,7 +405,7 @@ private fun GalleryLightbox(
                         .fillMaxSize()
                         .padding(horizontal = 80.dp, vertical = 56.dp)
                         .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-                        .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
+                        .clip(RoundedCornerShape(Form.cardCorner)),
                 )
             }
 

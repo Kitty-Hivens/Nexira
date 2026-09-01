@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 
 /**
  * A surface whose fill is an ARBITRARY [color], and which does nothing else to it.
@@ -30,7 +30,7 @@ import hivens.ui.theme.LocalStyle
 fun NxColorSurface(
     color: Color,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(LocalStyle.current.cardCorner),
+    shape: Shape = RoundedCornerShape(Form.cardCorner),
     border: BorderStroke? = null,
     content: @Composable BoxScope.() -> Unit = {},
 ) {

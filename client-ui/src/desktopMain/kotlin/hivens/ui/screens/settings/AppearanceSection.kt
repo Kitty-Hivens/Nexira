@@ -41,7 +41,7 @@ import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.LocalThemeReveal
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
@@ -211,7 +211,6 @@ internal fun DayNightRow(
     description: String,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    val style = LocalStyle.current
     val tint = if (checked) MoonBlue else SunOrange
     val reveal = LocalThemeReveal.current
     // The theme wipe's own pace -- a set piece rather than an interface response.

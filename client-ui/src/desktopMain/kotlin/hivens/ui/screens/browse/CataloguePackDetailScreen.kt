@@ -51,7 +51,7 @@ import hivens.ui.render.openInBrowser
 import hivens.ui.screens.versions.PickerIntent
 import hivens.ui.screens.versions.PickerVersion
 import hivens.ui.screens.versions.VersionPickerWindow
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -177,7 +177,7 @@ fun CataloguePackDetailScreen(
             // Same floated-card rounding as the Library detail hero.
             modifier  = Modifier
                 .padding(start = 16.dp, top = 8.dp, end = 16.dp)
-                .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
+                .clip(RoundedCornerShape(Form.cardCorner)),
             title     = loaded?.details?.title ?: packId,
             tagline   = loaded?.details?.tagline.orEmpty(),
             iconUrl   = loaded?.details?.iconUrl,

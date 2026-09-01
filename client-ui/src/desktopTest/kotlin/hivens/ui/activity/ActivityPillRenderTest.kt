@@ -21,10 +21,7 @@ import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -93,7 +90,6 @@ class ActivityPillRenderTest {
      * the sheet exists.
      */
     private fun render(
-        style: StyleSpec,
         dark: Boolean,
         name: String,
         scale: Float = 1f,
@@ -106,9 +102,8 @@ class ActivityPillRenderTest {
         ) {
             // The real theme entry point rather than a hand-provided palette: what
             // the sheet shows is then what the app resolves, tonal ladder included.
-            NxTheme(useDarkTheme = dark, style = style) {
+            NxTheme(useDarkTheme = dark) {
                 CompositionLocalProvider(
-                    LocalStyle provides style,
                     LocalStrings provides EnglishStrings,
                 ) {
                     accent = NxTheme.colors.progressAccent
@@ -157,15 +152,11 @@ class ActivityPillRenderTest {
         // the one thing that must hold in every combination is that its body is
         // not the same tone as what is behind it. A near-black ground is the
         // hardest case -- it is the default with no wallpaper.
-        val cases = listOf(
-            "celestia-dark" to (CelestiaStyle to true),
-            "celestia-light" to (CelestiaStyle to false),
-        )
-        for ((name, styling) in cases) {
-            val (style, dark) = styling
+        val cases = listOf("dark" to true, "light" to false)
+        for ((name, dark) in cases) {
             // Both, so a proportion can be judged at the scale it will be seen at.
-            render(style, dark, name, scale = 2f) { Sheet(PillProps()) }
-            val bmp = render(style, dark, name) { Sheet(PillProps()) }
+            render(dark, name, scale = 2f) { Sheet(PillProps()) }
+            val bmp = render(dark, name) { Sheet(PillProps()) }
             // Sampled as a fraction of the frame, not at pixels that happened to
             // work at one density. The whole point of rendering at the app's own
             // scale is lost if the probe still assumes a different one.
@@ -184,7 +175,7 @@ class ActivityPillRenderTest {
             val one = activity(
                 "install:A", ActivityKind.Install, "A", ActivityPhase.Running(done, 100),
             )
-            val bmp = render(CelestiaStyle, true, "measure-$done") {
+            val bmp = render(true, "measure-$done") {
                 Box { Pill(one, listOf(one), {}, PillProps(), null, EnglishStrings, 720.dp) }
             }
             var hits = 0

@@ -93,7 +93,7 @@ import hivens.ui.nx.AdaptiveWidth
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.EmptySlotDecorator

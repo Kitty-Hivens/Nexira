@@ -23,10 +23,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Ignore
@@ -49,10 +46,10 @@ class PrimitiveShots {
     private val outDir = File(System.getenv("PRIMITIVE_SHOTS_DIR") ?: "build/render").apply { mkdirs() }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun sheet(name: String, style: StyleSpec, dark: Boolean, ground: Color) {
+    private fun sheet(name: String, dark: Boolean, ground: Color) {
         val scene = ImageComposeScene(width = 1180, height = 760, density = Density(2f)) {
-            NxTheme(useDarkTheme = dark, style = style) {
-                CompositionLocalProvider(LocalStyle provides style) {
+            NxTheme(useDarkTheme = dark) {
+                run {
                     Column(
                         modifier = Modifier.fillMaxSize().background(ground).padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -114,7 +111,7 @@ class PrimitiveShots {
 
     @Test
     fun `every primitive composes in every style and palette`() {
-        sheet("celestia-dark", CelestiaStyle, dark = true, ground = DarkColorPalette.background)
-        sheet("celestia-light", CelestiaStyle, dark = false, ground = LightColorPalette.background)
+        sheet("dark", dark = true, ground = DarkColorPalette.background)
+        sheet("light", dark = false, ground = LightColorPalette.background)
     }
 }

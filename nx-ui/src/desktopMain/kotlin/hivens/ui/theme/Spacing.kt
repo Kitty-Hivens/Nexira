@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.dp
  * without any per-token arithmetic.
  *
  * Spacing only. A component's own dimensions, a corner radius, a stroke or an
- * icon size are not gaps between things, and they answer to the shape tokens on
- * [StyleSpec] or to the component itself.
+ * icon size are not gaps between things, and they answer to [Form] or to the
+ * component itself.
  */
 object Spacing {
     /** Hairline gap: icon to label, chip inner padding. */

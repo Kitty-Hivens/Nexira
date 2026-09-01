@@ -14,11 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LightColorPalette
 import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxColors
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -83,7 +81,6 @@ class SurfaceOpacityRenderTest {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
             CompositionLocalProvider(
                 LocalNxColors provides palette,
-                LocalStyle provides CelestiaStyle,
             ) {
                 Box(Modifier.fillMaxSize().background(GROUND)) { Plate(opacity) }
             }

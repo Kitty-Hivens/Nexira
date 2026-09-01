@@ -15,8 +15,7 @@ import hivens.ui.surface.PolygonShape
 import hivens.ui.surface.SmoothedRectShape
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.widget.model.FillSource
 import hivens.widget.model.SurfaceShape
 import hivens.widget.model.SurfaceSpec
@@ -39,7 +38,6 @@ import hivens.widget.model.parseFill
  */
 @Composable
 fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
-    val style = LocalStyle.current
     val fill = parseFill(spec.fill)
     val padding = spec.padding
     Box(
@@ -54,7 +52,7 @@ fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
     ) {
         NxSurface(
             level = fill.level(),
-            shape = spec.shape.toShape(style),
+            shape = spec.shape.toShape(),
             opacity = spec.opacity,
             // A widget that does not name a radius gets none. This call site used to
             // say so by passing a preset that carried no backdrop, and when the presets
@@ -115,8 +113,8 @@ private fun borderColor(spec: SurfaceSpec): Color? {
  * which is why smoothing sat in the record unread until the shapes library arrived
  * with it. Zero keeps the cheaper shape.
  */
-private fun SurfaceShape.toShape(style: StyleSpec): Shape {
-    val fallback = style.cardCorner.value
+private fun SurfaceShape.toShape(): Shape {
+    val fallback = Form.cardCorner.value
     val smooth = smoothing ?: 0f
     return when (kind.trim().lowercase()) {
         "circle" -> CircleShape

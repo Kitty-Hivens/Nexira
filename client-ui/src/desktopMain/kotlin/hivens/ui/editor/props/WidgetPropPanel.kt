@@ -41,7 +41,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.surface.bodyFloor
@@ -142,7 +142,6 @@ private fun PropPanelBody(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val sd = serializer?.descriptor
     // Effective values: the encoded default baseline overlaid with the
     // instance's stored overrides. Every key is present, so each field's
@@ -156,8 +155,8 @@ private fun PropPanelBody(
             .width(320.dp)
             .fillMaxHeight()
             .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-            .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
-            .clip(RoundedCornerShape(style.panelCorner))
+            .shadow(elevation = Form.panelElevation, shape = RoundedCornerShape(Form.panelCorner))
+            .clip(RoundedCornerShape(Form.panelCorner))
             // Solid surface, no glass: a settings panel must stay readable and
             // not composite with the layers it floats over.
             .background(NxTheme.colors.surface),
@@ -233,7 +232,7 @@ private fun PropPanelBody(
             // open where the plane on screen actually is.
             val surface = descriptor.resolveSurface(instance) ?: SurfaceSpec()
             fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
-            val corner = style.cardCorner.value
+            val corner = Form.cardCorner.value
 
             // One field, a value or a name. Blank follows the theme, a rung name
             // tracks the palette, a literal does not; a typo falls back to the theme

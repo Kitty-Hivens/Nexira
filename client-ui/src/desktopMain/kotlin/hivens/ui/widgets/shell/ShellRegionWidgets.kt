@@ -61,7 +61,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -250,7 +250,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     // The wedge is the chrome reaching around the corner, so it takes the chrome's
     // colour rather than one of its own -- see [CHROME_OPACITY_PCT].
     val chrome = NxTheme.colors.surface.copy(alpha = CHROME_OPACITY_PCT / 100f)
-    val cornerDp = LocalStyle.current.cardCorner
+    val cornerDp = Form.cardCorner
     NxSurface(
         NxSurfaceLevel.Base, Modifier.fillMaxSize(), RectangleShape,
         borderWidthDp = 0f,
@@ -358,7 +358,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         }
     }
 
-    val panelShape = RoundedCornerShape(LocalStyle.current.panelCorner)
+    val panelShape = RoundedCornerShape(Form.panelCorner)
 
     // Edit mode: static, no swipe/animation.
     if (editing) {
@@ -493,7 +493,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
     val editing = LocalEditMode.current is EditModeState.On
 
     val maximizeToggle: () -> Unit = { maximizer?.toggle() }
-    val corner = LocalStyle.current.cardCorner
+    val corner = Form.cardCorner
     // Hug = flush to the window's top edge, only the bottom corners curve into the
     // body so it reads as part of the chrome; Float = a detached, inset, all-round
     // pill; Rect = a plain flush rectangle.

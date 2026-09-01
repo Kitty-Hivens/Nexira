@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
@@ -80,8 +80,7 @@ fun PlayButton(
     iconOnly: Boolean = false,
     compact: Boolean = false,
 ) {
-    val style = LocalStyle.current
-    val shape = RoundedCornerShape(if (style.buttonCorner > 0.dp) PLATE_CORNER else 0.dp)
+    val shape = RoundedCornerShape(if (Form.buttonCorner > 0.dp) PLATE_CORNER else 0.dp)
     val darkTheme = NxTheme.colors.background.luminance() < 0.5f
     val ink = if (darkTheme) Color(0xFF121318) else Color.White
     val inkContent = if (darkTheme) Color.White else Color.Black
@@ -111,7 +110,7 @@ fun PlayButton(
     )
 
     val pulseSpec = Motion.drift
-    val contentPulse: Float = if (busy && !Motion.isStill) {
+    val contentPulse: Float = if (busy) {
         val transition = rememberInfiniteTransition(label = "playBusy")
         val a by transition.animateFloat(
             initialValue  = 0.55f,

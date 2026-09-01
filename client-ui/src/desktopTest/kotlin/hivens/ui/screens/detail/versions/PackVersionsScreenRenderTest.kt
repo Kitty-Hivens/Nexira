@@ -36,9 +36,7 @@ import hivens.core.update.UpdatePlan
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.launch.RunningPackSource
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -176,7 +174,7 @@ class PackVersionsScreenRenderTest {
         override val runningPackInstanceId: StateFlow<String?> = MutableStateFlow(null)
     }
 
-    private fun render(width: Int, height: Int, style: StyleSpec, name: String) {
+    private fun render(width: Int, height: Int, name: String) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         startKoin {
             modules(module {
@@ -195,7 +193,7 @@ class PackVersionsScreenRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true, style = style) {
+            NxTheme(useDarkTheme = true) {
                 Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
                     PackVersionsScreen(instanceId = "1", onBack = {})
                 }
@@ -246,10 +244,10 @@ class PackVersionsScreenRenderTest {
         return painted.toDouble() / sampled
     }
 
-    @Test fun `renders at FHD under Celestia`() = render(1920, 1080, CelestiaStyle, "pack-versions-fhd-celestia.png")
+    @Test fun `renders at FHD under Celestia`() = render(1920, 1080, "pack-versions-fhd-celestia.png")
 
 
-    @Test fun `renders at 2K under Celestia`() = render(2560, 1440, CelestiaStyle, "pack-versions-2k-celestia.png")
+    @Test fun `renders at 2K under Celestia`() = render(2560, 1440, "pack-versions-2k-celestia.png")
 
     private companion object {
         /** What the scene is cleared to, so anything else on the frame is the screen. */

@@ -398,16 +398,12 @@ private fun NewsSkeleton() {
     // A still style parks the sweep off-frame rather than restarting it every
     // frame, which is what a collapsed duration would do to an endless loop.
     val sweep = Motion.sweep
-    val translateAnim by if (Motion.isStill) {
-        remember { mutableStateOf(0f) }
-    } else {
-        rememberInfiniteTransition(label = "skeleton").animateFloat(
-            initialValue  = 0f,
-            targetValue   = 1000f,
-            animationSpec = infiniteRepeatable(sweep.of(), RepeatMode.Restart),
-            label = "shimmer"
-        )
-    }
+    val translateAnim by rememberInfiniteTransition(label = "skeleton").animateFloat(
+        initialValue  = 0f,
+        targetValue   = 1000f,
+        animationSpec = infiniteRepeatable(sweep.of(), RepeatMode.Restart),
+        label = "shimmer"
+    )
 
     val brush = Brush.linearGradient(
         colors = shimmerColors,

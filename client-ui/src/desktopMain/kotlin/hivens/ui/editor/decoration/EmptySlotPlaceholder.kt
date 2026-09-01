@@ -32,7 +32,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotPath
@@ -54,12 +54,8 @@ fun EmptySlotPlaceholder(
     registry: DropTargetRegistry,
 ) {
     val s = LocalStrings.current
-    // Holds mid-breath under a still style: a loop cannot express stillness by
-    // shortening, so it has to not run.
     val breathRhythm = Motion.ownRhythm(BREATH_MS)
-    val breath by if (Motion.isStill) {
-        remember { mutableStateOf(0.65f) }
-    } else rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
+    val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
         initialValue  = 0.45f,
         targetValue   = 0.85f,
         animationSpec = infiniteRepeatable(
@@ -90,7 +86,7 @@ fun EmptySlotPlaceholder(
         // floats, which a DrawScope reads as device pixels: on a 2K display the
         // border came out at half its weight with half-length dashes, and the
         // corner ignored the style entirely.
-        val corner = LocalStyle.current.cardCorner
+        val corner = Form.cardCorner
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRoundRect(
                 color  = borderColor,

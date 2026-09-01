@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Spacing
 
 /**
@@ -54,7 +54,7 @@ fun NxButton(
     minHeight: Dp? = null,
 ) {
     val palette = NxTheme.colors
-    val styleSpec = LocalStyle.current
+    val styleSpec = Form
     val shape = MaterialTheme.shapes.small
 
     val container: Color = when (style) {

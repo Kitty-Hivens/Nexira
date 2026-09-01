@@ -48,7 +48,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.skin3d.Cycles
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
 
@@ -202,11 +202,10 @@ private fun AccountPanel(session: SessionData) {
 @Composable
 private fun StatusPill(online: Boolean) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val accent = if (online) NxTheme.colors.success else NxTheme.colors.error
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(RoundedCornerShape(Form.cardCorner))
             .background(accent.copy(alpha = 0.14f))
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -224,10 +223,9 @@ private fun StatusPill(online: Boolean) {
 @Composable
 private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(RoundedCornerShape(Form.cardCorner))
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

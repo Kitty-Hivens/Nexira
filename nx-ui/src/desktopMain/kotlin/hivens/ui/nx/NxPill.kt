@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 
 /**
  * The badge shell every small labelled tag in the app is cut from: one height,
@@ -43,7 +43,7 @@ internal fun NxPill(
     dot: Color? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    val badge = LocalStyle.current.badgeStyle
+    val badge = Form.Badge
     val shape = badge.shape()
     Row(
         modifier = modifier

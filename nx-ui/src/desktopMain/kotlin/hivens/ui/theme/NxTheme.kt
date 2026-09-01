@@ -206,7 +206,6 @@ internal fun resolveBasePalette(dark: Boolean, seed: Int?, fromWallpaper: Boolea
 fun NxTheme(
     useDarkTheme: Boolean = true,
     customTheme: CustomTheme? = null,
-    style: StyleSpec = CelestiaStyle,
     // Material You: when [paletteFromWallpaper] is on and a [paletteSeed] (ARGB,
     // extracted from the wallpaper) is available, the base palette is generated from
     // it -- tinted tonal surfaces seeded by the background. Otherwise the fixed
@@ -302,17 +301,13 @@ fun NxTheme(
         )
     }
 
-    // Provide LocalStyle alongside the palette so child composables can
-    // read StyleSpec tokens without a separate CompositionLocalProvider
-    // chain at every entry point.
     CompositionLocalProvider(
-        LocalNxColors provides activePalette,
-        LocalStyle          provides style,
-        LocalMonoFamily     provides nexiraMonoFamily(),
+        LocalNxColors   provides activePalette,
+        LocalMonoFamily provides nexiraMonoFamily(),
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            shapes      = style.toMaterialShapes(),
+            shapes      = Form.materialShapes(),
             typography  = nexiraTypography(),
         ) {
             // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its

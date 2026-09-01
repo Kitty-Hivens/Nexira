@@ -1,38 +1,39 @@
 package hivens.ui.theme
 
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The promise a motion style makes is that it reaches everything. Brut sets
- * `animationMultiplier = 0.0f` and means it: under that style no role may resolve
- * to a duration a viewer could perceive as movement.
+ * The scale is only worth having if its rungs can be told apart on sight, and if
+ * every one of them is long enough to read as movement at all.
  *
- * Reads the roles through a real composition, because that is the only place
- * [LocalStyle] exists -- a role asked for outside one is not the thing call sites
- * use.
+ * Read through a real composition rather than from the object: the roles are
+ * `@Composable` accessors, and one asked for outside a composition is not the
+ * thing call sites use.
+ *
+ * There used to be a third case here, checking that a style asking for stillness
+ * left no role moving. Nothing can ask any more -- the style axis carried one
+ * motion token and went with it -- so the case had no subject. If a reduce-motion
+ * preference arrives it will come from the customization layer, and this is where
+ * its test belongs.
  */
 class MotionTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun rolesUnder(style: StyleSpec): Map<String, Int> {
+    private fun roles(): Map<String, Int> {
         val seen = LinkedHashMap<String, Int>()
         val scene = ImageComposeScene(width = 8, height = 8, density = Density(1f)) {
-            CompositionLocalProvider(LocalStyle provides style) {
-                seen["tap"] = Motion.tap.durationMs
-                seen["fade"] = Motion.fade.durationMs
-                seen["colorShift"] = Motion.colorShift.durationMs
-                seen["panelSlide"] = Motion.panelSlide.durationMs
-                seen["reveal"] = Motion.reveal.durationMs
-                seen["emphasis"] = Motion.emphasis.durationMs
-                seen["drift"] = Motion.drift.durationMs
-                seen["sweep"] = Motion.sweep.durationMs
-            }
+            seen["tap"] = Motion.tap.durationMs
+            seen["fade"] = Motion.fade.durationMs
+            seen["colorShift"] = Motion.colorShift.durationMs
+            seen["panelSlide"] = Motion.panelSlide.durationMs
+            seen["reveal"] = Motion.reveal.durationMs
+            seen["emphasis"] = Motion.emphasis.durationMs
+            seen["drift"] = Motion.drift.durationMs
+            seen["sweep"] = Motion.sweep.durationMs
         }
         try {
             scene.render(0L)
@@ -43,33 +44,20 @@ class MotionTest {
     }
 
     @Test
-    fun `a still style leaves no role moving`() {
-        val roles = rolesUnder(CelestiaStyle.copy(animationMultiplier = 0f))
-
+    fun `every role has a perceptible duration`() {
+        val roles = roles()
         assertTrue(roles.isNotEmpty(), "no role was read -- the composition never ran")
-        roles.forEach { (name, ms) ->
-            // 1ms rather than 0: Compose rejects a zero-duration spec, and a frame
-            // is 16ms, so this never renders as motion.
-            assertEquals(1, ms, "$name keeps animating under a style that asks for stillness")
-        }
-    }
-
-    @Test
-    fun `a moving style gives every role a perceptible duration`() {
-        val roles = rolesUnder(CelestiaStyle)
-
         roles.forEach { (name, ms) ->
             assertTrue(ms > 16, "$name resolves to ${ms}ms -- under one frame, so the role is not motion at all")
         }
     }
 
     /**
-     * The scale is only worth having if the rungs are told apart on sight. Pins the
-     * ordering rather than the numbers, so the values stay tunable.
+     * Pins the ordering rather than the numbers, so the values stay tunable.
      */
     @Test
     fun `the scale runs from a press to ambient drift`() {
-        val roles = rolesUnder(CelestiaStyle)
+        val roles = roles()
         val tap = roles.getValue("tap")
 
         roles.filterKeys { it != "tap" }.forEach { (name, ms) ->

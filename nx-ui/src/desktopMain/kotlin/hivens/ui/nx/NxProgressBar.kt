@@ -17,7 +17,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
@@ -49,9 +49,7 @@ fun NxProgressBar(
     color: Color = NxTheme.colors.progressAccent,
     trackColor: Color = NxTheme.colors.textSecondary.copy(alpha = 0.22f),
 ) {
-    val style = LocalStyle.current
-    val corner = style.badgeStyle.corner
-    val still = Motion.isStill
+    val corner = Form.Badge.corner
 
     // NaN passes coerceIn -- both of its comparisons are false against NaN -- and
     // then becomes the animation's current value, so every later valid value
@@ -67,7 +65,7 @@ fun NxProgressBar(
         label          = "nxProgress",
     )
 
-    val sweep = if (target == null && !still) {
+    val sweep = if (target == null) {
         val transition = rememberInfiniteTransition(label = "nxProgressSweep")
         transition.animateFloat(
             initialValue  = -INDETERMINATE_SPAN,
@@ -96,8 +94,6 @@ fun NxProgressBar(
                     drawRoundRect(color = color, size = Size(w, size.height), cornerRadius = radius)
                 }
             }
-            // Unknown job, motion off: a dimmed full track. Busy, not a percentage.
-            still -> drawRoundRect(color = color.copy(alpha = 0.35f), cornerRadius = radius)
             // Unknown job: a segment crossing the track, clipped at both ends.
             else -> {
                 val start = ((sweep ?: 0f) * size.width).coerceAtLeast(0f)

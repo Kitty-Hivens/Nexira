@@ -18,9 +18,7 @@ import hivens.core.data.PackReference
 import hivens.core.update.PackUpdater
 import hivens.launcher.PackOperationService
 import hivens.launcher.instance.InstanceSizeService
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -98,7 +96,7 @@ class PackSettingsWindowRenderTest {
         notes = "тестовая заметка",
     )
 
-    private fun render(width: Int, height: Int, style: StyleSpec, name: String) {
+    private fun render(width: Int, height: Int, name: String) {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         startKoin {
             modules(module {
@@ -115,7 +113,7 @@ class PackSettingsWindowRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true, style = style) {
+            NxTheme(useDarkTheme = true) {
                 // A vivid backdrop so any bleed-through of the overlay surface shows
                 // up as a pink tint -- proves the window is actually opaque.
                 Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
@@ -143,10 +141,10 @@ class PackSettingsWindowRenderTest {
         assertTrue(painted > MIN_PAINTED, "the window covers ${(painted * 100).toInt()}% of the frame -- it did not render")
     }
 
-    @Test fun `renders at FHD 1920x1080 under Celestia`() = render(1920, 1080, CelestiaStyle, "pack-settings-fhd.png")
+    @Test fun `renders at FHD 1920x1080 under Celestia`() = render(1920, 1080, "pack-settings-fhd.png")
 
 
-    @Test fun `renders at 2K 2560x1440 under Celestia`() = render(2560, 1440, CelestiaStyle, "pack-settings-2k.png")
+    @Test fun `renders at 2K 2560x1440 under Celestia`() = render(2560, 1440, "pack-settings-2k.png")
 
     /** Share of sampled pixels that are no longer the backdrop the window sits on. */
     private fun paintedFraction(frame: Image): Double {

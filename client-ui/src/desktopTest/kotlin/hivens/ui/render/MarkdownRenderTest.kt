@@ -10,9 +10,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
@@ -89,11 +87,11 @@ class MarkdownRenderTest {
         Licensed under LGPL. Report issues on [the tracker](https://example.invalid/issues).
     """.trimIndent()
 
-    private fun render(style: StyleSpec, name: String) {
+    private fun render(name: String) {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1100, 1600, density = Density(1f)) {
-            NxTheme(useDarkTheme = true, style = style) {
+            NxTheme(useDarkTheme = true) {
                 Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
                     Box(Modifier.verticalScroll(rememberScrollState()).padding(32.dp)) {
                         MarkdownHtml(markdown = body, onLink = {})
@@ -121,7 +119,7 @@ class MarkdownRenderTest {
         assertTrue(painted > MIN_INK, "only ${(painted * 100).toInt()}% of the page differs from its ground -- nothing rendered")
     }
 
-    @Test fun `renders a pack description under Celestia`() = render(CelestiaStyle, "markdown-celestia.png")
+    @Test fun `renders a pack description under Celestia`() = render("markdown-celestia.png")
 
 
     /** Share of sampled pixels that are not the page ground -- text, rules, panels. */

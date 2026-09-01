@@ -63,7 +63,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColors
 import hivens.ui.nx.NxTooltip
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
@@ -82,16 +82,15 @@ fun NotificationCard(
     // appears already opened into stale history.
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
     val palette = NxTheme.colors
-    val style = LocalStyle.current
     // Read here, not inside the drag coroutine: a role needs composition.
     val swipeSpec = Motion.panelSlide.of<Float>()
     val accentColor = severityAccent(group.severity, group.kind, palette)
     // Critical pulses only when the active style allows motion; Brut stays static.
-    val accentAlpha = if (group.severity == Severity.Critical && style.softGlowEnabled) criticalPulse() else 1f
+    val accentAlpha = if (group.severity == Severity.Critical && Form.softGlow) criticalPulse() else 1f
 
     val scope = rememberCoroutineScope()
     val offsetX = remember(group.sourceKey) { Animatable(0f) }
-    val cardShape = RoundedCornerShape(style.cardCorner)
+    val cardShape = RoundedCornerShape(Form.cardCorner)
     val density = LocalDensity.current
     // Fade the card as it is dragged toward the edge; the slide-off + the
     // stack's exit fade finish the gesture on release.
@@ -104,14 +103,14 @@ fun NotificationCard(
             .alpha(1f - 0.55f * swipeFrac)
             // Glass styles float on a soft shadow; flat (Brut) styles lean on a
             // hard border instead -- the shadow has no flat-style mapping.
-            .then(if (style.softGlowEnabled) Modifier.shadow(8.dp, cardShape, clip = false) else Modifier)
+            .then(if (Form.softGlow) Modifier.shadow(8.dp, cardShape, clip = false) else Modifier)
             .clip(cardShape)
             // Toasts are transient alerts read against the live wallpaper -- even a
             // few percent of translucency tints them off-colour and reads as a glitch,
             // so they stay fully opaque regardless of the glass style.
             .background(palette.surface)
             .then(
-                if (style.cardBorder > 0.dp) Modifier.border(style.cardBorder, palette.outline, cardShape)
+                if (Form.cardBorder > 0.dp) Modifier.border(Form.cardBorder, palette.outline, cardShape)
                 else Modifier,
             )
             // Swipe-to-dismiss: drag horizontally; past ~40% of the card width it
@@ -334,10 +333,7 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 
 @Composable
 private fun criticalPulse(): Float {
-    // Full strength rather than a strobe when the style asks for stillness: the
-    // card still has to read as critical without moving.
     val pulseRhythm = Motion.ownRhythm(CRITICAL_PULSE_MS)
-    if (Motion.isStill) return 1.0f
     val transition = rememberInfiniteTransition(label = "critical-pulse")
     val v by transition.animateFloat(
         initialValue = 0.55f,

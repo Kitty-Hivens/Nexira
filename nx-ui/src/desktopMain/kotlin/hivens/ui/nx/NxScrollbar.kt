@@ -10,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
@@ -44,7 +44,6 @@ fun NxVerticalScrollbar(
 @Composable
 private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
     val base  = NxTheme.colors.textSecondary
-    val style = LocalStyle.current
     // Reveal fades in at once; hiding waits out the idle pause, then fades. The fade and
     // the thumb's hover crossfade route through the style so reduced-motion collapses
     // them; the idle pause is fixed UX pacing, not motion, so it stays put. The corner
@@ -63,7 +62,7 @@ private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
     return ScrollbarStyle(
         minimalHeight       = MinLength,
         thickness           = Thickness,
-        shape               = RoundedCornerShape(style.buttonCorner),
+        shape               = RoundedCornerShape(Form.buttonCorner),
         hoverDurationMillis = Motion.colorShift.durationMs,
         unhoverColor        = base.copy(alpha = 0.40f * alpha),
         hoverColor          = base.copy(alpha = 0.75f * alpha),

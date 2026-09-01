@@ -81,7 +81,7 @@ import hivens.ui.skin3d.asSource
 import hivens.ui.skin3d.layered
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.profile.SkinHero
@@ -519,17 +519,16 @@ private fun SkinCard(
     onDelete: (() -> Unit)?,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = Modifier
             // Before the clip, not after: a stroke is centred on the outline, so
             // half of it falls outside the shape and drawing it inside the clip
             // left a half-width ring the corner antialiasing then ate.
             .then(
-                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(style.cardCorner))
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(Form.cardCorner))
                 else Modifier
             )
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(RoundedCornerShape(Form.cardCorner))
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
@@ -583,10 +582,9 @@ private fun CardCaption(name: String, modifier: Modifier = Modifier) {
 @Composable
 private fun AddTile(onClick: () -> Unit) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(RoundedCornerShape(Form.cardCorner))
             .background(NxTheme.colors.surface.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
@@ -612,17 +610,16 @@ private fun CapeCard(
     onDelete: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = Modifier
             // Before the clip, not after: a stroke is centred on the outline, so
             // half of it falls outside the shape and drawing it inside the clip
             // left a half-width ring the corner antialiasing then ate.
             .then(
-                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(style.cardCorner))
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(Form.cardCorner))
                 else Modifier
             )
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(RoundedCornerShape(Form.cardCorner))
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
