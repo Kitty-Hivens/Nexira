@@ -68,7 +68,7 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
@@ -132,7 +132,6 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     val selections: SelectionRegistry = koinInject()
     val selection by selections.selection.collectAsState()
     val activities by registry.activities.collectAsState()
-    val style = LocalStyle.current
     val s = LocalStrings.current
 
     // One line, so one subject. A failure outranks live work -- it is the only
@@ -220,7 +219,6 @@ internal fun Pill(
     maxWidth: Dp,
     open: Boolean = true,
 ) {
-    val style = LocalStyle.current
     val colors = NxTheme.colors
     val height = props.heightDp.dp
     // A panel's corner, not a capsule's. A fully rounded object at this size
@@ -231,7 +229,7 @@ internal fun Pill(
     // While the object is opening it travels from a circle to that radius, which
     // is the second half of the arrival: one shape becoming another.
     val corner by animateDpAsState(
-        targetValue = if (open) style.panelCorner else height / 2,
+        targetValue = if (open) Form.panelCorner else height / 2,
         animationSpec = Motion.reveal.of(),
         label = "pillCorner",
     )
@@ -262,7 +260,7 @@ internal fun Pill(
         // floating panel -- nothing under a flat form. Missing here while the
         // selection body set it meant the same object gained a shadow the moment a
         // selection took over and lost it again afterwards.
-        shadowDp = style.panelElevation.value,
+        shadowDp = Form.panelElevation.value,
         // Opaque body: the object floats over arbitrary content, so the
         // legibility floor cannot depend on what happens to be behind it.
         opacity = 1f,
@@ -372,11 +370,10 @@ private fun EdgeMeasure(
     modifier: Modifier,
 ) {
     val trackColor = NxTheme.colors.textSecondary.copy(alpha = 0.22f)
-    val style = LocalStyle.current
     // A job whose size is not known yet still has to look alive. A static track
     // reads as stalled, which is what a launcher does for the first seconds of
     // every install -- exactly when the user is watching hardest.
-    val sweep = if (fraction == null && !Motion.isStill) {
+    val sweep = if (fraction == null) {
         rememberInfiniteTransition(label = "pillSweep").animateFloat(
             initialValue = 0f,
             targetValue = 1f,

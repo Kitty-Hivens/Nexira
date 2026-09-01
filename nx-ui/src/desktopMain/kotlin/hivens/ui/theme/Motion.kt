@@ -89,18 +89,6 @@ object Motion {
         @Composable @ReadOnlyComposable get() = role(SWEEP_MS, LinearEasing)
 
     /**
-     * True when the active style asks for no motion at all.
-     *
-     * A finite animation handles that by resolving to 1ms and never being seen. An
-     * endless one cannot: `infiniteRepeatable` around a 1ms spec does not stop, it
-     * restarts every frame, turning stillness into a strobe. Anything that loops
-     * forever -- a spinner, a pulse, a drifting backdrop -- must ask this and hold
-     * its resting value instead.
-     */
-    val isStill: Boolean
-        @Composable @ReadOnlyComposable get() = LocalStyle.current.animationMultiplier == 0f
-
-    /**
      * A duration the vocabulary does not name, still scaled by the active style.
      *
      * For decorative effects whose period belongs to the effect itself -- a
@@ -120,7 +108,7 @@ object Motion {
         easing: Easing,
         enter: (MotionRole) -> EnterTransition = Enter.fade,
         exit: (MotionRole) -> ExitTransition = Exit.fade,
-    ): MotionRole = MotionRole(LocalStyle.current.animationDurationMs(baseMs), easing, enter, exit)
+    ): MotionRole = MotionRole(baseMs, easing, enter, exit)
 
     // Base durations, before the style multiplier. Deliberately few and spaced far
     // enough apart to be told apart on sight -- the old set (90, 110, 120, 160,

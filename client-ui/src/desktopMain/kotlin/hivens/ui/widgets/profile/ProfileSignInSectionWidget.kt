@@ -41,7 +41,7 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
 
@@ -145,11 +145,10 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
 
 @Composable
 private fun UuidCard(uuid: String) {
-    val style = LocalStyle.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(RoundedCornerShape(Form.cardCorner))
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

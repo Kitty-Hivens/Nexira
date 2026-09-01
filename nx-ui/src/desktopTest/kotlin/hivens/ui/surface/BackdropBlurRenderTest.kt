@@ -19,10 +19,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.LocalCustomization
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.LocalStyle
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -81,28 +79,31 @@ class BackdropBlurRenderTest {
 
     /**
      * The radius was a preset's private constant: 18 on one, 28 on another, and no
-     * way to reach either. It is the form axis that decides now, and a surface that
-     * names its own radius has to win over it in both directions.
+     * way to reach either. A surface names its own now, and the name decides in
+     * both directions -- including a named zero, which is a decision rather than
+     * an absence and must therefore beat the token's default.
      */
     @Test
-    fun `a named radius overrides the style in both directions`() {
-        val sharpStyleNamedBlur = scanline(blurDp = 18f, styleBlurDp = 0f)
-        val softStyleNamedZero = scanline(blurDp = 0f, styleBlurDp = 18f)
-        assertTrue(sharpStyleNamedBlur.spread < 10, "a named radius did not reach a style without one: ${sharpStyleNamedBlur.spread}")
-        assertTrue(softStyleNamedZero.spread > 60, "a named zero did not turn the style's blur off: ${softStyleNamedZero.spread}")
+    fun `a named radius decides, in both directions`() {
+        val named = scanline(blurDp = 18f)
+        val namedZero = scanline(blurDp = 0f)
+        assertTrue(named.spread < 10, "a named radius did not blur: ${named.spread}")
+        assertTrue(namedZero.spread > 60, "a named zero blurred anyway: ${namedZero.spread}")
     }
 
     /**
-     * What a surface that names nothing gets. This is the whole of the form axis
-     * owning the radius: the same call blurs under a soft style and does not under
-     * a sharp one, with no switch at the call site to keep in step with it.
+     * What a surface that names nothing gets: the form token's radius, without a
+     * switch at the call site to keep in step with it.
+     *
+     * This used to assert both directions by handing the composition a style with
+     * no blur. There is one set of form tokens now and no local to swap, so the
+     * negative half has no expressible input -- what is left is that the default
+     * reaches the pixels at all, which is the half that can actually regress.
      */
     @Test
-    fun `the style supplies the radius when the surface names none`() {
-        val soft = scanline(blurDp = null, styleBlurDp = 18f)
-        val sharp = scanline(blurDp = null, styleBlurDp = 0f)
-        assertTrue(soft.spread < 10, "a soft style did not blur: ${soft.spread}")
-        assertTrue(sharp.spread > 60, "a sharp style blurred anyway: ${sharp.spread}")
+    fun `a surface that names no radius takes the form token's`() {
+        val inherited = scanline(blurDp = null)
+        assertTrue(inherited.spread < 10, "the default radius did not reach the surface: ${inherited.spread}")
     }
 
     private data class Sample(val spread: Double, val red: Int, val green: Int) {
@@ -112,14 +113,12 @@ class BackdropBlurRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun scanline(
         blurDp: Float?,
-        styleBlurDp: Float = 18f,
         plate: Color? = null,
         blurEnabled: Boolean = true,
     ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
             CompositionLocalProvider(
                 LocalNxColors provides DarkColorPalette,
-                LocalStyle provides CelestiaStyle.copy(surfaceBlur = styleBlurDp.dp),
                 LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled),
             ) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
@@ -133,7 +132,7 @@ class BackdropBlurRenderTest {
         val image = scene.render()
         scene.close()
         File(OUT).mkdirs()
-        val named = blurDp?.toInt()?.toString() ?: "style${styleBlurDp.toInt()}"
+        val named = blurDp?.toInt()?.toString() ?: "inherited"
         val name = "backdrop-blur-$named${if (plate != null) "-over-plate" else ""}${if (blurEnabled) "" else "-off"}.png"
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(OUT, name).writeBytes(it) }
 
@@ -148,7 +147,7 @@ class BackdropBlurRenderTest {
         val spread = sqrt(lum.sumOf { (it - mean) * (it - mean) } / lum.size)
         val mid = bmp.getColor(SX + SW / 2, y)
         val s = Sample(spread, (mid shr 16) and 0xFF, (mid shr 8) and 0xFF)
-        println("BackdropBlurRenderTest: blur=$blurDp style=$styleBlurDp plate=${plate != null} enabled=$blurEnabled -> $s")
+        println("BackdropBlurRenderTest: blur=$blurDp plate=${plate != null} enabled=$blurEnabled -> $s")
         return s
     }
 

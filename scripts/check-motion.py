@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Keeps the motion scale from becoming a scale nobody reads.
 #
-# StyleSpec carries the motion axis, and a duration written at a call site is a
+# Motion carries the duration scale, and a duration written at a call site is a
 # duration no style can reach: that is how Brut came to declare motion off while
 # most of the interface kept animating. Motion names the roles instead, so this
 # scan fails the build on the three ways of stepping around it -- a literal
@@ -30,7 +30,6 @@ EXCLUDE_PATH_FRAGMENTS = ("/build/", "/.gradle/", "/.idea/")
 # Where the vocabulary itself lives, and the one place allowed to read the raw
 # axis. Anything else asking these questions is bypassing the scale.
 VOCABULARY = ("nx-ui/src/desktopMain/kotlin/hivens/ui/theme/Motion.kt",)
-AXIS_OWNERS = VOCABULARY + ("nx-ui/src/desktopMain/kotlin/hivens/ui/theme/StyleSpec.kt",)
 
 # Deliberate exemptions. Each names why the scale cannot reach it -- not a place
 # to park a site nobody wanted to move.
@@ -39,19 +38,8 @@ EXEMPT = {
     # defaults are declared, and console scrolling is navigation rather than
     # interface motion.
     "client-ui/src/desktopMain/kotlin/hivens/ui/screens/console/LogScrollState.kt": {"literal-duration"},
-    # Mirrors the active style's multiplier into the April Fools engine, which
-    # renders outside the theme. This is the bridge that makes it obey.
-    "client-ui/src/desktopMain/kotlin/hivens/ui/AppShell.kt": {"reads-multiplier"},
     # The easter engine scales its own set pieces through that mirrored value.
-    "client-easter": {"reads-multiplier", "literal-duration", "hand-scaled"},
-    # These verify the stillness contract itself, so constructing a style that
-    # asks for no motion is the subject under test rather than a bypass of it.
-    "nx-ui/src/desktopTest/kotlin/hivens/ui/theme/MotionTest.kt": {"reads-multiplier"},
-    "nx-ui/src/desktopTest/kotlin/hivens/ui/nx/NxProgressBarRenderTest.kt": {"reads-multiplier"},
-    # The 3D view drives its own scene clock, so it needs the multiplier itself
-    # rather than the still/not question -- an idle spin slows with the style
-    # before it stops. This is the bridge that hands it over.
-    "client-render3d": {"reads-multiplier"},
+    "client-easter": {"literal-duration"},
 }
 
 
@@ -67,16 +55,6 @@ RULES = (
         "literal-duration",
         re.compile(r"\btween\s*(?:<[^>]*>)?\s*\(\s*(?:durationMillis\s*=\s*)?\d[\d_]*"),
         "literal duration in tween() -- ask Motion for the role that fits, or Motion.ownRhythm if the period belongs to the effect",
-    ),
-    Rule(
-        "hand-scaled",
-        re.compile(r"\banimationDurationMs\s*\("),
-        "hand-scaled duration -- Motion roles already resolve through the style",
-    ),
-    Rule(
-        "reads-multiplier",
-        re.compile(r"\banimationMultiplier\b"),
-        "reads the raw motion axis -- use Motion.isStill to ask whether the style wants stillness",
     ),
 )
 
@@ -119,10 +97,6 @@ def violations() -> list[tuple[str, int, str, str]]:
                 line = strip_comment(raw)
                 for rule in RULES:
                     if rule.key in allowed:
-                        continue
-                    if rule.key == "hand-scaled" and rel in AXIS_OWNERS:
-                        continue
-                    if rule.key == "reads-multiplier" and rel in AXIS_OWNERS:
                         continue
                     if rule.pattern.search(line):
                         found.append((rel, n, rule.key, rule.message))

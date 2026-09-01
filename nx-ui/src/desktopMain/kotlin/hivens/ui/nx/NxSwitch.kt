@@ -16,12 +16,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 
 /**
  * Skin-driven toggle. Geometry (track/thumb size + corners) comes from the active
- * [hivens.ui.theme.StyleSpec.switchStyle]; colours come from the palette. Swapping the
+ * [hivens.ui.theme.Form.Switch]; colours come from the palette. Swapping the
  * style preset (Celestia pill <-> Brut square) -- or, later, a user skin -- restyles
  * every toggle in the app at once, since all of them route through here instead of a
  * raw Material `Switch` + inline `SwitchDefaults.colors`.
@@ -39,7 +39,7 @@ fun NxSwitch(
      *  Null = the palette accent. */
     accent: Color? = null,
 ) {
-    val st = LocalStyle.current.switchStyle
+    val st = Form.Switch
     val colors = NxTheme.colors
     val alpha = if (enabled) 1f else 0.4f
     val trackColor by animateColorAsState(

@@ -20,7 +20,6 @@ import hivens.ui.scene3d.Node
 import hivens.ui.scene3d.OrthoCamera
 import hivens.ui.scene3d.Scene3DState
 import hivens.ui.scene3d.Scene3DView
-import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.time.Duration.Companion.milliseconds
@@ -105,10 +104,11 @@ fun SkinView3D(
 
     var dragging by remember { mutableStateOf(false) }
 
-    // Honour the style engine's motion token: Brut sets animationMultiplier = 0
-    // ("motion off"), so the idle spin stops and pose retargets snap to their
-    // end state. Dragging always works regardless.
-    val motion = LocalStyle.current.animationMultiplier
+    // The scene drives its own clock, so it takes a multiplier rather than the
+    // still/not question -- an idle spin slows before it stops. Nothing varies it
+    // today: the style axis that used to carry a motion token is gone, and a
+    // reduce-motion preference would arrive as a customization setting instead.
+    val motion = 1f
     SideEffect { state.motionMultiplier = motion }
 
     // A spin nobody is looking at is a spin worth not drawing. The window

@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 
 /**
@@ -38,7 +38,6 @@ internal fun SettingsCategoryNav(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = modifier
             .width(200.dp)
@@ -52,7 +51,7 @@ internal fun SettingsCategoryNav(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(style.cardCorner))
+                    .clip(RoundedCornerShape(Form.cardCorner))
                     .background(
                         if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
                         else NxTheme.colors.background.copy(alpha = 0.0f),

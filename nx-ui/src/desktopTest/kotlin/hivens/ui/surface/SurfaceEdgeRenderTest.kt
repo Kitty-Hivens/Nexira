@@ -13,10 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.LocalStyle
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -94,7 +92,6 @@ class SurfaceEdgeRenderTest {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
             CompositionLocalProvider(
                 LocalNxColors provides DarkColorPalette,
-                LocalStyle provides CelestiaStyle,
             ) {
                 Box(Modifier.fillMaxSize().background(PAGE)) { content() }
             }

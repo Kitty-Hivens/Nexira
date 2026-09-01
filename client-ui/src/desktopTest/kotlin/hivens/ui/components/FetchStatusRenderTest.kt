@@ -17,10 +17,7 @@ import androidx.compose.ui.unit.dp
 import hivens.media.MediaFetch
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -56,15 +53,14 @@ class FetchStatusRenderTest {
      * a loaded machine does not promise, and a run of frames does not need.
      */
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun render(name: String, style: StyleSpec = CelestiaStyle, scale: Float = 1f, content: @Composable () -> Unit): List<Bitmap> {
+    private fun render(name: String, scale: Float = 1f, content: @Composable () -> Unit): List<Bitmap> {
         val scene = ImageComposeScene(
             width   = (width * scale).toInt(),
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(useDarkTheme = true, style = style) {
+            NxTheme(useDarkTheme = true) {
                 CompositionLocalProvider(
-                    LocalStyle provides style,
                     LocalStrings provides EnglishStrings,
                 ) {
                     progressAccent = NxTheme.colors.progressAccent

@@ -18,8 +18,6 @@ import hivens.ui.i18n.RussianStrings
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.Bitmap
 import kotlin.math.abs
@@ -73,9 +71,8 @@ class PillWidthTest {
         val strings = if (russian) RussianStrings else EnglishStrings
         val ambient = if (russian) probeAmbient else null
         val scene = ImageComposeScene(width = frame, height = 140, density = Density(1f)) {
-            NxTheme(useDarkTheme = true, style = CelestiaStyle) {
+            NxTheme(useDarkTheme = true) {
                 CompositionLocalProvider(
-                    LocalStyle provides CelestiaStyle,
                     LocalStrings provides strings,
                 ) {
                     Box(Modifier.fillMaxSize().background(ground).padding(20.dp)) {

@@ -14,13 +14,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LightColorPalette
 import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxColors
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
@@ -39,11 +36,10 @@ import kotlin.test.assertTrue
 class PlayButtonRenderTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun render(style: StyleSpec, palette: NxColors, name: String) {
+    private fun render(palette: NxColors, name: String) {
         val scene = ImageComposeScene(width = 1150, height = 360, density = Density(2f)) {
             CompositionLocalProvider(
                 LocalNxColors provides palette,
-                LocalStyle provides style,
             ) {
                 Column(
                     modifier            = Modifier.fillMaxSize().background(Color(BACKDROP)).padding(16.dp),
@@ -80,9 +76,9 @@ class PlayButtonRenderTest {
         assertTrue(painted > MIN_PAINTED, "the sheet covers ${(painted * 100).toInt()}% of the frame -- it did not render")
     }
 
-    @Test fun `renders under Celestia dark`() = render(CelestiaStyle, DarkColorPalette, "celestia-dark")
+    @Test fun `renders on the dark palette`() = render(DarkColorPalette, "dark")
 
-    @Test fun `renders under Celestia light`() = render(CelestiaStyle, LightColorPalette, "celestia-light")
+    @Test fun `renders on the light palette`() = render(LightColorPalette, "light")
 
 
     /** Share of sampled pixels that are not the bare backdrop the sheet sits on. */

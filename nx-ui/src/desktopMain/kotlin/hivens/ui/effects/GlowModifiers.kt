@@ -32,21 +32,13 @@ fun Modifier.pulsatingGlow(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    // A loop cannot express stillness by collapsing its duration -- a 1ms
-    // repeat restarts every frame. Under a still style the glow holds its
-    // resting intensity instead.
-    val still = Motion.isStill
     val pulse = Motion.ownRhythm(PULSE_MS)
-    val intensity by if (still) {
-        remember { mutableStateOf(GLOW_REST) }
-    } else {
-        rememberInfiniteTransition(label = "pulsatingGlow").animateFloat(
-            initialValue = GLOW_REST,
-            targetValue  = 0.72f,
-            animationSpec = infiniteRepeatable(pulse.of(), RepeatMode.Reverse),
-            label = "glowIntensity"
-        )
-    }
+    val intensity by rememberInfiniteTransition(label = "pulsatingGlow").animateFloat(
+        initialValue = GLOW_REST,
+        targetValue  = 0.72f,
+        animationSpec = infiniteRepeatable(pulse.of(), RepeatMode.Reverse),
+        label = "glowIntensity",
+    )
 
     drawBehind {
         val cPx = cornerRadius.toPx()
@@ -73,7 +65,6 @@ fun Modifier.shimmerOverlay(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    if (Motion.isStill) return@composed this
     val sweepRhythm = Motion.ownRhythm(SHIMMER_MS)
     val offsetX by rememberInfiniteTransition(label = "shimmer").animateFloat(
         initialValue = -1.1f,
@@ -111,16 +102,12 @@ fun Modifier.neonBorder(
     strokeWidth: Dp = 2.dp
 ): Modifier = composed {
     val neonRhythm = Motion.ownRhythm(NEON_MS)
-    val alpha by if (Motion.isStill) {
-        remember { mutableStateOf(1f) }
-    } else {
-        rememberInfiniteTransition(label = "neonBorder").animateFloat(
-            initialValue = 0.50f,
-            targetValue  = 1.00f,
-            animationSpec = infiniteRepeatable(neonRhythm.of(), RepeatMode.Reverse),
-            label = "neonAlpha"
-        )
-    }
+    val alpha by rememberInfiniteTransition(label = "neonBorder").animateFloat(
+        initialValue = 0.50f,
+        targetValue  = 1.00f,
+        animationSpec = infiniteRepeatable(neonRhythm.of(), RepeatMode.Reverse),
+        label = "neonAlpha",
+    )
 
     drawWithContent {
         drawContent()

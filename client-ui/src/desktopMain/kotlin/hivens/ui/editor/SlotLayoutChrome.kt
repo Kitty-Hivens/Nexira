@@ -45,7 +45,7 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.SlotContent
@@ -77,7 +77,7 @@ internal fun slotChromeModifier(
     onReportRect: (Rect) -> Unit,
 ): Modifier = Modifier.composed {
     val accent   = NxTheme.colors.primary
-    val cornerPx = with(LocalDensity.current) { LocalStyle.current.cardCorner.toPx() }
+    val cornerPx = with(LocalDensity.current) { Form.cardCorner.toPx() }
     val strokePx = with(LocalDensity.current) { 2.dp.toPx() }
     var bounds by remember { mutableStateOf(Rect.Zero) }
     var originInWindow by remember { mutableStateOf(Offset.Zero) }
@@ -182,7 +182,7 @@ private fun SlotSelectionHandle(onClick: () -> Unit) {
     NxSurface(
         level = NxSurfaceLevel.Floating,
         blurDp = 0f,
-        shape = RoundedCornerShape(LocalStyle.current.buttonCorner),
+        shape = RoundedCornerShape(Form.buttonCorner),
     ) {
         Box(
             modifier         = Modifier.size(SLOT_HANDLE_SIZE).clickable(onClick = onClick),

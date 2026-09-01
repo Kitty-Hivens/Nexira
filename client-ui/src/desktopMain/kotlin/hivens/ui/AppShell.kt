@@ -100,8 +100,7 @@ import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.SystemTheme
@@ -407,21 +406,13 @@ fun FrameWindowScope.AppShellContent(
     }
     var homeView      by remember { mutableStateOf(settings.homeView) }
 
-    val basePresetStyle = CelestiaStyle
-    // Preset-only spec at this level -- customization (and the
-    // editor-4 style overrides) live inside AppRoot. AprilFools
-    // tracks the preset value; the overridden value flows through
-    // LocalStyle further down for composables that need the
-    // user-tweaked tokens.
-    val styleSpec = basePresetStyle
-
-    // Push style coupling into AprilFools so the chaos engine (a plain
-    // singleton, not a Composable) and chaos components pick up the
-    // active style without having to thread a CompositionLocal through
-    // them. Triggered on every uiStyle change.
-    LaunchedEffect(styleSpec) {
-        AprilFools.styleAnimationMultiplier = styleSpec.animationMultiplier
-        AprilFools.useFlatSurface           = styleSpec.cardSurface == hivens.ui.theme.CardSurface.Flat
+    // The chaos engine is a plain singleton rather than a composable, so it is
+    // told what the interface looks like rather than reading it. Both values were
+    // mirrored from the style axis; there is one form now, so they are constants
+    // and this is the seam where a second one would reach the engine again.
+    LaunchedEffect(Unit) {
+        AprilFools.styleAnimationMultiplier = 1f
+        AprilFools.useFlatSurface           = false
     }
 
     // One-time registry-aware reconcile of the loaded layout graph. The
@@ -940,7 +931,6 @@ fun FrameWindowScope.AppShellContent(
                     isDarkTheme    = isDarkTheme,
                     onClose        = { gameConsole.hide() },
                     customTheme    = customTheme,
-                    style          = styleSpec,
                 )
             }
 
@@ -949,7 +939,6 @@ fun FrameWindowScope.AppShellContent(
             NxTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
-                style        = styleSpec,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
             ) {
@@ -1040,7 +1029,6 @@ fun FrameWindowScope.AppShellContent(
             NxTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
-                style        = styleSpec,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
             ) {

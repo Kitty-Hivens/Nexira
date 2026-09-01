@@ -47,7 +47,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 
 /** How many digits the second factor asks for. */
@@ -210,7 +210,7 @@ internal fun ConfirmCodeCellsForTest(code: String, hasError: Boolean = false, di
  * field above.
  */
 private fun CodeCells(code: String, hasError: Boolean, dimmed: Boolean) {
-    val shape = RoundedCornerShape(LocalStyle.current.buttonCorner)
+    val shape = RoundedCornerShape(Form.buttonCorner)
     val accent = if (hasError) NxTheme.colors.error else NxTheme.colors.primary
     Row(
         Modifier.fillMaxWidth().alpha(if (dimmed) 0.6f else 1f),

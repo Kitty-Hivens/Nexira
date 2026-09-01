@@ -107,12 +107,10 @@ import hivens.ui.screens.console.LogCanvas
 import hivens.ui.screens.console.LogSelection
 import hivens.ui.screens.console.buildLineModels
 import hivens.ui.screens.console.rememberLogCanvasState
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.StyleSpec
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.ConsoleSettingsStore
@@ -261,7 +259,6 @@ fun ConsoleWindow(
     isDarkTheme: Boolean,
     onClose: () -> Unit,
     customTheme: CustomTheme? = null,
-    style: StyleSpec = CelestiaStyle,
 ) {
     val title = LocalStrings.current.consoleTitle
     // Collected here rather than by the shell that hosts this window: the store
@@ -287,7 +284,6 @@ fun ConsoleWindow(
         NxTheme(
             useDarkTheme = isDarkTheme,
             customTheme  = customTheme,
-            style        = style,
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = NxTheme.colors.background) {
                 ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
@@ -780,7 +776,7 @@ internal fun ConsoleContent(
             // while the content swaps between "showing" and "hidden" --
             // AnimatedVisibility's scope-resolution issue avoided because
             // Crossfade has no scoped overload. Animation duration mirrors
-            // the StyleSpec's idea of a quick microinteraction (mpv-OSD
+            // the interface's idea of a quick microinteraction (mpv-OSD
             // style: appear on action, dissolve when idle).
             Crossfade(
                 targetState   = copiedFlash,

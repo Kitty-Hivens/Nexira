@@ -68,7 +68,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import kotlinx.coroutines.CoroutineScope
@@ -120,7 +120,6 @@ fun PackSettingsWindow(
     initialCategory: PackSettingsCategory? = null,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val repo: IPackRepository = koinInject()
     val appScope: CoroutineScope = koinInject()
     PuppetScreen("PackSettings.${pack.id}")
@@ -227,7 +226,7 @@ fun PackSettingsWindow(
             modifier = Modifier
                 .fillMaxWidth(0.88f)
                 .fillMaxHeight(0.90f)
-                .clip(RoundedCornerShape(style.cardCorner))
+                .clip(RoundedCornerShape(Form.cardCorner))
                 .clickable(card, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -245,7 +244,7 @@ fun PackSettingsWindow(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(style.cardCorner))
+                                    .clip(RoundedCornerShape(Form.cardCorner))
                                     .background(
                                         if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
                                         else Color.Transparent,

@@ -10,25 +10,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.BadgeStyleSpec
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.LocalStyle
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-
-/** Square badge shell, which is what the corner assertions contrast against the
- *  rounded default. */
-private val SquareStyle = CelestiaStyle.copy(badgeStyle = BadgeStyleSpec.Square)
-
-/** A style that asks for no motion -- the subject of the indeterminate-track test.
- *  Both were one retired second style, for two unrelated reasons. */
-private val StillStyle = CelestiaStyle.copy(animationMultiplier = 0f)
 
 /**
  * Reads a measurement out of the frame rather than asserting the PNG is not
@@ -48,8 +36,8 @@ class NxProgressBarRenderTest {
     private val density = 1f
 
     /** Accent run along one scanline, in pixels. */
-    private fun accentRun(style: StyleSpec, progress: Float?, row: Int): Int {
-        val bmp = render(style, progress)
+    private fun accentRun(progress: Float?, row: Int): Int {
+        val bmp = render(progress)
         val accent = DarkColorPalette.progressAccent
         var run = 0
         for (x in 0 until width) {
@@ -59,11 +47,10 @@ class NxProgressBarRenderTest {
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun render(style: StyleSpec, progress: Float?): Bitmap {
+    private fun render(progress: Float?): Bitmap {
         val scene = ImageComposeScene(width = width, height = barHeight, density = Density(density)) {
             CompositionLocalProvider(
                 LocalNxColors provides DarkColorPalette,
-                LocalStyle provides style,
             ) {
                 Box(Modifier.fillMaxSize().background(Color(0xFF121212))) {
                     NxProgressBar(progress = progress, height = barHeight.dp)
@@ -98,10 +85,10 @@ class NxProgressBarRenderTest {
     @Test
     fun `the filled run tracks the value`() {
         val mid = barHeight / 2
-        val at0 = accentRun(CelestiaStyle, 0f, mid)
-        val at25 = accentRun(CelestiaStyle, 0.25f, mid)
-        val at50 = accentRun(CelestiaStyle, 0.5f, mid)
-        val at100 = accentRun(CelestiaStyle, 1f, mid)
+        val at0 = accentRun(0f, mid)
+        val at25 = accentRun(0.25f, mid)
+        val at50 = accentRun(0.5f, mid)
+        val at100 = accentRun(1f, mid)
 
         assertEquals(0, at0, "an empty bar must draw no fill at all")
         assertTrue(at25 < at50 && at50 < at100, "run must grow with the value: $at25 / $at50 / $at100")
@@ -110,47 +97,13 @@ class NxProgressBarRenderTest {
         assertTrue(abs(at100 - width) <= 3, "100% should fill the track, filled $at100 of $width")
     }
 
+    /** This used to contrast two styles' corners. There is one set of form tokens
+     *  now, so what is left to check is that the bar rounds at all -- a flat end
+     *  is what a lost corner token looks like from the outside. */
     @Test
-    fun `an unknown job under motion-off draws a still full track, not a percentage`() {
-        val mid = barHeight / 2
-        // Asserting "no partial accent run" would pass on a frame with nothing
-        // drawn at all, which is the failure mode this whole file exists to
-        // avoid. So measure two things that cannot both hold on an empty frame:
-        // the busy row is uniform end to end, and it is not the bare track.
-        val busy = row(render(StillStyle, null), mid)
-        val track = row(render(StillStyle, 0f), mid)
-
-        val inset = 3 // skip the antialiased end pixels
-        val sample = busy.slice(inset until width - inset)
-        assertTrue(
-            sample.all { near(it, sample.first()) },
-            "busy fill must be uniform, not a stalled percentage: found ${sample.distinct().size} tones",
-        )
-        assertTrue(
-            !near(busy[width / 2], track[width / 2]),
-            "busy state must differ from the bare track, both read ${busy[width / 2]}",
-        )
-    }
-
-    @Test
-    fun `the corner follows the style axis`() {
-        val mid = barHeight / 2
-        val top = 0
-
-        val celestiaMid = accentRun(CelestiaStyle, 1f, mid)
-        val celestiaTop = accentRun(CelestiaStyle, 1f, top)
-        val squareMid = accentRun(SquareStyle, 1f, mid)
-        val squareTop = accentRun(SquareStyle, 1f, top)
-
-        // Round: the top scanline clips the corners, so it is shorter than the middle.
-        assertTrue(
-            celestiaTop < celestiaMid - 4,
-            "Celestia should round the ends: top $celestiaTop vs middle $celestiaMid",
-        )
-        // Square: every scanline is the same length.
-        assertTrue(
-            abs(squareTop - squareMid) <= 2,
-            "Brut should square the ends: top $squareTop vs middle $squareMid",
-        )
+    fun `the bar rounds its ends`() {
+        val mid = accentRun(1f, barHeight / 2)
+        val top = accentRun(1f, 0)
+        assertTrue(top < mid - 4, "the ends should round: top $top vs middle $mid")
     }
 }

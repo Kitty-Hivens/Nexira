@@ -35,7 +35,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
@@ -175,7 +175,6 @@ private fun NavSlot(
 ) {
     val af = LocalAprilFools.current
     val cz = LocalCustomization.current
-    val style = LocalStyle.current
 
     val bounceAmp = if (chaosEligible && af.isActive()) af.intensity() * 18f else 0f
     // Only run the infinite transition during April Fools. Otherwise a 0-amplitude
@@ -247,7 +246,7 @@ private fun NavSlot(
                     NavSelectionStyle.Pill ->
                         Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(50)).background(fill))
                     NavSelectionStyle.Square ->
-                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(RoundedCornerShape(style.buttonCorner)).background(fill))
+                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(RoundedCornerShape(Form.buttonCorner)).background(fill))
                     NavSelectionStyle.Circle ->
                         Box(Modifier.size(40.dp).clip(CircleShape).background(fill))
                     NavSelectionStyle.LeftBar ->

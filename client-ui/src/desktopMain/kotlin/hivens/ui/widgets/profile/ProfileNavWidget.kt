@@ -21,7 +21,7 @@ import hivens.auth.AuthProviderRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
@@ -36,7 +36,6 @@ import org.koin.compose.koinInject
 fun ProfileNavWidget() {
     val ctx = LocalProfileContext.current
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val authRegistry: AuthProviderRegistry = koinInject()
     val current by ctx.selectedCategory
 
@@ -64,7 +63,7 @@ fun ProfileNavWidget() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(style.cardCorner))
+                    .clip(RoundedCornerShape(Form.cardCorner))
                     .background(
                         if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
                         else NxTheme.colors.background.copy(alpha = 0.0f),
