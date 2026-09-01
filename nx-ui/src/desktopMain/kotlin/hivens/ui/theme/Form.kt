@@ -7,22 +7,27 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The one set of form tokens: corners, depth and the surface defaults, beside
- * [Spacing] on the gap axis and [NxColors] on the colour one.
+ * What a surface gets when nothing has said otherwise: corners, depth and the
+ * surface defaults, beside [Spacing] on the gap axis and [NxColors] on the colour
+ * one.
+ *
+ * A fallback, not a destination. The configuration a widget carries is its own --
+ * `SurfaceSpec` for the plane it sits on, props for what it draws inside -- and
+ * this is what the resolver reaches for when the widget names nothing. A value
+ * that can only be read from here is a value nobody can change, which is a gap to
+ * close rather than a design.
  *
  * These were fields of a `StyleSpec` handed down a composition local, because
- * there were two of them and a screen had to read whichever was active. There is
- * one now, so the indirection carried nothing: every read resolved to the same
- * object on every frame, and the local's only remaining job was to make that
- * fact cost a lookup.
+ * there were two of them and a screen had to read whichever was active. Two global
+ * looks were the wrong shape for the same reason: they decided for every widget at
+ * once what each should be able to decide for itself.
  *
- * What the local did earn is kept, and it is the reason this is an object rather
- * than a literal at each call site: [cardCorner] alone is read from thirty-six
- * places that have no other way to agree on what a corner is. Ending the axis by
- * inlining the numbers would have ended the agreement with it.
+ * It stays an object rather than a literal at each call site because the reads
+ * that remain have no other way to agree: [cardCorner] alone answers thirty-six of
+ * them. Agreement is what a fallback is for.
  *
- * These are base dp, like [Spacing]: the density override at the shell root
- * scales them at layout time.
+ * These are base dp, like [Spacing]: the density override at the shell root scales
+ * them at layout time.
  */
 object Form {
     /** Corner rounding on card-shaped surfaces -- the dominant shape in the tree. */
