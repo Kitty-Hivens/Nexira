@@ -33,7 +33,7 @@ jobs:
       # toolchain(26) resolves to the running JVM instead of a download.
       - name: Set up JDK 26 for the Gradle toolchain
         id: jdk26
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: liberica
           java-version: '26'
