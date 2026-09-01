@@ -44,14 +44,18 @@ class PackArtResolver(
         if (instance.iconUrl != null || instance.bannerUrl != null) {
             return PackArt(instance.iconUrl, instance.bannerUrl)
         }
-        return cache["${'$'}{instance.packRef.origin}:${'$'}{instance.packRef.id}"]
+        return cache[keyOf(instance)]
     }
+
+    /** One expression, so the reader and the writer cannot drift apart. */
+    private fun keyOf(instance: PackInstance): String =
+        "${instance.packRef.origin}:${instance.packRef.id}"
 
     suspend fun resolve(instance: PackInstance): PackArt {
         if (instance.iconUrl != null || instance.bannerUrl != null) {
             return PackArt(instance.iconUrl, instance.bannerUrl)
         }
-        val key = "${instance.packRef.origin}:${instance.packRef.id}"
+        val key = keyOf(instance)
         cache[key]?.let { return it }
 
         val art = try {

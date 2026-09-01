@@ -312,7 +312,9 @@ private val RAIL_INSET = 4.dp
  *
  * Collapsed it reserves no width at all -- see [RAIL_COLLAPSED_GRAB] -- so there is
  * nothing left on screen to swipe, and it reopens through Ctrl+N or, in edit mode,
- * the region's own Tune. This used to describe a slim catch at the edge; the catch
+ * the region's own Tune. Neither reaches it while the window is under
+ * [AUTO_COLLAPSE_BELOW]: the auto-collapse is not a state the chord can leave,
+ * because there is no room to open into. This used to describe a slim catch at the edge; the catch
  * went to zero and the sentence outlived it. Edit mode keeps the static
  * prop-driven behaviour.
  */
@@ -385,8 +387,8 @@ fun ShellRightRegion(instance: WidgetInstance) {
     val effectiveCollapsed = props.collapsed || autoCollapsed
     val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH
     val expandedPx  = with(density) { expandedWidth.toPx() }
-    // Collapsed keeps a slim transparent swipe-catch at the screen edge so the
-    // rail can be dragged back open; the drag then ranges over the full width.
+    // Collapsed reserves nothing, so there is no catch to drag: RAIL_COLLAPSED_GRAB
+    // is zero and the drag below only ever ranges from there to the full width.
     val collapsedPx = with(density) { RAIL_COLLAPSED_GRAB.dp.toPx() }
     val widthAnim = remember { Animatable(if (effectiveCollapsed) collapsedPx else expandedPx) }
     val scope = rememberCoroutineScope()

@@ -22,7 +22,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 
 /**
- * The one motion scale, beside [Spacing] and the shape tokens on [StyleSpec].
+ * The one motion scale, beside [Spacing] and the shape tokens on [Form].
  *
  * A call site asks for what is happening -- a panel arriving, content opening, a
  * press answering -- and gets the duration and curve that belong to it. It does

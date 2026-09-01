@@ -407,8 +407,9 @@ private fun EdgeMeasure(
         val arc = Path()
 
         when {
-            // Unknown size: a short arc travelling the perimeter.
-            fraction == null && sweep != null -> {
+            // Unknown size: a short arc travelling the perimeter. sweep is non-null
+            // exactly when fraction is null, so this is the whole of that case.
+            sweep != null -> {
                 val span = total * INDETERMINATE_SPAN
                 val head = total * sweep
                 measure.getSegment(head, (head + span).coerceAtMost(total), arc, true)
@@ -417,13 +418,7 @@ private fun EdgeMeasure(
                     measure.getSegment(0f, head + span - total, arc, true)
                 }
             }
-            // Unknown size with motion off: a still, dimmed full perimeter. Busy,
-            // not a percentage.
-            fraction == null -> {
-                drawPath(outline, color.copy(alpha = 0.35f), style = Stroke(width = strokeWidth))
-                return@Canvas
-            }
-            fraction <= 0f -> return@Canvas
+            fraction == null || fraction <= 0f -> return@Canvas
             else -> measure.getSegment(0f, total * fraction.coerceIn(0f, 1f), arc, true)
         }
         drawPath(arc, color, style = Stroke(width = strokeWidth))

@@ -119,7 +119,7 @@ fun PlayButton(
             label         = "playBusyAlpha",
         )
         a
-    } else if (busy) 0.75f else 1f
+    } else 1f
 
     val ghost = Color.White.copy(alpha = 0.38f)
     // A faint ring in the opposite ink holds the plate's edge when the ground

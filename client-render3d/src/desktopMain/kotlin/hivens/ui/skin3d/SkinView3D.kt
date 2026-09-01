@@ -104,12 +104,12 @@ fun SkinView3D(
 
     var dragging by remember { mutableStateOf(false) }
 
-    // The scene drives its own clock, so it takes a multiplier rather than the
-    // still/not question -- an idle spin slows before it stops. Nothing varies it
-    // today: the style axis that used to carry a motion token is gone, and a
-    // reduce-motion preference would arrive as a customization setting instead.
-    val motion = 1f
-    SideEffect { state.motionMultiplier = motion }
+    // The scene drives its own clock and takes a multiplier rather than a
+    // still/not question, so an idle spin slows before it stops. Nothing varies it
+    // today -- the style axis that carried a motion token is gone -- so the state's
+    // own default stands and nothing is pushed. A reduce-motion preference would
+    // arrive from the customization layer and write here.
+    val motion = state.motionMultiplier
 
     // A spin nobody is looking at is a spin worth not drawing. The window
     // losing focus does not hide the figure, so this trades a frozen model in

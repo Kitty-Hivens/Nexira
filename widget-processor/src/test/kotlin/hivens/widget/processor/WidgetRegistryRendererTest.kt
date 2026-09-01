@@ -31,10 +31,10 @@ class WidgetRegistryRendererTest {
     // --- the declared default plane ---
 
     @Test
-    fun `a declared plane is emitted as a decoded constant`() {
+    fun `a declared plane is emitted, decoded on first read`() {
         val src = renderRegistry(listOf(widget("home.card", surfaceJson = """{"fill":"base","opacity":0.45}""")))
         assertContains(src, "import hivens.widget.model.SurfaceSpec")
-        assertContains(src, "override val defaultSurface: SurfaceSpec?")
+        assertContains(src, "override val defaultSurface: SurfaceSpec? by lazy {")
         // Escaped into a Kotlin literal, not pasted raw: an unescaped quote here
         // would not compile, and the failure would be in generated code.
         assertContains(src, """decodeFromString(SurfaceSpec.serializer(), "{\"fill\":\"base\",\"opacity\":0.45}")""")
@@ -162,6 +162,7 @@ class WidgetRegistryRendererTest {
         // Lazy: the palette lists a kind without needing its serializer, and building
         // one loads the props class. A launcher pays for the widgets it draws.
         assertContains(src, "override val propsSerializer: KSerializer<*>? by lazy { hivens.ui.widgets.ClockProps.serializer() }")
+        assertContains(src, "override val defaultPropsJson: JsonObject by lazy {")
         assertContains(src, "hivens.ui.widgets.ClockProps.serializer(), hivens.ui.widgets.ClockProps()")
         // encodeDefaults is what makes the baseline carry every field rather
         // than only the ones that differ from their defaults.
