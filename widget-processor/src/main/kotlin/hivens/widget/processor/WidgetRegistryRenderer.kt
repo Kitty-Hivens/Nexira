@@ -105,7 +105,7 @@ internal fun renderRegistry(
     }
     if (hasSurface) {
         // The literals were decoded once at build time to check them; this decodes
-        // them again at class-init, which is where a descriptor's constants belong.
+        // them again on first read -- see the note on laziness below.
         appendLine("    private val surfaceJson: Json = Json { ignoreUnknownKeys = true }")
     }
     appendLine("    private val map: Map<WidgetKind, WidgetDescriptor> = buildMap {")
@@ -122,15 +122,24 @@ internal fun renderRegistry(
         if (entry.injects.isNotEmpty()) {
             appendLine("            override val injects: Set<String> = ${entry.injects.toStringSetLiteral()}")
         }
+        // Lazy, all three. The registry is built in full at class-init because the
+        // palette lists every kind, but these are the expensive members and none of
+        // them is needed to list one: a surface is read when a placed widget draws,
+        // and the serializer and its default baseline when the editor opens that
+        // widget's props. Eager, a launcher whose owner keeps two screens still paid
+        // to decode thirteen surface literals and build thirty serializers, each of
+        // which loads its props class, before anything was on screen.
         if (entry.surfaceJson != null) {
-            appendLine("            override val defaultSurface: SurfaceSpec? =")
+            appendLine("            override val defaultSurface: SurfaceSpec? by lazy {")
             appendLine("                surfaceJson.decodeFromString(SurfaceSpec.serializer(), \"${entry.surfaceJson.kotlinEscape()}\")")
+            appendLine("            }")
         }
         if (entry.propsClassFqn != null) {
             val fqn = entry.propsClassFqn
-            appendLine("            override val propsSerializer: KSerializer<*>? = $fqn.serializer()")
-            appendLine("            override val defaultPropsJson: JsonObject =")
+            appendLine("            override val propsSerializer: KSerializer<*>? by lazy { $fqn.serializer() }")
+            appendLine("            override val defaultPropsJson: JsonObject by lazy {")
             appendLine("                propsJson.encodeToJsonElement($fqn.serializer(), $fqn()).jsonObject")
+            appendLine("            }")
         }
         appendLine("            @Composable override fun Render(instance: WidgetInstance) {")
         appendLine("                ${entry.functionFqn}(${if (entry.takesInstance) "instance" else ""})")
