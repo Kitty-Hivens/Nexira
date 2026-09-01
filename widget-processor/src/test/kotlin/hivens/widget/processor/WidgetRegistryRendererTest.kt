@@ -159,7 +159,9 @@ class WidgetRegistryRendererTest {
     fun `a props class contributes its serializer and default baseline`() {
         val src = renderRegistry(listOf(widget("x", propsClassFqn = "hivens.ui.widgets.ClockProps")))
         assertContains(src, "import kotlinx.serialization.KSerializer")
-        assertContains(src, "override val propsSerializer: KSerializer<*>? = hivens.ui.widgets.ClockProps.serializer()")
+        // Lazy: the palette lists a kind without needing its serializer, and building
+        // one loads the props class. A launcher pays for the widgets it draws.
+        assertContains(src, "override val propsSerializer: KSerializer<*>? by lazy { hivens.ui.widgets.ClockProps.serializer() }")
         assertContains(src, "hivens.ui.widgets.ClockProps.serializer(), hivens.ui.widgets.ClockProps()")
         // encodeDefaults is what makes the baseline carry every field rather
         // than only the ones that differ from their defaults.
