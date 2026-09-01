@@ -200,9 +200,9 @@ private fun CollapsedRegionStrip() {
 
 /**
  * Left region: the navigation rail plus the divider that separates it from the
- * center. removable=false -- losing the rail would navigation-lock the launcher.
+ * center.
  */
-@Widget(id = "appshell.region.left", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellLeftRegionProps::class)
+@Widget(id = "appshell.region.left", displayName = "widget.appshell.region.left", propsClass = ShellLeftRegionProps::class)
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellLeftRegionProps>()
@@ -240,10 +240,10 @@ fun ShellLeftRegion(instance: WidgetInstance) {
 
 /**
  * Center region: the screen router. Carries weight=1 in the default layout so it
- * flexes between the two rails. removable=false and never collapsible -- without
- * it there is no content area.
+ * flexes between the two rails. Never collapsible: without it there is no
+ * content area.
  */
-@Widget(id = "appshell.region.center", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellCenterRegionProps::class)
+@Widget(id = "appshell.region.center", displayName = "widget.appshell.region.center", propsClass = ShellCenterRegionProps::class)
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellCenterRegionProps>()
@@ -306,7 +306,7 @@ val RAIL_DEFAULT_WIDTH = 265.dp
 private val RAIL_INSET = 4.dp
 
 /**
- * Right region: the divider plus the news panel. removable=false. No handles or
+ * Right region: the divider plus the news panel. No handles or
  * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
  * pointer and snaps on release; vertical scrolls and taps still reach the news).
  *
@@ -316,7 +316,7 @@ private val RAIL_INSET = 4.dp
  * went to zero and the sentence outlived it. Edit mode keeps the static
  * prop-driven behaviour.
  */
-@Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class)
+@Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", propsClass = ShellRightRegionProps::class)
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRightRegionProps>()
@@ -473,10 +473,9 @@ private const val TOPBAR_SURFACE = "appshell.topbar"
  * breadcrumb / status widgets (the appshell.topbar sub-surface), a draggable
  * center lane, and the caption buttons. Caption buttons are chrome (not a
  * widget): placed left on macOS, right elsewhere, and shown per
- * [WindowControlsMode] (hidden by default on tiling WMs). removable=false --
- * losing the bar would strand window controls on a floating DE.
+ * [WindowControlsMode] (hidden by default on tiling WMs).
  */
-@Widget(id = "appshell.region.top", displayName = "widget.appshell.region.top", removable = false, propsClass = ShellTopRegionProps::class)
+@Widget(id = "appshell.region.top", displayName = "widget.appshell.region.top", propsClass = ShellTopRegionProps::class)
 @Composable
 fun ShellTopRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellTopRegionProps>()
@@ -614,9 +613,8 @@ private fun BarDivider() {
  * center, right panel). It exists so the root surface can stack the top bar over
  * the body in a Column; the Row itself lives in the appshell.body sub-surface
  * (the orientation comes from that slot, mirroring the appshell.leftrail nesting).
- * removable=false -- it carries the entire app body.
  */
-@Widget(id = "appshell.region.body", displayName = "widget.appshell.region.body", removable = false)
+@Widget(id = "appshell.region.body", displayName = "widget.appshell.region.body")
 @Composable
 fun ShellBodyRegion() {
     SlotRenderer(SurfaceId("appshell.body"), SlotId("content"), Modifier.fillMaxSize())

@@ -77,6 +77,35 @@ class LayoutGraphRepositoryTest {
         assertTrue("schema_version" in Files.readString(file))
     }
 
+    /**
+     * Emptying every slot is a state a person can reach, now that nothing in the
+     * registry is pinned: the shell regions can be deleted like anything else. The
+     * claim that makes that safe is that the way back is not in the layout -- the
+     * editor opens on a window chord, and its reset restores the bundled default.
+     * This is the second half of that claim; ShellChordTest carries the first.
+     */
+    @Test
+    fun `an emptied layout is restored by resetAll`() = runBlocking {
+        val repo = repo()
+        repo.update { graph ->
+            graph.copy(
+                surfaces = graph.surfaces.mapValues { (_, layout) ->
+                    layout.copy(slots = layout.slots.mapValues { (_, content) -> content.copy(widgets = emptyList()) })
+                },
+            )
+        }
+        assertTrue(
+            repo.value().surfaces.values.all { it.slots.values.all { slot -> slot.widgets.isEmpty() } },
+            "the emptying itself did not take",
+        )
+
+        repo.resetAll()
+
+        assertEquals(sampleDefault, repo.value(), "resetAll did not restore the bundled default")
+        repo.flush()
+        assertEquals(sampleDefault, repo().value(), "the restored default did not survive a reload")
+    }
+
     @Test
     fun `update mutates state and survives a reload`() = runBlocking {
         val repo = repo()
