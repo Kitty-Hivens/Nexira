@@ -26,16 +26,15 @@ object AprilFools {
     // UiStyle axis live, chaos should follow the active style instead of
     // sitting outside it. AppShell pushes these values whenever uiStyle
     // changes; the engine reads styleAnimationMultiplier per tween, and
-    // components read useFlatSurface to drop elevation under Brut.
+    // components read useFlatSurface to drop elevation.
 
     /** Multiplier on every chaos animation duration. 1.0 = base motion,
-     *  0.0 = instant snap (Brut). AppShell mirrors style.animationMultiplier
-     *  here. */
+     *  0.0 = instant snap. Nothing varies it since the style axis went; AppShell
+     *  sets it, and this is the seam a reduce-motion preference would arrive by. */
     var styleAnimationMultiplier: Float by mutableStateOf(1f)
 
-    /** When true, chaos surfaces render without tonal / button elevation --
-     *  matches the active style's flat surface treatment (Brut). AppShell
-     *  mirrors style.cardSurface == Flat here. */
+    /** When true, chaos surfaces render without tonal / button elevation. Set by
+     *  AppShell; the token it used to mirror is gone, so it is constant today. */
     var useFlatSurface: Boolean by mutableStateOf(false)
 
     /** Scale a base ms duration by the active style multiplier. Coerces to
