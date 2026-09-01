@@ -55,7 +55,7 @@ private const val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 //
 // Skin and cape management (upload, cape selection via the Mojang API) is the
 // next, deeper pass -- this section is the identity + auth foundation.
-@Widget(id = "profile.signin", displayName = "widget.profile.signin", removable = false)
+@Widget(id = "profile.signin", displayName = "widget.profile.signin")
 @Composable
 fun ProfileSignInSectionWidget() {
     val ctx = LocalProfileContext.current

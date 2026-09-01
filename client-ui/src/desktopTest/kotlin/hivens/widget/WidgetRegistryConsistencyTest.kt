@@ -138,24 +138,30 @@ class WidgetRegistryConsistencyTest {
         )
     }
 
+    /**
+     * Nothing is pinned, and nothing should be.
+     *
+     * The shell regions and the sign-in panel used to carry `removable = false` on
+     * the reasoning that a layout without them has no navigation and no way to log
+     * in. That reasoning assumed the way back was in the layout. It is not: the
+     * editor opens on a window-scoped chord handled before focus dispatch, and its
+     * reset lives in editor chrome, so neither depends on a single widget being
+     * present. A person who empties their own layout can always put it back.
+     *
+     * Pinning cost something real, too -- the palette filters on this flag, so a
+     * pinned widget could not be added back either.
+     */
     @Test
-    fun `non-removable widgets cover the bundled-rail safety set`() {
-        val nonRemovable = GeneratedWidgetRegistry.all().values
+    fun `nothing is pinned, because the way back is not a widget`() {
+        val pinned = GeneratedWidgetRegistry.all().values
             .filterNot { it.removable }
             .map { it.kind.value }
             .toSet()
         assertEquals(
-            setOf(
-                "profile.signin",                // sign-in form: a user must not strand themselves logged-out
-                "appshell.region.left",          // shell regions: the frame must stay whole
-                "appshell.region.center",
-                "appshell.region.right",
-                "appshell.region.top",           // title bar: hosts window controls + breadcrumb
-                "appshell.region.body",          // carries the whole app body
-            ),
-            nonRemovable,
-            "non-removable set keeps the shell frame and sign-in panel intact; nav items " +
-                "are removable and restored via the editor's leftrail surface reset",
+            emptySet(),
+            pinned,
+            "a widget marked non-removable is also one the palette refuses to offer, " +
+                "so it cannot be restored once gone -- and the editor is reachable without it",
         )
     }
 
