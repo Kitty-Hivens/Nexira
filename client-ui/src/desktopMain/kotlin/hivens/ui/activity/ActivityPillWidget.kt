@@ -68,7 +68,6 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
@@ -229,7 +228,7 @@ internal fun Pill(
     // While the object is opening it travels from a circle to that radius, which
     // is the second half of the arrival: one shape becoming another.
     val corner by animateDpAsState(
-        targetValue = if (open) Form.panelCorner else height / 2,
+        targetValue = if (open) 14.dp else height / 2,
         animationSpec = Motion.reveal.of(),
         label = "pillCorner",
     )
@@ -260,7 +259,7 @@ internal fun Pill(
         // given. Missing here while the selection body set it meant the same object
         // gained a shadow the moment a selection took over and lost it again
         // afterwards.
-        shadowDp = Form.panelElevation.value,
+        shadowDp = 18f,
         // Opaque body: the object floats over arbitrary content, so the
         // legibility floor cannot depend on what happens to be behind it.
         opacity = 1f,

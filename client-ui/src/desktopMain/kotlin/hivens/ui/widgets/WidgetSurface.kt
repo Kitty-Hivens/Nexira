@@ -15,7 +15,6 @@ import hivens.ui.surface.PolygonShape
 import hivens.ui.surface.SmoothedRectShape
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.widget.model.FillSource
 import hivens.widget.model.SurfaceShape
 import hivens.widget.model.SurfaceSpec
@@ -114,7 +113,7 @@ private fun borderColor(spec: SurfaceSpec): Color? {
  * with it. Zero keeps the cheaper shape.
  */
 private fun SurfaceShape.toShape(): Shape {
-    val fallback = Form.cardCorner.value
+    val fallback = 12f
     val smooth = smoothing ?: 0f
     return when (kind.trim().lowercase()) {
         "circle" -> CircleShape

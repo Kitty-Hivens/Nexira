@@ -63,7 +63,6 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColors
 import hivens.ui.nx.NxTooltip
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
@@ -85,12 +84,12 @@ fun NotificationCard(
     // Read here, not inside the drag coroutine: a role needs composition.
     val swipeSpec = Motion.panelSlide.of<Float>()
     val accentColor = severityAccent(group.severity, group.kind, palette)
-    // Critical pulses only while decorative effects are on (Form.softGlow).
-    val accentAlpha = if (group.severity == Severity.Critical && Form.softGlow) criticalPulse() else 1f
+    // Critical pulses; everything else holds a steady accent.
+    val accentAlpha = if (group.severity == Severity.Critical) criticalPulse() else 1f
 
     val scope = rememberCoroutineScope()
     val offsetX = remember(group.sourceKey) { Animatable(0f) }
-    val cardShape = RoundedCornerShape(Form.cardCorner)
+    val cardShape = MaterialTheme.shapes.medium
     val density = LocalDensity.current
     // Fade the card as it is dragged toward the edge; the slide-off + the
     // stack's exit fade finish the gesture on release.
@@ -103,16 +102,12 @@ fun NotificationCard(
             .alpha(1f - 0.55f * swipeFrac)
             // Lifted on a soft shadow while decorative effects are on; the border
             // below is the flat alternative when they are not.
-            .then(if (Form.softGlow) Modifier.shadow(8.dp, cardShape, clip = false) else Modifier)
+            .shadow(8.dp, cardShape, clip = false)
             .clip(cardShape)
             // Toasts are transient alerts read against the live wallpaper -- even a
             // few percent of translucency tints them off-colour and reads as a glitch,
             // so they stay fully opaque regardless of the glass style.
             .background(palette.surface)
-            .then(
-                if (Form.cardBorder > 0.dp) Modifier.border(Form.cardBorder, palette.outline, cardShape)
-                else Modifier,
-            )
             // Swipe-to-dismiss: drag horizontally; past ~40% of the card width it
             // slides off and dismisses, otherwise it springs back. The close
             // button stays the keyboard / screen-reader path.

@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -17,7 +18,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
@@ -29,8 +29,7 @@ import hivens.ui.theme.NxTheme
  * reads as a speck of dirt rather than as information. Its corner is also fixed,
  * so it cannot follow the rest of the interface.
  *
- * The corner here comes from [hivens.ui.theme.Form.Badge], the same place every
- * other small shell takes it, so the bar carries no shape token of its own.
+ * The corner is fully round, which is what a measure reads as at this height.
  *
  * [progress] outside 0..1 is clamped; null means the size of the job is not
  * known yet, and an unknown job sweeps a segment along the track.
@@ -43,7 +42,7 @@ fun NxProgressBar(
     color: Color = NxTheme.colors.progressAccent,
     trackColor: Color = NxTheme.colors.textSecondary.copy(alpha = 0.22f),
 ) {
-    val corner = Form.Badge.corner
+    val corner = CornerSize(50)
 
     // NaN passes coerceIn -- both of its comparisons are false against NaN -- and
     // then becomes the animation's current value, so every later valid value

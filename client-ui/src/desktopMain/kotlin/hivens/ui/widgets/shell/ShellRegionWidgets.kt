@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -61,7 +62,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -250,7 +250,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     // The wedge is the chrome reaching around the corner, so it takes the chrome's
     // colour rather than one of its own -- see [CHROME_OPACITY_PCT].
     val chrome = NxTheme.colors.surface.copy(alpha = CHROME_OPACITY_PCT / 100f)
-    val cornerDp = Form.cardCorner
+    val cornerDp = 12.dp
     NxSurface(
         NxSurfaceLevel.Base, Modifier.fillMaxSize(), RectangleShape,
         borderWidthDp = 0f,
@@ -360,7 +360,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         }
     }
 
-    val panelShape = RoundedCornerShape(Form.panelCorner)
+    val panelShape = MaterialTheme.shapes.large
 
     // Edit mode: static, no swipe/animation.
     if (editing) {
@@ -496,7 +496,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
     val editing = LocalEditMode.current is EditModeState.On
 
     val maximizeToggle: () -> Unit = { maximizer?.toggle() }
-    val corner = Form.cardCorner
+    val corner = 12.dp
     // Hug = flush to the window's top edge, only the bottom corners curve into the
     // body so it reads as part of the chrome; Float = a detached, inset, all-round
     // pill; Rect = a plain flush rectangle.

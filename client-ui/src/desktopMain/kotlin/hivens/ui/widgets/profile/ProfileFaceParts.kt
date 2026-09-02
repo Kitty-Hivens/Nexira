@@ -23,7 +23,6 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SessionData
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import org.koin.compose.koinInject
 
@@ -117,7 +116,7 @@ private fun FaceOption(label: String, selected: Boolean, onClick: () -> Unit) {
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Form.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(
                 if (selected) NxTheme.colors.primary.copy(alpha = 0.12f)
                 else NxTheme.colors.background.copy(alpha = 0f),

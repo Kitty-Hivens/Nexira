@@ -55,7 +55,6 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.Form
 import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalWidgetRegistry
@@ -134,8 +133,8 @@ fun WidgetPalettePanel(
                 }
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp, start = 0.dp)
-                .shadow(elevation = Form.panelElevation, shape = RoundedCornerShape(Form.panelCorner))
-                .clip(RoundedCornerShape(Form.panelCorner))
+                .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
+                .clip(MaterialTheme.shapes.large)
                 // Solid surface, no glass: the panel floats over the right rail,
                 // and stacked translucent layers composited into muddy glass.
                 .background(NxTheme.colors.surface),

@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 
@@ -32,7 +31,7 @@ fun NxChoiceChip(
     enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(Form.buttonCorner)
+    val shape = MaterialTheme.shapes.small
     val alpha = if (enabled) 1f else 0.4f
     val fg = (if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary).copy(alpha = alpha)
     val bg = if (selected) NxTheme.colors.primary.copy(alpha = 0.18f * alpha)

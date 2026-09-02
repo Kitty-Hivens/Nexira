@@ -35,7 +35,6 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
@@ -64,7 +63,7 @@ internal fun SelectionPill(
     val colors = NxTheme.colors
     val height = props.heightDp.dp
     val corner by animateDpAsState(
-        targetValue = if (open) Form.panelCorner else height / 2,
+        targetValue = if (open) 14.dp else height / 2,
         animationSpec = Motion.reveal.of(),
         label = "selectionCorner",
     )
@@ -78,7 +77,7 @@ internal fun SelectionPill(
             .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        shadowDp = Form.panelElevation.value,
+        shadowDp = 18f,
         opacity = 1f,
     ) {
         Row(

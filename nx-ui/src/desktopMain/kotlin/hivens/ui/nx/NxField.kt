@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 
@@ -36,7 +35,7 @@ fun NxField(
     NxSurface(
         level    = NxSurfaceLevel.Sunken,
         blurDp   = 0f,
-        shape    = RoundedCornerShape(Form.buttonCorner),
+        shape    = MaterialTheme.shapes.small,
         modifier = modifier,
     ) {
         BasicTextField(

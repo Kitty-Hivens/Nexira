@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
@@ -58,7 +57,7 @@ fun NxRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val rowModifier = if (onClick != null) {
-        val shape = RoundedCornerShape(Form.cardCorner)
+        val shape = MaterialTheme.shapes.medium
         val interaction = remember { MutableInteractionSource() }
         val alpha = softHoverAlpha(interaction)
         Modifier

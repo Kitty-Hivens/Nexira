@@ -54,8 +54,7 @@ object ThemeStateLayer : IndicationNodeFactory {
  * to hand it that shape:
  *
  *  - `ShapedStateLayer(cornerDp, color)` -- a uniform rounded rect at [cornerDp]
- *    (the button path: matches MaterialTheme.shapes.small, which Form.materialShapes
- *    anchors to Form.buttonCorner).
+ *    (the button path: matches MaterialTheme.shapes.small).
  *  - `ShapedStateLayer(shape, color)` -- the host's actual [Shape] outline
  *    (circle, pill, per-corner radii), for non-button hosts.
  *

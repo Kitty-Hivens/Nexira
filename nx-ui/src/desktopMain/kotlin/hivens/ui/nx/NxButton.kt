@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.ui.theme.Spacing
 
 /**
@@ -54,7 +53,6 @@ fun NxButton(
     minHeight: Dp? = null,
 ) {
     val palette = NxTheme.colors
-    val styleSpec = Form
     val shape = MaterialTheme.shapes.small
 
     val container: Color = when (style) {
@@ -87,7 +85,7 @@ fun NxButton(
     // Hover/press feedback through the shared ShapedStateLayer, provided as
     // LocalIndication so the clickable picks it up.
     CompositionLocalProvider(
-        LocalIndication provides ShapedStateLayer(styleSpec.buttonCorner, content),
+        LocalIndication provides ShapedStateLayer(8.dp, content),
     ) {
         Row(
             modifier              = modifier

@@ -41,7 +41,6 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.Form
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
 
@@ -148,7 +147,7 @@ private fun UuidCard(uuid: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Form.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

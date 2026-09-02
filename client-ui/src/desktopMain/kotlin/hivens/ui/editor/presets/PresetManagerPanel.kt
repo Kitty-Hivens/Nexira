@@ -43,7 +43,6 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
@@ -82,7 +81,7 @@ fun PresetManagerPanel(
         Surface(
             color           = NxTheme.colors.surface,
             shape           = MaterialTheme.shapes.large,
-            shadowElevation = Form.panelElevation,
+            shadowElevation = 18.dp,
             modifier        = Modifier
                 .width(520.dp)
                 .height(620.dp),

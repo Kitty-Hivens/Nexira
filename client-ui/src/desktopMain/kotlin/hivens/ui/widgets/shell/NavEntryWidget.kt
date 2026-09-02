@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,7 +36,6 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
@@ -246,7 +246,7 @@ private fun NavSlot(
                     NavSelectionStyle.Pill ->
                         Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(50)).background(fill))
                     NavSelectionStyle.Square ->
-                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(RoundedCornerShape(Form.buttonCorner)).background(fill))
+                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(MaterialTheme.shapes.small).background(fill))
                     NavSelectionStyle.Circle ->
                         Box(Modifier.size(40.dp).clip(CircleShape).background(fill))
                     NavSelectionStyle.LeftBar ->
