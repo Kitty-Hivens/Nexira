@@ -1,5 +1,7 @@
 package hivens.ui.theme
 
+import androidx.compose.foundation.DefaultContextMenuRepresentation
+import androidx.compose.foundation.LocalContextMenuRepresentation
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -318,9 +320,21 @@ fun NxTheme(
             // LocalContentColor is anchored to the palette because with no root M3
             // Surface it defaults to Black, leaving the ambient state-layer wash
             // near-invisible on dark; M3 components still override it inside.
+            // The right-click menu a text field opens is drawn by foundation, not by
+            // us, and it defaults to an unthemed light popup that lands on a dark
+            // panel looking like a different program. One representation at the root
+            // reaches every field, since a field never provides its own.
+            val contextMenu = remember(activePalette) {
+                DefaultContextMenuRepresentation(
+                    backgroundColor = activePalette.surface,
+                    textColor       = activePalette.textPrimary,
+                    itemHoverColor  = activePalette.primary.copy(alpha = 0.14f),
+                )
+            }
             CompositionLocalProvider(
                 LocalIndication provides ThemeStateLayer,
                 LocalContentColor provides activePalette.textPrimary,
+                LocalContextMenuRepresentation provides contextMenu,
             ) {
                 content()
             }
