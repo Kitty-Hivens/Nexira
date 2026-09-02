@@ -24,7 +24,7 @@ data class PackFieldChange(val from: String, val to: String)
 
 /**
  * Client-side file diff between two pack builds -- the mirror stores every
- * historical manifest but deliberately serves no diff endpoint (ADR 0002), so
+ * historical manifest but deliberately serves no diff endpoint, so
  * "what changed in this build" is computed from two manifests here.
  *
  * Mod identity is [SmrtModEntry.stableKey] (slug -> modrinth project -> filename)
