@@ -50,7 +50,7 @@ data class AboutCreditsProps(
     id = "about.credits",
     displayName = "widget.about.credits",
     propsClass = AboutCreditsProps::class,
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
 )
 @Composable
 fun AboutCreditsWidget(instance: WidgetInstance) {

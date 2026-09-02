@@ -30,7 +30,7 @@ data class AboutLinksProps(
     id = "about.links.card",
     displayName = "widget.about.links.card",
     propsClass = AboutLinksProps::class,
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
 )
 @Composable
 fun AboutLinksCardWidget(instance: WidgetInstance) {

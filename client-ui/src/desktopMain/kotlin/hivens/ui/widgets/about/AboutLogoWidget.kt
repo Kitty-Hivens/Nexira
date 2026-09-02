@@ -54,7 +54,7 @@ data class AboutLogoProps(
     id = "about.logo",
     displayName = "widget.about.logo",
     propsClass = AboutLogoProps::class,
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
 )
 @Composable
 fun AboutLogoWidget(instance: WidgetInstance) {
