@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
  * Wire shape of `GET /v1/packs/{id}/diff?from=&to=`: the mirror's structured
  * change summary between two builds, matched by stable identity server-side
  * and enriched with registry version labels the manifests themselves do not
- * carry. Display-only data -- the update reconcile stays a client-side
- * three-way computation (ADR 0002); this feeds the versions screen's rows.
+ * carry. Display-only data: the update reconcile stays a client-side
+ * three-way computation, and this feeds the versions screen's rows.
  */
 @Serializable
 data class SmrtBuildDiff(
