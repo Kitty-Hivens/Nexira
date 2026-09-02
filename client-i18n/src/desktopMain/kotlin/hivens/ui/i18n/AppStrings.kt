@@ -1239,6 +1239,8 @@ interface AppStrings {
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String
     val editorBackingTitle: String
+    val editorSurfaceNone: String
+    val editorSurfaceAdd: String
     /** Pill chip + header for a surface's own settings panel (e.g. the left rail). */
     val editorSurfaceSettings: String
     val editorBackingGlass: String

@@ -1268,6 +1268,8 @@ object EnglishStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Reset to default"
     override val editorBackingTitle   = "Backing"
+    override val editorSurfaceNone    = "This widget draws no plane. Adding one puts a surface behind it that you can then shape."
+    override val editorSurfaceAdd     = "Add a plane"
     override val editorSurfaceSettings = "Settings"
     override val editorBackingGlass   = "Glass opacity"
     override val editorBackingCorner  = "Corner"
