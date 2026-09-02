@@ -350,13 +350,18 @@ fun EditableWidgetChrome(
                                         widgetSize      = Offset(bounds.width, bounds.height),
                                         ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
                                     )
+                                    // Accumulated from the start, not re-read from the
+                                    // widget's live bounds each frame. The drop indicator
+                                    // is a real layout child, so the moment the hit-test
+                                    // names this slot the widget shifts by its height --
+                                    // and a pointer measured against the widget's own
+                                    // origin then jumped by that much, flipping the
+                                    // hit-test back. The two branches above already do it
+                                    // this way; this one was the odd one out.
                                     var last = bounds.topLeft + slop.position
                                     drag(slop.id) { change ->
-                                        val wb = widgetWindowBounds
-                                        if (wb != null) {
-                                            last = wb.topLeft + change.position
-                                            controller.update(last)
-                                        }
+                                        last += change.positionChange()
+                                        controller.update(last)
                                         change.consume()
                                     }
                                     liveCommitDrop.value(last)
