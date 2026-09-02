@@ -261,10 +261,10 @@ internal fun MusicPlayerCard(
     }
 }
 
-// Thin horizontal track + small dot thumb. Track grows from 3dp to
-// 4dp on hover; thumb fades in on hover/press. Drag updates the value
-// continuously; tap jumps to the tapped position. Designed to read as
-// a player slider rather than a generic form control.
+// Thin horizontal track + small dot handle. The track grows from 3dp to 4dp and
+// the handle from 10dp to 12dp under the pointer, so the feedback is size rather
+// than appearance: the handle is solid at rest and does not have to be found.
+// Drag updates the value continuously; tap jumps to the tapped position.
 @Composable
 private fun VolumeBar(
     value: Float,
@@ -280,13 +280,6 @@ private fun VolumeBar(
         targetValue   = if (active) 4.dp else 3.dp,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "vol-track-height",
-    )
-    // Always faintly visible so the handle is findable without hunting; full
-    // opacity on hover/drag.
-    val thumbAlpha by animateFloatAsState(
-        targetValue   = if (active) 1f else 0.65f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label         = "vol-thumb-alpha",
     )
     val thumbSizeDp by animateDpAsState(
         targetValue   = if (pressing) 12.dp else 10.dp,
@@ -338,17 +331,21 @@ private fun VolumeBar(
                 .clip(RoundedCornerShape(50))
                 .background(NxTheme.colors.primary),
         )
-        // Thumb dot at the active edge -- only visible on hover/press.
-        if (widthPx > 0 && thumbAlpha > 0.01f) {
+        // The handle at the active edge. Drawn in the colour meant to be read ON the
+        // accent rather than in the accent itself: a translucent dot of the same hue
+        // as the fill it sits on cannot read as a handle, only as a thinner patch of
+        // the bar, and at full volume half of it hangs off the track onto the card,
+        // so one circle was compositing over two different grounds. Solid, and it
+        // contrasts by construction on either palette.
+        if (widthPx > 0) {
             val thumbHalfPx = with(LocalDensity.current) { thumbSizeDp.toPx() / 2f }
             val xPx = (value * widthPx - thumbHalfPx).toInt()
             Box(
                 modifier = Modifier
                     .offset { IntOffset(xPx, 0) }
                     .size(thumbSizeDp)
-                    .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
-                    .background(NxTheme.colors.primary),
+                    .background(NxTheme.colors.onPrimary),
             )
         }
     }
