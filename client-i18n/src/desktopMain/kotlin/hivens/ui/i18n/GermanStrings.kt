@@ -1270,6 +1270,8 @@ object GermanStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"
     override val editorBackingTitle   = "Hintergrund"
+    override val editorSurfaceNone    = "Dieses Widget zeichnet keine Fläche. Wird eine hinzugefügt, liegt dahinter eine Oberfläche, die sich gestalten lässt."
+    override val editorSurfaceAdd     = "Fläche hinzufügen"
     override val editorSurfaceSettings = "Einstellungen"
     override val editorBackingGlass   = "Glas-Deckkraft"
     override val editorBackingCorner  = "Ecke"
