@@ -50,11 +50,15 @@ data class TabContainerProps(
     @PropLabel("widget.container.tabs.label3") val label3: String = "",
 )
 
+// Transparent by default, for the same reason as the group container: the tab
+// bodies carry their own planes, and a plate behind them reads as a second card.
+// Named rather than absent so the editor has a value to raise.
 @Widget(
     id          = "container.tabs",
     displayName = "widget.container.tabs",
     slots       = ["tab_0", "tab_1", "tab_2"],
     propsClass  = TabContainerProps::class,
+    surface     = """{"fill":"base","opacity":0.0}""",
 )
 @Composable
 fun TabContainerWidget(instance: WidgetInstance) {

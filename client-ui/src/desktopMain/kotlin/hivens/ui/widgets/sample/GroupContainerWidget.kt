@@ -11,22 +11,17 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-// First-class container widget: holds nested sub-widgets in its "body"
-// slot. The simplest possible composition primitive -- pick this from
-// the palette, drop other widgets inside it. Phase A's smoke surface
-// for nested drag&drop, schema_version=2's children field, and the
-// editor's smallest-area-first hit-test all converge here.
+// Holds other widgets in its "body" slot, stacked vertically.
 //
-// The plane comes from the declaration below, not from this body; the
-// slot stacks its children vertically. Nesting depth is communicated
-// only through EditableWidgetChrome's depth-aware border alpha;
-// containers themselves stay visually quiet so the user's own widgets
-// remain the figure.
+// Transparent by default, because the children carry their own planes and a
+// plate behind a row of plates reads as a second card rather than as a group.
+// The value is named rather than absent so the editor can raise it where a
+// group is meant to be one object.
 @Widget(
     id          = "container.group",
     displayName = "widget.container.group",
     slots       = ["body"],
-    surface     = """{"fill":"base","opacity":0.55}""",
+    surface     = """{"fill":"base","opacity":0.0}""",
 )
 @Composable
 fun GroupContainerWidget(instance: WidgetInstance) {

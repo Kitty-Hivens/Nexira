@@ -30,7 +30,7 @@ data class AboutSystemProps(
     id = "about.system.card",
     displayName = "widget.about.system.card",
     propsClass = AboutSystemProps::class,
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
 )
 @Composable
 fun AboutSystemCardWidget(instance: WidgetInstance) {
