@@ -97,7 +97,6 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.utils.humanSize
 import hivens.ui.theme.decorativeColor
@@ -240,7 +239,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .clip(RoundedCornerShape(Form.cardCorner)),
+            .clip(MaterialTheme.shapes.medium),
     ) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Row(Modifier.weight(1f)) {
@@ -440,7 +439,7 @@ private fun BuildRow(
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
-    val shape = RoundedCornerShape(Form.cardCorner)
+    val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = Modifier

@@ -27,7 +27,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 
@@ -49,7 +48,7 @@ fun NxNavRow(
     trailing: IconKey = NxIcon.ChevronRight,
     iconTint: Color = NxTheme.colors.primary,
 ) {
-    val shape = RoundedCornerShape(Form.cardCorner)
+    val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
     val alpha = softHoverAlpha(interaction)
     NxSurface(

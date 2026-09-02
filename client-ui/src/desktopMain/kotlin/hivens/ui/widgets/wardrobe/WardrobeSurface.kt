@@ -81,7 +81,6 @@ import hivens.ui.skin3d.asSource
 import hivens.ui.skin3d.layered
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.profile.SkinHero
@@ -525,10 +524,10 @@ private fun SkinCard(
             // half of it falls outside the shape and drawing it inside the clip
             // left a half-width ring the corner antialiasing then ate.
             .then(
-                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(Form.cardCorner))
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
                 else Modifier
             )
-            .clip(RoundedCornerShape(Form.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
@@ -584,7 +583,7 @@ private fun AddTile(onClick: () -> Unit) {
     val s = LocalStrings.current
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(Form.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(NxTheme.colors.surface.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
@@ -616,10 +615,10 @@ private fun CapeCard(
             // half of it falls outside the shape and drawing it inside the clip
             // left a half-width ring the corner antialiasing then ate.
             .then(
-                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, RoundedCornerShape(Form.cardCorner))
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
                 else Modifier
             )
-            .clip(RoundedCornerShape(Form.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),

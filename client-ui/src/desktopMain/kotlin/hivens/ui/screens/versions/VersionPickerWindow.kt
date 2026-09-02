@@ -67,7 +67,6 @@ import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 
@@ -165,7 +164,7 @@ fun VersionPickerWindow(
             modifier = Modifier
                 .fillMaxWidth(0.88f)
                 .fillMaxHeight(0.90f)
-                .clip(RoundedCornerShape(Form.cardCorner))
+                .clip(MaterialTheme.shapes.medium)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -323,7 +322,7 @@ private fun ListPanel(
 private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
-    val shape = RoundedCornerShape(Form.buttonCorner)
+    val shape = MaterialTheme.shapes.small
     Row(
         modifier = Modifier
             .fillMaxWidth()

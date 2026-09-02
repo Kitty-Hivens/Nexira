@@ -64,7 +64,7 @@ data class CustomizationSettings(
 /**
  * Decoration drawn behind / around the active left-rail icon. Shape-only --
  * the rail geometry and spacing are unchanged; each variant just renders the
- * selection differently. [Square] follows [hivens.ui.theme.Form.buttonCorner];
+ * selection differently. [Square] follows the button corner;
  * [None] shows selection through the icon tint alone.
  */
 @Serializable

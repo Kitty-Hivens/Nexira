@@ -87,7 +87,6 @@ import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
@@ -297,7 +296,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
         // edges read as a foreign element next to the rounded cards the rest
         // of the screen is built from.
         modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        shape    = RoundedCornerShape(Form.cardCorner),
+        shape    = MaterialTheme.shapes.medium,
         // Glass tint, not solid: a solid fill broke the app's translucent
         // aesthetic and left a hard seam against the right panel. The
         // wallpaper stays softly visible while the tint keeps dense
@@ -433,7 +432,7 @@ private fun Hero(
             .fillMaxWidth()
             .padding(start = 16.dp, top = 8.dp, end = 16.dp)
             .height(196.dp)
-            .clip(RoundedCornerShape(Form.cardCorner)),
+            .clip(MaterialTheme.shapes.medium),
     ) {
         // Pixel-art base -> real banner -> scrim, same layering as the cards.
         Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))

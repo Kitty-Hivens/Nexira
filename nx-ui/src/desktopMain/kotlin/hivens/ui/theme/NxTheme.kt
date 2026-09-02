@@ -10,6 +10,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.nx.ThemeStateLayer
 
@@ -306,7 +309,7 @@ fun NxTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            shapes      = Form.materialShapes(),
+            shapes      = NexiraShapes,
             typography  = nexiraTypography(),
         ) {
             // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its
@@ -324,6 +327,27 @@ fun NxTheme(
         }
     }
 }
+
+/**
+ * The one place a corner radius is decided.
+ *
+ * Material's own bundle rather than a token object beside it: `MaterialTheme.shapes`
+ * is already what a call site reaches for, `Card`, `Button`, dialogs and sheets read
+ * it without being told, and a component that wants the card corner asks for
+ * [Shapes.medium] instead of importing a constant. A second vocabulary next to this
+ * one is what the style axis was.
+ *
+ * `small` is the button corner and `medium` the card corner, which is the pairing the
+ * primitives assume: a chip, a field and a scrollbar take `small`, a plane takes
+ * `medium`, and a floating panel takes `large`.
+ */
+internal val NexiraShapes: Shapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small      = RoundedCornerShape(8.dp),
+    medium     = RoundedCornerShape(12.dp),
+    large      = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(24.dp),
+)
 
 // Easy access via NxTheme.colors
 object NxTheme {

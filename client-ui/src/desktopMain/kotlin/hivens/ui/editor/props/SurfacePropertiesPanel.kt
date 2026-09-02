@@ -60,7 +60,6 @@ import hivens.ui.screens.settings.settingsRowBackground
 import hivens.ui.nx.NxSwitch
 import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.ui.widgets.customization.HexField
 
 // Right-edge settings panel for a whole SURFACE (region), distinct from the
@@ -96,8 +95,8 @@ fun SurfacePropertiesPanel(
                 .width(320.dp)
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-                .shadow(elevation = Form.panelElevation, shape = RoundedCornerShape(Form.panelCorner))
-                .clip(RoundedCornerShape(Form.panelCorner))
+                .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
+                .clip(MaterialTheme.shapes.large)
                 // Solid surface, no glass: a settings panel must stay readable and
                 // not composite with the layers it floats over.
                 .background(NxTheme.colors.surface),
@@ -177,7 +176,7 @@ private fun NavSelectionControl(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Form.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(settingsRowBackground())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -199,7 +198,7 @@ private fun NavSelectionControl(
                 val selected = customization.navSelectionStyle == variant
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(Form.buttonCorner))
+                        .clip(MaterialTheme.shapes.small)
                         .background(
                             if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
                             else NxTheme.colors.surface.copy(alpha = 0.4f),
@@ -208,7 +207,7 @@ private fun NavSelectionControl(
                             width = 1.dp,
                             color = if (selected) NxTheme.colors.primary
                             else NxTheme.colors.outline.copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(Form.buttonCorner),
+                            shape = MaterialTheme.shapes.small,
                         )
                         .clickable { onChange(customization.copy(navSelectionStyle = variant)) }
                         .padding(horizontal = 8.dp, vertical = 6.dp),

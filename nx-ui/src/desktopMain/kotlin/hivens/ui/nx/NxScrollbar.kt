@@ -6,11 +6,11 @@ import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.v2.ScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
@@ -60,7 +60,7 @@ private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
     return ScrollbarStyle(
         minimalHeight       = MinLength,
         thickness           = Thickness,
-        shape               = RoundedCornerShape(Form.buttonCorner),
+        shape               = MaterialTheme.shapes.small,
         hoverDurationMillis = Motion.colorShift.durationMs,
         unhoverColor        = base.copy(alpha = 0.40f * alpha),
         hoverColor          = base.copy(alpha = 0.75f * alpha),

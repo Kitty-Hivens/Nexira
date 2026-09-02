@@ -25,7 +25,7 @@ fun Modifier.pulsatingGlow(
     color: Color,
     enabled: Boolean = true,
     // No default on purpose: the caller passes its own shape token
-    // (Form.cardCorner or Form.buttonCorner), so the glow can't mismatch the host.
+    // the host is clipped to, so the glow can't mismatch it.
     cornerRadius: Dp,
 ): Modifier = composed {
     if (!enabled) return@composed this

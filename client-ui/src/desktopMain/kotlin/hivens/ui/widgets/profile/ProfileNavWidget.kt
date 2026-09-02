@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -21,7 +22,6 @@ import hivens.auth.AuthProviderRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
@@ -63,7 +63,7 @@ fun ProfileNavWidget() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Form.cardCorner))
+                    .clip(MaterialTheme.shapes.medium)
                     .background(
                         if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
                         else NxTheme.colors.background.copy(alpha = 0.0f),

@@ -17,7 +17,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.notifications.NotifGlyph
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 
 /**
  * Notification source avatar shared by the live card and the history widget:
@@ -33,7 +32,7 @@ fun NotificationAvatar(
     size: Dp = 30.dp,
 ) {
     val palette = NxTheme.colors
-    val shape = RoundedCornerShape((Form.cardCorner / 2).coerceAtMost(8.dp))
+    val shape = RoundedCornerShape(6.dp)
     Box(
         modifier         = modifier
             .size(size)

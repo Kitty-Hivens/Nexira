@@ -68,7 +68,6 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import kotlinx.coroutines.CoroutineScope
@@ -226,7 +225,7 @@ fun PackSettingsWindow(
             modifier = Modifier
                 .fillMaxWidth(0.88f)
                 .fillMaxHeight(0.90f)
-                .clip(RoundedCornerShape(Form.cardCorner))
+                .clip(MaterialTheme.shapes.medium)
                 .clickable(card, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -244,7 +243,7 @@ fun PackSettingsWindow(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(Form.cardCorner))
+                                    .clip(MaterialTheme.shapes.medium)
                                     .background(
                                         if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
                                         else Color.Transparent,

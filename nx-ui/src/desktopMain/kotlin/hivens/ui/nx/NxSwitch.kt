@@ -12,16 +12,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 
 /**
- * The toggle primitive. Geometry (track and thumb size, both corners) comes from
- * [hivens.ui.theme.Form.Switch]; colours come from the palette.
+ * The toggle primitive. Its track and thumb are sized here; colours come from
+ * the palette.
  *
  * Every toggle in the app routes through here rather than a raw Material `Switch`
  * with inline `SwitchDefaults.colors`, so the shell has one place to be changed.
@@ -39,7 +39,6 @@ fun NxSwitch(
      *  Null = the palette accent. */
     accent: Color? = null,
 ) {
-    val st = Form.Switch
     val colors = NxTheme.colors
     val alpha = if (enabled) 1f else 0.4f
     val trackColor by animateColorAsState(
@@ -48,16 +47,16 @@ fun NxSwitch(
         animationSpec = Motion.colorShift.of(),
         label = "nxSwitchTrack",
     )
-    val pad = (st.trackHeight - st.thumbSize) / 2
+    val pad = (trackHeight - thumbSize) / 2
     val thumbX by animateDpAsState(
-        targetValue = if (checked) st.trackWidth - st.thumbSize - pad else pad,
+        targetValue = if (checked) trackWidth - thumbSize - pad else pad,
         animationSpec = Motion.tap.of(),
         label = "nxSwitchThumb",
     )
     Box(
         modifier = modifier
-            .size(st.trackWidth, st.trackHeight)
-            .clip(RoundedCornerShape(st.trackCorner))
+            .size(trackWidth, trackHeight)
+            .clip(RoundedCornerShape(trackCorner))
             .background(trackColor)
             .let { m ->
                 if (onCheckedChange != null) m.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
@@ -68,9 +67,15 @@ fun NxSwitch(
         Box(
             Modifier
                 .offset(x = thumbX)
-                .size(st.thumbSize)
-                .clip(RoundedCornerShape(st.thumbCorner))
+                .size(thumbSize)
+                .clip(RoundedCornerShape(thumbCorner))
                 .background(Color.White.copy(alpha = alpha)),
         )
     }
 }
+
+private val trackWidth = 44.dp
+private val trackHeight = 24.dp
+private val thumbSize = 18.dp
+private val trackCorner = 12.dp
+private val thumbCorner = 9.dp

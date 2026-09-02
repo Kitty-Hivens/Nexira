@@ -30,7 +30,6 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.Form
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotPath
@@ -84,7 +83,7 @@ fun EmptySlotPlaceholder(
         // floats, which a DrawScope reads as device pixels: on a 2K display the
         // border came out at half its weight with half-length dashes, and the
         // corner ignored the style entirely.
-        val corner = Form.cardCorner
+        val corner = 12.dp
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRoundRect(
                 color  = borderColor,

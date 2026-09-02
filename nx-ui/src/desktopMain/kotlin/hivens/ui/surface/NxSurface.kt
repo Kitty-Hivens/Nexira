@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -25,7 +26,6 @@ import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxColors
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.bevelHairline
@@ -112,7 +112,7 @@ fun bodyFloor(dark: Boolean): Float = if (dark) 0.92f else 1.0f
 fun NxSurface(
     level: NxSurfaceLevel,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(Form.cardCorner),
+    shape: Shape = MaterialTheme.shapes.medium,
     /**
      * Body opacity, 0..1. Null takes [bodyFloor], which is what an unconfigured
      * surface has always drawn; 1 is a plane nothing reads through, which is what an
@@ -125,7 +125,7 @@ fun NxSurface(
     opacity: Float? = null,
     /**
      * How far the plane blurs what is behind it. Null takes the active style's
-     * [hivens.ui.theme.Form.surfaceBlur], zero turns it off. It was a preset's
+     * [DEFAULT_BLUR_DP], zero turns it off. It was a preset's
      * private constant before, so the two values in use were unreachable from
      * anywhere and indistinguishable from each other on screen.
      */
@@ -137,9 +137,7 @@ fun NxSurface(
     borderColor: Color? = null,
     /**
      * Cast-shadow elevation. Zero is a plane flat on the page, which is what most
-     * of them are. A caller that wants the depth its style chose for floating panels
-     * passes [hivens.ui.theme.Form.panelElevation], so a flat form still takes
-     * it to nothing without a second switch to keep in step.
+     * of them are. A panel that genuinely hovers names its own depth.
      */
     shadowDp: Float = 0f,
     /**
@@ -162,7 +160,7 @@ fun NxSurface(
     // A named radius wins; absent one, the active style decides. A blur under a body
     // nothing can see through is work thrown away -- the filter runs every frame and
     // is then covered completely -- so an opaque surface asks for none.
-    val blur = blurDp ?: Form.surfaceBlur.value
+    val blur = blurDp ?: DEFAULT_BLUR_DP
     val backdrop = rememberBackdropFilter(if (body.alpha < 1f) blur else 0f)
     val edge = if (borderWidthDp > 0f) borderColor ?: bevelHairline(bodyColor) else null
 
@@ -214,7 +212,7 @@ private const val PRESS_ALPHA = 0.12f
 fun NxCard(
     modifier: Modifier = Modifier,
     level: NxSurfaceLevel = NxSurfaceLevel.Raised,
-    shape: Shape = RoundedCornerShape(Form.cardCorner),
+    shape: Shape = MaterialTheme.shapes.medium,
     /** Body opacity, as [NxSurface.opacity]. */
     opacity: Float? = null,
     /** Blur radius, as [NxSurface.blurDp]. Zero is what a card inside an already
@@ -280,3 +278,6 @@ private fun DrawScope.drawBackdrop(filter: ImageFilter) {
         native.restore()
     }
 }
+
+/** How far a plane blurs what is behind it when it names no radius. */
+private const val DEFAULT_BLUR_DP = 18f

@@ -47,7 +47,6 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Form
 import hivens.ui.theme.decorativePair
 import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.milliseconds
@@ -179,8 +178,8 @@ fun SquareServerCard(
                     // With decorative motion off the selection frame is a static
                     // border rather than an animated pulse, the same gate every
                     // decorative effect takes.
-                    isSelected && Form.softGlow ->
-                        m.neonBorder(NxTheme.colors.primary, cornerRadius = Form.cardCorner, strokeWidth = 2.dp)
+                    isSelected ->
+                        m.neonBorder(NxTheme.colors.primary, cornerRadius = 12.dp, strokeWidth = 2.dp)
                     isSelected -> m.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
                     isFocused  -> m.border(2.dp, NxTheme.colors.textPrimary, MaterialTheme.shapes.medium)
                     else       -> m.border(1.dp, NxTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
@@ -188,7 +187,7 @@ fun SquareServerCard(
             }
             // Shimmer on hover (not when already glowing with neon), and only
             // where decorative motion renders at all.
-            .shimmerOverlay(enabled = isHovered && !isSelected && Form.softGlow)
+            .shimmerOverlay(enabled = isHovered && !isSelected)
             // Track position for chaos engine. Tracker setter is a no-op
             // in production builds (NoOp impl), so no `if active` guard.
             .onGloballyPositioned { coords ->

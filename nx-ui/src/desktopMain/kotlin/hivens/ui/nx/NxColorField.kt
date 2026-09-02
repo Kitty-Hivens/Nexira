@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.Form
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 
@@ -80,7 +79,7 @@ fun NxColorField(
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxTheme.colors.primary,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(Form.buttonCorner))
+                    .clip(MaterialTheme.shapes.small)
                     .clickable { text = ""; onClear() }
                     .padding(horizontal = Spacing.s8, vertical = Spacing.s4),
             )
