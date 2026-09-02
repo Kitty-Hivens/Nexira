@@ -41,6 +41,7 @@ class WidgetRegistryProcessor(
                     id = extracted.id,
                     displayName = extracted.displayName.ifBlank { funcName },
                     removable = extracted.removable,
+                    drawsOwnSurface = extracted.drawsOwnSurface,
                     slots = extracted.slots,
                     propsClassFqn = extracted.propsClassFqn,
                     functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",

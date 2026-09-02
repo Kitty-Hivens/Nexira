@@ -49,7 +49,7 @@ import hivens.widget.model.Widget
 // reads the same context and re-renders. Removing this widget hides
 // the picker -- the user keeps whatever theme was active at edit time
 // and must restore-to-default to see the grid again.
-@Widget(id = "theme.picker.grid", displayName = "widget.theme.picker.grid")
+@Widget(id = "theme.picker.grid", displayName = "widget.theme.picker.grid", drawsOwnSurface = true)
 @Composable
 fun ThemePickerGridWidget() {
     val ctx = LocalThemePickerContext.current

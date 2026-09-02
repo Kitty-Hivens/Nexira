@@ -35,6 +35,7 @@ internal object WidgetValidator {
         val id: String,
         val displayName: String,
         val removable: Boolean,
+        val drawsOwnSurface: Boolean,
         val slots: List<String>,
         // FQN of the @Serializable props class, or null for Unit::class
         // (a propless widget).
@@ -108,6 +109,7 @@ internal object WidgetValidator {
         val id = (args["id"] as? String).orEmpty()
         val displayName = (args["displayName"] as? String).orEmpty()
         val removable = (args["removable"] as? Boolean) ?: true
+        val drawsOwnSurface = (args["drawsOwnSurface"] as? Boolean) ?: false
         // KSP reports Array<String> annotation values as List<*>.
         val rawSlots = (args["slots"] as? List<*>).orEmpty().filterIsInstance<String>()
         val rawSurface = (args["surface"] as? String).orEmpty().trim()
@@ -210,6 +212,7 @@ internal object WidgetValidator {
             id = id,
             displayName = displayName,
             removable = removable,
+            drawsOwnSurface = drawsOwnSurface,
             slots = sanitized,
             propsClassFqn = propsClassFqn,
             takesInstance = takesInstance,

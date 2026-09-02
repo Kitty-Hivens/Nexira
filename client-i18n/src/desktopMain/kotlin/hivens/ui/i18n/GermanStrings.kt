@@ -1272,6 +1272,7 @@ object GermanStrings : AppStrings {
     override val editorBackingTitle   = "Hintergrund"
     override val editorSurfaceNone    = "Dieses Widget zeichnet keine Fläche. Wird eine hinzugefügt, liegt dahinter eine Oberfläche, die sich gestalten lässt."
     override val editorSurfaceAdd     = "Fläche hinzufügen"
+    override val editorSurfaceOwn     = "Dieses Widget zeichnet seine Fläche selbst, hier gibt es also nichts einzustellen. Ihre Form ändert sich mit dem, was es tut, und das kann ein gespeicherter Datensatz nicht beschreiben."
     override val editorSurfaceSettings = "Einstellungen"
     override val editorBackingGlass   = "Glas-Deckkraft"
     override val editorBackingCorner  = "Ecke"

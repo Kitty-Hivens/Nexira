@@ -72,6 +72,7 @@ import kotlin.io.path.name
 @Widget(
     id          = "home.new.playback.mini",
     displayName = "widget.home.new.playback.mini",
+    drawsOwnSurface = true,
 )
 @InjectService(MusicPlayerService::class)
 @Composable
