@@ -8,8 +8,6 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -330,7 +328,7 @@ private fun DetailBody(details: CataloguePackDetails, installError: String?) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement   = Arrangement.spacedBy(6.dp),
-                ) { details.tags.forEach { Chip(it) } }
+                ) { details.tags.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
             }
             // The gallery is a place of its own, not a strip at the head of the
             // description. Screenshots and prose want opposite widths, and a grid
@@ -388,20 +386,6 @@ private fun DetailBody(details: CataloguePackDetails, installError: String?) {
     }
 }
 
-@Composable
-private fun Chip(text: String) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        shape   = MaterialTheme.shapes.extraSmall,
-        label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textPrimary) },
-        colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = NxTheme.colors.surface.copy(alpha = 0.4f),
-            disabledLabelColor     = NxTheme.colors.textPrimary,
-        ),
-        border  = null,
-    )
-}
 
 /**
  * What the pack runs on, as short phrases, in the order a person asks for them:
