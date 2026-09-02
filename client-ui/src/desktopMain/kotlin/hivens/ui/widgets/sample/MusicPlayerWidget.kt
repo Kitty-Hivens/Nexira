@@ -94,7 +94,7 @@ private val AUDIO_EXTENSIONS = listOf(
     "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "aiff", "aif", "au",
 )
 
-@Widget(id = "home.new.music", displayName = "widget.home.new.music", propsClass = MusicProps::class)
+@Widget(id = "home.new.music", displayName = "widget.home.new.music", propsClass = MusicProps::class, drawsOwnSurface = true)
 @ProvidesService(MusicPlayerService::class)
 @Composable
 fun MusicPlayerWidget(instance: WidgetInstance) {

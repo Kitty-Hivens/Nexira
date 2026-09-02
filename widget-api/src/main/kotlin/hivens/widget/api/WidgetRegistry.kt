@@ -16,6 +16,11 @@ interface WidgetDescriptor {
     // safety check on nav rail / auth panel widgets.
     val removable: Boolean
 
+    // True when the widget paints its own plane, so nothing should paint one for
+    // it and the editor should not offer to. See [hivens.widget.model.Widget].
+    val drawsOwnSurface: Boolean
+        get() = false
+
     // Slot ids this widget exposes for nested sub-widgets. Empty for
     // leaves. Populated by the KSP processor from @Widget(slots = ...).
     // Editor uses this to drive drop-target discovery inside container

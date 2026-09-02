@@ -234,7 +234,13 @@ private fun PropPanelBody(
             // unnamed fields with. Giving one is its own act now.
             val resolved = descriptor.resolveSurface(instance)
             fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
-            if (resolved == null) {
+            if (descriptor.drawsOwnSurface) {
+                Text(
+                    text  = s.editorSurfaceOwn,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                )
+            } else if (resolved == null) {
                 Text(
                     text  = s.editorSurfaceNone,
                     style = MaterialTheme.typography.bodySmall,

@@ -53,4 +53,18 @@ annotation class Widget(
     // it lives here instead of in a table of kinds somewhere central: a widget
     // declares its own plane, beside itself, and a mistake is caught before it ships.
     val surface: String = "",
+    // True for a widget that paints its own plane in its body.
+    //
+    // Blank [surface] means "no plane, and one may be added"; this says "a plane
+    // exists and the kernel did not draw it", which is a different thing and used
+    // to be indistinguishable. The editor stops offering a second one, because a
+    // second one is what the user then sees: the activity pill's own shape is a
+    // capsule that animates to a panel corner as it opens, and the plane painted
+    // behind it from a static record is a rectangle over the same footprint.
+    //
+    // Reach for it only where a record cannot describe the plane: a shape that
+    // animates, or one that changes with the widget's own state. A widget whose
+    // plane is constant should declare it in [surface] and let the kernel draw it,
+    // which is what puts it under the editor's control.
+    val drawsOwnSurface: Boolean = false,
 )

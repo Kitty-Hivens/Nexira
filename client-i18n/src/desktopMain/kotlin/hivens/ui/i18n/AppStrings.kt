@@ -1240,6 +1240,7 @@ interface AppStrings {
     val editorResetToDefault: String
     val editorBackingTitle: String
     val editorSurfaceNone: String
+    val editorSurfaceOwn: String
     val editorSurfaceAdd: String
     /** Pill chip + header for a surface's own settings panel (e.g. the left rail). */
     val editorSurfaceSettings: String

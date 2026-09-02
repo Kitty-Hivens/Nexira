@@ -11,6 +11,7 @@ internal data class WidgetModel(
     val id: String,
     val displayName: String,
     val removable: Boolean,
+    val drawsOwnSurface: Boolean,
     val slots: List<String>,
     /** FQN of the @Serializable props class, or null for a propless widget. */
     val propsClassFqn: String?,
@@ -115,6 +116,7 @@ internal fun renderRegistry(
         appendLine("            override val kind: WidgetKind = $kindLiteral")
         appendLine("            override val displayName: String = \"${entry.displayName.kotlinEscape()}\"")
         appendLine("            override val removable: Boolean = ${entry.removable}")
+        if (entry.drawsOwnSurface) appendLine("            override val drawsOwnSurface: Boolean = true")
         appendLine("            override val slots: List<SlotId> = ${entry.slots.toSlotIdListLiteral()}")
         if (entry.provides.isNotEmpty()) {
             appendLine("            override val provides: Set<String> = ${entry.provides.toStringSetLiteral()}")

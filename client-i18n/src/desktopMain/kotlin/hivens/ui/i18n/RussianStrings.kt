@@ -1286,6 +1286,7 @@ object RussianStrings : AppStrings {
     override val editorBackingTitle   = "Подложка"
     override val editorSurfaceNone    = "У этого виджета нет подложки. Если добавить, за ним появится поверхность, которую можно настроить."
     override val editorSurfaceAdd     = "Добавить подложку"
+    override val editorSurfaceOwn     = "Этот виджет рисует подложку сам, поэтому настраивать здесь нечего. Её форма меняется вместе с тем, что он делает, а запись такое описать не может."
     override val editorSurfaceSettings = "Настройки"
     override val editorBackingGlass   = "Непрозрачность стекла"
     override val editorBackingCorner  = "Скругление"

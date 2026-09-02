@@ -122,6 +122,7 @@ data class PillProps(
     id = "appshell.activity.pill",
     displayName = "widget.activity.pill",
     propsClass = PillProps::class,
+    drawsOwnSurface = true,
 )
 @Composable
 fun ActivityPillWidget(instance: WidgetInstance) {
