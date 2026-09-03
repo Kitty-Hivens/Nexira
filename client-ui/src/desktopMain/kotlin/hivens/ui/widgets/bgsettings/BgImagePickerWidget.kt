@@ -72,10 +72,17 @@ fun BgImagePickerWidget() {
                 modifier = Modifier.weight(1f),
                 onClick  = {
                     scope.launch {
+                        // What the dialog offers, not what the launcher accepts: the
+                        // decoders decide that (see backgroundMediaKind), and between
+                        // them they read far more than a native file dialog should
+                        // list. A container missing from here plays if it is picked
+                        // some other way.
                         val picked = pickFile(
                             type     = FileKitType.File(extensions = listOf(
-                                "png", "jpg", "jpeg", "webp", "bmp", "gif", "apng",
-                                "mp4", "m4v", "mov", "webm", "mkv", "ogv",
+                                "png", "apng", "jpg", "jpeg", "webp", "bmp", "gif", "avif", "heic", "heif",
+                                "ico", "tif", "tiff",
+                                "mp4", "m4v", "mov", "webm", "mkv", "ogv", "avi", "mpg", "mpeg", "ts",
+                                "m2ts", "mts", "wmv", "asf", "flv", "3gp", "vob", "y4m",
                             )),
                             settings = dialogSettings,
                         )?.path ?: return@launch

@@ -13,6 +13,18 @@ class MediaUrlTest {
         }
     }
 
+    /**
+     * The containers beyond the handful the mirror shipped first. The player's
+     * natives read them, so a banner in one belongs on the player rather than
+     * on the image path, where it renders as a broken picture.
+     */
+    @Test
+    fun broadcastAndLegacyContainersAreVideo() {
+        for (ext in listOf("avi", "mpg", "mpeg", "ts", "m2ts", "mts", "wmv", "asf", "flv", "3gp", "vob", "y4m")) {
+            assertTrue(isVideoUrl("https://cdn.example.com/clip.$ext"), ext)
+        }
+    }
+
     @Test
     fun imagesAndAnimatedImagesAreNotVideo() {
         for (u in listOf("a.png", "a.jpg", "a.jpeg", "a.bmp", "a.gif", "a.webp", "a.apng")) {

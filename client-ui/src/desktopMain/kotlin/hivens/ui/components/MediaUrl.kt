@@ -5,7 +5,16 @@ import java.util.Locale
 
 // Real video containers only. gif/apng/webp are left to the image path (Coil
 // animates them) -- this gates which gallery/banner URLs go to the Skinema player.
-private val VIDEO_EXTENSIONS = setOf("mp4", "m4v", "mov", "webm", "mkv", "ogv")
+//
+// A URL is the one place the file name still has to answer: the decision is made
+// before there are any bytes to ask a decoder about, and downloading a link to
+// find out what it is would be the cost this test exists to avoid. So the list
+// stays, and covers what the player's natives read rather than the handful of
+// containers the mirror happened to ship first.
+private val VIDEO_EXTENSIONS = setOf(
+    "mp4", "m4v", "mov", "webm", "mkv", "ogv", "avi", "mpg", "mpeg",
+    "ts", "m2ts", "mts", "wmv", "asf", "flv", "3gp", "vob", "y4m",
+)
 
 // Service pages whose video plays through yt-dlp (download-then-play), not a
 // direct file fetch. Matched by host suffix so subdomains (m./music./player.) count.
