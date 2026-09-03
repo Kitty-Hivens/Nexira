@@ -25,15 +25,24 @@ class BackgroundMediaKindTest {
     }
 
     /**
-     * The container the still path cannot read goes to the player rather than
-     * to a decode that will fail. This is the case the old extension list got
-     * wrong: anything it did not name fell through to the image path.
+     * A still Skia has no codec for is still a still. The decoder reads it, finds
+     * no second frame, and it takes the path that downscales and caches it rather
+     * than one that would hold a decode thread for a picture.
      */
     @Test
-    fun whatSkiaWillNotOpenGoesToThePlayer() {
+    fun aStillOnlyTheDecoderReadsIsStatic() {
+        withFixture(TGA_STILL, ".tga") { assertEquals(BackgroundMediaKind.Static, backgroundMediaKind(it)) }
+    }
+
+    /**
+     * What no decoder reads goes to the still path, where a failure to decode is
+     * already reported, rather than to a player that could only fail later.
+     */
+    @Test
+    fun whatNothingReadsGoesToTheStillPath() {
         for (suffix in listOf(".mp4", ".avi", ".mkv", ".xyz", "")) {
             withFixture(NOT_AN_IMAGE, suffix) {
-                assertEquals(BackgroundMediaKind.TimeBased, backgroundMediaKind(it), "suffix '$suffix'")
+                assertEquals(BackgroundMediaKind.Static, backgroundMediaKind(it), "suffix '$suffix'")
             }
         }
     }
@@ -78,7 +87,11 @@ class BackgroundMediaKindTest {
             "R0lGODlhAQABAIEAAAAAAP///wAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAAQABAAAIBAABBAQAIf" +
                 "kEAQoAAQAsAAAAAAEAAQCB////AAAAAAAAAAAACAQAAQQEADs="
 
-        /** Bytes no image codec claims. */
+        /** 2x2 uncompressed TGA, a still format Skia carries no codec for. */
+        const val TGA_STILL =
+            "AAACAAAAAAAAAAAAAgACABgAHh7IHh7IHh7IHh7IAAAAAAAAAABUUlVFVklTSU9OLVhGSUxFLgA="
+
+        /** Bytes no codec claims. */
         const val NOT_AN_IMAGE = "bm90IGFuIGltYWdlLCBub3QgYSB2aWRlbywganVzdCBieXRlcw=="
     }
 }
