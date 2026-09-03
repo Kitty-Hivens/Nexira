@@ -118,10 +118,22 @@ class AudioPlayer(private val scope: CoroutineScope) {
         return try {
             VideoPlayer(path = file, loop = false, audio = true)
         } catch (e: Exception) {
-            log.error("Failed to open audio file {}", file, e)
-            _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
-            null
+            openFailed(file, e)
+        } catch (e: LinkageError) {
+            // A natives bundle that is missing, or from another FFmpeg line,
+            // fails as an Error rather than an Exception: the catch above never
+            // saw it, so a launcher whose media libraries will not load took the
+            // press of Play as a crash instead of a track that will not open.
+            // Narrower than Throwable on purpose: an OutOfMemoryError here is
+            // not a file that failed to open.
+            openFailed(file, e)
         }
+    }
+
+    private fun openFailed(file: Path, cause: Throwable): VideoPlayer? {
+        log.error("Failed to open audio file {}", file, cause)
+        _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+        return null
     }
 
     fun pause() {

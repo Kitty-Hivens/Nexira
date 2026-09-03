@@ -104,7 +104,19 @@ private class BackgroundVideo(
     private val closeScope: CoroutineScope,
 ) : RememberObserver {
 
-    val player = VideoPlayer(path = file.toPath(), loop = loop, audio = false, hardware = hardware)
+    /**
+     * Null when the media natives will not load: a bundle that is missing, or
+     * from another FFmpeg line, fails as a [LinkageError] rather than an
+     * exception, and this runs during composition, so it used to take the
+     * wallpaper down with the window. The caller draws nothing instead, which
+     * is what it already does for a file that fails to decode.
+     */
+    val player: VideoPlayer? = try {
+        VideoPlayer(path = file.toPath(), loop = loop, audio = false, hardware = hardware)
+    } catch (e: LinkageError) {
+        log.error("Background media natives unavailable for {}", file.absolutePath, e)
+        null
+    }
 
     private val frames = VideoFrameImage()
 
@@ -147,7 +159,8 @@ private class BackgroundVideo(
         // waiting for that on the thread painting the next wallpaper is a freeze
         // over a change the user just made.
         frames.close()
-        closeScope.launch(Dispatchers.IO) { player.close() }
+        val engine = player ?: return
+        closeScope.launch(Dispatchers.IO) { engine.close() }
     }
 }
 
@@ -187,7 +200,9 @@ internal fun rememberSkinemaFrame(
             closeScope = closeScope,
         )
     }
-    val player = video.player
+    // No engine means the natives did not load; same draw-nothing contract as
+    // the decode-failure gate below.
+    val player = video.player ?: return null
 
     var frameStamp by remember(video) { mutableIntStateOf(0) }
     var displaySize by remember(video) { mutableStateOf<Size?>(null) }
