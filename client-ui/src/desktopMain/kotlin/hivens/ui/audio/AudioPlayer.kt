@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.milliseconds
 // Every engine touch (open/play/pause/stop/setVolume) and the state poll loop
 // run on a single-thread dispatcher [engine], confining the mutable fields to
 // one thread: no locking, no torn reads, and -- because Skinema's close()
-// blocks up to five seconds joining the decode thread -- no UI-thread freeze.
+// blocks while it joins the decode thread -- no UI-thread freeze.
 // The public methods are fire-and-forget; widgets observe [state] / [volume].
 class AudioPlayer(private val scope: CoroutineScope) {
     private val log = LoggerFactory.getLogger(AudioPlayer::class.java)
