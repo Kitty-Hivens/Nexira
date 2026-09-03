@@ -14,17 +14,28 @@ import kotlin.test.assertTrue
  */
 class WidgetRegistryRendererTest {
 
+    // Named arguments throughout: the positional form compiled until a field was
+    // inserted in the middle of the model, and then failed three arguments later
+    // with a type error that says nothing about the cause.
     private fun widget(
         id: String,
         displayName: String = "Display",
         removable: Boolean = true,
+        drawsOwnSurface: Boolean = false,
         slots: List<String> = emptyList(),
         propsClassFqn: String? = null,
         functionFqn: String = "hivens.ui.widgets.Sample",
         takesInstance: Boolean = true,
         surfaceJson: String? = null,
     ) = WidgetModel(
-        id, displayName, removable, slots, propsClassFqn, functionFqn, takesInstance,
+        id = id,
+        displayName = displayName,
+        removable = removable,
+        drawsOwnSurface = drawsOwnSurface,
+        slots = slots,
+        propsClassFqn = propsClassFqn,
+        functionFqn = functionFqn,
+        takesInstance = takesInstance,
         surfaceJson = surfaceJson,
     )
 
@@ -45,6 +56,20 @@ class WidgetRegistryRendererTest {
         val src = renderRegistry(listOf(widget("home.card")))
         assertFalse("SurfaceSpec" in src, "an unused import warns on a build that declares no plane")
         assertFalse("defaultSurface" in src, src)
+    }
+
+    /**
+     * A widget that paints its own plane says so in the descriptor, which is
+     * what stops the editor offering a second one around it. The default is
+     * silence, so the override appears only where it was declared.
+     */
+    @Test
+    fun `a widget that paints its own plane emits the override`() {
+        val own = renderRegistry(listOf(widget("home.music", drawsOwnSurface = true)))
+        assertContains(own, "override val drawsOwnSurface: Boolean = true")
+
+        val plain = renderRegistry(listOf(widget("home.card")))
+        assertFalse("drawsOwnSurface" in plain, plain)
     }
 
     // --- duplicate ids ---
