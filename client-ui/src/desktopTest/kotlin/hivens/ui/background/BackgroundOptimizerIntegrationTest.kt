@@ -11,6 +11,7 @@ import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -20,6 +21,21 @@ import kotlin.test.assertTrue
  * encode) must produce a decodable display-height file on real natives.
  */
 class BackgroundOptimizerIntegrationTest {
+
+    /**
+     * The other half of the classification, which needs a real container: a file
+     * Skia cannot read and that has a second frame is time-based. The still
+     * formats the decoder also reads are pinned without natives in
+     * [BackgroundMediaKindTest].
+     */
+    @Test
+    fun `a real video is time-based`() {
+        val path = System.getenv("NEXIRA_TEST_VIDEO") ?: return
+        val src = Path.of(path)
+        if (!Files.exists(src)) return
+
+        assertEquals(BackgroundMediaKind.TimeBased, backgroundMediaKind(src.toFile()))
+    }
 
     @Test
     fun `optimizes the real 4K wallpaper to display height`() {
