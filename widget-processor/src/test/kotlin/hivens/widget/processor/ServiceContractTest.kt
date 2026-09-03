@@ -30,6 +30,7 @@ class ServiceContractTest {
         id = id,
         displayName = "Display",
         removable = true,
+        drawsOwnSurface = false,
         slots = emptyList(),
         propsClassFqn = null,
         functionFqn = "hivens.ui.widgets.$id",
