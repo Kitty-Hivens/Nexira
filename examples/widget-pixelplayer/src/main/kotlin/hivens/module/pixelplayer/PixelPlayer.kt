@@ -47,8 +47,8 @@ internal data class PlayerState(
  * still work, and a module that borrows the trunk's engine has not shown that.
  *
  * Every engine touch and the poll loop run on one confined dispatcher, so the
- * mutable fields are safely published and the five-second close of a decode
- * thread never lands on the drawing thread. Confinement is not enough on its
+ * mutable fields are safely published and the close of a decode thread never
+ * lands on the drawing thread. Confinement is not enough on its
  * own for the compound operations -- see [gate].
  */
 internal class PixelPlayer private constructor() {

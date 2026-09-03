@@ -259,7 +259,7 @@ fun VideoPlayer(
  * The close itself is handed to the app scope. It joins the decode thread, which
  * may be in the middle of a seek run, and the swap between the inline player and
  * the fullscreen one disposes this player while the user is waiting for the
- * other -- exactly where a five-second join would be felt as a frozen window.
+ * other -- exactly where that join would be felt as a frozen window.
  */
 private class InlineVideo(
     path: Path,
