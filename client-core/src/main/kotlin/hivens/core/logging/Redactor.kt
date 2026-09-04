@@ -80,6 +80,16 @@ object Redactor {
         // accepted trade (see the conservative-RIGHT note above).
         Regex("""(?i)(password["'\s:=]+)([^"',&}\r\n]+)""") to "$1<redacted>",
         Regex("""(?i)((?:session|refresh|auth|api)Token["'\s:=]+)($TOKEN_CHARS{6,}=*)""") to "$1<redacted>",
+        // The two SmartyCraft wire keys. Neither ends in "Token", so the rule above
+        // never saw them, while the protocol's own model calls uid the input to
+        // every signed action and session the input to the game token.
+        //
+        // `uid` is anchored on a long hex run so it cannot fire on prose, and the
+        // word boundary keeps it off the `uuid` the rule below owns. `session` needs
+        // a long token-shaped value for the same reason: the bare word opens far too
+        // many ordinary log lines to redact whatever follows it.
+        Regex("""(?i)(\buid["'\s:=]+)([0-9a-fA-F]{16,})""") to "$1<redacted>",
+        Regex("""(?i)(\bsession["'\s:=]+)($TOKEN_CHARS{20,}=*)""") to "$1<redacted>",
         // Bearer-rule alone covers the Authorization-header leak surface.
         // A generic "Authorization: ..." rule would either eat the "Bearer"
         // marker (breaking this rule) or -- if run first -- strip "Bearer"

@@ -170,7 +170,27 @@ class SmartycraftV1Protocol(
         // only when the body actually starts with a JSON object opener.
         if (!raw.startsWith("{")) return null
         return runCatching { json.decodeFromString<T>(raw) }
-            .onFailure { logger.warn("JSON decode failed for response: ${raw.take(200)}", it) }
+            // Neither the body nor the throwable: a login response carries the uid
+            // and the session token, and both of them reach the log through either.
+            .onFailure { logger.warn("JSON decode failed for a {}-character response. {}", raw.length, decodeDiagnostic(it)) }
             .getOrNull()
     }
+}
+
+/**
+ * What the decoder said about the failure, without the bytes it was reading.
+ *
+ * kotlinx.serialization appends `JSON input: <excerpt>` to its message, and on a
+ * login response that excerpt is the uid and the session token. It is cut around
+ * the error offset rather than at a field boundary, so the key can be missing from
+ * it and a marker rule in the redactor has nothing to anchor on. The offset, the
+ * path and the reason are the diagnosis. The bytes add nothing a wire spec does
+ * not already say.
+ *
+ * The caller passes this instead of the throwable for the same reason: the log
+ * pattern renders a throwable's own message alongside its stack trace.
+ */
+internal fun decodeDiagnostic(failure: Throwable): String {
+    val detail = failure.message?.substringBefore("\nJSON input:")?.trim().orEmpty()
+    return if (detail.isEmpty()) failure::class.simpleName.orEmpty() else "${failure::class.simpleName}: $detail"
 }

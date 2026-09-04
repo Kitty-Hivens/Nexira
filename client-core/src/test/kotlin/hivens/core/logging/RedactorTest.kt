@@ -136,6 +136,47 @@ class RedactorTest {
         assertEquals(text, Redactor.redact(text))
     }
 
+    // --- the SmartyCraft wire keys ---
+
+    @Test
+    fun `a login response body leaks neither the uid nor the session`() {
+        // The shape a decode failure used to put in the log, trimmed from the wire
+        // fixture. uid signs spawn, twoauth and the skin uploads; session is what the
+        // game token is derived from.
+        val uid = "a921e0baf5d4c4454774b09586a32d94"
+        val session = "vRfeed1IvnNZPZFJ6c02h1qkxBru+PXd3KJA6OLWy18="
+        val body = """{"status":"OK","playername":"TestPlayer","uid":"$uid","session":"$session","money":0}"""
+
+        val redacted = Redactor.redact(body)
+
+        assertFalse(redacted.contains(uid), "uid leaked")
+        assertFalse(redacted.contains("vRfeed1IvnNZ"), "session leaked")
+        assertTrue(redacted.contains("TestPlayer"), "the rest of the body stays readable")
+    }
+
+    @Test
+    fun `the uid rule keeps its hands off uuid`() {
+        // "uuid" contains "uid", and the two have separate rules with separate
+        // replacements: one is a credential, the other an identifier.
+        val redacted = Redactor.redact("""{"uuid":"1e86dc3ad14dc24f4706915bb7d8593a"}""")
+        assertTrue(redacted.contains("<uuid>"), "the uuid rule still owns this one")
+        assertFalse(redacted.contains("1e86dc3a"))
+    }
+
+    @Test
+    fun `the word session in ordinary prose is left alone`() {
+        // The bare word opens a lot of perfectly ordinary lines, which is why the
+        // rule wants a token-shaped value behind it rather than any value.
+        val text = "session started for pack Industrial, 247 mods"
+        assertEquals(text, Redactor.redact(text))
+    }
+
+    @Test
+    fun `a short uid-like word is left alone`() {
+        val text = "uid of the record is missing"
+        assertEquals(text, Redactor.redact(text))
+    }
+
     @Test
     fun `a registered secret is masked in any surrounding text`() {
         val token = "z9y8x7w6v5u4t3s2r1q0p9o8n7m6l5k4"
