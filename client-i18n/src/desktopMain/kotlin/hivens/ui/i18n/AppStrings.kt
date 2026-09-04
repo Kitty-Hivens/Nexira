@@ -1202,7 +1202,18 @@ interface AppStrings {
     val recoveryResetsHeading: String
     val recoveryResetLayout: String
     val recoveryResetCustomization: String
+    // Separate from customization because it is not appearance: it is what the
+    // user typed into a widget, and nothing else holds a copy of it.
+    val recoveryResetWidgetState: String
     val recoveryResetSettings: String
+    // Each reset says what it deletes before it deletes it. The surface invites
+    // pressing every button on it, and none of these can be undone.
+    val recoveryResetConfirmTitle: (String) -> String
+    val recoveryResetConfirm: String
+    val recoveryResetLayoutBody: String
+    val recoveryResetCustomizationBody: String
+    val recoveryResetWidgetStateBody: String
+    val recoveryResetSettingsBody: String
     val recoveryContinue: String
     val recoveryRelaunchFailed: String
     val recoveryRestartInApp: String

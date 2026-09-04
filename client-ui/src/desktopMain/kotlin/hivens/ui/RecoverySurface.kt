@@ -2,18 +2,21 @@ package hivens.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,8 +53,10 @@ import java.util.Locale
  *
  * It offers what recovers a launcher an environment breaks: toggle a system module
  * off (tray on a DE without SNI, skinema when its natives fail, ...), reset a
- * corrupted layout / customization / settings, then continue -- which relaunches
- * the process, since cached-at-boot settings only take effect in a fresh one.
+ * corrupted layout, appearance, widget content or settings, then continue -- which
+ * relaunches the process, since cached-at-boot settings only take effect in a fresh
+ * one. Every reset is a delete with no undo, so every one of them asks first and
+ * says what it takes.
  */
 @Composable
 fun RecoveryWindow(
@@ -84,6 +89,20 @@ fun RecoveryWindow(
         disabled = if (off) disabled + id else disabled - id
         RecoveryIo.writeDisabledModules(dataDir, disabled)
     }
+
+    // Each reset deletes a file and none of them can be undone, so each says what
+    // it takes before it takes it. Held as data because the three of them used to
+    // be three bare buttons labelled with a single word, and the one labelled
+    // Customization deleted the user's widget notes.
+    val resets = remember(s) {
+        listOf(
+            Reset(s.recoveryResetLayout, s.recoveryResetLayoutBody) { RecoveryIo.resetLayout(dataDir) },
+            Reset(s.recoveryResetCustomization, s.recoveryResetCustomizationBody) { RecoveryIo.resetCustomization(dataDir) },
+            Reset(s.recoveryResetWidgetState, s.recoveryResetWidgetStateBody) { RecoveryIo.resetWidgetState(dataDir) },
+            Reset(s.recoveryResetSettings, s.recoveryResetSettingsBody) { RecoveryIo.resetSettings(dataDir) },
+        )
+    }
+    var pending by remember { mutableStateOf<Reset?>(null) }
 
     Window(onCloseRequest = onExit, state = windowState, title = Branding.TITLE) {
         MaterialTheme(colorScheme = darkColorScheme()) {
@@ -118,13 +137,15 @@ fun RecoveryWindow(
                     }
 
                     Text(s.recoveryResetsHeading, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { RecoveryIo.resetLayout(dataDir) }) { Text(s.recoveryResetLayout) }
-                        OutlinedButton(onClick = { RecoveryIo.resetCustomization(dataDir) }) { Text(s.recoveryResetCustomization) }
-                        OutlinedButton(onClick = {
-                            RecoveryIo.resetSettings(dataDir)
-                            disabled = RecoveryIo.readDisabledModules(dataDir)
-                        }) { Text(s.recoveryResetSettings) }
+                    // FlowRow, not Row: the labels name what they clear, which in a
+                    // declined language is wider than the window at the default size.
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement   = Arrangement.spacedBy(8.dp),
+                    ) {
+                        resets.forEach { reset ->
+                            OutlinedButton(onClick = { pending = reset }) { Text(reset.label) }
+                        }
                     }
 
                     if (relaunchFailed) {
@@ -137,8 +158,38 @@ fun RecoveryWindow(
                         }
                         OutlinedButton(onClick = onExit) { Text(s.recoverySafeModeQuit) }
                     }
+
+                    pending?.let { reset ->
+                        AlertDialog(
+                            onDismissRequest = { pending = null },
+                            title = { Text(s.recoveryResetConfirmTitle(reset.label)) },
+                            text  = { Text(reset.body, style = MaterialTheme.typography.bodyMedium) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    reset.run()
+                                    // The settings reset keeps disabledModules, so the
+                                    // switches above have to be re-read rather than assumed.
+                                    disabled = RecoveryIo.readDisabledModules(dataDir)
+                                    pending = null
+                                }) {
+                                    Text(s.recoveryResetConfirm, color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { pending = null }) { Text(s.editorCancel) }
+                            },
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * One reset the surface offers: what it is called, what it deletes, and the call
+ * that does it. The name and the warning travel with the action so a button can
+ * neither be labelled with a word that does not describe what it clears, nor be
+ * wired up without one.
+ */
+private class Reset(val label: String, val body: String, val run: () -> Unit)

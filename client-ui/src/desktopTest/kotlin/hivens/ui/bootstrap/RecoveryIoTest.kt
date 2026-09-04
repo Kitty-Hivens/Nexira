@@ -85,6 +85,35 @@ class RecoveryIoTest {
     }
 
     @Test
+    fun `resetCustomization leaves the widget content alone`() {
+        // Scratchpad bodies and checklist items are what the user typed, not
+        // appearance, and nothing else on disk holds a copy. Clearing them under a
+        // button labelled for themes and wallpaper is a loss nobody asked for.
+        val themes = dataDir / "themes.json"
+        val widgetState = dataDir / "widget-state.json"
+        Files.writeString(themes, "{}")
+        Files.writeString(widgetState, """{"version":1,"entries":{"note-1":{"body":"buy milk"}}}""")
+
+        RecoveryIo.resetCustomization(dataDir)
+
+        assertFalse(Files.exists(themes), "appearance is what this button clears")
+        assertTrue(Files.exists(widgetState), "widget content is not appearance")
+    }
+
+    @Test
+    fun `resetWidgetState deletes the widget content and nothing else`() {
+        val themes = dataDir / "themes.json"
+        val widgetState = dataDir / "widget-state.json"
+        Files.writeString(themes, "{}")
+        Files.writeString(widgetState, "{}")
+
+        RecoveryIo.resetWidgetState(dataDir)
+
+        assertFalse(Files.exists(widgetState))
+        assertTrue(Files.exists(themes), "the appearance files are a separate reset")
+    }
+
+    @Test
     fun `readDisabledModules is empty on a clean install`() {
         assertTrue(RecoveryIo.readDisabledModules(dataDir).isEmpty())
     }
