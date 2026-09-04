@@ -9,17 +9,25 @@ import kotlinx.serialization.Serializable
  * Default state is a no-op -- every field is null / 1.0 / false so an
  * unconfigured user sees the same UI as before customization existed.
  *
- * [accentOverride] re-seeds the primary accent; the remaining fields
- * tune density, whether surfaces blur, and the nav-rail selection.
+ * [accentOverride] re-seeds the primary accent, the remaining fields decide
+ * whether surfaces blur and how the nav-rail selection is drawn.
  *
  * A glass-intensity multiplier used to live here too. It scaled the tint helper
  * every screen mixed its own planes with -- so it moved thirty places and none of
  * the library's own surfaces -- and no screen ever wrote it: it was reachable only
  * by hand-editing this file. Those thirty places name their colour directly now.
+ *
+ * A global density multiplier went the same way. It multiplied the density the
+ * window already carries, which the compositor sets, so it was a second answer to
+ * a question the system had answered, and nothing ever wrote it either. The axis
+ * actually in use is per widget: content scales to the footprint the layout gave
+ * it, in [hivens.ui.widgets.AdaptiveWidget]. A future per-widget property could
+ * hand a widget its own density, which is a different thing from a window-wide
+ * zoom. What a global control would want is the font scale, which the shell
+ * deliberately passes through untouched.
  */
 @Serializable
 data class CustomizationSettings(
-    val densityScale: Float = 1.0f,
     val accentOverride: String? = null,
 
     /**
