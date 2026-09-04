@@ -51,6 +51,14 @@ class SmrtSyncServiceTest {
     """.trimIndent()
 
     /**
+     * The build the caller picked. sync places what it is handed rather than
+     * fetching a pack's current manifest, which is the whole point: an install of
+     * an older build used to record that build and download the newest one.
+     */
+    private fun parsed(text: String = manifest()) =
+        json.decodeFromString(SmrtPackManifest.serializer(), text)
+
+    /**
      * [failDownloads] cuts the first N mod-file responses the way a middlebox cuts a
      * transfer: the request is answered and the body then fails to arrive. The
      * manifest is always served, since a pack that cannot be described never gets as
@@ -120,13 +128,8 @@ class SmrtSyncServiceTest {
 
     private fun serviceWith(engine: MockEngine): SmrtSyncService {
         val provider = HttpClientProvider { HttpClient(engine) }
-        val client = SmrtPackClient(provider, MIRROR_BASE, json)
         val modrinth = ModrinthClient(provider, testTransferEngine(provider), json)
-        return SmrtSyncService(
-            client,
-            modrinth,
-            testTransferEngine(provider),
-        )
+        return SmrtSyncService(modrinth, testTransferEngine(provider))
     }
 
 
@@ -165,7 +168,7 @@ class SmrtSyncServiceTest {
         val dir = tempDir("asset-owned")
         Files.writeString(dir.resolve("servers.dat"), "STALE")
 
-        assetService().sync("test", dir)
+        assetService().sync(parsed(assetManifest()), dir)
 
         assertContentEquals(
             serversBytes,
@@ -178,7 +181,7 @@ class SmrtSyncServiceTest {
     fun `enforceRoster drops what the pack does not name and keeps what it does`() = runTest {
         val dir = tempDir("enforce")
         val service = syncService()
-        service.sync("test", dir)
+        service.sync(parsed(), dir)
 
         // A hand-placed jar, one a level down, and the kinds of file that are NOT
         // a way to run code: tooling caches in dot-directories (Connector's remapped
@@ -228,7 +231,7 @@ class SmrtSyncServiceTest {
         // treated as verified -- which is what hands it a session token.
         val dir = tempDir("blocked")
         val service = syncService()
-        service.sync("test", dir)
+        service.sync(parsed(), dir)
 
         // Denying the delete is expressed through directory permissions, which is a
         // POSIX notion; Windows models this with ACLs and the test does not apply
@@ -258,11 +261,11 @@ class SmrtSyncServiceTest {
         // single sync -- silently, at the cost of a full remap next launch.
         val dir = tempDir("cache-kept")
         val service = syncService()
-        service.sync("test", dir)
+        service.sync(parsed(), dir)
         Files.createDirectories(dir.resolve("mods/.connector"))
         Files.write(dir.resolve("mods/.connector/bobby_mapped.jar"), "CACHE".toByteArray())
 
-        service.sync("test", dir)
+        service.sync(parsed(), dir)
 
         assertTrue(
             Files.exists(dir.resolve("mods/.connector/bobby_mapped.jar")),
@@ -511,7 +514,7 @@ class SmrtSyncServiceTest {
     @Test
     fun `optional default-off lands as disabled, required stays active`() = runTest {
         val dir = tempDir("sync")
-        syncService().sync("test", dir)
+        syncService().sync(parsed(), dir)
         assertTrue(Files.exists(dir.resolve("mods/req.jar")), "required mod active")
         assertFalse(Files.exists(dir.resolve("mods/opt.jar")), "default-off optional not active")
         assertTrue(Files.exists(dir.resolve("mods/opt.jar.disabled")), "default-off optional placed as .disabled")
@@ -520,7 +523,7 @@ class SmrtSyncServiceTest {
     @Test
     fun `enabledState activates an otherwise default-off optional`() = runTest {
         val dir = tempDir("sync2")
-        syncService().sync("test", dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
+        syncService().sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
         assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "user-enabled optional is active")
         assertFalse(Files.exists(dir.resolve("mods/opt.jar.disabled")), "no leftover .disabled variant")
     }
@@ -530,7 +533,7 @@ class SmrtSyncServiceTest {
     @Test
     fun `a cut transfer is retried rather than failing the pack`() = runTest {
         val dir = tempDir("sync-retry")
-        syncService(failDownloads = 2).sync("test", dir)
+        syncService(failDownloads = 2).sync(parsed(), dir)
         assertTrue(Files.exists(dir.resolve("mods/req.jar")), "the retry completed the transfer")
     }
 
@@ -543,7 +546,7 @@ class SmrtSyncServiceTest {
         Files.write(mods.resolve("req.jar.part"), reqBytes.copyOfRange(0, 4))
 
         val ranges = mutableListOf<Long>()
-        rangeAwareService(ranges).sync("test", dir)
+        rangeAwareService(ranges).sync(parsed(), dir)
 
         assertContentEquals(reqBytes, Files.readAllBytes(mods.resolve("req.jar")), "resumed file")
         assertTrue(4L in ranges, "the transfer did not ask to continue from the partial")
@@ -559,7 +562,7 @@ class SmrtSyncServiceTest {
         // as long as the partial decides the offset.
         Files.write(mods.resolve("req.jar.part"), reqBytes + "TRAILING".toByteArray())
 
-        rangeAwareService().sync("test", dir)
+        rangeAwareService().sync(parsed(), dir)
 
         assertContentEquals(reqBytes, Files.readAllBytes(mods.resolve("req.jar")), "refetched file")
     }
@@ -570,7 +573,7 @@ class SmrtSyncServiceTest {
     fun `repair on an untouched install reports everything intact and fetches nothing`() = runTest {
         val dir = tempDir("repair-clean")
         val service = syncService()
-        service.sync("test", dir)
+        service.sync(parsed(), dir)
         val manifest = json.decodeFromString(SmrtPackManifest.serializer(), manifest())
 
         val report = service.verifyAndRepair(dir, manifest)
@@ -584,7 +587,7 @@ class SmrtSyncServiceTest {
     fun `repair replaces a mod that was damaged on disk`() = runTest {
         val dir = tempDir("repair-damaged")
         val service = syncService()
-        service.sync("test", dir)
+        service.sync(parsed(), dir)
         val manifest = json.decodeFromString(SmrtPackManifest.serializer(), manifest())
 
         // What a bad sector, a truncating copy or a half-finished manual edit leaves.
@@ -601,7 +604,7 @@ class SmrtSyncServiceTest {
     fun `repair puts back a mod that was deleted outright`() = runTest {
         val dir = tempDir("repair-missing")
         val service = syncService()
-        service.sync("test", dir)
+        service.sync(parsed(), dir)
         val manifest = json.decodeFromString(SmrtPackManifest.serializer(), manifest())
         Files.delete(dir.resolve("mods/req.jar"))
 
@@ -617,7 +620,7 @@ class SmrtSyncServiceTest {
         val mods = Files.createDirectories(dir.resolve("mods"))
         Files.write(mods.resolve("req.jar.part"), reqBytes.copyOfRange(0, 4))
 
-        rangeAwareService(ignoreRanges = true).sync("test", dir)
+        rangeAwareService(ignoreRanges = true).sync(parsed(), dir)
 
         // Appending to a partial the response already contains would land 12 bytes
         // and fail the sha1; the partial has to be thrown away instead.
@@ -631,7 +634,7 @@ class SmrtSyncServiceTest {
         Files.writeString(mods.resolve("foreign.jar"), "from another source")
 
         // Every attempt is cut, so the sync gives up.
-        val failed = runCatching { syncService(failDownloads = Int.MAX_VALUE).sync("test", dir) }
+        val failed = runCatching { syncService(failDownloads = Int.MAX_VALUE).sync(parsed(), dir) }
         assertTrue(failed.isFailure, "the sync was expected to fail")
         assertTrue(
             Files.exists(mods.resolve("foreign.jar")),
@@ -648,7 +651,7 @@ class SmrtSyncServiceTest {
             Files.writeString(it.resolve("buried.jar"), "nested payload")
         }
 
-        syncService().sync("test", dir)
+        syncService().sync(parsed(), dir)
 
         assertFalse(Files.exists(mods.resolve("foreign.jar")), "foreign jar survived a completed sync")
         assertFalse(Files.exists(mods.resolve("nested/buried.jar")), "nested payload survived a completed sync")
@@ -667,11 +670,11 @@ class SmrtSyncServiceTest {
         // drop-everything branch, which removes the file whatever its
         // extension -- the test would pass without exercising the orphan prune
         // at all.
-        syncService().sync("test", dir)
+        syncService().sync(parsed(), dir)
         val mods = dir.resolve("mods")
         Files.writeString(mods.resolve("foreign.zip"), "loadable on 1.7.10")
 
-        syncService().sync("test", dir)
+        syncService().sync(parsed(), dir)
 
         assertFalse(Files.exists(mods.resolve("foreign.zip")), "foreign zip survived a completed sync")
         assertTrue(Files.exists(mods.resolve("req.jar")), "the pack's own mod is in place")

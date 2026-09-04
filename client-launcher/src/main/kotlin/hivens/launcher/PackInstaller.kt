@@ -69,8 +69,11 @@ class PackInstaller(
         // (required=false) seeds at its default_enabled. Sync places toggled-off
         // optionals as `.disabled` so a later flip is a rename, not a re-download.
         val optionalToggles = OptionalContentRules.defaultToggles(manifest.mods)
+        // The same manifest object everything below is recorded from. Handing sync a
+        // pack id instead let it fetch the pack's current build, so a user who picked
+        // an older one got that build's pin and baseline over the newest build's files.
         syncService.sync(
-            packId    = packId,
+            manifest  = manifest,
             clientDir = clientDir,
             progress  = progress,
             enabledState = OptionalContentRules.enabledState(manifest.mods, optionalToggles),
