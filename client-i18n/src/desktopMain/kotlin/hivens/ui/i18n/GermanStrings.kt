@@ -1240,7 +1240,7 @@ object GermanStrings : AppStrings {
     override val recoveryResetCustomization = "Erscheinungsbild"
     override val recoveryResetWidgetState   = "Widget-Inhalte"
     override val recoveryResetSettings      = "Einstellungen"
-    override val recoveryResetConfirmTitle: (String) -> String = { name -> "$name zurücksetzen?" }
+    override fun recoveryResetConfirmTitle(name: String) = "$name zurücksetzen?"
     override val recoveryResetConfirm       = "Zurücksetzen"
     override val recoveryResetLayoutBody         = "Alle Widgets kehren zu dem Layout zurück, mit dem der Launcher ausgeliefert wird. Selbst hinzugefügte Widgets verschwinden mitsamt ihren Positionen."
     override val recoveryResetCustomizationBody  = "Designs, das Hintergrundbild und die Einstellungen der Konsole kehren zu den Standardwerten zurück."
