@@ -491,6 +491,32 @@ class CredentialsManagerTest {
     }
 
     @Test
+    fun `markTwoFactor arms the gate without touching the secrets or the active account`() {
+        val mgr = newManager()
+        mgr.saveAccount(session(), "smartycraft")
+        mgr.saveAccount(
+            SessionData(playerName = "msa", uuid = "u2", accessToken = "tok2", refreshToken = "r"),
+            "microsoft",
+        )
+        val activeBefore = mgr.activeAccountId()
+
+        mgr.markTwoFactor("smartycraft")
+
+        assertTrue(mgr.accountFor("smartycraft")?.twoFactor == true, "the gate must be armed")
+        assertEquals(activeBefore, mgr.activeAccountId(), "marking a flag must not change the primary face")
+        assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
+        assertEquals("secret-pw", vault.entries[scKey("password")]?.decodeToString())
+        assertFalse(mgr.accountFor("microsoft")?.twoFactor == true, "another provider's gate is untouched")
+    }
+
+    @Test
+    fun `markTwoFactor on a provider with no account writes nothing`() {
+        val mgr = newManager()
+        mgr.markTwoFactor("smartycraft")
+        assertFalse(Files.exists(workDir / "credentials.json"), "an empty store must not be created by a flag")
+    }
+
+    @Test
     fun `clearTwoFactor leaves other providers alone`() {
         val mgr = newManager()
         mgr.saveAccount(

@@ -471,19 +471,12 @@ fun FrameWindowScope.AppShellContent(
     LaunchedEffect(controller) {
         controller.events.collect { event ->
             if (event !is LaunchLogEvent.TwoFactorDetected) return@collect
-            val saved = withContext(Dispatchers.IO) {
-                accountStore.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
-            }
-            if (saved == null || saved.twoFactor) return@collect
             runCatching {
                 withContext(Dispatchers.IO) {
-                    accountStore.saveAccount(
-                        saved.copy(twoFactor = true),
-                        PackAuthRequirement.SmartyCraft.PROVIDER_KEY,
-                    )
+                    accountStore.markTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
                 }
             }.onSuccess {
-                ActionRing.record("Marked ${saved.playerName} as a 2FA account: no silent re-login from here")
+                ActionRing.record("Launch met the second factor: the SmartyCraft account is marked")
             }
         }
     }
@@ -1209,6 +1202,16 @@ fun AppRoot(
                         withContext(Dispatchers.IO) {
                             credentialsManager.saveAccount(session, PackAuthRequirement.Microsoft.PROVIDER_KEY)
                         }
+                    }
+                    // The sign-in that just ran met the 2FA gate, and it is the only
+                    // thing that could have told us. Unpersisted, the coordinator would
+                    // spend another login on the next start -- and each one invalidates
+                    // whatever session the player has in hand.
+                    if (session.twoFactor && saved?.twoFactor != true) {
+                        withContext(Dispatchers.IO) {
+                            credentialsManager.markTwoFactor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+                        }
+                        ActionRing.record("Auto-login met the second factor: the SmartyCraft account is marked")
                     }
                     appState = AppState.Authenticated(session)
                     return@LaunchedEffect

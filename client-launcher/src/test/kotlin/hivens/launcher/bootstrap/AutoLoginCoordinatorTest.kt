@@ -3,12 +3,14 @@ package hivens.launcher.bootstrap
 import hivens.auth.AuthProvider
 import hivens.auth.microsoft.MsaAuthProvider
 import hivens.core.api.AuthException
+import hivens.core.api.TwoFactorRequiredException
 import hivens.core.data.AuthStatus
 import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.launcher.bootstrap.AutoLoginCoordinator.Resolution
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -112,6 +114,58 @@ class AutoLoginCoordinatorTest {
 
         assertEquals("old-mc-token", session.accessToken)
         assertEquals("rt-old", session.refreshToken)
+    }
+
+    // ── the two-factor guard ─────────────────────────────────────────────────
+
+    @Test
+    fun `an ordinary account is still signed in`() = runTest {
+        coEvery { authService.login("ScUser", "hunter2", any()) } returns scSaved.copy(accessToken = "fresh-token")
+        assertEquals("fresh-token", session(resolve(SettingsData(), saved = scSaved)).accessToken)
+    }
+
+    @Test
+    fun `a marked two-factor account is never signed in again`() = runTest {
+        // Not "the login is harmless because it fails": SmartyCraft mints a uid per
+        // login and invalidates the previous one, so the REQUEST is what revokes the
+        // session the player unlocked with a code. It must not be made at all.
+        coEvery { authService.login(any(), any(), any()) } throws
+            AssertionError("auto-login signed a two-factor account in")
+
+        val session = session(resolve(SettingsData(), saved = scSaved.copy(twoFactor = true)))
+
+        assertEquals("sc-token", session.accessToken)
+        assertTrue(session.twoFactor)
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
+    fun `a two-factor account with no saved password still opens on its token`() = runTest {
+        // The guard sits ahead of the password read on purpose: the token is what
+        // this branch goes with, and declining to save a password is not a reason to
+        // drop the account to the login form on every start.
+        coEvery { authService.login(any(), any(), any()) } throws
+            AssertionError("auto-login signed a two-factor account in")
+
+        val session = session(
+            resolve(SettingsData(), saved = scSaved.copy(twoFactor = true, cachedPassword = null)),
+        )
+
+        assertEquals("sc-token", session.accessToken)
+    }
+
+    @Test
+    fun `first contact with the gate comes back marked so the caller can arm it`() = runTest {
+        // An account saved before the flag existed reaches the gate here, and the
+        // demand is the only evidence there is. Unmarked, the next start spends
+        // another login and kills another session.
+        coEvery { authService.login(any(), any(), any()) } throws
+            TwoFactorRequiredException(uid = "a921e0baf5d4c445", login = "ScUser")
+
+        val session = session(resolve(SettingsData(), saved = scSaved))
+
+        assertTrue(session.twoFactor, "the caller persists this; without it the guard stays unarmed")
+        assertEquals("sc-token", session.accessToken)
     }
 
     // ── failure classification ───────────────────────────────────────────────
