@@ -41,20 +41,29 @@ import java.util.Comparator
  * stays invisible.
  */
 class SmrtSyncService(
-    private val client: SmrtPackClient,
     private val modrinth: ModrinthClient,
     private val transfers: TransferEngine,
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
     /**
+     * Places [manifest] on disk under [clientDir].
+     *
+     * The build is the caller's to choose, and it is handed over rather than named:
+     * this used to take a packId and fetch the pack's CURRENT manifest itself, so a
+     * user who picked an older build from the version list got that build recorded
+     * everywhere -- the pin, the baseline, the optional-content defaults -- and the
+     * latest build's bytes on disk. Every other manifest read in the launcher
+     * already branches on the pin; this one could not, because it was never told
+     * there was one.
+     *
      * [enabledState] maps a mod `filename` to whether it should be active.
      * Required mods are always active regardless; an optional absent from the
      * map falls back to its manifest `default_enabled`. Empty map = install
      * every mod at its manifest default (the pre-toggle behaviour).
      */
     suspend fun sync(
-        packId: String,
+        manifest: SmrtPackManifest,
         clientDir: Path,
         progress: ((current: Int, total: Int, filename: String) -> Unit)? = null,
         enabledState: Map<String, Boolean> = emptyMap(),
@@ -64,7 +73,6 @@ class SmrtSyncService(
         // existence check and the move below. Reads are not gated -- they open
         // delete-shared and cannot corrupt a rename.
         InstanceMutationLock.withLock(clientDir) {
-            val manifest = client.fetchManifest(packId)
             log.info(
                 "smrt sync: pack={}, pack_version={}, mods={}, assets={}",
                 manifest.packId, manifest.packVersion,

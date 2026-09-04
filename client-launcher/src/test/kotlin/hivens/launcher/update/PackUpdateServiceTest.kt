@@ -143,7 +143,7 @@ class PackUpdateServiceTest {
         }
         private val provider = HttpClientProvider { HttpClient(engine) }
         val client = SmrtPackClient(provider, MIRROR, json)
-        val sync = SmrtSyncService(client, ModrinthClient(provider, testTransferEngine(provider), json), testTransferEngine(provider))
+        val sync = SmrtSyncService(ModrinthClient(provider, testTransferEngine(provider), json), testTransferEngine(provider))
         private val snapshots = PackSnapshotService(dataDir, json)
         val journal = ApplyJournal(dataDir, json)
         val service = PackUpdateService(client, sync, repo, snapshots, journal, dataDir)
@@ -185,8 +185,8 @@ class PackUpdateServiceTest {
         /** Install v1 with optB toggled off, and record the resulting instance. */
         suspend fun installV1(): PackInstance {
             val enabled = mapOf("req.jar" to true, "optB.jar" to false, "drop.jar" to true)
-            sync.sync("test", clientDir, enabledState = enabled)
             val v1 = client.fetchManifest("test")
+            sync.sync(v1, clientDir, enabledState = enabled)
             val instance = PackInstance(
                 id = "i1",
                 packRef = PackReference(PackOrigin.Mirror, "test", v1.packVersion),
