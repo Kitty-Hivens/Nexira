@@ -1254,7 +1254,7 @@ object RussianStrings : AppStrings {
     override val recoveryResetCustomization = "Оформление"
     override val recoveryResetWidgetState   = "Содержимое виджетов"
     override val recoveryResetSettings      = "Настройки"
-    override val recoveryResetConfirmTitle: (String) -> String = { name -> "Сбросить: $name?" }
+    override fun recoveryResetConfirmTitle(name: String) = "Сбросить \"$name\"?"
     override val recoveryResetConfirm       = "Сбросить"
     override val recoveryResetLayoutBody         = "Все виджеты вернутся к расстановке, с которой лаунчер поставляется. Добавленные виджеты исчезнут вместе с их местами."
     override val recoveryResetCustomizationBody  = "Темы, обои и настройки консоли вернутся к значениям по умолчанию."

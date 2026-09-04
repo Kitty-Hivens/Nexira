@@ -1208,7 +1208,7 @@ interface AppStrings {
     val recoveryResetSettings: String
     // Each reset says what it deletes before it deletes it. The surface invites
     // pressing every button on it, and none of these can be undone.
-    val recoveryResetConfirmTitle: (String) -> String
+    fun recoveryResetConfirmTitle(name: String): String
     val recoveryResetConfirm: String
     val recoveryResetLayoutBody: String
     val recoveryResetCustomizationBody: String

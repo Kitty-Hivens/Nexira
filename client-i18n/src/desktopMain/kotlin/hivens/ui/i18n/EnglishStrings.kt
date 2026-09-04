@@ -1238,7 +1238,7 @@ object EnglishStrings : AppStrings {
     override val recoveryResetCustomization = "Appearance"
     override val recoveryResetWidgetState   = "Widget content"
     override val recoveryResetSettings      = "Settings"
-    override val recoveryResetConfirmTitle: (String) -> String = { name -> "Reset $name?" }
+    override fun recoveryResetConfirmTitle(name: String) = "Reset $name?"
     override val recoveryResetConfirm       = "Reset"
     override val recoveryResetLayoutBody         = "Every widget goes back to the layout the launcher ships with. Widgets you added are removed, and so is where you put them."
     override val recoveryResetCustomizationBody  = "Themes, the wallpaper and the console's preferences go back to their defaults."
