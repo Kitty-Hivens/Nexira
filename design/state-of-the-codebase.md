@@ -119,14 +119,15 @@ Two entries left this section by being connected rather than deleted -- the pack
 Built, correct, and impossible to get to from the UI.
 
 - **The whole layout editor.** 4830 lines, the widget palette, the prop panel, presets, drag and drop. Entered only by pressing Ctrl+E. `requestEditToggle()` has exactly one production caller, the chord binding in the shell. No button, no menu item, nothing in the UI mentions the chord. Twelve of 59 widget kinds -- clock, music player, video, notes, checklist, quick launch, progress, launch button, mini playback and both containers -- exist only in that palette and never appear on a fresh install.
-- **`glassIntensity` and `densityScale`.** Both are read (`glassIntensity` by the surface layers, `densityScale` as a global `Density` override at the shell root) and neither is written anywhere. The only way to change them is editing `customization.json` by hand.
+- **`accentOverride`.** Read by the palette, which re-seeds the primary accent from it and then derives the tonal expansion from the result, and written nowhere: the six writers of the record all set a nav-rail field or the blur switch. The only way to set it is editing `customization.json` by hand. Grep the name alone and the clock widget answers, which takes an unrelated `accentOverride` for its second hand. `glassIntensity` and `densityScale` sat in this entry until each was deleted rather than wired: the first named a colour thirty screens now name themselves, the second multiplied a density the compositor already sets.
 - **`hardwareDecode`** on the background settings. Read by the video painter, never written.
 
 Two fields are unreachable by design and documented as such: `nightlyChannel` (config-only opt-in) and `disabledModules` (written only from the recovery surface).
 
 ```sh
 grep -rn 'requestEditToggle' --include=*.kt --exclude-dir=build .
-for k in glassIntensity densityScale hardwareDecode; do grep -rn "$k *=" --include=*.kt --exclude-dir=build . | grep -vE "val $k|\* |// "; done
+grep -rn 'customization\.copy(' --include=*.kt --exclude-dir=build . | grep -v /test
+grep -rn 'hardwareDecode *=' --include=*.kt --exclude-dir=build . | grep -vE "val |: Boolean"
 ```
 
 ## What is enforced, and what is not
