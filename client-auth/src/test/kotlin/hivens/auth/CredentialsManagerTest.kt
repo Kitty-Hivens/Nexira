@@ -335,6 +335,68 @@ class CredentialsManagerTest {
         assertEquals(6, fileJson()["version"]?.jsonPrimitive?.int)
     }
 
+    @Test
+    fun `a keyring that is down leaves the legacy file for the next launch`() {
+        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
+        // The secret is still in the store. The store is simply not answering, which
+        // is what a locked Secret Service or a daemon that has not come up looks
+        // like, and its retrieve returns null exactly as an empty one would.
+        legacyKeyring.available = false
+
+        assertNull(manager.load(), "nothing to hand back while the store is down")
+        assertEquals(4, fileJson()["version"]?.jsonPrimitive?.int, "the old file must survive an outage")
+
+        // And it is still there once the store comes back.
+        legacyKeyring.available = true
+        assertEquals("fake-game-token", newManager().load()?.accessToken)
+        assertEquals(6, fileJson()["version"]?.jsonPrimitive?.int)
+    }
+
+    @Test
+    fun `an envelope that does not decrypt leaves the legacy file alone`() {
+        // File-fallback mode with a ciphertext this machine cannot read. The key is
+        // derived from the OS user, the home path and the platform, so a moved home
+        // reads exactly like corruption and comes back when the seed does.
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"username":"ChaosA","uuid":"$scUuid","uid":"1","keyringHasAccessToken":false,""" +
+                """"encryptedAccessToken":"not-a-ciphertext","accessTokenIv":"not-an-iv","version":4}""",
+        )
+
+        assertNull(manager.load())
+        assertEquals(4, fileJson()["version"]?.jsonPrimitive?.int, "an unreadable envelope is not an absent one")
+    }
+
+    @Test
+    fun `a v5 file whose vault returns nothing is left for the next launch`() {
+        // The v5 file is the only record of who the secrets belong to, and the flat
+        // keys are dropped on the success path alone.
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"username":"ChaosA","uuid":"$scUuid","uid":"1","version":5}""",
+        )
+
+        assertNull(manager.load())
+        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int)
+
+        vault.entries["accessToken"] = "fake-game-token".toByteArray()
+        assertEquals("ChaosA", newManager().load()?.playerName, "recoverable once the vault answers")
+    }
+
+    @Test
+    fun `a failed migration is attempted once per run, not per read`() {
+        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
+        legacyKeyring.available = false
+
+        val mgr = newManager()
+        repeat(5) { mgr.load(); mgr.listAccounts(); mgr.activeAccountId() }
+
+        // Every read path runs through the migration, and three of them sit inside
+        // composition, so retrying per read would be a Secret Service probe per frame.
+        assertEquals(4, fileJson()["version"]?.jsonPrimitive?.int)
+        assertTrue(mgr.listAccounts().isEmpty())
+    }
+
     // ── Fakes ─────────────────────────────────────────────────────────────────
 
     private class FakeVault : SecretVault {
@@ -363,9 +425,16 @@ class CredentialsManagerTest {
         val entries: MutableMap<String, String> = mutableMapOf()
         var failStore: Boolean = false
 
+        /**
+         * A store that is down rather than empty. Its retrieve returns null either
+         * way, which is what the interface documents and what the migration has to
+         * tell apart.
+         */
+        var available: Boolean = true
+
         private fun key(service: String, account: String) = "$service::$account"
 
-        override fun isAvailable(): Boolean = true
+        override fun isAvailable(): Boolean = available
 
         override fun store(service: String, account: String, secret: String): Boolean {
             if (failStore) return false
@@ -373,7 +442,8 @@ class CredentialsManagerTest {
             return true
         }
 
-        override fun retrieve(service: String, account: String): String? = entries[key(service, account)]
+        override fun retrieve(service: String, account: String): String? =
+            if (available) entries[key(service, account)] else null
 
         override fun clear(service: String, account: String): Boolean = entries.remove(key(service, account)) != null
     }

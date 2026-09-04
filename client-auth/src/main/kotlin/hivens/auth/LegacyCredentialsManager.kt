@@ -20,7 +20,7 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * LEGACY -- the pre-libvault credential store, retained ONLY for the one-time
  * migration of existing users into [CredentialsManager]'s libvault-backed
- * storage. The current [CredentialsManager] calls [load] once on a pre-v5
+ * storage. The current [CredentialsManager] calls [recover] once on a pre-v5
  * `credentials.json` to recover the secrets, re-saves them through libvault,
  * then calls [clearKeyringOnly] to drop the orphaned old-schema entries.
  *
@@ -66,7 +66,9 @@ import javax.crypto.spec.SecretKeySpec
  * null from [load], cleanly triggering the re-login path. A session whose
  * password is missing but accessToken survived returns a SessionData with
  * `cachedPassword=null` -- the user can still play; re-login is requested
- * the next time the password is actually needed.
+ * the next time the password is actually needed. [recover] answers the same
+ * question with the reason attached, which is what the migration needs before
+ * it writes over this file.
  */
 class LegacyCredentialsManager(
     workDir: Path,
@@ -200,40 +202,64 @@ class LegacyCredentialsManager(
         }
     }
 
-    fun load(): SessionData? {
-        if (!Files.exists(credentialsFile)) return null
+    fun load(): SessionData? = (recover() as? LegacyRecovery.Recovered)?.session
 
-        return try {
-            val text = Files.readString(credentialsFile)
-            val data = json.decodeFromString<SavedCredentials>(text)
+    /**
+     * Reads the legacy store, saying which kind of nothing it found when it finds
+     * nothing.
+     *
+     * [load] collapses both into null, which is right for a caller that only wants
+     * a session and wrong for the migration: it decides whether to stamp the new
+     * format over this file, and doing that on a store that was merely unreachable
+     * destroys credentials that were still there. [IKeyringStorage.retrieve] is
+     * documented as returning null for absent AND for unreachable, with
+     * [IKeyringStorage.isAvailable] as the way to tell them apart, so that is what
+     * this asks.
+     *
+     * A failed decrypt counts as unreadable rather than absent: the file-fallback
+     * key is derived from the OS user name, the home path and the platform, so a
+     * renamed account or a moved home reads as corruption and comes back when the
+     * seed does.
+     */
+    fun recover(): LegacyRecovery {
+        if (!Files.exists(credentialsFile)) return LegacyRecovery.Absent
 
-            val password = resolvePassword(data)
-            val accessToken = resolveAccessToken(data)
-
-            // accessToken is load-blocking -- without it the launcher cannot
-            // launch the game, so a missing/decryption-failed accessToken
-            // means the session is effectively gone and the user must
-            // re-login. Returning null here cleanly triggers that path in
-            // the calling controller.
-            if (accessToken.isNullOrBlank()) {
-                log.warn(
-                    "credentials present but accessToken could not be resolved " +
-                        "(keyring entry wiped? AES decryption failed?) -- treating session as gone",
-                )
-                return null
-            }
-
-            SessionData(
-                playerName = data.username,
-                accessToken = accessToken,
-                uuid = data.uuid,
-                uid = data.uid ?: "",
-                cachedPassword = password,
-                status = null,
-            )
+        val data = try {
+            json.decodeFromString<SavedCredentials>(Files.readString(credentialsFile))
         } catch (e: Exception) {
+            // Unreadable rather than empty: whatever this file holds is still in it,
+            // and the caller must not write over it on the strength of a parse error.
             log.error("Error reading credentials.json file", e)
-            null
+            return LegacyRecovery.Unavailable
+        }
+
+        val accessToken = resolveAccessToken(data)
+        if (!accessToken.isNullOrBlank()) {
+            return LegacyRecovery.Recovered(
+                SessionData(
+                    playerName = data.username,
+                    accessToken = accessToken,
+                    uuid = data.uuid,
+                    uid = data.uid ?: "",
+                    cachedPassword = resolvePassword(data),
+                    status = null,
+                ),
+            )
+        }
+
+        // The token is load-blocking: without it there is no session either way.
+        // What differs is whether it can come back.
+        val readable = when {
+            data.keyringHasAccessToken -> keyring.isAvailable()
+            data.encryptedAccessToken != null && data.accessTokenIv != null -> false
+            else -> true
+        }
+        return if (readable) {
+            log.warn("credentials present and the store holds no access token -- the session is gone")
+            LegacyRecovery.Absent
+        } else {
+            log.warn("credentials present and the store could not be read this run -- leaving them for the next one")
+            LegacyRecovery.Unavailable
         }
     }
 
@@ -381,4 +407,25 @@ class LegacyCredentialsManager(
         val secret = factory.generateSecret(spec)
         return SecretKeySpec(secret.encoded, "AES")
     }
+}
+
+/**
+ * What the legacy store had to say, for a caller that must tell "there is nothing
+ * here" apart from "I could not look".
+ *
+ * The distinction only matters to the migration, which decides on the strength of
+ * it whether to write the new format over the old file.
+ */
+sealed interface LegacyRecovery {
+
+    data class Recovered(val session: SessionData) : LegacyRecovery
+
+    /** The store answered and holds no session. Nothing is lost by moving on. */
+    data object Absent : LegacyRecovery
+
+    /**
+     * The secret could not be read this run and may still be there: an unreachable
+     * keyring, a file that did not parse, or an envelope that did not decrypt.
+     */
+    data object Unavailable : LegacyRecovery
 }

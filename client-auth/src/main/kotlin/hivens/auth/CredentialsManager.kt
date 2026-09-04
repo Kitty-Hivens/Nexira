@@ -34,6 +34,11 @@ import java.nio.file.Path
  * Migration writes the vault + file directly (never via [saveAccount]) so it can't
  * recurse through the same read path.
  *
+ * A migration that recovers nothing stamps the v6 format over the old file only
+ * when the store it asked actually answered. A store that could not be read leaves
+ * the file alone: the stamp is one-way, so writing it on an unreachable keyring
+ * would trade a temporary outage for a permanent loss of the account.
+ *
  * An offline identity is NOT an account here (it has no secret -- a blank token
  * no-ops [saveAccount]); it is reconstructed from `SettingsData.offlinePlayerName`.
  */
@@ -45,6 +50,19 @@ class CredentialsManager(
 ) : AccountStore {
     private val log = LoggerFactory.getLogger(CredentialsManager::class.java)
     private val credentialsFile = workDir.resolve("credentials.json")
+
+    /**
+     * Whether a migration already failed on an unreadable store this run.
+     *
+     * Without it the retry that keeps the old file alive would run again on every
+     * read, and the read paths include three that sit inside composition, so a
+     * profile whose keyring is down would pay a Secret Service probe per frame.
+     * One attempt per launch is what the retry is worth. A store that comes back
+     * mid-session is picked up on the next start, which is when the account was
+     * going to be recovered anyway.
+     */
+    @Volatile
+    private var legacyUnreadableThisRun = false
 
     // ── ICredentialStore: the active session ──────────────────────────────────
 
@@ -184,7 +202,9 @@ class CredentialsManager(
             log.warn("credentials.json unreadable -- treating as no saved accounts")
             return null
         }
-        return if (file.version >= CURRENT_VERSION) file else migrate(text)
+        if (file.version >= CURRENT_VERSION) return file
+        if (legacyUnreadableThisRun) return SavedAccountsFile()
+        return migrate(text)
     }
 
     private fun migrate(rawV5OrOlder: String): SavedAccountsFile {
@@ -200,8 +220,14 @@ class CredentialsManager(
         val token = vault.retrieve(LEGACY_KEY_ACCESS_TOKEN)?.decodeToString()?.takeIf { it.isNotBlank() }
             ?: vault.retrieve(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_ACCESS_TOKEN))?.decodeToString()
         if (token.isNullOrBlank()) {
-            log.info("v5 credentials present but no usable token -- re-login required")
-            return SavedAccountsFile().also { writeAccountsFile(it) }
+            // No stamp. The v5 file carries the only copy of the username, the uuid
+            // and the uid, and the flat vault keys are dropped on the success path
+            // alone, so a vault that answered nothing this run (a tier that opened
+            // where the secret was not written) would otherwise cost the identity
+            // those secrets belong to.
+            legacyUnreadableThisRun = true
+            log.warn("v5 credentials present and the vault returned no token -- leaving them for the next launch")
+            return SavedAccountsFile()
         }
         vault.store(compositeKey(PROVIDER_SMARTYCRAFT, accountId, FIELD_ACCESS_TOKEN), token.toByteArray())
         val pass = vault.retrieve(LEGACY_KEY_PASSWORD)?.decodeToString()
@@ -220,10 +246,26 @@ class CredentialsManager(
     /** v < 5 -> recover via the legacy keyring/AES store, re-save as one SmartyCraft v6 account. */
     private fun migrateFromLegacy(): SavedAccountsFile {
         val legacy = legacyProvider()
-        val recovered = legacy.load()
-        if (recovered == null || recovered.accessToken.isBlank()) {
-            log.info("legacy credentials unrecoverable -- re-login required")
-            return SavedAccountsFile().also { writeAccountsFile(it) }
+        val recovered = when (val recovery = legacy.recover()) {
+            is LegacyRecovery.Recovered -> recovery.session
+            LegacyRecovery.Absent -> {
+                // The store answered and holds nothing, so the old file describes an
+                // account that cannot come back. Stamping the new format over it is
+                // what stops this path being retried on every read for the rest of
+                // the install's life.
+                log.info("legacy credentials unrecoverable -- re-login required")
+                return SavedAccountsFile().also { writeAccountsFile(it) }
+            }
+            LegacyRecovery.Unavailable -> {
+                // Read failed rather than came back empty, so the secrets may still
+                // be there: a locked Secret Service, a keyring daemon that has not
+                // started yet, a home that moved. Writing here would replace the only
+                // record of the account with an empty one, and the version stamp
+                // means nothing would ever look at the legacy path again.
+                legacyUnreadableThisRun = true
+                log.warn("legacy credentials could not be read -- leaving them for the next launch")
+                return SavedAccountsFile()
+            }
         }
         val accountId = accountIdFor(recovered)
         storeSecrets(PROVIDER_SMARTYCRAFT, accountId, recovered)
