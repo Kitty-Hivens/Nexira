@@ -21,9 +21,14 @@ import java.nio.file.Path
 object RecoveryIo {
 
     // Customization leaf files, each of which its owner re-seeds when absent
-    // (ThemeManager, BackgroundManager, ConsoleSettings, WidgetStateStore). Kept
-    // as literals mirroring those owners -- they are not Storage constants there.
-    private val CUSTOMIZATION_FILES = listOf("themes.json", "background.json", "console.json", "widget-state.json")
+    // (ThemeManager, BackgroundManager, ConsoleSettings). Kept as literals
+    // mirroring those owners -- they are not Storage constants there.
+    private val CUSTOMIZATION_FILES = listOf("themes.json", "background.json", "console.json")
+
+    // Not one of the above, and not a reset the appearance button is allowed to
+    // make: this file is what the user typed into their widgets, and nothing else
+    // holds a copy of it.
+    private const val WIDGET_STATE_FILE = "widget-state.json"
 
     private val pretty = Json { prettyPrint = true }
 
@@ -68,10 +73,25 @@ object RecoveryIo {
         deleteQuietly(dataDir.resolve(Storage.LAYOUT_GRAPH_FILE))
     }
 
-    /** Delete theme / background / console / widget-state so each re-seeds its default. */
+    /** Delete theme / background / console so each re-seeds its default. */
     fun resetCustomization(dataDir: Path) {
         stateWasReset = true
         CUSTOMIZATION_FILES.forEach { deleteQuietly(dataDir.resolve(it)) }
+    }
+
+    /**
+     * Delete the per-instance widget state: scratchpad bodies, checklist items,
+     * whatever else a widget kept for the user.
+     *
+     * Its own reset rather than part of [resetCustomization], because none of that
+     * is appearance and none of it exists anywhere else. It is offered at all
+     * because a widget that chokes on its own stored entry has no other way out --
+     * [hivens.ui.widgets.state.WidgetStateStore] already survives a corrupt FILE by
+     * starting empty, so the whole-store case never needed a button.
+     */
+    fun resetWidgetState(dataDir: Path) {
+        stateWasReset = true
+        deleteQuietly(dataDir.resolve(WIDGET_STATE_FILE))
     }
 
     /**
