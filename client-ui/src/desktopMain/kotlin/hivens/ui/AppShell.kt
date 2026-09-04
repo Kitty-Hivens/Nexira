@@ -873,13 +873,6 @@ fun FrameWindowScope.AppShellContent(
                 }
             }
 
-            val baseDensity   = LocalDensity.current
-            val scaledDensity = remember(baseDensity, customization.densityScale) {
-                androidx.compose.ui.unit.Density(
-                    baseDensity.density * customization.densityScale.coerceIn(0.5f, 2f),
-                    baseDensity.fontScale,
-                )
-            }
             val layoutGraph by layoutGraphRepo.observe().collectAsState()
             // Production renderer for a widget's own surface, see
             // [hivens.ui.widgets.WidgetSurface]. Invoked by the kernel only when a
@@ -891,7 +884,6 @@ fun FrameWindowScope.AppShellContent(
             val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
-                LocalDensity provides scaledDensity,
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
@@ -1051,7 +1043,7 @@ fun FrameWindowScope.AppShellContent(
                 )
             }
             } // end Box(window resize overlay)
-            } // end CompositionLocalProvider(LocalCustomization + LocalDensity)
+            } // end CompositionLocalProvider(LocalCustomization)
         }
     }
     } // end CompositionLocalProvider(LocalAprilFools)

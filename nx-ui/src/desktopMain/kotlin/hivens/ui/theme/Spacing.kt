@@ -24,11 +24,6 @@ import androidx.compose.ui.unit.dp
  * value is on the scale. A value that is not here is a value to move to the
  * nearest rung, not a rung to add.
  *
- * These are base dp. The global density knob (customization densityScale,
- * applied as a [androidx.compose.ui.unit.Density] override at the shell root)
- * multiplies them at layout time, so the scale composes with user density
- * without any per-token arithmetic.
- *
  * Spacing only. A component's own dimensions, a corner radius, a stroke or an
  * icon size are not gaps between things, and they answer to the shape bundle or to the
  * component itself.
