@@ -108,6 +108,16 @@ class CredentialsManager(
 
     override fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
 
+    override fun markTwoFactor(providerId: String) {
+        val file = readAccountsFile() ?: return
+        val updated = file.accounts.map {
+            if (it.providerId == providerId && !it.twoFactor) it.copy(twoFactor = true) else it
+        }
+        if (updated == file.accounts) return
+        writeAccountsFile(file.copy(accounts = updated))
+        log.info("armed the two-factor gate on {} -- no silent sign-in from here", providerId)
+    }
+
     override fun clearTwoFactor(providerId: String) {
         val file = readAccountsFile() ?: return
         val updated = file.accounts.map {

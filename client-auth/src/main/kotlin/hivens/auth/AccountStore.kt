@@ -28,6 +28,17 @@ interface AccountStore : ICredentialStore {
     fun saveAccount(session: SessionData, providerId: String)
 
     /**
+     * Records that [providerId]'s account answers to a second factor, so nothing
+     * signs it in behind the user's back again.
+     *
+     * A flag, not a save: [saveAccount] would rewrite all three secrets and make
+     * this account the active one, and meeting the 2FA gate is no reason to change
+     * which account fronts the shell. No-op when the provider has no account, or
+     * when the gate is already set.
+     */
+    fun markTwoFactor(providerId: String)
+
+    /**
      * Records that [providerId]'s account completed a sign-in without being asked
      * for a second factor, releasing the gate [saveAccount] otherwise keeps set.
      *
