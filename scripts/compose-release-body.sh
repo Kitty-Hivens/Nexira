@@ -13,6 +13,9 @@
 #   APP_VERSION       — version string without the v prefix (e.g. 2.2.9)
 #   CHANGELOG_NOTES   — full markdown body of the [APP_VERSION] CHANGELOG
 #                       section, fed in by the changelog job's output
+#   PLAYER_NOTES      — the same version's section of CHANGELOG_EN.md, the
+#                       player-facing notes. Optional: empty for a nightly and
+#                       for any release nobody wrote notes for.
 #   CHECKSUMS_FILE    — path to dist/SHA256SUMS.txt (default: dist/SHA256SUMS.txt)
 #
 # Output: writes the composed markdown to stdout.
@@ -21,25 +24,19 @@ set -euo pipefail
 
 : "${APP_VERSION:?APP_VERSION is required (e.g. 2.2.9)}"
 : "${CHANGELOG_NOTES:?CHANGELOG_NOTES is required (markdown body for this version)}"
+PLAYER_NOTES="${PLAYER_NOTES:-}"
 CHECKSUMS_FILE="${CHECKSUMS_FILE:-dist/SHA256SUMS.txt}"
 
 REPO_BASE="https://github.com/Kitty-Hivens/Nexira/releases/download/v${APP_VERSION}"
 
-# Extract the ### Highlights section verbatim — the in-app updater renders
-# this as the "What's new" panel; the GitHub release body shows it too,
-# above the full changelog.
-HIGHLIGHTS=$(printf '%s' "$CHANGELOG_NOTES" \
-  | awk '/^### Highlights/ {flag=1; next} /^### / {flag=0} flag' \
-  | sed '/^[[:space:]]*$/d')
-
-# The same notes WITHOUT the ### Highlights block -- highlights already render
-# above as "## What's New", so dumping the full section below would repeat them.
-CHANGELOG_DETAILS=$(printf '%s' "$CHANGELOG_NOTES" \
-  | awk '/^### Highlights/ {skip=1; next} /^### / {skip=0} !skip')
-# Degenerate entry (highlights only, no summary/details) -> keep the full notes.
-if [ -z "$(printf '%s' "$CHANGELOG_DETAILS" | tr -d '[:space:]')" ]; then
-  CHANGELOG_DETAILS="$CHANGELOG_NOTES"
-fi
+# The two halves come from two files now and neither is cut out of the other:
+# What's New is CHANGELOG_EN.md as written for a player, What's Changed is the
+# engineering log. A release with no player notes prints no What's New heading
+# rather than an empty one.
+# Blank lines are kept: the block is a paragraph, a heading and a list now, not
+# the flat bullet run the old extraction squeezed.
+HIGHLIGHTS="$PLAYER_NOTES"
+CHANGELOG_DETAILS="$CHANGELOG_NOTES"
 
 # Build the SHA256 checksum table by walking dist/SHA256SUMS.txt.
 CHECKSUMS=""
@@ -56,7 +53,7 @@ done < "$CHECKSUMS_FILE"
   printf '> [!NOTE]\n'
   printf '> **Nexira** is an unofficial third-party launcher and is not affiliated with or endorsed by the original game developers.\n\n'
 
-  if [ -n "$HIGHLIGHTS" ]; then
+  if [ -n "$(printf '%s' "$HIGHLIGHTS" | tr -d '[:space:]')" ]; then
     printf "## What's New\n\n"
     printf '%s\n\n' "$HIGHLIGHTS"
   fi

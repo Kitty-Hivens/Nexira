@@ -245,6 +245,7 @@ jobs:
     needs: test   # tests must pass before we touch artefacts
     outputs:
       notes: ${{ steps.extract.outputs.notes }}
+      player_notes: ${{ steps.extract.outputs.player_notes }}
       version: ${{ steps.version.outputs.value }}
     steps:
       # Full history + tags: a tag with no CHANGELOG section of its own derives
@@ -315,10 +316,30 @@ jobs:
             NOTES="No changelog entry for v${VERSION}. See [CHANGELOG.md](./CHANGELOG.md)."
           fi
 
+          # What the release means for a player, kept in its own file and written
+          # for them. Empty for a nightly (no section) and for any release nobody
+          # wrote notes for, which the consumers below both handle: the release
+          # body drops its What's New heading and the manifest carries null, so
+          # the launcher falls back to the stitched engineering notes rather than
+          # showing a player an empty panel.
+          PLAYER_NOTES=""
+          if [ -f CHANGELOG_EN.md ]; then
+            PLAYER_NOTES=$(awk -v ver="$VERSION" '
+              /^## \[/ {
+                if (found) exit
+                if (index($0, "["ver"]") > 0) { found=1; next }
+              }
+              found { print }
+            ' CHANGELOG_EN.md | sed '/./,$!d' | sed 's/[[:space:]]*$//')
+          fi
+
           EOF_DELIM=$(openssl rand -hex 8)
           {
             echo "notes<<$EOF_DELIM"
             echo "$NOTES"
+            echo "$EOF_DELIM"
+            echo "player_notes<<$EOF_DELIM"
+            echo "$PLAYER_NOTES"
             echo "$EOF_DELIM"
           } >> "$GITHUB_OUTPUT"
 
@@ -603,12 +624,15 @@ jobs:
       - name: Generate release-manifest.json
         working-directory: dist
         env:
-          CHANGELOG_NOTES: ${{ needs.changelog.outputs.notes }}
+          PLAYER_NOTES: ${{ needs.changelog.outputs.player_notes }}
         run: |
-          # Highlights = lines under "### Highlights" up to the next "### "
-          HIGHLIGHTS=$(printf '%s' "$CHANGELOG_NOTES" \
-            | awk '/^### Highlights/ {flag=1; next} /^### / {flag=0} flag' \
-            | sed '/^[[:space:]]*$/d')
+          # The player notes as written, not a slice of the engineering log. The
+          # launcher prefers the reader's own language off `stable` and uses this
+          # only when that file cannot be read, so what it carries has to stand
+          # on its own.
+          # Verbatim, blank lines and all: the notes are a paragraph, a heading
+          # and a list, and the dialog renders them as markdown.
+          HIGHLIGHTS="$PLAYER_NOTES"
 
           ASSETS_JSON='[]'
           while IFS= read -r line; do
@@ -654,6 +678,7 @@ jobs:
         id: body
         env:
           CHANGELOG_NOTES: ${{ needs.changelog.outputs.notes }}
+          PLAYER_NOTES: ${{ needs.changelog.outputs.player_notes }}
         run: |
           EOF_DELIM=$(openssl rand -hex 8)
           {

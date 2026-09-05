@@ -238,12 +238,13 @@ fun UpdateDialog(
                 HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.2f))
                 Spacer(Modifier.height(16.dp))
 
-                // ── Highlights or full changelog ──────────────────────────────
-                // The highlights are the target release's notes in the reader's own
-                // language where a translation exists, so this is the panel the
-                // localized changelogs were written for. The stitched changelog
-                // behind it stays English: it is assembled from release bodies,
-                // which are the engineering log.
+                // ── Player notes, or the engineering log behind them ──────────
+                // The highlights are the target release's notes as written for a
+                // player, in the reader's own language where a translation exists.
+                // That is the whole of what this panel is for. The stitched
+                // changelog is the fallback for a release with no such notes, and
+                // it stays English: it is assembled from release bodies, which
+                // carry the engineering log.
                 val hasHighlights = !update.highlights.isNullOrBlank()
                 val bodyContent = update.highlights?.takeIf { it.isNotBlank() }
                     ?: update.changelog.takeIf { it.isNotBlank() }

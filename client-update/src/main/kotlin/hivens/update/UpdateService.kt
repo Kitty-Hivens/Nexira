@@ -95,17 +95,19 @@ class UpdateService(
         /**
          * Where a release's notes are read in the user's own language.
          *
-         * The localized changelogs carry the Highlights only and are written for
-         * people who do not read class names, which is exactly what the update
-         * dialog needs; the English file is the engineering log.
+         * `CHANGELOG_EN.md` and its translations are the player-facing notes,
+         * written for the person using the launcher; `CHANGELOG.md` is the
+         * engineering log and is not read from here at all. English is one of
+         * these files rather than a case of its own, so what a reader gets does
+         * not depend on which language they picked.
          *
          * Read off `stable` rather than out of the release manifest, and rather
          * than off the target's own tag. A section is keyed by version, so it is
          * that version's notes wherever it is read from -- and reading the current
-         * file means a translation written after a release was cut, or a correction
-         * to one, reaches the people it is for without cutting another release.
-         * Every version already published becomes translatable, which a field
-         * frozen into a manifest or a tag could never be.
+         * file means a note written after a release was cut, or a correction to
+         * one, reaches the people it is for without cutting another release.
+         * Every version already published stays editable, which a field frozen
+         * into a manifest or a tag could never be.
          */
         private const val LOCALIZED_CHANGELOG_REF = "stable"
         private const val RAW_BASE = "https://raw.githubusercontent.com/$GITHUB_REPO"
@@ -418,7 +420,7 @@ class UpdateService(
         release: GitHubRelease,
         manifest: ReleaseManifest,
         changelog: String,
-        /** The target's notes in the user's language, or null to keep English. */
+        /** The target's player notes in the user's language, or null to fall back. */
         localizedNotes: String? = null,
         isMandatory: Boolean = false,
         mandatoryReason: String? = null,
@@ -580,20 +582,23 @@ class UpdateService(
     }
 
     /**
-     * The target release's notes in [locale], or null to leave the English ones.
+     * The target release's player-facing notes in [locale], or null.
      *
-     * English is answered without a request: the manifest the check already
-     * fetched carries it. Any other language is one read of `CHANGELOG_<LANG>.md`,
-     * from which the section named by [tag] is taken.
+     * One read of `CHANGELOG_<LANG>.md`, from which the section named by [tag] is
+     * taken. English goes through the same path as every other language: it is
+     * the file the others are translated from, not a special case, which is what
+     * makes a note correctable after a release in every language rather than in
+     * all but one.
      *
      * Null on anything at all -- no file for the language, no section for the
-     * version, a version nobody translated, no network. The caller falls back to
-     * English, which is always present, so a missing translation costs the reader
-     * nothing beyond the language.
+     * version, a version nobody wrote notes for, no network. The caller then
+     * falls back to the copy CI froze into the release manifest, so a reader with
+     * no route to raw.githubusercontent still sees the release's notes, in
+     * English.
      */
     internal suspend fun fetchLocalizedNotes(tag: String, locale: String): String? {
         val lang = locale.substringBefore('-').trim().lowercase()
-        if (lang.isEmpty() || lang == "en") return null
+        if (lang.isEmpty()) return null
         val url = "$RAW_BASE/$LOCALIZED_CHANGELOG_REF/CHANGELOG_${lang.uppercase()}.md"
         return try {
             val response = httpClient.get(url) { header("Accept", "text/plain") }
