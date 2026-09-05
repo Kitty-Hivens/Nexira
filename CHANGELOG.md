@@ -4,38 +4,158 @@ All notable changes to Nexira (formerly Aura Launcher) will be
 documented in this file. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-Note: each released entry opens with a short `### Highlights` block --
-2-5 plain-English bullets summarizing what the user actually notices.
-The launcher's in-app update dialog renders just the Highlights.
+This file is the engineering log, and only that. Name the actual classes,
+files and mechanism, and the reason behind the change, not the user-facing
+feature (see 2.2.12 for the reference depth). Scale the depth to the release
+weight: a fast beta can stay thin, a stable rollup carries the full writeup
+consolidating its betas.
 
-The detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
-below are an engineering log. Name the actual classes, files, and
-mechanism, and the reason behind the change -- not just the user-facing
-feature (see 2.2.12 for the reference depth). Scale the depth to the
-release weight: a fast beta can stay thin, a stable rollup carries the
-full writeup consolidating its betas.
+What a release means for the person using the launcher belongs in
+[CHANGELOG_EN.md](./CHANGELOG_EN.md), with `CHANGELOG_RU.md` and
+`CHANGELOG_DE.md` as its translations. That is the file the in-app update
+dialog renders and the one a player reads, so it is written in a player's
+terms and owes nothing to this one. The two are not two depths of the same
+text: an entry can matter here and be invisible there, or the reverse. Same
+version headers and dates in both, which is how an entry is matched across.
 
-Author each entry -- version summaries and the Added/Changed/Fixed bullets --
-as one physical line, no manual line wrapping. A `.md` renders the same either
-way, and these notes feed the GitHub Release / in-app updater verbatim, where a
-hand-wrapped line would render as a <br> staircase.
-
-`CHANGELOG_RU.md` and `CHANGELOG_DE.md` carry the Highlights only. They
-are for users, who do not read class names; the developer-level detail
-lives in this English file.
+Author each bullet as one physical line, no manual line wrapping. A `.md`
+renders the same either way, and these notes feed the GitHub release body
+verbatim, where a hand-wrapped line would render as a <br> staircase.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-05
+
+### Changed
+- A widget's plane is one record of nine values, and layouts written before it are discarded rather than migrated. `SurfaceSpec` in `widget-model` carries the fill, opacity, blur radius, shape, border, shadow and padding; `WidgetSurface` renders it through `NxSurface`; the editor's Surface section writes the same names in the same units, so reading one shows the other. It replaces `WidgetChrome` (2.3.4), which described a plane as a glass percentage, one corner and a set of insets, beside a `FrostTier` name (2.4.0-preview) that stood for four more values. No file below schema 8 has a faithful reading in the new shape -- a tier name meant a body alpha, a blur radius and a cast shadow at once, and turning one name into three numbers would be inventing intent -- so the graph resets to the bundled layout on first run, and the old file is left on disk untouched for a build that still understands it. This is the one reset the format is allowed. Every field defaults, so a field added later is absent from an older file and reads as its default, a retired one is ignored, and a renamed shape kind is a change to a parser rather than a break in the format; null means "inherit the style's token" and zero means "off", which is why the numbers are nullable rather than sentinel-valued.
+- Every value `NxSurface` draws with is a number a caller can write. It took a `FrostTier` that moved the body's opacity, the blur radius and the cast shadow together -- one step was blur 18 at 55% fill, the next blur 28 at 45%, so asking for more blur quietly asked for less fill, and two of the four values a tier carried never reached a pixel at all -- and four booleans beside it (`glass`, `opaque`, `elevated`, `hairline`) that each stood for a number the caller could not otherwise write. What is left is `opacity`, `blurDp`, `borderWidthDp`, `borderColor`, `shadowDp` and `fillColor`, with zero meaning off for each. Two ways to say one thing is how they disagree: `shadowDp` and `elevated` had to be reconciled in a three-branch `when`, and a caller reading the signature could not tell which of them won.
+- A frosted surface blurs what is actually beneath it. It used to be answered by redrawing the wallpaper at the surface's own offset, which is a narrower question than the one asked: a plane over another plane showed the wallpaper it could not see rather than the plane it covered, and the redraw itself was measured drawing nothing at all for any surface away from the window origin. Skia's `saveLayer` with a backdrop filter does it in one call in the draw phase, exposed through skiko, and needs no knowledge of what it is blurring. The radius is the caller's and zero means no filtering, with one switch in Appearance turning it off everywhere at once, because a backdrop filter cannot be cached and is worth refusing in one place rather than per surface. Two limits are inherent rather than defects: a backdrop filter reads the current layer, so an ancestor with alpha below 1 isolates the element and the filter finds it empty (scale, rotation and clipping do not isolate, only alpha does), and the result cannot be cached because the destination it reads may change on any frame.
+- Every plane names its own colour. `glassSurfaceAlpha` and `scaledAlpha` (2.3.3, 2.4.0-preview) are gone and their thirty call sites write the colour they mean. On a dark palette the helper multiplied the requested alpha by a persisted glass-intensity knob; on a light one it ignored the alpha entirely and substituted a rung of the tonal ladder, so 0.35 and 0.5 came back as the same pixel and no value made a light plane translucent. The consequence on light is deliberate: those thirty places are translucent at the fraction they name, which is the rule `NxSurface` already follows -- what a caller writes reaches the pixel on both themes, and a surface that cannot afford translucency names a higher number or none.
+- A surface is one layout node. It was five: a compositor took a `List<SurfaceLayer>` and gave every layer a `Box(matchParentSize().drawBehind {})` of its own, and the list was allocated, filtered twice and walked twice on every recomposition of every plane, while nothing outside those two functions ever built a layer. What it cost was not the nodes. Content was a sibling of the box carrying the clip, so a surface clipped its own fill to its shape and let the widget inside it paint square over the corners; widgets that noticed clipped themselves. Drawing in order on one node -- backdrop, body, state, content, edge -- puts content inside the clip, which is what a rounded plane means. The hairline stays outside that clip and above the content, because a stroke is centred on the outline and clipping it leaves a half-width line that the corner antialiasing then eats. Hover and press move to the draw phase; read in the composable body they recomposed a card and everything in it to change one rectangle. The role enum went with the layers: a level resolved to one of nine theme roles and a role to a palette field, and the five roles that were not ladder rungs existed only for layer kinds already deleted, so a level names its colour directly.
+- A widget declares the plane it sits on instead of drawing one. `@Widget(surface = ...)` carries the record, the processor checks at build time that it parses, and an instance's own surface overrides the declaration -- the same order the props take. Before this a widget that wanted a card drew one itself while the kernel drew a second behind it, each with its own corner and its own opacity, and only the second was reachable from the editor: turning the opacity up added a plane behind the one on screen rather than changing it. Thirteen widgets moved across, the five About cards and the three that scale their content to their footprint among them; the plane does not scale with the content, because a corner radius is a number a person typed and doubling a widget's footprint has no business doubling it. Three keep drawing their own for stated reasons -- the playback pair swaps between a sunken plane and a floating one by playback state, which a static declaration cannot express, and the theme-picker grid uses the shape one step above the card corner, which a record can name as a radius but not as an offset from a style token.
+- The centre shell region takes the same opacity and blur pair as the other three. It carried five props and read one: a width its weight decides, a divider the rails draw, a collapse it does not have and the swipe that would drive it were all inherited from a props class shared with regions that do use them, so the panel offered the centre four knobs that moved nothing. The one it read was a raw alpha handed to the tint helper. The chrome's default opacity was three separate literals that happened to agree, which is how they came apart: the centre's corner wedge only carries the content's corner into the chrome while it is exactly the colour of the plane it joins, and they read one constant now.
+- The editor's Surface section shows five rows and puts twelve refinements behind a disclosure. Every value in the record is reachable -- seven of them were written by no control at all -- and the shape rows that belong to a star or a polygon appear only under those kinds, so the panel offers nothing that moves nothing.
+- The experimental master switch is gone, and each knob it gated stands on its own default. It defaulted ON so its section would be reachable out of the box, which meant "experimental" described none of the things under it -- while four launch-path sites read it: the adaptive heap every instance is sized by, both auto-update passes, and the mandatory-update floor. Switching off a section labelled experimental therefore changed the heap of every game and stopped pack updates, and switching the section's own tools on was a prerequisite for behaviour nobody would look for there. A settings file that stored the master off is folded once on load onto the knobs it actually suppressed and then cleared, so a deliberate opt-out survives instead of silently reverting to the defaults. The category is dissolved into Advanced, which now carries three planes: updates (pre-releases, the mandatory floor, instance auto-update with its policy), launch (adaptive memory, the JVM-args builder, the launcher-version override), and the data directory.
+- SmartyCraft client auto-sync moves to the SmartyCraft section and says what it is. It reads as a sibling of instance auto-update and is not one: it re-runs the SmartyCraft sync rather than moving an instance between pinned manifests, and it carries two limits that are not defects awaiting a fix. A two-factor account is never logged in from a background pass, because SmartyCraft mints a uid per login and invalidates the previous one -- the pass would revoke the session the player had just unlocked with a code -- so such an account syncs only against a manifest cached by an earlier manual sign-in, and a server without one is skipped. The raw-server path itself is deprecated since 2.4.0 and removed in 2.5.0 at the latest. Both now appear in the setting's own copy rather than in a tracker issue.
+- The update policy for a build that changes Minecraft or the loader is named after what it decides. "Structural updates" said nothing to the person reading it and nothing about how the grade is reached: a candidate is compared against the installed manifest by Minecraft version, loader family and loader version, a newer loader version re-syncs on its own, and the other two cases are what the policy governs. The copy states that, states that a restore point is always taken first, and states the scope -- the grading reads a cached manifest snapshot, which only a mirror instance carries, so a SmartyCraft client is never graded at all.
+- Two rules leave the shell composable and get tests. The roster heuristic -- an empty fetch over a non-empty cache means the upstream is down, not that the servers are gone -- was buried in a hundred-line startup effect where nothing could reach it; it is `rosterAfterFetch` in `client-core` now, with the bias written down as assertions rather than as a comment. The window chords were a `when` deciding two separate things at once: what a key means, and whether the event is swallowed. A chord is consumed on both edges so its other half never reaches a focused control, and acts only on release so auto-repeat cannot toggle edit mode for as long as the key is held -- both now stated and pinned.
+- The widget processor reads the service annotations it defines. `@ProvidesService` and `@InjectService` were documentation nothing consumed -- the processor contained no reference to either -- so a widget could read a contract no widget offers and compile clean, then be handed null on every frame, which looks exactly like a widget that does nothing. Both sets now reach the descriptor, the build warns about a contract with no provider in it, and a registry test fails on one. Registration stays the widget's own `provideService` call: the annotations describe intent, and this is what checks the intent is satisfiable.
+- The layout graph is written when an edit session ends. Mutations are debounced 200ms and the only flush was the JVM shutdown hook, so a crash inside that window took the last edit with it -- and an edit session ends far more often than the process does. Leaving edit mode and switching surface both commit now. Per-mutation writes stay out: a drag mutates the graph every frame.
+- The precedence between `weight`, `canvas` and `cell` is stated once. A widget carries all three regardless of the slot it sits in, and the renderer resolved that with a rule written twice, once per flow branch, inside a composable where nothing could test it. `WidgetInstance.flowPlacement()` answers it in `widget-model` instead. The fields a slot ignores are deliberately kept rather than cleared: flipping a slot's orientation and back would otherwise cost the user their arrangement.
+- Every launch control reads one mapping of launch state. Five surfaces each had their own `when` over the same sealed type -- the dashboard panel, its puppet hook, the pack hero, the home pill and the launch tile -- and they had drifted: two knew a running game can be stopped, two did not. `LaunchControlMode` in `client-core` says what the control can do (play, wait, stop) and deliberately says nothing about how it looks; each surface keeps its own wording, icon and shape, which is the part a widget answers for itself.
+- The launcher reports the graphics backend it actually draws through. Every readout of it -- About, the debug HUD -- was built on the `skiko.renderApi` system property, which is a request the launcher never makes, so all three said "default" on every machine including one that had fallen back to software rasterisation. `RenderBackend` reads the API the window's `SkiaLayer` settled on after the first frame, logs it once at startup, and carried in the diagnostic bundle. The distinction matters outside the launcher: a software fallback rasterises the whole window on the CPU, which is felt across the machine and reads in a report as everything going slow rather than as a launcher problem.
+- The diagnostic bundle names the modules boot recovery has switched off. A module stays off across restarts and changes what a whole feature does -- with skinema off, every player reports that it cannot open the file -- and nothing in the bundle said which ones were off, so a report reads as a broken feature rather than a disabled one.
+- Work that blocks names its own dispatcher instead of borrowing the caller's thread. `ProcessLaunchHandle.awaitExit` held whichever thread called it for the length of a game session, `JavaManagerService` expanded a ~200MB JDK archive on it, and the same went for the foreign-instance copy and hardlink walks, the modern loader's installer run, `SmrtSyncService`'s per-mod planning and both media caches' downloads -- every one of them correct today because each caller happens to be on IO, and none of them saying so. The launch flow is the deliberate exception and now says that too: it runs on the app scope, whose dispatcher is IO, so its file probes hop nowhere. Timing arguments came along with it -- a `delay` or a `withTimeoutOrNull` takes a `Duration`, so five minutes reads as `5.minutes` rather than as `5 * 60_000L`.
+- A pack instance is held to the identity it carries before it is stored. Nothing checked it on the way in, so a reference with an empty id persisted like any other and surfaced much later, as a Library entry the catalogue cannot be asked about and an update check with no id to send. `PackIdentity` says what a well-formed reference is -- an id that names something, and a version that either pins a build or floats -- `IPackRepository` makes it part of the put contract, and the registry holds every write to it. The check is deliberately structural: resolving a reference against the pack catalogue would put a network round trip on each write, and an instance whose origin is unreachable this minute is still a legitimate instance. A blank version is neither a pin nor floating, and the mirror installer wrote one whenever a build declared no version -- it resolves to null now, the way the mrpack and CurseForge installers already did, and a registry load repairs the blank versions written before that.
+- The server profile stops carrying its payloads as raw JSON and packed strings. `optionalModsData` was a `Map<String, JsonElement>` on a model that is also written to disk, decoded at the far end of the launch path by whoever happened to need it; it is a map of `OptionalMod` now, decoded where the dashboard's own shape becomes the launcher's, and one entry nobody can parse costs that entry rather than the whole server's mod list. The wire key is unchanged, so a roster cached by an earlier build still loads with its mods intact -- an offline launch computes what to skip from exactly that file. NeoForge's pinned launch coordinates were a flat `Map<String, String>`, four keys spelled correctly by hope, and are `NeoForgeArgs`. The module ignore list was a comma-joined string that only became a list inside the system property it ends up in, and is a `List<String>` joined at that point instead. `OptionalMod.isDefault` read `selected ?: default` and was named for neither -- it is `enabledByDefault`, which is what all four of its callers ask it.
+- The two records that say what to launch with share the questions they answer. `InstanceProfile` (a SmartyCraft server) and `InstanceRuntime` (a pack instance) each carried their own `javaPath`, heap, JVM args, window geometry and fullscreen flag, with the starting heap written out three times and disagreeing in two of them -- 6144 on the profile, 4096 on the runtime and 4096 again as a literal inside the pack settings composable. `RuntimePrefs` is what they have in common and where those numbers are stated; the command builder and both Java-path ladders take the interface, so they stop caring which record they were handed. It is an interface rather than a value type both compose because both records are on disk: nesting the shared fields would push them a level down in files already written, and an instance would come back from a rename it never asked for having forgotten its heap. Neither number survived the look: a fresh record now pins no heap at all, which is what it always meant. An unpinned instance is sized from the machine and then from what the adaptive sizer measured, so the stored value was read on no launch and shown on no screen -- and where the RAM selector needs a number to start from when the user leaves Auto, it offers the one the next launch would have used instead of a constant.
+- What decides whether TLS verification is skipped is handed to its callers instead of reached for. The per-host SSL-bypass set was a JVM-global object that the transport, the certificate gate and four composables all reached into, and whose persistence was armed by an `initialize(path)` call the bootstrap had to make before anything could resolve an HTTP client -- a request that beat it saw an empty grant set and took the strict client for a host the user had already accepted. `SslBypassStore` is the contract in `client-core` and `JsonSslBypassStore` reads its file when it is built, so that ordering cannot be got wrong: nothing can hold one that has not loaded. The settings section stops polling its own list once a second and follows the store's published grants like every other surface, and the tests build their own store per case rather than wiping a process-wide one between them -- the certificate gate's now runs entirely in memory. The `Authenticator.setDefault` half of the same complaint went with the SOCKS channel earlier and is not coming back.
+- The spacing scale is derived from the code it has to describe, and starts having call sites. Its seven rungs were 2, 4, 8, 12, 16, 24 and 32, picked from an ideal; the interface meanwhile leaned on 6, 10, 14 and 20, each of which appears in more files than two of the rungs do. `14.dp` is the plainest case: it is the inner padding of every card, the horizontal inset of a row or a menu item, and the gap in every grid, arrived at independently across thirty one files. A scale that cannot express what the interface already does earns no call sites, and it had exactly zero. The ladder is a rule now, steps of 2 up to sixteen, steps of 4 up to twenty four, then 32, with a test that walks it so a rung added by eye fails. Rungs are named for what they measure: `Spacing.s6` says what `6.dp` said and adds the one fact the literal could not, that the value is on the scale. `:nx-ui` adopts it first, since the library owns the design and should be the first to live under it: 45 spacing sites across 17 primitives, and not one pixel moves, because every converted value was already a rung. Corner radii, strokes, icon sizes and a panel's clearance under the chrome above it are left as they were: those measure a component, not a gap between two.
+- Media decode moves to skinema 0.8.0 with the FFmpeg 9.0.1 bundles it is built against. The library binds the soname majors of the natives it pairs with, so `skinema-core` now publishes a strict constraint on `skinema-natives`: the two lines in the version catalog can no longer drift apart quietly. A bump of one without the other is a resolution failure at build time rather than an UnsatisfiedLinkError on the first frame. On Linux the classifier `client-ui` asks for is now chosen by C library as well as by architecture, the way the loader computes its own platform key. A musl host used to be handed the glibc bundle, which is not refused: the loader looks for a `linux-musl` tree, finds none, and falls through to the system libraries as though no natives had been shipped at all. The tier stays `decode`, which is where GPU decode and the `h264_vaapi` encoder live, and remains one tier per platform on the classpath. `VideoFramePainter` takes its frame through `VideoFrameImage.reclaim`, so the superseded image is freed at the start of the draw that replaces it instead of one frame later, around 33 MB of native memory on a 4K wallpaper. A player whose frames stop being taken now freezes its own timeline and stops decoding until one is taken again, so a wallpaper nobody is drawing costs nothing while it is not on screen.
+- What a wallpaper is allowed to be is decided by the decoders instead of by a list of extensions, and the question put to them is whether the picture moves. Skia answers for what it can open, by frame count. What Skia has no codec for goes to the media decoder, which reads stills as readily as video: a second frame means it plays, one frame means a still, and that still stays on the still path even though the decoder is what read it, so tiff, tga, dpx and the rest are downscaled and cached like any other picture rather than holding a decode thread for something that never changes. avi, MPEG-TS, wmv, flv and the rest of the long tail play now, where the old list did not name them and they fell through to the image path, which drew nothing and logged a decode failure. A GIF holding one frame takes the still path. The file dialog still offers a set of extensions, as a way to find the file rather than as the boundary of what is accepted. A gallery or banner URL still decides by extension because that decision is made before there are any bytes to ask about, and the set it matches covers what the natives read rather than the containers the mirror happened to ship first.
+- The style axis is one set of form tokens rather than a switch between two. `StyleSpec`, `CelestiaStyle` and `LocalStyle` are gone and what they carried is an object, `Form`, beside `Spacing` on the gap axis and `NxColors` on the colour one. Brut went with them, along with the `UiStyle` setting, its two chips, the preset field that carried it and a second render-test baseline for every primitive. It was an axis with one alternative nobody chose, and the cost was not the constant but a second visual contract that was never true: the token deciding glass against flat had one consumer, the border token reached one component, and the motion multiplier reached two call sites out of eighty, so the style whose whole point was to be sharp and still was neither. Celestia's values stay exactly as they are and become the defaults, which is the part worth being careful about, because `cardCorner` alone is read from thirty-six places that have no other way to agree on what a corner is. Four members did not survive: `cardSurface` had one consumer and is told its value instead, `switchStyle` and `badgeStyle` were skins whose second variant never shipped, and `animationMultiplier` was 1.0 everywhere. Old settings and presets keep loading, since both formats ignore unknown keys and the retired field drops on the next write.
+- Motion is named by what is happening instead of by a number. One token, `animationMultiplier`, was reachable through a single helper that thirty call sites used, while roughly a hundred and fifty `tween`, `spring`, `animate*AsState` and `AnimatedVisibility` sites picked their own duration and consulted nothing: 90, 110, 120, 160, 170, 180, 200, 220, 250, 260, 300, 380, 500, 700 and 950, most of them used once or twice, with no relation between them and no rule for choosing. `Motion` names a press answering, content opening, something landing and ambient drift, and hands back the duration and curve that belong to each. A role is usable directly wherever a `FiniteAnimationSpec<Float>` is expected and supplies the enter and exit pair for a visibility change, so a screen stops assembling one by hand. A lint rule holds the remaining literal durations out.
+- A pack description is rendered as a document rather than as one column of prose. Sections were bold lines in a wall, a quote was a filled box that read as a callout, a table had no edge and no column rules, a fold showed its label and its contents at once, a long line of code was silently wrapped, and every image was stretched to the column width whatever its real size, so a sixty-pixel badge came out banner-sized. The top two heading levels carry a rule, a quote is a bar and an indent, a table has an outer edge with a toned header and banded rows, code scrolls sideways, an image takes its own size with the column as its ceiling, and a fold folds. SVG is drawn properly, text and all, which is what shields.io badges are made of and what the renderer previously dropped or reduced to a handful of hard squares. An off-screen render writes a page under `build/` for a look at the typography, which is the part no assertion judges.
+- The catalogue pack page is one measure instead of a hero over a centred block, and it stops paying for a sidebar nothing used. The description ran the full width of a wide monitor, the side column left a dead band down the screen, the compatibility column said what a row of metadata already said, and the page rebuilt itself on every open. Screenshots are a gallery of their own rather than a strip over the description, sized to the pane rather than to a thumbnail, and each says what it is of. The Library holds its content to the same width Browse does.
+- A launcher pays for the widgets it draws. The kernel walked the whole layout graph per surface per recomposition to answer questions whose answers do not change between frames.
+- The launch questions leave the composables that were asking them. The console's small decisions (which session a line belongs to, what a filter admits, when to follow the tail) became functions with tests instead of branches inside the window, the pack detail screen and the mod browser stopped owning the IO they trigger, and the running-pack guard stopped pulling the whole launch orchestrator in to ask one question: whether this instance is the one in a game. `LaunchState` carries no target identity by design, so the controller answers that as its own question rather than having every caller reconstruct it.
+- The design tokens are one object per axis rather than one object over all of them. `NxTokens` held the corner radii, the strokes and the elevations together, so a component reaching for a corner pulled in everything else and no axis could be reasoned about on its own. A corner now comes from the shape bundle beside `Spacing` on the gap axis, `Form` on the form axis and `NxColors` on the colour one.
+- Bring-up leaves composition and becomes something that can be tested. The order in which the tray, the notifier, the cached roster, the fetched roster, auto-sync and the pack auto-update come up is load-bearing, and it lived inside a hundred-line startup effect where nothing could reach it. `ShellStartup` is that sequence over functions rather than over the singletons, so the order is stated once and asserted, and the shell site only wires the real ones in.
+- Adding a widget surface is a registration rather than surgery in six disjoint places. The `Screen` mapping, the icon, the two names, the settings flag and a wall of stub-context providers all had to agree, and five of them fail loudly enough to notice. The wall does not: it was a closed list, so a surface whose widgets read a context of their own fell straight through it with no missing branch and nothing to see.
+- The screens stop hand-assembling their own transitions. Enter and exit belonged to whoever wrote the screen, so the router hand-placed a `Crossfade` while everything else built its own fade and slide pair with durations to match, which is the same decision made repeatedly and drifting further apart as each screen was edited alone. `NxSwap` replaces content when its target changes and `NxReveal` shows and hides, both taking a motion role, so how a panel arrives is an argument rather than a hand-built transition. A site that genuinely needs something the vocabulary does not describe still builds it by hand.
+
+### Removed
+- `FrostTier`, `FrostSurface` and the layer vocabulary behind them. `Wash`, the `Edge` group and the three atoms it expanded into were constructed nowhere at all; `Texture` was not one, being a white-to-black diagonal gradient at four percent documented as keeping large glass areas from banding, which a gradient cannot do (banding is a quantised gradient, and only noise breaks it -- the shader that does was already written and in use elsewhere); `Fill` and the tier that built it were a second translucent coat over the body whose alpha rode the same knob as the blur.
+- `glassSurfaceAlpha`, `scaledAlpha` and the `glassIntensity` multiplier they scaled by. No screen ever wrote the multiplier: it was reachable only by hand-editing `customization.json`, and after the surface rework it scaled thirty hand-mixed fills while touching none of the library's own planes. A global that moves an arbitrary half of the interface is worse than no global.
+- `WidgetChrome` and the per-instance frame it carried, including the per-side padding overrides and their `-1` inherit sentinel (2.3.4, 2.4.0-beta5). `SurfaceSpec` describes the same frame and more, and the bundled layout stopped repeating a widget's own declaration.
+- The global fallback heap is gone. `SettingsData.memoryMB` was the launcher's single RAM setting back when one number covered every launch; the control that wrote it left with the January settings screen, and per-server profiles, per-instance runtimes, the machine-aware baseline and the adaptive sizer each moved the decision further away from it. What was left was a number in `settings.json` that only a pinned instance naming no heap of its own could reach -- and pinning happens by choosing a number, which writes one, so nothing but a hand-edited file could produce that state. The field, the `allocatedMemoryMB` parameter it travelled through on both launch entry points, and the fallback arm of the memory rule are all removed: a heap is the instance's pin or the machine baseline the adaptive sizer refines, and there is no third answer. Settings files carrying the old key still load, and the key drops on the next write.
+- The global density multiplier. `CustomizationSettings.densityScale` was applied as a `Density` override at the shell root, so it scaled every dp in the window and, through the sp conversion, the text with it. Nothing ever wrote it: no control, no test, no preset that set it, and it sat at 1.0 in every install while riding along in `customization.json` and in every saved preset. The window already carries the density the compositor gives it, so the knob was a second answer to a question the system had answered, and what a global control would actually want is the font scale, which the shell passes through untouched. The axis that is in use is per widget, where content scales to the footprint the layout gave it.
+
+### Added
+- Appearance carries one switch for the blur behind surfaces. A backdrop filter cannot be cached, because the destination it reads may change on any frame and Skia has no way to know that it did not -- cheap on a GPU and measurably not free without one -- so it is worth switching off in one place rather than per surface. Off leaves every other surface property alone: the plane keeps its body, its opacity and its shape and simply stops filtering.
+- A shape record can name a squircle, a star or a regular polygon. Corner smoothing is a different curve rather than a different radius, so `RoundedCornerShape` had nowhere to put the value the editor was already writing; `androidx.graphics.shapes` cuts both it and the polygon family, and is declared rather than left on the classpath transitively. Its desktop artifact has no Compose-Path bridge, so `:nx-ui` walks the polygon's cubics itself. A rounded rectangle keeps its cheaper shape while smoothing is zero and its four corners stay independent, in dp against the measured footprint so a corner does not grow when the plane does; a star and a polygon are relative by nature, so they normalise and stretch, and they bring the three values they need (point count, notch depth, point rounding).
+- A theme preset colours the ground, not just five accents. `resolveBasePalette` returned a fixed palette whenever there was no wallpaper to seed from, so with a custom background off the ladder was the same grey under every preset and only the accents moved; the theme's own primary is the seed in that case.
+- The Content tab filters by more than section and search. Its chips answer what kind of thing a row is -- a mod, a resource pack, a shader -- and the axes that narrow WITHIN a section are none of them: whether the pack leaves the mod up to the player, whether the row is on or off, and whether the pack shipped it or the player dropped it in. All three live in one panel behind a filter control at the end of the toolbar, grouped and answered the same way, with the number of active axes on the trigger and a reset in the footer beside how much of the scan survives them -- a list quietly shorter than the folder otherwise reads as content having gone missing. The pack's own content is read from the manifest's assets as well as its mods -- a resource pack or a shader the pack ships lives there, under a path rather than a bare name -- and matched by folder as well as by name, so a mirror-shipped resource pack is the pack's and two files that share a name in two folders stay two rows. An axis the pack has no data for is not offered: a local pack curates nothing, so "optional" and "who added it" would be questions with one answer. `NxPopoverPanel` is the shape itself, next to `NxContextMenu`: a menu is a list of verbs, a panel is a set of settings read together, and the two dismiss and animate differently for that reason. It does not hang below its control -- it grows out of it, the panel's corner landing on the trigger's corner and scaling up from that point, with the trigger turning into the close it lands on. Near the bottom of the window it grows upward instead and the origin follows, because the provider is the only thing that knows where the panel ended up. Closes #489.
+- The news feed goes past three entries. The launcher read its news out of the dashboard payload, which carries three and has carried three for as long as it has existed -- so a rail told to show twenty showed three, and the count control was honest about a ceiling it could not lift. The site paginates the same news ten to a page and keeps its whole archive; `SmartyCraftNewsFeed` reads that index through the existing smartycraft channel and `SmartyNewsParser` takes each entry off it by class and id rather than by position. Pages arrive as they are needed: one when the rail opens, the next as the reader reaches the end of what is loaded, and a widget with a count fills up to that count on its own. The dashboard's three stay as the floor -- when the site cannot be read at all, offline or because its markup moved, the first page falls back to them and the rail shows what it has always shown, and says so where the feed ends so the archive can be asked for again. Rows fetch the thumbnail the site keeps beside each news image, several times smaller than the image itself and still more pixels than a 38dp row can show; a widget on a display scaled far enough up that the small one would be stretched can switch to the full-size one in its settings.
+- The dashboard control stops a running game. It went grey and read "Game running" while the game was up, so the one place the launcher could end a wedged session offered nothing -- and its puppet hook was disabled in the same state, leaving automation no way to stop what it had started. The engine side was already there: `abort` terminates the process tree rather than signalling and hoping. The home launch tile had the same gap for a different reason -- it asked only whether a launch was possible and never whether one was running.
+- Signing out releases the face choice it named. The picker is only on screen while two accounts are signed in, so a choice left behind by an account that is gone became a setting nobody could see or change -- and it re-decided the shell's face the moment that provider was signed into again, long after the decision was made and forgotten. Both per-provider sign-outs and the full logout now clear it, and the shell falls back to licence priority as it does on a fresh install.
+- The profile names which signed-in account fronts the shell. `SettingsData.preferredFaceProvider` was read on every startup and written nowhere, so it was permanently null and licence priority decided alone -- a user signed into both providers had no way to say which one the shell should wear. The nav lists Auto plus each provider that has an account, and the choice applies at once rather than at the next start. It appears only above two accounts, where the choice has more than one outcome. `AccountStore.primarySession` already implemented the preference and its fallback; both are now under test, having had no caller that exercised them.
+- Widget modules load from a jar on disk instead of being compiled into the launcher. The kernel already accepted registries from more than one source, but every source had to be a Gradle module of this build, so a widget could only arrive by rebuilding. A jar dropped into the widgets directory under the data dir is discovered at boot, with no install step and no registry to update. The processor emits `META-INF/services` beside the registry and a small delegating class with it, because a Kotlin object has a private constructor and `ServiceLoader` cannot instantiate one, so discovery needs no agreed class name between a module and the launcher, only the agreed interface. Each module gets its own class loader over the application's, parent-first, which is load-bearing rather than incidental: a widget is a composable, and one compiled against a second copy of compose-runtime would hand the wrong `Composer` type across every call, so a module bundling its own Compose, stdlib or widget API gets the launcher's instead. A module declares the widget API version it was built against and anything else is refused with both versions named, one file at a time, so a bad module does not cost the others. `CompositeWidgetRegistry` resolves a kind across sources in precedence order with the built-in registry first, so a contributed widget cannot shadow the shell regions or the sign-in panel, and a refused kind is recorded rather than dropped in silence. Nothing is sandboxed: a jar has whatever access the JVM has, and a half-policy would be worse than saying so. The worked example moves out of the launcher's build to `examples/`, where it is what a third party would write.
+- An installed Modrinth pack updates in place instead of being reinstalled. The installer records what it placed into an instance, so a later build can retire what it dropped and keep what the player added, and the retirement happens after the replacements land rather than before. A pack that carried no such record used to end up holding every mod twice.
+- The version screen works for a Modrinth pack. It could switch builds with nowhere to say so, and comparing two of its builds asked the mirror about packs the mirror has never heard of.
+- A screen keeps the state that outlives a visit. Two visits to the same pack are the same place, so the tab, the file tree and the scroll survive leaving and coming back, keyed on identity rather than on the whole back-stack entry, which a screen rewrites when it stamps a note onto itself.
+- Rewriting the files of a pack that is currently playing asks first. Update, version switch, rollback and repair all rewrite an instance on disk and none of them looked at whether that instance was in a game, so pressing one mid-session overwrote mods and configs the loader already had open with no hint beforehand that it would. They ask and go ahead if told to: it is a bad idea rather than an impossible one, and the person doing it may have a reason the launcher cannot see, so what they are owed is the cost up front rather than the choice taken away. The warning is keyed on the instance rather than on anything running, since rewriting one pack while another plays touches nothing the running one has open, and a warning that fires there is noise. On an amber version switch it is a second prompt after the structural one, because the two answer different questions: whether the change is wanted at all, and whether it is wanted right now.
+- A version row says what the build runs on. The Minecraft version and the loader were in the manifest and on no screen, so choosing between retained builds meant choosing between labels.
+
+### Fixed
+- The update dialog shows what changed in the reader's own language. Every label in it was translated while the one thing a reader opens it for came off GitHub in English: the highlights are extracted by CI from the English changelog into the release manifest, and the full notes are stitched from release bodies. `CHANGELOG_RU.md` and `CHANGELOG_DE.md` were read by nothing at all -- their only mentions anywhere in the repository were inside themselves, announcing their own existence. The target release's notes now come from the localized file, and English costs no request because the manifest already carries it. They are read off `stable` rather than off the target's own tag: a section is keyed by version, so it is that version's notes wherever it is read from, and reading the current file means a translation written after a release was cut, or a correction to one, reaches the people it is for without cutting another release. A language with no file, and a version nobody translated, fall back to English. Both localized files now cover every version from 2.3.4-beta4 up, which is the floor they claim.
+- A nightly published the same placeholder every night, and the launcher repeated it once per build the reader was behind. A nightly is cut from the dev tip and never has a changelog section of its own, so the notes step produced "No changelog entry for vX. See CHANGELOG.md" -- which became the whole `## What's Changed` body, which the update check stitches per release in the range. Twelve nightlies back meant twelve copies of that sentence and nothing else. A tag with no section now derives its notes from the commits since the previous tag, which is the delta from whatever the reader is running: the one thing a nightly tester wants, and the one thing a curated section cannot be, since the same block is cut into every nightly built from it. Runs of releases carrying identical notes collapse into a single entry naming the span, the stitch orders by version rather than by tag text (where `nightly99` ranked above `nightly1219`), and a release that published nothing parseable leaves the notes empty rather than an English sentence shown to someone who chose another language.
+- A widget with rounded corners drew a hard square behind them. The kernel's backing skipped its clip whenever the corner radius was zero, and zero was the default, so raising a widget's opacity put a square plane behind the rounded one it had drawn for itself. Nobody chose that square; it was what "unset" looked like. The clip is unconditional now, and a surface clips its content along with its fill.
+- A named opacity did not reach the surface body. `bodyFloor` was applied as a clamp rather than as a default, so every plane drew at 0.92 on dark and 1.0 on light no matter what any control above it said: the opacity slider moved nothing, and the layer meant to show the wallpaper through was covered before it drew. Light was the worse half, where alpha was refused outright -- whether a light plane can afford to be translucent depends on what sits behind it and on what the widget buys legibility with, and the library can see neither, so it may default but must not decide.
+- Moving the pointer recomposed the wallpaper. The parallax offset was read in the composable body, so every pointer event recomposed the background and everything under it; it is an `Animatable` driven by a `snapshotFlow` and read only inside `graphicsLayer` now, which keeps the movement in the draw phase where it belongs.
+- The right panel silently lost its inset and its rounded corner. Its frame lived in the per-instance chrome record the kernel read to paint a second plane around the region, and when that record went the frame went with it, while the bundled layout still described both -- a key nothing reads is dropped in silence. It draws on the region's own plane now, and the radius is the style's panel corner rather than a literal, which is what the literal always was, so a flat form can square it. A test decodes the bundled layout strictly and fails on any key the model does not read.
+- The corner control in the prop panel wiped the per-corner overrides beside it. It wrote a fresh corner record rather than copying the one it was editing, so setting the uniform radius discarded whatever a single corner had been pinned to.
+- A widget's declared plane reached only the instances added from the palette. An instance shipped in the bundled layout carried none, so every bundled entry had to repeat the JSON its widget already declared and the two would drift the first time either changed. Resolution is one order now, and a plane is turned off with a named zero opacity, because absence has to keep meaning "nothing said" for the declaration to be reachable through it.
+- Two settings rows showed a state their readers did not honour. The experimental master greyed out the hand-typed launcher-version string and the JVM-args builder, but `SettingsRestoreHook` pushes the stored version into `smrt.mimic.version` on every start and `ServerSettingsState` reads the builder flag directly, so with the master off that version still went into the `action=loader` handshake, the User-Agent and the child JVM's `-Dminecraft.launcher.version` while its row was drawn switched off. Both rows now reflect what actually happens, and the fold that retires the master deliberately leaves those two values alone -- the gate never suppressed them, so switching it off expressed no intent about them. The launcher hash sent beside that version is a separate, automatic mechanism (`LauncherHashCache` re-derives it from the official jar when the server answers UPDATE) and was never gated by anything.
+- Following the system theme started its portal listener on the drawing thread. `SystemTheme.probe` declared an IO context for itself, but the `gdbus monitor` behind the Linux signal path is spawned inside a `callbackFlow`, and a callbackFlow's producer runs wherever the flow is collected -- here a composition effect, which on desktop is the EDT. Starting and tearing down that subprocess therefore happened on the UI thread: once when the theme was set to follow the system, and again each time the portal restarted underneath it. The whole upstream is on IO now.
+- The tray tooltip named the wrong thing while a game ran. It read the last SmartyCraft server id, so a pack launched from the Library was reported under whichever server was played before it -- and on a launcher that had never launched a server, under nothing at all. It names the running session now, which is what the launch driver registers for the session list and the console.
+- The news and the server roster stop requiring a sign-in. Neither needs one -- the dashboard call is unauthenticated by the protocol's own definition and the news archive is a public page -- but both go through the client the routing rule picks for the host, and the SmartyCraft certificate is refused until a bypass is granted. Granting one was possible from exactly one place: the warning inside the login form. A launcher that had never signed in therefore showed an empty news rail and an empty server list, and a bypass granted for an hour put it back to empty when it expired. The transport reports the refusal itself now -- `CertificateTrustInterceptor` on the direct channel, for the one host the bypass exists for -- and parks it on `CertificateTrustGate` for the shell to ask about once, with the same three durations the form offered. The form stops drawing its own copy of the question and hands the gate its retry instead, so accepting still signs the user in with one click.
+- Surfaces that show an installed pack read the registry instead of a copy of it. `PackDetailState` resolved the instance once and the version manager took the first value off the flow and dropped it, so every write that did not come from the surface itself went unseen: the hero kept saying "Never played" through a session it had just launched, the versions screen pinned its green "current" chip to the build before an update that had already landed underneath it -- from the settings window's own footer, or from the auto-update pass at startup -- and offered to switch to one that was installed, while its restore points listed a snapshot the retention sweep had dropped and not the one the apply had just written. The Content tab and the settings window's Content section had the same shape from two sides: each seeded its optional-mod switches once, keyed on an id that does not change when the build does, and each wrote its own answer back, so the two disagreed about the same mod. All of them now follow `IPackRepository.observe()`, which no write path bypasses. Following a record is not the same as rendering one, though: a write is a durable round trip, so the settings window shows the edit it just made until the registry carries it -- without that, a fully controlled text field dropped characters between the keystroke and the record catching up, and a second flip made inside that window composed onto a value neither it nor the record had reached. The same rule holds the Content tab's switches steady while its writes land, and the launcher now drops a selection that a newer one supersedes rather than letting two of them race to be last.
+- A version switch or a rollback survives leaving the screen it was started from. Both ran on the composition's scope, so Back, the corner close and a breadcrumb click each cancelled the apply mid-flight: the snapshot restore did run and the files came back, but the user was left with a switch that silently did not happen. They run through `PackOperationService` now -- the same owner the settings window's apply already used, refusing a second one per instance -- and the screen narrates whichever operation that instance is running rather than only the ones it started itself.
+- Console preferences stopped being three copies of one file. `AppShell` loaded `console.json` when the shell mounted and never again, Settings > Console and the pack's Logs tab each loaded their own, and every gear control wrote its whole record back: an edit made in Settings did not reach a console that was already open, and the next switch flipped in that console wrote the startup copy back over the highlight rules Settings had added. `ConsoleSettingsStore` owns the file and publishes it; the three surfaces read the same value and every write starts from what is current.
+- Clicking Play on a second pack no longer leaves the first one running forever in the session list. The launcher runs one game at a time and the controller refuses the second launch, but the notification driver had already evicted the observer of the game that WAS running -- and its cancellation path cleared only the activity entry, so the session stayed with a live uptime counter and the launch indication never came down, for the rest of the session. The launcher now answers whether it took a launch -- `launch` and `launchPackInstance` return that -- and the driver narrates only what was taken, so a click that started nothing neither replaces the observer of the game that is running nor speaks for it. The pack page also gates Play on the global launch state the way the home controls already did, so the click that cannot start anything is not offered.
+- The classic dashboard launched the server profile it first saw. The selection lives above the screen for the process lifetime and was only ever seeded, never re-resolved, so after a roster fetch the card lost its highlight and Play went on using the old entry -- its address, its version, its checksums. It is re-resolved by id against each fetch. The two server-scoped routes carry that id as well, instead of a `ServerProfile` copied into the back stack: the screens resolve the roster entry as it stands, and two visits to one server stop being structurally different history entries, which is what the back stack's dedupe and popTo compare.
+- Renaming a pack reaches the breadcrumb. It resolved the name once per instance id, and the top bar is chrome that is never disposed while the rename happens in place, so the old name stayed until the user visited a different pack.
+- A drag in the layout editor stops deciding against the layout as it was at the first drag. The drop handlers close over the graph inside a `pointerInput` whose key never changes, so the gesture never restarts and the closure never updates: three widgets dragged from the same palette row into a canvas all seeded from the same widget count and landed on top of each other, and a slot switched between Column, Row and CubeGrid kept being dropped into as the orientation it used to have. The graph, the widget's index and the host's commit handler are read live -- the treatment the same file already applies to canvas placement -- and the gesture is keyed on the slot and its orientation.
+- Loading a layout preset seeds the child slots a container declares. The preset path ran the structural reconcile only, skipping the registry-aware pass that startup performs, so a preset saved before a container's descriptor gained a slot arrived without it: the slot drew its placeholder and highlighted on hover while every drop into it did nothing, until the next launcher start reconciled what the preset had written.
+- The profile's face picker stops offering an account that was signed out. It re-read the account list only when the session changed, and removing an account that was not fronting the shell resolves to the same session -- so the removed provider stayed on the list, and choosing it wrote the preference for an account that no longer existed.
+- Smaller reads that had gone stale: a pack's cover survives its record being rewritten with a new one, the quick-launch button mints the offline identity from the name as it stands at the click rather than the one the affordance was resolved with, and the server settings screen reads the experimental JVM-args flag when it renders instead of when it was first opened.
+- Hiding the launcher after the game starts worked for one way of starting a game. The rule sat inside the classic dashboard widget: `HomeClassicContent` watched `LauncherController.state` and called back up a chain of `onCloseApp` callbacks that existed for nothing else, and that widget is composed only while the SmartyCraft dashboard is the screen on display. A pack started from the Library or from its own page, a relaunch after a second-factor prompt, the offline retry offered on a failed launch, and even a server launch begun on the dashboard and followed by a walk to another screen all left the window standing in front of the game. Every launch path reaches the same `LaunchState`, so the shell owns the move now: `PostLaunchGate` decides it once per session -- off the composition, under test, keyed on the session's own `LaunchHandle` so a conflated state flow cannot make one session read as two, and disarmed when it is built while a game is already running, so a shell restarted after a UI crash does not read its own arrival as a launch -- and `AppShellContent` performs it beside the tray status it already keeps. Where there is no tray icon to hide into, the window is iconified rather than the launcher quitting as the old path did: quitting takes the console, the content watchdog and the playtime record with it and leaves the game running with nothing attached to it. The automatic hide asks for a tray that is up rather than one that may yet come up, which is the weaker test the close button is right to use -- its alternative is quitting the launcher, this one's is the taskbar. A launch that then fails raises the window this rule put down, and only that one: a window the user minimized themselves during the launch stays where they left it. Bringing the window back is two writes rather than one, and only the second-instance signal was making both -- a window minimized before it was hidden came back from the tray still minimized, which reads as a tray click that does nothing.
+- A finished download could leave the progress reading one file short of the set, for good. Every transfer in a set reports from its own thread, and `SetProgress` read the counters and handed them to the consumer as two steps: a reporter descheduled between the two delivers an older picture after a newer one, and at the end of a set that older one is the last word -- a bar stopped at four of five files with nothing left running to move it. The counters were already atomic, which is what made this look safe; what was not ordered was the delivery. Reads and delivery are now one step. It surfaced as `TransferEngineTest` failing on one CI runner and passing on the next; measured at three sets in twenty thousand on a machine that is not starved for cores.
+- Installing a launcher update left the launcher frozen on screen. The install runs in a JVM shutdown hook, and the native window is destroyed by process exit rather than before it, so the whole swap ran with the launcher still up and no longer drawing -- it reads as a hang, and on Linux the swap was also two full copies of the AppImage (the download into a staging path, the running binary into its backup), roughly 150MB written after the user had been shown their last frame. `UpdateDialog` takes the window down before exiting now, and only after scheduling, so a failure still has a window to be reported in; where a tray is up, the tray icon is what remains. Neither copy survives either: `IUpdateApplicator.stagingPath` lets an applicator choose where the download lands, `LinuxUpdateApplicator` answers with a path beside the binary it will replace so the install is a rename, and the backup is a hard link rather than a second copy of the image. A launcher installed somewhere the user cannot write falls back to the updates directory and the copy, a staged download that was never installed is swept at the next check instead of accumulating one image per version beside the launcher, and the rollback drops the backup name where the backup and the launcher turn out to be the same file -- renaming one onto the other succeeds and does nothing. The macOS trampoline copies from a mounted disk image and still does its work after exit; the window no longer sits there while it happens.
+- The launcher's first frame was white, at a size the window was not. `ShellHost` asked for a 1100x720 window and picked its placement from `IS_TILING_WM`: a floating desktop maximised it right after showing it, and a tiling compositor took the floating request and tiled it full-screen regardless. Compose does render one frame before making the window visible -- deliberately, to avoid showing the window background -- but sizes that frame to what was asked for and applies placement afterwards, so whatever the window became beyond 1100x720 stayed bare native surface until the next frame arrived. Recorded on Hyprland at 120 fps that was roughly 1.9 seconds of white around a correctly drawn corner, against none at all for a window created at the work area, which also appeared about a second sooner. `initialWindowSize` takes the work area on every desktop now -- clamped to the smallest frame the shell lays out in, so a panel eating most of a small display cannot open a window the rails do not fit in -- and the placement branch is gone: the launcher opens full-size, and 1100x720 is only what un-maximising returns to.
+- A Modrinth mod that failed to download reported itself installed. The install ran inside a `runCatching` in the row's click lambda with the success line outside the catch, so a throw still ticked the row -- the user read "done" over a jar that was never written. The outcome is a value now: installed on success, a retry the row offers otherwise, and a project with no build for this pack's Minecraft or loader counts as the latter rather than as an error.
+- The pack settings window re-measured the instance folder on every entry into the Data section, and counted the launcher's own bookkeeping as the pack. The walk hung off a `LaunchedEffect` in the section, which is remounted each time the rail returns to it, so moving between sections re-walked a tree that can hold a world save; and it summed the per-file block maps under `.nexira-blocks` and the staging file plus journal of an interrupted transfer along with the content the user installed. `InstanceSizeService` measures once on the app scope, publishes per instance, serves that answer until it is older than five minutes, and skips what the launcher wrote for itself -- and an operation that rewrites the files takes a fresh measurement, which the old code did only for a repair and never for an update.
+- A pack update or a repair could be started twice. The re-entry guard was composable state, so dismissing the settings window and reopening it reset it while the operation was still running on the app scope: the instance lock serialised the two, but the user was told nothing about the one already in flight and the second one's progress overwrote the first one's in the footer. `PackOperationService` owns both operations app-scoped and keyed by instance, the way `PackInstallService` already owns installs. A second start is refused where it is asked for rather than deep in the lock, a window reopened over a running operation finds it and picks the narration back up, and every button that would start another one is disabled while it runs. `PackDetailScreen` re-reads the instance record when an operation ends -- including a failed update, whose rollback writes the record too.
+- Byte sizes were formatted through the machine's locale instead of the interface language, so a launcher running in Russian on an English system rendered "1.5 GB" beside Russian text and the reverse in the other direction. `humanSize` takes both the unit and the decimal mark from `AppStrings` (`byteUnits` alongside the existing `locale`), which covers the pack folder size, the version diff rows, the content detail and the media download progress.
+- Every native file dialog in the launcher was opened with no owner window. `FileKitDialogSettings` was built by hand at eight call sites and none of them filled `parentWindow`, so the Win32 `IFileDialog` came up as a top-level window of its own: its own taskbar button, its z-order untied from the launcher, and over a maximized window it could land behind it. From the user's side the button does nothing, and nothing in the log says otherwise, because the picker path logged nothing at all -- an opened-and-cancelled dialog and a dialog that never appeared left the same empty diagnostic bundle. It covered the music player's "open file", the pack import, the content add, the wallpaper picker, the skin and cape import, the server icon and Java binary pickers, and the data-directory mover. Pickers now go through `hivens.ui.utils.pickFile` / `pickFiles`, which take the owner from the window the shell already publishes as `LocalComposeWindow`, log what the dialog did, and turn a picker that cannot run at all into a logged null instead of an exception thrown out of a composition scope.
+- A launcher whose media natives will not load took down the surface that asked for them instead of reporting it. The bundle failing to open is a `LinkageError` rather than an exception, so `AudioPlayer` caught nothing, and the two players built during composition (`InlineVideo`, `BackgroundVideo`) had nothing to catch them at all: pressing Play was a crash. Each site now takes the branch it already had for media that is not there, the same one boot recovery's module switch produces.
+- A launcher that starts while the OS keyring is locked no longer erases the stored account. The migration off the pre-v6 credential formats treated an unreadable store and an empty one as the same answer, and wrote the new format over the old file either way. The stamp is one-way, so one boot with a locked Secret Service, a D-Bus that was not up yet, or a home directory that had moved cost the account permanently: the next start read version 6 and never looked at the legacy path again. `IKeyringStorage` already documents `isAvailable` as the way to tell an absent secret from an unreachable store, and `LegacyCredentialsManager.recover` now reports which of the two it found. An absent secret still stamps, since nothing is lost by moving on and it stops the path being retried forever. An unreadable one leaves the file where it is and tries again on the next launch, once per launch rather than once per read.
+- A SmartyCraft response the launcher could not decode reached the log with its credentials in it. `parseJsonTolerant` logged the first 200 characters of the body and the throwable beside it, and a login response carries the uid every signed action is keyed by and the session the game token is derived from. The throwable was the worse half: kotlinx.serialization appends its own `JSON input:` excerpt, cut around the byte offset that failed rather than at a field boundary, so the value arrived with the key already truncated away and no marker rule had anything to anchor on. The line now carries the body's length and the decoder's message up to that excerpt, which is the offset, the JSON path and the reason, and none of the bytes. `Redactor` covers the two wire keys as well, since a log written by an earlier build is what the in-app console re-reads and what a diagnostic bundle copies: `uid` is anchored on a long hex run so it stays off prose and off the `uuid` the neighbouring rule owns, and `session` wants a token-shaped value because the bare word opens too many ordinary lines.
+- Opening the launcher signed a two-factor account in again and killed the session it already had. `AutoLoginCoordinator` read the cached password and called `login` without ever looking at whether the account answers to a second factor, and the damage is the request rather than its refusal: SmartyCraft mints a `uid` per login and invalidates the previous one, so a player in game was dropped with a username verification error moments after the window appeared, with nothing on screen connecting the two. `AutoSyncService` has guarded the same call for the same reason since background sync hit it across every installed server. The guard sits ahead of the cached-password read, so an account that never saved a password opens on its stored token instead of falling to the login form on every start. The flag that arms it was also only ever written by the launch path, which is why the sign-in repeated: the gate met during auto-login now marks the account too, and marking is a flag write (`AccountStore.markTwoFactor`, the mirror of `clearTwoFactor`) rather than a full save, which used to rewrite all three vault secrets and quietly make that account the primary face.
+- Reset customization on the recovery surface deleted the user's widget content, and asked nothing first. `widget-state.json` sat in the same list as `themes.json`, `background.json` and `console.json`, and it is not appearance: it is what a person typed into their widgets, scratchpad bodies and checklist items, with no second copy anywhere. It has its own reset now, offered because a widget that chokes on its own stored entry has no other way out, while the whole-file case never needed a button (`WidgetStateStore` already starts empty on a file it cannot read). All four resets ask before they delete and name what they take, where three bare buttons used to be labelled Layout, Customization and Settings on a surface whose whole invitation is to press everything on it.
+- Installing a build that was not the newest downloaded the newest one. Everything the installer recorded came from the manifest it was handed (the pin, the cached snapshot, the update baseline, the optional-content defaults, the runtime version), and the bytes did not: `SmrtSyncService.sync` took a pack id and fetched that pack's current manifest itself, with no way to be told which build was picked. From the first second the disk held one build while the registry described another, on the ordinary path, since the version picker appears as soon as a pack retains more than one build. Two things followed from it beyond the mismatch: the optional-content toggles were computed from the picked manifest and applied to the other build's mod list by filename, and the first launch held `mods/` to a baseline naming files that were never installed. `sync` now places the manifest it is handed, which is the same object everything else is recorded from, and the pack id it no longer needs is gone from the call. Every other manifest read in the launcher already branched on the pin; this one could not, because nothing told it there was one. `PackInstaller` had no tests at all and has four.
+- The release notes a player reads and the log a contributor reads are two files. `CHANGELOG.md` was both: a `### Highlights` block of player prose on top of the engineering sections, and CI cut the block out with an awk. That made them two depths of one text, when they are two documents with different audiences, and it showed in what each reader could get. An English reader's notes were frozen into `release-manifest.json` at release time while every other language was read live off `stable`, so the one language the notes are written in was the only one a correction could never reach, and the release's own framing paragraph never left the file because the awk started at the heading below it. `CHANGELOG_EN.md` is now the player-facing file with `CHANGELOG_RU.md` and `CHANGELOG_DE.md` as its translations, `CHANGELOG.md` is the engineering log and nothing else, and `UpdateService.fetchLocalizedNotes` treats English as a language rather than as the absence of one. The manifest still carries a frozen copy, demoted to what a launcher with no route to raw.githubusercontent falls back on. Twenty-seven releases' worth of highlights moved across as written, since rewriting notes for releases already published would be inventing what they said.
+- The catalogue stopped at its first page and said nothing about it. Paging was never requested past the first response, a single refused request ended the listing for good, one empty answer left the catalogue blank and inert until a restart, and the fetch that would have refilled it was parked behind a scroll that could not happen on a list with nothing in it. A failure now leaves a line the reader can act on, and the disclosure that explains it opens rather than appearing. Opening a pack and coming back no longer changes which source the listing came from, and a search made while scrolled opens at the top of its own results rather than at the end of them.
+- Two ways for a pack description to take the launcher down, both reachable from text a mirror or Modrinth serves. A quote drew its bar as a sibling stretched to the row height, which forces an intrinsic measurement of the quote's whole subtree on top of the real one, and quotes nest: eight levels cost a tenth of a second, twelve cost one and a third, sixteen cost over a minute, on the thread that draws. Thirty-six characters of nested quote markers is enough and the launcher does not come back. The bar is drawn behind the content now, which costs one rectangle and no measurement, and the walk stops descending past a floor and renders what it reached as text, so no future block that measures its subtree can be reached deeply enough to do it again. Separately, the ceiling on an inlined SVG icon bounded only icons that declared a box: leave the width and height off and the size fell back to the one the untrusted document names, bounded by nothing but a four-thousand-pixel ceiling, so eight icons is eight sixty-seven-megabyte rasters and an `OutOfMemoryError` is an Error nothing downstream catches. An icon is clamped to an icon's size however it arrives at one, the refusal happens before the clamp, and the budget is one pixel count shared by everything a single source sets off rather than a per-document count that multiplied with nesting depth. A description nested deep enough to overflow the markdown parser's stack degrades to its source as text instead of leaving the body permanently blank with nothing logged, and a parse that throws no longer leaves the previous pack's description on screen.
+- A Modrinth update downloaded nothing and then opened the nothing as a zip. Two builds wearing the same version label took the version screen down with them, and three builds sharing a number all claimed to be the one installed.
+- The launch-time check that holds an instance to its pack ran on a watch that does not exist on macOS, so the guard was inert there. An aborted launch waking up late reached into the session that had started after it, a mod jar that could not be opened was reported as tampered with rather than as unreadable, and a bound session was held to its pack only up to the spawn rather than past it. Reading `mods/` against a running game is a separate read-only path now, since deleting a jar the loader has open breaks the install.
+- The recovery surface's resets were undone by the process that ran them. The stores it deletes files out from under were still holding their in-memory copies, and their shutdown hooks wrote those copies straight back, so a reset survived exactly as long as it took to relaunch. Clearing the crash history during composition made safe mode unreachable, since the surface that clears it is the one a crash loop is supposed to reach, and a third crash latched safe mode even after the shell had come back healthy. The machinery and the reader's language are both resolved before they are needed rather than during the failure they exist for.
+- Themes and customization were published by truncating their files. A write that was interrupted between the truncate and the content left an empty file, which reads as no theme at all. Both go through the atomic write the rest of the stores already used.
+- The light palette had no direction. Its ladder straddled the page, so a raised plane and a sunken one were the same distance from it and depth said nothing, a requested depth was discarded outright, and the chrome met the page on nothing. Colours taken from the wallpaper relit every plane rather than tinting it.
+- A drag in the editor read the movement it was causing rather than the pointer causing it, so a widget accelerated away from the cursor. Panel headers swallowed the first few pixels of a drag, a dragged panel could leave the window and not come back, an empty slot's drop target sat below the dashes that mark it, and that border was drawn in device pixels rather than dp, so it thinned as the display scaled up. The palette pulls to width, and the editor has a way in that does not require already knowing it exists.
+- Writing a content icon from a worker thread took the shell down. A Modrinth pack locked every file in the instance including the ones the player added, and a mod dropped into the folder needed the tab reopened before it appeared.
+- Work that writes to disk stopped dying when the reader looked away. A pack install, a profile operation and a settings write each ran on the composition's scope, so navigating away cancelled them mid-write. A settings category opens at its top rather than wherever the previous one was scrolled to, its last section is no longer clipped, and a damaged timestamp in the settings file no longer takes the screen down.
+- The wallpaper arrived in two steps and every plane above it sat on nothing for both of them.
+- Every Minecraft version past the 1.x line was told it needed Java 8. The fallback mapping matched a version's leading text against a table of 1.x prefixes, and a release numbered by year matches nothing in it, so every one of them fell through to the oldest answer the table holds: the runtime that predates every version the table names. The version is read as numbers now, so above the 1.x line is newer than anything the table describes and takes the newest runtime, the 1.x line keeps the mapping it had, and a version that cannot be read at all stays on the old runtime, since that is what an unnumbered build is. The pack settings label derived from this was frozen at install time as well, so a correction to the mapping now reaches instances that already exist.
+- A catalogue read could hang for ten minutes with nothing to show for it. Metadata went through the shared client's request timeout, which is sized for a runtime or a pack archive and is right for those, so a source that connected and then stalled produced a spinner that outlasts anyone's patience with no error, no line in the log and nothing to retry. Metadata reads carry their own twenty-second ceiling now and a stall becomes an ordinary failure, while downloads keep the long one because they go through the transfer engine rather than here. Browse also records the question it asked and the size of the answer, so an effect that never started can be told from one waiting on a source that never answered.
+- The rest of what a pack description got wrong. A description was parsed twice on the UI thread before its first frame, a fold inside a fold lost its label while a nested table was drawn twice, sniffing for an SVG signature broke every image under a kilobyte, a `data:` URI was read with the form decoder so an unencoded icon saying `width='100%'` was dropped, every link rendered as one already followed, a picture did not answer the cursor, a centred row of badges was drawn against the left edge, and a height ceiling meant for a badge decided how wide an illustration could be.
+- A stopped video download was kept and served as a complete one. The fetch passed `--no-part`, so yt-dlp wrote straight to the finished filename, and both ways this service ends a download early kill the process, which left a truncated file under the name of a whole one. The cache lookup takes any non-empty file for that URL's hash that does not end in `.part`, so the short file qualified and `resolve` returned it before considering a download: that URL was then permanently broken, with every later play getting the same truncated video. The `.part` filters in the lookup and the eviction sweep were written for exactly this, and the flag was what made them match nothing.
+- The authlib agent said nothing when it could not repoint the texture whitelist. The redirect is a constant swap with no bytecode patch behind it, so a class that matched nothing was transformed in name only. Through authlib 7.0.61 the checker held two domains and matched a host by suffix; from 7.0.63 it holds one host and compares for equality, so neither constant the agent moves is in that class any more and the whitelist keeps pointing upstream. Skin URLs are refused and every player renders as the default while the join still works, which from inside the game is indistinguishable from the server having no skins. This does not repoint the new form, since equality leaves no room for a suffix and that needs an exact host rather than a guess. What it removes is the silence.
+- The GitHub issue the launcher pre-fills was part Russian for every user. Seven strings, the headings and the instructions, sat in `client-launcher` where no translator could reach them. The split is by who reads what: section headings, the collected fields and the stack trace are English and identical across reports, because a tracker where one section has three names cannot be searched, while the lines addressed to the author as they type follow the language they chose. The news parser's Russian literals are input rather than interface text and are marked as such, so the string scanner stops asking for them to be translated.
+- A diagnostic bundle that could not be made said nothing at all. The button reported success either way, so a failed collection and a successful one left the same impression and the user attached nothing to a report that asked for it.
+- Widget and editor surfaces that drew the wrong thing. A widget plane blurred with a radius it never asked for, a container reported a plane it does not have, the pack tiles carried a plane the length of the slot rather than of the tile, the volume handle was drawn hollow in a colour meant to be read on the accent, the tab container carried its own copy of a chip the library already has, and the editor overlay measured against a rail width nobody updated after the rails became resizable.
+- The theme picker previewed one theme and drew it under another's text, since the preview rendered the background it was previewing while the labels over it stayed on the live theme. The Clear tier drew a hard line down the window where it met the page, and the screen carried a back arrow of its own beside the one the chrome already provides.
+- Controls across four surfaces that were squeezed away, inert, or saying something other than what they did. The content, worlds, console and wardrobe panes each had rows that collapsed to nothing at a narrow width, a menu that covered the item it belonged to, and a delete with no confirmation. A wardrobe flow was a new object on every call, so every collection restarted it, and a list keyed on something not unique dropped entries that shared a name. A snapshot map was written from the IO pool and read on the composition, which is a data race that shows up as a list that is briefly wrong.
+- The version and update surfaces described changes nobody could act on. A build that differed in nothing was announced as a change, the two sources were graded by different rules so a build was a build only if the mirror published it, leaving the version screen returned to the top rather than to the section it was opened from, and a release channel was one colour in About and another in the version picker.
+- A widget module that was refused held its jar open for the rest of the session, so the file could not be replaced or deleted until the launcher was closed.
+- Reads that went nowhere and a parameter half the widgets could not use. Several values were plumbed through the launcher and never read at the far end, and the widget kernel demanded an instance parameter from widgets that draw from their surface context alone, which every one of them had to accept and ignore.
+- Smaller reads in Browse: a tag was drawn as a disabled control rather than as a label, a rounded gallery cell lit up as a square on hover, the page's side blocks had no edge to separate them from the column, a trace line printed a sentinel instead of what it meant, and what a pack runs on is said without a column of its own to say it in.
+- The pixel player's tag repair guessed at character encodings it had no way to verify, so a tag it could not read became a different wrong tag rather than staying as it was.
+- User state was published by truncating the file it replaces, so an interrupted write left an empty one. It goes through the same atomic write as the rest.
+- A pack update overwrote edits to files the pack never touched. The asset reconcile read its hash triple with one case missing: a file that differed from the disk went to the update list without anyone asking whether the target differed from the baseline at all, so when the pack shipped the same bytes it always had, the update handed back its own copy over the player's edit. The mirror ships `servers.dat`, which the game rewrites whenever a player edits their server list, so this fired on every update to a pack that left the file alone. Only the protected-path list stood between that and the player, which is why a list keyed on names looked load-bearing. It is gone: a file is compared against the baseline the install recorded, so the pack can deliver its own `servers.dat` when it actually changed it and leave the player's alone when it did not.
+
 ## [2.4.0-beta5] - 2026-08-05
-
-2.4.0-beta5 is a [critical] release. It fixes checks that were not running and repairs that could not happen. The guard meant to protect a mod's settings was matching the mod's own jar, so the most commonly installed mods were never updated, never retired when a pack moved on, and never repaired when their archive was damaged. A modern-loader pack picked which version file to read by directory order. The launcher hash could be poisoned by a single error page and stayed poisoned across restarts. The JVM-argument builder could compose a set the JVM refuses to start with. Stop gave up after a signal a wedged game ignores.
-
-### Highlights
-- **Guarded mods update again.** JEI, JourneyMap, VoxelMap and Xaero's maps were treated as untouchable config, so a pack update never replaced them and a damaged jar was never repaired. They are ordinary pack content again; the settings directories they exist to protect still are protected.
-- **Modern-loader packs launch reliably.** Forge and NeoForge packs picked one of two version files by whatever order the filesystem returned, and picking the wrong one failed the launch with a message about a library nobody asked for.
-- **The JVM-argument builder produces a set that starts.** Switching the collector and applying twice could compose arguments the JVM rejects outright, and the launch surfaced only an exit code.
-- **Stop stops.** It sent one polite signal and gave up; a game that ignores it now gets a forced kill, and its child processes with it.
-- **Nothing loses your things.** An interrupted write could erase the whole skin library, and a preset named in Cyrillic overwrote the one saved before it.
 
 ### Fixed
 - The protected-path list matched the whole relative path, so every default entry also matched its own mod's filename: `mods/jei-1.20.1-forge-15.2.0.27.jar` matched "jei", and JourneyMap, VoxelMap and both Xaero maps behaved the same. A protected path is skipped before the hash compare and before the corrupt-archive check in `FileDownloadService`, and both update reconcilers pass over it, so those jars never updated, never retired on a Minecraft version bump, and never repaired. `contains` now matches the directory portion only; nested state directories such as `mods/VoxelMods/voxelmap/` keep their protection.
@@ -61,7 +181,6 @@ lives in this English file.
 - The pull-request job runs every module's tests. Twelve modules with tests were absent from it, among them the widget kernel, the design system, all three auth providers and both java agents. The widget kernel's default-layout guard had been failing on both branches for several releases while the job stayed green, because the suite holding it was never invoked.
 - The contrast test measures every severity accent across every plane of both palettes, and pins that a light ground takes a darker ink than its dark counterpart. The surface test measures that every plane a surface can take is distinguishable from every other and that a divider is visible against each of them.
 
-
 ### Changed
 - The launcher's self-update becomes `:client-update`, and pack update stays behind in `client-launcher`. The two shared the package `hivens.launcher.update` and nothing else: one reads a GitHub release and rewrites the launcher's own installation, the other reads the mirror and an installed instance, neither referenced the other, and each declared its own `UpdateOutcome`. Thirteen files move to `hivens.update` -- the release check, delta bundle, binary patch, install layout, desktop integration and the Linux, macOS and Windows applicators -- and reach nothing under `hivens.launcher`, which is what made the split possible without an interface in between. The six pack-side files keep their package and stay next to the mirror client they call. The 858 tests `client-launcher` carried split 762 / 96 with none lost, and the shared `testTransferEngine` fixture moves to `client-core`'s test fixtures beside the mock-client helpers that its callers already use.
 - Five primitives move from `client-ui` into `nx-ui`: `InitialsAvatar`, `CenteredProgress`, `RetryStateBlock`, the width-breakpoint vocabulary (`WidthClass`, `Breakpoints`, `widthClassFor`, `AdaptiveWidth`), and the nav-row body, which lands as `NxNavRowContent` because `nx-ui` already owns an `NxNavRow` and the two do different jobs -- one is a whole clickable row, the other only its content. Each names no domain type and resolves no string of its own, which is the standing bar for the module. Three were `internal` to `client-ui` and are now public. The rest of `hivens.ui.components` stays: the code-entry, device-code and destructive-confirm dialogs read `LocalStrings` and carry puppet tags, and the image gallery would drag Coil into the design system.
@@ -71,15 +190,6 @@ lives in this English file.
 - The update check picks the highest version among the eligible releases instead of the first one GitHub returns. The list arrives newest-published first, and publication order is not version order: a beta cut after a nightly leads the page while ranking below it on the prerelease ladder, so a nightly install compared itself against the beta, concluded it was up to date, and never looked at the newer nightly one row down. The ladder itself is unchanged and still correct -- a beta is not an upgrade for a nightly install, and the point of the ladder is that nobody gets dragged backwards.
 
 ## [2.4.0-beta4] - 2026-08-03
-
-2.4.0-beta4 closes the ways code could reach a launch that the pack never named. An installed pack is now held to its own bytes rather than its own filenames, the check is asked again with the game about to start, and the launcher stops carrying into the process anything it was handed on the side: its environment, the arguments a pack's settings supply, the native libraries in the instance, and the interpreter it was told to run. The SmartyCraft server list is deprecated with this release.
-
-### Highlights
-- **A pack launches as the pack, by content.** Installed mods are checked against the bytes the pack declared, not against their filenames, so a file swapped under a name the pack uses no longer passes.
-- **The check happens again as the game starts.** It used to run before the sign-in, minutes before the process existed; a pack changed in between is now caught.
-- **Nothing rides in on the side.** Settings that point at outside code, variables inherited from the desktop session, and a runtime that is not a real program are all refused on a launch that signs into a server.
-- **A modified pack says so.** The launch stops with a message instead of starting a game that cannot join.
-- **The SmartyCraft server list is on its way out.** It is deprecated in this release and goes away in 2.5.0; packs replace it.
 
 ### Added
 - A launch that carries a session token holds the instance to the pack's installed manifest by sha1, not to the roster of filenames beside the mods. The roster answered by name and lived in the directory it described, so overwriting a named jar, or adding a line to the roster, both passed it. The manifest is recorded at install and after every apply, carries a digest per entry, and lives in the registry, so the same answer holds offline. An optional mod toggled off maps its `.disabled` name to the same digest and does not read as tampering. A named file whose bytes are wrong fails the verdict but is not deleted -- removing it mid-launch leaves the pack incomplete and the repair path is what fixes it. Instances installed before a baseline existed fall back to the roster file.
@@ -101,14 +211,6 @@ lives in this English file.
 
 ## [2.4.0-beta3] - 2026-08-02
 
-2.4.0-beta3 makes two-factor accounts playable and closes the ways a mod could ride into a pack uninvited. Signing in with a second factor now works end to end: the code is asked once when you press Play, and the game starts on a session minted for that launch. On the content side, a pack is held to its own file list before every spawn, files that refuse to be deleted are treated as the obstruction they are, and the sweep touches only what a loader would execute -- caches, configs and the launcher's own bookkeeping are left alone.
-
-### Highlights
-- **Two-factor accounts can play.** Sign-in with a code works, and it is asked once per launch instead of over and over. Every background re-login that used to invalidate your session behind your back is gone.
-- **A pack launches as the pack.** Jars added to an installed pack are removed before the game starts, and a file that cannot be removed means the launch goes ahead without a sign-in rather than pretending everything is fine.
-- **Only mods are swept.** Mod caches, configs and leftovers are no longer deleted along with them -- previously a launch could wipe a loader's remapped-jar cache and cost you a full rebuild.
-- **Packs install again where a platform library is not shipped.** A pack whose loader lists a macOS-only library no longer fails to install on Windows and Linux.
-
 ### Added
 - A launch by a two-factor account mints its session for that launch: the code is asked once when you press Play, and the game starts on a token that is known good at spawn. Carrying the stored session forward was cheaper but unverifiable -- SmartyCraft invalidates a session on any later login, from a second pack or another machine, and the player found out only when the server refused the join. The demand now stops the launch instead of spawning a doomed one, the shell prompts, and the same target starts again with the fresh session, so one click and one code is the whole interaction.
 - Two-factor sign-in works on SmartyCraft accounts. It never did before, and the reason was ours: the launcher logged in more often than the protocol allows. SmartyCraft mints a new `uid` on every `login` and invalidates the previous one, so background auto-sync (one login per server) and the pre-spawn refresh kept destroying the session the player had just unlocked with a code -- which is what produced an endless demand for codes. Measured against the live API: the `TWOAUTH` response already carries a usable `session`, `uuid` and the client manifest, `twoauth` replies with a bare status and no session of its own, and a second `login` after it answers `TWOAUTH` again while killing what the code just unlocked. So `completeTwoFactor` no longer re-logs in -- it unlocks the session that came with the demand -- `supports2FA` is on, and a session that answered a second factor is marked so that nothing refreshes it behind the player's back: auto-sync does not send the request at all, and both launch paths carry the session as-is. A code is asked for once per session, and again only when the game itself is refused.
@@ -123,14 +225,6 @@ lives in this English file.
 
 ## [2.4.0-beta2] - 2026-08-02
 
-2.4.0-beta2 closes the gap between what a pack says it is and what actually launches. An instance is held to the list of files the pack consists of before every spawn, not only when it syncs, so a jar added by hand between two syncs no longer rides along. A launch also carries only a session it earned: offline, an unverified instance, and a refresh that could not go through all start the game with the token stripped. Alongside that, a failed pre-spawn refresh finally says so instead of surfacing as Minecraft's own "Failed to verify username", and the packaged runtime stops reporting a class-data archive mismatch at error level on every launch.
-
-### Highlights
-- **A pack launches as the pack.** Files added to an installed pack's `mods/` are removed before the game starts, and the launcher names what it removed. Only what the pack itself declares loads.
-- **Your token stays out of launches that did not earn it.** An offline launch, an instance the launcher could not vouch for, and a launch that could not reach the login server all start the game without a session token.
-- **The launcher tells you when your session is stale.** Instead of the game refusing your server join with "Failed to verify username", the launcher says up front that it could not refresh the session and what to do about it.
-- **A quieter, lighter start.** The packaged runtime no longer prints class-data archive errors at every launch, and a stale archive after an update no longer silently disables class sharing.
-
 ### Changed
 - A pack is held to its own contents on every launch, not just when it syncs. `SmrtSyncService` already deleted everything `mods/` held that the manifest does not name, but only during install, update and repair -- and the gap between two of those is where a jar gets dropped in by hand, a cheat client among them. Sync now writes the names the pack consists of into the instance (`.nexira-mods`), and `enforceRoster` holds the directory to that list right before spawn: anything else goes, including a jar hidden a level down, since the loader scans those too. It answers off disk, so an offline launch is held to the same rule. An instance with no roster (installed before the file existed) is left untouched and reported unverified rather than emptied -- "no roster" and "a pack with no mods" are indistinguishable, and guessing wrong costs someone their install.
 - An instance the launcher cannot vouch for says so instead of looking like a normal launch. No roster on disk means the pack contents were never confirmed, so the game starts without a session token and cannot join a server -- and since the user chose neither offline mode nor this, it is reported as its own case, sticky in the notification centre and in the console, naming the way out (sync the pack). An instance installed before rosters existed is in exactly this state until its first sync.
@@ -142,18 +236,6 @@ lives in this English file.
 - The application class-data archive is bound to the build that wrote it: `app-<version>-<jar digest>.jsa` in the data dir on Linux, removed on install by `setup.iss` on Windows. `-XX:+AutoCreateSharedArchive` re-creates an archive that is missing or built by another JVM, but not one a new jar made stale -- so after every launcher update the leftover archive reported `shared class paths mismatch` on each launch and class sharing stayed off until the file was deleted by hand. The AppRun also drops archives belonging to builds that are gone, so they do not pile up in the data dir.
 
 ## [2.4.0-beta] - 2026-07-30
-
-2.4.0-beta continues the preview and rebuilds what the launcher does with the network. Every file it pulls onto disk -- a runtime, a JDK, a pack, a mod, a loader installer, its own update -- moves onto one transfer engine that retries, resumes from where the connection broke and falls back to a mirror, and a verified file keeps a block map so a damaged pack is repaired by its damaged blocks instead of fetched again. A pack's builds get their own screen with a per-build changelog, switching and rollback, and pack updates announce themselves in the notification center. Nightly builds and a Pre-releases toggle replace the update-manager window. A hardening pass keeps session tokens out of logs and diagnostic bundles, scopes a certificate bypass to the host it was granted for, and bounds every path and archive a server document gets to choose. ProGuard is gone and the Linux AppImage drops to ~74 MB.
-
-### Highlights
-- **This is a beta.** It carries everything since the 2.4.0 preview -- please keep reporting anything broken on the issue tracker.
-- **Downloads that survive a bad connection.** Every download in the launcher now retries and picks up where it stopped instead of starting over, splits big files into pieces that are fetched in parallel, and falls back to another mirror -- so a reset in the middle of a 200 MB runtime or a 300 MB resource pack costs seconds, not the whole transfer.
-- **Repair a pack instead of re-downloading it.** Pack settings gains Verify and repair: it checks the installed files against the build the pack is pinned to and fetches back only the damaged parts of the damaged files. Your own jars, your disabled optional mods and your edited configs are left alone.
-- **Every build of a pack, with its changelog.** A versions screen lists the mirror's retained builds and shows what each one adds, updates and removes, so you can switch to a specific build or roll back with the change in front of you.
-- **Updates tell you about themselves.** A new pack build raises a notification and the Library card carries a clickable update pill, instead of the update happening silently or not at all.
-- **SmartyCraft servers on modern Minecraft.** Joining an SC-bound pack's server on a modern version works, and other players' skins render instead of falling back to the default.
-- **A lighter launcher.** The Linux AppImage drops from ~95.6 MB to ~74 MB, a custom wallpaper is cached at your display's size instead of being re-decoded at full resolution every start, and the Content tab stops re-cracking every jar on each open.
-- **Your session token stays out of the logs.** The token no longer reaches `game.log`, the crash report and the diagnostic bundle are redacted where they are written, and the credential file is created readable only by you.
 
 ### Added
 - Pack versions screen (`Screen.PackVersions`): the mirror's retained builds with channel badge, publish date and mod/asset counts, consecutive same-fingerprint rebuilds collapsed into expandable runs, and a per-build changelog computed client-side by `PackVersionDiff` -- added/updated/removed mods and assets with icons and size deltas, diffed against the previous distinct build or against the installed one. Mod identity is the stable key with a filename-stem pairing pass, so a slug-less `smrt_cache` mod's version bump reads as an update instead of a remove plus an add. Switching is compat-gated: a green preview applies directly with per-file progress in a layout-stable status row, an amber one confirms with the reconcile plan counts and user-edit conflicts; restore points move onto this screen. Reachable from the pack hero's update badge, the Library card badge, and the settings Version section.
@@ -240,17 +322,6 @@ lives in this English file.
 - Declarations nothing referenced, verified per symbol rather than taken from a list: `savedFileManifest`, `InstanceRuntime.autoConnectServerId`, `NxPanel`, `NxHorizontalScrollbar`, `NoOpIndication`, `DisintegrateBox`, `RoleGroupSection`, `AssetRowPanel`. Dropping the two persisted fields needs no migration, since the shared `Json` ignores unknown keys. Two names caught by the same sweep survive: `ShellRegionProps.glassAlphaPct` is live, and `saveCredentials` turned out to be a missing wire rather than dead weight and is now connected to the login panel's remember-me box. What the last two deletions cost is recorded rather than lost -- auto-connect-on-launch was an unwired stub, and the asset row was the one surface rendering a pack's assets from the manifest with the curator's category, description, licence and optional flag.
 
 ## [2.4.0-preview] - 2026-07-14
-
-2.4.0 opens the launcher onto the wider modding world. A new Browse tab searches and installs Modrinth modpacks, imports a `.mrpack` / a CurseForge zip / a foreign launcher's instance, or builds a pack from scratch; a Wardrobe manages your skins and capes over a reworked 3D character stack; the launcher can follow your desktop's colour scheme; and a boot screen plus a recovery mode carry a start that goes wrong. Underneath, the whole interface moves onto a single `:nx-ui` design system, the launch engine splits into headless modules with a native CLI, and the build moves to Java 26. Microsoft / multi-account infrastructure lands but stays gated off pending a later release.
-
-### Highlights
-- **This is a preview**. 2.4.0 is a large, fast-moving release shipped early as a preview -- expect rough edges, and please report anything broken on the issue tracker.
-- **Browse and install modpacks**. A new Browse tab searches Modrinth's modpacks, renders their descriptions inside the launcher, and installs one in a click -- and you can import a `.mrpack` or a CurseForge zip, or start an empty pack from scratch.
-- **A wardrobe for your skins**. A new Wardrobe keeps your skins as small 3D figures, applies one to SmartyCraft, picks a cape, or starts from the game's default set -- your character's look in one place.
-- **The launcher follows your desktop**. It can track your system's light / dark scheme on its own and tune its theme to your wallpaper's brightness, with a new appearance studio gathering the background and look controls.
-- **A boot screen and a recovery mode**. A quick boot screen shows while the launcher starts; if something goes wrong, hold Shift (or pass `--recovery`) to disable a misbehaving part or reset it -- no reinstall.
-- **One consistent interface**. The whole UI moved onto a single design system -- surfaces, buttons, menus and settings sections share the same shapes, spacing and icons, and stay legible with or without a wallpaper.
-- **Packs show what they're doing**. A pack card now carries a live launch state (preparing / downloading / running), and a partial import says which mods still need a manual download instead of looking like an empty pack.
 
 ### Added
 - Modrinth DTOs relocate to `hivens.core.api.dto.modrinth` and a dedicated `ModrinthClient` (+ `ModrinthCaches`) splits out of `SmrtPackClient` for Modrinth's keyless `/v2` API, so Modrinth is a first-class source rather than a mirror-manifest resolver.
@@ -403,20 +474,6 @@ lives in this English file.
 
 ## [2.3.4] - 2026-06-15
 
-The customization release, consolidated. 2.3.4 makes the entire interface editable -- and editable surfaces now carry their own settings -- rebuilds the Profile around a live 3D render of your skin, ships an in-app update manager with channels and rollback, gives notifications a persistent home both in-app and on the desktop, teaches the UI to fit narrow windows, and bundles the launcher's own type. Underneath: SmartyCraft modpacks join their servers without shipping anything of SmartyCraft's, an installed pack relaunches offline, memory sizes itself, and a deep robustness and refactor pass keeps a corrupt file or a stray widget from taking the launcher down. It rolls up the 2.3.4-beta .. beta5 line and everything since.
-
-### Highlights
-- **Make the launcher yours**. Press Ctrl+E to edit. Drag, resize, restyle, and free-place every widget across the home, library, side rails, and the app shell itself, with per-widget glass backing and save / load / export of layout presets. Surfaces now carry their own settings too -- the left rail's selection style lives in its editor panel, not a global menu.
-- **Your skin in 3D**. The Profile leads with a live, rotatable 3D render of your skin, drawn from scratch with no extra dependency, and sign-in lives inside the Profile, reachable while logged out.
-- **An update manager with channels**. The "i" by the version opens a manager: pick Release / Beta / Alpha (plus Dev / Git source builds), update or roll back to a recent version, and install a desktop shortcut. The About screen also checks on its own every few minutes.
-- **Notifications you can keep**. A placeable message-history widget groups repeats, swipes to dismiss, and mutes on do-not-disturb -- and, new this release, the launcher posts a real desktop notification when it slips into the tray so it does not read as a crash.
-- **The launcher fits narrow windows**. Rails collapse by a swipe, the server list pages into pills, and the About screen stacks its columns instead of clipping.
-- **SmartyCraft modpacks join their servers**. A pack from the mirror that targets a SmartyCraft server connects and joins, and other players' custom skins load -- without shipping anything of SmartyCraft's.
-- **Offline relaunch**. An already-installed pack starts with the network off; a warm relaunch makes no network requests at all.
-- **Adaptive memory**. A non-pinned instance sizes its heap from your real RAM and refines it over a few sessions; pin a value to opt one out.
-- **The launcher's own type**. Google Sans Flex and JetBrains Mono ship inside the app, so the interface looks the same on every machine instead of borrowing the host's fonts.
-- **A launcher that does not fall over**. A corrupt world or server file, a widget whose kind left the registry, or a crashed surface no longer takes the whole launcher down.
-
 ### Added
 - In-app UI editor (Ctrl+E): widget palette with search, drag-and-drop placement, cross-slot moves, slot orientation (Column / Row / Grid), a free-placement Canvas (move / resize / bring-to-front / send-to-back), per-widget backing (glass / corner radius / padding), weight drag-dividers, container and tabs widgets, and layout presets (save / load / export). Home, Library, the side rails, and the app shell are all editable widget surfaces.
 - Per-surface settings in the editor: a gear shown only for surfaces that expose settings (currently the left rail) opens a panel mirroring the widget prop panel, so a surface's own options live with the region they configure instead of a global screen. The panel is draggable by its header like the palette, toggles closed on a second tap, and writes through `CustomizationSettings`.
@@ -471,21 +528,6 @@ The customization release, consolidated. 2.3.4 makes the entire interface editab
 
 ## [2.3.4-beta5] - 2026-06-09
 
-A profile-and-updates release. The Profile is rebuilt around a live 3D
-render of your skin, with sign-in moved inside it and reachable while
-logged out. A new in-app update manager adds release channels, rollback,
-a desktop-shortcut install, and -- for developers -- building the launcher
-from source. Underneath: the launcher no longer dies on a corrupt world
-file, auth is carved into its own modules, and the AppImage gains a
-cross-distro release gate.
-
-### Highlights
-- **Your skin in 3D**. The Profile's account tab leads with a live, rotatable 3D render of your skin, drawn from scratch with no extra dependency.
-- **Sign in from the Profile**. The login form lives in the Profile and is reachable while logged out; the cramped right-rail login is gone.
-- **An update manager with channels**. The "i" by the version opens a manager: pick a channel (Release / Beta / Alpha, plus Dev / Git source builds), update or roll back to a recent version, and install a desktop shortcut.
-- **Background update checks**. The About screen checks for updates on its own every few minutes and tints the running version by its channel.
-- **A corrupt world or server file no longer crashes the launcher**. A malformed NBT length used to take the whole launcher down on scan.
-
 ### Added
 - 3D skin renderer in a new `hivens.ui.skin3d` package. A Compose-free core builds the player as textured boxes (head/body/arms/legs plus the overlay layer, classic vs slim arm width, legacy 64x32) from the standard Minecraft UV layout, rotates by yaw/pitch, projects orthographically, back-face culls, and depth-sorts (painter's). `SkinView3D` draws each surviving face with a single Skia `Canvas.drawImageRect` under a per-face affine `Matrix33` at NEAREST sampling, so texels stay sharp with no extra dependency; drag rotates and an idle auto-spin runs while the style engine's motion token is non-zero (Brut holds it still). The geometry, projection, cull and face-affine are unit-tested without a renderer.
 - `SkinManager.getRawSkin(nickname)` returns the raw skin texture (`ImageBitmap`) for the 3D view, reusing the existing disk + bounded-LRU cache and the path-traversal-safe cache filename. The baked 2D front/back paper-doll (`assembleSkin`, `getSkinFront`/`getSkinBack`) is removed.
@@ -515,26 +557,6 @@ cross-distro release gate.
 - Two no-op Compose keep-alive functions (`touchDerivedStateOf`/`touchSnapshot` in `DragAndDrop`): unused private methods the shrinker strips anyway (and the ProGuard config keeps `androidx.compose.**`/`hivens.ui.**` wholesale), so they kept nothing alive; `derivedStateOf` is genuinely used in `ConsoleWindow`.
 
 ## [2.3.4-beta4] - 2026-06-07
-
-The SmartyCraft-pack release. A modpack that targets a SmartyCraft
-server now connects and joins -- other players' skins included --
-without shipping anything of SmartyCraft's. Alongside that: offline
-relaunch of an installed pack, dependency-aware optional mods, a console
-that no longer freezes under a log flood, and adaptive-memory fixes.
-
-### Highlights
-- **SmartyCraft modpacks join their servers**. A pack from the mirror that
-  targets a SmartyCraft server now connects and joins, and other players'
-  custom skins load.
-- **Offline relaunch**. An already-installed pack starts with the network off;
-  a warm relaunch makes no network requests at all.
-- **Optional mods follow their dependencies**. Enabling an optional mod also
-  enables the shared libraries it needs, and switching one mod in an
-  interchangeable group (e.g. a recipe viewer) swaps the other out.
-- **A console that keeps up**. A heavy mod-load log flood no longer freezes or
-  crashes the launcher window.
-- **Adaptive memory reads your real RAM**. The installed build now detects the
-  host's RAM correctly, and adaptive sizing works under ZGC and Shenandoah.
 
 ### Added
 - SmartyCraft join through a small agent: for a pack bound to a SmartyCraft
@@ -572,21 +594,6 @@ that no longer freezes under a log flood, and adaptive-memory fixes.
 
 ## [2.3.4-beta3] - 2026-06-04
 
-Matures the adaptive memory from 2.3.4-beta2 into a three-tier model
-(Fixed / Automatic / Adaptive) and cleans up the release notes.
-
-### Highlights
-- **Automatic memory baseline**. A non-pinned instance now sizes its heap from
-  your machine's RAM (a sane share, capped) instead of a fixed default, so it
-  stops over-allocating on a small machine. The adaptive sizer refines this
-  baseline over a few sessions.
-- **Adaptive governs every instance**. The global Adaptive memory toggle now
-  applies to every instance, not just freshly-created ones. Pin a specific RAM
-  value to opt one out; turn the toggle off to keep the automatic baseline
-  without learning.
-- **See and set the mode**. The RAM selector shows an "Auto" chip with the heap
-  it currently resolves to, and pack instances get their own Settings tab for RAM.
-
 ### Changed
 - Adaptive heap derivation is peak-aware: it also covers churn-heavy packs and
   collectors that never report a major GC.
@@ -599,48 +606,12 @@ Matures the adaptive memory from 2.3.4-beta2 into a three-tier model
 
 ## [2.3.4-beta2] - 2026-06-03
 
-Adds the experimental adaptive memory sizer on top of 2.3.4-beta.
-
-### Highlights
-- **Adaptive memory (experimental)**. New instances measure their real heap use
-  while you play and right-size `-Xmx` over the next few launches, so a pack runs
-  smoother without hand-tuning RAM. On by default under the experimental settings;
-  pick a specific RAM value to opt that instance out.
-
 ### Added
 - Profiler agent: a small in-JVM measurement agent (GC / heap only, no mod contact)
   that records each session's metrics; the launcher derives the next launch's heap
   from them between runs.
 
 ## [2.3.4-beta] - 2026-06-03
-
-The customization release. The launcher's whole interface becomes
-editable: an in-app edit mode lets you rearrange, resize, and restyle
-every widget -- including the app shell itself -- and save the result as
-a preset. The UI also learns to recover: a crash reloads the shell
-instead of leaving a dead window. Alongside that: pack browsing and
-install from the mirror, a reworked console, multi-loader runtime
-support, and Russian / English / German across the interface.
-
-### Highlights
-- **Make the launcher yours**. Press Ctrl+E to edit. Drag, resize, and
-  rearrange every widget across the home, library, side rails, and the
-  app shell itself. A free-placement Canvas mode, per-widget glass
-  backing (corner / padding / opacity), and save / load / export of
-  layout presets.
-- **A UI that recovers instead of dying**. If the interface crashes, the
-  launcher reloads its shell on the fly; a repeated crash falls back to a
-  minimal quit-only safe screen rather than a frozen window.
-- **Browse and install packs from the mirror**. A catalogue page with a
-  pack detail view (Content / Files / Worlds), optional-mod toggles, and
-  dependency-aware grouping.
-- **A calmer console**. Quiet by default, themed to the active palette,
-  and available as a file-backed Logs tab on each pack.
-- **Smarty servers, without the spyware**. A Settings -> Smarty section
-  swaps SmartyCraft's proprietary Smarty mod for an open-source helper:
-  same network compatibility, none of the client-side surveillance. If no
-  open replacement exists for a server's game version, the launch is
-  blocked rather than quietly running the original mod.
 
 ### Added
 - In-app UI editor (Ctrl+E): widget palette with search, drag-and-drop
@@ -690,34 +661,6 @@ support, and Russian / English / German across the interface.
 - Experimental "Hivens Mirror" settings toggle.
 
 ## [2.3.3] - 2026-05-25
-
-Visual customization release. Custom background gains real
-animated-format support (GIF / APNG / animated WebP) with
-playback controls. A new experimental Customization screen
-exposes density, glass intensity, accent override, and a full
-per-role color override matrix on top of the active theme.
-
-### Highlights
-- **Animated wallpapers**. Pick a GIF, APNG, or animated WebP as
-  your custom background and it actually animates. Frame 0 shows
-  immediately on cold load instead of grey while the remaining
-  frames decode. New Animation speed slider (0.25 - 4x, live
-  during playback) and Loop mode picker (Use codec / Loop forever
-  / Play once -- the last one freezes on the last frame for
-  intro-and-settle patterns).
-- **Customization (experimental)**. New Settings entry exposes
-  density scale (0.85 - 1.15x, all `.dp` values), glass density
-  (0 - 100%, every glass surface in the launcher), accent color
-  override (free hex), and a full 7-role color override matrix
-  behind an experimental toggle.
-- **Glass density reaches every glass surface**. Sidebar, right
-  panel, dividers, every card and tile across every screen
-  respect the slider, not just the few screens it was first
-  wired into.
-- **GlassCard finally honours palette.glassAlpha**. The Glass
-  branch had been hardcoding `alpha = 0.7f` and ignoring the
-  palette's own field (0.60 dark, 0.65 light). Now reads the
-  palette correctly.
 
 ### Added
 - Multi-frame background decoder via Skiko `Codec`. Reads
@@ -778,25 +721,6 @@ per-role color override matrix on top of the active theme.
 
 ## [2.3.2] - 2026-05-24
 
-Same-day patch on 2.3.1. Three user-facing bugs surfaced within
-hours of the 2.3.1 release; this rolls them up.
-
-### Highlights
-- **Java 21 downloads work again** for users on CloudFlare WARP and
-  similar VPNs. The launcher now adds a real-browser User-Agent on
-  the JDK fetch and falls back to Adoptium / GitHub releases when
-  BellSoft's CloudFlare CDN refuses the request. Affects launching
-  Create and any other 1.21.x pack.
-- **"Move data directory" button works** again on every platform.
-  The release-build shrinker was culling FileKit internals reached
-  only from that one call site; a `keep` rule restores the affected
-  overload and a localized error line now surfaces on the rare
-  picker failure instead of a silent dead button.
-- **April Fools debug panel auto-scrolls into view** when unlocked
-  by the 5-tap Diagnostics title gesture. Previously the panel did
-  open but rendered below the visible scroll area on most window
-  sizes, which read as "the click did nothing but jiggle the list".
-
 ### Fixed
 - JDK download path silently 403'd from CloudFlare WARP exits
   (CloudFlare bot manager hostile to its own infrastructure when
@@ -831,28 +755,6 @@ hours of the 2.3.1 release; this rolls them up.
   move.)
 
 ## [2.3.1] - 2026-05-24
-
-Maintenance release focused on the Windows 11 installer bug that
-broke OneDrive users, plus a sweep of UI polish on the Style
-variant infrastructure that landed in 2.3.0's wake.
-
-### Highlights
-- **Windows 11 installer no longer breaks under OneDrive.** New
-  installs land in `%LocalAppData%\Nexira\Programs\` instead of the
-  OneDrive-synced Roaming tree, so `jvm.dll` stays materialised on
-  disk and the "Invalid Image" crash no longer triggers. Existing
-  Roaming installs are uninstalled silently when you run this
-  installer over them.
-- **Style variant infrastructure.** Settings now offers Celestia
-  (rounded, glassy, motion-rich) and Brut (sharp, flat, no glow,
-  no motion) as live-switchable UI looks. No restart required.
-- **Two-column Settings and Profile.** Vertical category navigation
-  on the left, selected section's form on the right. Form state
-  persists when you switch categories.
-- **Portable build ships a README** inside the `Nexira\` folder
-  explaining that `Nexira.exe`, `app\`, and `runtime\` must stay
-  together. Bilingual (EN / RU). Heads off the very common "copy
-  just the EXE to Desktop" mistake.
 
 ### Added
 - Style variant axis (`SettingsData.uiStyle`): Celestia (default,
@@ -934,27 +836,6 @@ variant infrastructure that landed in 2.3.0's wake.
 
 ## [2.3.0] - 2026-05-20
 
-Rebrand release. The launcher is now called **Nexira**; the underlying
-service it targets (SMARTYcraft) is unchanged, and so is the wire
-protocol, the auth flow, and the file-sync semantics. Existing Aura
-data is preserved through a mandatory migration UI on first Nexira
-launch.
-
-### Highlights
-- **Aura is now Nexira.** Window title, executable, install dir, data
-  dir, AppStream id, .desktop entry, GitHub repo and docs URL all
-  change. SmartyCraft compatibility is byte-identical to 2.2.16.
-- **Mandatory data migration on first launch.** When Nexira detects an
-  Aura-era data directory it shows a full-screen modal with size /
-  file count and a single "Migrate now" button. The copy runs with a
-  determinate progress bar; on completion the launcher asks for a
-  restart. The old Aura folder is left in place as a backup -- delete
-  manually once you've confirmed Nexira loads your settings.
-- **2FA accounts now cleanly rejected.** SMARTYcraft's two-factor
-  flow is not part of the documented protocol and was never working
-  reliably here. Nexira surfaces the limitation up-front instead of
-  failing at game launch.
-
 ### Changed
 - Window title / WM_CLASS / app bundle id all renamed:
   `AuraLauncher` -> `Nexira` (Windows / macOS install + dock name),
@@ -986,44 +867,6 @@ launch.
   and pre-2.3 directories so the migration UI can find old data.
 
 ## [2.2.16] - 2026-05-19
-
-Bug-fix + size-cut release. The headline is a UI-freeze fix that bit
-every user on every "Play" click — the tray library was making
-blocking D-Bus calls on the EDT during launch state transitions,
-holding up the whole window for seconds at a time. Alongside that,
-the distribution size drops noticeably (~10% on AppImage / DMG,
-similar on the Windows installer) thanks to a custom jlink + jpackage
-pipeline that finally lands the flags (`--vm=server`, `--strip-debug`,
-`--include-locales=en,ru,de`) that Compose Desktop's built-in
-`nativeDistributions` block never exposed. Internal: the build
-toolchain swaps from JetBrains Runtime to BellSoft Liberica, and the
-packaging infrastructure moves into a `buildSrc/` convention plugin
-so the AppImage shell script and the Windows / macOS jpackage path
-share one configuration source.
-
-### Highlights
-- **No more freeze on Play click** — clicking "Play" used to lock the
-  launcher window for several seconds while the system-tray library
-  made blocking D-Bus calls on the UI thread. Tray status updates are
-  now off the EDT entirely; the window stays responsive through the
-  whole launch flow. Affects every Linux user under
-  KDE / Hyprland / GNOME / Cinnamon.
-- **Smaller download across every platform.** The custom jlink runtime
-  drops the unused HotSpot VM variants (client + minimal, ~22 MB),
-  trims three unused JDK modules (`java.sql`, `java.naming`,
-  `java.net.http`), restricts locale data to en/ru/de, and strips
-  debug info. Compared to 2.2.15: AppImage and DMG drop by ~10 MB,
-  the Windows installer by a similar amount. Inner jlink compression
-  intentionally not applied; outer LZMA (Inno Setup) and squashfs-zstd
-  (AppImage) compress a raw runtime image more tightly than they can
-  a pre-compressed one (measured locally: a zip-9 inner pass costs
-  8 MB on the AppImage path and ~13 MB on the LZMA path).
-- **/diag endpoints for puppet** (developer-facing) — the puppet HTTP
-  control surface gains read-only diagnostic endpoints
-  (`/diag/threads`, `/diag/jvm`, `/diag/actions`, `/diag/snapshot`)
-  for automated profiling and freeze diagnosis. Off
-  `Dispatchers.Swing` by design so they do not perturb what they
-  measure. Available only in puppet builds (`-PauraPuppetPort=N`).
 
 ### Added
 - `aura.packaging` convention plugin in `buildSrc/` — typed Gradle
@@ -1088,51 +931,6 @@ share one configuration source.
   Liberica swaps.
 
 ## [2.2.15] - 2026-05-18
-
-Network plumbing + UI responsiveness release. The "Force proxy mode"
-toggle from 2.2.13 finally takes effect across every smartycraft.ru
-request, not just the auth handshake -- skins, news images and pack
-syncs now honour the user's choice and react to it without a
-relaunch. Several "the launcher froze when I clicked X" reports trace
-back to native `Desktop.open` / `Desktop.browse` calls running on the
-Compose UI thread; every such call now dispatches to a daemon thread
-so a wedged `xdg-desktop-portal` D-Bus can no longer hold up the
-window. The integrity walk that hashes every file in a modpack now
-emits progress while it works, so a cold launch on a 1000-file pack
-no longer looks frozen for tens of seconds. Plus an architectural
-sweep -- `LauncherController` moves to the right module, the chaos
-subsystem hides behind a CompositionLocal, several long-standing
-god-files and singleton patterns get cleaned up.
-
-### Highlights
-- **"Force proxy mode" actually does what it says** -- pre-fix the
-  toggle only affected the auth handshake. Skins, news images and
-  pack-file downloads stayed pinned to the SOCKS proxy regardless of
-  the setting, so users in networks where `proxy.smartycraft.ru:58613`
-  is unreachable saw login work but everything else silently fail.
-  Every smartycraft.ru request now reads the toggle freshly per call;
-  flipping it in Settings takes effect on the next request without a
-  restart.
-- **News strip can retry after network recovery** -- the news feed
-  used to fetch exactly once on startup; a single failure stuck it
-  in the empty state for the rest of the session. The empty state
-  now has a Retry button that bypasses the in-memory cache, and the
-  feed re-fetches automatically on a force-proxy or SSL-bypass
-  toggle.
-- **Click handlers don't freeze the launcher anymore** -- `Desktop.open`
-  and `Desktop.browse` (Open folder, View on GitHub, Report on GitHub,
-  news links, register button, ...) now dispatch to a daemon thread.
-  A stuck `xdg-desktop-portal` D-Bus or misconfigured `xdg-open`
-  on Linux can no longer hold up the EDT.
-- **Integrity walk shows progress** -- when the launcher hashes every
-  file in a 1000-file modpack before deciding what to download, the
-  progress bar now advances visibly through that phase instead of
-  freezing at 20% for tens of seconds.
-- **Custom upstream version pin** -- new opt-in field in Settings
-  (Experimental section) lets users override the version string the
-  launcher sends to the upstream handshake, in case the upstream pins
-  a newer version before the next Aura release ships. Persisted across
-  restarts; applied without one.
 
 ### Added
 - `SettingsData.mimicVersionOverride` + Experimental row in Settings
@@ -1283,54 +1081,6 @@ window go" support tickets.
   dock-style fallback for close-while-game-running.
 
 ## [2.2.13] - 2026-05-15
-
-Security, concurrency, and platform-completion release. The auto-updater
-now refuses to install bytes it cannot integrity-verify against a manifest
-hash. The mod-pack file sync gained a sample-existence sanity gate that
-catches the case where the manifest cache says "synced" but the actual
-files are gone (the bug behind the empty-classpath crash on cold launches).
-Two-factor authentication finally works in the launcher itself instead of
-locking out 2FA-enabled accounts. macOS Apple Silicon joins Linux and
-Windows on the OS-keyring path. Conduit pillar — the network-layer
-refactor — is feature-complete; the `Network.BASE_URL` constant is no
-longer reached by production code.
-
-### Highlights
-- **TOTP 2FA login** — accounts with two-factor authentication enabled
-  in SmartyCraft can now sign in directly from Aura. A 6-digit code
-  prompt appears after the password step; wrong codes re-prompt
-  inline; expired sessions surface a clear "log in again" message
-  instead of getting stuck in a verify loop. Russian / English /
-  German strings shipped.
-- **Auto-update refuses unverified installers** — every released asset
-  now requires a SHA-256 entry in `release-manifest.json` before the
-  launcher will install it. The pre-fix path silently treated an empty
-  hash as success, which would have driven arbitrary bytes through the
-  updater if anyone had edited a release page out from under it. Older
-  releases that pre-date the manifest convention require manual
-  reinstall — the auto-updater will refuse them rather than guess.
-- **Cold-launch reliability fixes** — three classes of "click Play,
-  game dies" reports addressed: (a) the manifest cache no longer lies
-  when the client directory has been wiped between syncs (e.g. after a
-  data-dir move or manual `rm`); (b) the natives-folder validity gate
-  now requires the actual `lwjgl` library, not just any `.so` file
-  (jinput-only directories used to pass and crash the game with
-  `UnsatisfiedLinkError`); (c) `mods/*.jar` files are spot-checked
-  for ZIP integrity even when their MD5 matches, catching the rare
-  corrupt-bytes-with-correct-hash case that NeoForge would otherwise
-  surface as "invalid CEN header" mid-launch.
-- **macOS keyring (Apple Silicon)** — the third platform on the OS
-  keyring path, after Linux libsecret and Windows DPAPI. Passwords
-  and access tokens land in the user's login Keychain via the modern
-  `SecItem*` API (Project Panama bindings to Security.framework).
-  Falls back to the per-machine AES-GCM file when Keychain isn't
-  reachable, identical to the Linux/Windows flow.
-- **macOS Intel as community-tier** — Apple Silicon stays tier-1 (built
-  on every release tag); Intel macOS now ships asynchronously via a
-  manual `workflow_dispatch` build and is named
-  `*-x86_64-community.dmg` so the support shape is obvious from the
-  filename. The README has a new "Platform support tiers" section
-  spelling out what tier-1 vs community means.
 
 ### Added
 - `hivens.launcher.security.MacOSKeychainStorage` — Project Panama
@@ -1489,46 +1239,6 @@ longer reached by production code.
 
 ## [2.2.12] - 2026-05-14
 
-Security and platform-completion release. Passwords and login tokens now
-live in your OS keyring instead of an AES-GCM file (Vault — Linux libsecret
-and Windows Credential Manager wired up; macOS pending). The "accept SSL
-warning" flow stops being all-or-nothing: each bypass is per-host and
-expires. Bridge pillar gets the missing UI for moving the data directory
-without env-var hackery. macOS finally ships proper dual-architecture
-DMGs with a real app icon. Plus a continuous AppImage portability check
-in CI to catch "works on my distro" regressions before users do.
-
-### Highlights
-- **OS keyring integration** (Vault): launcher credentials now persist
-  to GNOME Keyring / KWallet via libsecret on Linux and to Credential
-  Manager (DPAPI) on Windows. Falls back to a per-machine AES-GCM file
-  if no keyring is reachable, so nothing breaks on minimal desktops or
-  headless installs. Both the password and the access token are
-  protected — previously only the password was. macOS keyring impl is
-  the next chunk.
-- **Per-host SSL bypass with expiry**: when you accept a certificate
-  warning, the bypass is now scoped to that host and ends when you say
-  it does — session-only by default, with optional 1 hour / 1 day /
-  7 days. Previous behaviour granted "trust every HTTPS call this
-  process makes" until the launcher restarted. Settings → Network lists
-  every active bypass with a Revoke button.
-- **Move data directory** without touching `AURA_DATA_DIR`. Settings →
-  Data directory → pick a new location → "Quit now" or schedule for
-  next launch. The picker uses your desktop's native dialog
-  (xdg-desktop-portal on Linux, AppKit on macOS, Win32 on Windows)
-  instead of the Swing JFileChooser that looked broken on Hyprland and
-  several KDE themes.
-- **macOS dual-architecture DMGs** — separate builds for Apple Silicon
-  (`*-aarch64.dmg`) and Intel (`*-x86_64.dmg`). Auto-updater now reads
-  `os.arch` and downloads the correct one; previously the first DMG
-  asset wins, which on a dual-arch release produced a 50/50 wrong-arch
-  install. Plus a proper `.icns` app icon — the default Compose K-folder
-  placeholder is gone.
-- **Daily AppImage portability check**: a CI matrix downloads the latest
-  released AppImage on Fedora / Arch / Debian-stable containers and
-  verifies the app actually starts. Catches glibc / GTK / Skiko-loader
-  regressions on distros the maintainer doesn't run day-to-day.
-
 ### Added
 - `hivens.core.security.IKeyringStorage` interface in `client-core` —
   contract for `store(account, secret)` / `retrieve(account)` /
@@ -1684,57 +1394,6 @@ in CI to catch "works on my distro" regressions before users do.
 
 ## [2.2.11] - 2026-05-12
 
-Infrastructure-heavy release focused on debuggability when something goes
-wrong: a proper logging pipeline (Pulse), a one-click diagnostic bundle
-(Beacon), the actual fix for the KDE/GNOME tray hover-title bug, and a
-better unauthenticated dashboard state. Plus three audit-driven fixes
-that catch regressions before users see them.
-
-### Highlights
-- **Centralised logging pipeline** (Pulse): launcher now writes
-  structured rolling log files to the platform-correct data directory
-  — `launcher.log`, `network.log`, `game.log` and `crash.log`, each
-  with size + age caps. Game stdout/stderr persists automatically (no
-  more "I forgot to save the console before the crash"). Crash forensics
-  survive 30 days in `crash.log` even when active logs roll faster.
-- **Per-launch tagging in logs**: every line carries
-  `[sessionId/launchId]` — shipping a 200 MB log dump for support and
-  needing only the last Play attempt? `grep launchId=abcd1234 *.log`
-  slices to that one launch.
-- **Token / password / UUID redaction** before any log line hits disk
-  or the in-app console — screenshots and copy-pastes from the console
-  for support are safe to share without manually scrubbing the
-  `accessToken=...` lines.
-- **One-click diagnostic bundle** (Beacon): Settings → Diagnostics →
-  "Create diagnostic bundle" → ZIP with system info, the action history
-  ring, all redacted log files, and every crash report — open the
-  containing folder so you can attach the file to a support message
-  in one motion.
-- **"Report on GitHub" buttons** on the crash dialog and next to the
-  diagnostic-bundle button — opens a browser at a pre-filled
-  `github.com/issues/new` URL with the crash report (or a body asking
-  you to drag-attach the bundle ZIP) already in the editor. Nothing
-  leaves your machine until you review and click Submit on github.com;
-  the launcher itself never POSTs anything. Designed as the principled
-  alternative to telemetry — convenient for both sides without a
-  phone-home codepath in the binary.
-- **Action history ring buffer** behind the scenes: the last 64
-  user/lifecycle events with timestamps. Replaces the old
-  `lastAction = "..."` (one global string, only ever the most recent
-  thing). Crash reports now include the full trail leading up to the
-  crash, not just the last entry.
-- **KDE/GNOME tray hover now actually says "Aura Launcher"** instead
-  of "SystemTray". The previous tooltip-removal in 2.2.10 didn't fix
-  the underlying cause — AppIndicator's hover text comes from the
-  constructor argument to `SystemTray.get()`, not from `setTooltip()`.
-- **Sign-in screen no longer shows a vacant spinning indicator**:
-  when the launcher is waiting on user login, the main panel now
-  shows an explicit "Sign in to see servers" message with a hint
-  pointing at the right-side login form. Previously, both the brief
-  startup-loading state AND the stable unauthenticated state rendered
-  the same tiny spinner, making it look like servers were forever
-  trying to load.
-
 ### Added
 - `client-ui/src/desktopMain/resources/logback.xml` — central logging
   config with four rolling-file appenders. Output dir resolves from
@@ -1854,71 +1513,6 @@ that catch regressions before users see them.
 
 ## [2.2.10] - 2026-05-12
 
-UX polish chunk anchored on the new visual JVM Args Builder — a Compose
-dialog for picking GC algorithm and tuning flags so users no longer
-have to hand-type Aikar's recipe to get smooth modded MC. Plus the
-usual round of stability fixes, a saner default heap size, full
-Console-window localisation that was previously hardcoded English,
-and a new gothic dark-red theme.
-
-### Highlights
-- **Visual JVM Args Builder** (experimental opt-in): pick GC (G1 / ZGC
-  / Shenandoah / ParallelGC / SerialGC), tune G1 region size and pause
-  targets via sliders, enable AppCDS or JFR profiling — all without
-  memorising `-XX:+UnlockExperimentalVMOptions`. Six curated presets
-  cover Aikar's flags (canonical modded MC), Heavy modded (GTNH-class),
-  Vanilla G1 (stock baseline), ZGC and Shenandoah for huge heaps, plus
-  ParallelGC throughput. Live preview at the bottom shows the composed
-  arg string. Enable under Settings → Experimental features.
-- **Auto-sync installed packs on launch** (experimental opt-in): the
-  launcher quietly refreshes every server pack you've already installed
-  at startup. Useful if you hop between multiple servers and want
-  fresh state without clicking each one. Sequential to avoid bandwidth
-  contention. Cheap when nothing changed — the 2.2.9 manifest cache
-  short-circuits the integrity walk.
-- **NeoForge `--fml.*` args auto-detect**: launcher now reads the
-  required NeoForge / FML / NeoForm version values directly from the
-  populated `libraries-{mc}/` directory and the universal jar's
-  manifest. Removes the recurring "smrt-deco bumped, Aura's hardcoded
-  version doesn't match, NeoForge fails to register the `neoforge`
-  mod and every dependent mod shows `[MISSING]`" failure mode. Baked-
-  in values stay as a safety-net fallback.
-- **Default heap bumped 4 → 6 GB** for new per-server profiles: 4 GB
-  was borderline tight for the SmartyCraft modpack class (50-70 mods).
-  RamSelector still caps choices at 75 % of detected system RAM, so
-  the default scales down gracefully on low-RAM machines.
-- **Blood Rain theme**: first warm-dark gothic option in the theme
-  picker. All accents stay inside the dark-red family (no cool
-  counterpoint) for a "blood rain on a moonless night" mood. Sits
-  opposite the existing cool-electric presets (Cyberpunk / Vaporwave
-  / Synthwave / Neon Dreams).
-- **Console window fully localised** (EN / RU / DE): window title,
-  filter labels, action tooltips, search placeholder, jump-to-bottom
-  button — all previously hardcoded English. Three i18n keys
-  (`consoleTitle`, `consoleCopyAll`, `consoleClear`) had existed in
-  `AppStrings` since an earlier refactor but were never wired to the
-  screen; fixed alongside the new keys.
-- **RAM custom-value field no longer clips its placeholder**: the
-  `OutlinedTextField` had been forced to 48 dp height, below the
-  Material3 default ~56 dp the placeholder layout assumes. The
-  placeholder digit appeared to "fall through" the bottom border.
-- **Server settings bottom buttons unified**: Open Folder, Reset
-  Client, and Return to Spawn now all render in the same outlined
-  Celestia style. Open Folder and Spawn Reset were previously
-  `AprilFoolsButton` with a transparent-container hack that made them
-  read as floating text instead of buttons.
-- **Tray init race fix**: the close-request callback treats a close
-  as "minimise" while the tray subsystem is still initialising.
-  Previously, on systems where dorkbox/SystemTray takes up to a
-  minute to fall back to the GTK status icon, the launcher could
-  exit before the tray ever appeared — silently, with no error.
-- **Offline launches now rebuild the classpath**: per-server
-  `ManifestCache` persists the full manifest content alongside its
-  hash, so `LauncherController`'s offline branch has the data it
-  needs. Previously the cache stored only the hash and offline mode
-  produced an empty classpath that failed with a confusing
-  class-not-found error.
-
 ### Added
 - `JvmConfig` model in `client-core/jvm/` composing `G1Tuning` /
   `ZgcTuning` / `ShenandoahTuning` / `CdsConfig` / `JitConfig` /
@@ -2003,48 +1597,6 @@ and a new gothic dark-red theme.
 
 ## [2.2.9] - 2026-05-10
 
-Stability sweep — four user-visible reliability fixes that ride on the
-infrastructure shipped in 2.2.8. Targeted at the failure classes observed
-in production logs: mid-stream HTTP/2 resets on the SOCKS-proxied
-SMARTYcraft channel, downloads restarting from byte 0 on every flake,
-duplicate auth requests on the dashboard → Play flow, and the
-single-instance gate failing to actually raise the existing window on
-KDE / Hyprland / GNOME.
-
-### Highlights
-- **Cold-start much faster after a clean session**: when the server
-  manifest hasn't changed since the last successful sync (TTL 7 days),
-  the launcher skips the per-file MD5 integrity walk. On a 1000-file
-  modpack this collapses multi-second checks into a single hash compare.
-- **Orphan files now actually leave**: when the upstream modpack
-  removes a mod, the corresponding local file is pruned on next sync
-  (was: lingered forever, often causing mismatch crashes on join).
-- **User-extendable protected-paths list**: drop a mod into
-  `dataDir/protected-paths.json` and the launcher will never overwrite
-  configs under that directory, even when the manifest says they're
-  stale. Defaults shipped with the file on first run.
-- **SMARTYcraft channel pinned to HTTP/1.1**: h2 multiplexing over the
-  upstream SOCKS proxy was dropping mid-stream on long bodies. 1.1 with
-  parallel connections trades multiplexing for resilience. Direct channel
-  (GitHub releases, BellSoft JDKs, Maven Central) is unaffected.
-- **Auth and downloads now retry on transient resets** (3 attempts, 1 s /
-  3 s / 9 s backoff). Auth-rejection responses and SSL cert errors are
-  explicitly *not* retried — those need user attention, not a silent loop.
-- **Downloads resume via `Range:`** instead of restarting from byte 0.
-  A 100 MB asset that drops at 70 % now costs seconds to recover instead
-  of restarting the whole transfer.
-- **Per-server session cache** in `AuthService`: dashboard list refresh
-  and the actual server-launch auth used to fire two back-to-back logins
-  for the same server. The second one now returns the 30-second-cached
-  session without hitting the network — fewer requests, fewer chances to
-  trip the upstream's "sessions don't dedup" race.
-- **Single-instance gate raises the existing window**: second-launch
-  attempts previously only flipped `visible = true`, leaving the window
-  minimised or buried under other windows on KDE / Hyprland / GNOME.
-  Now un-minimises and pulses `isAlwaysOnTop` to force a true raise.
-  Lock file also stores the holder PID for diagnostics
-  (`cat ~/.local/share/aura-launcher/.lock`).
-
 ### Added
 - `RetryWithBackoff` utility in `client-core/util/`. Generic suspend
   wrapper with caller-supplied retry predicate; deliberately narrow.
@@ -2092,33 +1644,6 @@ KDE / Hyprland / GNOME.
 
 ## [2.2.8] - 2026-05-10
 
-Update Channels chunk — gives the launcher two new tools for surviving the
-upstream cadence: a server-controlled mandatory-update floor (so the launcher
-refuses to start when the protocol breaks compat with installed builds), and
-an opt-in pre-release channel (so RC builds reach users before the next
-stable cut). Both gated by a master "Experimental features" toggle. Shipped
-as a non-prerelease so existing 2.2.7-rc3 users actually receive it — older
-launchers ignore prereleases by GitHub API contract.
-
-### Highlights
-- **Mandatory updates**: launcher refuses to start when the installed version
-  drops below `mandatory_min_version` published in `meta/update-channel.json`.
-  No new server infra — the file lives on the `stable` branch and is updated
-  via PR. Triggers a non-dismissable dialog with "Install" or "Quit".
-- **Pre-release update channel**: opt in to receive RC and beta builds before
-  the next stable. Currently ON by default while the upstream protocol is a
-  moving target; expected to flip to OFF once cadence stabilises.
-- **Experimental features master toggle** in Settings — gates both knobs
-  above with a single switch for users who want a calm upgrade story.
-- **Near-real-time mandatory rollouts**: a long-running launcher session
-  polls `update-channel.json` every 5 minutes (cheap, no GitHub API quota),
-  so when an emergency upgrade is published the user sees the blocking
-  dialog within ~5 minutes — no need to restart the launcher to pick it up.
-  Routine release checks stay on the existing 12 h cadence.
-- Strict version comparison in the update flow: `1.3.0 > 1.3.0-rc3`,
-  `rc1 < rc2 < rc3`, `alpha < beta < rc`. Without this the prerelease channel
-  would consider RC bumps within the same base "the same version".
-
 ### Added
 - `meta/update-channel.json` — out-of-band channel metadata fetched via the
   direct HTTP channel (no SMARTYcraft proxy dependency). Carries
@@ -2152,49 +1677,9 @@ launchers ignore prereleases by GitHub API contract.
 
 ## [2.2.7-rc3] - 2026-05-10
 
-Release candidate for [2.2.7], superseding rc2 with the freshly-rotated
-upstream version pin (smrt-deco 3.6.5, pushed 2026-05-10) and a runtime
-knob to ride out the *next* upstream rotation without waiting for a
-launcher release. CI internals also got a couple of paper-cut fixes —
-metainfo injection now uses `xmlstarlet` instead of regex-on-XML, and
-the AppImage assembly bash moved from inline yaml into a shell script.
-
-### Highlights
-- Mimicked launcher version bumped to **SMARTYcraft 3.6.5** (rc2 was 3.6.4).
-  No protocol bytes changed beyond the version string; proxy creds, AES
-  params and salt are all unchanged.
-- New **experimental override** for the mimicked version: pass
-  `-Dsmrt.mimic.version=X.Y.Z` on the JVM command line to claim a different
-  launcher version without rebuilding. Useful when upstream rotates the
-  pin and a launcher update has not shipped yet.
-
 ## [2.2.7-rc2] - 2026-05-07
 
-Release candidate for [2.2.7]. Same code; canary tag for catching install
-regressions on Windows / macOS / Linux before the public bump. (rc1 failed
-on Inno Setup `VersionInfoVersion` strict-version validation; fixed by
-stripping the pre-release suffix in setup.iss the same way build.gradle.kts
-already does for Compose's `packageVersion`.)
-
-### Highlights
-- **Required upgrade** once promoted: SMARTYcraft 3.6.4 protocol sync, plus a
-  new direct HTTP channel that keeps auto-update alive when the upstream
-  proxy is unreachable. See [2.2.7] below for the full notes.
-
 ## [2.2.7] - 2026-05-07
-
-### Highlights
-- **Required upgrade**: SMARTYcraft 3.6.5 protocol sync — proxy credentials
-  rotated upstream, so anything older than this build cannot authenticate.
-- Auto-updater and JDK/natives downloads now bypass the SMARTYcraft proxy,
-  so the launcher can still update itself when the upstream is unreachable.
-- Window icon and WM_CLASS render correctly on KDE Plasma, Hyprland and
-  GNOME — workspace overviews show the proper hi-res launcher icon instead
-  of a generic "broken file" glyph, on every JDK vendor.
-- Per-OS data directory with automatic migration from `~/.aura`; relocate
-  via the `AURA_DATA_DIR` env var.
-- Update dialog reads a tidy "What's new" summary from a published
-  `release-manifest.json` instead of scraping the raw changelog body.
 
 ### Added
 - Direct HTTP channel (`HttpClientProvider` qualified `named("direct")`) for

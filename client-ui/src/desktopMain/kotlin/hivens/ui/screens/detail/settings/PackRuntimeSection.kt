@@ -17,10 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.InstanceRuntime
+import hivens.core.data.RuntimePrefs
 import hivens.core.data.PackInstance
-import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.PackOrigin
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.JvmArgsPresets
 import hivens.core.jvm.JvmConfig
@@ -53,28 +55,23 @@ import java.nio.file.Path
 internal fun PackRuntimeSection(
     pack: PackInstance,
     instanceDir: Path,
-    onInstanceChange: (PackInstance) -> Unit,
+    save: (PackInstance) -> Unit,
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
-    val repo: IPackRepository = koinInject()
     val profilerStore: ProfilerProfileStore = koinInject()
     val settingsService: ISettingsService = koinInject()
+    val javaManager: IJavaManager = koinInject()
     val scope = rememberCoroutineScope()
     val runtime = pack.runtime
 
-    fun commit(rt: InstanceRuntime) {
-        val updated = pack.copy(runtime = rt)
-        onInstanceChange(updated)
-        scope.launch { repo.put(updated) }
-    }
+    fun commit(rt: InstanceRuntime) = save(pack.copy(runtime = rt))
 
     // Auto-heap resolution mirrors the old settings tab: the adaptive profile when
     // enabled and present, else the physical-memory heuristic.
     var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
     LaunchedEffect(instanceDir) {
-        val settings = settingsService.getSettings()
-        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
+        val adaptiveOn = settingsService.getSettings().adaptiveMemoryEnabled
         val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(instanceDir)?.derivedHeapMb } else null
         resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
     }
@@ -87,7 +84,9 @@ internal fun PackRuntimeSection(
         RamSelector(
             isAuto = !runtime.fixedMemory,
             resolvedAutoMb = resolvedAutoMb,
-            currentMb = if (runtime.memoryMb > 0) runtime.memoryMb else 4096,
+            // Nothing pinned: offer what the next launch would use anyway, so
+            // leaving Auto starts from the real number rather than a constant.
+            currentMb = runtime.memoryMb.takeIf { it > 0 } ?: resolvedAutoMb,
             onAutoSelected = { commit(runtime.copy(fixedMemory = false)) },
             onValueChanged = { commit(runtime.copy(memoryMb = it, fixedMemory = true)) },
             modifier = Modifier.fillMaxWidth(),
@@ -95,7 +94,7 @@ internal fun PackRuntimeSection(
     }
 
     NxSection(s.packSettingsEnvironment) {
-        val major = pack.cachedManifest?.javaMajor
+        val major = requiredJavaMajor(pack, javaManager)
         Column(Modifier.fillMaxWidth()) {
             Text(s.packSettingsJava, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             NxField(
@@ -194,7 +193,7 @@ internal fun PackRuntimeSection(
                 ?: JvmArgsPresets.default.config,
             // The runtime the args will be handed to, so the builder does not
             // compose a flag this pack's JDK no longer recognises.
-            javaMajor = pack.cachedManifest?.javaMajor,
+            javaMajor = requiredJavaMajor(pack, javaManager),
             onDismiss = { showJvmBuilder = false },
             onApply = { newArgs ->
                 commit(runtime.copy(jvmArgs = newArgs.ifBlank { null }))
@@ -202,4 +201,20 @@ internal fun PackRuntimeSection(
             },
         )
     }
+}
+
+/**
+ * The Java the next launch would pick for this instance.
+ *
+ * The mirror declares the runtime in its manifest and is taken at its word. No
+ * other source does: what is stored for them is the launcher's own reading of
+ * the Minecraft version, taken once at install and never revisited -- so an
+ * instance installed while that reading was wrong went on reporting the wrong
+ * runtime long after it was corrected. Reading it again here costs nothing and
+ * cannot go stale.
+ */
+private fun requiredJavaMajor(pack: PackInstance, javaManager: IJavaManager): Int? {
+    val manifest = pack.cachedManifest ?: return null
+    if (pack.packRef.origin == PackOrigin.Mirror) return manifest.javaMajor
+    return javaManager.detectJavaVersion(manifest.minecraftVersion)
 }

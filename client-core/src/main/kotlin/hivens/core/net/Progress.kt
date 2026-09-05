@@ -44,6 +44,13 @@ internal class BlockProgress(
  * The per-file last-known count is kept so the aggregate can be moved by a delta
  * instead of summing the map on every chunk. One coroutine owns one file's entry,
  * so the read-modify-write on it needs no lock of its own.
+ *
+ * Emission itself IS serialized, and that is not about the counters -- they are
+ * atomic. It is about the order the consumer is told things in. Every transfer in
+ * a set reports from its own thread, so a reporter descheduled between reading
+ * the counters and handing them over delivers a stale picture after a fresher
+ * one. At the end of a set that is the last word the consumer gets, and a bar
+ * that stops at four of five files never moves again.
  */
 internal class SetProgress(
     private val totalBytes: Long,
@@ -55,6 +62,7 @@ internal class SetProgress(
     private val doneBytes = AtomicLong(0)
     private val doneFiles = AtomicLong(0)
     private val lastEmitAt = AtomicLong(0)
+    private val emitLock = Any()
 
     @Volatile
     private var current: String = ""
@@ -97,23 +105,29 @@ internal class SetProgress(
         if (!force && !lastEmitAt.compareAndSet(last, now)) return
         if (force) lastEmitAt.set(now)
 
-        val bytes = doneBytes.get()
-        val windowMs = now - windowStartAt.get()
-        if (windowMs >= RATE_WINDOW_MS) {
-            rate = (bytes - windowStartBytes.get()) * 1000 / windowMs
-            windowStartAt.set(now)
-            windowStartBytes.set(bytes)
-        }
-        onProgress(
-            TransferProgress(
-                done = bytes,
-                total = totalBytes,
-                bytesPerSecond = rate,
-                filesDone = doneFiles.get().toInt(),
-                filesTotal = filesTotal,
-                current = current,
+        // Reading the counters and delivering them is one step, or the delivery
+        // order stops matching the order the counts were taken in. The throttle
+        // above means this is entered rarely; the forced emissions at the end of
+        // a set are the ones that have to arrive in the right order.
+        synchronized(emitLock) {
+            val bytes = doneBytes.get()
+            val windowMs = now - windowStartAt.get()
+            if (windowMs >= RATE_WINDOW_MS) {
+                rate = (bytes - windowStartBytes.get()) * 1000 / windowMs
+                windowStartAt.set(now)
+                windowStartBytes.set(bytes)
+            }
+            onProgress(
+                TransferProgress(
+                    done = bytes,
+                    total = totalBytes,
+                    bytesPerSecond = rate,
+                    filesDone = doneFiles.get().toInt(),
+                    filesTotal = filesTotal,
+                    current = current,
+                )
             )
-        )
+        }
     }
 
     private companion object {

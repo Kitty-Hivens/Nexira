@@ -32,35 +32,12 @@ data class WidgetInstance(
     // Cell placement when the enclosing slot is CubeGrid (col/row + span in cells).
     // Null for non-grid slots -- back-compat default for old layouts.
     val cell: GridCell? = null,
-    // Per-instance backing the kernel paints around the widget (glass card,
-    // corner, padding). Null = no backing -- back-compat default for old
-    // layouts. The editor's "Backing" section sets it on ANY widget, propless
-    // included. Rendered in production via LocalWidgetChromeRenderer.
-    val chrome: WidgetChrome? = null,
+    // Per-instance surface the kernel paints around the widget. Null = none --
+    // back-compat default for a widget that wants no plane of its own. The
+    // editor's "Surface" section sets it on ANY widget, propless included.
+    // Rendered in production via LocalWidgetSurfaceRenderer.
+    val surface: SurfaceSpec? = null,
 )
-
-// Optional backing painted around a widget by the kernel: a glass card behind
-// it ([glassAlphaPct] 0 = none), rounded corners ([cornerRadiusDp]), and inner
-// padding. [paddingDp] is the uniform baseline; each side may override it via
-// [paddingTopDp] / [paddingEndDp] / [paddingBottomDp] / [paddingStartDp], where
-// -1 means "inherit the uniform value". Compose-free (widget-model carries no
-// Compose); the kernel turns these scalars into a Modifier via the injected
-// LocalWidgetChromeRenderer.
-@Serializable
-data class WidgetChrome(
-    val glassAlphaPct: Int = 0,
-    val cornerRadiusDp: Int = 0,
-    val paddingDp: Int = 0,
-    val paddingTopDp: Int = -1,
-    val paddingEndDp: Int = -1,
-    val paddingBottomDp: Int = -1,
-    val paddingStartDp: Int = -1,
-) {
-    val effectiveTop: Int    get() = if (paddingTopDp    >= 0) paddingTopDp    else paddingDp
-    val effectiveEnd: Int    get() = if (paddingEndDp    >= 0) paddingEndDp    else paddingDp
-    val effectiveBottom: Int get() = if (paddingBottomDp >= 0) paddingBottomDp else paddingDp
-    val effectiveStart: Int  get() = if (paddingStartDp  >= 0) paddingStartDp  else paddingDp
-}
 
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
 // the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows
@@ -126,7 +103,7 @@ data class LayoutGraph(val surfaces: Map<SurfaceId, SurfaceLayout> = emptyMap())
     }
 }
 
-// (SurfaceId, SlotId) pair. Retained for chrome-level callers that
+// (SurfaceId, SlotId) pair. Retained for surface-level callers that
 // only care about the leaf coordinates and do not navigate the path.
 // Internal transforms operate on SlotPath; SlotAddress.toPath() bridges
 // when needed.
@@ -190,34 +167,38 @@ fun LayoutGraph.updateWidgetProps(
     path: SlotPath,
     instanceId: String,
     props: JsonObject,
-): LayoutGraph =
-    mutate(path) { content ->
-        if (content.widgets.none { it.instanceId == instanceId }) content
-        else content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(props = props) else it
-            },
-        )
-    }
+): LayoutGraph = updateInstance(path, instanceId) { it.copy(props = props) }
 
-// Sets (or clears, with null) the per-instance backing chrome. Same no-op /
-// missing-instance contract as updateWidgetProps. A no-backing chrome
+// Sets (or clears, with null) the per-instance surface. Same no-op /
+// missing-instance contract as updateWidgetProps. An all-default surface
 // normalizes to null so the field stays absent for default-styled widgets.
-fun LayoutGraph.updateWidgetChrome(
+fun LayoutGraph.updateWidgetSurface(
     path: SlotPath,
     instanceId: String,
-    chrome: WidgetChrome?,
+    surface: SurfaceSpec?,
 ): LayoutGraph {
-    val normalized = chrome?.takeUnless { it == WidgetChrome() }
-    return mutate(path) { content ->
-        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-        if (target.chrome == normalized) return@mutate content
-        content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(chrome = normalized) else it
-            },
-        )
-    }
+    val normalized = surface?.takeUnless { it == SurfaceSpec() }
+    return updateInstance(path, instanceId) { it.copy(surface = normalized) }
+}
+
+// Every per-instance transform is the same three steps: find the instance in the
+// slot, leave the graph alone when [edit] returns what was already there, and
+// otherwise rebuild the list with that one widget replaced. Written out five
+// times, it was five chances for the no-op contract to be spelled differently --
+// and one of them did not check at all.
+//
+// Returning the same SlotContent is what makes a no-op a real one: [mutate]
+// decides by reference identity, so an edit that changes nothing has to hand the
+// same object back rather than an equal copy.
+private fun LayoutGraph.updateInstance(
+    path: SlotPath,
+    instanceId: String,
+    edit: (WidgetInstance) -> WidgetInstance,
+): LayoutGraph = mutate(path) { content ->
+    val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
+    val next = edit(target)
+    if (next == target) return@mutate content
+    content.copy(widgets = content.widgets.map { if (it.instanceId == instanceId) next else it })
 }
 
 // Phase G layout transforms. Slot orientation + grid column count are
@@ -363,7 +344,7 @@ private fun fitCubeSpan(col: Int, row: Int, colSpan: Int, rowSpan: Int, others: 
     var c = colSpan.coerceAtLeast(1)
     var r = rowSpan.coerceAtLeast(1)
     fun free() = others.none { cubeOverlap(col, row, c, r, it) }
-    while ((c > 1 || r > 1) && !free()) { if (c >= r && c > 1) c-- else if (r > 1) r-- else c-- }
+    while ((c > 1 || r > 1) && !free()) { if (c >= r) c-- else r-- }
     return c to r
 }
 
@@ -379,29 +360,12 @@ private fun applyCubeCell(content: SlotContent, seeded: List<WidgetInstance>, mo
 }
 
 fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Float): LayoutGraph =
-    mutate(path) { content ->
-        val w = weight.coerceAtLeast(0f)
-        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-        if (target.weight == w) return@mutate content
-        content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(weight = w) else it
-            },
-        )
-    }
+    updateInstance(path, instanceId) { it.copy(weight = weight.coerceAtLeast(0f)) }
 
 // Canvas placement transforms (used when the slot is Canvas). Same no-op /
 // missing-instance identity contract as the Phase G transforms above.
 fun LayoutGraph.setCanvasPlacement(path: SlotPath, instanceId: String, placement: CanvasPlacement): LayoutGraph =
-    mutate(path) { content ->
-        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-        if (target.canvas == placement) return@mutate content
-        content.copy(
-            widgets = content.widgets.map {
-                if (it.instanceId == instanceId) it.copy(canvas = placement) else it
-            },
-        )
-    }
+    updateInstance(path, instanceId) { it.copy(canvas = placement) }
 
 fun LayoutGraph.setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float): LayoutGraph =
     updateCanvas(path, instanceId) { it.copy(x = x, y = y) }
@@ -419,17 +383,7 @@ private fun LayoutGraph.updateCanvas(
     path: SlotPath,
     instanceId: String,
     edit: (CanvasPlacement) -> CanvasPlacement,
-): LayoutGraph = mutate(path) { content ->
-    val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-    val current = target.canvas ?: CanvasPlacement()
-    val next = edit(current)
-    if (next == target.canvas) return@mutate content
-    content.copy(
-        widgets = content.widgets.map {
-            if (it.instanceId == instanceId) it.copy(canvas = next) else it
-        },
-    )
-}
+): LayoutGraph = updateInstance(path, instanceId) { it.copy(canvas = edit(it.canvas ?: CanvasPlacement())) }
 
 // Walks the path and returns the SlotContent at the leaf, or null if
 // any intermediate surface / slot / parent widget is missing.

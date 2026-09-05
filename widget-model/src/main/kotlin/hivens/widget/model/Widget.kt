@@ -4,8 +4,12 @@ import kotlin.reflect.KClass
 
 // Marker annotation scanned by the KSP processor in :widget-processor.
 // Apply to top-level @Composable functions with signature
-//   fun Name(instance: WidgetInstance)
-// Wrong signatures fail the build with a KSP diagnostic.
+//   fun Name(instance: WidgetInstance)   -- reads props or per-instance state
+//   fun Name()                           -- reads neither
+// The instance is what carries props and the instance id, so a widget that
+// declares [propsClass] or keeps state under its instance id has to take it
+// and the build says so; one that draws from its surface context alone takes
+// nothing. Any other signature fails the build with a KSP diagnostic.
 //
 // id MUST be unique across the whole runtime. Convention:
 //   "<surface>.<role>"        for kernel widgets ("home.classic.header")
@@ -38,4 +42,29 @@ annotation class Widget(
     // values via instance.rememberProps<T>(), the editor builds its
     // form from the serializer's descriptor.
     val propsClass: KClass<*> = Unit::class,
+    // The plane this widget sits on when nothing has said otherwise, as a
+    // [SurfaceSpec] in the same JSON the layout file carries. Blank (the default)
+    // means no plane: the widget draws its content and nothing behind it.
+    //
+    // A string rather than an object because an annotation cannot hold one, and the
+    // layout's own grammar rather than a second set of arguments because there is
+    // then one thing to learn and one parser to trust. The processor decodes it at
+    // build time and fails the build on a malformed value, which is the whole reason
+    // it lives here instead of in a table of kinds somewhere central: a widget
+    // declares its own plane, beside itself, and a mistake is caught before it ships.
+    val surface: String = "",
+    // True for a widget that paints its own plane in its body.
+    //
+    // Blank [surface] means "no plane, and one may be added"; this says "a plane
+    // exists and the kernel did not draw it", which is a different thing and used
+    // to be indistinguishable. The editor stops offering a second one, because a
+    // second one is what the user then sees: the activity pill's own shape is a
+    // capsule that animates to a panel corner as it opens, and the plane painted
+    // behind it from a static record is a rectangle over the same footprint.
+    //
+    // Reach for it only where a record cannot describe the plane: a shape that
+    // animates, or one that changes with the widget's own state. A widget whose
+    // plane is constant should declare it in [surface] and let the kernel draw it,
+    // which is what puts it under the editor's control.
+    val drawsOwnSurface: Boolean = false,
 )

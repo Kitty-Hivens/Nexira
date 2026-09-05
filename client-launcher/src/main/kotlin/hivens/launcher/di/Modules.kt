@@ -10,7 +10,9 @@ import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
 import hivens.auth.microsoft.MsaAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
-import hivens.launcher.network.NetworkState
+import hivens.launcher.network.CertificateTrustGate
+import hivens.launcher.network.CertificateTrustInterceptor
+import hivens.launcher.network.JsonSslBypassStore
 import hivens.launcher.network.MsaConfig
 import hivens.launcher.network.MsaConfigLoader
 import hivens.launcher.network.ServerProtocolConfig
@@ -34,6 +36,7 @@ import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
+import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.AgentExtractor
 import hivens.launcher.ProfilerProfileStore
@@ -53,8 +56,10 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
 import hivens.core.data.DashboardData
+import hivens.core.data.NewsPage
 import hivens.core.data.ModuleId
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
@@ -62,6 +67,7 @@ import hivens.launcher.cache.CacheFactory
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallCoordinator
 import hivens.launcher.PackInstallService
+import hivens.launcher.PackOperationService
 import hivens.launcher.imports.ForeignInstanceImporter
 import hivens.launcher.imports.FtbAppSource
 import hivens.launcher.imports.LocalPackCreator
@@ -75,14 +81,20 @@ import hivens.launcher.cache.ModrinthCaches
 import hivens.core.api.dto.smrt.SmrtManifestVersions
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.core.io.IconProcessor
+import hivens.core.security.SslBypassStore
+import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
+import hivens.launcher.news.SmartyCraftNewsFeed
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
+import hivens.launcher.catalogue.CachedPackCatalogue
+import hivens.core.api.catalogue.CataloguePack
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.OpenSmrtHelperResolver
@@ -95,6 +107,8 @@ import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.launcher.update.PackSnapshotService
 import hivens.launcher.update.PackUpdateService
+import hivens.launcher.update.RoutingPackUpdater
+import hivens.launcher.update.ModrinthPackUpdater
 import hivens.update.DesktopIntegration
 import hivens.update.UpdateApplicators
 import hivens.update.UpdateService
@@ -166,6 +180,21 @@ val networkModule = module {
         }
     }
 
+    /**
+     * The hosts the user has agreed to reach on a refused certificate. Reads its
+     * file when it is built, so no caller can be handed one that has not loaded
+     * yet -- the ordering the bootstrap used to keep by hand, by initializing a
+     * global before anything could resolve a client.
+     */
+    single<SslBypassStore> { JsonSslBypassStore(get<Path>().resolve("ssl-bypasses.json")) }
+
+    /**
+     * Where a refused certificate is parked for the shell to ask about. Held here
+     * rather than in the UI module because the transport is what discovers the
+     * refusal, and the launcher must not depend on the shell to report it.
+     */
+    single { CertificateTrustGate(get()) }
+
     // ── Smartycraft channel ───────────────────────────────────────────────────
     // Everything on `*.smartycraft.ru`. See the routing taxonomy in
     // [HttpClientProvider]'s KDoc.
@@ -183,13 +212,14 @@ val networkModule = module {
      */
     single<OkHttpClient>(named("insecure")) {
         val cfg: ServerProtocolConfig = get()
-        val (socketFactory, trustManager) = buildBypassScopedSsl()
+        val bypasses: SslBypassStore = get()
+        val (socketFactory, trustManager) = buildBypassScopedSsl(bypasses)
 
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
-            .hostnameVerifier(bypassScopedHostnameVerifier())
+            .hostnameVerifier(bypassScopedHostnameVerifier(bypasses))
             .build()
     }
 
@@ -208,9 +238,15 @@ val networkModule = module {
      */
     single<OkHttpClient>(named("direct")) {
         val cfg: ServerProtocolConfig = get()
+        val trustGate: CertificateTrustGate = get()
         OkHttpClient.Builder()
             .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
+            // A refused certificate on the smartycraft host becomes a question the
+            // shell can ask, from whichever read hit it. Before this, only the login
+            // form could ask -- so the roster and the news, neither of which needs a
+            // session, were unreadable until the user had signed in.
+            .addInterceptor(CertificateTrustInterceptor(trustGate) { cfg.sslBypassHost })
             // HTTP/1.1 only. This channel carries the pack downloads, which are
             // fetched one file at a time, so multiplexing buys nothing while h2's
             // framing adds a failure mode we have seen in the wild: a middlebox on
@@ -229,7 +265,7 @@ val networkModule = module {
     /**
      * Default (smartycraft) [HttpClientProvider] -- hands out the bypass
      * client while a grant for the smartycraft host is live, the direct one
-     * otherwise. Reading [NetworkState] per request rather than at
+     * otherwise. Reading the bypass set per request rather than at
      * construction is what lets a grant made mid-session take effect on the
      * next call instead of after a relaunch.
      *
@@ -239,10 +275,11 @@ val networkModule = module {
      */
     single {
         val cfg: ServerProtocolConfig = get()
+        val bypasses: SslBypassStore = get()
         val direct   = buildHttpClient(get<OkHttpClient>(named("direct")),   get())
         val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
         HttpClientProvider {
-            if (NetworkState.bypassFor(cfg.sslBypassHost)) insecure else direct
+            if (bypasses.isBypassed(cfg.sslBypassHost)) insecure else direct
         }
     }
 
@@ -295,12 +332,13 @@ val networkModule = module {
     single<Call.Factory> {
         val direct   = get<OkHttpClient>(named("direct"))
         val insecure = get<OkHttpClient>(named("insecure"))
+        val bypasses: SslBypassStore = get()
         Call.Factory { request ->
             // The request's own host, not the configured smartycraft one. This
             // factory backs the process-wide Coil loader, so keying on a fixed
             // host meant a grant for smartycraft also relaxed pack art from the
             // mirror and Modrinth.
-            val client = if (NetworkState.bypassFor(request.url.host)) insecure else direct
+            val client = if (bypasses.isBypassed(request.url.host)) insecure else direct
             client.newCall(request)
         }
     }
@@ -468,13 +506,21 @@ val mirrorModule = module {
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
     single { ModrinthClient(get(named("direct")), get(), caches = get()) }
-    single { SmrtSyncService(get(), get(), get(), get()) }
+    single { SmrtSyncService(get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by
     // origin so the Browse UI stays source-agnostic.
     single { MirrorPackCatalogue(get()) }
     single { ModrinthPackCatalogue(get()) }
-    single { PackCatalogueRegistry(listOf(get<MirrorPackCatalogue>(), get<ModrinthPackCatalogue>())) }
+    single {
+        val searches = catalogueSearchCache()
+        PackCatalogueRegistry(
+            listOf(
+                CachedPackCatalogue(get<MirrorPackCatalogue>(), searches),
+                CachedPackCatalogue(get<ModrinthPackCatalogue>(), searches),
+            ),
+        )
+    }
     // Resolves an installed instance's native cover from its source when the
     // install didn't capture one (pre-field instances), so Library cards and the
     // PackDetail hero show real art instead of the pixel placeholder.
@@ -538,6 +584,13 @@ val mirrorModule = module {
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     // Instance-level mutations that reach past the registry (full delete, detach).
     single { PackInstanceService(repository = get(), dataDir = get()) }
+    // On-disk size of an instance, measured on the app scope and shared, so a
+    // surface that asks again does not re-walk a tree the size of a world save.
+    single { InstanceSizeService(dataDir = get(), scope = get(), clock = get()) }
+    // App-scoped owner of the operations that rewrite an installed instance
+    // (an update apply, a repair): one per instance, outliving the surface that
+    // started it -- see PackOperationService.
+    single { PackOperationService(scope = get(), sizes = get()) }
     // Update write side: moves an installed mirror instance to another build
     // (forward update or version switch) via the reconcile engine. Concrete
     // SmrtPackClient for the summary/version-list poll the interface slice lacks.
@@ -545,19 +598,37 @@ val mirrorModule = module {
     single { ApplyJournal(dataDir = get(), json = get()) }
     // Startup rollback for updates a hard crash interrupted (journal + snapshot).
     single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get()) }
-    // Also bound as the PackUpdater contract: the UI injects the interface so
-    // render tests can substitute a fake; the auto-updater keeps the concrete type.
     single {
         PackUpdateService(
             client = get<SmrtPackClient>(),
             syncService = get(),
             repository = get(),
-            protectedPaths = get(),
             snapshotService = get(),
             journal = get(),
             dataDir = get(),
         )
-    } bind PackUpdater::class
+    }
+    single {
+        ModrinthPackUpdater(
+            client = get(),
+            installer = get(),
+            repository = get(),
+            snapshotService = get(),
+            dataDir = get(),
+        )
+    }
+    // One PackUpdater above, routing to the source each instance came from. The
+    // UI injects the interface and knows nothing of the split -- which is the
+    // point, since the alternative was every caller testing the origin itself.
+    // An origin absent from this map has no version feed and says so.
+    single<PackUpdater> {
+        RoutingPackUpdater(
+            mapOf(
+                PackOrigin.Mirror to get<PackUpdateService>(),
+                PackOrigin.Modrinth to get<ModrinthPackUpdater>(),
+            ),
+        )
+    }
     // Background auto-updater over installed mirror instances. Reads the current
     // auto-update policy each pass via the settings service. Also bound as the
     // status hub so UI badges and manual flows share one state.
@@ -565,7 +636,7 @@ val mirrorModule = module {
         val settings = get<ISettingsService>()
         PackAutoUpdateService(
             repository = get(),
-            updater = get<PackUpdateService>(),
+            updater = get<PackUpdater>(),
             settingsProvider = { settings.getSettings() },
         )
     } bind PackUpdateStatusHub::class
@@ -644,7 +715,7 @@ val launchPipelineModule = module {
     single<IFileDownloadService> {
         FileDownloadService(get(named("smartycraft")), get(), get(), get<ServerProtocolConfig>())
     }
-    single<IManifestProcessorService> { ManifestProcessorService(get()) }
+    single<IManifestProcessorService> { ManifestProcessorService() }
     single { ProfileManager(get(), get()) }
     single<IInstanceProfileStore> { get<ProfileManager>() }
 
@@ -655,6 +726,10 @@ val launchPipelineModule = module {
      * types (i18n strings, console service) leak in.
      */
     singleOf(::LauncherController)
+
+    // The slice the settings surfaces consume, so they do not pull the whole
+    // orchestrator in to ask one question. Same instance, not a second one.
+    single<RunningPackSource> { get<LauncherController>() }
 
     /**
      * Basic launch service. All collaborators are constructor-injected so the
@@ -710,7 +785,8 @@ val updateModule = module {
             transfers       = get(),
             json            = get(),
             dataDirectory   = get(),
-            settingsService = get()
+            settingsService = get(),
+            applicator      = get(),
         )
     }
 
@@ -810,7 +886,20 @@ val appModule = module {
     }
 
     single<IServerListService> {
-        SmartyCraftServerListService(get(), get(), get(), dashboardCache())
+        SmartyCraftServerListService(get(), get(), get(), dashboardCache(), get())
+    }
+
+    // The news archive, read from the site's paginated index rather than from the
+    // dashboard payload -- which carries three entries and is why a widget asked
+    // for twenty showed three. Same channel as the rest of the smartycraft
+    // traffic; the dashboard stays the floor when the site cannot be read.
+    single<INewsFeed> {
+        SmartyCraftNewsFeed(
+            clientProvider = get<HttpClientProvider>(),
+            config = get(),
+            dashboard = get(),
+            cache = newsCache(),
+        )
     }
 
     // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
@@ -841,7 +930,14 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
     val hour = 60 * min
     val day = 24 * hour
     return SmrtPackCaches(
-        listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
+        // An empty listing is not stored. This one is on disk, so a mirror that
+        // answered once with nothing would otherwise serve that nothing for a day,
+        // across restarts -- the case shouldStore is documented for.
+        listing = f.create(
+            "pack-listing",
+            SmrtPackListing.serializer(),
+            CacheConfig(ttlMs = 5 * min, staleTtlMs = day, shouldStore = { it.packs.isNotEmpty() }),
+        ),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
         versions = f.create("pack-versions", SmrtManifestVersions.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
@@ -862,6 +958,41 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
         version = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
     )
 }
+
+/**
+ * In-memory catalogue-search cache (single-flight + 5-min SWR), keyed by source,
+ * page and query. Held in memory only on purpose: a listing written to disk
+ * would be the first thing shown on the next launch, and a catalogue is exactly
+ * the sort of thing that has moved on by then. An empty result is not stored, so
+ * a source that was briefly unreachable does not leave an empty Browse behind it.
+ */
+private fun Scope.catalogueSearchCache(): Cache<List<CataloguePack>> =
+    get<CacheFactory>().createInMemory(
+        "catalogue-search",
+        CacheConfig(
+            ttlMs = 5 * 60_000L,
+            staleTtlMs = Long.MAX_VALUE,
+            maxEntries = 64,
+            shouldStore = { it.isNotEmpty() },
+        ),
+    )
+
+/**
+ * In-memory news-page cache (single-flight + 10-min SWR), keyed by page number.
+ * Scrolling back up a rail, or reopening it, reads what was already fetched
+ * instead of asking upstream for a page it just had; a page that came back empty
+ * is not stored, so a failed read retries rather than sticking.
+ */
+private fun Scope.newsCache() =
+    get<CacheFactory>().createInMemory<NewsPage>(
+        "news",
+        CacheConfig(
+            ttlMs = 10 * 60_000L,
+            staleTtlMs = Long.MAX_VALUE,
+            maxEntries = 64,
+            shouldStore = { it.items.isNotEmpty() },
+        ),
+    )
 
 /**
  * In-memory dashboard cache (single-flight + 10-min SWR). The disk seed for the
@@ -934,11 +1065,11 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
  * the mirror and from Modrinth too.
  *
  * Here the peer's own name decides. Verification is skipped only while
- * [NetworkState] holds a live grant for that exact host; every other host on
+ * [bypasses] holds a live grant for that exact host; every other host on
  * the same client gets full platform validation. Which client a call site
  * picks is then a routing detail, not a security decision.
  */
-private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
+private fun buildBypassScopedSsl(bypasses: SslBypassStore): Pair<SSLSocketFactory, X509TrustManager> {
     val platform = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         .apply { init(null as KeyStore?) }
         .trustManagers
@@ -947,12 +1078,12 @@ private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
 
     val trustManager = object : X509ExtendedTrustManager() {
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) {
-            if (granted(peerHostOf(socket))) return
+            if (granted(bypasses, peerHostOf(socket))) return
             platform.checkServerTrusted(chain, authType, socket)
         }
 
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine?) {
-            if (granted(engine?.peerHost)) return
+            if (granted(bypasses, engine?.peerHost)) return
             platform.checkServerTrusted(chain, authType, engine)
         }
 
@@ -982,7 +1113,8 @@ private fun buildBypassScopedSsl(): Pair<SSLSocketFactory, X509TrustManager> {
 }
 
 /** True when the user currently holds a bypass for [host]. Null host never matches. */
-private fun granted(host: String?): Boolean = host != null && NetworkState.bypassFor(host)
+private fun granted(bypasses: SslBypassStore, host: String?): Boolean =
+    host != null && bypasses.isBypassed(host)
 
 /**
  * Peer name for an in-progress handshake. `handshakeSession` is the JSSE hook
@@ -997,7 +1129,7 @@ private fun peerHostOf(socket: Socket?): String? =
  * Hostname verification for the bypass channel: skipped for a host under a
  * live grant, the platform check for everything else.
  */
-private fun bypassScopedHostnameVerifier(): HostnameVerifier {
+private fun bypassScopedHostnameVerifier(bypasses: SslBypassStore): HostnameVerifier {
     val platform = HttpsURLConnection.getDefaultHostnameVerifier()
-    return HostnameVerifier { host, session -> granted(host) || platform.verify(host, session) }
+    return HostnameVerifier { host, session -> granted(bypasses, host) || platform.verify(host, session) }
 }

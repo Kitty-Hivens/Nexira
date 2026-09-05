@@ -16,10 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.DarkColorPalette
 import hivens.ui.theme.LocalNxColors
-import hivens.ui.theme.LocalStyle
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -28,7 +26,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Isolated (no window / no compositor / no GPU) proof that `opaque = true` -- the
+ * Isolated (no window / no compositor / no GPU) proof that `opacity = 1f` -- the
  * treatment [hivens.ui.nx.NxContextMenu] uses -- lets NOTHING bleed through the
  * surface body, on the dark palette (where the default body floor is 0.92). Renders
  * two Floating surfaces over a bright magenta ground and samples the centre of each:
@@ -44,17 +42,16 @@ class MenuOpacityRenderTest {
         val scene = ImageComposeScene(width = wPx, height = hPx, density = Density(2f)) {
             CompositionLocalProvider(
                 LocalNxColors provides DarkColorPalette,
-                LocalStyle provides CelestiaStyle,
             ) {
                 Box(Modifier.fillMaxSize().background(Color(0xFFFF00FF))) { // bright magenta ground
                     Column(Modifier.padding(20.dp)) {
                         // Default dark body (floor 0.92) -- background bleeds through.
-                        NxSurface(NxSurfaceLevel.Floating, glass = false, opaque = false, shape = RoundedCornerShape(12.dp)) {
+                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                         Spacer(Modifier.height(20.dp))
                         // Opaque body (the menu's treatment) -- no bleed.
-                        NxSurface(NxSurfaceLevel.Floating, glass = false, opaque = true, shape = RoundedCornerShape(12.dp)) {
+                        NxSurface(NxSurfaceLevel.Floating, blurDp = 0f, opacity = 1f, shape = RoundedCornerShape(12.dp)) {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                     }
@@ -64,8 +61,8 @@ class MenuOpacityRenderTest {
         val image = scene.render()
         scene.close()
 
-        // Save the frame for eyeballing too.
-        val outDir = File("/tmp/claude-1000/-home-haru-Nexira/e55b3682-bae2-4e22-8d3c-218a4d20187f/scratchpad")
+        // Save the frame for eyeballing too, beside every other render sheet.
+        val outDir = File("build/render")
         outDir.mkdirs()
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(outDir, "menu-opacity.png").writeBytes(it) }
 

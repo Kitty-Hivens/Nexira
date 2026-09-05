@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -121,7 +120,7 @@ fun ServerPill(
             .fillMaxWidth()
             .height(52.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.45f))
+            .background(NxTheme.colors.surface.copy(alpha = 0.45f))
             .border(if (isSelected) 1.5.dp else 1.dp, borderColor, MaterialTheme.shapes.medium)
             .clickable(interactionSource = interaction, indication = null) { onSelect() }
             .hoverable(interaction)

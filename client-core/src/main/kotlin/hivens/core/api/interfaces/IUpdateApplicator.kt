@@ -20,4 +20,25 @@ interface IUpdateApplicator {
      * manually".
      */
     fun scheduleUpdate(installerPath: Path)
+
+    /**
+     * Where the downloaded bytes should be written, given the launcher's own
+     * updates directory and the asset's file name.
+     *
+     * The default answers with the updates directory, which is what a platform
+     * whose installer is a separate program wants. An implementation that
+     * installs by replacing files answers with a path beside its own install, so
+     * [scheduleUpdate] can put the update in place with a rename instead of a
+     * copy -- the copy would otherwise run after the process has been told to
+     * exit, where nothing can report it and the window is already dead.
+     */
+    fun stagingPath(fallbackDir: Path, fileName: String): Path = fallbackDir.resolve(fileName)
+
+    /**
+     * Staged files left beside the install by a download the user never
+     * installed. The updates directory is swept by the update service itself;
+     * anything [stagingPath] puts elsewhere has to name itself here or it is
+     * never collected.
+     */
+    fun stagedLeftovers(): List<Path> = emptyList()
 }

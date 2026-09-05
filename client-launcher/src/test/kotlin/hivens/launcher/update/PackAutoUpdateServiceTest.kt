@@ -1,6 +1,6 @@
 package hivens.launcher.update
 
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.AmberUpdatePolicy
 import hivens.core.data.PackInstance
@@ -15,6 +15,7 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,7 +30,7 @@ class PackAutoUpdateServiceTest {
     private class FakeRepo(initial: List<PackInstance>) : IPackRepository {
         private val map = LinkedHashMap<String, PackInstance>().apply { initial.forEach { put(it.id, it) } }
         private val flow = MutableStateFlow(map.values.toList())
-        override fun observe(): Flow<List<PackInstance>> = flow.asStateFlow()
+        override fun observe(): StateFlow<List<PackInstance>> = flow.asStateFlow()
         override suspend fun list() = map.values.toList()
         override suspend fun get(id: String) = map[id]
         override suspend fun put(instance: PackInstance) { map[instance.id] = instance; flow.value = map.values.toList() }
@@ -37,8 +38,13 @@ class PackAutoUpdateServiceTest {
     }
 
     /** Returns a scripted check per instance id and records which ids were applied. */
-    private class FakeUpdater(private val checks: Map<String, UpdateCheck>) : PackUpdater {
+    private class FakeUpdater(
+        private val checks: Map<String, UpdateCheck>,
+        /** Instance ids no source can offer other builds for. */
+        private val unhandled: Set<String> = emptySet(),
+    ) : PackUpdater {
         val applied = mutableListOf<String>()
+        override fun handles(instance: PackInstance): Boolean = instance.id !in unhandled
         override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck =
             checks[instance.id] ?: UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
@@ -51,8 +57,8 @@ class PackAutoUpdateServiceTest {
             applied += instance.id
             return UpdateOutcome.Applied("2026.02.02", CompatChange.Same, UpdatePlan())
         }
-        override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = emptyList()
-        override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> = flowOf(emptyList())
+        override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = emptyList()
+        override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> = flowOf(emptyList())
         override fun listSnapshots(instance: PackInstance): List<PackSnapshot> = emptyList()
         override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance
     }
@@ -119,17 +125,44 @@ class PackAutoUpdateServiceTest {
     }
 
     @Test
-    fun `pinned and non-mirror instances are skipped`() = runTest {
-        val repo = FakeRepo(listOf(instance("pinned", followLatest = false), instance("mr", origin = PackOrigin.Modrinth)))
-        val updater = FakeUpdater(
-            mapOf("pinned" to available(CompatChange.Same), "mr" to available(CompatChange.Same)),
-        )
+    fun `a pinned instance is skipped whatever its source offers`() = runTest {
+        val repo = FakeRepo(listOf(instance("pinned", followLatest = false)))
+        val updater = FakeUpdater(mapOf("pinned" to available(CompatChange.Same)))
         val service = PackAutoUpdateService(repo, updater) { settings() }
 
         service.runOnce()
 
         assertTrue(updater.applied.isEmpty())
         assertTrue(service.statuses.value.isEmpty())
+    }
+
+    @Test
+    fun `an instance nothing can offer builds for is skipped`() = runTest {
+        // A locally created pack, or one synced from a game server: there is no
+        // version feed to ask. The pass asks the updater whether it handles the
+        // instance rather than testing where the pack came from, so a source that
+        // learns to update is not silently left out of this loop.
+        val repo = FakeRepo(listOf(instance("local", origin = PackOrigin.Local)))
+        val updater = FakeUpdater(mapOf("local" to available(CompatChange.Same)), unhandled = setOf("local"))
+        val service = PackAutoUpdateService(repo, updater) { settings() }
+
+        service.runOnce()
+
+        assertTrue(updater.applied.isEmpty())
+        assertTrue(service.statuses.value.isEmpty())
+    }
+
+    @Test
+    fun `an instance from another source is updated once something handles it`() = runTest {
+        // The behaviour this replaced: the pass tested for the mirror by name, so
+        // a Modrinth instance was never even checked no matter what could update it.
+        val repo = FakeRepo(listOf(instance("mr", origin = PackOrigin.Modrinth)))
+        val updater = FakeUpdater(mapOf("mr" to available(CompatChange.Same)))
+        val service = PackAutoUpdateService(repo, updater) { settings() }
+
+        service.runOnce()
+
+        assertEquals(listOf("mr"), updater.applied)
     }
 
     @Test

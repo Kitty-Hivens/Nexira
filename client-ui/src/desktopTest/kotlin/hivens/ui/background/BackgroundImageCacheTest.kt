@@ -1,15 +1,18 @@
 package hivens.ui.background
 
+import hivens.ui.diag.SkinemaGate
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
 import java.io.File
 import java.nio.file.Files
+import java.util.Base64
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -101,5 +104,41 @@ class BackgroundImageCacheTest {
         assertNotNull(bmp, "headless fallback still decodes")
         assertEquals(2000, bmp.height, "no downscale when the display height is unknown")
         assertTrue(cachedPngs().isEmpty())
+    }
+
+    /**
+     * A still in a format Skia has no codec for is decoded by the media decoder
+     * and then travels the still path like any other picture.
+     *
+     * Turning the media module off is what pins the reader: nothing else in the
+     * launcher opens a TGA, so the same file that renders with it on must not
+     * render with it off. A PNG renders either way, which is the other half of
+     * the same claim.
+     */
+    @Test
+    fun aStillOnlyTheDecoderReadsIsDecodedByIt() {
+        val tga = File(tmp, "still.tga").apply { writeBytes(Base64.getDecoder().decode(TGA_STILL)) }
+
+        assertNotNull(loadStaticBackground(tga, cacheDir, maxHeight = 1000), "the decoder's frame is the still")
+        withSkinemaOff {
+            assertNull(loadStaticBackground(tga, cacheDir, 1000), "nothing else reads a TGA")
+            assertNotNull(loadStaticBackground(writePng("plain.png", 8, 8), cacheDir, 1000), "Skia needs no decoder")
+        }
+    }
+
+    private fun withSkinemaOff(body: () -> Unit) {
+        val was = SkinemaGate.enabled
+        SkinemaGate.enabled = false
+        try {
+            body()
+        } finally {
+            SkinemaGate.enabled = was
+        }
+    }
+
+    private companion object {
+        /** 2x2 uncompressed TGA. */
+        const val TGA_STILL =
+            "AAACAAAAAAAAAAAAAgACABgAHh7IHh7IHh7IHh7IAAAAAAAAAABUUlVFVklTSU9OLVhGSUxFLgA="
     }
 }

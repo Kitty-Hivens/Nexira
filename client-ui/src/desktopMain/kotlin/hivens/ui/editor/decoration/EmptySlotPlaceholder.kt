@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -29,6 +30,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotPath
 
@@ -49,11 +51,12 @@ fun EmptySlotPlaceholder(
     registry: DropTargetRegistry,
 ) {
     val s = LocalStrings.current
+    val breathRhythm = Motion.ownRhythm(BREATH_MS)
     val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
         initialValue  = 0.45f,
         targetValue   = 0.85f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 1600, easing = LinearEasing),
+            animation  = breathRhythm.of(),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "empty-slot-breath-value",
@@ -63,23 +66,32 @@ fun EmptySlotPlaceholder(
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
-            .padding(vertical = 6.dp)
+            // Measured before the inset, not after. Reporting the padded box
+            // registered a drop target six dp lower and twelve shorter than the
+            // thing on screen, so a drop aimed at the top edge of the dashes
+            // missed and was discarded without a word.
             .onGloballyPositioned { c: LayoutCoordinates ->
                 registry.registerSlot(path, c.boundsInWindow())
-            },
+            }
+            .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         // Dashed border via Canvas so we can use PathEffect; M3's
         // border modifier does not support dashed strokes.
         val borderColor = NxTheme.colors.primary.copy(alpha = breath)
+        // Every length here is dp converted at draw time. They used to be bare
+        // floats, which a DrawScope reads as device pixels: on a 2K display the
+        // border came out at half its weight with half-length dashes, and the
+        // corner ignored the style entirely.
+        val corner = 12.dp
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRoundRect(
                 color  = borderColor,
                 style  = Stroke(
-                    width      = 1.5f,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f),
+                    width      = 1.5.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()), 0f),
                 ),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f, 10f),
+                cornerRadius = CornerRadius(corner.toPx(), corner.toPx()),
             )
         }
         Box(
@@ -104,3 +116,6 @@ fun EmptySlotPlaceholder(
         }
     }
 }
+
+/** How long an empty slot takes to breathe in and out. */
+private const val BREATH_MS = 1600

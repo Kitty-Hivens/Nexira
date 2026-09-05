@@ -1,6 +1,7 @@
 package hivens.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import hivens.core.io.deleteTree
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
+import hivens.core.data.RuntimePrefs
 import hivens.core.data.OptionalMod
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.SystemMemory
@@ -24,10 +26,9 @@ import hivens.launcher.ProfileManager
 import hivens.launcher.platform.ServerNameValidator
 import hivens.launcher.ProfilerProfileStore
 import hivens.ui.platform.SystemActions
-import io.github.vinceglb.filekit.FileKit
+import hivens.ui.utils.pickFile
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +67,7 @@ private val log = LoggerFactory.getLogger("ServerSettingsState")
 
 @Stable
 internal class ServerSettingsState(
-    val server: ServerProfile,
+    initialServer: ServerProfile,
     private val profileManager: ProfileManager,
     private val manifestProcessor: IManifestProcessorService,
     private val settingsService: ISettingsService,
@@ -76,17 +77,37 @@ internal class ServerSettingsState(
     private val dataDirectory: Path,
     private val scope: CoroutineScope,
 ) {
-    /** Whether the experimental JVM-args builder entry points are shown. */
-    val jvmBuilderEnabled: Boolean = settingsService.getSettings().jvmBuilderEnabled
+    /**
+     * The roster entry this screen is editing settings for. Held by id -- the
+     * holder must not be rebuilt when the roster is re-resolved, or the form would
+     * reload from disk and take the edits the user has not saved with it -- but its
+     * fields are followed, so what the screen reads is what the roster says now.
+     */
+    var server by mutableStateOf(initialServer)
+        private set
+
+    /** Take a re-resolved roster entry for the same server. */
+    fun adopt(updated: ServerProfile) {
+        if (updated.assetDir == server.assetDir) server = updated
+    }
+
+    /**
+     * Whether the JVM-args builder entry points are shown. Read when asked rather
+     * than captured at construction: this holder is remembered per server and
+     * would otherwise answer with the flag as it stood the first time the screen
+     * was opened.
+     */
+    val jvmBuilderEnabled: Boolean get() = settingsService.getSettings().jvmBuilderEnabled
 
     var javaPath by mutableStateOf("")
-    var memoryMb by mutableStateOf(4096)
+    /** Zero until the profile loads one or the user picks one; see [RuntimePrefs.memoryMb]. */
+    var memoryMb by mutableStateOf(RuntimePrefs.NO_PINNED_MEMORY)
     var isAutoMode by mutableStateOf(true)
     var resolvedAutoMb by mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb()))
         private set
     var jvmArgs by mutableStateOf("")
-    var winWidth by mutableStateOf("925")
-    var winHeight by mutableStateOf("530")
+    var winWidth by mutableStateOf(RuntimePrefs.WINDOW_WIDTH.toString())
+    var winHeight by mutableStateOf(RuntimePrefs.WINDOW_HEIGHT.toString())
     var fullScreen by mutableStateOf(false)
     var autoConnect by mutableStateOf(true)
     var serverIcon by mutableStateOf<ImageBitmap?>(null)
@@ -122,8 +143,7 @@ internal class ServerSettingsState(
         // the next launch will actually use -- the adaptive-derived heap when
         // adaptive is on and has data, otherwise the machine-aware baseline.
         isAutoMode = !p.fixedMemory
-        val settings = settingsService.getSettings()
-        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
+        val adaptiveOn = settingsService.getSettings().adaptiveMemoryEnabled
         val clientDir = clientDirOrNull()
         val derivedMb = if (adaptiveOn && clientDir != null) {
             withContext(Dispatchers.IO) { profilerStore.readProfile(clientDir)?.derivedHeapMb }
@@ -135,7 +155,7 @@ internal class ServerSettingsState(
         val loadedMods = manifestProcessor.getOptionalModsForClient(server)
         mods = loadedMods
         loadedMods.forEach { mod ->
-            modStates[mod.id] = p.optionalModsState.getOrDefault(mod.id, mod.isDefault)
+            modStates[mod.id] = p.optionalModsState.getOrDefault(mod.id, mod.enabledByDefault)
         }
         modsLoaded = true
 
@@ -172,11 +192,11 @@ internal class ServerSettingsState(
         save()
     }
 
-    fun pickIcon(dialogTitle: String) {
+    fun pickIcon(dialogSettings: FileKitDialogSettings) {
         scope.launch {
-            val file = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg")),
-                dialogSettings = FileKitDialogSettings(title = dialogTitle),
+            val file = pickFile(
+                type     = FileKitType.File(extensions = listOf("png", "jpg", "jpeg")),
+                settings = dialogSettings,
             )
             file?.path?.let { selectedPath ->
                 withContext(Dispatchers.IO) {
@@ -193,11 +213,11 @@ internal class ServerSettingsState(
         }
     }
 
-    fun pickJava(dialogTitle: String) {
+    fun pickJava(dialogSettings: FileKitDialogSettings) {
         scope.launch {
-            val file = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("exe", "bin")),
-                dialogSettings = FileKitDialogSettings(title = dialogTitle),
+            val file = pickFile(
+                type     = FileKitType.File(extensions = listOf("exe", "bin")),
+                settings = dialogSettings,
             )
             file?.path?.let { javaPath = it }
         }
@@ -262,9 +282,13 @@ internal fun rememberServerSettingsState(server: ServerProfile): ServerSettingsS
     val playerRepository: PlayerRepository = koinInject()
     val dataDirectory: Path = koinInject()
     val scope = rememberCoroutineScope()
-    return remember(server) {
+    // Keyed on the server's id, not on the roster entry: the entry is re-resolved
+    // while the screen is open -- its checksum set changes on every server-side
+    // push -- and re-keying on it would rebuild this holder and reload the form
+    // from disk, taking the edits the user had not saved yet with it.
+    val state = remember(server.assetDir) {
         ServerSettingsState(
-            server = server,
+            initialServer = server,
             profileManager = profileManager,
             manifestProcessor = manifestProcessor,
             settingsService = settingsService,
@@ -275,6 +299,10 @@ internal fun rememberServerSettingsState(server: ServerProfile): ServerSettingsS
             scope = scope,
         )
     }
+    // The entry itself is followed: the holder keeps the form, the roster keeps the
+    // address, the version and the checksums it launches and repairs against.
+    LaunchedEffect(state, server) { state.adopt(server) }
+    return state
 }
 
 // ── Pure logic (unit-tested without a ProfileManager) ────────────────────────
@@ -302,8 +330,8 @@ internal fun assembleProfile(
         memoryMb     = memoryMb,
         fixedMemory  = !isAutoMode,
         jvmArgs      = jvmArgs.ifBlank { null },
-        windowWidth  = winWidth.toIntOrNull() ?: 925,
-        windowHeight = winHeight.toIntOrNull() ?: 530,
+        windowWidth  = winWidth.toIntOrNull() ?: RuntimePrefs.WINDOW_WIDTH,
+        windowHeight = winHeight.toIntOrNull() ?: RuntimePrefs.WINDOW_HEIGHT,
         fullScreen   = fullScreen,
         autoConnect  = autoConnect,
         // Merge the editor's canonical toggles over whatever the base carried,

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -65,24 +66,23 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Dimens
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.nio.file.Path
-import java.util.UUID
 
 /**
  * Library = user's collection of installed packs. The bottom-right action opens
@@ -105,51 +105,83 @@ fun LibraryScreen(
     val creator: LocalPackCreator = koinInject()
     val scope = rememberCoroutineScope()
 
-    var importing by remember { mutableStateOf(false) }
-    var importError by remember { mutableStateOf<String?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var showCreate by remember { mutableStateOf(false) }
     var createKey by remember { mutableStateOf<String?>(null) }
+    var importKey by remember { mutableStateOf<String?>(null) }
 
     val installs by installService.installs.collectAsState()
     val createSnap = createKey?.let { installs[it] }
     val creating = createSnap?.phase is InstallPhase.Running
     val createError = (createSnap?.phase as? InstallPhase.Failed)?.message
+    val importSnap = importKey?.let { installs[it] }
+    val importing = importSnap?.phase is InstallPhase.Running
+    val importError = (importSnap?.phase as? InstallPhase.Failed)?.message
 
     // A finished create opens the new instance's detail (Content tab), then
     // evicts the snapshot.
     LaunchedEffect(createSnap?.phase) {
-        val phase = createSnap?.phase
-        val key = createKey
-        if (key != null && phase is InstallPhase.Succeeded) {
-            installService.dismiss(key)
-            createKey = null
-            onScreenChange(Screen.PackDetail(phase.instanceId))
+        val key = createKey ?: return@LaunchedEffect
+        when (val phase = createSnap?.phase) {
+            is InstallPhase.Succeeded -> {
+                installService.dismiss(key)
+                createKey = null
+                onScreenChange(Screen.PackDetail(phase.instanceId))
+            }
+            // The user stopped it; there is nothing left to say about it.
+            InstallPhase.Cancelled -> {
+                installService.dismiss(key)
+                createKey = null
+            }
+            else -> Unit
         }
     }
 
+    // Same for a finished import, which now takes the same road.
+    LaunchedEffect(importSnap?.phase) {
+        val key = importKey ?: return@LaunchedEffect
+        when (val phase = importSnap?.phase) {
+            is InstallPhase.Succeeded -> {
+                installService.dismiss(key)
+                importKey = null
+                onScreenChange(Screen.PackDetail(phase.instanceId))
+            }
+            InstallPhase.Cancelled -> {
+                installService.dismiss(key)
+                importKey = null
+            }
+            else -> Unit
+        }
+    }
+
+    val importDialogSettings = rememberFileDialogSettings(s.browseImport)
+
+    // The picker is UI and stays on the composition; the unpacking does not. It ran
+    // on rememberCoroutineScope, which is the screen's own scope, so leaving the
+    // Library while a .mrpack was being extracted cancelled it mid-way and left a
+    // half-written instance directory with nothing said about it -- and an import is
+    // slow enough that clicking away is the ordinary thing to do. The file's own
+    // KDoc already claimed both paths ran app-scoped; only create did.
+    //
+    // Going through the same service as create also gives the import the progress it
+    // could always report: import() takes a progress lambda that no caller passed.
     fun startImport() {
         scope.launch {
-            val picked = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("mrpack", "zip")),
-                dialogSettings = FileKitDialogSettings(title = s.browseImport),
+            val picked = pickFile(
+                type     = FileKitType.File(extensions = listOf("mrpack", "zip")),
+                settings = importDialogSettings,
             )
-            val path = picked?.path ?: return@launch
-            importing = true
-            importError = null
-            try {
-                onScreenChange(Screen.PackDetail(importService.import(Path.of(path)).id))
-            } catch (e: Exception) {
-                importError = e.message ?: s.browseDetailInstallFailedGeneric
-            } finally {
-                importing = false
-            }
+            val file = Path.of(picked?.path ?: return@launch)
+            importKey = installService.run(
+                key   = "import:${file.fileName}",
+                title = file.fileName.toString(),
+            ) { reserve, progress -> importService.import(file, reserve, progress) }
         }
     }
 
     fun startCreate(name: String, mc: String, loader: String?, loaderVersion: String) {
         showCreate = false
-        createKey = installService.run(key = "create:$name:${UUID.randomUUID().toString().take(8)}", title = name) { reserve, progress ->
+        createKey = installService.run(key = "create:$name", title = name) { reserve, progress ->
             creator.create(name, mc, loader, loaderVersion, reserve, progress)
         }
     }
@@ -159,9 +191,20 @@ fun LibraryScreen(
     }
     CompositionLocalProvider(LocalLibraryContext provides ctx) {
         Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
-                SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
-                SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
+            // Centred under the same ceiling Browse uses: past a point the extra
+            // width of a wide monitor stops being room and starts stretching the
+            // rows, which keep their height while their width tracks the window.
+            // Its own Box so the error overlay below keeps its own alignment.
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Column(
+                    Modifier.fillMaxHeight()
+                        .widthIn(max = Dimens.contentMaxWidth)
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                ) {
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
+                }
             }
 
             (importError ?: createError)?.let { err ->
@@ -169,7 +212,17 @@ fun LibraryScreen(
                     text = err,
                     style = MaterialTheme.typography.bodySmall,
                     color = NxTheme.colors.error,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, end = 96.dp, bottom = 34.dp),
+                    modifier = Modifier.align(Alignment.BottomStart)
+                        .padding(start = 24.dp, end = 96.dp, bottom = 34.dp)
+                        .clickable {
+                            if (importError != null) {
+                                importKey?.let(installService::dismiss)
+                                importKey = null
+                            } else {
+                                createKey?.let(installService::dismiss)
+                                createKey = null
+                            }
+                        },
                 )
             }
 
@@ -237,13 +290,11 @@ private fun NewLocalPackDialog(
         (if (mc.isBlank()) pool else pool.filter { it.contains(mc.trim(), ignoreCase = true) }).take(60)
     }
 
-    // Unfold on open: fade the scrim in and scale the card up from 92%.
-    // Durations run through the active style so Brut (animationMultiplier 0)
-    // collapses the unfold to instant, honouring its motion-off contract.
-    val style = LocalStyle.current
+    // Unfold on open: the scrim fades in and the card arrives. Both are motion
+    // roles, so a still style collapses the unfold to instant on its own.
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
-    val scrimAlpha by animateFloatAsState(if (shown) 0.72f else 0f, animationSpec = tween(style.animationDurationMs(180)), label = "scrim")
+    val scrimAlpha by animateFloatAsState(if (shown) 0.72f else 0f, animationSpec = Motion.fade, label = "scrim")
 
     Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         Box(
@@ -253,15 +304,15 @@ private fun NewLocalPackDialog(
         ) {
           AnimatedVisibility(
               visible = shown,
-              enter = fadeIn(tween(style.animationDurationMs(200))) + scaleIn(tween(style.animationDurationMs(200)), initialScale = 0.92f),
-              exit  = fadeOut(tween(style.animationDurationMs(120))) + scaleOut(tween(style.animationDurationMs(120)), targetScale = 0.95f),
+              enter = Motion.emphasis.enter,
+              exit  = Motion.emphasis.exit,
           ) {
             NxSurface(
                 level = NxSurfaceLevel.Floating,
-                // Opaque, not glass: a modal sits over a dark scrim, so there is
-                // nothing behind it to frost -- glass would read as a flat muddy
-                // panel.
-                glass = false,
+                // A modal sits over a dark scrim, so there is nothing behind it
+                // worth blurring: the filter would cost a frame to produce a flat
+                // muddy panel.
+                blurDp = 0f,
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),

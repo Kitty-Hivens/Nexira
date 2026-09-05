@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Prunes orphaned per-instance state. Keyed reactively off the layout graph rather
@@ -29,7 +30,7 @@ class WidgetStateGc(
 ) {
     init {
         scope.launch {
-            repo.observe().debounce(GC_DEBOUNCE_MS).collect { graph ->
+            repo.observe().debounce(GC_DEBOUNCE_MS.milliseconds).collect { graph ->
                 store.retain(graph.walkInstances().map { it.instanceId }.toSet())
             }
         }

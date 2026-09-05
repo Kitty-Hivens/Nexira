@@ -5,9 +5,16 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
+/**
+ * [publish] is supplied by the app root for the reason spelled out on
+ * [hivens.ui.theme.ThemeManager]: this module has no project dependencies, and a
+ * second copy of the atomic-write sequence would be a durability primitive
+ * maintained in two places.
+ */
 class CustomizationManager(
     configPath: Path,
     private val json: Json,
+    private val publish: (file: Path, content: String) -> Unit,
 ) {
     private val log = LoggerFactory.getLogger(CustomizationManager::class.java)
     private val settingsFile = configPath.resolve("customization.json")
@@ -24,8 +31,7 @@ class CustomizationManager(
 
     fun save(settings: CustomizationSettings) {
         try {
-            Files.createDirectories(settingsFile.parent)
-            Files.writeString(settingsFile, json.encodeToString(settings))
+            publish(settingsFile, json.encodeToString(settings))
         } catch (e: Exception) {
             log.error("Failed to save customization settings", e)
         }

@@ -114,7 +114,7 @@ class LayoutApplier(private val layout: InstallLayout) {
             ApplyCommit.serializer(),
             ApplyCommit(newVersion, staged.staged.keys.toList(), staged.deletes),
         ))
-        commit(newManifest, newVersion)
+        commit(newManifest)
     }
 
     /** Finish an interrupted apply, if a marker is present. Idempotent. */
@@ -133,7 +133,10 @@ class LayoutApplier(private val layout: InstallLayout) {
         commitFrom(commit, manifest)
     }
 
-    private fun commit(newManifest: FileManifest, newVersion: String) {
+    // No version parameter: the marker written a moment ago carries it, and
+    // [commitFrom] reads the version from there so the resumed path and this one
+    // cannot disagree about which version was applied.
+    private fun commit(newManifest: FileManifest) {
         val commit = json.decodeFromString(ApplyCommit.serializer(), Files.readString(marker))
         commitFrom(commit, newManifest)
     }

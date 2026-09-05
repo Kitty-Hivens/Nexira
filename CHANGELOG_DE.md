@@ -1,7 +1,32 @@
 # Änderungen
 
-Changelog von Nexira auf Deutsch. Gepflegt ab Version 2.3.4-beta4; die
-vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
+Was jede Nexira-Version für die Person bedeutet, die den Launcher benutzt.
+Gepflegt ab Version 2.3.4-beta4, das englische Original steht in
+[CHANGELOG_EN.md](./CHANGELOG_EN.md).
+
+Das Entwicklungsprotokoll ist ein eigenes Dokument:
+[CHANGELOG.md](./CHANGELOG.md). Es nennt Klassen und Mechanismen und muss
+nicht gelesen werden, um eine Version zu verstehen.
+
+## [2.4.0] - 2026-09-05
+
+2.4.0 ist das, worauf die Previews und Betas dieser Reihe hingearbeitet haben. Das meiste betrifft die Oberfläche: woraus eine Fläche besteht, ob die Zahl, die du einstellst, beim Pixel ankommt, und ob der Launcher aus dem Weg geht, sobald das Spiel läuft. Der Rest ist eine Liste von Dingen, die still nicht funktionierten, und einige davon konnten dich ein Konto, eine Sitzung oder etwas Getipptes kosten.
+
+### Highlights
+- **Dein Layout wird einmalig zurückgesetzt**. Eine Fläche wird jetzt über Zahlen beschrieben, die du setzen kannst, statt über Voreinstellungsnamen, die je drei Werte gleichzeitig bewegten. Die alten Beschreibungen lassen sich nicht ehrlich als die neuen lesen, also kehrt die Anordnung zu der zurück, die der Launcher mitbringt. Deine alte Datei bleibt unberührt auf der Platte liegen.
+- **Die Darstellungsregler tun, was sie sagen**. Der Deckkraft-Regler bewegte vorher gar nichts: im dunklen Design zeichnete jede Fläche mit einem festen Wert, im hellen verweigerte sie Transparenz völlig. Die Unschärfe verwischt jetzt das, was wirklich hinter einer Fläche liegt, statt einer Kopie des Hintergrundbildes, eine Fläche malt kein hartes Quadrat mehr hinter ihre eigenen runden Ecken, und ihre Form kann ein Squircle, ein Stern oder ein Vieleck sein.
+- **Ein Konto mit Zwei-Faktor-Anmeldung wird nicht mehr aus dem Spiel geworfen**. Das Öffnen des Launchers meldete dich erneut an, und SmartyCraft beendet bei jeder Anmeldung die vorherige Sitzung, also flog man Sekunden später mit einem Namensfehler aus dem laufenden Spiel, ohne dass irgendetwas auf dem Bildschirm die beiden verband.
+- **Widgets kannst du selbst hinzufügen, ohne auf uns zu warten**. Ein Widget-Modul ist eine `.jar`, die du in den Ordner widgets legst. Der Launcher findet sie beim Start, es gibt keinen Installationsschritt, keine Registry und keinen Store, bei dem etwas eingereicht wird. Nichts läuft in einer Sandbox, behandle ein Modul also wie einen Spiel-Mod und nimm solche, deren Quelltext du sehen kannst.
+- **Der Katalog zeigt mehr als seine erste Seite, und eine Pack-Seite liest sich wie eine**. Der Katalog fragte eine Seite ab und nie die nächste, und eine einzige abgelehnte Anfrage beendete die Liste bis zum Neustart des Launchers. Beschreibungen wurden als eine Spalte flachen Textes gezeichnet, jedes Bild auf die volle Breite gestreckt, ein sechzig Pixel grosses Abzeichen kam also bannergross heraus. Überschriften, Tabellen, Zitate und Klappelemente sehen jetzt aus wie das, was sie sind, Screenshots haben eine eigene Galerie, und eine Beschreibung kann den Launcher nicht mehr aufhängen oder seinen Speicher erschöpfen, was sie konnte, und zwar aus Text, den das Pack selbst liefert.
+- **Der Launcher geht aus dem Weg, egal wie du gestartet hast**. Das Ausblenden nach dem Start funktionierte nur vom klassischen Dashboard aus. Ein Pack aus der Bibliothek, von seiner eigenen Seite, nach einer Code-Abfrage oder nach einem Offline-Versuch ließ das Fenster vor dem Spiel stehen.
+- **Das Fenster öffnet sofort in voller Größe**. Früher öffnete es klein und wurde erst nach dem bereits gezeichneten ersten Bild vergrößert, was rund zwei Sekunden Weiss um eine korrekt gezeichnete Ecke zeigte.
+- **Ein Update zu installieren sieht nicht mehr wie ein Absturz aus**. Der Launcher blieb während des gesamten Austauschs auf dem Bildschirm, ohne noch zu zeichnen, und schrieb unter Linux dafür zwei vollständige Kopien seiner selbst. Jetzt geht das Fenster zuerst, und die Installation ist eine Umbenennung.
+- **Die Update-Hinweise kommen in deiner Sprache**. Im Update-Dialog war alles übersetzt außer dem Einzigen, wofür man ihn öffnet. Die russischen und deutschen Änderungslisten gab es, und gelesen wurden sie von gar nichts. Sie sind jetzt ein eigenes Dokument, für dich geschrieben statt aus dem Entwicklerprotokoll geschnitten, und eine Korrektur braucht keine neue Version.
+- **Mehr als drei Neuigkeiten, und schon vor der Anmeldung**. Die Leiste las aus einer Antwort, die drei trägt und immer trug, ein Widget mit Wunsch nach zwanzig zeigte also drei. Jetzt wird das Archiv der Website gelesen, seitenweise beim Scrollen. Weder die Neuigkeiten noch die Serverliste brauchen ein Konto, beide blieben aber bis zur Anmeldung leer, weil das Zertifikat des Servers nur im Anmeldeformular angenommen werden konnte.
+- **Ein laufendes Pack fragt, bevor seine Dateien überschrieben werden**. Update, Versionswechsel, Rückstufung und Reparatur überschreiben Mods und Konfigurationen, die das laufende Spiel bereits geöffnet hat, und keines davon sah nach, ob es lief. Sie fragen jetzt und machen weiter, wenn du es sagst, denn du hast vielleicht einen Grund, den der Launcher nicht sehen kann.
+- **Ein gewählter älterer Build wird auch installiert**. Die Versionsauswahl merkte sich den gewählten Build und lud den neuesten herunter, auf der Platte lag also nie das, was der Launcher zu haben glaubte.
+- **Nichts nimmt dir mehr still etwas weg**. Das Zurücksetzen der Anpassung im Wiederherstellungsmodus löschte die Notizen und Checklisten, die du in Widgets getippt hattest, und fragte vorher nichts. Ein Launcher, der bei gesperrtem System-Schlüsselbund startete, löschte dein gespeichertes Konto endgültig. Ein Mod, dessen Download fehlschlug, meldete sich als installiert. Und ein Pack-Update gab seine eigene Kopie einer Datei zurück, die es nie geändert hatte, über deine Bearbeitung hinweg, so nahm ein Pack mit Serverliste deine Serverliste mit.
+- **Deine Sitzung landet nicht im Log**. Eine Antwort, die der Launcher nicht lesen konnte, wurde mitsamt deiner uid und deinem Sitzungs-Token ins Log geschrieben und von dort in jedes Diagnosepaket, das du an den Support geschickt hast.
 
 ## [2.4.0-beta5] - 2026-08-05
 
@@ -13,6 +38,37 @@ vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
 - **Der JVM-Argument-Baukasten erzeugt einen startbaren Satz.** Ein Wechsel des Garbage Collectors und zweimal Anwenden konnte Argumente erzeugen, die die JVM rundweg ablehnt; sichtbar wurde davon nur ein Exit-Code.
 - **Beenden beendet.** Bisher ging ein hoefliches Signal hinaus und mehr nicht; ein Spiel, das es ignoriert, wird nun samt seiner Kindprozesse hart beendet.
 - **Nichts geht verloren.** Ein abgebrochener Schreibvorgang konnte die gesamte Skin-Bibliothek loeschen, und ein kyrillisch benanntes Preset ueberschrieb das zuvor gespeicherte.
+
+## [2.4.0-beta4] - 2026-08-03
+
+2.4.0-beta4 schließt die Wege, auf denen Code in einen Start gelangen konnte, den das Pack nie benannt hat. Ein installiertes Pack wird an seinen eigenen Bytes gemessen statt an seinen Dateinamen, die Prüfung wird unmittelbar vor dem Start noch einmal gestellt, und der Launcher trägt nichts mehr in den Prozess, was ihm nebenbei zugereicht wurde: seine Umgebung, die Argumente aus den Pack-Einstellungen, die nativen Bibliotheken in der Instanz und den Interpreter, den er ausführen soll. Die SmartyCraft-Serverliste gilt ab diesem Release als veraltet.
+
+### Highlights
+- **Ein Pack startet als das Pack, nach Inhalt.** Installierte Mods werden gegen die Bytes geprüft, die das Pack deklariert hat, nicht gegen ihre Dateinamen; eine unter einem bekannten Namen ausgetauschte Datei kommt nicht mehr durch.
+- **Die Prüfung läuft beim Start erneut.** Sie lief bisher vor der Anmeldung, Minuten bevor der Prozess überhaupt existierte; ein dazwischen verändertes Pack wird jetzt bemerkt.
+- **Nichts fährt nebenbei mit.** Einstellungen, die auf fremden Code zeigen, aus der Desktop-Sitzung geerbte Variablen und eine Laufzeitumgebung, die kein echtes Programm ist, werden bei einem Start mit Serveranmeldung abgewiesen.
+- **Ein verändertes Pack sagt es.** Der Start bricht mit einer Meldung ab, statt ein Spiel zu starten, das dem Server ohnehin nicht beitreten kann.
+- **Die SmartyCraft-Serverliste läuft aus.** In diesem Release gilt sie als veraltet, in 2.5.0 verschwindet sie -- an ihre Stelle treten Packs.
+
+## [2.4.0-beta3] - 2026-08-02
+
+2.4.0-beta3 macht Konten mit Zwei-Faktor-Schutz spielbar und schließt die Wege, auf denen ein Mod ungebeten in ein Pack gelangt. Die Anmeldung mit einem Code funktioniert durchgehend: Der Code wird einmal beim Druck auf Spielen abgefragt, und das Spiel startet auf einer Sitzung, die für genau diesen Start ausgestellt wurde. Auf der Inhaltsseite wird ein Pack vor jedem Start an seine eigene Dateiliste gehalten, Dateien, die sich nicht löschen lassen, gelten als das Hindernis, das sie sind, und der Durchgang berührt nur, was ein Loader tatsächlich ausführt -- Caches, Konfigurationen und die Buchführung des Launchers bleiben unangetastet.
+
+### Highlights
+- **Konten mit Zwei-Faktor-Schutz können spielen.** Die Anmeldung per Code funktioniert und wird einmal pro Start abgefragt statt immer wieder. Jede Hintergrundanmeldung, die die eben bestätigte Sitzung unbemerkt entwertet hat, ist entfernt.
+- **Ein Pack startet als das Pack.** Von Hand hinzugefügte JARs werden vor dem Start entfernt, und eine Datei, die sich nicht entfernen lässt, führt zu einem Start ohne Anmeldung, statt so zu tun, als wäre alles in Ordnung.
+- **Nur Mods werden aufgeräumt.** Mod-Caches, Konfigurationen und Reste werden nicht mehr mitgelöscht -- zuvor konnte ein Start den Cache umgeschriebener JARs eines Loaders leeren und einen vollständigen Neuaufbau kosten.
+- **Packs installieren wieder, wo eine Plattformbibliothek fehlt.** Ein Pack, dessen Loader eine nur für macOS gedachte Bibliothek auflistet, scheitert unter Windows und Linux nicht mehr an der Installation.
+
+## [2.4.0-beta2] - 2026-08-02
+
+2.4.0-beta2 schließt die Lücke zwischen dem, was ein Pack zu sein behauptet, und dem, was tatsächlich startet. Eine Instanz wird vor jedem Start an die Liste der Dateien gehalten, aus denen das Pack besteht, nicht nur beim Synchronisieren; eine zwischen zwei Synchronisationen von Hand hinzugefügte JAR fährt nicht mehr mit. Ein Start trägt außerdem nur eine Sitzung, die er sich verdient hat: offline, eine ungeprüfte Instanz und eine fehlgeschlagene Auffrischung starten das Spiel ohne Token. Daneben meldet eine fehlgeschlagene Auffrischung vor dem Start das endlich selbst, statt als "Failed to verify username" aus Minecraft heraus aufzutauchen, und die mitgelieferte Laufzeitumgebung meldet nicht mehr bei jedem Start einen nicht passenden Klassenarchiv-Stand.
+
+### Highlights
+- **Ein Pack startet als das Pack.** Dateien, die in `mods/` eines installierten Packs gelegt wurden, werden vor dem Start entfernt, und der Launcher benennt, was er entfernt hat. Es lädt nur, was das Pack selbst deklariert.
+- **Der Token bleibt aus Starts heraus, die ihn nicht verdient haben.** Ein Offline-Start, eine Instanz, für die der Launcher nicht einstehen kann, und ein Start, der den Anmeldeserver nicht erreicht hat, starten das Spiel ohne Sitzungstoken.
+- **Der Launcher sagt, wenn die Sitzung veraltet ist.** Statt dass das Spiel den Serverbeitritt mit "Failed to verify username" verweigert, sagt der Launcher vorab, dass er die Sitzung nicht auffrischen konnte und was dagegen hilft.
+- **Ein ruhigerer, leichterer Start.** Die mitgelieferte Laufzeitumgebung druckt nicht mehr bei jedem Start Klassenarchiv-Fehler, und ein nach einem Update veraltetes Archiv deaktiviert die Klassenteilung nicht mehr stillschweigend.
 
 ## [2.4.0-beta] - 2026-07-30
 

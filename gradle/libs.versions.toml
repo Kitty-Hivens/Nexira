@@ -5,21 +5,21 @@
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
 kotlin            = "2.4.10"
-compose           = "1.11.1"
+compose           = "1.12.0"
 buildconfigPlugin = "6.0.10"
-versionsPlugin    = "0.58.0"
+versionsPlugin    = "0.61.0"
 # ksp tracks its own release line, decoupled from the Kotlin version. 2.3.10 is
 # the latest published KSP; KSP2 runs on the Analysis API and compiles cleanly
 # against the Kotlin 2.4.10 toolchain here (:widget-processor / :client-ui
 # kspKotlinDesktop both green). Bump when a newer KSP ships; it does not need to
 # match the Kotlin minor.
-ksp               = "2.3.10"
+ksp               = "2.3.11"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
 ktor              = "3.5.2"
 # Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
 # certificate helper matches the TLS stack under test.
-okhttp            = "5.4.0"
+okhttp            = "5.5.0"
 koin              = "4.2.2"
 xodus             = "2.0.1"
 serialization     = "1.11.0"
@@ -27,29 +27,42 @@ coroutines        = "1.11.0"
 
 # ── UI / Compose ecosystem ───────────────────────────────────────────────────
 # composeMaterial3 tracks JetBrains' separately-published material3 artifact,
-# which lags Compose-MP core by ~2 release lines. core 1.11.1 shipped but
-# material3 has no 1.10.x / 1.11.x stable; 1.11.0-alpha07 is the JetBrains-paired
-# alpha for the 1.11 line. 1.12.0-alpha03 exists but pairs with compose 1.12-beta,
-# so it stays parked until compose core moves to 1.12 stable.
-composeMaterial3  = "1.11.0-alpha07"
-markdownRenderer  = "0.43.0"
+# which has no stable release on any line the desktop target has used. The
+# version here is the alpha paired with the compose core above; the two move
+# together, and the pairing is the only thing that makes an alpha acceptable.
+composeMaterial3  = "1.12.0-alpha03"
+# androidx graphics-shapes -- rounded polygons with corner SMOOTHING (squircles)
+# and star/polygon outlines, which RoundedCornerShape cannot express. Already on
+# the classpath transitively; declared so the source depends on it deliberately.
+# The desktop artifact has no Compose-Path bridge, so nx-ui builds the path from
+# the cubics itself (see PolygonShape).
+graphicsShapes    = "1.1.0"
+markdownRenderer  = "0.45.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
-markdown          = "0.7.8"
+markdown          = "0.7.9"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
-jsoup             = "1.23.1"
+jsoup             = "1.23.2"
 # Coil 3 -- async image loading (pack + mod icons, Browse cards). Deliberately no
 # library aliases: the KMP source-set block has to exclude Coil's skiko copy, and
 # implementation(<catalog accessor>) { ... } is rejected there (Provider vs String),
 # so client-ui builds the coordinates off this version instead.
-coil              = "3.5.0"
+coil              = "3.6.0"
+
+# SVG rasteriser for pack descriptions. Skia's own SVG module is what the image
+# loader uses on this platform and it draws no text at all -- a shields.io badge
+# came out as two blank colour blocks -- and skiko exposes no way to hand it a
+# font manager. Chosen over Batik for being a fraction of the size and for having
+# no script engine and no external-entity resolution to switch off: description
+# markup is written by third parties.
+jsvg              = "2.1.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
-materialColorUtils = "5.0.0"
-filekit           = "0.14.2"
+materialColorUtils = "5.0.1"
+filekit           = "0.15.0"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.0.18"
-logback           = "1.6.1"
+logback           = "1.6.3"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
@@ -90,18 +103,24 @@ libvault          = "0.2.1"
 # out as Skia images, fail-closed/drop-late, built for looping backgrounds.
 # Replaces the in-tree Skia-Codec animation path in CustomBackground and adds
 # video wallpapers. dev.hivens family, mavenCentral; decode-only LGPL FFmpeg +
-# libwebp + libass ship in per-platform skinema-natives classifier jars.
-# 0.7.0: packaging only -- no API change and no decode change from 0.6.2. The
-# natives moved off the library's version line onto their own (skinemaNatives
-# below), so these two versions no longer match and are not meant to.
-skinema           = "0.7.0"
+# libass ship in per-platform skinema-natives classifier jars.
+# 0.8.0 needs Compose 1.12 (skiko is compileOnly there, so the copy that runs is
+# the one Compose brings, and the library compiles against skiko 0.150.1, the
+# exact version `compose` above resolves). It also moves the FFmpeg pin to the
+# n9.0 line, which renames every soname the loader asks for, so it pairs only
+# with the natives below.
+skinema           = "0.8.0"
 
 # The natives are versioned as the FFmpeg build they carry plus a repack
-# revision, not as the library: skinema names the natives version it pairs
-# with in its release notes, and that version stays put across library
-# releases that do not touch the bundles. 8.1.1-1 is the same FFmpeg 8.1.1
-# that shipped with skinema 0.6.2, liblzma-5.dll fix included.
-skinemaNatives    = "8.1.1-1"
+# revision, not as the library: skinema names the natives version it pairs with
+# in its release notes, and that version stays put across library releases that
+# do not touch the bundles. 9.0.1-1 is FFmpeg 9.0.1.
+#
+# The two lines are not free to drift. skinema-core 0.8.0 publishes a `strictly`
+# constraint on dev.hivens:skinema-natives at the version it was built against,
+# so a bump of one without the other is a Gradle resolution conflict rather than
+# an UnsatisfiedLinkError on the first frame. Bump both, or neither.
+skinemaNatives    = "9.0.1-1"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # One version for the whole platform: JUnit 6 merged the Jupiter 5.x and Platform
@@ -110,9 +129,10 @@ skinemaNatives    = "8.1.1-1"
 # agent classes need Java 8 bytecode, so that pin is now scoped to compileJava and
 # 6.x resolves on every test classpath.
 mockk             = "1.14.11"
-junit             = "6.1.2"
+junit             = "6.1.3"
 
 [libraries]
+jsvg = { module = "com.github.weisj:jsvg", version.ref = "jsvg" }
 # Logging
 slf4j-api                       = { group = "org.slf4j",       name = "slf4j-api",                version.ref = "slf4j" }
 slf4j-simple                    = { group = "org.slf4j",       name = "slf4j-simple",             version.ref = "slf4j" }
@@ -151,6 +171,7 @@ compose-ui                      = { group = "org.jetbrains.compose.ui",         
 compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
 
 # UI add-ons
+androidx-graphics-shapes        = { group = "androidx.graphics", name = "graphics-shapes",        version.ref = "graphicsShapes" }
 multiplatform-markdown-m3       = { group = "com.mikepenz",        name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 markdown-core                   = { group = "org.jetbrains",       name = "markdown",            version.ref = "markdown" }
 jsoup                           = { group = "org.jsoup",           name = "jsoup",               version.ref = "jsoup" }
@@ -192,5 +213,5 @@ kotlin-serialization            = { id = "org.jetbrains.kotlin.plugin.serializat
 kotlin-compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
 compose                         = { id = "org.jetbrains.compose",                     version.ref = "compose" }
 buildconfig                     = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
-versions                        = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
+versions                        = { id = "io.github.ben-manes.versions",              version.ref = "versionsPlugin" }
 ksp                             = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }

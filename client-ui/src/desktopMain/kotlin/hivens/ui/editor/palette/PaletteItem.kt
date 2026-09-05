@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,7 +70,14 @@ fun PaletteItem(
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var rowBounds by remember { mutableStateOf<Rect?>(null) }
-    val graph = LocalLayoutGraph.current
+    // The drop handler lives inside a gesture the row starts once and never
+    // restarts -- its pointerInput is keyed on the payload, which is the same
+    // value for the row's whole life -- so a plain read here would freeze the
+    // graph at the first drag from this row. Every drop after that resolved the
+    // target slot's orientation and widget count from a layout that had since
+    // moved on: three widgets from one row into a canvas all seeded from the same
+    // count and landed on top of each other.
+    val graph by rememberUpdatedState(LocalLayoutGraph.current)
     val s = LocalStrings.current
     // Resolve the widget's label via key-indirection (see AppStrings.widgetLabel).
     val label = s.widgetLabel(descriptor.displayName)
@@ -109,13 +117,14 @@ fun PaletteItem(
                         }
                         editController.addWidget(
                             targetPath, descriptor.kind, descriptor.slots,
-                            index  = target.widgets.size,
-                            canvas = placement,
+                            index   = target.widgets.size,
+                            canvas  = placement,
+                            surface = descriptor.defaultSurface,
                         )
                     } else {
                         val orientation = target?.orientation ?: SlotOrientation.Column
                         val index = registry.insertionIndexInSlot(targetPath, pointer, orientation)
-                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
+                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index, surface = descriptor.defaultSurface)
                     }
                 },
             )

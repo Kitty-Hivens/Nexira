@@ -1,7 +1,5 @@
 package hivens.ui
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -9,37 +7,36 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
-import hivens.core.data.UiStyle
-import hivens.launcher.network.NetworkState
+import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.widgets.shell.RAIL_DEFAULT_WIDTH
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
-import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.icons.Symbol
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
@@ -61,9 +58,9 @@ import org.koin.compose.koinInject
 @Composable
 fun AppLayout(
     appState: AppState,
-    onCloseApp: () -> Unit,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
+    onSwitchTab: (Screen) -> Unit,
     onReplaceScreen: (Screen) -> Unit = {},
     onBack: () -> Unit,
     canGoBack: Boolean,
@@ -86,8 +83,6 @@ fun AppLayout(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
     onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {},
     customization: CustomizationSettings = CustomizationSettings(),
@@ -107,21 +102,25 @@ fun AppLayout(
     else NxTheme.colors.background
 
     val bypassHost = protocolConfig.sslBypassHost
-    val bypassesList by NetworkState.bypassesState.collectAsState()
-    val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
+    val bypassStore: SslBypassStore = koinInject()
+    val bypassesList by bypassStore.bypasses.collectAsState()
+    val sslBypass = remember(bypassesList, bypassHost) { bypassStore.isBypassed(bypassHost) }
 
     // The center region's screen router. Defined here (not in the layout graph)
     // because navigation is not yet a widget surface; the center region widget
     // invokes it. Reads currentSession/selectedServer live on each recompose.
     val centerBody: @Composable () -> Unit = {
-        // Screen-to-screen Crossfade duration follows the active style. Under
-        // Brut (animationMultiplier = 0) the swap is effectively instant; under
-        // Celestia keeps the 180ms fade.
-        val crossfadeMs = LocalStyle.current.animationDurationMs(180)
-        Crossfade(
-            targetState   = currentScreen,
-            animationSpec = tween(crossfadeMs),
+        // Screens are disposed when they are swapped out, so everything a reader had
+        // arranged -- a scroll position, an open tab, a chosen category -- died with
+        // the visit and came back at its default. Held per destination here instead.
+        val retention = rememberSaveableStateHolder()
+        // How a screen replaces another is the swap primitive's business, not the
+        // router's. A still style collapses it without this site knowing.
+        NxSwap(
+            target = currentScreen,
+            label  = "screen",
         ) { screen ->
+            retention.SaveableStateProvider(screen.retentionKey) {
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
@@ -137,9 +136,8 @@ fun AppLayout(
                                     initialSelectedServer = selectedServer,
                                     onServerSelected      = { selectedServer = it },
                                     onSessionUpdated      = { currentSession = it },
-                                    onCloseApp            = onCloseApp,
-                                    onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
-                                    onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
+                                    onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it.assetDir)) },
+                                    onOpenDetails         = { onScreenChange(Screen.ServerDetails(it.assetDir)) }
                                 )
                                 appState is AppState.Loading -> ContentLoadingPlaceholder()
                                 else -> ContentLoginRequiredPlaceholder(
@@ -182,8 +180,6 @@ fun AppLayout(
                             onLocaleChanged              = onLocaleChanged,
                             homeView                     = homeView,
                             onHomeViewChanged            = onHomeViewChanged,
-                            uiStyle                      = uiStyle,
-                            onUiStyleChanged             = onUiStyleChanged,
                             onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
@@ -213,22 +209,26 @@ fun AppLayout(
                             systemThemeAvailable = systemThemeAvailable,
                             paletteFromWallpaper = paletteFromWallpaper,
                             onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
-                            uiStyle           = uiStyle,
-                            onUiStyleChanged  = onUiStyleChanged,
+                            surfaceBlur       = customization.surfaceBlur,
+                            onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
 
                     is Screen.ServerSettings ->
-                        ServerSettingsScreen(
-                            server = screen.server,
-                            onBack = onBack
-                        )
+                        WithServer(screen.serverId, onBack) { server ->
+                            ServerSettingsScreen(
+                                server = server,
+                                onBack = onBack
+                            )
+                        }
 
                     is Screen.ServerDetails ->
-                        ServerDetailsSurface(
-                            server = screen.server,
-                            onBack = onBack,
-                        )
+                        WithServer(screen.serverId, onBack) { server ->
+                            ServerDetailsSurface(
+                                server = server,
+                                onBack = onBack,
+                            )
+                        }
 
                     Screen.Library -> LibraryScreen(
                         appState       = appState,
@@ -254,12 +254,24 @@ fun AppLayout(
                             instanceId          = screen.instanceId,
                             appState            = appState,
                             onBack              = onBack,
-                            initialShowSettings = screen.openSettings,
-                            onOpenVersions      = { fromSettings ->
+                            initialShowSettings    = screen.openSettings,
+                            initialSettingsSection = screen.settingsSection,
+                            onOpenVersions         = { fromSettings ->
                                 // Coming from the settings overlay: stamp the current
-                                // stack entry so Back restores the overlay, not the
-                                // bare pack page.
-                                if (fromSettings) onReplaceScreen(Screen.PackDetail(screen.instanceId, openSettings = true))
+                                // stack entry so Back restores the overlay, and the
+                                // section it was standing on. Without the section the
+                                // overlay came back on its first one, which is not
+                                // where anybody left it -- the version screen is only
+                                // reachable from Version.
+                                if (fromSettings) {
+                                    onReplaceScreen(
+                                        Screen.PackDetail(
+                                            screen.instanceId,
+                                            openSettings = true,
+                                            settingsSection = PackSettingsCategory.Version,
+                                        ),
+                                    )
+                                }
                                 onScreenChange(Screen.PackVersions(screen.instanceId))
                             },
                         )
@@ -271,12 +283,14 @@ fun AppLayout(
                         )
                 }
             }
+        }
     } // end centerBody
 
     val shellCtx = ShellContext(
         currentScreen   = currentScreen,
         isAuthenticated = appState is AppState.Authenticated,
         onScreenChange  = onScreenChange,
+        onSwitchTab     = onSwitchTab,
         onLogout        = onLogout,
         appState        = appState,
         onLogin         = onLogin,
@@ -299,10 +313,11 @@ fun AppLayout(
         homeView               = homeView,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
-        uiStyle                = uiStyle,
-        onUiStyleChanged       = onUiStyleChanged,
         centerStartInset       = 65.dp,
-        centerEndInset         = 265.dp,
+        // The rail's own default, not a copy of the number it happens to be. A
+        // rail widened in the editor used to leave this behind, and the overlay
+        // then sat over the rail it was meant to stop short of.
+        centerEndInset         = RAIL_DEFAULT_WIDTH,
     ) {
         CompositionLocalProvider(LocalShellContext provides shellCtx) {
             SlotRenderer(
@@ -321,6 +336,7 @@ fun AppSidebar(
     currentScreen: Screen,
     isAuthenticated: Boolean,
     onScreenChange: (Screen) -> Unit,
+    onSwitchTab: (Screen) -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
 ) {
@@ -329,13 +345,13 @@ fun AppSidebar(
     // Puppet: sidebar navigation. Direct onScreenChange calls keep
     // test runs deterministic regardless of the AprilFools chaos
     // wrapper inside the nav-buttons widget.
-    PuppetClick("nav.home")     { onScreenChange(Screen.Home) }
-    PuppetClick("nav.library")  { onScreenChange(Screen.Library) }
-    PuppetClick("nav.browse")   { onScreenChange(Screen.Browse) }
-    PuppetClick("nav.profile") { onScreenChange(Screen.Profile) }
-    PuppetClick("nav.wardrobe") { onScreenChange(Screen.Wardrobe) }
-    PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
-    PuppetClick("nav.about")    { onScreenChange(Screen.About) }
+    PuppetClick("nav.home")     { onSwitchTab(Screen.Home) }
+    PuppetClick("nav.library")  { onSwitchTab(Screen.Library) }
+    PuppetClick("nav.browse")   { onSwitchTab(Screen.Browse) }
+    PuppetClick("nav.profile") { onSwitchTab(Screen.Profile) }
+    PuppetClick("nav.wardrobe") { onSwitchTab(Screen.Wardrobe) }
+    PuppetClick("nav.settings") { onSwitchTab(Screen.Settings) }
+    PuppetClick("nav.about")    { onSwitchTab(Screen.About) }
     PuppetClick("nav.console")  {
         if (gameConsole.shouldShowConsole) gameConsole.hide()
         else gameConsole.show()
@@ -344,11 +360,12 @@ fun AppSidebar(
         PuppetClick("nav.logout") { onLogout() }
     }
 
-    val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onLogout) {
+    val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onSwitchTab, onLogout) {
         LeftRailContext(
             currentScreen   = currentScreen,
             isAuthenticated = isAuthenticated,
             onScreenChange  = onScreenChange,
+            onSwitchTab     = onSwitchTab,
             onLogout        = onLogout,
         )
     }
@@ -356,7 +373,7 @@ fun AppSidebar(
         NavigationRail(
             modifier       = modifier,
             // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
-            // background now, so its frostTier drives the matte.
+            // background now, so its own opacity and blur drive the matte.
             containerColor = Color.Transparent,
             contentColor   = NxTheme.colors.textSecondary
         ) {
@@ -375,6 +392,29 @@ fun AppSidebar(
 }
 
 private const val SIDEBAR_SURFACE = "appshell.leftrail"
+
+/**
+ * Renders [content] once the roster entry behind a server-scoped route resolves.
+ *
+ * A server that is no longer on the roster leaves rather than paints a screen
+ * built on an entry nothing serves any more -- the same exit the version manager
+ * takes when its instance is deleted underneath it.
+ */
+@Composable
+private fun WithServer(
+    serverId: String,
+    onBack: () -> Unit,
+    content: @Composable (ServerProfile) -> Unit,
+) {
+    when (val resolution = rememberServerResolution(serverId)) {
+        ServerResolution.Loading -> ContentLoadingPlaceholder()
+        ServerResolution.NotFound -> {
+            LaunchedEffect(serverId) { onBack() }
+            ContentLoadingPlaceholder()
+        }
+        is ServerResolution.Ready -> content(resolution.server)
+    }
+}
 
 // ─── Loading placeholder ──────────────────────────────────────────────────────
 

@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.launcher.platform.PlatformPaths
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
@@ -39,34 +40,29 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
-import hivens.ui.utils.ConsoleSettingsManager
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.FilterRule
 import hivens.ui.utils.HighlightRule
-import kotlinx.serialization.json.Json
+import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
 /**
- * Settings > Console. Owns its own [ConsoleSettingsManager] over the same
- * `console.json` the live console uses; loads fresh on open and writes on each
- * change, so there is no clobbering between this and the in-window gear. Edits
- * land in a running console when it is reopened.
+ * Settings > Console. Reads and writes through the shared [ConsoleSettingsStore],
+ * so an edit here reaches a console that is already open instead of waiting for
+ * it to be reopened -- and a switch flipped in that console's gear no longer
+ * writes a startup copy back over the rules added here.
  *
  * Carries Display (font / wrap / gutter / timestamps / buffer), severity
  * Colours, user highlight + filter rules, and the empty-state art manager --
- * all on the same [settings] state. Composes nx-ui primitives only.
+ * all on the same [settings] value. Composes nx-ui primitives only.
  */
 @Composable
-internal fun ConsoleSection(paths: PlatformPaths) {
+internal fun ConsoleSection() {
     val s = LocalStrings.current
-    val json = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
-    val manager = remember { ConsoleSettingsManager(paths.dataDir, json) }
-    var settings by remember { mutableStateOf(manager.load()) }
-    var artDraft by remember { mutableStateOf("") }
-    fun update(next: ConsoleSettings) {
-        val coerced = next.coerced()
-        settings = coerced
-        manager.save(coerced)
-    }
+    val store: ConsoleSettingsStore = koinInject()
+    val settings by store.settings.collectAsState()
+    var artDraft by rememberSaveable { mutableStateOf("") }
+    fun update(next: ConsoleSettings) = store.update(next)
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         NxSection(s.consoleSecDisplay) {
@@ -178,7 +174,7 @@ private fun ConsoleColorRow(label: String, hex: String?, autoLabel: String, onCh
 @Composable
 private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> Unit, onDelete: () -> Unit) {
     val s = LocalStrings.current
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Column(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -200,7 +196,7 @@ private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> 
 @Composable
 private fun FilterRuleCard(rule: FilterRule, onChange: (FilterRule) -> Unit, onDelete: () -> Unit) {
     val s = LocalStrings.current
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment     = Alignment.CenterVertically,
@@ -226,7 +222,7 @@ private fun EmptyRulesHint(text: String) {
 
 @Composable
 private fun ArtCard(art: String, onDelete: () -> Unit) {
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment     = Alignment.Top,
@@ -256,7 +252,7 @@ private fun ArtAdder(
     addLabel: String,
     placeholder: String,
 ) {
-    NxCard(glass = false) {
+    NxCard(blurDp = 0f) {
         Column(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

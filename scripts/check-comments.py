@@ -16,6 +16,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from _modules import source_dirs
+
 ROOT = Path(__file__).resolve().parent.parent
 
 SCAN_EXTS = {".kt", ".kts", ".java"}
@@ -24,14 +26,10 @@ EXCLUDE_PATH_FRAGMENTS = ("/build/", "/.gradle/", "/.idea/")
 
 # Scan roots are derived, not listed. A hand-maintained list is how nx-ui and the
 # widget modules went unscanned: they were added after the list was written and
-# nothing noticed. Any top-level directory carrying sources qualifies, so a module
-# added tomorrow is covered the day it lands.
+# nothing noticed. The build file is what says which directories are modules, so
+# one added tomorrow is covered the day it lands, wherever it is nested.
 def scan_dirs() -> list[Path]:
-    roots = [p for p in sorted(ROOT.iterdir()) if p.is_dir() and (p / "src").is_dir()]
-    build_src = ROOT / "buildSrc"
-    if build_src.is_dir() and build_src not in roots:
-        roots.append(build_src)
-    return roots
+    return source_dirs(ROOT)
 
 
 @dataclass(frozen=True)

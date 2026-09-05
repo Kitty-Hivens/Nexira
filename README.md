@@ -77,11 +77,13 @@ under reasonable JVM availability but isn't tested. Patches welcome.
 <details>
   <summary>Contributing</summary>
 
-Forks and PRs are welcome. Code is GPL-3.0 — take it and do whatever.  
+Forks and PRs are welcome. Code is GPL-3.0-or-later — take it and do whatever.  
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 </details>
 
 ---
+
+> ※ Licensed under the GNU General Public License, either version 3 of the License, or (at your option) any later version.
 
 > ※ Not affiliated with or endorsed by SMARTYcraft.  
 > ※ Protocol constants reverse-engineered from [`Kitty-Hivens/smrt-deco`](https://github.com/Kitty-Hivens/smrt-deco).

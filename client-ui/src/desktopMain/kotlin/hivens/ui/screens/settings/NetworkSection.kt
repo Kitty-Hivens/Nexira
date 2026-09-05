@@ -8,24 +8,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
-import hivens.launcher.network.NetworkState
+import hivens.core.security.SslBypassStore
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSection
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxTheme
-import kotlinx.coroutines.delay
+import org.koin.compose.koinInject
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Network controls -- the SSL-bypass entries, as a live list with revoke. One
@@ -35,15 +34,12 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 internal fun NetworkSection() {
     val s = LocalStrings.current
+    val bypassStore: SslBypassStore = koinInject()
 
-    // Live snapshot -- re-reads every 1s. Sufficient for a settings screen; avoids
-    // a Flow purely for this single read site.
-    val bypasses by produceState(initialValue = NetworkState.listBypasses()) {
-        while (true) {
-            value = NetworkState.listBypasses()
-            delay(1_000.milliseconds)
-        }
-    }
+    // The store publishes its grants, so the list follows a revoke made from
+    // anywhere -- this section used to re-read a snapshot once a second, which
+    // is a poll for state that changes on the scale of days.
+    val bypasses by bypassStore.bypasses.collectAsState()
     val dateFormatter = DateTimeFormatter
         .ofLocalizedDateTime(FormatStyle.MEDIUM)
         .withZone(java.time.ZoneId.systemDefault())
@@ -61,8 +57,16 @@ internal fun NetworkSection() {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(entry.host, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                        // Parsing a stored string during composition: a damaged
+                        // timestamp threw out of the render pass and took the
+                        // settings screen with it, over one unreadable field of
+                        // one row. The raw value is shown instead -- it is what
+                        // the file says, and it can be read by whoever has to fix
+                        // it.
+                        val expires = runCatching { dateFormatter.format(java.time.Instant.parse(entry.expiresAt)) }
+                            .getOrDefault(entry.expiresAt)
                         Text(
-                            text  = s.sslBypassExpiresAt(dateFormatter.format(java.time.Instant.parse(entry.expiresAt))),
+                            text  = s.sslBypassExpiresAt(expires),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxTheme.colors.textSecondary,
                         )
@@ -71,14 +75,14 @@ internal fun NetworkSection() {
                         label   = s.sslBypassRevoke,
                         onClick = {
                             ActionRing.record("SSL bypass revoked by user from Settings: ${entry.host}")
-                            NetworkState.revokeBypass(entry.host)
+                            bypassStore.revoke(entry.host)
                         },
                         style   = NxButtonStyle.Secondary,
                         compact = true,
                     )
                     PuppetClick("settings.sslBypass.revoke.${entry.host}") {
                         ActionRing.record("SSL bypass revoked by puppet driver: ${entry.host}")
-                        NetworkState.revokeBypass(entry.host)
+                        bypassStore.revoke(entry.host)
                     }
                 }
             }

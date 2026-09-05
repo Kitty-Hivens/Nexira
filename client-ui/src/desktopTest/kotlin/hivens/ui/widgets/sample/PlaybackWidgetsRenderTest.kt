@@ -17,11 +17,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.BrutStyle
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -58,9 +54,7 @@ class PlaybackWidgetsRenderTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(
-        style: StyleSpec,
         dark: Boolean,
-        ground: Color,
         name: String,
         scale: Float = 1f,
         content: @Composable () -> Unit,
@@ -70,14 +64,13 @@ class PlaybackWidgetsRenderTest {
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(useDarkTheme = dark, style = style) {
+            NxTheme(useDarkTheme = dark) {
                 CompositionLocalProvider(
-                    LocalStyle provides style,
                     LocalStrings provides EnglishStrings,
                 ) {
                     progressAccent = NxTheme.colors.progressAccent
                     Column(
-                        modifier            = Modifier.fillMaxSize().background(ground).padding(16.dp),
+                        modifier            = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { content() }
                 }
@@ -117,16 +110,10 @@ class PlaybackWidgetsRenderTest {
         // The complaint these surfaces came from is that they floated on the
         // wallpaper with no plane under them. A near-black ground is the hardest
         // case: it is what the app shows with no wallpaper set.
-        val cases = listOf(
-            Triple("celestia-dark", CelestiaStyle to true, Color(0xFF121212)),
-            Triple("brut-dark", BrutStyle to true, Color(0xFF121212)),
-            Triple("celestia-light", CelestiaStyle to false, Color(0xFFF5F7FA)),
-            Triple("brut-light", BrutStyle to false, Color(0xFFF5F7FA)),
-        )
-        for ((name, styling, ground) in cases) {
-            val (style, dark) = styling
-            render(style, dark, ground, name, scale = 2f) { Sheet() }
-            val bmp = render(style, dark, ground, name) { Sheet() }
+        val cases = listOf("dark" to true, "light" to false)
+        for ((name, dark) in cases) {
+            render(dark, name, scale = 2f) { Sheet() }
+            val bmp = render(dark, name) { Sheet() }
 
             val card = bmp.getColor(bmp.width / 2, (bmp.height * 0.14f).toInt())
             val mini = bmp.getColor(bmp.width / 2, (bmp.height * 0.66f).toInt())
@@ -141,7 +128,7 @@ class PlaybackWidgetsRenderTest {
         // Volume held at zero so the only thing that can ink the progress accent
         // is the measure itself.
         fun accentPixels(fraction: Float, volume: Float, name: String): Int {
-            val bmp = render(CelestiaStyle, true, Color(0xFF121212), name) {
+            val bmp = render(true, name) {
                 PlaybackMiniControl(
                     state       = playing(fraction),
                     track       = track,

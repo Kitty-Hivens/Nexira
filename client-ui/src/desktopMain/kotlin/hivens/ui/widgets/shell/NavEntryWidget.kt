@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,7 +36,6 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
@@ -76,35 +76,35 @@ fun NavEntry(instance: WidgetInstance) {
             outlineSwap  = true,
             phase        = 0.0f,
             active       = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
-            onClick      = { ctx.onScreenChange(Screen.Home) },
+            onClick      = { ctx.onSwitchTab(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
             outlineSwap  = true,
             phase        = 0.55f,
             active       = screen is Screen.Library || screen is Screen.PackDetail || screen is Screen.PackVersions,
-            onClick      = { ctx.onScreenChange(Screen.Library) },
+            onClick      = { ctx.onSwitchTab(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(
             icon         = NxIcon.Search,
             outlineSwap  = true,
             phase        = 1.65f,
             active       = screen is Screen.Browse || screen is Screen.CataloguePackDetail,
-            onClick      = { ctx.onScreenChange(Screen.Browse) },
+            onClick      = { ctx.onSwitchTab(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
             icon         = NxIcon.Person,
             outlineSwap  = true,
             phase        = 1.1f,
             active       = screen is Screen.Profile,
-            onClick      = { ctx.onScreenChange(Screen.Profile) },
+            onClick      = { ctx.onSwitchTab(Screen.Profile) },
         )
         NavTarget.Wardrobe -> NavSlot(
             icon         = NxIcon.Palette,
             outlineSwap  = true,
             phase        = 1.6f,
             active       = screen is Screen.Wardrobe,
-            onClick      = { ctx.onScreenChange(Screen.Wardrobe) },
+            onClick      = { ctx.onSwitchTab(Screen.Wardrobe) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,
@@ -112,14 +112,14 @@ fun NavEntry(instance: WidgetInstance) {
             phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
                 screen is Screen.BackgroundSettings,
-            onClick      = { ctx.onScreenChange(Screen.Settings) },
+            onClick      = { ctx.onSwitchTab(Screen.Settings) },
         )
         NavTarget.About -> NavSlot(
             icon         = NxIcon.Info,
             outlineSwap  = true,
             phase        = 3.3f,
             active       = screen is Screen.About,
-            onClick      = { ctx.onScreenChange(Screen.About) },
+            onClick      = { ctx.onSwitchTab(Screen.About) },
         )
         NavTarget.Console -> {
             val gameConsole: GameConsoleService = koinInject()
@@ -175,7 +175,6 @@ private fun NavSlot(
 ) {
     val af = LocalAprilFools.current
     val cz = LocalCustomization.current
-    val style = LocalStyle.current
 
     val bounceAmp = if (chaosEligible && af.isActive()) af.intensity() * 18f else 0f
     // Only run the infinite transition during April Fools. Otherwise a 0-amplitude
@@ -247,7 +246,7 @@ private fun NavSlot(
                     NavSelectionStyle.Pill ->
                         Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(50)).background(fill))
                     NavSelectionStyle.Square ->
-                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(RoundedCornerShape(style.buttonCorner)).background(fill))
+                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(MaterialTheme.shapes.small).background(fill))
                     NavSelectionStyle.Circle ->
                         Box(Modifier.size(40.dp).clip(CircleShape).background(fill))
                     NavSelectionStyle.LeftBar ->

@@ -32,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,16 +41,21 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.surface.bodyFloor
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.resolveSurface
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
+import hivens.widget.model.FillSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.SlotPath
-import hivens.widget.model.WidgetChrome
+import hivens.widget.model.SurfaceCorners
+import hivens.widget.model.SurfaceSpec
+import hivens.widget.model.parseFill
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 import kotlin.math.roundToInt
@@ -134,7 +141,6 @@ private fun PropPanelBody(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val sd = serializer?.descriptor
     // Effective values: the encoded default baseline overlaid with the
     // instance's stored overrides. Every key is present, so each field's
@@ -148,8 +154,8 @@ private fun PropPanelBody(
             .width(320.dp)
             .fillMaxHeight()
             .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-            .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
-            .clip(RoundedCornerShape(style.panelCorner))
+            .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
+            .clip(MaterialTheme.shapes.large)
             // Solid surface, no glass: a settings panel must stay readable and
             // not composite with the layers it floats over.
             .background(NxTheme.colors.surface),
@@ -212,89 +218,48 @@ private fun PropPanelBody(
                 Spacer(Modifier.size(8.dp))
             }
 
-            // Universal "Backing" section: per-widget glass / corner / padding.
-            // Available on every widget, propless included.
+            // The widget's own surface, as the seven values it is. Available on
+            // every widget, propless included. Each row writes one field and leaves
+            // the rest alone, so nothing here can move something the eye is not on.
             Text(
                 text       = s.editorBackingTitle,
                 style      = MaterialTheme.typography.labelMedium,
                 color      = NxTheme.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
-            val chrome = instance.chrome ?: WidgetChrome()
-            LabeledSlider(
-                label         = s.editorBackingGlass,
-                value         = chrome.glassAlphaPct.toFloat(),
-                range         = 0f..100f,
-                format        = "%.0f%%",
-                keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(glassAlphaPct = it.roundToInt())) },
-            )
-            // Glass 0 = no visible card, but the renderer applies the corner clip
-            // and padding outside the glass, so both still shape the widget. Say so
-            // rather than letting the corner/padding controls read as inert.
-            if (chrome.glassAlphaPct == 0) {
+            // Seeded through the same resolution the renderer uses, so the sliders
+            // open where the plane on screen actually is. Null is not an empty spec:
+            // it means the widget draws no plane, and seeding one from it turned any
+            // edit into "give this widget a plane", at whatever the renderer fills the
+            // unnamed fields with. Giving one is its own act now.
+            val resolved = descriptor.resolveSurface(instance)
+            fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
+            if (descriptor.drawsOwnSurface) {
                 Text(
-                    text  = s.editorBackingNoGlassHint,
+                    text  = s.editorSurfaceOwn,
                     style = MaterialTheme.typography.bodySmall,
                     color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                 )
+            } else if (resolved == null) {
+                Text(
+                    text  = s.editorSurfaceNone,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                )
+                TextButton(onClick = { write(SurfaceSpec(fill = "base", opacity = 0.5f)) }) {
+                    Symbol(NxIcon.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(s.editorSurfaceAdd, style = MaterialTheme.typography.labelMedium)
+                }
+            } else {
+                SurfaceRows(surface = resolved, write = ::write)
             }
-            LabeledSlider(
-                label         = s.editorBackingCorner,
-                value         = chrome.cornerRadiusDp.toFloat(),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(cornerRadiusDp = it.roundToInt())) },
-            )
-            LabeledSlider(
-                label         = s.editorBackingPadding,
-                value         = chrome.paddingDp.toFloat(),
-                range         = 0f..32f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingDp = it.roundToInt())) },
-            )
-            // Per-side overrides. Each starts at the uniform value (effective*)
-            // and, once moved, pins that side independently of the uniform one.
-            LabeledSlider(
-                label         = s.editorBackingPaddingTop,
-                value         = chrome.effectiveTop.toFloat(),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingTopDp = it.roundToInt())) },
-            )
-            LabeledSlider(
-                label         = s.editorBackingPaddingEnd,
-                value         = chrome.effectiveEnd.toFloat(),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingEndDp = it.roundToInt())) },
-            )
-            LabeledSlider(
-                label         = s.editorBackingPaddingBottom,
-                value         = chrome.effectiveBottom.toFloat(),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingBottomDp = it.roundToInt())) },
-            )
-            LabeledSlider(
-                label         = s.editorBackingPaddingStart,
-                value         = chrome.effectiveStart.toFloat(),
-                range         = 0f..40f,
-                format        = "%.0f",
-                keyStep       = 1f,
-                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingStartDp = it.roundToInt())) },
-            )
         }
 
         TextButton(
             onClick  = {
                 if (sd != null) controller.updateProps(path, instanceId, JsonObject(emptyMap()))
-                controller.updateChrome(path, instanceId, null)
+                controller.updateSurface(path, instanceId, null)
             },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
@@ -302,5 +267,211 @@ private fun PropPanelBody(
             Spacer(Modifier.width(6.dp))
             Text(s.editorResetToDefault, style = MaterialTheme.typography.labelMedium)
         }
+    }
+}
+
+/**
+ * Whether the body a spec resolves to is dark, which is what decides the opacity a
+ * surface that names none draws at.
+ *
+ * A rung follows the palette and every rung of one palette sits on the same side of
+ * mid grey, so the page's own tone answers for all of them; a literal colour answers
+ * for itself.
+ */
+@Composable
+private fun surfaceBodyIsDark(spec: SurfaceSpec): Boolean =
+    when (val fill = parseFill(spec.fill)) {
+        is FillSource.Literal -> Color(fill.argb).luminance() < 0.5f
+        else -> NxTheme.colors.surface.luminance() < 0.5f
+    }
+
+/**
+ * The seven values a plane has, one row each.
+ *
+ * Only rendered for a widget that HAS a plane: a widget without one gets the
+ * offer to add it instead, so no row here can bring a surface into being as a
+ * side effect of moving something else.
+ */
+@Composable
+private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
+    val s = LocalStrings.current
+    val corner = 12f
+
+    // One field, a value or a name. Blank follows the theme, a rung name
+    // tracks the palette, a literal does not; a typo falls back to the theme
+    // rather than to black, so a mistake never looks deliberate.
+    StringRow(s.editorSurfaceFill, surface.fill) { write(surface.copy(fill = it)) }
+    Text(
+        text  = s.editorSurfaceFillHint,
+        style = MaterialTheme.typography.bodySmall,
+        color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+    )
+    // Both open on what the plane DRAWS at, not on a zero. A value the record
+    // does not name is filled in by the style or by the theme, so a slider
+    // reading its own null reported no blur under a style that blurs at 18dp
+    // and full opacity under a body that draws at 0.92. Moving either one
+    // writes it down, which is what makes the number true from then on.
+    LabeledSlider(
+        label         = s.editorSurfaceOpacity,
+        value         = (surface.opacity ?: bodyFloor(surfaceBodyIsDark(surface))) * 100f,
+        range         = 0f..100f,
+        format        = "%.0f%%",
+        keyStep       = 1f,
+        onValueChange = { write(surface.copy(opacity = it / 100f)) },
+    )
+    LabeledSlider(
+        label         = s.editorSurfaceBlur,
+        // Zero when unset, because that is what the renderer draws for a
+        // widget that names no radius. It opened on the style's value, which
+        // the widget path does not use.
+        value         = surface.blurDp ?: 0f,
+        range         = 0f..40f,
+        format        = "%.0f",
+        keyStep       = 1f,
+        onValueChange = { write(surface.copy(blurDp = it)) },
+    )
+    // Opens on the style's card corner rather than on a sentinel, and writes
+    // the baseline WITHOUT clearing the per-corner overrides beside it: it
+    // used to replace the whole record, so moving this slider silently threw
+    // away corners set one at a time.
+    LabeledSlider(
+        label         = s.editorBackingCorner,
+        value         = surface.shape.corners.all ?: corner,
+        range         = 0f..40f,
+        format        = "%.0f",
+        keyStep       = 1f,
+        onValueChange = {
+            write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = it))))
+        },
+    )
+    LabeledSlider(
+        label         = s.editorBackingPadding,
+        value         = surface.padding.all ?: 0f,
+        range         = 0f..32f,
+        format        = "%.0f",
+        keyStep       = 1f,
+        onValueChange = { write(surface.copy(padding = surface.padding.copy(all = it))) },
+    )
+
+    // Everything past this point is a refinement of one of the rows above.
+    // Shown on request rather than always: the panel had eleven rows for a
+    // plane most widgets set two of, and a wall of controls is its own way of
+    // hiding the ones that matter.
+    var showMore by remember { mutableStateOf(false) }
+    DisclosureRow(s.editorSurfaceMore, showMore) { showMore = !showMore }
+    // Revealed rather than switched on. Twelve rows appearing between two
+    // frames reads as the panel having been replaced; the same rows growing
+    // out of the row that asked for them reads as one panel with more in it.
+    AnimatedVisibility(
+        visible = showMore,
+        enter = Motion.reveal.enter,
+        exit = Motion.reveal.exit,
+    ) {
+      Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          StringRow(s.editorSurfaceShapeKind, surface.shape.kind) {
+              write(surface.copy(shape = surface.shape.copy(kind = it)))
+          }
+          Text(
+              text  = s.editorSurfaceShapeKindHint,
+              style = MaterialTheme.typography.bodySmall,
+              color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+          )
+          LabeledSlider(
+              label         = s.editorSurfaceSmoothing,
+              value         = (surface.shape.smoothing ?: 0f) * 100f,
+              range         = 0f..100f,
+              format        = "%.0f%%",
+              keyStep       = 1f,
+              onValueChange = { write(surface.copy(shape = surface.shape.copy(smoothing = it / 100f))) },
+          )
+          // A star's three values, and only where they mean something. Offering
+          // them under a rounded rectangle would put back the thing this panel
+          // was collapsed to remove: rows that move nothing.
+          val kind = surface.shape.kind.trim().lowercase()
+          if (kind == "star" || kind == "polygon") {
+              LabeledSlider(
+                  label         = s.editorSurfaceShapePoints,
+                  value         = (surface.shape.points ?: if (kind == "star") 5 else 6).toFloat(),
+                  range         = 3f..16f,
+                  format        = "%.0f",
+                  keyStep       = 1f,
+                  onValueChange = { write(surface.copy(shape = surface.shape.copy(points = it.roundToInt()))) },
+              )
+              if (kind == "star") {
+                  LabeledSlider(
+                      label         = s.editorSurfaceShapeInnerRadius,
+                      value         = (surface.shape.innerRadius ?: 0.5f) * 100f,
+                      range         = 5f..95f,
+                      format        = "%.0f%%",
+                      keyStep       = 1f,
+                      onValueChange = { write(surface.copy(shape = surface.shape.copy(innerRadius = it / 100f))) },
+                  )
+              }
+              LabeledSlider(
+                  label         = s.editorSurfaceShapePointRounding,
+                  value         = (surface.shape.pointRounding ?: 0f) * 100f,
+                  range         = 0f..100f,
+                  format        = "%.0f%%",
+                  keyStep       = 1f,
+                  onValueChange = { write(surface.copy(shape = surface.shape.copy(pointRounding = it / 100f))) },
+              )
+          }
+          // Each corner opens at whatever the baseline resolves to and, once
+          // moved, pins that corner independently -- which is what makes a plane
+          // square on one side and round on the other.
+          CornerRow(s.editorSurfaceCornerTopStart, surface.shape.corners.topStart(corner)) {
+              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topStart = it))))
+          }
+          CornerRow(s.editorSurfaceCornerTopEnd, surface.shape.corners.topEnd(corner)) {
+              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topEnd = it))))
+          }
+          CornerRow(s.editorSurfaceCornerBottomEnd, surface.shape.corners.bottomEnd(corner)) {
+              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomEnd = it))))
+          }
+          CornerRow(s.editorSurfaceCornerBottomStart, surface.shape.corners.bottomStart(corner)) {
+              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomStart = it))))
+          }
+          LabeledSlider(
+              label         = s.editorSurfaceBorder,
+              value         = surface.border.widthDp ?: 0f,
+              range         = 0f..6f,
+              format        = "%.1f",
+              keyStep       = 0.5f,
+              onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
+          )
+          StringRow(s.editorSurfaceBorderColor, surface.border.color) {
+              write(surface.copy(border = surface.border.copy(color = it)))
+          }
+          LabeledSlider(
+              label         = s.editorSurfaceBorderOpacity,
+              value         = (surface.border.opacity ?: 1f) * 100f,
+              range         = 0f..100f,
+              format        = "%.0f%%",
+              keyStep       = 1f,
+              onValueChange = { write(surface.copy(border = surface.border.copy(opacity = it / 100f))) },
+          )
+          LabeledSlider(
+              label         = s.editorSurfaceShadow,
+              value         = surface.shadowDp ?: 0f,
+              range         = 0f..24f,
+              format        = "%.0f",
+              keyStep       = 1f,
+              onValueChange = { write(surface.copy(shadowDp = it)) },
+          )
+          // Per-side padding. Each opens at the uniform value and, once moved,
+          // pins that side independently of it.
+          CornerRow(s.editorBackingPaddingTop, surface.padding.top(0f)) {
+              write(surface.copy(padding = surface.padding.copy(top = it)))
+          }
+          CornerRow(s.editorBackingPaddingEnd, surface.padding.end(0f)) {
+              write(surface.copy(padding = surface.padding.copy(end = it)))
+          }
+          CornerRow(s.editorBackingPaddingBottom, surface.padding.bottom(0f)) {
+              write(surface.copy(padding = surface.padding.copy(bottom = it)))
+          }
+          CornerRow(s.editorBackingPaddingStart, surface.padding.start(0f)) {
+              write(surface.copy(padding = surface.padding.copy(start = it)))
+          }
+      }
     }
 }

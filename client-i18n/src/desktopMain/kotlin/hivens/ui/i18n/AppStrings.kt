@@ -1,5 +1,7 @@
 package hivens.ui.i18n
 
+import java.util.Locale
+
 interface AppStrings {
 
     // --- App ---
@@ -27,7 +29,14 @@ interface AppStrings {
     val navBack: String
     val navForward: String
     /** App locale, for date/number formatting in widgets (not the system default). */
-    val locale: java.util.Locale
+    val locale: Locale
+
+    /**
+     * Binary byte units as this language abbreviates them, smallest first: bytes,
+     * then kilo-, mega-, giga-, tera-. Read alongside [locale] by the size
+     * formatter, so a figure carries both the language's units and its decimal mark.
+     */
+    val byteUnits: List<String>
 
     // --- Dashboard ---
     fun dashboardWelcome(name: String): String
@@ -43,6 +52,8 @@ interface AppStrings {
     val launchButton: String
     val launchAbort: String
     val launchRunning: String
+    /** Stops the running game from the dashboard control. */
+    val launchStop: String
     val launchDownloading: String
     val launchPreparing: String
     val launchFailed: String
@@ -95,6 +106,8 @@ interface AppStrings {
     val settingsThemeModeSystemUnavailable: String
     val settingsPaletteFromWallpaper: String
     val settingsPaletteFromWallpaperDesc: String
+    val settingsSurfaceBlur: String
+    val settingsSurfaceBlurDesc: String
     val settingsCustomChrome: String
     val settingsCustomChromeDesc: String
     val settingsCustomChromeTiling: String
@@ -181,6 +194,7 @@ interface AppStrings {
     fun updateMandatoryBannerWithReason(reason: String): String
     val updateChangelog: String
     val updateHighlights: String
+    val updateNoChangelog: String
     val updateViewOnGitHub: String
     val updateLater: String
     val updateExit: String
@@ -243,6 +257,18 @@ interface AppStrings {
      *  triggers when user clicks Submit in their browser — never the launcher itself. */
     val settingsReportOnGithub: String
 
+    /** Prompts inside the GitHub issue body the launcher pre-fills. Only the parts
+     *  the author reads while writing are localised; headings and collected fields
+     *  stay English so the tracker stays searchable. */
+    val reportDescribeHeading: String
+    val reportCrashHint: String
+    val reportBundleHint: String
+    /** Nudge toward the tracker's working language -- advisory, never enforced. */
+    val reportLanguageNudge: String
+    /** `$bundle` is replaced with the ZIP's file name. */
+    val reportBundleCreated: String
+    val reportBundleAttach: String
+
     // --- File Manager ---
     fun fileDownloading(n: Int): String
 
@@ -262,7 +288,7 @@ interface AppStrings {
     // --- Server Settings: Extended ---
     val serverSettingsJvmArgs: String
     val serverSettingsJvmArgsHint: String
-    /** Button label that opens the visual JVM args builder when the experimental toggle is on. */
+    /** Button label that opens the visual JVM args builder when its toggle is on. */
     val serverSettingsJvmBuildArgs: String
     val serverSettingsResolution: String
     val serverSettingsWidth: String
@@ -388,11 +414,9 @@ interface AppStrings {
     /** Label on the hint's action button that restores the window. */
     val trayHintShow: String
 
-    // --- Settings: Experimental features ---
-    val settingsSectionExperimental: String
-    val settingsExperimentalMaster: String
-    val settingsExperimentalMasterDesc: String
+    // --- Settings: Advanced (updates, launch, data directory) ---
     val settingsSectionUpdates: String
+    val settingsSectionLaunch: String
     val settingsPreReleases: String
     val settingsPreReleasesDesc: String
     val settingsMandatoryUpdates: String
@@ -630,10 +654,6 @@ interface AppStrings {
     val settingsHomeViewNew: String
 
     // --- UI style variant picker (in Settings -> Interface) ---
-    val settingsUiStyleTitle: String
-    val settingsUiStyleSub: String
-    val settingsUiStyleCelestia: String
-    val settingsUiStyleBrut: String
 
     // --- Settings: left-rail selection style ---
     /** Title of the nav-rail selection-style control. */
@@ -657,7 +677,6 @@ interface AppStrings {
     val settingsCategoryAppearance: String
     val settingsCategoryNetwork: String
     val settingsCategorySmarty: String
-    val settingsCategoryExperimental: String
     val settingsCategoryAdvanced: String
     val settingsCategoryDiagnostics: String
     val settingsCategoryConsole: String
@@ -709,6 +728,8 @@ interface AppStrings {
     val wardrobeApplyCape: String
     val wardrobeCapeClanHint: String
     val wardrobeDefaults: String
+    val wardrobeDeleteTitle: String
+    val wardrobeDeleteBody: String
     val wardrobePoseStand: String
     val wardrobePoseWave: String
     val wardrobePoseSit: String
@@ -753,30 +774,22 @@ interface AppStrings {
     fun modrinthCategory(id: String): String
 
     // --- Browse pack detail ---
+    /** Tabs on a catalogue pack page. The gallery tab is offered only when the pack has shots. */
+    val browseDetailTabDescription: String
+    val browseDetailTabGallery: String
+    val browseDetailNoDescription: String
     val browseDetailErrorTitle: String
     val browseDetailErrorMessage: String
-    val browseDetailInstallReady: String
-    val browseDetailInstallHint: String
     val browseDetailInstallButton: String
-    val browseDetailTagsTitle: String
-    val browseDetailAboutTitle: String
+    /** Retry label on a mod whose install did not land. */
+    val contentInstallRetry: String
+    /** Tooltip on that retry, saying why it is offered. */
+    val contentInstallFailed: String
     /** Placeholder pack blurb shown until the mirror ships a real description. Receives the mod and asset counts. */
     fun browseDetailAbout(mods: Int, assets: Int): String
-    val browseDetailAboutNote: String
-    val browseDetailCompatTitle: String
-    val browseDetailCompatMc: String
-    val browseDetailCompatLoader: String
-    val browseDetailCompatJava: String
-    val browseDetailVersionTitle: String
 
-    val browseDetailInstallRunningTitle: String
     /** Per-file install progress line. Receives the current filename and the file counter. */
     fun browseDetailInstallProgress(filename: String, current: Int, total: Int): String
-    val browseDetailInstallStarting: String
-    val browseDetailInstallDoneTitle: String
-    val browseDetailInstallDoneHint: String
-    val browseDetailInstallOpenLibrary: String
-    val browseDetailInstallFailedTitle: String
     val browseDetailInstallFailedGeneric: String
 
     // ── Library / PackDetail / Files tab ────────────────────────────────
@@ -798,6 +811,19 @@ interface AppStrings {
     val contentFilterMods: String
     val contentFilterResourcePacks: String
     val contentFilterShaderPacks: String
+    val contentFiltersTitle: String
+    val contentFiltersReset: String
+    fun contentFiltersShown(shown: Int, total: Int): String
+    val contentFilterGroupCurated: String
+    val contentFilterGroupStatus: String
+    val contentFilterGroupOwner: String
+    val contentFilterAny: String
+    val contentFilterEnabled: String
+    val contentFilterDisabled: String
+    val contentFilterOwnerPack: String
+    val contentFilterOwnerUser: String
+    val contentFilterOptionalOnly: String
+    val contentFilterOptionalOnlyHint: String
     val contentDeleteTitle: String
     val contentDeleteBody: String
     fun contentBulkDeleteBody(count: Int): String
@@ -814,6 +840,8 @@ interface AppStrings {
     val contentTabFetchErrorTitle: String
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String
+    val modBrowserErrorTitle: String
+    val modBrowserErrorMessage: String
     val contentTabRoleSection: String
     fun contentTabOptionalSection(count: Int): String
     fun contentTabIncompatibleWith(name: String): String
@@ -921,6 +949,8 @@ interface AppStrings {
     val packVersionsDiffVsInstalled: String
     val packVersionsIdentical: String
     val packVersionsFirstBuild: String
+    /** Shown where the file diff would be, for a source that publishes no per-build file list. */
+    val packVersionsNoDiffSource: String
     fun packVersionsAdded(n: Int): String
     fun packVersionsUpdated(n: Int): String
     fun packVersionsRemoved(n: Int): String
@@ -996,6 +1026,11 @@ interface AppStrings {
     val packSettingsRepair: String
     val packSettingsRepairDesc: String
     val packSettingsRepairAction: String
+
+    /** Shown before an operation that rewrites the files of a pack whose game is live. */
+    val packBusyRunningTitle: String
+    val packBusyRunningBody: String
+    val packBusyRunningConfirm: String
     /** Outcome line: how much was looked at, and how much had to be put back. */
     fun packSettingsRepairDone(checked: Int, repaired: Int): String
     fun packSettingsRepairProgress(current: Int, total: Int, name: String): String
@@ -1133,6 +1168,8 @@ interface AppStrings {
 
     // --- Layout editor: common actions ---
     val editorClose: String
+    /** Context-menu entry that enters layout edit mode -- the only way in besides Ctrl+E. */
+    val editorEnterLayout: String
     val editorCancel: String
     val editorDelete: String
     val editorReset: String
@@ -1165,7 +1202,18 @@ interface AppStrings {
     val recoveryResetsHeading: String
     val recoveryResetLayout: String
     val recoveryResetCustomization: String
+    // Separate from customization because it is not appearance: it is what the
+    // user typed into a widget, and nothing else holds a copy of it.
+    val recoveryResetWidgetState: String
     val recoveryResetSettings: String
+    // Each reset says what it deletes before it deletes it. The surface invites
+    // pressing every button on it, and none of these can be undone.
+    fun recoveryResetConfirmTitle(name: String): String
+    val recoveryResetConfirm: String
+    val recoveryResetLayoutBody: String
+    val recoveryResetCustomizationBody: String
+    val recoveryResetWidgetStateBody: String
+    val recoveryResetSettingsBody: String
     val recoveryContinue: String
     val recoveryRelaunchFailed: String
     val recoveryRestartInApp: String
@@ -1202,6 +1250,9 @@ interface AppStrings {
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String
     val editorBackingTitle: String
+    val editorSurfaceNone: String
+    val editorSurfaceOwn: String
+    val editorSurfaceAdd: String
     /** Pill chip + header for a surface's own settings panel (e.g. the left rail). */
     val editorSurfaceSettings: String
     val editorBackingGlass: String
@@ -1214,6 +1265,25 @@ interface AppStrings {
     /** Caption under the backing controls when glass is 0: the card is not drawn,
      *  but corner still clips the widget and padding still insets it. */
     val editorBackingNoGlassHint: String
+    val editorSurfaceFill: String
+    val editorSurfaceOpacity: String
+    val editorSurfaceBlur: String
+    val editorSurfaceBorder: String
+    val editorSurfaceShadow: String
+    val editorSurfaceFillHint: String
+    val editorSurfaceShapeKind: String
+    val editorSurfaceSmoothing: String
+    val editorSurfaceCornerTopStart: String
+    val editorSurfaceCornerTopEnd: String
+    val editorSurfaceCornerBottomEnd: String
+    val editorSurfaceCornerBottomStart: String
+    val editorSurfaceBorderColor: String
+    val editorSurfaceBorderOpacity: String
+    val editorSurfaceMore: String
+    val editorSurfaceShapeKindHint: String
+    val editorSurfaceShapePoints: String
+    val editorSurfaceShapeInnerRadius: String
+    val editorSurfaceShapePointRounding: String
 
     // --- Layout editor: presets ---
     val editorPresetsTitle: String

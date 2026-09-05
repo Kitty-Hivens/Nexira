@@ -61,8 +61,8 @@ fun HomeNewHero(instance: WidgetInstance) {
     val p = instance.rememberProps<HeroProps>()
     val ctx = LocalHomeNewContext.current
     val s = LocalStrings.current
-    val qt = rememberQuickLaunchTarget() ?: return
-    val target = qt.target
+    val quickLaunch = rememberQuickLaunchTarget() ?: return
+    val target = quickLaunch.target
     val (hueA, hueB) = NxTheme.colors.decorativePair(target.id)
     val art = rememberPackArt(target)
 
@@ -145,11 +145,11 @@ fun HomeNewHero(instance: WidgetInstance) {
                 }
             }
             Flexible("home_hero_play_btn", FlexibleKind.Button) {
-                QuickLaunchButton(qt = qt, defaultLabel = s.homeQuickButton)
+                QuickLaunchButton(quickLaunch = quickLaunch, defaultLabel = s.homeQuickButton)
             }
         }
 
-        PuppetClick("home.hero.launch", enabled = qt.canLaunch) { qt.launch() }
+        PuppetClick("home.hero.launch", enabled = quickLaunch.canLaunch) { quickLaunch.launch() }
         PuppetClick("home.hero.open") { openDetail() }
     }
 }

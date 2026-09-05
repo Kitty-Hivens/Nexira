@@ -9,7 +9,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.positionChange
+import hivens.ui.editor.rememberDockSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -49,7 +55,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
+import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalWidgetRegistry
 
@@ -67,10 +73,10 @@ fun WidgetPalettePanel(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val registry0 = LocalWidgetRegistry.current
     // Draggable dock: the header drags this offset (session-scoped).
-    var paletteOffset by remember { mutableStateOf(Offset.Zero) }
+    val paletteOffset = rememberDockOffset()
+    val paletteSize   = rememberDockSize(default = 280.dp)
     // Only removable descriptors enter the palette. Non-removable
     // widgets (the auth panel, the three shell regions) are
     // surface-essential: shipping a default layout pins exactly one
@@ -99,19 +105,36 @@ fun WidgetPalettePanel(
         Column(
             modifier = Modifier
                 .graphicsLayer {
-                    translationX = paletteOffset.x
-                    translationY = paletteOffset.y
+                    translationX = paletteOffset.value.x
+                    translationY = paletteOffset.value.y
                     // Fade out of the way while a widget is dragged so the drop
                     // zone under the dock stays visible. Folded into this one
                     // layer (not a separate .alpha modifier) so the glass
                     // composites uniformly rather than as banded sub-layers.
                     alpha = if (dimmed) 0.12f else 1f
                 }
-                .width(280.dp)
+                .width(paletteSize.width)
+                // The panel is anchored to the right edge, so pulling left widens it.
+                // Secondary button, because the primary one is already the drag that
+                // moves the panel and the drag that lifts a widget out of it.
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type != PointerEventType.Press || !event.buttons.isSecondaryPressed) continue
+                            val id = event.changes.first().id
+                            event.changes.forEach { it.consume() }
+                            drag(id) { change ->
+                                paletteSize.resize(-change.positionChange().x.toDp())
+                                change.consume()
+                            }
+                        }
+                    }
+                }
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp, start = 0.dp)
-                .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
-                .clip(RoundedCornerShape(style.panelCorner))
+                .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
+                .clip(MaterialTheme.shapes.large)
                 // Solid surface, no glass: the panel floats over the right rail,
                 // and stacked translucent layers composited into muddy glass.
                 .background(NxTheme.colors.surface),
@@ -123,9 +146,18 @@ fun WidgetPalettePanel(
                 modifier              = Modifier
                     .fillMaxWidth()
                     .pointerInput(Unit) {
-                        detectDragGestures { change, drag ->
-                            change.consume()
-                            paletteOffset += drag
+                        // No slop: a header is a handle. detectDragGestures holds the
+                        // first few pixels back before it reports anything, which on a
+                        // short strip reads as the panel refusing to be grabbed. The
+                        // editor's own widget drag starts on the press for this reason.
+                        // requireUnconsumed yields to the close button sitting in here.
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            drag(down.id) { change ->
+                                change.consume()
+                                paletteOffset.drag(change.positionChange())
+                            }
                         }
                     }
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),

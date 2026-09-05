@@ -13,11 +13,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.BrutStyle
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -37,16 +33,10 @@ class ConfirmCodeCellsRenderTest {
     private val height = 96
 
     @Test
-    fun `typed digits stand off their cells under every style and palette`() {
-        val cases = listOf(
-            Triple("celestia-dark", CelestiaStyle to true, Color(0xFF121212)),
-            Triple("celestia-light", CelestiaStyle to false, Color(0xFFF5F7FA)),
-            Triple("brut-dark", BrutStyle to true, Color(0xFF121212)),
-            Triple("brut-light", BrutStyle to false, Color(0xFFF5F7FA)),
-        )
-        for ((name, styleAndDark, ground) in cases) {
-            val (style, dark) = styleAndDark
-            val bmp = render(style, dark, ground, name)
+    fun `typed digits stand off their cells on either palette`() {
+        val cases = listOf("dark" to true, "light" to false)
+        for ((name, dark) in cases) {
+            val bmp = render(dark, name)
             assertTrue(
                 contrastSpread(bmp) > MIN_SPREAD,
                 "$name: the cells and their digits are indistinguishable (spread ${contrastSpread(bmp)})",
@@ -72,17 +62,16 @@ class ConfirmCodeCellsRenderTest {
         return max - min
     }
 
-    private fun render(style: StyleSpec, dark: Boolean, ground: Color, name: String): Bitmap {
+    private fun render(dark: Boolean, name: String): Bitmap {
         val scene = ImageComposeScene(width = width, height = height, density = Density(1f)) {
             // The real theme entry point rather than a hand-provided palette, so the
             // sheet shows what the app resolves, tonal ladder included.
-            NxTheme(useDarkTheme = dark, style = style) {
+            NxTheme(useDarkTheme = dark) {
                 CompositionLocalProvider(
-                    LocalStyle provides style,
                     LocalStrings provides EnglishStrings,
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxSize().background(ground).padding(16.dp),
+                        modifier = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
                     ) { Cells() }
                 }
             }

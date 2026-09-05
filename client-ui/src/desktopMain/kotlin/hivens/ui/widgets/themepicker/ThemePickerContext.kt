@@ -10,9 +10,9 @@ import hivens.ui.theme.ThemePresets
 // Surface-scoped state + callbacks the theme-picker widgets share.
 // The grid widget reads `themes` to render every preset and writes
 // `selectedTheme.value` on tap; the preview widget reads
-// `selectedTheme.value` to render the preview panel. The apply
-// button (still in ThemePickerSurface chrome, not a widget) invokes
-// `onApply(selectedTheme.value)`.
+// `selectedTheme.value` to render the preview panel. Applying is not
+// here: the button is surface chrome, not a widget, so it calls the
+// surface's own callback and a copy in the context had no reader.
 //
 // Stub used by EditorSurfaceHost when a foreign-surface widget gets
 // dropped into theme.picker -- callbacks no-op rather than crash.
@@ -23,7 +23,6 @@ import hivens.ui.theme.ThemePresets
 class ThemePickerContext(
     val themes: List<CustomTheme>,
     val selectedTheme: MutableState<CustomTheme>,
-    val onApply: (CustomTheme) -> Unit,
     val onBack: () -> Unit,
 )
 
@@ -35,6 +34,5 @@ val LocalThemePickerContext: ProvidableCompositionLocal<ThemePickerContext> =
 internal val STUB_THEME_PICKER: ThemePickerContext = ThemePickerContext(
     themes        = emptyList(),
     selectedTheme = mutableStateOf(ThemePresets.getAll().first()),
-    onApply       = {},
     onBack        = {},
 )

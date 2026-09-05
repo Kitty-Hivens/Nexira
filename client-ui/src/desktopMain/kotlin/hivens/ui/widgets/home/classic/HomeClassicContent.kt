@@ -32,16 +32,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IServerListService
-import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.launch.LaunchState
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ProfileManager
 import hivens.launcher.launch.LauncherController
-import hivens.launcher.network.NetworkState
+import hivens.core.security.SslBypassStore
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -49,7 +47,6 @@ import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -65,10 +62,9 @@ import org.koin.compose.koinInject
 // code that's going away.
 @Widget(id = "home.classic.content", displayName = "widget.home.classic.content")
 @Composable
-fun HomeClassicContent(instance: WidgetInstance) {
+fun HomeClassicContent() {
     val ctx = LocalHomeClassicContext.current
     val serverListService: IServerListService = koinInject()
-    val settingsService: ISettingsService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
@@ -81,7 +77,6 @@ fun HomeClassicContent(instance: WidgetInstance) {
     val syncSnapshot by autoSyncService.snapshot.collectAsState()
     val syncStates = syncSnapshot.perServer
     val syncOverall = syncSnapshot.overall
-    var hiddenForCurrentSession by remember { mutableStateOf(false) }
 
     var servers by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
     var selectedServerState by remember { mutableStateOf(ctx.initialSelectedServer) }
@@ -89,8 +84,9 @@ fun HomeClassicContent(instance: WidgetInstance) {
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
     var isLoadingServers by remember { mutableStateOf(true) }
     val bypassHost = protocolConfig.sslBypassHost
-    val bypassesList by NetworkState.bypassesState.collectAsState()
-    val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
+    val bypassStore: SslBypassStore = koinInject()
+    val bypassesList by bypassStore.bypasses.collectAsState()
+    val sslBypass = remember(bypassesList, bypassHost) { bypassStore.isBypassed(bypassHost) }
 
     fun fetchServers(forceRefresh: Boolean = false) {
         isLoadingServers = true
@@ -102,13 +98,22 @@ fun HomeClassicContent(instance: WidgetInstance) {
                 }
                 withContext(Dispatchers.Main) {
                     servers = data.servers
-                    if (selectedServerState == null && servers.isNotEmpty()) {
-                        val lastId = profileManager.lastServerId
-                        val default = servers.find { it.assetDir == lastId } ?: servers.firstOrNull()
-                        if (default != null) {
-                            selectedServerState = default
-                            ctx.onServerSelected(default)
-                        }
+                    // Re-resolve the selection against the list that just arrived,
+                    // rather than only seeding it when there is none. The selection
+                    // is held above this screen for the process lifetime, so what
+                    // sits in it is a profile from whichever fetch first produced
+                    // it -- and Play launches THAT one, address, version, checksums
+                    // and all, however many times the roster has changed since.
+                    val wanted = selectedServerState?.assetDir ?: profileManager.lastServerId
+                    // Falls back to the first entry only when nothing is selected
+                    // yet: a fetch that comes back without the selected server --
+                    // a partial roster, a bad response -- must not quietly move
+                    // the selection onto a different server and launch that one.
+                    val resolved = servers.find { it.assetDir == wanted }
+                        ?: servers.firstOrNull().takeIf { selectedServerState == null }
+                    if (resolved != null && resolved != selectedServerState) {
+                        selectedServerState = resolved
+                        ctx.onServerSelected(resolved)
                     }
                 }
             } catch (e: Exception) {
@@ -117,19 +122,6 @@ fun HomeClassicContent(instance: WidgetInstance) {
             } finally {
                 withContext(Dispatchers.Main) { isLoadingServers = false }
             }
-        }
-    }
-
-    LaunchedEffect(launchState) {
-        when (launchState) {
-            is LaunchState.GameRunning -> {
-                if (settingsService.getSettings().closeAfterStart && !hiddenForCurrentSession) {
-                    hiddenForCurrentSession = true
-                    ctx.onCloseApp()
-                }
-            }
-            is LaunchState.Idle, is LaunchState.Error -> hiddenForCurrentSession = false
-            else -> {}
         }
     }
 
@@ -204,8 +196,9 @@ fun HomeClassicContent(instance: WidgetInstance) {
                         onLaunch = { srv ->
                             selectedServerState = srv
                             ctx.onServerSelected(srv)
-                            launchDriver.observe(LaunchTarget.Server(srv))
-                            controller.launch(ctx.session, srv, ctx.onSessionUpdated)
+                            if (controller.launch(ctx.session, srv, ctx.onSessionUpdated)) {
+                                launchDriver.observe(LaunchTarget.Server(srv))
+                            }
                         },
                         onSettings  = { ctx.onOpenServerSettings(it) },
                         onDetails   = { ctx.onOpenDetails(it) },
@@ -241,7 +234,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
                     shape = MaterialTheme.shapes.medium,
                 )
                 .background(
-                    color = glassSurfaceAlpha(0.45f),
+                    color = NxTheme.colors.surface.copy(alpha = 0.45f),
                     shape = MaterialTheme.shapes.medium,
                 )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -250,8 +243,9 @@ fun HomeClassicContent(instance: WidgetInstance) {
                 state        = launchState,
                 onLaunch     = {
                     selectedServerState?.let { srv ->
-                        launchDriver.observe(LaunchTarget.Server(srv))
-                        controller.launch(ctx.session, srv, ctx.onSessionUpdated)
+                        if (controller.launch(ctx.session, srv, ctx.onSessionUpdated)) {
+                            launchDriver.observe(LaunchTarget.Server(srv))
+                        }
                     }
                 },
                 onAbort      = { controller.abort() },
@@ -282,7 +276,7 @@ private fun AutoSyncProgressStrip(
                 shape = MaterialTheme.shapes.medium,
             )
             .background(
-                color = glassSurfaceAlpha(0.35f),
+                color = NxTheme.colors.surface.copy(alpha = 0.35f),
                 shape = MaterialTheme.shapes.medium,
             )
             .padding(horizontal = 14.dp, vertical = 8.dp),

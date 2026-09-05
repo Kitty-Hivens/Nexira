@@ -33,7 +33,7 @@ jobs:
       # toolchain(26) resolves to the running JVM instead of a download.
       - name: Set up JDK 26 for the Gradle toolchain
         id: jdk26
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: liberica
           java-version: '26'
@@ -55,6 +55,6 @@ jobs:
           # quick-fixes available in Ultimate and Ultimate Plus plans
           push-fixes: 'none'
           # Mount the runner's JDK 26 into the linter container so projectJDK
-          # (/root/.jdks/jdk) resolves the Gradle toolchain. Comma-splits into
-          # `qodana scan` args.
-          args: -v,${{ steps.jdk26.outputs.path }}:/root/.jdks/jdk
+          # (/root/.jdks/jdk) resolves the Gradle toolchain. Space-separated: the
+          # comma form is deprecated and the action warns on it every run.
+          args: -v ${{ steps.jdk26.outputs.path }}:/root/.jdks/jdk

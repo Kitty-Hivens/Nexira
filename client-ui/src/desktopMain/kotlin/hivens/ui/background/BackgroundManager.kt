@@ -1,5 +1,6 @@
 package hivens.ui.background
 
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
@@ -24,8 +25,7 @@ class BackgroundManager(
 
     fun save(settings: BackgroundSettings) {
         try {
-            Files.createDirectories(settingsFile.parent)
-            Files.writeString(settingsFile, json.encodeToString(settings))
+            AtomicFiles.writeString(settingsFile, json.encodeToString(settings))
         } catch (e: Exception) {
             logger.error("Failed to save background settings", e)
         }

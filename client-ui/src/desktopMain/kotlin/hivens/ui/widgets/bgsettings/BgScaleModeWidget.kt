@@ -6,11 +6,10 @@ import hivens.ui.background.ScaleMode
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxChoiceChip
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 @Widget(id = "bg.scale.mode", displayName = "widget.bg.scale.mode")
 @Composable
-fun BgScaleModeWidget(instance: WidgetInstance) {
+fun BgScaleModeWidget() {
     val ctx = LocalBgSettingsContext.current
     val s = LocalStrings.current
     val settings by ctx.settings

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.jvm.SystemHardware
 import hivens.core.jvm.SystemMemory
 import hivens.ui.components.UpdateDialog
+import hivens.ui.diag.RenderBackend
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.AdaptiveWidth
 import hivens.ui.nx.WidthClass
@@ -30,6 +31,7 @@ import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.minutes
 
 private const val SURFACE = "about"
 
@@ -40,7 +42,7 @@ private const val SURFACE = "about"
 // screen.
 //
 // Surface owns the per-screen state (updateState, showUpdateDialog)
-// and the asynchronous triggerUpdateCheck closure; widgets observe
+// and the asynchronous check it runs on a timer; widgets observe the
 // MutableState holders in the context and re-render. The full
 // UpdateDialog modal lives at the surface level so it survives even
 // if the user removes the update.panel widget via the editor.
@@ -83,16 +85,17 @@ fun AboutSurface(onBack: () -> Unit) {
     // Renderer "future hook". Skiko has no native Wayland yet: on a Wayland session
     // it renders through XWayland, i.e. still Xorg -- so report Xorg (noting
     // XWayland) rather than the session type. Native Wayland is the future hook;
-    // flip this when Skiko-on-Wayland lands. The render API comes from the skiko
-    // system property when pinned (else "default" -- Skiko picks at runtime).
+    // flip this when Skiko-on-Wayland lands.
     val renderer = remember {
         val windowing = when {
             System.getenv("DISPLAY") != null ->
                 if (System.getenv("WAYLAND_DISPLAY") != null) "Xorg (XWayland)" else "Xorg"
             else -> System.getProperty("os.name") ?: "?"
         }
-        val api = System.getProperty("skiko.renderApi")?.takeIf { it.isNotBlank() } ?: "default"
-        "$windowing · $api"
+        // The backend in use, not the one requested: the launcher never sets
+        // `skiko.renderApi`, so reading that property said "default" on every
+        // machine, including one that had fallen back to software.
+        "$windowing · ${RenderBackend.current}"
     }
 
     val unknownErrorText = s.updateErrorUnknown
@@ -111,11 +114,10 @@ fun AboutSurface(onBack: () -> Unit) {
         }
     }
 
-    val ctx = remember(updateState, showUpdateDialog, triggerUpdateCheck, systemRam, swapMb, cpu, displayInfo, renderer) {
+    val ctx = remember(updateState, showUpdateDialog, systemRam, swapMb, cpu, displayInfo, renderer) {
         AboutContext(
             updateState        = updateState,
             showUpdateDialog   = showUpdateDialog,
-            triggerUpdateCheck = triggerUpdateCheck,
             systemRam          = systemRam,
             swapMb             = swapMb,
             cpu                = cpu,
@@ -137,7 +139,7 @@ fun AboutSurface(onBack: () -> Unit) {
             if (state !is UpdateCheckState.Available && state !is UpdateCheckState.Checking) {
                 triggerUpdateCheck()
             }
-            delay(5 * 60_000L)
+            delay(5.minutes)
         }
     }
 

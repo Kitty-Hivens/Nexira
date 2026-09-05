@@ -42,7 +42,6 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
@@ -106,7 +105,16 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
     // Hyprland builds; the state-map form removes the structural-equality
     // ambiguity by tracking per-key reads explicitly.
     val expanded = remember { mutableStateMapOf<Path, Boolean>().apply { put(rootDir, true) } }
-    val rows = flattenTree(rootDir, expanded)
+    // The walk lists a directory per expanded node, so calling it straight from
+    // the composable body put a synchronous filesystem crawl on the composition
+    // thread -- and not once, but on every recomposition, including ones that had
+    // nothing to do with the tree. Off the thread, and keyed on the expansion set
+    // so it re-runs when a folder is toggled and not otherwise. `value` survives a
+    // key change, so the previous rows stay up while the new walk lands.
+    val expandedPaths = expanded.filterValues { it }.keys.toSet()
+    val rows by produceState(initialValue = emptyList<TreeRow>(), rootDir, expandedPaths) {
+        value = withContext(Dispatchers.IO) { flattenTree(rootDir, expandedPaths) }
+    }
 
     Row(modifier = modifier.fillMaxSize()) {
         // Left: tree.
@@ -117,7 +125,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.medium)
-                .background(glassSurfaceAlpha(0.55f))
+                .background(NxTheme.colors.surface.copy(alpha = 0.55f))
                 .hoverable(hover),
         ) {
             val listState = rememberLazyListState()
@@ -161,7 +169,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                 .weight(2f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.medium)
-                .background(glassSurfaceAlpha(0.55f))
+                .background(NxTheme.colors.surface.copy(alpha = 0.55f))
                 .padding(16.dp),
         ) {
             val picked = selected
@@ -186,16 +194,17 @@ private val log = org.slf4j.LoggerFactory.getLogger("FileBrowserPane")
 
 private data class TreeRow(val path: Path, val depth: Int, val isDir: Boolean, val isEmpty: Boolean = false)
 
-private fun flattenTree(root: Path, expanded: Map<Path, Boolean>): List<TreeRow> {
+/** Blocking: lists a directory per expanded node. Callers keep it off the composition thread. */
+private fun flattenTree(root: Path, expanded: Set<Path>): List<TreeRow> {
     val out = mutableListOf<TreeRow>()
     addNode(root, 0, expanded, out)
     return out
 }
 
-private fun addNode(node: Path, depth: Int, expanded: Map<Path, Boolean>, out: MutableList<TreeRow>) {
+private fun addNode(node: Path, depth: Int, expanded: Set<Path>, out: MutableList<TreeRow>) {
     val isDir = node.isDirectory()
     out += TreeRow(path = node, depth = depth, isDir = isDir)
-    if (isDir && expanded[node] == true) {
+    if (isDir && node in expanded) {
         val children = try {
             Files.list(node).use { stream ->
                 stream.toList().sortedWith(compareBy({ !it.isDirectory() }, { it.name.lowercase() }))
@@ -404,7 +413,7 @@ private fun BinaryPreview(file: Path) {
         PreviewHeader(file = file, sizeLabel = file.fileSizeLabel())
         Spacer(Modifier.height(8.dp))
         Box(
-            modifier         = Modifier.fillMaxWidth().height(140.dp).clip(MaterialTheme.shapes.medium).background(glassSurfaceAlpha(0.35f)),
+            modifier         = Modifier.fillMaxWidth().height(140.dp).clip(MaterialTheme.shapes.medium).background(NxTheme.colors.surface.copy(alpha = 0.35f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(

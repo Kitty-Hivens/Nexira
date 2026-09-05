@@ -52,7 +52,11 @@ object DiagnosticBundle {
      * Caller is responsible for deciding what to do with it (open file manager,
      * upload, etc.).
      */
-    fun create(paths: PlatformPaths): Path {
+    fun create(
+        paths: PlatformPaths,
+        disabledModules: Set<String> = emptySet(),
+        renderBackend: String = "unknown",
+    ): Path {
         val sessionId = System.getProperty("nexira.sessionId", "unknown")
         val timestamp = tsFmt.format(Instant.now())
         val output = paths.dataDir.resolve("nexira-diagnostic-$sessionId-$timestamp.zip")
@@ -65,7 +69,7 @@ object DiagnosticBundle {
             // that were not: an action-ring line quotes whatever a call site
             // recorded, and a path line carries the account name the OS put in
             // it.
-            writeText(zip, "system-info.txt", Redactor.redact(buildSystemInfo(paths)))
+            writeText(zip, "system-info.txt", Redactor.redact(buildSystemInfo(paths, disabledModules, renderBackend)))
             writeText(zip, "action-ring.txt", Redactor.redact(buildActionRing()))
 
             // Live log files. Each file is isolated: a single broken file
@@ -110,7 +114,11 @@ object DiagnosticBundle {
         return output
     }
 
-    private fun buildSystemInfo(paths: PlatformPaths): String = buildString {
+    private fun buildSystemInfo(
+        paths: PlatformPaths,
+        disabledModules: Set<String>,
+        renderBackend: String,
+    ): String = buildString {
         val rt = Runtime.getRuntime()
         appendLine("==============================")
         appendLine(" Nexira diagnostic bundle")
@@ -118,6 +126,12 @@ object DiagnosticBundle {
         appendLine(" Generated  : ${isoFmt.format(Instant.now())}")
         appendLine(" Version    : ${Branding.VERSION}")
         appendLine(" SessionId  : ${System.getProperty("nexira.sessionId", "unknown")}")
+        // A module switched off by boot recovery stays off across restarts and
+        // changes what whole features do -- with skinema off, every player
+        // reports that it cannot open the file. Nothing else in the bundle says
+        // which ones are off, so a report reads as a broken feature rather than
+        // a disabled one.
+        appendLine(" Modules off: ${disabledModules.sorted().joinToString(", ").ifEmpty { "(none)" }}")
         appendLine()
         appendLine(" OS         : ${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})")
         appendLine(" JVM        : ${System.getProperty("java.version")} (${System.getProperty("java.vendor")})")
@@ -125,6 +139,11 @@ object DiagnosticBundle {
         // directory, so this line carried the account name as readily as the
         // four below it.
         appendLine(" JVM home   : ${abbreviateHome(System.getProperty("java.home") ?: "")}")
+        // The backend Skiko resolved, not the one that was asked for. A software
+        // fallback rasterises the window on the CPU, which is felt across the
+        // machine rather than inside the launcher, and reads in a report as the
+        // whole system going slow.
+        appendLine(" Renderer   : $renderBackend")
         appendLine(" Locale     : ${java.util.Locale.getDefault()}")
         appendLine(" Timezone   : ${java.util.TimeZone.getDefault().id}")
         appendLine()

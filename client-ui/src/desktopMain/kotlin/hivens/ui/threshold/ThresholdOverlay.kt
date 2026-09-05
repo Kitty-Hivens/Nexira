@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.press_start_2p
 import hivens.ui.i18n.AppStrings
+import hivens.ui.theme.Motion
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -124,7 +125,8 @@ fun ThresholdOverlay(
     // skipped the readout entirely on a warm boot, which is exactly the
     // "boot animation sometimes missing" complaint.
     val entryAlpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { entryAlpha.animateTo(1f, tween(120)) }
+    val entrySpec = Motion.tap.of<Float>()
+    LaunchedEffect(Unit) { entryAlpha.animateTo(1f, entrySpec) }
 
     val motion = remember { BarMotion() }
     var bar by remember { mutableStateOf(0f) }
@@ -165,7 +167,7 @@ fun ThresholdOverlay(
         // Gate: a truly full bar AND the readout's floor of screen time -- a
         // warm boot still shows a complete (condensed) fill, never a flicker.
         snapshotFlow { bar >= 1f && overlayClockMs >= FLOOR_MS }.first { it }
-        val condensed = readyAtMs >= 0f && readyAtMs <= WARM_BOOT_MS
+        val condensed = readyAtMs in 0f..WARM_BOOT_MS
         // The breath, accumulated on the frame clock (delay() would break
         // deterministic frame addressing in off-screen tests).
         val holdMs = if (condensed) HOLD_WARM_MS else HOLD_COLD_MS
@@ -208,7 +210,7 @@ fun ThresholdOverlay(
             if (lift < 1f) {
                 val ditherBrush = if (lift > 0f) DitherVeil.brush(lift, u, pal.field) else null
                 when {
-                    ditherBrush != null && lift > 0f -> drawRect(brush = ditherBrush)
+                    ditherBrush != null              -> drawRect(brush = ditherBrush)
                     lift > 0f                        -> drawRect(pal.field.copy(alpha = veil.value))
                     else                             -> drawRect(pal.field)
                 }

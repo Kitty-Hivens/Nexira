@@ -5,10 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -20,10 +22,8 @@ import hivens.auth.AuthProviderRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
 // Vertical category nav for the profile surface. Writes
@@ -33,10 +33,9 @@ import org.koin.compose.koinInject
 // surface to bring nav back.
 @Widget(id = "profile.nav", displayName = "widget.profile.nav")
 @Composable
-fun ProfileNavWidget(instance: WidgetInstance) {
+fun ProfileNavWidget() {
     val ctx = LocalProfileContext.current
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val authRegistry: AuthProviderRegistry = koinInject()
     val current by ctx.selectedCategory
 
@@ -64,7 +63,7 @@ fun ProfileNavWidget(instance: WidgetInstance) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(style.cardCorner))
+                    .clip(MaterialTheme.shapes.medium)
                     .background(
                         if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
                         else NxTheme.colors.background.copy(alpha = 0.0f),
@@ -80,5 +79,11 @@ fun ProfileNavWidget(instance: WidgetInstance) {
                 )
             }
         }
+
+        // The face choice belongs beside the list of providers rather than
+        // inside one of their sections: it is a statement about which of them
+        // wins, so it cannot live in a pane that shows only one at a time.
+        Spacer(Modifier.weight(1f))
+        FacePicker()
     }
 }

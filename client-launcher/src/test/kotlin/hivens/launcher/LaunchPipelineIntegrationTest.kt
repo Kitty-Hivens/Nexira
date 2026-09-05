@@ -118,7 +118,7 @@ class LaunchPipelineIntegrationTest {
         val protocol = protocolWithLaunchwrapperManifest()
         val session = SmartyCraftAuthProvider(protocol).login("user", "pass", "Industrial")
 
-        val manifestProcessor = ManifestProcessorService(json)
+        val manifestProcessor = ManifestProcessorService()
         val classpathProvider = ClasspathProvider(manifestProcessor)
         val classpath = classpathProvider.buildClasspath(clientRoot, session.fileManifest!!, emptyList())
 
@@ -135,7 +135,7 @@ class LaunchPipelineIntegrationTest {
         val protocol = protocolWithLaunchwrapperManifest()
         val session = SmartyCraftAuthProvider(protocol).login("user", "pass", "Industrial")
 
-        val manifestProcessor = ManifestProcessorService(json)
+        val manifestProcessor = ManifestProcessorService()
         val classpath = ClasspathProvider(manifestProcessor)
             .buildClasspath(clientRoot, session.fileManifest!!, emptyList())
 
@@ -190,7 +190,7 @@ class LaunchPipelineIntegrationTest {
         // No libraries dir on disk; no manifest entries either.
         val emptyManifest = FileManifest(directories = emptyMap(), files = emptyMap())
 
-        val classpath = ClasspathProvider(ManifestProcessorService(json))
+        val classpath = ClasspathProvider(ManifestProcessorService())
             .buildClasspath(clientRoot, emptyManifest, emptyList())
 
         // Empty is acceptable here -- the LauncherController offline path catches

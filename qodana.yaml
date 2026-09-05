@@ -22,12 +22,12 @@ exclude:
   - name: KDocUnresolvedReference
   #
   # Compose state delegated via `var x by remember { mutableStateOf(...) }`
-  # consistently trips this rule -- Qodana 2025.2's flow analysis does not
+  # consistently trips this rule -- the 2025.2 linter's flow analysis did not
   # connect the property-delegate setter (the `x = ...` line) to the
   # corresponding getter calls in surrounding composables, so every state
   # mutation in an event handler / coroutine / when-branch gets flagged
   # even when the value is obviously read elsewhere in the same file
-  # (e.g. `if (!hiddenForCurrentSession) { hiddenForCurrentSession = true }`).
+  # (e.g. `if (!thresholdDone) { thresholdDone = true }`).
   # The previous removal of this exclusion 2026-05-17 was premature -- the
   # 2.2.16 release PR triggered 21 such false positives across 8 Compose
   # files. The rule is genuinely useful for plain Kotlin code, but the
@@ -37,23 +37,26 @@ exclude:
   # pragmatic floor.
   - name: AssignedValueIsNeverRead
   #
-  # Qodana JVM Community 2025.2's Kotlin flow analysis regressed against the
-  # Kotlin 2.4.0 toolchain we bumped to (0a22579): KotlinUnreachableCode now
-  # flags ordinary control flow -- a `?: return`, an if/else assignment, a
-  # `when` over an enum -- as unreachable, and KotlinConstantConditions calls a
-  # platform-typed comparison "always false". Spot-checked the flagged sites
-  # (WorldScanner, SkinRepository, RuntimeProvisioner's offline asset-index
-  # reuse, ConsoleWindow's severity `when`); every one is reachable and correct.
-  # Both are dataflow inspections -- exclude until the linter's Kotlin analysis
-  # catches up to 2.4.0, then re-evaluate (same as the entries above/below).
+  # Kotlin flow analysis in the 2025.2 linter regressed against the Kotlin 2.4.0
+  # toolchain (0a22579): KotlinUnreachableCode flagged ordinary control flow -- a
+  # `?: return`, an if/else assignment, a `when` over an enum -- as unreachable,
+  # and KotlinConstantConditions called a platform-typed comparison "always
+  # false". Spot-checked the flagged sites (WorldScanner, SkinRepository,
+  # RuntimeProvisioner's offline asset-index reuse, ConsoleWindow's severity
+  # `when`); every one is reachable and correct.
+  #
+  # Both exclusions predate the 2026.2 linter and have NOT been re-evaluated
+  # against it -- the reason to lift them is a clean report from the new
+  # analysis, not the version bump on its own. Whoever reads the first 2026.2
+  # report should drop these and see what comes back.
   - name: KotlinUnreachableCode
   - name: KotlinConstantConditions
   #
   # Historically also excluded: UnusedAssignment, UnusedSymbol,
   # HasPlatformType. Removed 2026-05-17 -- they were muted because an
   # older Qodana JVM Community release mis-flagged Compose composables
-  # and Kotlin DSL builder receivers as "unused". Current linter (2025.2)
-  # handles both cases correctly, so the blanket exclusion would now hide
+  # and Kotlin DSL builder receivers as "unused". The linter has handled both
+  # correctly since 2025.2, so the blanket exclusion would now hide
   # real findings (e.g. it would have caught the `// TODO: NOT USED`
   # regressions in AuthStatus 2026-05-15). If a specific composable still
   # trips one of those inspections, suppress at the call site
@@ -85,4 +88,4 @@ projectJDK: /root/.jdks/jdk
   
 #Qodana supports other languages, for example, Python, JavaScript, TypeScript, Go, C#, PHP
 #For all supported languages see https://www.jetbrains.com/help/qodana/linters.html
-linter: jetbrains/qodana-jvm-community:2025.2
+linter: jetbrains/qodana-jvm-community:2026.2

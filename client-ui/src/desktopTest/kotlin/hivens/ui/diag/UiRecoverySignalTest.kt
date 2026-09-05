@@ -10,12 +10,19 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * Covers the render-path crash side-channel and the recovered flag.
- * UiRecoverySignal is a process-global object, so each test clears the two
- * one-shot fields it touches first -- it deliberately never calls
- * recordShellCrash(), which latches safeMode irreversibly for the JVM.
+ * Covers the render-path crash side-channel, the recovered flag, and the rules
+ * that decide when a restart becomes safe mode.
+ *
+ * UiRecoverySignal is a process-global object and `recordShellCrash` latches
+ * safeMode irreversibly, so every test resets the whole object first. Without
+ * that, one test that trips the guard makes every later call in the same fork
+ * return FATAL and the suite becomes order-dependent -- a single regression
+ * would surface as a wall of unrelated failures.
  */
 class UiRecoverySignalTest {
+
+    @BeforeTest
+    fun resetLatch() = UiRecoverySignal.resetForTests()
 
     @BeforeTest
     @AfterTest
@@ -93,5 +100,37 @@ class UiRecoverySignalTest {
         a.initCause(b)
         b.initCause(a)
         assertFalse(UiRecoverySignal.isStructural(a))
+    }
+
+    @Test
+    fun `a healthy session stops the crashes before it counting as a loop`() {
+        // The reported failure: crash, come back, be used, crash, come back, be
+        // used, crash -- and the third lands in the recovery surface even though
+        // the launcher worked every time. Three short sessions fit inside one
+        // twenty-second window.
+        val t0 = 1_000_000L
+        assertEquals(ShellRecovery.RETRY, UiRecoverySignal.recordShellCrash(t0))
+        assertEquals(ShellRecovery.RETRY, UiRecoverySignal.recordShellCrash(t0 + 5_000))
+
+        UiRecoverySignal.noteShellHealthy(t0 + 6_000)
+
+        assertEquals(ShellRecovery.RETRY, UiRecoverySignal.recordShellCrash(t0 + 10_000))
+    }
+
+    @Test
+    fun `a healthy session does not disarm the long window`() {
+        // The regression that has to stay fixed: an earlier version cleared the
+        // crash history outright, so a fault that let the shell come up before
+        // killing it again reset the count every time and safe mode could never
+        // latch -- an unbounded restart spin instead of a guard. Every crash is
+        // still counted for the long window; only the tight-loop window ignores
+        // what happened before a session that lasted.
+        val t0 = 2_000_000L
+        repeat(6) { i ->
+            UiRecoverySignal.noteShellHealthy(t0 + i * 30_000L - 1)
+            assertEquals(ShellRecovery.RETRY, UiRecoverySignal.recordShellCrash(t0 + i * 30_000L))
+        }
+        UiRecoverySignal.noteShellHealthy(t0 + 6 * 30_000L - 1)
+        assertEquals(ShellRecovery.SAFE_MODE, UiRecoverySignal.recordShellCrash(t0 + 6 * 30_000L))
     }
 }

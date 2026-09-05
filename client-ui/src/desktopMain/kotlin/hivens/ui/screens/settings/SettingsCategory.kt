@@ -21,7 +21,6 @@ internal enum class SettingsCategory(
     Console(      NxIcon.Code,      { it.settingsCategoryConsole }),
     Network(      NxIcon.Wifi,      { it.settingsCategoryNetwork }),
     Smarty(       NxIcon.Shield,    { it.settingsCategorySmarty }),
-    Experimental( NxIcon.Science,   { it.settingsCategoryExperimental }),
     Advanced(     NxIcon.Folder,    { it.settingsCategoryAdvanced }),
     Diagnostics(  NxIcon.BugReport, { it.settingsCategoryDiagnostics }),
 }

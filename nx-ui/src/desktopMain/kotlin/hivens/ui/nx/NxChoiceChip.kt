@@ -13,9 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A small selectable chip (e.g. regex / bold). Selected = an accent wash + accent
@@ -32,7 +31,7 @@ fun NxChoiceChip(
     enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(LocalStyle.current.buttonCorner)
+    val shape = MaterialTheme.shapes.small
     val alpha = if (enabled) 1f else 0.4f
     val fg = (if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary).copy(alpha = alpha)
     val bg = if (selected) NxTheme.colors.primary.copy(alpha = 0.18f * alpha)
@@ -54,6 +53,6 @@ fun NxChoiceChip(
                 enabled           = enabled,
                 onClick           = onToggle,
             )
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = Spacing.s10, vertical = Spacing.s6),
     )
 }

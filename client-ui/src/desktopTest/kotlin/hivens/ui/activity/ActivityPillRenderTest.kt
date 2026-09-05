@@ -21,11 +21,7 @@ import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.BrutStyle
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -94,9 +90,7 @@ class ActivityPillRenderTest {
      * the sheet exists.
      */
     private fun render(
-        style: StyleSpec,
         dark: Boolean,
-        ground: Color,
         name: String,
         scale: Float = 1f,
         content: @Composable () -> Unit,
@@ -108,14 +102,13 @@ class ActivityPillRenderTest {
         ) {
             // The real theme entry point rather than a hand-provided palette: what
             // the sheet shows is then what the app resolves, tonal ladder included.
-            NxTheme(useDarkTheme = dark, style = style) {
+            NxTheme(useDarkTheme = dark) {
                 CompositionLocalProvider(
-                    LocalStyle provides style,
                     LocalStrings provides EnglishStrings,
                 ) {
                     accent = NxTheme.colors.progressAccent
                     Column(
-                        modifier = Modifier.fillMaxSize().background(ground).padding(16.dp),
+                        modifier = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { content() }
                 }
@@ -159,16 +152,11 @@ class ActivityPillRenderTest {
         // the one thing that must hold in every combination is that its body is
         // not the same tone as what is behind it. A near-black ground is the
         // hardest case -- it is the default with no wallpaper.
-        val cases = listOf(
-            Triple("celestia-dark", CelestiaStyle to true, Color(0xFF121212)),
-            Triple("brut-dark", BrutStyle to true, Color(0xFF121212)),
-            Triple("celestia-light", CelestiaStyle to false, Color(0xFFF5F7FA)),
-        )
-        for ((name, styling, ground) in cases) {
-            val (style, dark) = styling
+        val cases = listOf("dark" to true, "light" to false)
+        for ((name, dark) in cases) {
             // Both, so a proportion can be judged at the scale it will be seen at.
-            render(style, dark, ground, name, scale = 2f) { Sheet(PillProps()) }
-            val bmp = render(style, dark, ground, name) { Sheet(PillProps()) }
+            render(dark, name, scale = 2f) { Sheet(PillProps()) }
+            val bmp = render(dark, name) { Sheet(PillProps()) }
             // Sampled as a fraction of the frame, not at pixels that happened to
             // work at one density. The whole point of rendering at the app's own
             // scale is lost if the probe still assumes a different one.
@@ -187,7 +175,7 @@ class ActivityPillRenderTest {
             val one = activity(
                 "install:A", ActivityKind.Install, "A", ActivityPhase.Running(done, 100),
             )
-            val bmp = render(CelestiaStyle, true, Color(0xFF121212), "measure-$done") {
+            val bmp = render(true, "measure-$done") {
                 Box { Pill(one, listOf(one), {}, PillProps(), null, EnglishStrings, 720.dp) }
             }
             var hits = 0

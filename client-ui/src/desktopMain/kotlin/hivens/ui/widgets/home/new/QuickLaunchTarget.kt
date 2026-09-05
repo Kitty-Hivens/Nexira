@@ -11,6 +11,7 @@ import hivens.auth.OfflineAuthProvider
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackInstance
+import hivens.core.launch.LaunchControlMode
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
@@ -19,7 +20,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.notifications.IndicationCenter
-import hivens.ui.notifications.IndicationCenter.LaunchIndication
+import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.nx.PlayButton
@@ -72,7 +73,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
-    val all by remember { repo.observe() }.collectAsState(initial = emptyList())
+    val all by remember { repo.observe() }.collectAsState()
     val launchState by controller.state.collectAsState()
 
     val target: PackInstance = remember(all) {
@@ -99,8 +100,11 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
             icon = NxIcon.PlayArrow,
             launch = launch@{
                 val real = session ?: return@launch
-                launchDriver.observe(LaunchTarget.Pack(target))
-                controller.launchPackInstance(real, target)
+                // Narrated only if the controller took it -- the button's own gate
+                // is a frame behind the state it reads.
+                if (controller.launchPackInstance(real, target)) {
+                    launchDriver.observe(LaunchTarget.Pack(target))
+                }
             },
         )
         LaunchAffordance.PlayOffline -> QuickLaunchTarget(
@@ -112,12 +116,17 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
             launch = {
                 // Same offline identity LoginPanel's button mints; the shipped
                 // offline-launch path handles the rest from the cached manifest.
-                val name = offlineName
-                if (!name.isNullOrBlank()) {
-                    scope.launch {
-                        val offlineSession = withContext(Dispatchers.IO) { offlineProvider.login(name, "", "") }
+                //
+                // Re-read at the click rather than launched under the name the
+                // affordance was resolved with: what decides whether to offer the
+                // button can afford to lag by a frame, what the game runs as
+                // cannot.
+                scope.launch {
+                    val name = withContext(Dispatchers.IO) { settingsService.getSettings().offlinePlayerName }
+                    if (name.isNullOrBlank()) return@launch
+                    val offlineSession = withContext(Dispatchers.IO) { offlineProvider.login(name, "", "") }
+                    if (controller.launchPackInstance(offlineSession, target)) {
                         launchDriver.observe(LaunchTarget.Pack(target))
-                        controller.launchPackInstance(offlineSession, target)
                     }
                 }
             },
@@ -137,7 +146,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
  * The shared launch pill for the home widgets, walking the same launch states
  * the pack-detail hero does off [IndicationCenter]: a running target turns
  * into Exit (stops the game), prepare/sync shows the inert wait, and otherwise
- * it plays / offline-plays / routes to sign-in per the resolved [qt]. Keeps the
+ * it plays / offline-plays / routes to sign-in per the resolved [quickLaunch]. Keeps the
  * one launch affordance in one place instead of each widget re-deriving it.
  *
  * [defaultLabel] is the play label the widget wants when the affordance carries
@@ -145,7 +154,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
  */
 @Composable
 internal fun QuickLaunchButton(
-    qt: QuickLaunchTarget,
+    quickLaunch: QuickLaunchTarget,
     defaultLabel: String,
     modifier: Modifier = Modifier,
     iconOnly: Boolean = false,
@@ -153,21 +162,20 @@ internal fun QuickLaunchButton(
     val s = LocalStrings.current
     val indications: IndicationCenter = koinInject()
     val controller: LauncherController = koinInject()
-    val indication by indications.launchIndication(qt.target.id).collectAsState()
+    val indication by indications.launchIndication(quickLaunch.target.id).collectAsState()
 
-    val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
-    val running = indication is LaunchIndication.Running
+    val mode = indication.controlMode()
 
     PlayButton(
-        label    = when {
-            running -> s.packPlayExit
-            busy    -> s.packPlayWait
-            else    -> qt.buttonLabel ?: defaultLabel
+        label    = when (mode) {
+            LaunchControlMode.Stop -> s.packPlayExit
+            LaunchControlMode.Wait -> s.packPlayWait
+            LaunchControlMode.Play -> quickLaunch.buttonLabel ?: defaultLabel
         },
-        icon     = if (running) NxIcon.Stop else qt.icon,
-        busy     = busy,
-        onClick  = if (running) { { controller.abort() } } else qt.launch,
-        enabled  = if (running) true else qt.canLaunch,
+        icon     = if (mode == LaunchControlMode.Stop) NxIcon.Stop else quickLaunch.icon,
+        busy     = mode == LaunchControlMode.Wait,
+        onClick  = if (mode == LaunchControlMode.Stop) { { controller.abort() } } else quickLaunch.launch,
+        enabled  = if (mode == LaunchControlMode.Stop) true else quickLaunch.canLaunch,
         iconOnly = iconOnly,
         modifier = modifier,
     )

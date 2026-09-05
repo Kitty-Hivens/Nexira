@@ -3,6 +3,7 @@ package hivens.launcher
 import hivens.core.data.NewerBuildData
 import hivens.core.data.ReadOnlyStore
 import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.PackIdentity
 import hivens.core.data.PackInstance
 import jetbrains.exodus.ArrayByteIterable
 import jetbrains.exodus.ByteIterable
@@ -16,6 +17,7 @@ import jetbrains.exodus.env.Transaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
@@ -73,11 +75,12 @@ class XodusPackRepository(
         Runtime.getRuntime().addShutdownHook(shutdownHook)
     }
 
-    override fun observe(): Flow<List<PackInstance>> = state.asStateFlow()
+    override fun observe(): StateFlow<List<PackInstance>> = state.asStateFlow()
     override suspend fun list(): List<PackInstance> = state.value
     override suspend fun get(id: String): PackInstance? = state.value.firstOrNull { it.id == id }
 
     override suspend fun put(instance: PackInstance) {
+        PackIdentity.require(instance)
         mutex.withLock {
             val previous = state.value
             state.update { current ->
@@ -182,7 +185,7 @@ class XodusPackRepository(
         instances(txn).openCursor(txn).use { cursor ->
             while (cursor.next) {
                 runCatching { json.decodeFromString(PackInstance.serializer(), cursor.value.toByteArray().decodeToString()) }
-                    .onSuccess { out.add(it) }
+                    .onSuccess { out.add(PackIdentity.normalize(it)) }
                     .onFailure { log.warn("registry: dropping unreadable entry {}", StringBinding.entryToString(cursor.key), it) }
             }
         }

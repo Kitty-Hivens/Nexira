@@ -3,6 +3,7 @@ package hivens.ui.bootstrap
 import hivens.launcher.CrashReporter
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.diag.CrashDialog
+import hivens.ui.diag.ShellRecovery
 import org.koin.core.module.Module
 import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicReference
@@ -22,7 +23,7 @@ import javax.swing.SwingUtilities
  *     gate, log dir) plus a direct [SettingsPeek] of settings.json for the
  *     window-creation-time values (undecorated chrome, locale) that
  *     normally live behind Koin.
- *   - [completeBoot] is the slow remainder (data move, NetworkState, Koin),
+ *   - [completeBoot] is the slow remainder (data move, migration, Koin),
  *     run by hivens.ui.Main on a background thread behind the live
  *     boot-threshold window.
  */
@@ -108,6 +109,11 @@ object GuiBootstrap {
         // process. The log this was found in shows exactly that: the crash was
         // reported to disk and then the dialog meant to surface it failed too.
         runCatching { CrashDialog::class.java.name }
+        // Same reasoning, one layer earlier. ShellRecovery is the enum
+        // recordShellCrash returns, and its first executed reference is inside
+        // crash handling itself, so a process whose classes have gone out from
+        // under it dies deciding how to recover rather than recovering.
+        runCatching { ShellRecovery::class.java.name }
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)

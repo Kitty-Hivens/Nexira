@@ -12,21 +12,34 @@ sealed interface UpdateCheck {
 
     /**
      * A different build is available (newer for an update, older for a rollback).
-     * [plan] is the three-way reconcile against the current on-disk state and
      * [compat] grades how structural the change is (green = safe re-sync, amber =
-     * snapshot first). [hasFileChanges] is false when only the version label moved
-     * (e.g. a rebuild that touched no file), in which case applying just advances
-     * the recorded version.
+     * snapshot first).
+     *
+     * [plan] is the three-way reconcile against the current on-disk state, and it
+     * is null when the source cannot answer without being handed the whole pack.
+     * A mirror build lists its files with hashes, so the plan is free; a Modrinth
+     * version does not, and computing one would mean downloading the archive to
+     * decide whether to offer a download. Null is "not computed", which is not
+     * the same as "nothing changes" -- an empty plan means the version label
+     * moved and no file did, and applying it just advances the recorded version.
      */
     data class Available(
         val fromVersion: String?,
         val toVersion: String,
         val direction: UpdateDirection,
         val compat: CompatChange,
-        val plan: UpdatePlan,
-    ) : UpdateCheck {
-        val hasFileChanges: Boolean get() = !plan.isEmpty
-    }
+        val plan: UpdatePlan?,
+        /**
+         * What identifies the target build, where its label does not.
+         *
+         * Defaults to the label, which is what identifies a mirror build. A
+         * Modrinth pack can publish two versions under one number -- one per
+         * loader -- and asking for it by name then applies whichever came first,
+         * so the switch a user clicked and the switch that happens are the same
+         * build only by luck.
+         */
+        val targetKey: String = toVersion,
+    ) : UpdateCheck
 }
 
 /**
@@ -53,11 +66,15 @@ enum class UpdateDirection {
  * fail-loud sync path; callers catch and surface them.
  */
 sealed interface UpdateOutcome {
-    /** The plan was applied and the instance committed at [toVersion]. */
+    /**
+     * The change was applied and the instance committed at [toVersion]. [plan] is
+     * null for the same reason it can be null on a check: a source that does not
+     * list its files with hashes cannot describe what it did in those terms.
+     */
     data class Applied(
         val toVersion: String,
         val compat: CompatChange,
-        val plan: UpdatePlan,
+        val plan: UpdatePlan?,
     ) : UpdateOutcome
 
     /** The requested target equals the installed build; nothing was fetched or written. */

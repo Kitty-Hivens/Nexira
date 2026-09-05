@@ -6,7 +6,6 @@ import hivens.core.data.FileManifest
 import hivens.core.data.SettingsData
 import hivens.launcher.ManifestProcessorService
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +14,7 @@ import kotlin.test.assertTrue
 
 class SmartyModPlannerTest {
 
-    private val manifestProcessor = ManifestProcessorService(Json { ignoreUnknownKeys = true })
+    private val manifestProcessor = ManifestProcessorService()
     private val helperJar = Path.of("/tmp/open-smrt-network-1.12.jar")
 
     private fun manifest() = FileManifest(

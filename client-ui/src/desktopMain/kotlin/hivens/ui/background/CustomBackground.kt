@@ -20,7 +20,10 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
+import dev.hivens.skinema.libav.VideoDecoder
+import hivens.ui.diag.SkinemaGate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.theme.luminanceOfArgb
@@ -28,6 +31,8 @@ import hivens.ui.theme.wallpaperToneFromImage
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.Codec
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Data
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
@@ -49,19 +54,20 @@ private val log = LoggerFactory.getLogger("CustomBackground")
  * Renders a custom background wallpaper behind the main app content.
  *
  * Supports: blur, darkening, opacity, parallax, vignette, color tint,
- * multiple scale modes and alignment control. Still images decode through
- * Skia; video and animated images (GIF, APNG, animated WebP) play through
- * Skinema (see [rememberSkinemaFrame]).
+ * multiple scale modes and alignment control. A picture that moves plays
+ * through Skinema (see [rememberSkinemaFrame]); a still is decoded once,
+ * downscaled and cached, by Skia where Skia reads the format and by the media
+ * decoder where it does not (see [backgroundMediaKind]).
  */
 @Composable
 fun CustomBackground(
     settings: BackgroundSettings,
     modifier: Modifier = Modifier,
     mousePosProvider: () -> Offset = { Offset(0.5f, 0.5f) },
-    onBackdrop: (BackdropState) -> Unit = {},
+    onTone: (WallpaperTone) -> Unit = {},
 ) {
     if (!settings.hasUsableImage()) {
-        LaunchedEffect(Unit) { onBackdrop(BackdropState.EMPTY) }
+        LaunchedEffect(Unit) { onTone(WallpaperTone(null, null)) }
         return
     }
     val file = File(settings.imagePath!!)
@@ -71,7 +77,7 @@ fun CustomBackground(
             file             = file,
             settings         = settings,
             mousePosProvider = mousePosProvider,
-            onBackdrop       = onBackdrop,
+            onTone           = onTone,
         )
 
         // Darkening overlay
@@ -122,27 +128,26 @@ private fun AnimatedParallaxImage(
     file: File,
     settings: BackgroundSettings,
     mousePosProvider: () -> Offset,
-    onBackdrop: (BackdropState) -> Unit,
+    onTone: (WallpaperTone) -> Unit,
 ) {
-    // Shared helpers (Backdrop.kt) so a frosted surface reproduces this exact
-    // transform when it redraws a blurred slice -- no drift between the two.
+    // Scale mode and alignment (Backdrop.kt) decide where every pixel of the
+    // wallpaper lands.
     val contentScale = bgContentScale(settings.scaleMode)
     val alignment = bgAlignment(settings.alignX, settings.alignY)
 
-    // Classify off the UI thread (png/webp need a frame-count probe); null until
-    // known, so the background draws nothing for a frame rather than blocking
-    // composition on file I/O. Kept in a state keyed on the file rather than in a
+    // Classify off the UI thread (the decoders are asked, which is file I/O); null
+    // until known, so the background draws nothing for a frame rather than blocking
+    // composition on it. Kept in a state keyed on the file rather than in a
     // produceState, which holds the PREVIOUS file's answer until the new one lands
     // -- long enough to open the video player on a still image.
-    var mediaKind by remember(file) { mutableStateOf<BackgroundMediaKind?>(null) }
-    LaunchedEffect(file) { mediaKind = withContext(Dispatchers.IO) { backgroundMediaKind(file) } }
-
-    // Still image decodes through Skia; video + animated images play through
-    // Skinema. Only the active branch composes, so switching media kind tears
-    // down the other's decode/player state.
-    val staticBitmap = if (mediaKind == BackgroundMediaKind.Static) rememberStaticImage(file) else null
+    val resolved = rememberBackgroundMedia(file)
+    val mediaKind = resolved?.kind
+    // A still is already decoded into a bitmap by here; anything that moves plays
+    // through Skinema. Only the active branch composes, so switching media kind
+    // tears down the other's decode/player state.
+    val staticBitmap = resolved?.bitmap
     // Material-You seed: static from the decoded bitmap (off-thread); video from its
-    // first decoded frame (via the player's onSeed). Either feeds BackdropState.seedArgb.
+    // first decoded frame (via the player's onSeed). Either feeds the palette seed.
     var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
     val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased)
         rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, settings.hardwareDecode, onSeed = { videoSeed = it }) else null
@@ -160,42 +165,17 @@ private fun AnimatedParallaxImage(
     }
     if (painter == null) return
 
-    val isAnimated = mediaKind == BackgroundMediaKind.TimeBased
-    val tint = remember(settings.tintColor) {
-        settings.tintColor?.let {
-            try { Color(("FF" + it.removePrefix("#")).toLong(16)) } catch (_: Exception) { null }
-        }
-    }
     // Saturation applies at the Image, so it covers the static painter and every
-    // video frame alike; the frost slice mirrors it via BackdropState.saturation.
+    // video frame alike.
     val saturationFilter = remember(settings.saturation) { bgSaturationFilter(settings.saturation) }
-    // Publish the wallpaper recipe for frosted surfaces. A still carries its
-    // bitmap so the frost redraws a real blurred slice; time-based publishes a
-    // null bitmap + isAnimated so the frost falls back to a scrim (per-frame
-    // reblur of video is too costly). Live parallax is read through
-    // mousePosProvider so mouse movement does not churn this.
-    LaunchedEffect(staticBitmap, settings, isAnimated, seedArgb, avgLuminance) {
-        onBackdrop(
-            BackdropState(
-                bitmap            = staticBitmap,
-                contentScale      = contentScale,
-                alignment         = alignment,
-                opacity           = settings.opacity,
-                bgBlurRadiusDp    = settings.blurRadius,
-                darken            = settings.darkenAmount,
-                tint              = tint,
-                tintOpacity       = settings.tintOpacity,
-                saturation        = settings.saturation,
-                parallaxIntensity = settings.parallaxIntensity,
-                isAnimated        = isAnimated,
-                seedArgb          = seedArgb,
-                avgLuminance      = avgLuminance,
-                mouse             = mousePosProvider,
-            ),
-        )
+    // The palette's two inputs, and nothing else. A frosted surface used to need the
+    // whole wallpaper recipe here so it could reproduce the image under itself; it
+    // blurs the canvas beneath it now, so the recipe has no second reader and the
+    // effect no longer re-fires on every slider tick.
+    LaunchedEffect(seedArgb, avgLuminance) {
+        onTone(WallpaperTone(seedArgb = seedArgb, avgLuminance = avgLuminance))
     }
 
-    val useParallax = settings.parallaxIntensity > 0f
     // alpha OUTSIDE the blur (leftmost = outermost): an opacity tick then only
     // recomposites the cached blurred layer. With alpha inside, every tick of
     // the opacity slider invalidated the blur's input and re-blurred the whole
@@ -210,50 +190,96 @@ private fun AnimatedParallaxImage(
             else it
         }
 
-    if (useParallax) {
-        val target = parallaxTranslationFor(mousePosProvider(), settings.parallaxIntensity)
-        val parallaxX by animateFloatAsState(target.x, spring(stiffness = 50f, dampingRatio = 0.8f))
-        val parallaxY by animateFloatAsState(target.y, spring(stiffness = 50f, dampingRatio = 0.8f))
-        Image(
-            painter            = painter,
-            contentDescription = null,
-            contentScale       = contentScale,
-            alignment          = alignment,
-            colorFilter        = saturationFilter,
-            modifier           = baseModifier.graphicsLayer {
-                val extraScale = parallaxScaleFor(settings.parallaxIntensity)
-                scaleX       = extraScale
-                scaleY       = extraScale
-                translationX = parallaxX
-                translationY = parallaxY
-            }
-        )
-    } else {
-        Image(
-            painter            = painter,
-            contentDescription = null,
-            contentScale       = contentScale,
-            alignment          = alignment,
-            colorFilter        = saturationFilter,
-            modifier           = baseModifier
-        )
-    }
+    val parallax = rememberParallaxOffset(mousePosProvider, settings.parallaxIntensity)
+    Image(
+        painter            = painter,
+        contentDescription = null,
+        contentScale       = contentScale,
+        alignment          = alignment,
+        colorFilter        = saturationFilter,
+        modifier           = if (parallax == null) baseModifier else baseModifier.graphicsLayer {
+            val extraScale = parallaxScaleFor(settings.parallaxIntensity)
+            scaleX       = extraScale
+            scaleY       = extraScale
+            // Read here and nowhere else: graphicsLayer runs in the draw phase, so
+            // the pointer moving invalidates a draw rather than a composition.
+            translationX = parallax.x.value
+            translationY = parallax.y.value
+        },
+    )
 }
 
+internal class ParallaxOffset(val x: Animatable<Float, AnimationVector1D>, val y: Animatable<Float, AnimationVector1D>)
+
+/**
+ * The parallax translation, animated off-composition. Null when parallax is off.
+ *
+ * Parallax is a view transform over pixels that are already drawn, and
+ * [graphicsLayer] applies it at composite time for free. What was not free was
+ * asking the pointer for its position in the composable body: that is a snapshot
+ * read during composition, so every mouse move recomposed this whole subtree, the
+ * video player included. The spring runs in a coroutine now and the value is read
+ * only where it is used.
+ */
 @Composable
-private fun rememberStaticImage(file: File): ImageBitmap? {
+internal fun rememberParallaxOffset(mouse: () -> Offset, intensity: Float): ParallaxOffset? {
+    if (intensity <= 0f) return null
+    val latestMouse by rememberUpdatedState(mouse)
+    val offset = remember { ParallaxOffset(Animatable(0f), Animatable(0f)) }
+    LaunchedEffect(intensity) {
+        snapshotFlow { parallaxTranslationFor(latestMouse(), intensity) }
+            // Each target is launched, not awaited. Animatable retargets through its
+            // own mutex: the running animation is cancelled by the next animateTo and
+            // the next one continues from the current value AND velocity.
+            //
+            // collectLatest here instead cancelled the whole coroutine on every
+            // emission, and a moving pointer emits once a frame -- so the spring was
+            // cancelled before it was ever handed a frame and the offset stayed at
+            // zero for as long as the pointer kept moving. It only travelled once the
+            // pointer stopped, which is the opposite of what parallax is.
+            .collect { target ->
+                launch { offset.x.animateTo(target.x, PARALLAX_SPRING) }
+                launch { offset.y.animateTo(target.y, PARALLAX_SPRING) }
+            }
+    }
+    return offset
+}
+
+private val PARALLAX_SPRING = spring<Float>(stiffness = 50f, dampingRatio = 0.8f)
+
+/** What a wallpaper file turned out to be, and its pixels when it is a still. */
+private data class ResolvedMedia(val kind: BackgroundMediaKind, val bitmap: ImageBitmap?)
+
+/**
+ * Classifies the file and, when it is a still, decodes it -- in ONE pass off the UI
+ * thread.
+ *
+ * These were two effects with a composition round-trip between them: the decode could
+ * not start until the probe had returned and been recomposed. So a wallpaper arrived
+ * in two visible steps, and every translucent plane above it spent both of them
+ * sitting on nothing -- which is what made the blur look like it was applied late,
+ * on top of an already-drawn transparency, rather than with the rest of the frame.
+ */
+@Composable
+private fun rememberBackgroundMedia(file: File): ResolvedMedia? {
     // A wallpaper re-decodes on every launch; a full-resolution source pays tens of
     // MB of Skia decode each time. Cache a display-height copy under the shared
     // background-cache dir and decode that on later launches instead.
     val dataDir = koinInject<Path>()
     val cacheDir = remember(dataDir) { dataDir.resolve("background-cache").toFile() }
     val maxHeight = remember { physicalScreenHeight() }
-    var bitmap by remember(file) { mutableStateOf<ImageBitmap?>(null) }
+    var resolved by remember(file) { mutableStateOf<ResolvedMedia?>(null) }
     LaunchedEffect(file, maxHeight) {
         if (!file.exists()) return@LaunchedEffect
-        withContext(Dispatchers.IO) { bitmap = loadStaticBackground(file, cacheDir, maxHeight) }
+        resolved = withContext(Dispatchers.IO) {
+            val kind = backgroundMediaKind(file)
+            ResolvedMedia(
+                kind   = kind,
+                bitmap = if (kind == BackgroundMediaKind.Static) loadStaticBackground(file, cacheDir, maxHeight) else null,
+            )
+        }
     }
-    return bitmap
+    return resolved
 }
 
 /**
@@ -279,19 +305,54 @@ private fun sha(s: String): String {
     return md.digest().joinToString("") { "%02x".format(it) }
 }
 
-private fun decodeStaticBackground(file: File): ImageBitmap? {
+private fun decodeStaticBackground(file: File): ImageBitmap? =
+    decodeStill(file)?.use { it.toComposeImageBitmap() }
+
+/**
+ * The still's pixels, from whichever decoder reads the file.
+ *
+ * Skia first, since it is what the cached copies are written for and what every
+ * ordinary wallpaper is. What it has no codec for goes to the player's decoder,
+ * which reads stills as well as video: a file only reaches this path once
+ * [backgroundMediaKind] has established that it holds a single frame, so the
+ * decoder is being asked for a picture here, not for a stream.
+ */
+private fun decodeStill(file: File): Image? = decodeStillWithSkia(file) ?: decodeStillWithDecoder(file)
+
+private fun decodeStillWithSkia(file: File): Image? {
     var data:  Data?  = null
     var codec: Codec? = null
     return try {
         data  = Data.makeFromFileName(file.absolutePath)
         codec = Codec.makeFromData(data)
-        decodeFrame(codec, codec.imageInfo, frame = 0)
+        Bitmap().apply { allocPixels(codec.imageInfo) }.use { bmp ->
+            codec.readPixels(bmp, 0)
+            Image.makeFromBitmap(bmp)
+        }
     } catch (e: Exception) {
-        log.error("Failed to decode static background at {}", file.absolutePath, e)
+        log.debug("Skia decodes no image in {}, asking the decoder", file.absolutePath, e)
         null
     } finally {
         codec?.close()
         data?.close()
+    }
+}
+
+/** One frame through the media decoder, straight-alpha RGBA as the player hands it over. */
+private fun decodeStillWithDecoder(file: File): Image? {
+    if (!SkinemaGate.enabled) return null
+    return runCatching {
+        VideoDecoder.open(file.toPath()).use { decoder ->
+            val frame = decoder.nextFrame() ?: return@use null
+            Image.makeRaster(
+                ImageInfo(frame.width, frame.height, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL),
+                frame.rgba,
+                frame.width * 4,
+            )
+        }
+    }.getOrElse { e ->
+        log.error("Failed to decode static background at {}", file.absolutePath, e)
+        null
     }
 }
 
@@ -301,46 +362,27 @@ private fun decodeStaticBackground(file: File): ImageBitmap? {
  * shrunk bitmap. A source no taller than [maxHeight] is returned as-is and left
  * uncached. [prefix] identifies the source so older cached copies of it are evicted.
  */
-private fun decodeAndCacheDownscaled(file: File, cached: File, prefix: String, maxHeight: Int): ImageBitmap? {
-    var data:  Data?  = null
-    var codec: Codec? = null
-    return try {
-        data  = Data.makeFromFileName(file.absolutePath)
-        codec = Codec.makeFromData(data)
-        val info = codec.imageInfo
-        if (info.height <= maxHeight) return decodeFrame(codec, info, frame = 0)
+private fun decodeAndCacheDownscaled(file: File, cached: File, prefix: String, maxHeight: Int): ImageBitmap? =
+    decodeStill(file)?.use { srcImg ->
+        if (srcImg.height <= maxHeight) return@use srcImg.toComposeImageBitmap()
 
-        val dh  = maxHeight
-        val dw  = (info.width.toLong() * dh / info.height).toInt().coerceAtLeast(1)
-        val src = Bitmap().apply { allocPixels(info) }
-        src.use {
-            codec.readPixels(src, 0)
-            val dst = Bitmap().apply { allocPixels(ImageInfo.makeN32Premul(dw, dh)) }
-            dst.use {
-                Image.makeFromBitmap(src).use { srcImg ->
-                    Canvas(dst).use { canvas ->
-                        canvas.drawImageRect(
-                            srcImg,
-                            Rect.makeWH(info.width.toFloat(), info.height.toFloat()),
-                            Rect.makeWH(dw.toFloat(), dh.toFloat()),
-                            SamplingMode.LINEAR, null, true,
-                        )
-                    }
-                }
-                Image.makeFromBitmap(dst).use { dstImg ->
-                    writePngCache(dstImg, cached, prefix)
-                    dstImg.toComposeImageBitmap()
-                }
+        val dh = maxHeight
+        val dw = (srcImg.width.toLong() * dh / srcImg.height).toInt().coerceAtLeast(1)
+        Bitmap().apply { allocPixels(ImageInfo.makeN32Premul(dw, dh)) }.use { dst ->
+            Canvas(dst).use { canvas ->
+                canvas.drawImageRect(
+                    srcImg,
+                    Rect.makeWH(srcImg.width.toFloat(), srcImg.height.toFloat()),
+                    Rect.makeWH(dw.toFloat(), dh.toFloat()),
+                    SamplingMode.LINEAR, null, true,
+                )
+            }
+            Image.makeFromBitmap(dst).use { dstImg ->
+                writePngCache(dstImg, cached, prefix)
+                dstImg.toComposeImageBitmap()
             }
         }
-    } catch (e: Exception) {
-        log.error("Failed to decode static background at {}", file.absolutePath, e)
-        null
-    } finally {
-        codec?.close()
-        data?.close()
     }
-}
 
 private fun writePngCache(image: Image, dst: File, prefix: String) {
     runCatching {
@@ -360,10 +402,3 @@ private fun writePngCache(image: Image, dst: File, prefix: String) {
     }
 }
 
-private fun decodeFrame(codec: Codec, info: ImageInfo, frame: Int): ImageBitmap {
-    val bmp = Bitmap().apply { allocPixels(info) }
-    return bmp.use { bmp ->
-        codec.readPixels(bmp, frame)
-        Image.makeFromBitmap(bmp).use { it.toComposeImageBitmap() }
-    }
-}

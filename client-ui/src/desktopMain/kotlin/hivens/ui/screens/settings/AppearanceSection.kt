@@ -27,7 +27,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
-import hivens.core.data.UiStyle
 import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
@@ -42,8 +41,8 @@ import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.LocalThemeReveal
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /**
@@ -56,8 +55,8 @@ import hivens.ui.theme.NxTheme
  * expressiveness stays as a row state (day/night sun/moon + reveal,
  * the offline accent), never a whole-row wash.
  *
- * Network bypasses live separately in [NetworkSection]; experimental
- * toggles in [ExperimentalSection].
+ * Network bypasses live separately in [NetworkSection]; update, content,
+ * launch and protocol knobs in [AdvancedSection].
  */
 @Composable
 internal fun AppearanceSection(
@@ -71,8 +70,6 @@ internal fun AppearanceSection(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
 ) {
     val s = LocalStrings.current
     var langExpanded by remember { mutableStateOf(false) }
@@ -156,15 +153,6 @@ internal fun AppearanceSection(
         PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
         PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
 
-        // UI style variant. Independent axis from palette -- governs form, surface
-        // treatment, motion. Celestia (current) and Brut (sharp / flat).
-        PickerBlock(s.settingsUiStyleTitle, s.settingsUiStyleSub) {
-            NxChoiceChip(s.settingsUiStyleCelestia, uiStyle == UiStyle.Celestia) { onUiStyleChanged(UiStyle.Celestia) }
-            NxChoiceChip(s.settingsUiStyleBrut,     uiStyle == UiStyle.Brut)     { onUiStyleChanged(UiStyle.Brut) }
-        }
-        PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
-        PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
-
         // Window chrome. `undecorated` is fixed when the window is created, so the flip
         // lands at the next launch and the row says so rather than looking inert. On a
         // tiling WM nothing downstream of the flag is active -- the frame stays
@@ -222,10 +210,10 @@ internal fun DayNightRow(
     description: String,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    val style = LocalStyle.current
     val tint = if (checked) MoonBlue else SunOrange
     val reveal = LocalThemeReveal.current
-    val durationMs = style.animationDurationMs(550)
+    // The theme wipe's own pace -- a set piece rather than an interface response.
+    val durationMs = Motion.ownRhythm(THEME_REVEAL_MS).durationMs
     var switchOrigin by remember { mutableStateOf(Offset.Zero) }
     val onToggle: (Boolean) -> Unit = { newValue ->
         if (reveal != null) reveal.reveal(switchOrigin, durationMs) { onCheckedChange(newValue) }
@@ -277,3 +265,6 @@ internal fun PickerBlock(
         )
     }
 }
+
+/** How long the theme wipe takes to cross the window. */
+private const val THEME_REVEAL_MS = 550

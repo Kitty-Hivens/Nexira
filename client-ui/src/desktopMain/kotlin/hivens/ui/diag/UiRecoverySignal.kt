@@ -74,11 +74,17 @@ object UiRecoverySignal {
      */
     @Volatile private var pendingCrash: Throwable? = null
 
+    // Synchronized like the counting methods below, not merely @Volatile: the
+    // documented "first writer wins" is a check-then-act, and two broken frames
+    // can crash on different threads, so without the lock the report can name
+    // the second throwable.
+    @Synchronized
     fun recordPendingCrash(crash: Throwable) {
         if (pendingCrash == null) pendingCrash = crash
     }
 
     /** Read and clear the stashed render-path crash, if any. */
+    @Synchronized
     fun consumePendingCrash(): Throwable? = pendingCrash.also { pendingCrash = null }
 
     /**
@@ -89,12 +95,37 @@ object UiRecoverySignal {
      */
     @Volatile private var recovered: Boolean = false
 
+    @Synchronized
     fun markRecovered() { recovered = true }
 
     /** Read and clear the recovered flag; true only on the composition that follows a crash restart. */
+    @Synchronized
     fun consumeRecovered(): Boolean = recovered.also { recovered = false }
 
     private val crashTimes = ArrayDeque<Long>()
+
+    /** When a shell last proved it could stay up. Zero until one does. */
+    private var lastHealthyAt = 0L
+
+    /**
+     * A shell has been running long enough to count as recovered.
+     *
+     * The fast guard counts crashes in a time window, and a window cannot tell a
+     * crash LOOP from a run of separate faults: three short but working sessions
+     * fit inside twenty seconds, and the third failure took the user to the
+     * recovery surface instead of the launcher that had just worked three times.
+     *
+     * What this does NOT do is clear the history. An earlier attempt did, and it
+     * removed the guard entirely: a crash on the render path happens after the
+     * shell has composed by construction, so the count reset before every one of
+     * them and safe mode became unreachable -- an unbounded restart spin in place
+     * of a latch. The long window still sees every crash, which is what bounds a
+     * fault that keeps letting the shell come up before killing it again.
+     */
+    @Synchronized
+    fun noteShellHealthy(now: Long = System.currentTimeMillis()) {
+        lastHealthyAt = now
+    }
 
     /**
      * Record a shell-composition crash and decide how to recover. Thread-safe;
@@ -119,7 +150,11 @@ object UiRecoverySignal {
         // so stop burning restarts on it.
         val fastLimit = if (crash != null && isStructural(crash)) 1 else MAX_FAST_CRASHES
 
-        val recentFast = crashTimes.count { now - it <= FAST_WINDOW_MS }
+        // Only crashes since the last healthy session count as a tight loop.
+        // Everything is still in crashTimes for the long window below, which is
+        // what stops a fault that keeps clearing this one from restarting for
+        // ever.
+        val recentFast = crashTimes.count { it > lastHealthyAt && now - it <= FAST_WINDOW_MS }
         val crashLoop = recentFast > fastLimit || crashTimes.size > MAX_TOTAL_CRASHES
         return if (crashLoop) {
             _safeMode.value = true
@@ -128,6 +163,25 @@ object UiRecoverySignal {
         } else {
             ShellRecovery.RETRY
         }
+    }
+
+    /**
+     * Drops every latched decision. Internal for unit tests only.
+     *
+     * [recordShellCrash] latches [safeMode] for the life of the JVM, which is
+     * right in production and makes the count-based rules untestable without it:
+     * one test that trips the guard turns every later call in the same fork into
+     * [ShellRecovery.FATAL], so a single regression cascades into a wall of
+     * unrelated failures and the tests become order-dependent.
+     */
+    @Synchronized
+    internal fun resetForTests() {
+        crashTimes.clear()
+        lastHealthyAt = 0L
+        _safeMode.value = false
+        _recoveryReason.value = RecoveryReason.None
+        pendingCrash = null
+        recovered = false
     }
 
     /** A class-linkage failure (a missing or re-patched class) reproduces on every
@@ -149,4 +203,15 @@ object UiRecoverySignal {
     private const val LONG_WINDOW_MS = 300_000L
     private const val MAX_FAST_CRASHES = 2
     private const val MAX_TOTAL_CRASHES = 6
+
+    /**
+     * How long a shell has to survive before it counts as recovered.
+     *
+     * Deliberately short. The sessions being defended are the ones a person
+     * would call working -- the launcher came back, they did something, it
+     * failed again -- and those can be brief. A tight loop never reaches it, and
+     * a fault slow enough to clear it repeatedly is caught by the long window
+     * instead, which this does not touch.
+     */
+    const val HEALTHY_SESSION_MS = 5_000L
 }

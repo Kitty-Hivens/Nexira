@@ -2,6 +2,7 @@ package hivens.update
 
 import hivens.test.testTransferEngine
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.ReleaseChannel
 import hivens.core.data.SettingsData
 import hivens.test.MockResponse
@@ -11,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.*
 
 class UpdateServiceTest {
@@ -33,16 +35,16 @@ class UpdateServiceTest {
     }
 
     private fun fakeSettings(
-        experimentalFeaturesEnabled: Boolean = true,
         mandatoryUpdatesEnabled: Boolean = true,
         updateChannel: ReleaseChannel = ReleaseChannel.Release,  // Release so existing /releases/latest mocks work
-        nightlyChannel: Boolean = false
+        nightlyChannel: Boolean = false,
+        locale: String = "en"
     ): ISettingsService = FakeSettingsService(
         SettingsData(
-            experimentalFeaturesEnabled = experimentalFeaturesEnabled,
             mandatoryUpdatesEnabled = mandatoryUpdatesEnabled,
             updateChannel = updateChannel,
-            nightlyChannel = nightlyChannel
+            nightlyChannel = nightlyChannel,
+            locale = locale
         )
     )
 
@@ -81,6 +83,7 @@ class UpdateServiceTest {
             json = json,
             dataDirectory = tempDir,
             settingsService = settings,
+            applicator = defaultStaging,
             currentVersion = currentVersion
         )
     }
@@ -110,8 +113,19 @@ class UpdateServiceTest {
             json = json,
             dataDirectory = tempDir,
             settingsService = settings,
+            applicator = defaultStaging,
             currentVersion = currentVersion
         )
+    }
+
+    /**
+     * An applicator that keeps every default on the interface: the download goes
+     * to the updates directory and nothing is staged elsewhere. That is the
+     * shape for a platform whose installer is a separate program; the path where
+     * the applicator redirects the download is [LinuxUpdateApplicatorTest].
+     */
+    private val defaultStaging = object : IUpdateApplicator {
+        override fun scheduleUpdate(installerPath: Path) = Unit
     }
 
     // ─── Fixtures ─────────────────────────────────────────────────────────────
@@ -175,6 +189,175 @@ class UpdateServiceTest {
             "assets": [${assets.joinToString(",")}]
         }
     """.trimIndent()
+
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // release notes in the reader's language, and notes that stack
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private val russianChangelog = """
+        # Изменения
+
+        ## [2.4.0-beta5] - 2026-08-05
+
+        Сводка выпуска.
+
+        ### Главное
+        - Первое.
+        - Второе.
+
+        ## [2.4.0-beta] - 2026-07-30
+
+        Более старая сводка.
+    """.trimIndent()
+
+    @Test
+    fun `a version section is the body under its header`() {
+        val service = createService("{}")
+        val section = service.extractVersionSection(russianChangelog, "2.4.0-beta5")
+        assertNotNull(section)
+        assertTrue(section.startsWith("Сводка выпуска."), "the header line leaked into the body: $section")
+        assertTrue("### Главное" in section, "the highlights subsection was cut off: $section")
+        assertFalse("Более старая" in section, "the next version's section bled in: $section")
+    }
+
+    /**
+     * The bracket is what separates them. Matching on the version text alone,
+     * a reader on 2.4.0-beta would be shown 2.4.0-beta5's notes, which is worse
+     * than showing none.
+     */
+    @Test
+    fun `a shorter version tag does not select a longer one`() {
+        val service = createService("{}")
+        val section = service.extractVersionSection(russianChangelog, "2.4.0-beta")
+        assertNotNull(section)
+        assertTrue(section.startsWith("Более старая сводка."), "matched the wrong section: $section")
+    }
+
+    @Test
+    fun `a version nobody translated resolves to nothing`() {
+        val service = createService("{}")
+        assertNull(service.extractVersionSection(russianChangelog, "2.4.0-beta3"))
+    }
+
+    /**
+     * English is a language here, not the absence of one. It used to be answered
+     * from the release manifest instead, which froze it: a note corrected after
+     * the release reached every reader except the ones it was written for.
+     */
+    @Test
+    fun `English notes are read from the English file like any other language`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_EN.md", body = englishChangelog),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        val notes = service.fetchLocalizedNotes("v2.4.0-beta5", "en")
+        assertNotNull(notes)
+        assertTrue("The first thing." in notes, "the English notes did not arrive: $notes")
+    }
+
+    /**
+     * A file that cannot be read is not an error the reader should see: the
+     * manifest carries a frozen copy, so the caller falls back to it.
+     */
+    @Test
+    fun `English with no file reachable falls back rather than failing`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_EN.md", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        assertNull(service.fetchLocalizedNotes("v2.4.0-beta5", "en"))
+    }
+
+    private val englishChangelog = """
+        # What's New
+
+        ## [2.4.0-beta5] - 2026-08-05
+
+        Release summary.
+
+        ### Highlights
+        - The first thing.
+        - The second thing.
+    """.trimIndent()
+
+    @Test
+    fun `a translated release reads its own tag`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_RU.md", body = russianChangelog),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        val notes = service.fetchLocalizedNotes("v2.4.0-beta5", "ru")
+        assertNotNull(notes)
+        assertTrue("Первое." in notes, "the localized notes did not arrive: $notes")
+    }
+
+    @Test
+    fun `a language with no changelog falls back rather than failing`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_FR.md", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        assertNull(service.fetchLocalizedNotes("v2.4.0-beta5", "fr"))
+    }
+
+    /**
+     * A nightly's notes are the development section as it stood, so consecutive
+     * nightlies carry the same text. Repeating it once per release is what a
+     * reader twelve builds behind was handed.
+     */
+    @Test
+    fun `releases that repeat one set of notes collapse into a span`() = runTest {
+        val service = createService("{}")
+        val same = "## What's Changed\n\n- The same work, still unreleased."
+        val stitched = service.fetchChangelogBetween(
+            currentVersion = "2.4.0",
+            latestVersion = "2.4.1-nightly1221",
+            releases = listOf(
+                releaseFor("v2.4.1-nightly1221", same),
+                releaseFor("v2.4.1-nightly1220", same),
+                releaseFor("v2.4.1-nightly1219", same),
+            ),
+        )
+        assertEquals(1, Regex("The same work").findAll(stitched).count(), "the notes repeated: $stitched")
+        assertTrue("v2.4.1-nightly1221 .. v2.4.1-nightly1219" in stitched, "the span was not named: $stitched")
+    }
+
+    @Test
+    fun `releases with their own notes stay separate and in version order`() = runTest {
+        val service = createService("{}")
+        val stitched = service.fetchChangelogBetween(
+            currentVersion = "2.4.0",
+            latestVersion = "2.4.1-nightly1221",
+            releases = listOf(
+                releaseFor("v2.4.1-nightly99", "## What's Changed\n\n- Older work."),
+                releaseFor("v2.4.1-nightly1221", "## What's Changed\n\n- Newer work."),
+            ),
+        )
+        assertTrue("Older work." in stitched && "Newer work." in stitched, "a section went missing: $stitched")
+        assertTrue(
+            stitched.indexOf("Newer work.") < stitched.indexOf("Older work."),
+            "nightly99 sorted above nightly1221 -- tags compared as text: $stitched",
+        )
+    }
+
+    @Test
+    fun `nothing to stitch is empty, not an English sentence`() = runTest {
+        val service = createService("{}")
+        val stitched = service.fetchChangelogBetween(
+            currentVersion = "2.4.0",
+            latestVersion = "2.4.1",
+            releases = listOf(releaseFor("v2.4.1", "no section here")),
+        )
+        assertTrue(stitched.isBlank(), "a fallback sentence would reach the dialog untranslated: $stitched")
+    }
+
+    private fun releaseFor(tag: String, body: String) = GitHubRelease(
+        tagName = tag,
+        name = tag,
+        body = body,
+        assets = emptyList(),
+    )
 
     // ═══════════════════════════════════════════════════════════════════════════
     // compareVersions
@@ -862,12 +1045,15 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `checkForUpdate uses fallback changelog when body is null`() = runTest {
+    fun `a release with no notes leaves the changelog empty rather than filling it in English`() = runTest {
+        // The sentinel that used to live here reached the dialog verbatim, so a
+        // reader in any other language was told "No changelog available" in one
+        // they had not chosen. Empty is a state the dialog can phrase itself.
         val svc = createService(githubReleaseJson(tagName = "v99.0.0", body = null))
         val update = svc.checkForUpdate()
 
         assertNotNull(update)
-        assertEquals("No changelog available", update.changelog)
+        assertTrue(update.changelog.isBlank(), "expected no notes, got: ${update.changelog}")
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -893,7 +1079,8 @@ class UpdateServiceTest {
             transfers = testTransferEngine(buildMockClient(body = "{}")),
             json = json,
             dataDirectory = tempDir,
-            settingsService = fakeSettings()
+            settingsService = fakeSettings(),
+            applicator = defaultStaging,
         )
         svc.cleanupOldUpdates()
 
@@ -1021,20 +1208,22 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `experimental master OFF forces both children OFF`() = runTest {
-        // Master off -> prereleases off (so /releases/latest is the path, not
-        // /releases) AND mandatory off (so even a high floor doesn't block).
+    fun `mandatory updates off leaves a floor above current advisory`() = runTest {
+        // The floor is published and sits far above the installed version; with
+        // enforcement off the update is still offered, just not forced. This used
+        // to be gated by a second, master switch as well -- the knob now stands on
+        // its own, so the floor is answered by exactly one setting.
         val release = githubReleaseJson(tagName = "v99.0.0")
         val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
         val svc = createService(
             MockResponse(urlContains = "releases/latest",     body = release),
             MockResponse(urlContains = "releases",            body = "BOOM", status = HttpStatusCode.InternalServerError),
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
-            settings = fakeSettings(experimentalFeaturesEnabled = false)
+            settings = fakeSettings(mandatoryUpdatesEnabled = false)
         )
         val update = svc.checkForUpdate()
         assertNotNull(update)
-        assertFalse(update.isMandatory, "Master off must force mandatory off even when floor > current")
+        assertFalse(update.isMandatory, "Enforcement off must leave the floor advisory even when it is above current")
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

@@ -19,6 +19,7 @@ import hivens.core.data.OptionalMod
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /**
@@ -43,14 +44,14 @@ fun ModItemCard(
             hasConflicts && isChecked -> NxTheme.colors.error.copy(alpha = 0.08f)
             isChecked -> NxTheme.colors.primary.copy(alpha = 0.12f)
             else -> NxTheme.colors.background.copy(alpha = 0.25f)
-        }, tween(250)
+        }, Motion.colorShift.of()
     )
     val borderColor by animateColorAsState(
         when {
             hasConflicts && isChecked -> NxTheme.colors.error.copy(alpha = 0.4f)
             isChecked -> NxTheme.colors.primary.copy(alpha = 0.4f)
             else -> NxTheme.colors.outline.copy(alpha = 0.12f)
-        }, tween(250)
+        }, Motion.colorShift.of()
     )
 
     Column(
@@ -60,7 +61,7 @@ fun ModItemCard(
             .border(1.dp, borderColor, MaterialTheme.shapes.medium)
             .clickable { onToggle(!isChecked) }
             .padding(12.dp)
-            .animateContentSize(animationSpec = tween(300))
+            .animateContentSize(animationSpec = Motion.reveal.of())
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Checkbox(

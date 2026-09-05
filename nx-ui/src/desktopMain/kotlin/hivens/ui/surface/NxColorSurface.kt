@@ -6,29 +6,31 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import hivens.ui.theme.LocalStyle
 
 /**
- * A surface whose fill is an ARBITRARY [color] -- the one escape hatch NxSurface
- * deliberately withholds. Use ONLY where the colour is data, not a theme role:
- * the theme-picker swatches paint the colour of the theme being previewed, which
- * is not the live palette, so they cannot derive their body from a role. For any
- * themed plane use NxSurface / NxCard instead -- a colour argument there would
- * reopen the per-screen colour drift #351 closes.
+ * A surface whose fill is an ARBITRARY [color], and which does nothing else to it.
  *
- * Because the colour is data, this does none of NxSurface's per-theme work (body
- * floor, bevel, glass coat): it is a plain clipped fill with an optional [border].
+ * Use ONLY where the colour is data, not a theme role: the theme-picker swatches
+ * paint the colour of the theme being previewed, which is not the live palette, so
+ * they cannot derive their body from a level. For any themed plane use NxSurface /
+ * NxCard instead -- picking a tone per screen is the drift #351 closes.
+ *
+ * NxSurface takes a colour too, for the same reason. The difference is the treatment
+ * around it: there a colour still meets the body floor, the bevel and the blur, and
+ * saying "just this colour and nothing else" would mean naming four more arguments to
+ * switch each of them off. Here it is a clipped fill with an optional [border].
  */
 @Composable
 fun NxColorSurface(
     color: Color,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(LocalStyle.current.cardCorner),
+    shape: Shape = MaterialTheme.shapes.medium,
     border: BorderStroke? = null,
     content: @Composable BoxScope.() -> Unit = {},
 ) {

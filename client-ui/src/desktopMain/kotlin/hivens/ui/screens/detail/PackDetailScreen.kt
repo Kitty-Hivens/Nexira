@@ -29,6 +29,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,30 +45,28 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import dev.hivens.skinema.compose.VideoScale
-import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
-import hivens.launcher.launch.LauncherController
-import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isVideoUrl
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.core.launch.LaunchControlMode
+import hivens.core.launch.LaunchState
+import hivens.launcher.launch.LauncherController
 import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -81,16 +81,16 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
+import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.settings.PackSettingsWindow
 import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
-import hivens.ui.utils.ConsoleSettingsManager
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import java.io.File
@@ -98,16 +98,16 @@ import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
- * Worlds). Resolves the instance lazily via [IPackRepository] from
- * the [Screen.PackDetail.instanceId] in the navigation entry so the
- * sealed Screen class stays small.
+ * Worlds). [PackDetailState] resolves the instance from the
+ * [Screen.PackDetail.instanceId] in the navigation entry, so the sealed Screen
+ * class stays small and the screen itself renders rather than fetches.
  *
  * Tabs are scoped to a single per-instance dir (`<dataDir>/instances/
  * <instance.instanceDirName>`) for Files / Worlds; the Content tab
@@ -120,76 +120,76 @@ fun PackDetailScreen(
     appState: AppState,
     onBack: () -> Unit,
     initialShowSettings: Boolean = false,
+    initialSettingsSection: PackSettingsCategory? = null,
     onOpenVersions: (fromSettings: Boolean) -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
 
-    val repo: IPackRepository = koinInject()
-    val paths: PlatformPaths = koinInject()
+    val state = rememberPackDetailState(instanceId)
     val controller: LauncherController = koinInject()
-    val launchDriver: LaunchDriver = koinInject()
     val indications: IndicationCenter = koinInject()
     val updateHub: PackUpdateStatusHub = koinInject()
     val autoUpdateStatuses by updateHub.statuses.collectAsState()
-    var instance by remember { mutableStateOf<PackInstance?>(null) }
-    var resolved by remember { mutableStateOf(false) }
-    LaunchedEffect(instanceId) {
-        instance = repo.observe().firstOrNull()?.firstOrNull { it.id == instanceId }
-            ?: repo.get(instanceId)
-        resolved = true
-    }
 
-    if (!resolved) {
-        CenteredProgress(Modifier.fillMaxSize())
-        return
-    }
-    val pack = instance
-    if (pack == null) {
-        NotFound(onBack = onBack)
-        return
-    }
+    // Following the record covers every writer at once: the settings window, an
+    // update or repair running on the app scope, the auto-updater, and the launch
+    // writing playtime back when the game exits.
+    LaunchedEffect(state) { state.observe() }
 
-    val instanceDir = remember(pack.instanceDirName) {
-        paths.dataDir.resolve("instances").resolve(pack.instanceDirName)
+    when (val resolution = state.resolution) {
+        PackResolution.NotFound -> {
+            NotFound(onBack = onBack)
+            return
+        }
+        is PackResolution.Ready -> Unit
     }
+    val pack = state.pack ?: return
+    val instanceDir = state.instanceDir ?: return
 
-    var tabIndex by remember(pack.id) { mutableIntStateOf(0) }
+    var tabIndex by rememberSaveable(pack.id) { mutableIntStateOf(0) }
     val s = LocalStrings.current
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
     val authedSession = (appState as? AppState.Authenticated)?.session
     val launchIndication by indications.launchIndication(pack.id).collectAsState()
 
+    // The launcher runs one game at a time, and this page only knew about its own
+    // pack: with another one up, Play read as available, the controller refused it,
+    // and the click cost the running game its narration for nothing. Same test the
+    // home launch controls use.
+    // Collapsed to the one question this screen asks before collecting it:
+    // Downloading republishes per progress callback, and this page has no reason
+    // to repaint at frame rate while some other pack downloads.
+    val launcherIdle by remember(controller) {
+        controller.state
+            .map { it is LaunchState.Idle || it is LaunchState.Error }
+            .distinctUntilChanged()
+    }.collectAsState(initial = true)
+    val canPlay = authedSession != null && launcherIdle
+
     // The hero's play/abort are the only way to drive a pack launch, so the control
     // surface has to reach them -- a scenario that cannot start a launch cannot check
     // what a launch does to the instance.
-    PuppetClick("packDetail.play", enabled = authedSession != null) {
-        authedSession?.let { session ->
-            launchDriver.observe(LaunchTarget.Pack(pack))
-            controller.launchPackInstance(session, pack)
-        }
+    PuppetClick("packDetail.play", enabled = canPlay) {
+        authedSession?.let { state.play(it) }
     }
-    PuppetClick("packDetail.abort") { controller.abort() }
+    PuppetClick("packDetail.abort") { state.abortLaunch() }
 
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
-            playEnabled    = authedSession != null,
+            playEnabled    = canPlay,
             indication     = launchIndication,
             onBack         = onBack,
-            onPlay         = {
-                authedSession?.let { session ->
-                    // Observer first, then launch: the first-non-Idle await must
-                    // subscribe before Prepare fires.
-                    launchDriver.observe(LaunchTarget.Pack(pack))
-                    controller.launchPackInstance(session, pack)
-                }
-            },
-            onAbort        = { controller.abort() },
+            onPlay         = { authedSession?.let { state.play(it) } },
+            onAbort        = { state.abortLaunch() },
             onOpenSettings = { showSettings = true },
-            onOpenFolder   = { SystemActions.openFolder(instanceDir.toString()) },
-            versionLabel   = if (pack.packRef.origin == PackOrigin.Mirror) (pack.pinnedPackVersion ?: pack.packRef.version) else null,
+            onOpenFolder   = { state.openFolder() },
+            // Any source that pins a version has one worth naming; this used to
+            // ask whether the pack came from the mirror, which hid the version of
+            // a Modrinth instance that had one all along.
+            versionLabel   = pack.pinnedPackVersion ?: pack.packRef.version,
             pending        = autoUpdateStatuses[pack.id] as? PackUpdateStatus.Pending,
             onOpenVersions = { onOpenVersions(false) },
         )
@@ -207,23 +207,29 @@ fun PackDetailScreen(
 
         PackTabBar(selected = tabIndex, onSelect = { tabIndex = it })
 
+        // A tab body is disposed when another is selected, so an expanded file
+        // tree, a selected file and every scroll position in it were gone by the
+        // time the reader came back one click later.
+        val tabRetention = rememberSaveableStateHolder()
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
+            tabRetention.SaveableStateProvider(tabIndex) {
             when (tabIndex) {
                 0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
-                3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)
+                3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)
+            }
             }
         }
     }
 
     if (showSettings) {
         PackSettingsWindow(
-            pack             = pack,
-            instanceDir      = instanceDir,
-            onInstanceChange = { instance = it },
-            onDismiss        = { showSettings = false },
-            onOpenVersions   = { onOpenVersions(true) },
+            pack            = pack,
+            instanceDir     = instanceDir,
+            onDismiss       = { showSettings = false },
+            onOpenVersions  = { onOpenVersions(true) },
+            initialCategory = initialSettingsSection,
         )
     }
 }
@@ -243,26 +249,29 @@ fun PackDetailScreen(
  * off-thread and run through the redactor so an external latest.log is
  * as safe to screenshot as our own capture.
  *
- * ConsoleSettings load through the same manager AppShell + the
- * standalone window use, so font / wrap / gutter / timestamps stay one
- * source of truth across every console surface.
+ * ConsoleSettings come from the store AppShell + the standalone window
+ * read, so font / wrap / gutter / timestamps are one source of truth
+ * across every console surface rather than three copies of one file.
  */
 @Composable
-private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
+private fun PackLogsTab(packId: String, instanceDir: Path) {
     val gameConsole: GameConsoleService = koinInject()
-    val consoleJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
-    val consoleSettingsManager = remember { ConsoleSettingsManager(dataDir, consoleJson) }
-    var consoleSettings by remember { mutableStateOf(consoleSettingsManager.load()) }
+    val consoleSettingsStore: ConsoleSettingsStore = koinInject()
+    val consoleSettings by consoleSettingsStore.settings.collectAsState()
 
     // Re-list when a session starts: a new captured file appears and the
     // instance's latest.log gets rewritten. Keyed on the monotonic
     // session counter, NOT the pack id -- relaunching the SAME pack
     // keeps the id but must still refresh the list.
     val sessionEpoch = gameConsole.sessionStartCount
-    val logFiles = remember(packId, instanceDir, sessionEpoch) {
-        // Instance's own logs first (latest.log pinned to the top), then
-        // the launcher's redacted captures for this pack.
-        listInstanceLogs(instanceDir) + gameConsole.capturedSessionFiles(packId)
+    // Instance's own logs first (latest.log pinned to the top), then the
+    // launcher's redacted captures for this pack. Off the composition thread:
+    // two directory listings and a lastModified sort dropped frames on a cold
+    // cache, and ran again on every launch.
+    val logFiles by produceState(emptyList<File>(), packId, instanceDir, sessionEpoch) {
+        value = withContext(Dispatchers.IO) {
+            listInstanceLogs(instanceDir) + gameConsole.capturedSessionFiles(packId)
+        }
     }
 
     // null = the "General" live launcher console; a File = a read-only view.
@@ -287,12 +296,12 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
         // edges read as a foreign element next to the rounded cards the rest
         // of the screen is built from.
         modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        shape    = RoundedCornerShape(LocalStyle.current.cardCorner),
+        shape    = MaterialTheme.shapes.medium,
         // Glass tint, not solid: a solid fill broke the app's translucent
         // aesthetic and left a hard seam against the right panel. The
         // wallpaper stays softly visible while the tint keeps dense
         // monospace readable.
-        color    = glassSurfaceAlpha(0.85f),
+        color    = NxTheme.colors.surface.copy(alpha = 0.85f),
     ) {
         Column(Modifier.fillMaxSize()) {
             LogSessionPicker(
@@ -310,10 +319,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
                 } else {
                     ConsoleContent(
                         settings = consoleSettings,
-                        onSettingsChange = { new ->
-                            consoleSettings = new
-                            consoleSettingsManager.save(new)
-                        },
+                        onSettingsChange = consoleSettingsStore::update,
                         source = source,
                     )
                 }
@@ -426,7 +432,7 @@ private fun Hero(
             .fillMaxWidth()
             .padding(start = 16.dp, top = 8.dp, end = 16.dp)
             .height(196.dp)
-            .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
+            .clip(MaterialTheme.shapes.medium),
     ) {
         // Pixel-art base -> real banner -> scrim, same layering as the cards.
         Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
@@ -508,14 +514,17 @@ private fun Hero(
                 // The pill walks the launch: Play -> wait (prepare/sync, inert)
                 // -> Exit (stop the running game) -> Play again. Failed falls
                 // back to Play -- the error toast carries the diagnosis.
-                val busy = indication is LaunchIndication.Preparing || indication is LaunchIndication.Downloading
-                val running = indication is LaunchIndication.Running
+                val mode = indication.controlMode()
                 PlayButton(
-                    label    = when { running -> s.packPlayExit; busy -> s.packPlayWait; else -> s.packDetailPlay },
-                    icon     = if (running) NxIcon.Stop else NxIcon.PlayArrow,
-                    busy     = busy,
-                    onClick  = if (running) onAbort else onPlay,
-                    enabled  = if (running) true else playEnabled,
+                    label    = when (mode) {
+                        LaunchControlMode.Stop -> s.packPlayExit
+                        LaunchControlMode.Wait -> s.packPlayWait
+                        LaunchControlMode.Play -> s.packDetailPlay
+                    },
+                    icon     = if (mode == LaunchControlMode.Stop) NxIcon.Stop else NxIcon.PlayArrow,
+                    busy     = mode == LaunchControlMode.Wait,
+                    onClick  = if (mode == LaunchControlMode.Stop) onAbort else onPlay,
+                    enabled  = if (mode == LaunchControlMode.Stop) true else playEnabled,
                     iconOnly = playIconOnly,
                 )
             }
@@ -550,7 +559,7 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
         NxIcon.Description to s.packDetailTabLogs,
     )
     FlowRow(
-        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement   = Arrangement.spacedBy(6.dp),
     ) {
@@ -560,7 +569,7 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
             Row(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
-                    .background(if (active) NxTheme.colors.primary else glassSurfaceAlpha(0.5f))
+                    .background(if (active) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f))
                     .clickable { onSelect(i) }
                     .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment     = Alignment.CenterVertically,

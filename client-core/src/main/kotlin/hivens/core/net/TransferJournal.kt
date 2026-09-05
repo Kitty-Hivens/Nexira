@@ -3,6 +3,7 @@ package hivens.core.net
 import hivens.core.io.AtomicFiles
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -89,10 +90,10 @@ class JournalStore(private val json: Json = DEFAULT_JSON) {
             journal.size == transfer.size &&
             journal.expect == transfer.expect?.value
 
-    private fun pathFor(partial: Path): Path = partial.resolveSibling("${partial.fileName}.state")
+    private fun pathFor(partial: Path): Path = TransferStaging.journalOf(partial)
 
     private companion object {
-        val log = LoggerFactory.getLogger(JournalStore::class.java)
+        val log: Logger = LoggerFactory.getLogger(JournalStore::class.java)
         val DEFAULT_JSON = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     }
 }

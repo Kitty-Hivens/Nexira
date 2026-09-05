@@ -15,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.ThemeMode
-import hivens.core.data.UiStyle
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -58,8 +57,8 @@ fun BgSettingsSurface(
     systemThemeAvailable: Boolean,
     paletteFromWallpaper: Boolean,
     onPaletteFromWallpaperChanged: (Boolean) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
+    surfaceBlur: Boolean,
+    onSurfaceBlurChanged: (Boolean) -> Unit,
     onOpenThemePicker: () -> Unit,
 ) {
     val settings = remember { mutableStateOf(currentSettings) }
@@ -80,6 +79,7 @@ fun BgSettingsSurface(
         update { copy(imagePath = null, enabled = false) }
     }
     PuppetToggle("background.paletteFromWallpaper", paletteFromWallpaper, onValueChange = onPaletteFromWallpaperChanged)
+    PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
     PuppetClick("background.reset") {
         settings.value = BackgroundSettings()
         onSettingsChanged(settings.value)
@@ -109,8 +109,8 @@ fun BgSettingsSurface(
                 systemThemeAvailable = systemThemeAvailable,
                 paletteFromWallpaper = paletteFromWallpaper,
                 onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
-                uiStyle              = uiStyle,
-                onUiStyleChanged     = onUiStyleChanged,
+                surfaceBlur          = surfaceBlur,
+                onSurfaceBlurChanged = onSurfaceBlurChanged,
                 onOpenThemePicker    = onOpenThemePicker,
                 modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
             )

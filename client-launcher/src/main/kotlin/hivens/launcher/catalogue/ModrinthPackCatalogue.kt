@@ -1,5 +1,6 @@
 package hivens.launcher.catalogue
 
+import hivens.core.api.catalogue.CatalogueGalleryItem
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -41,8 +42,16 @@ class ModrinthPackCatalogue(private val client: ModrinthClient) : IPackCatalogue
             // that upscales to mush at full-window size. Featured image is the hero,
             // else the first.
             bannerUrl = (p.gallery.firstOrNull { it.featured } ?: p.gallery.firstOrNull())?.let { it.rawUrl ?: it.url },
-            galleryUrls = p.gallery.map { it.rawUrl ?: it.url },   // full-res, for the lightbox
-            galleryThumbUrls = p.gallery.map { it.url },           // ~350px previews, for the strip
+            // Full-res for the lightbox, the ~350px preview for the grid, and the
+            // author's own caption for both.
+            gallery = p.gallery.map { g ->
+                CatalogueGalleryItem(
+                    full = g.rawUrl ?: g.url,
+                    thumb = g.url,
+                    title = g.title?.takeIf { it.isNotBlank() },
+                    description = g.description?.takeIf { it.isNotBlank() },
+                )
+            },
             bodyMarkdown = p.body.ifBlank { null },
             versions = versions(packId),
         )

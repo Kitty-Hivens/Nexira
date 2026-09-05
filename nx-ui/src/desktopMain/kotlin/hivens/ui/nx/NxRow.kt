@@ -1,7 +1,6 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,8 +30,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A generic in-plane settings row: optional [icon] + [title] (+ [subtitle]) on the
@@ -57,7 +57,7 @@ fun NxRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val rowModifier = if (onClick != null) {
-        val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
+        val shape = MaterialTheme.shapes.medium
         val interaction = remember { MutableInteractionSource() }
         val alpha = softHoverAlpha(interaction)
         Modifier
@@ -66,9 +66,9 @@ fun NxRow(
             .clip(shape)
             .background(NxTheme.colors.textPrimary.copy(alpha = alpha))
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = edgeBleed, vertical = 8.dp)
+            .padding(horizontal = edgeBleed, vertical = Spacing.s8)
     } else {
-        Modifier.fillMaxWidth().padding(vertical = 8.dp)
+        Modifier.fillMaxWidth().padding(vertical = Spacing.s8)
     }
     Row(
         modifier              = modifier.then(rowModifier),
@@ -78,7 +78,7 @@ fun NxRow(
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
                 Symbol(icon, null, tint = iconTint, size = 22.dp)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(Spacing.s12))
             }
             Column {
                 Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -87,7 +87,7 @@ fun NxRow(
                 }
             }
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(Spacing.s12))
         trailing()
     }
 }
@@ -109,7 +109,7 @@ internal fun softHoverAlpha(interaction: MutableInteractionSource): Float {
     }
     val alpha by animateFloatAsState(
         targetValue   = target,
-        animationSpec = tween(durationMillis = LocalStyle.current.animationDurationMs(150)),
+        animationSpec = Motion.tap,
         label         = "softHoverAlpha",
     )
     return alpha

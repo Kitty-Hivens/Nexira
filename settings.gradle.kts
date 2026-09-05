@@ -62,6 +62,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "nexira"
 
+// PARKED. Groundwork for a module-loading architecture that is not the shape the
+// launcher is built in today; it lives under experimental/ alongside the design
+// notes it came from. Kept in the build so it keeps compiling and its tests keep
+// running -- parked code that falls out of the build rots instead of waiting.
+include(":experimental:client-boot")
 include(":client-config")
 include(":client-core")
 // Auth seam carved out of the launcher god-module: :client-auth holds the
@@ -111,5 +116,14 @@ include(":client-easter")
 include(":widget-model")
 include(":widget-api")
 include(":widget-processor")
+// Not part of the launcher. A worked example of a widget module: it builds to an
+// ordinary jar, is discovered from the widgets directory at runtime, and depends
+// on the kernel and nothing else in-tree -- no client-ui, no nx-ui, no NxTheme.
+// Kept in the build so it keeps compiling against the API it demonstrates.
+include(":examples:widget-pixelplayer")
+// Runtime discovery of widget modules: scans a directory for jars, checks the
+// ABI they declare, and hands back registries. Separate from :widget-api so a
+// module author compiles against the kernel without pulling in its loader.
+include(":widget-loader")
 include(":profiler-agent")
 include(":authlib-agent")

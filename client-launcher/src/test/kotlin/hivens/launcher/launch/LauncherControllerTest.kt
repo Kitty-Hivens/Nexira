@@ -42,9 +42,12 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -57,6 +60,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -218,7 +222,7 @@ class LauncherControllerTest {
         coEvery { handle.awaitExit() } returns 0
         every { handle.terminate() } just runs
         coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
         } returns SpawnResult.Started(handle)
 
         val controller = newController(this)
@@ -244,7 +248,7 @@ class LauncherControllerTest {
 
         coVerify(exactly = 1) { authService.login("tester", "pw", "test") }
         coVerify(exactly = 1) {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
         }
 
         collectorJob.cancel()
@@ -300,7 +304,7 @@ class LauncherControllerTest {
         coEvery { handle.awaitExit() } returns 0
         every { handle.terminate() } just runs
         coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
         } returns SpawnResult.Started(handle)
 
         val controller = newController(this)
@@ -416,7 +420,6 @@ class LauncherControllerTest {
                 runtime            = any(),
                 clientRootPath     = any(),
                 javaPathOverride   = any(),
-                allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
                 boundLaunch        = any(), seal        = any(), displayName        = any(),
@@ -473,6 +476,151 @@ class LauncherControllerTest {
         coVerify(exactly = 2) { packRepository.put(any()) }
         assertTrue(puts.first().lastPlayedEpochOrZero > 0, "spawn bumps lastPlayed")
         assertTrue(puts.last().lastPlayedEpochOrZero > 0, "exit preserves lastPlayed (re-read, not clobbered)")
+    }
+
+    /**
+     * The settings surfaces warn before rewriting the files of a pack that is
+     * playing, so they need to know which pack that is. [LaunchState] does not say
+     * -- it is the frontend-agnostic contract and carries no target identity.
+     */
+    @Test
+    fun `the running pack is named while it plays and forgotten once it exits`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath("1.12.2") } returns Path.of("/opt/jdk8/bin/java")
+
+        lateinit var controller: LauncherController
+        var namedDuringSession: String? = null
+        val handle = mockk<LaunchHandle>()
+        // The one moment the process is live: the flow is parked in the wait.
+        coEvery { handle.awaitExit() } answers {
+            namedDuringSession = controller.runningPackInstanceId.value
+            0
+        }
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = any(),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaPathOverride   = any(),
+                adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
+                boundLaunch        = any(), seal        = any(), displayName        = any(),
+                onLog              = any(),
+            )
+        } returns SpawnResult.Started(handle)
+
+        val instance = hivens.core.data.PackInstance(
+            id                    = "i-running",
+            packRef               = hivens.core.data.PackReference(
+                origin  = hivens.core.data.PackOrigin.Mirror,
+                id      = "modern-explorer",
+                version = "2026.05.26.1",
+            ),
+            displayName           = "Modern Explorer",
+            instanceDirName       = "modern-explorer-i-running",
+            createdAtEpoch        = 0L,
+            pinnedPackVersion     = "2026.05.26.1",
+            cachedManifest        = hivens.core.data.CachedManifestSnapshot(
+                minecraftVersion = "1.12.2",
+                loaderName       = "forge",
+                loaderVersion    = "14.23.5.2922",
+                javaMajor        = 8,
+            ),
+        )
+        Files.createDirectories(sandbox.resolve("instances").resolve(instance.instanceDirName))
+        coEvery { packRepository.get(any()) } returns instance
+
+        controller = newController(this)
+        assertNull(controller.runningPackInstanceId.value, "nothing is playing before the launch")
+
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        assertEquals("i-running", namedDuringSession)
+        assertNull(controller.runningPackInstanceId.value, "and nothing is playing once the process is gone")
+    }
+
+    private fun packInstance(id: String) = hivens.core.data.PackInstance(
+        id                    = id,
+        packRef               = hivens.core.data.PackReference(
+            origin  = hivens.core.data.PackOrigin.Mirror,
+            id      = "modern-explorer",
+            version = "2026.05.26.1",
+        ),
+        displayName           = "Pack $id",
+        instanceDirName       = "dir-$id",
+        createdAtEpoch        = 0L,
+        pinnedPackVersion     = "2026.05.26.1",
+        cachedManifest        = hivens.core.data.CachedManifestSnapshot(
+            minecraftVersion = "1.12.2",
+            loaderName       = "forge",
+            loaderVersion    = "14.23.5.2922",
+            javaMajor        = 8,
+        ),
+    )
+
+    /**
+     * Stopping one pack and starting another immediately is allowed: abort sets Idle
+     * while the first launch is still parked in a wait that cancellation cannot
+     * interrupt. When it finally wakes -- after the second game is live -- everything
+     * its tail would clear belongs to the second one.
+     */
+    @Test
+    fun `an aborted launch waking up late does not clear the session that replaced it`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+
+        val first = packInstance("first")
+        val second = packInstance("second")
+        for (i in listOf(first, second)) {
+            Files.createDirectories(sandbox.resolve("instances").resolve(i.instanceDirName))
+        }
+        coEvery { packRepository.get(any()) } answers { if (firstArg<String>() == "first") first else second }
+
+        // Uninterruptible, the way `Process.waitFor` is: cancelling the launch job
+        // does not free it, which is the whole premise of the race.
+        val firstExit = CompletableDeferred<Int>()
+        val firstHandle = mockk<LaunchHandle>(relaxed = true)
+        coEvery { firstHandle.awaitExit() } coAnswers { withContext(NonCancellable) { firstExit.await() } }
+        val secondHandle = mockk<LaunchHandle>(relaxed = true)
+        val secondExit = CompletableDeferred<Int>()
+        coEvery { secondHandle.awaitExit() } coAnswers { withContext(NonCancellable) { secondExit.await() } }
+
+        val handles = ArrayDeque(listOf(firstHandle, secondHandle))
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), boundLaunch = any(), seal = any(), displayName = any(),
+                onLog = any(),
+            )
+        } answers { SpawnResult.Started(handles.removeFirst()) }
+
+        val controller = newController(this)
+        val session = SessionData(playerName = "tester", uuid = "u", accessToken = "tok")
+
+        controller.launchPackInstance(session, first)
+        advanceUntilIdle()
+        assertEquals("first", controller.runningPackInstanceId.value)
+
+        controller.abort()
+        controller.launchPackInstance(session, second)
+        advanceUntilIdle()
+        assertEquals("second", controller.runningPackInstanceId.value, "the second launch owns the controller now")
+
+        // The first game finally dies, long after the second is live.
+        firstExit.complete(143)
+        advanceUntilIdle()
+
+        assertEquals("second", controller.runningPackInstanceId.value, "the first launch's tail cleared the second's session")
+        assertIs<LaunchState.GameRunning>(controller.state.value, "and overwrote the state it had no claim on")
+
+        secondExit.complete(0)
+        advanceUntilIdle()
     }
 
     /**
@@ -547,7 +695,6 @@ class LauncherControllerTest {
                 runtime            = any(),
                 clientRootPath     = any(),
                 javaPathOverride   = any(),
-                allocatedMemoryMB  = any(),
                 adaptiveEnabled    = any(),
                 redirectAuthHost   = any(),
                 boundLaunch        = any(), seal        = any(), displayName        = any(),
@@ -583,7 +730,7 @@ class LauncherControllerTest {
         // authlib; it returns SpawnResult.Failed carrying the semantic reason.
         coEvery {
             launcherService.launchPackClient(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
         } returns SpawnResult.Failed(LaunchError.AuthlibUnavailable("1.12.2"))
 
@@ -626,7 +773,7 @@ class LauncherControllerTest {
             state.reason,
         )
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
@@ -680,7 +827,7 @@ class LauncherControllerTest {
         coEvery {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
-                clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
+                clientRootPath = any(), javaPathOverride = any(),
                 adaptiveEnabled = any(), redirectAuthHost = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
@@ -726,7 +873,7 @@ class LauncherControllerTest {
         coEvery {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
-                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = capture(agentFlag),
                 useSmartycraftAuthLib = capture(swapFlag), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
@@ -760,7 +907,7 @@ class LauncherControllerTest {
         coEvery {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
-                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
                 useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
@@ -793,7 +940,7 @@ class LauncherControllerTest {
         coEvery {
             launcherService.launchPackClient(
                 sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
-                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
                 redirectAuthHost = capture(redirect), useNetworkAgent = any(),
                 useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
@@ -902,7 +1049,7 @@ class LauncherControllerTest {
         coEvery {
             launcherService.launchPackClient(
                 sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
-                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
                 redirectAuthHost = any(), useNetworkAgent = any(),
                 useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
@@ -947,7 +1094,7 @@ class LauncherControllerTest {
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.TwoFactorExpired, state.reason)
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -968,7 +1115,7 @@ class LauncherControllerTest {
         coEvery { handle.awaitExit() } returns 137 // SIGKILL exit code
         every { handle.terminate() } just runs
         coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
         } returns SpawnResult.Started(handle)
 
         val controller = newController(this)
@@ -991,7 +1138,7 @@ class LauncherControllerTest {
         val handle = mockk<LaunchHandle>()
         coEvery { handle.awaitExit() } returns 0
         coEvery {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
@@ -1024,7 +1171,7 @@ class LauncherControllerTest {
         assertEquals(LaunchState.Idle, controller.state.value)
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
         coVerify(exactly = 1) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 

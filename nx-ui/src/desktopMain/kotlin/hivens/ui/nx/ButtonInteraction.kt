@@ -18,7 +18,6 @@ import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.unit.Dp
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
@@ -55,7 +54,7 @@ object ThemeStateLayer : IndicationNodeFactory {
  * to hand it that shape:
  *
  *  - `ShapedStateLayer(cornerDp, color)` -- a uniform rounded rect at [cornerDp]
- *    (the button path: matches MaterialTheme.shapes.small / LocalStyle.buttonCorner).
+ *    (the button path: matches MaterialTheme.shapes.small).
  *  - `ShapedStateLayer(shape, color)` -- the host's actual [Shape] outline
  *    (circle, pill, per-corner radii), for non-button hosts.
  *

@@ -190,7 +190,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -198,19 +198,43 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Kept in step with the PR matrix in tests.yml -- a release must not be
+      # checked against less than a pull request is. Seven suites were listed
+      # here while tests.yml ran twenty, so the design system, the widget kernel
+      # and all three auth providers were unguarded on the one run that gates a
+      # tag.
       - name: Run unit tests
-        run: ./gradlew :client-config:test :client-core:test :client-launcher:test :client-update:test :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest --continue
+        run: >-
+          ./gradlew
+          :client-config:test :client-core:test :client-launcher:test :client-update:test
+          :client-auth:test :client-auth-smartycraft:test :client-auth-microsoft:test
+          :client-cli:test :client-media:test :client-tray:test
+          :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
+          :client-easter:desktopTest :nx-ui:desktopTest
+          :widget-api:test :widget-model:test :widget-processor:test
+          :authlib-agent:test :profiler-agent:test
+          --continue
+
+      # Gradle's daemon keeps the .lock files under ~/.gradle/caches open for as
+      # long as it lives. On Windows another process cannot read an open file, so
+      # setup-java's post-job cache save runs tar into "Device or resource busy"
+      # on modules-2.lock and five others, and abandons the whole archive. The
+      # cache is therefore never written, which is why it is never found either --
+      # every Windows run re-downloads the dependencies it already had.
+      #
+      # POSIX runners have no such rule and save fine, so this is Windows-only.
+      - name: Release Gradle's file locks before the cache is saved
+        if: always() && runner.os == 'Windows'
+        run: ./gradlew --stop
 
       - name: Upload test reports
         if: always()   # we publish it even if it falls, so we can see what's broken
         uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
-          path: |
-            client-config/build/reports/tests/
-            client-core/build/reports/tests/
-            client-launcher/build/reports/tests/
-            client-ui/build/reports/tests/
+          # Every module, not a hand-kept subset -- a suite whose report is not
+          # collected is one whose failure has to be read off the raw log.
+          path: '*/build/reports/tests/'
 
   # ─────────────────────────────────────────────────────────────────────────
   # Extract changelog section for this version from CHANGELOG.md
@@ -221,9 +245,15 @@ jobs:
     needs: test   # tests must pass before we touch artefacts
     outputs:
       notes: ${{ steps.extract.outputs.notes }}
+      player_notes: ${{ steps.extract.outputs.player_notes }}
       version: ${{ steps.version.outputs.value }}
     steps:
+      # Full history + tags: a tag with no CHANGELOG section of its own derives
+      # its notes from the commits since the previous tag, which a shallow
+      # checkout cannot see.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Resolve version
         id: version
@@ -254,14 +284,62 @@ jobs:
             found { print }
           ' CHANGELOG.md | sed '/./,$!d' | sed 's/[[:space:]]*$//')
 
+          # A nightly is cut from the dev tip and never has a section of its own,
+          # so its notes are the commits since the previous tag. That is the DELTA
+          # from whatever the reader is running, which is the one thing a nightly
+          # tester wants and the one thing a curated section cannot be: the
+          # Unreleased block is identical for every nightly cut from it, so it
+          # describes work the reader already has and reads the same every night.
+          # Before either, this published "No changelog entry for vX, see the
+          # changelog" -- and the launcher stitches one body per release the reader
+          # is behind, so twelve nightlies back meant twelve copies of that.
+          if [ -z "$NOTES" ]; then
+            REF="v${VERSION}"
+            git rev-parse -q --verify "refs/tags/${REF}" > /dev/null || REF="HEAD"
+            PREV=$(git describe --tags --abbrev=0 "${REF}^" 2>/dev/null || true)
+            if [ -n "$PREV" ]; then
+              SUBJECTS=$(git log --no-merges --format='- %s' "${PREV}..${REF}")
+            else
+              # No tag behind it at all: cap the walk rather than printing the
+              # whole history into a release body.
+              SUBJECTS=$(git log --no-merges --format='- %s' -n 30 "${REF}")
+            fi
+            TOTAL=$(printf '%s\n' "$SUBJECTS" | grep -c '^- ' || true)
+            if [ "$TOTAL" -gt 50 ]; then
+              SUBJECTS=$(printf '%s\n' "$SUBJECTS" | head -50)
+              SUBJECTS=$(printf '%s\n- ... and %d more commits.' "$SUBJECTS" "$((TOTAL - 50))")
+            fi
+            NOTES="$SUBJECTS"
+          fi
+
           if [ -z "$NOTES" ]; then
             NOTES="No changelog entry for v${VERSION}. See [CHANGELOG.md](./CHANGELOG.md)."
+          fi
+
+          # What the release means for a player, kept in its own file and written
+          # for them. Empty for a nightly (no section) and for any release nobody
+          # wrote notes for, which the consumers below both handle: the release
+          # body drops its What's New heading and the manifest carries null, so
+          # the launcher falls back to the stitched engineering notes rather than
+          # showing a player an empty panel.
+          PLAYER_NOTES=""
+          if [ -f CHANGELOG_EN.md ]; then
+            PLAYER_NOTES=$(awk -v ver="$VERSION" '
+              /^## \[/ {
+                if (found) exit
+                if (index($0, "["ver"]") > 0) { found=1; next }
+              }
+              found { print }
+            ' CHANGELOG_EN.md | sed '/./,$!d' | sed 's/[[:space:]]*$//')
           fi
 
           EOF_DELIM=$(openssl rand -hex 8)
           {
             echo "notes<<$EOF_DELIM"
             echo "$NOTES"
+            echo "$EOF_DELIM"
+            echo "player_notes<<$EOF_DELIM"
+            echo "$PLAYER_NOTES"
             echo "$EOF_DELIM"
           } >> "$GITHUB_OUTPUT"
 
@@ -277,7 +355,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -342,7 +420,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -456,7 +534,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -546,12 +624,15 @@ jobs:
       - name: Generate release-manifest.json
         working-directory: dist
         env:
-          CHANGELOG_NOTES: ${{ needs.changelog.outputs.notes }}
+          PLAYER_NOTES: ${{ needs.changelog.outputs.player_notes }}
         run: |
-          # Highlights = lines under "### Highlights" up to the next "### "
-          HIGHLIGHTS=$(printf '%s' "$CHANGELOG_NOTES" \
-            | awk '/^### Highlights/ {flag=1; next} /^### / {flag=0} flag' \
-            | sed '/^[[:space:]]*$/d')
+          # The player notes as written, not a slice of the engineering log. The
+          # launcher prefers the reader's own language off `stable` and uses this
+          # only when that file cannot be read, so what it carries has to stand
+          # on its own.
+          # Verbatim, blank lines and all: the notes are a paragraph, a heading
+          # and a list, and the dialog renders them as markdown.
+          HIGHLIGHTS="$PLAYER_NOTES"
 
           ASSETS_JSON='[]'
           while IFS= read -r line; do
@@ -597,6 +678,7 @@ jobs:
         id: body
         env:
           CHANGELOG_NOTES: ${{ needs.changelog.outputs.notes }}
+          PLAYER_NOTES: ${{ needs.changelog.outputs.player_notes }}
         run: |
           EOF_DELIM=$(openssl rand -hex 8)
           {

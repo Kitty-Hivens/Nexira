@@ -1,6 +1,6 @@
 package hivens.launcher.update
 
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.toBaselineManifest
@@ -25,7 +25,6 @@ import hivens.core.update.UpdateReconciler
 import hivens.core.update.classifyCompat
 import hivens.core.update.mergedWith
 import hivens.core.update.reconcileMods
-import hivens.launcher.ProtectedPaths
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +57,6 @@ class PackUpdateService(
     private val client: SmrtPackClient,
     private val syncService: SmrtSyncService,
     private val repository: IPackRepository,
-    private val protectedPaths: ProtectedPaths,
     private val snapshotService: PackSnapshotService,
     private val journal: ApplyJournal,
     private val dataDir: Path,
@@ -70,6 +68,9 @@ class PackUpdateService(
 
     private fun currentVersionOf(instance: PackInstance): String? =
         instance.pinnedPackVersion ?: instance.packRef.version
+
+    /** Every mirror build has a manifest, so any two of them can be compared unread. */
+    override fun describesBuildContents(instance: PackInstance): Boolean = true
 
     /**
      * Read-only preview: is a different build current on the mirror, and what
@@ -269,6 +270,12 @@ class PackUpdateService(
      * in the installed version's manifest, fetched via [fetchBaselineMods]; when
      * that is unavailable the plan falls back to the path-keyed whole-manifest
      * diff, i.e. the prior behaviour.
+     *
+     * No protected-path list takes part. Here the reconcile has a baseline, so it
+     * can tell an edit from a stale file by content and answer each path on the
+     * evidence -- which is the thing a list of names was standing in for, and it
+     * stands in badly: a name is not evidence, protection by name is lifted by a
+     * rename, and the list is a file the instance's own owner can extend.
      */
     private suspend fun computePlan(
         instance: PackInstance,
@@ -281,14 +288,12 @@ class PackUpdateService(
                 baseline = instance.installedManifest,
                 target = targetManifest,
                 current = current,
-                isProtected = protectedPaths::isProtected,
             )
-        val modPlan = reconcileMods(baselineMods, target.mods, current, protectedPaths::isProtected)
+        val modPlan = reconcileMods(baselineMods, target.mods, current)
         val assetPlan = UpdateReconciler.reconcile(
             baseline = instance.installedManifest?.let(::assetsOnly),
             target = assetsOnly(targetManifest),
             current = current,
-            isProtected = protectedPaths::isProtected,
         )
         return modPlan.mergedWith(assetPlan)
     }
@@ -363,12 +368,12 @@ class PackUpdateService(
      * kept as-is: publish date is the only ranking that holds across channels,
      * and the listing already arrives sorted by it.
      */
-    override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = withContext(Dispatchers.IO) {
+    override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = withContext(Dispatchers.IO) {
         client.listBuilds(instance.packRef.id).builds
     }
 
     /** The same listing, stale-then-fresh, for a screen that must not miss a build the cache predates. */
-    override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> =
+    override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> =
         client.buildsStream(instance.packRef.id).map { it.builds }.flowOn(Dispatchers.IO)
 
     /** Snapshots [instance] can be rolled back to, newest first. */

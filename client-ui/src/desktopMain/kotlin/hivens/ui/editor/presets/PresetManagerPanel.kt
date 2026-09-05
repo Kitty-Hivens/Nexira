@@ -43,7 +43,6 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
@@ -68,7 +67,6 @@ fun PresetManagerPanel(
     if (!visible) return
 
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val scope = rememberCoroutineScope()
     var presets by remember(visible) { mutableStateOf(emptyList<PresetMeta>()) }
     var newName by remember(visible) { mutableStateOf("") }
@@ -83,7 +81,7 @@ fun PresetManagerPanel(
         Surface(
             color           = NxTheme.colors.surface,
             shape           = MaterialTheme.shapes.large,
-            shadowElevation = style.panelElevation,
+            shadowElevation = 18.dp,
             modifier        = Modifier
                 .width(520.dp)
                 .height(620.dp),

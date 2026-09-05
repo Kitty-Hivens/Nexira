@@ -1,7 +1,7 @@
 package hivens.core.smrt
 
 import hivens.core.api.dto.smrt.SmrtAssetEntry
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 
@@ -24,7 +24,7 @@ data class PackFieldChange(val from: String, val to: String)
 
 /**
  * Client-side file diff between two pack builds -- the mirror stores every
- * historical manifest but deliberately serves no diff endpoint (ADR 0002), so
+ * historical manifest but deliberately serves no diff endpoint, so
  * "what changed in this build" is computed from two manifests here.
  *
  * Mod identity is [SmrtModEntry.stableKey] (slug -> modrinth project -> filename)
@@ -156,8 +156,8 @@ data class PackVersionDiff(
  * renders as one group instead of N identical "changes". Builds without a
  * fingerprint never group. Order is preserved.
  */
-fun groupRebuildRuns(builds: List<SmrtManifestBuild>): List<List<SmrtManifestBuild>> {
-    val runs = ArrayList<MutableList<SmrtManifestBuild>>()
+fun groupRebuildRuns(builds: List<PackBuild>): List<List<PackBuild>> {
+    val runs = ArrayList<MutableList<PackBuild>>()
     for (build in builds) {
         val current = runs.lastOrNull()
         if (current != null && build.fingerprint != null && build.fingerprint == current.last().fingerprint) {

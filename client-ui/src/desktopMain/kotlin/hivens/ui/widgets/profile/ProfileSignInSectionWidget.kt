@@ -12,26 +12,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.releasingFace
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
 import hivens.ui.components.MicrosoftSignInButton
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -44,12 +41,10 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
-private val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
+private const val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 
 // Microsoft profile section (slot "signin"). Signed into Microsoft it shows the
 // licensed identity -- Minecraft name, UUID, the live skin -- with a sign-out.
@@ -61,15 +56,18 @@ private val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 // next, deeper pass -- this section is the identity + auth foundation.
 @Widget(id = "profile.signin", displayName = "widget.profile.signin", removable = false)
 @Composable
-fun ProfileSignInSectionWidget(instance: WidgetInstance) {
+fun ProfileSignInSectionWidget() {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()
+    val settingsService: ISettingsService = koinInject()
 
     // The device-code provider is registered only when a client id is configured.
     val msaConfigured = remember { authRegistry.hasDeviceCodeProvider() }
-    var refreshKey by remember { mutableIntStateOf(0) }
-    val msSession = remember(refreshKey, ctx.session) { credentials.accountFor(MS_KEY) }
+    // Shared with the account section and the nav's face picker -- see
+    // ProfileContext.accountsRevision.
+    val revision = ctx.accountsRevision
+    val msSession = remember(revision.value, ctx.session) { credentials.accountFor(MS_KEY) }
 
     // Microsoft / multi-account is deferred to a later release. With no Microsoft
     // client id configured the provider never registers, so there is nothing to
@@ -85,12 +83,12 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (msSession != null) {
-                MicrosoftAccount(msSession) { refreshKey++ }
+                MicrosoftAccount(msSession) { revision.value++ }
             } else {
                 MicrosoftSignInButton(
                     onSignedIn = {
-                        credentials.primarySession()?.let { ctx.onLogin(it) }
-                        refreshKey++
+                        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
+                        revision.value++
                     },
                     puppetId = "account.signin.microsoft",
                 )
@@ -103,6 +101,7 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
 private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
+    val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
 
     // Signing out of Microsoft removes its account; if it was the only one, that
@@ -115,7 +114,9 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
         }
         credentials.listAccounts().firstOrNull { it.providerId == MS_KEY }
             ?.let { credentials.removeAccount(it.accountId) }
-        credentials.primarySession()?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+        // The face choice goes with the account it named -- see releasingFace.
+        settingsService.saveSettings(settingsService.getSettings().releasingFace(MS_KEY))
+        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
         onChanged()
     }
 
@@ -143,11 +144,10 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
 
 @Composable
 private fun UuidCard(uuid: String) {
-    val style = LocalStyle.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

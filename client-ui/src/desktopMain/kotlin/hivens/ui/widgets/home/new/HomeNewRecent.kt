@@ -36,7 +36,6 @@ import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.ui.Screen
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -63,14 +62,22 @@ data class RecentProps(
 // launches still shows the tiles (sorted by createdAt), so the new
 // home reads as populated rather than blank. Empty repo shows a CTA
 // pointing at Browse.
-@Widget(id = "home.new.recent", displayName = "widget.home.new.recent", propsClass = RecentProps::class)
+// No surface. The tiles are the object here and they carry their own art; a plane
+// behind them fills the slot's whole width while they keep their own, so the row
+// ends up sitting on a bar several times longer than itself. It also declared a top
+// inset the column below already applies, so the two stacked.
+@Widget(
+    id = "home.new.recent",
+    displayName = "widget.home.new.recent",
+    propsClass = RecentProps::class,
+)
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()
     val ctx = LocalHomeNewContext.current
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
-    val all by remember { repo.observe() }.collectAsState(initial = emptyList())
+    val all by remember { repo.observe() }.collectAsState()
 
     if (all.isEmpty()) {
         EmptyPacksCta(onBrowse = { ctx.onScreenChange(Screen.Browse) })
@@ -166,9 +173,6 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.40f))
             .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {

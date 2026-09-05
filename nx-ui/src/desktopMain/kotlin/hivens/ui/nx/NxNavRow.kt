@@ -27,13 +27,13 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * A clickable navigation row: icon + title (+ optional [subtitle]) + a trailing
  * chevron, on a library-owned opaque body plane. The one "tap to go somewhere" row
- * for settings shortcuts, replacing per-screen `glassSurfaceAlpha` + raw `clickable`
+ * for settings shortcuts, replacing the per-screen hand-mixed fill + raw `clickable`
  * rows (Rule 0/5). Its hover/press uses the same soft NEUTRAL overlay as the in-plane
  * [NxRow] ([softHoverAlpha]) so a navigable row reads the same on its own plane or in
  * one. The [icon] keeps its [iconTint] accent.
@@ -48,14 +48,14 @@ fun NxNavRow(
     trailing: IconKey = NxIcon.ChevronRight,
     iconTint: Color = NxTheme.colors.primary,
 ) {
-    val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
+    val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
     val alpha = softHoverAlpha(interaction)
     NxSurface(
         // Same level as an NxSection plane so a standalone nav card reads as the same
         // material as the section planes around it, not a step-darker odd one out.
         level    = NxSurfaceLevel.Floating,
-        glass    = false,
+        blurDp   = 0f,
         shape    = shape,
         modifier = modifier
             .fillMaxWidth()
@@ -66,13 +66,13 @@ fun NxNavRow(
             modifier              = Modifier
                 .fillMaxWidth()
                 .background(NxTheme.colors.textPrimary.copy(alpha = alpha))
-                .padding(16.dp),
+                .padding(Spacing.s16),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon, null, tint = iconTint, size = 24.dp)
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(Spacing.s16))
                 Column {
                     Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {

@@ -45,7 +45,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.slf4j.MDCContext
 
 /**
@@ -78,7 +82,7 @@ class LauncherController(
     private val smartyPlanner: SmartyModPlanner,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
-) {
+) : RunningPackSource {
 
     private val logger = LoggerFactory.getLogger(LauncherController::class.java)
 
@@ -124,14 +128,31 @@ class LauncherController(
      * cancelled the persistence mid-flight and the toggle silently
      * reverted on next load. The launcher-side scope outlives the UI
      * so the write always reaches disk.
+     *
+     * Each call carries the WHOLE selection, so a second flip made before the
+     * first has landed supersedes it rather than adding to it. The scope is
+     * multi-threaded, so without the sequence below the two could land in either
+     * order and the older selection could be the one left on disk -- a toggle
+     * the user flipped last, silently undone. Superseded calls are dropped, and
+     * what is left runs one at a time per instance.
      */
     fun setOptionalModsAsync(
         instance: PackInstance,
         manifest: SmrtPackManifest,
         toggles: List<ContentToggle>,
     ) {
-        appScope.launch { setOptionalMods(instance, manifest, toggles) }
+        val latest = optionalWriteSeq.computeIfAbsent(instance.id) { AtomicLong() }.incrementAndGet()
+        appScope.launch {
+            optionalWriteLocks.computeIfAbsent(instance.id) { Mutex() }.withLock {
+                if (optionalWriteSeq[instance.id]?.get() != latest) return@withLock
+                setOptionalMods(instance, manifest, toggles)
+            }
+        }
     }
+
+    /** Per-instance ordering for [setOptionalModsAsync]; see its KDoc. */
+    private val optionalWriteSeq = ConcurrentHashMap<String, AtomicLong>()
+    private val optionalWriteLocks = ConcurrentHashMap<String, Mutex>()
 
     /**
      * The pack's own `mods/` baseline as filename -> sha1, from the installed
@@ -174,6 +195,16 @@ class LauncherController(
      * itself capped at 2000 lines, so lossy-under-pressure semantics
      * stay consistent across the two layers.
      */
+    private val _runningPackInstanceId = MutableStateFlow<String?>(null)
+
+    /**
+     * [LaunchState] deliberately carries no target identity -- it is the shared
+     * Compose-free contract and a frontend renders it without caring what was
+     * launched. This is the separate question "whose files are in use right now",
+     * which the settings surfaces need in order to warn about rewriting them.
+     */
+    override val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
+
     private val _events = MutableSharedFlow<LaunchLogEvent>(
         extraBufferCapacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -218,9 +249,26 @@ class LauncherController(
     @Volatile private var currentAbortToken: AtomicBoolean? = null
 
     /**
+     * Identity of the launch that currently owns the controller's shared state --
+     * [runningHandle], [_runningPackInstanceId] and [_state].
+     *
+     * Aborting A and immediately launching B is allowed: abort sets Idle
+     * synchronously while A's coroutine is still parked in a blocking `awaitExit`
+     * that cancellation cannot interrupt. A then wakes up, potentially long after B
+     * spawned, and everything its tail clears would be B's. Each launch checks that
+     * it is still the current one before touching anything shared, and otherwise
+     * unwinds silently.
+     */
+    @Volatile private var currentLaunchTag: Any? = null
+
+    private fun ownsController(tag: Any): Boolean = currentLaunchTag === tag
+
+    /**
      * SC server-list launch. Delegates the gate/token/MDC/spawn/wait/exit
      * machinery to [launchInternal]; [prepareServerLaunch] supplies the
      * SC-specific auth + sync + java steps and the spawn binding.
+     *
+     * @return false when a launch was already under way and this one was refused.
      */
     fun launch(
         currentSession: SessionData,
@@ -244,10 +292,25 @@ class LauncherController(
     private sealed interface Prepared {
         class Ready(
             val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> SpawnResult,
-            /** Runs once after the process spawns. [launchInternal] guards it, so it never fails the launch. */
-            val onSpawned: (suspend () -> Unit)? = null,
+            /**
+             * Runs once after the process spawns. [launchInternal] guards it, so it
+             * never fails the launch. Returns a job to cancel when the process is
+             * gone (a session-long guard), or null when it has nothing to keep.
+             */
+            val onSpawned: (suspend (handle: LaunchHandle) -> Job?)? = null,
             /** Runs once after the game process exits, with the session length in seconds. Guarded like [onSpawned]. */
             val onExit: (suspend (sessionSeconds: Long) -> Unit)? = null,
+            /**
+             * Raised by a post-spawn guard that has already called [fail] and ended the
+             * process itself. The exit verdict reads it FIRST, because the exit code it
+             * would otherwise judge is the one that guard produced.
+             *
+             * Deliberately not the abort token. With that one set, a non-zero exit is
+             * read as a user-requested stop and the state goes to Idle -- which would
+             * quietly erase the very error the guard raised. Per-launch by
+             * construction: it lives on the value the launch coroutine holds.
+             */
+            val contentFailed: AtomicBoolean = AtomicBoolean(false),
         ) : Prepared
 
         data object Bail : Prepared
@@ -264,7 +327,7 @@ class LauncherController(
         label: String,
         onStart: () -> Unit,
         prepare: suspend CoroutineScope.() -> Prepared,
-    ) {
+    ): Boolean {
         // Re-entry guard must be atomic with the launchJob assignment. Without
         // the lock two parallel callers (UI double-click, tray-launch racing
         // dashboard-launch) could both observe Idle, both pass the gate, both
@@ -274,7 +337,7 @@ class LauncherController(
         // during the long flow.
         synchronized(launchLock) {
             if (_state.value !is LaunchState.Idle &&
-                _state.value !is LaunchState.Error) return
+                _state.value !is LaunchState.Error) return false
             _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
         }
 
@@ -286,8 +349,14 @@ class LauncherController(
         val launchId = UUID.randomUUID().toString().take(8)
         val abortToken = AtomicBoolean(false)
         currentAbortToken = abortToken
+        val launchTag = Any()
+        currentLaunchTag = launchTag
 
         launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
+            // Local, not a field: a field would let an aborted launch's tail cancel
+            // the guard of the launch that started after it -- the same shape of
+            // race currentAbortToken's KDoc describes.
+            var sessionGuard: Job? = null
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
                 onStart()
@@ -314,7 +383,8 @@ class LauncherController(
                         // Post-spawn hook guarded centrally: a throwing hook must
                         // not flip the running game into an Error state.
                         prepared.onSpawned?.let { hook ->
-                            runCatching { hook() }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+                            runCatching { sessionGuard = hook(handle) }
+                                .onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
                         }
                         val sessionStart = Instant.now().epochSecond
 
@@ -322,30 +392,52 @@ class LauncherController(
                         // currentAbortToken field -- see that field's KDoc for the
                         // abort-A-then-launch-B race a shared flag would reopen.
                         val exitCode = handle.awaitExit()
-                        runningHandle = null
+                        // Whatever the post-spawn guard was still watching for, the
+                        // process is gone and there is nothing left to watch it on.
+                        // Unconditional: this one is this launch's own.
+                        sessionGuard?.cancel()
+                        if (ownsController(launchTag)) {
+                            runningHandle = null
+                            // Cleared here rather than in the pack path's own exit
+                            // hook: that hook is guarded and may be skipped, and "no
+                            // files are in use" has to be true the moment the
+                            // process is gone.
+                            _runningPackInstanceId.value = null
+                        }
                         ActionRing.record("Game exited: $label (code $exitCode)")
                         prepared.onExit?.let { hook ->
                             val secs = (Instant.now().epochSecond - sessionStart).coerceAtLeast(0)
                             runCatching { hook(secs) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
                         }
 
-                        if (exitCode != 0 && !abortToken.get()) {
-                            fail(LaunchError.ExitCode(exitCode))
-                        } else {
-                            _state.value = LaunchState.Idle
+                        when {
+                            // A newer launch owns the state now: this one exited
+                            // into a world that has moved on and says nothing.
+                            !ownsController(launchTag) -> Unit
+                            // Read before the exit code: that code IS the guard's
+                            // doing, and judging it would overwrite the reason.
+                            prepared.contentFailed.get() -> Unit
+                            exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
+                            else -> _state.value = LaunchState.Idle
                         }
                     }
                 }
             } catch (e: Exception) {
-                runningHandle = null
+                sessionGuard?.cancel()
+                val mine = ownsController(launchTag)
+                if (mine) {
+                    runningHandle = null
+                    _runningPackInstanceId.value = null
+                }
                 if (e !is CancellationException) {
                     logger.error("Launch flow failed for {}", label, e)
-                    fail(LaunchError.Internal(e.message ?: ""), e)
-                } else {
+                    if (mine) fail(LaunchError.Internal(e.message ?: ""), e)
+                } else if (mine) {
                     _state.value = LaunchState.Idle
                 }
             }
         }
+        return true
     }
 
     /**
@@ -356,12 +448,22 @@ class LauncherController(
      *
      * A [CoroutineScope] extension so `isActive` inside the sync callbacks reads
      * the launch coroutine's cancellation, matching the pre-extraction body.
+     *
+     * The file probes here block, deliberately: a launch runs on the app scope,
+     * whose dispatcher is [Dispatchers.IO]. Moving them to their own IO context
+     * would only add a hop -- and take the launch off the caller's dispatcher,
+     * which is what the tests drive it on.
      */
+    @Suppress("BlockingMethodInNonBlockingContext")
     private suspend fun CoroutineScope.prepareServerLaunch(
         currentSession: SessionData,
         server: ServerProfile,
         onSessionRefreshed: ((SessionData) -> Unit)?,
     ): Prepared {
+        // Named rather than implicit: `isActive` inside the sync callbacks below is
+        // the LAUNCH coroutine's, not that of whatever suspends around it, and an
+        // implicit receiver leaves the reader (and the linter) guessing which.
+        val launchScope = this
         val settings = settingsService.getSettings()
         val isOffline = settings.isOfflineMode
 
@@ -486,7 +588,7 @@ class LauncherController(
                     ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
                     messageUI = { /* log */ },
                     progressUI = { progress ->
-                        if (!isActive) return@processSession
+                        if (!launchScope.isActive) return@processSession
                         _state.value = LaunchState.Downloading(
                             currentFileIdx   = progress.currentFileIdx,
                             totalFiles       = progress.totalFiles,
@@ -501,7 +603,7 @@ class LauncherController(
                     // the progress bar froze at 20% during the MD5 walk on
                     // 1000-file modpacks -- 5-30s of perceived hang.
                     verifyUI = { verified, total ->
-                        if (!isActive) return@processSession
+                        if (!launchScope.isActive) return@processSession
                         val fraction = if (total > 0) verified.toFloat() / total else 0f
                         setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
                     },
@@ -528,8 +630,7 @@ class LauncherController(
                     serverProfile = server,
                     clientRootPath = clientDir,
                     javaExecutablePath = javaPath,
-                    allocatedMemoryMB = settings.memoryMB,
-                    adaptiveEnabled = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
+                    adaptiveEnabled = settings.adaptiveMemoryEnabled,
                     onLog = onLog,
                 )
             },
@@ -542,6 +643,8 @@ class LauncherController(
      * come from [launchInternal]; [preparePackLaunch] supplies the manifest
      * resolve + pack auth + spawn binding, so the existing UI surfaces
      * (LaunchControlPanel, GameConsoleService) plug in unchanged.
+     *
+     * @return false when a launch was already under way and this one was refused.
      */
     fun launchPackInstance(
         currentSession: SessionData,
@@ -634,6 +737,11 @@ class LauncherController(
                 "Pack launch ${refreshedInstance.displayName}: ${verdict.mismatched.size} file(s) do not match the pack's own bytes",
             )
         }
+        if (verdict.unreadable.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${refreshedInstance.displayName}: ${verdict.unreadable.size} file(s) could not be read to check them",
+            )
+        }
         if (verdict.removed.isNotEmpty()) {
             ActionRing.record(
                 "Pack launch ${refreshedInstance.displayName}: removed ${verdict.removed.size} file(s) absent from the pack",
@@ -668,7 +776,9 @@ class LauncherController(
             ?.let { Path.of(it) }
 
         // 5. Spawn binding handed back to launchInternal.
+        val contentFailed = AtomicBoolean(false)
         return Prepared.Ready(
+            contentFailed = contentFailed,
             spawn = { onLog ->
                 launcherService.launchPackClient(
                     sessionData          = session,
@@ -680,8 +790,7 @@ class LauncherController(
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
                     javaPathOverride     = javaOverride,
-                    allocatedMemoryMB    = settings.memoryMB,
-                    adaptiveEnabled      = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
+                    adaptiveEnabled      = settings.adaptiveMemoryEnabled,
                     // Redirect authlib away from the Mojang hosts only when the
                     // session being carried is an SC one. Keying this on the
                     // pack's ORIGIN instead put a mirror pack with no auth block
@@ -722,10 +831,19 @@ class LauncherController(
                     onLog                = onLog,
                 )
             },
-            onSpawned = {
+            onSpawned = { handle ->
+                _runningPackInstanceId.value = refreshedInstance.id
                 packRepository.put(
                     refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
                 )
+                // Armed for exactly the launches the seal covers. A launch that got
+                // no token has nothing to lend to a jar that arrives late, and its
+                // owner's `mods/` is their own business.
+                if (serverBound && verdict.verified) {
+                    watchSessionContent(handle, clientDir, refreshedInstance, contentFailed)
+                } else {
+                    null
+                }
             },
             onExit = { secs ->
                 // Re-read the persisted instance (onSpawned wrote lastPlayed; the
@@ -737,6 +855,55 @@ class LauncherController(
                 }
             },
         )
+    }
+
+    /**
+     * Holds the instance to the pack for as long as anything added to `mods/` could
+     * still be picked up, and ends the session if it stops matching.
+     *
+     * The pre-spawn seal can only speak for the instant before the process existed;
+     * the loader reads `mods/` seconds later, and that gap was unwatched. See
+     * [LaunchContentWatchdog] for how the window is covered and why late is safe
+     * there and early is not.
+     *
+     * Ends the session rather than deleting what it found. The jar is open in a
+     * running JVM by then, so removing it neither stops the code nor leaves a
+     * working install -- what is left to do is take the session away. The instance
+     * is reported as it stands, and the repair path is what puts it right.
+     */
+    private fun watchSessionContent(
+        handle: LaunchHandle,
+        clientDir: Path,
+        instance: PackInstance,
+        contentFailed: AtomicBoolean,
+    ): Job = appScope.launch {
+        val findings = LaunchContentWatchdog(
+            sync = smrtSyncService,
+            clientDir = clientDir,
+            expected = modBaseline(instance),
+        ).run()
+        if (findings.isEmpty()) return@launch
+        // The process this was armed for must still be the controller's live one.
+        // An aborted launch stays parked in its blocking wait, so its guard can
+        // outlive it and reach a session that started afterwards -- and end that
+        // one instead, over findings about an instance nobody is playing.
+        if (runningHandle !== handle) {
+            logger.info("Content changed on {} after its session ended; nothing to act on", instance.displayName)
+            return@launch
+        }
+
+        // Raised BEFORE the process is ended, so the exit verdict already sees it
+        // when the wait returns and does not overwrite the reason with an exit code.
+        contentFailed.set(true)
+        logger.warn("Content changed after the spawn for {}: {}", instance.displayName, findings)
+        ActionRing.record(
+            "Pack launch ${instance.displayName}: content changed after the spawn, ending the session (${findings.size})",
+        )
+        // No ForeignContentRemoved here: nothing was removed, and the console line
+        // for that event says otherwise. fail() emits the error the UI already
+        // renders for this reason.
+        fail(LaunchError.ContentChangedDuringLaunch)
+        runCatching { handle.terminate() }
     }
 
     /**

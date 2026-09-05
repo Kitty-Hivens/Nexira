@@ -5,6 +5,7 @@ import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
+import hivens.core.api.interfaces.RosterInspection
 import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
@@ -17,7 +18,6 @@ import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.update.UpdatePlan
 import hivens.launcher.util.ModArchives
-import hivens.launcher.ProtectedPaths
 import hivens.launcher.modrinth.ModrinthClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -41,21 +41,29 @@ import java.util.Comparator
  * stays invisible.
  */
 class SmrtSyncService(
-    private val client: SmrtPackClient,
     private val modrinth: ModrinthClient,
-    private val protectedPaths: ProtectedPaths,
     private val transfers: TransferEngine,
 ) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
     /**
+     * Places [manifest] on disk under [clientDir].
+     *
+     * The build is the caller's to choose, and it is handed over rather than named:
+     * this used to take a packId and fetch the pack's CURRENT manifest itself, so a
+     * user who picked an older build from the version list got that build recorded
+     * everywhere -- the pin, the baseline, the optional-content defaults -- and the
+     * latest build's bytes on disk. Every other manifest read in the launcher
+     * already branches on the pin; this one could not, because it was never told
+     * there was one.
+     *
      * [enabledState] maps a mod `filename` to whether it should be active.
      * Required mods are always active regardless; an optional absent from the
      * map falls back to its manifest `default_enabled`. Empty map = install
      * every mod at its manifest default (the pre-toggle behaviour).
      */
     suspend fun sync(
-        packId: String,
+        manifest: SmrtPackManifest,
         clientDir: Path,
         progress: ((current: Int, total: Int, filename: String) -> Unit)? = null,
         enabledState: Map<String, Boolean> = emptyMap(),
@@ -65,7 +73,6 @@ class SmrtSyncService(
         // existence check and the move below. Reads are not gated -- they open
         // delete-shared and cannot corrupt a rename.
         InstanceMutationLock.withLock(clientDir) {
-            val manifest = client.fetchManifest(packId)
             log.info(
                 "smrt sync: pack={}, pack_version={}, mods={}, assets={}",
                 manifest.packId, manifest.packVersion,
@@ -296,41 +303,90 @@ class SmrtSyncService(
         // The sweep answers by name. With a baseline there is a second question --
         // whether what kept its name kept its bytes -- and that is where a jar
         // overwritten in place gets caught, which no name comparison can see.
-        val mismatched = if (expected == null) emptyList() else digestMismatches(clientDir, expected)
-        if (mismatched.isNotEmpty()) {
+        val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
+        if (digests.mismatched.isNotEmpty()) {
             log.warn(
                 "mods enforce: {} file(s) in {} do not match the pack's baseline: {}",
-                mismatched.size, clientDir.fileName, mismatched,
+                digests.mismatched.size, clientDir.fileName, digests.mismatched,
+            )
+        }
+        if (digests.unreadable.isNotEmpty()) {
+            log.warn(
+                "mods enforce: {} file(s) in {} could not be read to check them: {}",
+                digests.unreadable.size, clientDir.fileName, digests.unreadable,
             )
         }
         RosterVerdict(
             // Anything left behind means the instance was not brought in line, and a
             // file that resists deletion is the likeliest thing to have been left on
             // purpose.
-            verified = sweep.blocked.isEmpty() && mismatched.isEmpty(),
+            verified = sweep.blocked.isEmpty() && digests.mismatched.isEmpty() && digests.unreadable.isEmpty(),
             removed = sweep.removed,
             blocked = sweep.blocked,
-            mismatched = mismatched,
+            mismatched = digests.mismatched,
+            unreadable = digests.unreadable,
         )
     }
 
     /**
-     * Names the pack declares whose bytes on disk are not the bytes it declared.
-     * A missing file is not a mismatch -- that is an incomplete install, which the
-     * sync and repair paths own; this asks only about what is there.
+     * See [IPackSyncService.inspectRoster]. Same roster resolution and the same rule
+     * for what counts as foreign as [enforceRoster] -- shared through
+     * [foreignEntries] and [digestScan] rather than restated, so the two can only
+     * ever agree.
      */
-    private fun digestMismatches(clientDir: Path, expected: Map<String, String>): List<String> {
+    override suspend fun inspectRoster(clientDir: Path, expected: Map<String, String>?): RosterInspection =
+        withContext(Dispatchers.IO) {
+            val roster = expected?.keys ?: readRoster(clientDir)
+            if (roster.isEmpty()) {
+                log.warn("mods inspect: no roster for {}, nothing to hold it to", clientDir.fileName)
+                return@withContext RosterInspection(checkable = false)
+            }
+            val foreign = foreignEntries(clientDir, roster).map { (_, relText) -> relText }.sorted()
+            val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
+            RosterInspection(
+                foreign = foreign,
+                mismatched = digests.mismatched,
+                unreadable = digests.unreadable,
+            )
+        }
+
+    /** What comparing the pack's declared digests against disk could establish. */
+    private data class DigestScan(
+        val mismatched: List<String> = emptyList(),
+        val unreadable: List<String> = emptyList(),
+    )
+
+    /**
+     * Compares the bytes on disk against the digests the pack declared. A missing
+     * file is neither answer -- that is an incomplete install, which the sync and
+     * repair paths own; this asks only about what is there.
+     *
+     * "Could not read it" is kept apart from "it does not match". They are not the
+     * same claim and the difference is not cosmetic: a read failure is what an
+     * antivirus scanning a jar, or a handle the previous session has not dropped
+     * yet, looks like from here, and folding it into the mismatch list accuses the
+     * player of swapping a mod on the strength of a locked file. The read is
+     * retried on the transient shapes first ([fileOpRetry]), so only a lock that
+     * outlives the backoff is reported at all.
+     */
+    private fun digestScan(clientDir: Path, expected: Map<String, String>): DigestScan {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return emptyList()
-        val bad = mutableListOf<String>()
+        if (!Files.isDirectory(modsDir)) return DigestScan()
+        val mismatched = mutableListOf<String>()
+        val unreadable = mutableListOf<String>()
         for ((name, sha1) in expected) {
             if (sha1.isBlank()) continue
             val file = modsDir.resolve(name)
             if (!Files.isRegularFile(file)) continue
-            val actual = runCatching { sha1Of(file) }.getOrNull()
-            if (actual == null || !actual.equals(sha1, ignoreCase = true)) bad += name
+            val actual = runCatching { fileOpRetry("roster digest $name") { sha1Of(file) } }
+                .onFailure { log.warn("mods enforce: cannot read {}: {}", name, it.toString()) }
+                .getOrNull()
+            when {
+                actual == null -> unreadable += name
+                !actual.equals(sha1, ignoreCase = true) -> mismatched += name
+            }
         }
-        return bad.sorted()
+        return DigestScan(mismatched.sorted(), unreadable.sorted())
     }
 
     private fun sha1Of(file: Path): String {
@@ -396,19 +452,18 @@ class SmrtSyncService(
 
 
     /**
-     * Removes everything under `mods/` that the manifest does not name, keeping the
-     * files just downloaded. Replaces the old wipe-then-download order: the same end
-     * state, reached without a window in which the instance holds neither the old
-     * content nor the new one.
+     * Every loadable archive under `mods/` that [expected] does not name, deepest
+     * first, paired with the '/'-joined relative path a person reads in a report.
      *
-     * Walked deepest-first so a directory is considered after its children; one that
-     * still holds a kept file refuses to delete and is left alone.
+     * Pure: it walks and decides, and touches nothing. [pruneForeignEntries] is this
+     * plus a delete, [inspectRoster] is this without one -- the rule for what counts
+     * as foreign has to be the same in both, or a launch would be held to one
+     * standard and the session that follows it to another.
      */
-    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): Sweep {
+    private fun foreignEntries(clientDir: Path, expected: Set<String>): List<Pair<Path, String>> {
         val modsDir = clientDir.resolve("mods")
-        if (!Files.isDirectory(modsDir)) return Sweep(emptyList(), emptyList())
-        val removed = mutableListOf<String>()
-        val blocked = mutableListOf<String>()
+        if (!Files.isDirectory(modsDir)) return emptyList()
+        val found = mutableListOf<Pair<Path, String>>()
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
@@ -432,13 +487,30 @@ class SmrtSyncService(
                 // Joined over the path's own segments rather than toString(): the
                 // report is read by a person and matched against manifest paths, both
                 // of which use '/' whatever the host separator is.
-                val relText = rel.joinToString("/")
-                runCatching { fileOpRetry("smrt drop foreign $p") { Files.delete(p) } }
-                    .onSuccess { removed += relText }
-                    // Only regular files reach this point, so a refusal is always an
-                    // obstruction: something is holding the file or denying the delete.
-                    .onFailure { blocked += relText }
+                found += p to rel.joinToString("/")
             }
+        }
+        return found
+    }
+
+    /**
+     * Removes everything under `mods/` that the manifest does not name, keeping the
+     * files just downloaded. Replaces the old wipe-then-download order: the same end
+     * state, reached without a window in which the instance holds neither the old
+     * content nor the new one.
+     *
+     * Walked deepest-first so a directory is considered after its children; one that
+     * still holds a kept file refuses to delete and is left alone.
+     */
+    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): Sweep {
+        val removed = mutableListOf<String>()
+        val blocked = mutableListOf<String>()
+        for ((path, relText) in foreignEntries(clientDir, expected)) {
+            runCatching { fileOpRetry("smrt drop foreign $path") { Files.delete(path) } }
+                .onSuccess { removed += relText }
+                // Only regular files reach this point, so a refusal is always an
+                // obstruction: something is holding the file or denying the delete.
+                .onFailure { blocked += relText }
         }
         if (removed.isNotEmpty()) log.info("smrt sync: dropped {} foreign entr(ies) from mods/: {}", removed.size, removed)
         return Sweep(removed, blocked)
@@ -482,7 +554,11 @@ class SmrtSyncService(
      * removed and the active variant fetched. Forge 1.12.2 scans both `mods/`
      * and `mods/{mcversion}/`, so flat placement still loads.
      */
-    private suspend fun planMod(mod: SmrtModEntry, clientDir: Path, enabled: Boolean): Transfer? {
+    private suspend fun planMod(
+        mod: SmrtModEntry,
+        clientDir: Path,
+        enabled: Boolean,
+    ): Transfer? = withContext(Dispatchers.IO) {
         val modsDir = clientDir.resolve("mods")
         val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
         val disabledDest = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
@@ -492,30 +568,29 @@ class SmrtSyncService(
         if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
             Files.createDirectories(dest.parent)
             fileOpRetry("smrt sync move ${mod.filename}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
-            return null
+            return@withContext null
         }
         runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
-        return plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
+        plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
+    /**
+     * No name-based exemption here, deliberately.
+     *
+     * The `clients/` path needs one: it downloads whatever the server's manifest
+     * lists, with no record of what it put there last time, so without a list of
+     * names to leave alone it overwrites a player's own settings. The mirror was
+     * built to replace that path and does not have the problem -- it keeps the
+     * installed version's manifest as a baseline, so the reconciler can tell a file
+     * the pack shipped from one the player wrote, and answers each case on its own.
+     *
+     * Carrying the list here made the mirror worse rather than safer: a name on it
+     * was skipped in BOTH directions, so a pack could not deliver its own
+     * `servers.dat` or its JEI settings at all -- the pack ships the server list on
+     * purpose, and the exemption silently dropped it.
+     */
     private suspend fun planAsset(asset: SmrtAssetEntry, clientDir: Path): Transfer? {
-        // resolveSafe FIRST: a manifest entry like
-        // `../../config/servers.dat` happens to match the protected-
-        // suffix list (ProtectedPaths.isProtected lowercases + checks
-        // endsWith/contains on the raw string), so running the
-        // isProtected gate before path normalisation would silently
-        // skip a path-escape attempt as "protected" instead of loudly
-        // failing the manifest. The traversal IOException needs to
-        // win over the protected-path debug log.
         val dest = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
-        // Protected paths (e.g. user-edited options.txt) are honored
-        // here just like in the SC code path -- if the user has tuned
-        // their FOV, sync must not overwrite. Protection only kicks in
-        // when the file is already present and non-empty.
-        if (protectedPaths.isProtected(asset.dest) && fileIsPresentAndNonEmpty(dest)) {
-            log.debug("smrt sync: skipping protected {}", asset.dest)
-            return null
-        }
         return plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
     }
 
@@ -611,8 +686,6 @@ class SmrtSyncService(
         return DigestAlgorithm.SHA1.of(dest).equals(expectedSha1, ignoreCase = true)
     }
 
-    private fun fileIsPresentAndNonEmpty(p: Path): Boolean =
-        Files.exists(p) && Files.isRegularFile(p) && Files.size(p) > 0L
 
     companion object {
         /**

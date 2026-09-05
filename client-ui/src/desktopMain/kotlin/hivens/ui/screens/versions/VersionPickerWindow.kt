@@ -52,6 +52,7 @@ import coil3.compose.SubcomposeAsyncImage
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
+import hivens.ui.components.channelColor
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -66,7 +67,6 @@ import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 
@@ -114,7 +114,6 @@ fun VersionPickerWindow(
     busyVersionId: String? = null,
     warning: String? = null,
 ) {
-    val style = LocalStyle.current
     val colors = NxTheme.colors
     val busy = busyVersionId != null
 
@@ -158,14 +157,14 @@ fun VersionPickerWindow(
     ) {
         NxSurface(
             level = NxSurfaceLevel.Raised,
-            glass = false,
-            opaque = true,
+            blurDp = 0f,
+            opacity = 1f,
             // Fraction of the app window with no dp ceiling: a bigger screen gets a
             // bigger window, not the same island floating in more emptiness.
             modifier = Modifier
                 .fillMaxWidth(0.88f)
                 .fillMaxHeight(0.90f)
-                .clip(RoundedCornerShape(style.cardCorner))
+                .clip(MaterialTheme.shapes.medium)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -269,7 +268,7 @@ private fun ListPanel(
     val colors = NxTheme.colors
     // Its own sunken plane: the list and the detail must read as two places, not
     // as one field with a gap down the middle.
-    NxSurface(level = NxSurfaceLevel.Sunken, glass = false, modifier = modifier) {
+    NxSurface(level = NxSurfaceLevel.Sunken, blurDp = 0f, modifier = modifier) {
         Column(Modifier.fillMaxSize()) {
             // Search earns its place at 39 builds; without it the only way to a
             // year-old version is scrolling.
@@ -323,7 +322,7 @@ private fun ListPanel(
 private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
-    val shape = RoundedCornerShape(LocalStyle.current.buttonCorner)
+    val shape = MaterialTheme.shapes.small
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -421,7 +420,7 @@ private fun Footer(
     val s = LocalStrings.current
     val colors = NxTheme.colors
     HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
-    NxSurface(level = NxSurfaceLevel.Sunken, glass = false, modifier = Modifier.fillMaxWidth()) {
+    NxSurface(level = NxSurfaceLevel.Sunken, blurDp = 0f, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -473,9 +472,4 @@ private fun Footer(
 
 private const val SEARCH_THRESHOLD = 8
 
-@Composable
-private fun channelColor(channel: VersionChannel): Color = when (channel) {
-    VersionChannel.Release -> NxTheme.colors.success
-    VersionChannel.Beta -> NxTheme.colors.warnAccent
-    VersionChannel.Alpha -> NxTheme.colors.error
-}
+

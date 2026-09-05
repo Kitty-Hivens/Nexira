@@ -30,7 +30,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.releasingFace
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
 import hivens.ui.LoginPanel
@@ -46,12 +48,10 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.skin3d.Cycles
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
-private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
+private const val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
 // SmartyCraft profile section (slot "account"). Signed into SmartyCraft it is the
 // skin-forward account view -- name + status, balance + top-up, the 3D skin and
@@ -61,12 +61,15 @@ private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 // face may belong to a different provider; Microsoft lives in its own section.
 @Widget(id = "profile.account.section", displayName = "widget.profile.account.section")
 @Composable
-fun ProfileAccountSectionWidget(instance: WidgetInstance) {
+fun ProfileAccountSectionWidget() {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
+    val settingsService: ISettingsService = koinInject()
 
-    var refreshKey by remember { mutableIntStateOf(0) }
-    val scSession = remember(refreshKey, ctx.session) { credentials.accountFor(SC_KEY) }
+    // The surface's revision rather than a key of this section's own: the nav's
+    // face picker has to hear about a sign-out that happens here.
+    val revision = ctx.accountsRevision
+    val scSession = remember(revision.value, ctx.session) { credentials.accountFor(SC_KEY) }
 
     Box(Modifier.fillMaxWidth()) {
         Column(Modifier.widthIn(max = 520.dp)) {
@@ -75,13 +78,13 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
                 // Microsoft button is suppressed -- it has its own section.
                 LoginPanel(
                     onLogin = {
-                        credentials.primarySession()?.let { ctx.onLogin(it) }
-                        refreshKey++
+                        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
+                        revision.value++
                     },
                     showMicrosoft = false,
                 )
             } else {
-                SmartyCraftAccount(scSession) { refreshKey++ }
+                SmartyCraftAccount(scSession) { revision.value++ }
             }
         }
     }
@@ -91,6 +94,7 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
 private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
     val credentials: AccountStore = koinInject()
+    val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
 
     // Bumped by the skin uploader so the skin re-loads after upload/refresh.
@@ -107,7 +111,9 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
         }
         credentials.listAccounts().firstOrNull { it.providerId == SC_KEY }
             ?.let { credentials.removeAccount(it.accountId) }
-        credentials.primarySession()?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+        // The face choice goes with the account it named -- see releasingFace.
+        settingsService.saveSettings(settingsService.getSettings().releasingFace(SC_KEY))
+        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) } ?: ctx.onLogout()
         onChanged()
     }
 
@@ -183,7 +189,7 @@ private fun AccountPanel(session: SessionData) {
             Flexible("profile_topup_btn", FlexibleKind.Button) {
                 NxButton(
                     label = s.profileTopUp,
-                    onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
+                    onClick = { SystemActions.openUrl("https://smartycraft.ru/cabinet") },
                     modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
                     style = NxButtonStyle.Secondary,
                 )
@@ -195,11 +201,10 @@ private fun AccountPanel(session: SessionData) {
 @Composable
 private fun StatusPill(online: Boolean) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     val accent = if (online) NxTheme.colors.success else NxTheme.colors.error
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(accent.copy(alpha = 0.14f))
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -217,10 +222,9 @@ private fun StatusPill(online: Boolean) {
 @Composable
 private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -8,7 +8,8 @@ import kotlinx.serialization.Serializable
  * launch. Distinct from the existing server-centric `InstanceProfile`
  * because the pack-centric model handles optional content separately
  * via [PackInstance.optionalContent] (lists, not maps; covers mods +
- * shaders + resource packs uniformly).
+ * shaders + resource packs uniformly). What the two do have in common
+ * is [RuntimePrefs], which is what the launch path asks for.
  *
  * All fields default to sensible values for a fresh instance so
  * `InstanceRuntime()` is a valid starting state.
@@ -22,8 +23,8 @@ data class InstanceRuntime(
      * custom JDK with specific GC flags, a third-party Java with
      * patched modules, etc).
      */
-    val javaPath: String? = null,
-    val memoryMb: Int = 4096,
+    override val javaPath: String? = null,
+    override val memoryMb: Int = RuntimePrefs.NO_PINNED_MEMORY,
     /**
      * Pin this instance to its explicit [memoryMb] instead of the global adaptive
      * sizer. Default false so [SettingsData.adaptiveMemoryEnabled] governs every
@@ -31,11 +32,11 @@ data class InstanceRuntime(
      * field (not a flipped opt-in) so instances persisted before it default to
      * adaptive, not to a stale opt-out.
      */
-    val fixedMemory: Boolean = false,
-    val jvmArgs: String? = null,
-    val windowWidth: Int = 925,
-    val windowHeight: Int = 530,
-    val fullScreen: Boolean = false,
+    override val fixedMemory: Boolean = false,
+    override val jvmArgs: String? = null,
+    override val windowWidth: Int = RuntimePrefs.WINDOW_WIDTH,
+    override val windowHeight: Int = RuntimePrefs.WINDOW_HEIGHT,
+    override val fullScreen: Boolean = false,
     /**
      * Emit an explicit game-window size (`--width`/`--height`) at launch from
      * [windowWidth]/[windowHeight]. Default false so an instance keeps the
@@ -45,4 +46,4 @@ data class InstanceRuntime(
      * stale 925x530.
      */
     val windowSizeOverride: Boolean = false,
-)
+) : RuntimePrefs

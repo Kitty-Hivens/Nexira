@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 
@@ -96,7 +95,7 @@ internal fun StackOverflow(count: Int) {
 
 /** Capped so a face never rounds into a disc, and still squares under a square form. */
 @Composable
-private fun faceCorner(): Dp = minOf(LocalStyle.current.panelCorner, 9.dp)
+private fun faceCorner(): Dp = 9.dp
 
 /** Diameter of one face in a subject stack. */
 internal val FACE_SIZE = 36.dp

@@ -10,11 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * One text input: a [BasicTextField] inside a sunken library surface (opaque body
@@ -35,8 +34,8 @@ fun NxField(
     val ts = textStyle ?: MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary)
     NxSurface(
         level    = NxSurfaceLevel.Sunken,
-        glass    = false,
-        shape    = RoundedCornerShape(LocalStyle.current.buttonCorner),
+        blurDp   = 0f,
+        shape    = MaterialTheme.shapes.small,
         modifier = modifier,
     ) {
         BasicTextField(
@@ -45,7 +44,7 @@ fun NxField(
             singleLine    = singleLine,
             textStyle     = ts,
             cursorBrush   = SolidColor(NxTheme.colors.primary),
-            modifier      = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier      = Modifier.fillMaxWidth().padding(horizontal = Spacing.s10, vertical = Spacing.s8),
         ) { inner ->
             if (value.isEmpty()) {
                 Text(placeholder, style = ts.copy(color = NxTheme.colors.textSecondary.copy(alpha = 0.6f)))

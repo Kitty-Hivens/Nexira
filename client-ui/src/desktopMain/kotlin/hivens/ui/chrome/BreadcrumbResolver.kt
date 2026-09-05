@@ -1,14 +1,18 @@
 package hivens.ui.chrome
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.screens.ServerResolution
+import hivens.ui.screens.rememberServerResolution
 import org.koin.compose.koinInject
 
 /**
@@ -27,10 +31,10 @@ fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
     Screen.ThemePicker            -> s.themePickerTitle
     Screen.About                  -> s.aboutTitle
     Screen.BackgroundSettings     -> s.backgroundTitle
-    is Screen.ServerSettings      -> screen.server.title?.ifBlank { null } ?: screen.server.name
-    is Screen.ServerDetails       -> screen.server.title?.ifBlank { null } ?: screen.server.name
     is Screen.PackVersions        -> s.packVersionsTitle
-    // Resolved to a human pack name by the catalogue / repository (see below).
+    // Resolved to a human name by the catalogue / repository / roster (see below).
+    is Screen.ServerSettings      -> null
+    is Screen.ServerDetails       -> null
     is Screen.PackDetail          -> null
     is Screen.CataloguePackDetail -> null
 }
@@ -48,19 +52,32 @@ fun rememberCrumbLabel(screen: Screen): String {
     return when (screen) {
         is Screen.PackDetail -> {
             val repo: IPackRepository = koinInject()
-            val label by produceState(initialValue = s.crumbLoading, screen.instanceId) {
-                // Back to loading first: produceState keeps the last value across a key
-                // change, so walking from one pack to another left the crumb naming the
-                // one just left until the lookup returned.
-                value = s.crumbLoading
-                value = runCatching { repo.get(screen.instanceId)?.displayName }.getOrNull() ?: screen.instanceId
-            }
-            label
+            // Read once, this crumb kept the name the pack had when it was first
+            // shown: the rename happens in place, without navigating, and the top
+            // bar is chrome that is never disposed, so only visiting a different
+            // pack could ever fix it. The registry always has a value, so there is
+            // no loading state to pass through -- an id the registry does not hold
+            // is a pack that is gone, and the id itself is the honest label for it.
+            val instances by remember { repo.observe() }.collectAsState()
+            instances.firstOrNull { it.id == screen.instanceId }?.displayName
+                ?: screen.instanceId
         }
+        is Screen.ServerSettings      -> serverCrumb(screen.serverId)
+        is Screen.ServerDetails       -> serverCrumb(screen.serverId)
         is Screen.CataloguePackDetail -> catalogueCrumb(screen.origin, screen.packId, s.crumbLoading)
         else -> staticCrumbLabel(screen, s).orEmpty() // unreachable: statics returned above
     }
 }
+
+/**
+ * A server's display name from the roster; its id -- which is what the route
+ * carries -- is the placeholder and the fallback while the roster is unreachable.
+ */
+@Composable
+private fun serverCrumb(serverId: String): String =
+    (rememberServerResolution(serverId) as? ServerResolution.Ready)
+        ?.server?.let { it.title?.ifBlank { null } ?: it.name }
+        ?: serverId
 
 /** Resolve a catalogue pack's display title by id (cached when the detail screen
  *  has already fetched it); the raw id is the placeholder + failure fallback. */

@@ -31,6 +31,41 @@ group = "hivens"
 // with FAIL_ON_PROJECT_REPOS). Adding a `repositories { ... }` block here
 // is a build-time error by design -- changes go in one place only.
 
+/**
+ * Whether the host links musl rather than glibc, which decides half of the
+ * skinema-natives classifier below.
+ *
+ * The mappings of the running process, not the filesystem: a host can carry
+ * both C libraries (Alpine with gcompat, a glibc JVM unpacked onto a musl
+ * system), and what matters is the one the JVM that dlopens these libraries
+ * actually uses. A glibc marker settles it outright, because under gcompat a
+ * glibc process maps musl's loader too (gcompat's ld-linux shim is itself a
+ * musl program), so a musl marker on its own would misread exactly the host
+ * that motivates reading the mappings.
+ *
+ * Read directly rather than through providers.fileContents: /proc/self/maps
+ * reports a length of zero, which is not the shape a file-contents provider is
+ * built to read. The answer is a property of the machine, so a configuration
+ * cache entry reused on that machine still holds. ISO-8859-1 because one
+ * non-UTF-8 byte in a mapped file name would otherwise fail the decode of the
+ * whole file and silently answer glibc.
+ */
+fun hostIsMusl(): Boolean {
+    val maps = runCatching { File("/proc/self/maps").readText(Charsets.ISO_8859_1) }.getOrNull() ?: return false
+    var musl = false
+    for (line in maps.lineSequence()) {
+        // The path is the sixth field and runs to the end of the line: the kernel
+        // pads to the column with spaces, does not escape spaces inside the path,
+        // and appends " (deleted)" once the file is unlinked.
+        val path = line.split(' ', limit = 6).getOrNull(5)?.trimStart()?.removeSuffix(" (deleted)")
+        if (path.isNullOrEmpty() || path.startsWith('[')) continue
+        val name = path.substringAfterLast('/')
+        if (name.startsWith("libgcompat.") || name.startsWith("libc.so.6") || name.startsWith("ld-linux-")) return false
+        if (name.startsWith("ld-musl-") || name.startsWith("libc.musl-")) musl = true
+    }
+    return musl
+}
+
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin
     // (java-plugin modules only) skips them; set it here so org.gradle.jvm.version
@@ -71,6 +106,12 @@ kotlin {
                 val coilV     = libs.versions.coil.get()
                 implementation("$coilCoord:coil-compose:$coilV")        { exclude(group = "org.jetbrains.skiko") }
                 implementation("$coilCoord:coil-network-okhttp:$coilV") { exclude(group = "org.jetbrains.skiko") }
+                // SVG for pack descriptions, which are full of shields.io badges.
+                // Deliberately NOT coil-svg: its renderer on this platform is Skia's
+                // SVG module, which draws no text -- see SvgImageDecoder. Animation
+                // is elsewhere again: coil-gif is Android-only and does not resolve
+                // here, so moving images go through skinema below.
+                implementation(libs.jsvg)
                 implementation(libs.ktor.serialization.json)
             }
         }
@@ -112,13 +153,28 @@ kotlin {
                 // classifier -- bundling every classifier put ~35 MB of other-platform natives
                 // into every package (the Linux AppImage was carrying the Windows + both macOS
                 // libraries). providers.systemProperty keeps the read config-cache-correct.
+                //
+                // The `decode` tier, not `core`: GPU decode (HwAccel.AUTO, what a 4K wallpaper
+                // rides on) and the h264_vaapi encoder BackgroundOptimizer transcodes with are
+                // both absent from core, and `full` adds only the GPL software encoders. One
+                // tier per platform on the classpath: the natives resource tree is keyed by
+                // platform alone, so two tiers of one platform is undefined.
                 implementation(libs.skinema.compose)
                 implementation(libs.skinema.skiko)
                 val hostOs = providers.systemProperty("os.name").get().lowercase()
                 val hostArch = providers.systemProperty("os.arch").get().lowercase()
                 val hostArm64 = hostArch == "aarch64" || hostArch == "arm64"
                 val skinemaNativeClassifier = when {
-                    hostOs.contains("linux")   -> if (hostArm64) "decode-linux-arm64" else "decode-linux-x64"
+                    // Linux splits by C library as well as by architecture, so the key is the
+                    // one skinema's own loader computes (dev.hivens.skinema.libav
+                    // .nativesPlatform) rather than os.name + os.arch. Handing a musl host the
+                    // glibc bundle is not a load error: the loader looks for a linux-musl tree,
+                    // finds none, and falls through to the system libraries as though no natives
+                    // had been shipped at all.
+                    hostOs.contains("linux")   -> {
+                        val libc = if (hostIsMusl()) "linux-musl" else "linux"
+                        if (hostArm64) "decode-$libc-arm64" else "decode-$libc-x64"
+                    }
                     hostOs.contains("windows") -> if (hostArm64) "decode-windows-arm64" else "decode-windows-x64"
                     hostOs.contains("mac") || hostOs.contains("darwin") ->
                         if (hostArm64) "decode-macos-arm64" else "decode-macos-x64"
@@ -191,6 +247,9 @@ kotlin {
 // configuration per target compilation, not per source set.
 dependencies {
     add("kspDesktop", project(":widget-processor"))
+    // Widget modules arrive from the user's widgets directory at boot, not from
+    // this build. The loader is what finds them.
+    add("desktopMainImplementation", project(":widget-loader"))
 }
 
 // BUILD_TIME = Unix epoch millis of last commit (`git log -1 --format=%ct
@@ -529,7 +588,7 @@ packaging {
         // native runner (no cross-building).
         if (System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)) {
             add("-XX:+AutoCreateSharedArchive")
-            add("-XX:SharedArchiveFile=\$APPDIR/app.jsa")
+            add($$"-XX:SharedArchiveFile=$APPDIR/app.jsa")
         }
     })
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 
 /**
@@ -38,7 +38,6 @@ internal fun SettingsCategoryNav(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = modifier
             .width(200.dp)
@@ -52,7 +51,7 @@ internal fun SettingsCategoryNav(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(style.cardCorner))
+                    .clip(MaterialTheme.shapes.medium)
                     .background(
                         if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
                         else NxTheme.colors.background.copy(alpha = 0.0f),

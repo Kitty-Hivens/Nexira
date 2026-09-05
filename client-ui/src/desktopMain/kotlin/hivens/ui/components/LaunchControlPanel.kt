@@ -14,8 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.launch.LaunchControlMode
 import hivens.core.launch.LaunchState
 import hivens.core.launch.PrepareStage
+import hivens.core.launch.controlMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -144,11 +146,15 @@ fun LaunchControlPanel(
         // Error maps to Play (not a "clear error" affordance): the next launch
         // attempt overwrites the Error state, and the failure already went out as
         // a notification. So Error behaves exactly like Idle in this panel.
-        val btnText = when (state) {
-            is LaunchState.Downloading, is LaunchState.Prepare -> s.launchAbort
-            is LaunchState.GameRunning                         -> s.launchRunning
-            else                                               -> s.launchButton
+        val mode = state.controlMode()
+        val btnText = when (mode) {
+            LaunchControlMode.Wait -> s.launchAbort
+            LaunchControlMode.Stop -> s.launchStop
+            LaunchControlMode.Play -> s.launchButton
         }
+        // Wait aborts the attempt, Stop kills the running game -- both are the
+        // same call, since abort terminates whatever the launch currently owns.
+        val act = { if (mode == LaunchControlMode.Play) onLaunch() else onAbort() }
 
         // One play / abort control. The April Fools chaos decorates it through
         // Flexible when active -- no more idle-only branch. The ready-to-play pulse
@@ -156,15 +162,9 @@ fun LaunchControlPanel(
         Flexible("launch_play_btn", FlexibleKind.Button) {
             NxButton(
                 label     = btnText,
-                onClick   = {
-                    when (state) {
-                        is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
-                        else                                               -> onLaunch()
-                    }
-                },
+                onClick   = act,
                 modifier  = Modifier.fillMaxWidth(),
                 style     = NxButtonStyle.Primary,
-                enabled   = state !is LaunchState.GameRunning,
                 minHeight = 50.dp,
             )
         }
@@ -172,12 +172,9 @@ fun LaunchControlPanel(
         // Same mapping as the CelestiaButton onClick above -- driver doesn't need
         // to know whether it's currently a Play / Abort / ClearError button, just
         // "do the action attached to the launch control".
-        PuppetClick("dashboard.launch", enabled = state !is LaunchState.GameRunning) {
-            when (state) {
-                is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
-                else                                               -> onLaunch()
-            }
-        }
+        // Enabled in every mode, Stop included: a driver that cannot stop the
+        // game it started has to kill the process from outside the launcher.
+        PuppetClick("dashboard.launch") { act() }
     }
 }
 

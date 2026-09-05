@@ -36,12 +36,12 @@ import hivens.ui.skin3d.SkinView3D
 import hivens.ui.skin3d.SkinViewState
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -70,9 +70,21 @@ fun SkinHero(
 ) {
     val skinManager: SkinManager = koinInject()
     var skin by remember(playerName) { mutableStateOf<ImageBitmap?>(null) }
+    // Null alone cannot say which of the two states this is. It meant both "still
+    // fetching" and "there is nothing to fetch", so a player with no skin on file,
+    // or no network, got a spinner that never stopped.
+    var resolved by remember(playerName) { mutableStateOf(false) }
 
     LaunchedEffect(playerName, refreshKey) {
-        skin = skinManager.getRawSkin(playerName)
+        resolved = false
+        // finally: a decode that throws -- a corrupt cached PNG reaches
+        // toComposeImageBitmap -- would otherwise leave the spinner running for
+        // good, which is the state this flag was added to end.
+        try {
+            skin = skinManager.getRawSkin(playerName)
+        } finally {
+            resolved = true
+        }
     }
 
     Box(modifier, contentAlignment = Alignment.Center) {
@@ -87,12 +99,14 @@ fun SkinHero(
                 cape = cape,
                 state = state,
             )
-        } else {
+        } else if (!resolved) {
             CircularProgressIndicator(
                 color = NxTheme.colors.primary,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(28.dp),
             )
+        } else {
+            Symbol(NxIcon.Person, null, tint = NxTheme.colors.textSecondary, size = 48.dp)
         }
     }
 }
@@ -111,28 +125,34 @@ fun rememberSkinUploader(session: SessionData, onSkinChanged: () -> Unit): SkinU
     val skinManager: SkinManager = koinInject()
     val skinRepository: SkinRepository = koinInject()
     val scope = rememberCoroutineScope()
+    // The picker is UI and belongs to the composition; the POST that follows it
+    // does not stop because the reader left the screen mid-upload.
+    val uploadScope: CoroutineScope = koinInject()
     var status by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
+    val dialogSettings = rememberFileDialogSettings(s.profileUploadSkin)
 
     val pick: () -> Unit = {
         scope.launch {
-            val picked = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("png")),
-                dialogSettings = FileKitDialogSettings(title = s.profileUploadSkin),
+            val picked = pickFile(
+                type     = FileKitType.File(extensions = listOf("png")),
+                settings = dialogSettings,
             )
             val file = picked?.path?.let { File(it) }
             if (file != null) {
                 status = UploadStatus.Loading
-                status = try {
-                    val result = withContext(Dispatchers.IO) { skinRepository.uploadSkin(file, false, session) }
-                    if (result == "OK") {
-                        skinManager.invalidate(session.playerName)
-                        onSkinChanged()
-                        UploadStatus.Success(s.profileUploadSuccess)
-                    } else {
-                        UploadStatus.Error(s.profileUploadError(result))
+                uploadScope.launch {
+                    status = try {
+                        val result = withContext(Dispatchers.IO) { skinRepository.uploadSkin(file, false, session) }
+                        if (result == "OK") {
+                            skinManager.invalidate(session.playerName)
+                            onSkinChanged()
+                            UploadStatus.Success(s.profileUploadSuccess)
+                        } else {
+                            UploadStatus.Error(s.profileUploadError(result))
+                        }
+                    } catch (e: Exception) {
+                        UploadStatus.Error(s.profileUploadError(e.message ?: s.loginErrorGeneric))
                     }
-                } catch (e: Exception) {
-                    UploadStatus.Error(s.profileUploadError(e.message ?: s.loginErrorGeneric))
                 }
             }
         }

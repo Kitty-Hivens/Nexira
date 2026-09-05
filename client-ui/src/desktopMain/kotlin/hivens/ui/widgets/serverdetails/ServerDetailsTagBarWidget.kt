@@ -15,12 +15,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 // Two-chip tag row: minecraft version + assetDir identifier.
 @Widget(id = "server.details.tagbar", displayName = "widget.server.details.tagbar")
 @Composable
-fun ServerDetailsTagBarWidget(instance: WidgetInstance) {
+fun ServerDetailsTagBarWidget() {
     val ctx = LocalServerDetailsContext.current
     Row(modifier = Modifier.padding(vertical = 16.dp)) {
         Tag(ctx.server.version)

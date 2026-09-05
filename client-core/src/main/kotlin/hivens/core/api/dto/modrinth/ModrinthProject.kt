@@ -43,4 +43,6 @@ data class ModrinthGalleryImage(
     @SerialName("raw_url") val rawUrl: String? = null,
     val featured: Boolean = false,
     val title: String? = null,
+    /** Author's caption for the shot. Often the only thing saying what is being looked at. */
+    val description: String? = null,
 )

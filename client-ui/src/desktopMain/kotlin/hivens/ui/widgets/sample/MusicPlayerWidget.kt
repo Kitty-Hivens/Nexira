@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -64,6 +62,8 @@ import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
@@ -72,16 +72,11 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import java.nio.file.Paths
 import kotlin.io.path.name
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -95,7 +90,11 @@ data class MusicProps(
     @PropLabel("widget.home.new.music.title") val title: String = "",
 )
 
-@Widget(id = "home.new.music", displayName = "widget.home.new.music", propsClass = MusicProps::class)
+private val AUDIO_EXTENSIONS = listOf(
+    "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "aiff", "aif", "au",
+)
+
+@Widget(id = "home.new.music", displayName = "widget.home.new.music", propsClass = MusicProps::class, drawsOwnSurface = true)
 @ProvidesService(MusicPlayerService::class)
 @Composable
 fun MusicPlayerWidget(instance: WidgetInstance) {
@@ -117,16 +116,13 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
     val musicService = remember(player) { MusicPlayerServiceImpl(player) }
     provideService(MusicPlayerService::class, instance.instanceId, musicService)
 
-    val pickFile = {
+    val dialogSettings = rememberFileDialogSettings(s.audioPickTrack)
+    val openTrack = {
         scope.launch {
-            val picked = withContext(Dispatchers.IO) {
-                FileKit.openFilePicker(
-                    type           = FileKitType.File(extensions = listOf(
-                        "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "aiff", "aif", "au",
-                    )),
-                    dialogSettings = FileKitDialogSettings(title = s.audioPickTrack),
-                )
-            }
+            val picked = pickFile(
+                type     = FileKitType.File(extensions = AUDIO_EXTENSIONS),
+                settings = dialogSettings,
+            )
             val path = picked?.path?.let { Paths.get(it) }
             if (path != null) player.open(path)
         }
@@ -138,7 +134,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         state       = state,
         track       = track,
         volume      = volume,
-        onPick      = { pickFile() },
+        onPick      = { openTrack() },
         onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
         onStop      = { player.stop() },
         onVolume    = { player.setVolume(it) },
@@ -163,8 +159,8 @@ internal fun MusicPlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    // A plane from the library rather than a hand-mixed fill: the tonal body, the
-    // legibility floor over a wallpaper and the frost tier come with the level.
+    // A plane from the library rather than a hand-mixed fill: the tonal body and the
+    // legibility floor over a wallpaper come with the level.
     NxSurface(NxSurfaceLevel.Floating, modifier.fillMaxWidth().padding(top = 12.dp)) {
         Column(
             modifier = Modifier
@@ -194,7 +190,7 @@ internal fun MusicPlayerCard(
                     )
                     if (state is PlaybackState.Error) {
                         Text(
-                            text  = audioErrorText((state as PlaybackState.Error).reason, s),
+                            text  = audioErrorText(state.reason, s),
                             style = MaterialTheme.typography.bodySmall,
                             color = NxTheme.colors.error,
                         )
@@ -265,10 +261,10 @@ internal fun MusicPlayerCard(
     }
 }
 
-// Thin horizontal track + small dot thumb. Track grows from 3dp to
-// 4dp on hover; thumb fades in on hover/press. Drag updates the value
-// continuously; tap jumps to the tapped position. Designed to read as
-// a player slider rather than a generic form control.
+// Thin horizontal track + small dot handle. The track grows from 3dp to 4dp and
+// the handle from 10dp to 12dp under the pointer, so the feedback is size rather
+// than appearance: the handle is solid at rest and does not have to be found.
+// Drag updates the value continuously; tap jumps to the tapped position.
 @Composable
 private fun VolumeBar(
     value: Float,
@@ -284,13 +280,6 @@ private fun VolumeBar(
         targetValue   = if (active) 4.dp else 3.dp,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "vol-track-height",
-    )
-    // Always faintly visible so the handle is findable without hunting; full
-    // opacity on hover/drag.
-    val thumbAlpha by animateFloatAsState(
-        targetValue   = if (active) 1f else 0.65f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label         = "vol-thumb-alpha",
     )
     val thumbSizeDp by animateDpAsState(
         targetValue   = if (pressing) 12.dp else 10.dp,
@@ -342,17 +331,21 @@ private fun VolumeBar(
                 .clip(RoundedCornerShape(50))
                 .background(NxTheme.colors.primary),
         )
-        // Thumb dot at the active edge -- only visible on hover/press.
-        if (widthPx > 0 && thumbAlpha > 0.01f) {
+        // The handle at the active edge. Drawn in the colour meant to be read ON the
+        // accent rather than in the accent itself: a translucent dot of the same hue
+        // as the fill it sits on cannot read as a handle, only as a thinner patch of
+        // the bar, and at full volume half of it hangs off the track onto the card,
+        // so one circle was compositing over two different grounds. Solid, and it
+        // contrasts by construction on either palette.
+        if (widthPx > 0) {
             val thumbHalfPx = with(LocalDensity.current) { thumbSizeDp.toPx() / 2f }
             val xPx = (value * widthPx - thumbHalfPx).toInt()
             Box(
                 modifier = Modifier
                     .offset { IntOffset(xPx, 0) }
                     .size(thumbSizeDp)
-                    .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
-                    .background(NxTheme.colors.primary),
+                    .background(NxTheme.colors.onPrimary),
             )
         }
     }

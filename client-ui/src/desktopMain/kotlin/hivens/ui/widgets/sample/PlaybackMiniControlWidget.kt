@@ -59,7 +59,6 @@ import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
 import hivens.widget.model.InjectService
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 import kotlin.io.path.name
 
 // Mini transport for the cross-widget music service. Reads
@@ -73,10 +72,11 @@ import kotlin.io.path.name
 @Widget(
     id          = "home.new.playback.mini",
     displayName = "widget.home.new.playback.mini",
+    drawsOwnSurface = true,
 )
 @InjectService(MusicPlayerService::class)
 @Composable
-fun PlaybackMiniControlWidget(instance: WidgetInstance) {
+fun PlaybackMiniControlWidget() {
     val service: MusicPlayerService? = useService()
 
     if (service == null) {

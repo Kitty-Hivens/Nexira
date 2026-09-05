@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -243,13 +244,13 @@ fun Modifier.dragSource(
             widgetSize      = Offset(bounds.width, bounds.height),
             ghost           = ghost,
         )
+        // Accumulated, for the same reason the chrome's flow drag accumulates: the
+        // source's bounds move while the drag is in flight, and a pointer measured
+        // against them reports the source's movement as the user's.
         var lastPointer = bounds.topLeft + drag.position
         drag(drag.id) { change: PointerInputChange ->
-            val widgetBounds = widgetBoundsProvider()
-            if (widgetBounds != null) {
-                lastPointer = widgetBounds.topLeft + change.position
-                controller.update(lastPointer)
-            }
+            lastPointer += change.positionChange()
+            controller.update(lastPointer)
             change.consume()
         }
         onDragEnd(lastPointer)

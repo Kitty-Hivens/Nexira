@@ -2,17 +2,23 @@ package hivens.ui.screens.detail.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.launcher.PackOperation
+import hivens.launcher.PackOperationKind
+import hivens.launcher.PackOperationPhase
+import hivens.launcher.PackOperationService
+import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.update.PackUpdateService
 import hivens.ui.utils.humanSize
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -21,11 +27,8 @@ import hivens.ui.nx.NxSection
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -40,50 +43,49 @@ import java.nio.file.Path
  * build it is already pinned to and restores only what does not match. Files the
  * manifest never named -- a jar the user dropped in, a config they edited -- are
  * not touched, so it is a repair rather than a reset.
+ *
+ * It runs through [PackOperationService], which owns it for as long as it takes:
+ * a repair walks the whole pack and outlives the window that asked for it, and
+ * only one operation at a time may rewrite an instance.
  */
 @Composable
 internal fun PackDataSection(
     pack: PackInstance,
     instanceDir: Path,
-    onInstanceChange: (PackInstance) -> Unit,
+    operation: PackOperation?,
     onDismiss: () -> Unit,
-    onOpState: (PackSettingsOp) -> Unit = {},
 ) {
     val s = LocalStrings.current
     val service: PackInstanceService = koinInject()
     val updates: PackUpdateService = koinInject()
-    val scope = rememberCoroutineScope()
-    // A repair walks the whole pack and outlives the window, exactly like an
-    // update apply -- see the note on PackVersionSection.applyLatest.
-    val appScope: CoroutineScope = koinInject()
+    val operations: PackOperationService = koinInject()
+    val sizes: InstanceSizeService = koinInject()
+    // Both actions here rewrite the instance and outlive this window: deleting it
+    // makes the screen behind resolve to a dead end, which disposes the window --
+    // and on the composition's scope that cancelled the delete's own tail, so the
+    // size entry for an instance that no longer exists was left behind.
+    val scope: CoroutineScope = koinInject()
 
-    var sizeText by remember(pack.id) { mutableStateOf<String?>(null) }
+    // A repair rewrites whatever does not match, so it is one of the operations
+    // that must not surprise a live session.
+    val runningGuard = rememberRunningPackGuard(pack.id)
+
     var pendingDelete by remember(pack.id) { mutableStateOf(false) }
-    var repairing by remember(pack.id) { mutableStateOf(false) }
+    val busy = operation?.isRunning == true
 
-    LaunchedEffect(instanceDir) {
-        sizeText = withContext(Dispatchers.IO) { runCatching { humanSize(dirSizeBytes(instanceDir)) }.getOrNull() }
-    }
+    // Asks for a measurement rather than taking one: the service walks the tree
+    // only when what it holds is too old to serve, so moving between sections
+    // costs nothing.
+    val measured by sizes.sizes.collectAsState()
+    LaunchedEffect(pack.id) { sizes.measure(pack) }
+    val sizeText = measured[pack.id]?.let { humanSize(it.bytes, s) }
 
     fun runRepair() {
-        if (repairing) return
-        appScope.launch {
-            repairing = true
-            onOpState(PackSettingsOp.Running(PackSettingsOpKind.Repair, 0, 0, ""))
-            runCatching {
-                updates.verifyAndRepair(pack) { current, total, path ->
-                    onOpState(PackSettingsOp.Running(PackSettingsOpKind.Repair, current, total, path.substringAfterLast('/')))
-                }
-            }.onSuccess { report ->
-                // The folder size is stale the moment anything was replaced.
-                sizeText = withContext(Dispatchers.IO) {
-                    runCatching { humanSize(dirSizeBytes(instanceDir)) }.getOrNull()
-                }
-                onOpState(PackSettingsOp.Repaired(report.checked, report.repaired.size))
-            }.onFailure {
-                onOpState(PackSettingsOp.Failed(it.message ?: it::class.simpleName.orEmpty()))
+        operations.start(pack, PackOperationKind.Repair) { progress ->
+            val report = updates.verifyAndRepair(pack) { current, total, path ->
+                progress(current, total, path.substringAfterLast('/'))
             }
-            repairing = false
+            PackOperationPhase.Repaired(report.checked, report.repaired.size)
         }
     }
 
@@ -100,21 +102,34 @@ internal fun PackDataSection(
         // and a local or imported pack has none to measure against.
         if (pack.packRef.origin == PackOrigin.Mirror) {
             NxRow(title = s.packSettingsRepair, subtitle = s.packSettingsRepairDesc) {
-                PuppetClick("packSettings.data.repair") { runRepair() }
+                PuppetClick("packSettings.data.repair") { runningGuard.run(::runRepair) }
                 NxButton(
                     s.packSettingsRepairAction,
-                    onClick = { runRepair() },
+                    onClick = { runningGuard.run(::runRepair) },
                     style = NxButtonStyle.Secondary,
-                    enabled = !repairing,
+                    enabled = !busy,
                     compact = true,
                 )
             }
         }
         if (pack.packRef.origin != PackOrigin.Local) {
+            // Detaching costs the instance its update source and cannot be undone
+            // from here. The browsing surface already refuses to carry the action
+            // for that reason; one click and no question was not much better.
+            var confirmDetach by remember { mutableStateOf(false) }
+            if (confirmDetach) {
+                DestructiveConfirmDialog(
+                    title        = s.packSettingsDetach,
+                    body         = s.packSettingsDetachDesc,
+                    confirmLabel = s.packSettingsDetachAction,
+                    onConfirm    = { scope.launch { service.detachToLocal(pack) } },
+                    onDismiss    = { confirmDetach = false },
+                )
+            }
             NxRow(title = s.packSettingsDetach, subtitle = s.packSettingsDetachDesc) {
                 NxButton(
                     s.packSettingsDetachAction,
-                    onClick = { scope.launch { onInstanceChange(service.detachToLocal(pack)) } },
+                    onClick = { confirmDetach = true },
                     style = NxButtonStyle.Secondary,
                     compact = true,
                 )
@@ -133,6 +148,8 @@ internal fun PackDataSection(
         }
     }
 
+    runningGuard.Dialog()
+
     if (pendingDelete) {
         DestructiveConfirmDialog(
             title = s.packCardDeleteTitle,
@@ -140,18 +157,14 @@ internal fun PackDataSection(
             confirmLabel = s.packSettingsDelete,
             onConfirm = {
                 pendingDelete = false
-                scope.launch { if (service.deleteCompletely(pack)) onDismiss() }
+                scope.launch {
+                    if (service.deleteCompletely(pack)) {
+                        sizes.forget(pack.id)
+                        onDismiss()
+                    }
+                }
             },
             onDismiss = { pendingDelete = false },
         )
-    }
-}
-
-private fun dirSizeBytes(dir: Path): Long {
-    if (!Files.exists(dir)) return 0L
-    Files.walk(dir).use { stream ->
-        return stream.filter { Files.isRegularFile(it) }
-            .mapToLong { runCatching { Files.size(it) }.getOrDefault(0L) }
-            .sum()
     }
 }

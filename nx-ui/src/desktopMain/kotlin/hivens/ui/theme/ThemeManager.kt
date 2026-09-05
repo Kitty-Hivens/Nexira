@@ -164,7 +164,23 @@ object ThemePresets {
     )
 }
 
-class ThemeManager(configPath: Path) {
+/**
+ * A user's saved theme is authored, not derived -- nothing regenerates it -- so it
+ * has to be published whole or not at all.
+ *
+ * [publish] is supplied rather than performed here because this module has no
+ * project dependencies and cannot reach the launcher's atomic-write helper. The
+ * app root passes that helper in. Copying the tmp-fsync-rename sequence into this
+ * module to keep it self-contained would put a second copy of a durability
+ * primitive in the tree, and two copies drift.
+ *
+ * Contract: [publish] writes the whole content or leaves the previous file
+ * untouched, and creates missing parent directories.
+ */
+class ThemeManager(
+    configPath: Path,
+    private val publish: (file: Path, content: String) -> Unit,
+) {
     private val logger = LoggerFactory.getLogger(ThemeManager::class.java)
     private val themesFile = configPath.resolve("themes.json")
     private val json = Json { ignoreUnknownKeys = true }
@@ -184,8 +200,7 @@ class ThemeManager(configPath: Path) {
 
     fun saveTheme(theme: CustomTheme) {
         try {
-            Files.createDirectories(themesFile.parent)
-            Files.writeString(themesFile, json.encodeToString(theme))
+            publish(themesFile, json.encodeToString(theme))
             logger.info("Theme saved: ${theme.name}")
         } catch (e: Exception) {
             logger.error("Failed to save theme", e)

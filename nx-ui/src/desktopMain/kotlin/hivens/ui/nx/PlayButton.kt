@@ -1,14 +1,12 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,8 +37,9 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /** Corner of the Play plate under a rounded style -- a rounded rectangle
  *  between a bare rectangle and a full stadium, not a pill. */
@@ -80,8 +79,7 @@ fun PlayButton(
     iconOnly: Boolean = false,
     compact: Boolean = false,
 ) {
-    val style = LocalStyle.current
-    val shape = RoundedCornerShape(if (style.buttonCorner > 0.dp) PLATE_CORNER else 0.dp)
+    val shape = RoundedCornerShape(PLATE_CORNER)
     val darkTheme = NxTheme.colors.background.luminance() < 0.5f
     val ink = if (darkTheme) Color(0xFF121318) else Color.White
     val inkContent = if (darkTheme) Color.White else Color.Black
@@ -94,32 +92,33 @@ fun PlayButton(
     val fillTarget = when {
         !enabled               -> Color.Transparent
         busy                   -> ink.copy(alpha = 0.78f)
-        pressed && interactive -> lerp(ink, inkContent, 0.16f)
-        hovered && interactive -> lerp(ink, inkContent, 0.10f)
+        pressed                -> lerp(ink, inkContent, 0.16f)
+        hovered                -> lerp(ink, inkContent, 0.10f)
         else                   -> ink
     }
-    val fill by animateColorAsState(fillTarget, tween(style.animationDurationMs(110)), label = "playFill")
+    val fill by animateColorAsState(fillTarget, Motion.tap.of(), label = "playFill")
     val plateScale by animateFloatAsState(
         targetValue   = if (pressed && interactive) 0.97f else 1f,
-        animationSpec = tween(style.animationDurationMs(90)),
+        animationSpec = Motion.tap,
         label         = "playScale",
     )
     val glyphNudge by animateDpAsState(
         targetValue   = if (hovered && interactive) 2.dp else 0.dp,
-        animationSpec = tween(style.animationDurationMs(110)),
+        animationSpec = Motion.tap.of(),
         label         = "playNudge",
     )
 
-    val contentPulse: Float = if (busy && style.animationMultiplier > 0f) {
+    val pulseSpec = Motion.drift
+    val contentPulse: Float = if (busy) {
         val transition = rememberInfiniteTransition(label = "playBusy")
         val a by transition.animateFloat(
             initialValue  = 0.55f,
             targetValue   = 0.95f,
-            animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+            animationSpec = infiniteRepeatable(pulseSpec.of(), RepeatMode.Reverse),
             label         = "playBusyAlpha",
         )
         a
-    } else if (busy) 0.75f else 1f
+    } else 1f
 
     val ghost = Color.White.copy(alpha = 0.38f)
     // A faint ring in the opposite ink holds the plate's edge when the ground
@@ -139,8 +138,8 @@ fun PlayButton(
     val pad = when {
         iconOnly && compact -> PaddingValues(7.dp)
         iconOnly            -> PaddingValues(9.dp)
-        compact             -> PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-        else                -> PaddingValues(horizontal = 20.dp, vertical = 9.dp)
+        compact             -> PaddingValues(horizontal = Spacing.s14, vertical = Spacing.s6)
+        else                -> PaddingValues(horizontal = Spacing.s20, vertical = 9.dp)
     }
 
     Row(

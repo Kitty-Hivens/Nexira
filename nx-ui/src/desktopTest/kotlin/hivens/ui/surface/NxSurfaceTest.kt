@@ -11,46 +11,26 @@ import kotlin.test.assertTrue
 
 class NxSurfaceTest {
 
-    // --- level -> role mapping ---
+    // --- level -> ladder colour ---
 
     @Test
-    fun `each level maps to its ladder role`() {
-        assertEquals(FrostRole.SurfaceContainerLow, NxSurfaceLevel.Sunken.role())
-        assertEquals(FrostRole.Surface, NxSurfaceLevel.Base.role())
-        assertEquals(FrostRole.SurfaceContainer, NxSurfaceLevel.Raised.role())
-        assertEquals(FrostRole.SurfaceContainerHigh, NxSurfaceLevel.Floating.role())
+    fun `each level takes its rung of the ladder`() {
+        val p = DarkColorPalette
+        assertEquals(p.surfaceContainerLow, NxSurfaceLevel.Sunken.color(p))
+        assertEquals(p.surface, NxSurfaceLevel.Base.color(p))
+        assertEquals(p.surfaceContainer, NxSurfaceLevel.Raised.color(p))
+        assertEquals(p.surfaceContainerHigh, NxSurfaceLevel.Floating.color(p))
     }
 
     @Test
-    fun `levels map to four distinct roles`() {
-        val roles = NxSurfaceLevel.entries.map { it.role() }
-        assertEquals(roles.size, roles.toSet().size)
-    }
-
-    // --- Rule 2: body floor is independent of the glass-intensity knob ---
-
-    @Test
-    fun `body alpha ignores glass intensity`() {
-        // bodyAlpha has no intensity term by construction; it returns the floor verbatim.
-        for (floor in listOf(0f, 0.5f, 0.92f, 1f)) {
-            assertEquals(floor, bodyAlpha(floor))
+    fun `four levels are four colours`() {
+        for (palette in listOf(DarkColorPalette, LightColorPalette)) {
+            val rungs = NxSurfaceLevel.entries.map { it.color(palette) }
+            assertEquals(rungs.size, rungs.toSet().size, "two levels resolved to one colour: $rungs")
         }
     }
 
-    @Test
-    fun `body alpha clamps out of range`() {
-        assertEquals(0f, bodyAlpha(-0.3f))
-        assertEquals(1f, bodyAlpha(1.4f))
-    }
-
-    @Test
-    fun `coat alpha scales with glass intensity`() {
-        assertEquals(0f, coatAlpha(0.6f, 0f))
-        assertEquals(0.3f, coatAlpha(0.6f, 0.5f))
-        assertEquals(0.6f, coatAlpha(0.6f, 1f))
-    }
-
-    // --- body floor per theme (Rule 4 phase 1: light is opaque) ---
+    // --- the per-theme default a surface that names no opacity gets ---
 
     @Test
     fun `light body floor is opaque`() {
@@ -79,7 +59,7 @@ class NxSurfaceTest {
         val ladder = listOf(
             NxSurfaceLevel.Sunken, NxSurfaceLevel.Base,
             NxSurfaceLevel.Raised, NxSurfaceLevel.Floating,
-        ).map { palette.ladderColor(it.role()) }
+        ).map { it.color(palette) }
         ladder.zipWithNext { a, b ->
             val d = kotlin.math.abs(lstar(a) - lstar(b))
             assertTrue(d >= MIN_DELTA_L, "adjacent levels separated by only DeltaL* $d (< $MIN_DELTA_L)")
@@ -88,14 +68,6 @@ class NxSurfaceTest {
 
     private companion object {
         const val MIN_DELTA_L = 1.0f
-
-        fun NxColors.ladderColor(role: FrostRole): Color = when (role) {
-            FrostRole.Surface              -> surface
-            FrostRole.SurfaceContainerLow  -> surfaceContainerLow
-            FrostRole.SurfaceContainer     -> surfaceContainer
-            FrostRole.SurfaceContainerHigh -> surfaceContainerHigh
-            else -> error("not a ladder role: $role")
-        }
 
         // CIELAB L* from relative luminance -- a perceptual step, not raw luminance
         // (raw luminance compresses near black where the dark ladder lives).

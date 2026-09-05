@@ -42,5 +42,21 @@ internal fun SmartySection(
             form.useSmartycraftAuthLib = it; save()
         }
         PuppetToggle("settings.useSmartycraftAuthLib", form.useSmartycraftAuthLib) { form.useSmartycraftAuthLib = it; save() }
+
+        // Client auto-sync sits here rather than with the instance auto-update it
+        // resembles: it re-runs the SmartyCraft sync, so it is that server's
+        // mechanism end to end. Its two standing limits are in the copy rather than
+        // in a warning icon -- a two-factor account is never logged in from a
+        // background pass (the login would revoke the code-confirmed session), and
+        // the raw-server path is on its way out, so neither is a defect awaiting
+        // a fix.
+        //
+        // No compat grading either: `classifyCompat` reads an installed manifest
+        // snapshot, which only a mirror instance carries. Nothing here is graded
+        // green or amber, so the policy picker on the Advanced plane does not apply.
+        NxToggle(s.settingsAutoSyncAllPacks, form.autoSyncAllPacks, description = s.settingsAutoSyncAllPacksDesc, icon = NxIcon.Sync) {
+            form.autoSyncAllPacks = it; save()
+        }
+        PuppetToggle("settings.autoSyncAllPacks", form.autoSyncAllPacks) { form.autoSyncAllPacks = it; save() }
     }
 }

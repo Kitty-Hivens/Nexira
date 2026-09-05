@@ -1,5 +1,7 @@
 package hivens.ui.nx
 
+import hivens.ui.theme.LightColorPalette
+import hivens.ui.theme.DarkColorPalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
@@ -21,11 +22,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.BrutStyle
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Ignore
@@ -48,10 +45,10 @@ class PrimitiveShots {
     private val outDir = File(System.getenv("PRIMITIVE_SHOTS_DIR") ?: "build/render").apply { mkdirs() }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun sheet(name: String, style: StyleSpec, dark: Boolean, ground: Color) {
+    private fun sheet(name: String, dark: Boolean, ground: Color) {
         val scene = ImageComposeScene(width = 1180, height = 760, density = Density(2f)) {
-            NxTheme(useDarkTheme = dark, style = style) {
-                CompositionLocalProvider(LocalStyle provides style) {
+            NxTheme(useDarkTheme = dark) {
+                run {
                     Column(
                         modifier = Modifier.fillMaxSize().background(ground).padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -113,9 +110,7 @@ class PrimitiveShots {
 
     @Test
     fun `every primitive composes in every style and palette`() {
-        sheet("celestia-dark", CelestiaStyle, dark = true, ground = Color(0xFF121212))
-        sheet("celestia-light", CelestiaStyle, dark = false, ground = Color(0xFFF5F7FA))
-        sheet("brut-dark", BrutStyle, dark = true, ground = Color(0xFF121212))
-        sheet("brut-light", BrutStyle, dark = false, ground = Color(0xFFF5F7FA))
+        sheet("dark", dark = true, ground = DarkColorPalette.background)
+        sheet("light", dark = false, ground = LightColorPalette.background)
     }
 }

@@ -28,14 +28,16 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.widget.model.CanvasPlacement
+import hivens.widget.model.FlowPlacement
 import hivens.widget.model.GridCell
+import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.flowPlacement
 import hivens.widget.model.traverse
 
 // Renders every widget at the addressed slot. Two entry forms:
@@ -115,29 +117,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
 
     when (content.orientation) {
         SlotOrientation.Row -> Row(slotChrome(path, content).then(modifier).animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            content.widgets.forEachIndexed { index, instance ->
-                key(instance.instanceId) {
-                    val descriptor = registry[instance.kind]
-                    if (descriptor != null) {
-                        val movable = rememberWidgetMovable(descriptor, instance)
-                        val sizeMod = canvasSizeModifier(instance.canvas)
-                        when {
-                            // Weight wins over an explicit size in a flow slot: resizing
-                            // a weighted widget must not strip its flex (else the
-                            // weighted center region stops filling between the rails).
-                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            sizeMod != null -> Box(sizeMod) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            else -> decorator(address, index, descriptor, instance) { movable() }
-                        }
-                    } else {
-                        unknownDecorator(address, index, instance)
-                    }
-                }
-            }
+            FlowWidgets(address, content, registry, decorator, unknownDecorator) { Modifier.weight(it) }
         }
         SlotOrientation.Grid -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
             // Non-lazy chunked grid: a Column of equal-width Rows. Reuses the
@@ -259,28 +239,44 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         }
         // Column.
         else -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            content.widgets.forEachIndexed { index, instance ->
-                key(instance.instanceId) {
-                    val descriptor = registry[instance.kind]
-                    if (descriptor != null) {
-                        val movable = rememberWidgetMovable(descriptor, instance)
-                        val sizeMod = canvasSizeModifier(instance.canvas)
-                        when {
-                            // Weight wins over an explicit size in a flow slot: resizing
-                            // a weighted widget must not strip its flex (else the
-                            // weighted center region stops filling between the rails).
-                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            sizeMod != null -> Box(sizeMod) {
-                                decorator(address, index, descriptor, instance) { movable() }
-                            }
-                            else -> decorator(address, index, descriptor, instance) { movable() }
-                        }
-                    } else {
-                        unknownDecorator(address, index, instance)
+            FlowWidgets(address, content, registry, decorator, unknownDecorator) { Modifier.weight(it) }
+        }
+    }
+}
+
+// The Row and Column branches differ in exactly one thing: which axis a weighted
+// widget takes its share of. Modifier.weight is scope-typed, so the two cannot
+// share a body by one calling the other -- the layout passes its own weight in
+// instead, and the rest (placement precedence, the decorator, the unknown-kind
+// fallback) is written once. It was written twice, line for line, and the comment
+// on both copies said they must not drift.
+@Composable
+private fun FlowWidgets(
+    address: SlotAddress,
+    content: SlotContent,
+    registry: WidgetRegistry,
+    decorator: WidgetDecorator,
+    unknownDecorator: UnknownWidgetDecorator,
+    weight: (Float) -> Modifier,
+) {
+    content.widgets.forEachIndexed { index, instance ->
+        key(instance.instanceId) {
+            val descriptor = registry[instance.kind]
+            if (descriptor != null) {
+                val movable = rememberWidgetMovable(descriptor, instance)
+                // Precedence lives on the model as flowPlacement(), so the rule is
+                // testable without a composition.
+                when (val placement = instance.flowPlacement()) {
+                    is FlowPlacement.Weighted -> Box(weight(placement.weight)) {
+                        decorator(address, index, descriptor, instance) { movable() }
                     }
+                    is FlowPlacement.Bounded -> Box(boundedModifier(placement)) {
+                        decorator(address, index, descriptor, instance) { movable() }
+                    }
+                    FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
                 }
+            } else {
+                unknownDecorator(address, index, instance)
             }
         }
     }
@@ -294,11 +290,10 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
 // box with phantom padding. A fixed extent only suits the free canvas (which sets
 // Modifier.size directly). Only a resized widget carries a size, so untouched
 // layouts are unaffected.
-private fun canvasSizeModifier(cp: CanvasPlacement?): Modifier? {
-    if (cp == null || (cp.width <= 0f && cp.height <= 0f)) return null
+private fun boundedModifier(placement: FlowPlacement.Bounded): Modifier {
     var m: Modifier = Modifier
-    if (cp.width > 0f) m = m.widthIn(max = cp.width.dp)
-    if (cp.height > 0f) m = m.heightIn(max = cp.height.dp)
+    if (placement.widthDp > 0f) m = m.widthIn(max = placement.widthDp.dp)
+    if (placement.heightDp > 0f) m = m.heightIn(max = placement.heightDp.dp)
     return m
 }
 
@@ -308,7 +303,7 @@ private fun canvasSizeModifier(cp: CanvasPlacement?): Modifier? {
 // (UiRecoverySignal) at the composition root, not a per-widget catch.
 // Edit-mode reflow: animate the slot container's footprint as widgets are
 // added / removed / resized so the change reads as motion, not a jump. motionMs
-// 0 (production, and Brut) returns the modifier untouched -- zero cost.
+// 0, the production default, returns the modifier untouched at zero cost.
 private fun Modifier.animatedReflow(motionMs: Int): Modifier =
     if (motionMs > 0) this.then(Modifier.animateContentSize(tween(motionMs))) else this
 
@@ -326,16 +321,18 @@ private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: Widget
     return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
 }
 
-// Renders a widget, wrapped in its per-instance backing when it has one. The
-// chrome wrap is inside the editor decorator (the drag handle / remove button
-// surround the glass card) but is PRODUCTION styling -- it paints whenever
-// instance.chrome != null, editor mounted or not.
+// Renders a widget, wrapped in the plane it resolves to. The wrap is inside the
+// editor decorator (the drag handle and remove button surround the plane) but is
+// PRODUCTION styling -- it paints whether the editor is mounted or not.
+//
+// Which plane it draws is [resolveSurface]'s answer, so the renderer and the
+// editor's panel read the same one.
 @Composable
 private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
-    val chrome = instance.chrome
-    if (chrome == null) {
+    val surface = descriptor.resolveSurface(instance)
+    if (surface == null) {
         descriptor.Render(instance)
     } else {
-        LocalWidgetChromeRenderer.current(chrome) { descriptor.Render(instance) }
+        LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
     }
 }

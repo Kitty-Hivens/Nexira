@@ -35,7 +35,7 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 /**
@@ -60,12 +60,11 @@ internal fun SelectionPill(
     maxWidth: Dp,
     open: Boolean = true,
 ) {
-    val style = LocalStyle.current
     val colors = NxTheme.colors
     val height = props.heightDp.dp
     val corner by animateDpAsState(
-        targetValue = if (open) style.panelCorner else height / 2,
-        animationSpec = tween(style.animationDurationMs(380)),
+        targetValue = if (open) 14.dp else height / 2,
+        animationSpec = Motion.reveal.of(),
         label = "selectionCorner",
     )
     val shape = RoundedCornerShape(corner)
@@ -75,12 +74,11 @@ internal fun SelectionPill(
         modifier = Modifier
             .heightIn(min = height)
             .widthIn(max = maxWidth)
-            .animateContentSize(tween(style.animationDurationMs(380)))
+            .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        tier = props.frostTier,
-        elevated = true,
-        opaque = true,
+        shadowDp = 18f,
+        opacity = 1f,
     ) {
         Row(
             // No fillMaxWidth: it stretched the object to the ceiling and, once
@@ -186,7 +184,9 @@ private fun Verbs(selection: Selection, s: AppStrings, labelled: Boolean) {
 @Composable
 private fun SelectionStack(items: List<SelectionItem>, ambient: Activity?) {
     Box(contentAlignment = Alignment.Center) {
-        Row(horizontalArrangement = Arrangement.spacedBy(-8.dp)) {
+        // Negative spacing: the faces overlap by design, so the stack reads as one
+        // group. Parenthesised because `-8.dp` at a glance is a subtraction.
+        Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
             items.take(3).reversed().forEach { StackFace(it.key, it.title, it.icon) }
             val hidden = items.size - minOf(items.size, 3)
             if (hidden > 0) StackOverflow(hidden)

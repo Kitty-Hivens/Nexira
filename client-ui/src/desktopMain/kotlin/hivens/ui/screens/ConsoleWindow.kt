@@ -48,6 +48,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -96,17 +97,24 @@ import hivens.ui.puppet.PuppetToggle
 import hivens.ui.generated.resources.Res
 import hivens.ui.screens.console.DocPos
 import hivens.ui.screens.console.LineModels
+import hivens.ui.screens.console.clampMatchIndex
+import hivens.ui.screens.console.compileSearch
+import hivens.ui.screens.console.copyAllText
+import hivens.ui.screens.console.copyLineText
+import hivens.ui.screens.console.nextMatchIndex
+import hivens.ui.screens.console.previousMatchIndex
+import hivens.ui.screens.console.shouldPageHistory
 import hivens.ui.screens.console.LogCanvas
 import hivens.ui.screens.console.LogSelection
 import hivens.ui.screens.console.buildLineModels
 import hivens.ui.screens.console.rememberLogCanvasState
-import hivens.ui.theme.CelestiaStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.StyleSpec
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.FilterRule
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.HighlightRule
@@ -114,6 +122,9 @@ import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import java.awt.datatransfer.StringSelection
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -249,11 +260,13 @@ fun ConsoleWindow(
     isDarkTheme: Boolean,
     onClose: () -> Unit,
     customTheme: CustomTheme? = null,
-    style: StyleSpec = CelestiaStyle,
-    settings: ConsoleSettings = ConsoleSettings(),
-    onSettingsChange: (ConsoleSettings) -> Unit = {},
 ) {
     val title = LocalStrings.current.consoleTitle
+    // Collected here rather than by the shell that hosts this window: the store
+    // publishes on every reported slider value, and the shell root is the last
+    // composable that should be repainting for it.
+    val settingsStore: ConsoleSettingsStore = koinInject()
+    val settings by settingsStore.settings.collectAsState()
     val windowState = rememberWindowState(width = 960.dp, height = 620.dp)
 
     Window(
@@ -272,10 +285,9 @@ fun ConsoleWindow(
         NxTheme(
             useDarkTheme = isDarkTheme,
             customTheme  = customTheme,
-            style        = style,
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = NxTheme.colors.background) {
-                ConsoleContent(settings = settings, onSettingsChange = onSettingsChange)
+                ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
             }
         }
     }
@@ -380,11 +392,7 @@ internal fun ConsoleContent(
     // Compile regex once per debounced query change. Invalid pattern -> null
     // (filter falls back to "match nothing" so the user sees an empty buffer
     // rather than an exception while they are still typing).
-    val searchRegex = remember(effectiveQuery, regexMode) {
-        if (regexMode && effectiveQuery.isNotBlank()) {
-            runCatching { Regex(effectiveQuery, RegexOption.IGNORE_CASE) }.getOrNull()
-        } else null
-    }
+    val searchRegex = remember(effectiveQuery, regexMode) { compileSearch(effectiveQuery, regexMode) }
 
     // ── Render: filter + counts + annotate, all OFF the UI thread ──────────
     // The whole O(n) pass -- severity/query filtering, warn/error counts, and
@@ -430,7 +438,7 @@ internal fun ConsoleContent(
 
     // Clamp current match index when the match set shrinks past it.
     LaunchedEffect(models.matches.size) {
-        if (currentMatch >= models.matches.size) currentMatch = 0
+        currentMatch = clampMatchIndex(currentMatch, models.matches.size)
     }
 
     // Initial focus on the log area: BasicTextField is read-only but still
@@ -471,28 +479,41 @@ internal fun ConsoleContent(
     // published snapshot carries them; we shift scrollState by the approximate
     // height of the loaded block so the user's visual line stays put.
     var historyLoading by remember { mutableStateOf(false) }
+    val latestHistoryOffset by rememberUpdatedState(historyOffset)
     // historyOffset comes from the published snapshot (live only); file-backed
     // views load the whole tail-bounded file up front, so there is nothing to
     // page. loadHistoryBefore prepends to the buffer on the drainer and the next
     // snapshot carries the older entries; we only do the scroll-anchor shift.
-    LaunchedEffect(canvasState.scroll.offsetPx, historyOffset, isLive) {
-        if (!isLive) return@LaunchedEffect
-        if (historyLoading) return@LaunchedEffect
-        if (historyOffset <= 0) return@LaunchedEffect
-        if (canvasState.scroll.offsetPx > 80f) return@LaunchedEffect
-        historyLoading = true
-        try {
-            val loaded = gameConsole.loadHistoryBefore(count = 500)
-            if (loaded.isNotEmpty()) {
-                // Shift by an approximate line height per prepended entry so the
-                // user's visual line stays put; exact for no-wrap, off by wrap
-                // reflow (sub-100 px) until those lines re-measure.
-                val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
-                canvasState.scroll.shiftBy(loaded.size * approxLineHeightPx)
+    LaunchedEffect(isLive) {
+        // Watched, not keyed on. With the scroll offset in the key this effect was
+        // cancelled and relaunched on every scroll frame, so holding the wheel at
+        // the top started and killed a 500-entry disk read dozens of times a
+        // second and the older lines only arrived once the scrolling stopped --
+        // the finally re-armed the guard each time for the next frame to try again.
+        //
+        // historyOffset reaches the flow through a state holder rather than by
+        // being captured: it is a plain Int derived from the snapshot, and the
+        // effect only restarts when isLive changes, so the captured copy froze at
+        // whatever it was when the window opened -- usually zero, which is the one
+        // value shouldPageHistory refuses. Paging was dead for the whole session.
+        snapshotFlow { shouldPageHistory(isLive, historyLoading, latestHistoryOffset, canvasState.scroll.offsetPx) }
+            .distinctUntilChanged()
+            .filter { it }
+            .collect {
+                historyLoading = true
+                try {
+                    val loaded = gameConsole.loadHistoryBefore(count = 500)
+                    if (loaded.isNotEmpty()) {
+                        // Shift by an approximate line height per prepended entry so the
+                        // user's visual line stays put; exact for no-wrap, off by wrap
+                        // reflow (sub-100 px) until those lines re-measure.
+                        val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
+                        canvasState.scroll.shiftBy(loaded.size * approxLineHeightPx)
+                    }
+                } finally {
+                    historyLoading = false
+                }
             }
-        } finally {
-            historyLoading = false
-        }
     }
 
     // Selection lives in `selection` (LogSelection); the canvas renders and
@@ -500,9 +521,7 @@ internal fun ConsoleContent(
 
     // ── Copy actions ───────────────────────────────────────────────────────
     fun copyAll() {
-        val text = entries.joinToString("\n") { e ->
-            if (e.type == LogType.DIVIDER) e.text else "[${e.timestamp}] ${e.text}"
-        }
+        val text = copyAllText(entries)
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
         copiedFlash = true
         scope.launch {
@@ -516,9 +535,8 @@ internal fun ConsoleContent(
     fun copyLine() {
         // No caret yet (e.g. right-click before any left-click) -> first line, matching
         // the old field-copy behaviour so the menu action always does something.
-        val lineIdx = selection.focus?.line ?: selection.anchor?.line ?: 0
-        val lineText = models.lines.getOrNull(lineIdx)?.text ?: return
-        if (lineText.isBlank()) return
+        val caret = selection.focus?.line ?: selection.anchor?.line
+        val lineText = copyLineText(models.lines.size, caret) { models.lines[it].text } ?: return
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(lineText))) }
         copiedFlash = true
         scope.launch {
@@ -552,16 +570,17 @@ internal fun ConsoleContent(
     }
 
     fun jumpNext() {
-        if (models.matches.isEmpty()) return
-        currentMatch = (currentMatch + 1) % models.matches.size
-        scrollToMatch(currentMatch)
+        val next = nextMatchIndex(currentMatch, models.matches.size)
+        if (next < 0) return
+        currentMatch = next
+        scrollToMatch(next)
     }
 
     fun jumpPrev() {
-        if (models.matches.isEmpty()) return
-        currentMatch = if (currentMatch == 0) models.matches.lastIndex
-                       else currentMatch - 1
-        scrollToMatch(currentMatch)
+        val prev = previousMatchIndex(currentMatch, models.matches.size)
+        if (prev < 0) return
+        currentMatch = prev
+        scrollToMatch(prev)
     }
 
     fun openSearch() {
@@ -668,9 +687,10 @@ internal fun ConsoleContent(
             // session the user is actually looking at.
             onSave        = { gameConsole.exportEntries(entries) },
             // Clear only acts on the live buffer; a file-backed view is
-            // read-only, so the button no-ops there rather than wiping
-            // the running session's buffer behind the user's back.
+            // read-only. The control is disabled there rather than looking
+            // live and doing nothing when it is pressed.
             onClear       = { if (isLive) gameConsole.clear() },
+            canClear      = isLive,
         )
 
         HorizontalDivider(thickness = 1.dp, color = themeColors.outline.copy(alpha = 0.4f))
@@ -764,11 +784,11 @@ internal fun ConsoleContent(
             // while the content swaps between "showing" and "hidden" --
             // AnimatedVisibility's scope-resolution issue avoided because
             // Crossfade has no scoped overload. Animation duration mirrors
-            // the StyleSpec's idea of a quick microinteraction (mpv-OSD
+            // the interface's idea of a quick microinteraction (mpv-OSD
             // style: appear on action, dissolve when idle).
             Crossfade(
                 targetState   = copiedFlash,
-                animationSpec = tween(180),
+                animationSpec = Motion.fade.of(),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 12.dp),
@@ -921,11 +941,14 @@ private fun Toolbar(
     onCopyAll: () -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
+    /** A file-backed view has no buffer to wipe, and the control says so. */
+    canClear: Boolean,
 ) {
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -1002,8 +1025,12 @@ private fun Toolbar(
             IconButton(onClick = onCopyAll, modifier = Modifier.size(32.dp)) {
                 Symbol(NxIcon.ContentCopy, strings.consoleCopyAll, tint = colors.textSecondary)
             }
-            IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                Symbol(NxIcon.Delete, strings.consoleClear, tint = colors.textSecondary)
+            IconButton(onClick = onClear, enabled = canClear, modifier = Modifier.size(32.dp)) {
+                Symbol(
+                    NxIcon.Delete,
+                    strings.consoleClear,
+                    tint = colors.textSecondary.copy(alpha = if (canClear) 1f else 0.38f),
+                )
             }
 
             // In-window gear: quick-access menu for the persisted toggles
@@ -1106,7 +1133,8 @@ private fun SearchPrompt(
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -1239,7 +1267,8 @@ private fun CommandInputRow(
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Right-arrow prompt glyph reads as "you type here, it goes
@@ -1311,7 +1340,8 @@ private fun StatusFooter(
     val colors = NxTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // When the sliding window has dropped entries to disk, report

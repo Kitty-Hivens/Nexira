@@ -1,6 +1,7 @@
 package hivens.ui.widgets.state
 
 import hivens.core.io.AtomicFiles
+import hivens.ui.bootstrap.RecoveryIo
 import hivens.widget.api.WidgetStateHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -18,6 +19,7 @@ import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Disk store for per-instance widget state ([WidgetStateHost]). Separate from the
@@ -47,6 +49,11 @@ class WidgetStateStore(
 
     private val log = LoggerFactory.getLogger(WidgetStateStore::class.java)
     private val writeMutex = Mutex()
+
+    // Whether the map holds an edit the file does not. Without it flush wrote
+    // unconditionally, so the shutdown hook rewrote the file even on the path
+    // where the recovery surface had just deleted it.
+    @Volatile private var dirty = false
     private val entries = MutableStateFlow(load())
 
     // Coalesces a keystroke burst into one disk write. tryEmit keeps store()
@@ -57,7 +64,7 @@ class WidgetStateStore(
 
     init {
         scope.launch {
-            writeRequests.debounce(DEBOUNCE_MS).collect { writeMutex.withLock { writeNow() } }
+            writeRequests.debounce(DEBOUNCE_MS.milliseconds).collect { writeMutex.withLock { writeNow() } }
         }
     }
 
@@ -72,6 +79,7 @@ class WidgetStateStore(
             return
         }
         entries.update { it + (instanceId to value) }
+        dirty = true
         writeRequests.tryEmit(Unit)
     }
 
@@ -79,6 +87,7 @@ class WidgetStateStore(
     fun remove(instanceId: String) {
         if (instanceId !in entries.value) return
         entries.update { it - instanceId }
+        dirty = true
         writeRequests.tryEmit(Unit)
     }
 
@@ -86,21 +95,31 @@ class WidgetStateStore(
     fun retain(liveIds: Set<String>) {
         if (entries.value.keys.all { it in liveIds }) return
         entries.update { current -> current.filterKeys { it in liveIds } }
+        dirty = true
         writeRequests.tryEmit(Unit)
     }
 
     /**
      * Forces the pending debounced write to land synchronously. For the JVM
      * shutdown hook so a note typed inside the debounce window is not lost on quit.
+     *
+     * No-op when the file already matches the map. That matters beyond saving a
+     * write: on the path where the recovery surface has just deleted the file,
+     * writing it back would undo the reset the user asked for.
      */
     suspend fun flush() {
-        writeMutex.withLock { writeNow() }
+        writeMutex.withLock { if (dirty) writeNow() }
     }
 
     // Caller must hold writeMutex.
     private fun writeNow() {
+        if (RecoveryIo.stateWasReset) {
+            log.debug("Widget state was reset from the recovery surface -- not writing the in-memory copy back")
+            return
+        }
         runCatching {
             AtomicFiles.writeString(file, json.encodeToString(Envelope.serializer(), Envelope(entries = entries.value)))
+            dirty = false
         }.onFailure { log.warn("Failed to persist widget state to {}", file, it) }
     }
 

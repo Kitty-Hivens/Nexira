@@ -11,12 +11,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
@@ -26,7 +28,6 @@ import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.coroutineContext
 
 /**
  * Plays video from a service page (YouTube, Vimeo, ...) by running yt-dlp to
@@ -81,6 +82,9 @@ class YtDlpService(
     override suspend fun resolve(url: String): Path {
         val hash = hash(url)
         existingCached(hash)?.let { return it }
+        // The Deferred IS the map's value and the caller awaits it a few lines
+        // down; it is in flight, not dropped.
+        @Suppress("DeferredResultUnused")
         val deferred = inflight.computeIfAbsent(url) {
             scope.async(Dispatchers.IO) {
                 try {
@@ -94,36 +98,22 @@ class YtDlpService(
         return deferred.await()
     }
 
-    private suspend fun download(pageUrl: String, hash: String): Path {
-        existingCached(hash)?.let { return it }
+    private suspend fun download(pageUrl: String, hash: String): Path = withContext(Dispatchers.IO) {
+        existingCached(hash)?.let { return@withContext it }
         val progress = stateOf(pageUrl)
         progress.value = MediaFetch.InstallingTool()
         val ytdlp = ensureBinary(progress)
         Files.createDirectories(videoCacheDir)
         // %(ext)s lets yt-dlp pick the container; we find the result by the hash prefix.
         val outTemplate = videoCacheDir.resolve("$hash.%(ext)s").toString()
-        val cmd = listOf(
-            ytdlp,
-            "-f", FORMAT,
-            "--no-playlist",
-            "--no-part",
-            // Counters rather than silence: --no-progress left the caller with
-            // nothing to show for a download that runs for minutes. One line per
-            // update (the default rewrites a single line with a carriage return,
-            // which never reaches a line reader) in a template we can parse.
-            "--newline",
-            "--progress-template", "download:$YT_DLP_PROGRESS_MARKER " +
-                "%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s",
-            "-o", outTemplate,
-            pageUrl,
-        )
+        val cmd = downloadArgs(ytdlp, outTemplate, pageUrl)
         progress.value = MediaFetch.Resolving
         runProcess(cmd, DOWNLOAD_TIMEOUT_SECONDS) { line ->
             parseYtDlpProgress(line)?.let { progress.value = it }
         }
         val file = existingCached(hash) ?: throw IOException("yt-dlp produced no playable file for $pageUrl")
         evictOverCap()
-        return file
+        file
     }
 
     private fun existingCached(hash: String): Path? {
@@ -170,7 +160,11 @@ class YtDlpService(
      * read, so the check is the same one the install path already makes: the binary
      * has to answer `--version` before it is used.
      */
-    private suspend fun downloadBinary(asset: String, target: Path, progress: MutableStateFlow<MediaFetch>) {
+    private suspend fun downloadBinary(
+        asset: String,
+        target: Path,
+        progress: MutableStateFlow<MediaFetch>,
+    ) = withContext(Dispatchers.IO) {
         transfers.fetch(Transfer(url = "$RELEASE_BASE/$asset", dest = target, skip = SkipIfPresent.Never)) { done, total ->
             progress.value = MediaFetch.InstallingTool(done, total)
         }
@@ -214,7 +208,11 @@ class YtDlpService(
      * a bare blocking waitFor cannot notice a cancellation at all -- at a period
      * short enough to feel immediate and long enough to cost nothing.
      */
-    private suspend fun runProcess(cmd: List<String>, timeoutSeconds: Long, onLine: (String) -> Unit) {
+    private suspend fun runProcess(
+        cmd: List<String>,
+        timeoutSeconds: Long,
+        onLine: (String) -> Unit,
+    ) = withContext(Dispatchers.IO) {
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val tail = StringBuilder()
         // Drain stdout in a daemon thread so a full pipe buffer cannot wedge the
@@ -234,7 +232,7 @@ class YtDlpService(
         val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
         try {
             while (proc.isAlive) {
-                coroutineContext.ensureActive()
+                currentCoroutineContext().ensureActive()
                 if (System.nanoTime() >= deadlineNanos) {
                     kill(proc)
                     throw IOException("yt-dlp timed out after ${timeoutSeconds}s")
@@ -279,7 +277,38 @@ class YtDlpService(
     private fun hash(url: String): String =
         MessageDigest.getInstance("SHA-256").digest(url.toByteArray()).joinToString("") { "%02x".format(it) }
 
-    private companion object {
+    internal companion object {
+        /**
+         * The yt-dlp invocation for one page fetch. Pure, so the one argument that
+         * must never come back can be held to it by a test.
+         *
+         * `--no-part` is that argument. With it, yt-dlp writes straight to the
+         * finished filename, and this service kills the process on cancel and on
+         * timeout -- so a stopped fetch left a truncated video sitting under the
+         * name of a complete one. Nothing downstream could tell: the cache lookup
+         * accepts any non-`.part` file of non-zero size, so every later request for
+         * that URL returned the short file and never downloaded again. Both the
+         * lookup and the eviction sweep already filter `.part`; the flag was what
+         * made those filters match nothing.
+         *
+         * Without it yt-dlp writes `<name>.part` and renames only when the file is
+         * whole, and a leftover part-file is resumed by the next attempt.
+         */
+        internal fun downloadArgs(ytdlp: String, outTemplate: String, pageUrl: String): List<String> = listOf(
+            ytdlp,
+            "-f", FORMAT,
+            "--no-playlist",
+            // Counters rather than silence: --no-progress left the caller with
+            // nothing to show for a download that runs for minutes. One line per
+            // update (the default rewrites a single line with a carriage return,
+            // which never reaches a line reader) in a template we can parse.
+            "--newline",
+            "--progress-template", "download:$YT_DLP_PROGRESS_MARKER " +
+                "%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s",
+            "-o", outTemplate,
+            pageUrl,
+        )
+
         const val RELEASE_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download"
         // Single progressive file (audio+video muxed) so no ffmpeg merge is
         // needed; cap at 720p to keep the whole-file download reasonable.

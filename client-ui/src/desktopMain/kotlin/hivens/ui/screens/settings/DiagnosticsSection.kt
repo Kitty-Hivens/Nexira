@@ -11,11 +11,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
+import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.AppRelauncher
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.bootstrap.RecoveryEntry
+import hivens.ui.diag.RenderBackend
+import hivens.ui.diag.reportPrompts
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
@@ -32,10 +35,12 @@ import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Path
 import kotlin.system.exitProcess
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import org.koin.compose.koinInject
 
 /**
  * Beacon diagnostic surface + About link.
@@ -62,6 +67,10 @@ internal fun DiagnosticsSection(
 ) {
     val s  = LocalStrings.current
     val af = LocalAprilFools.current
+    // Read at bundle time rather than composition time: recovery can switch a
+    // module off mid-session, and the bundle should say what is off now.
+    val settingsService: ISettingsService = koinInject()
+    val disabledModules = { settingsService.getSettings().disabledModules }
 
     // April Fools debug panel -- secret unlock. Only wire the 5-tap gesture when the
     // active impl actually renders a panel: a build that resolves the NoOp has an
@@ -97,7 +106,34 @@ internal fun DiagnosticsSection(
     // only after a bundle exists this session.
     var lastBundlePath by remember { mutableStateOf<Path?>(null) }
     var bundleBusy     by remember { mutableStateOf(false) }
-    val bundleScope    = rememberCoroutineScope()
+    // Why the bundle could not be made. Swallowing it left a button that visibly
+    // did nothing: it re-enabled, no file opened, and the reason -- a full disk,
+    // a read-only data dir -- was known and thrown away.
+    var bundleError    by remember { mutableStateOf<String?>(null) }
+    // The app's scope, not the composition's. Writing the archive does not stop
+    // because the reader switched category, and on the composition's scope that
+    // switch cancelled it mid-ZIP and left a partial file with the flag raised.
+    val bundleScope: CoroutineScope = koinInject()
+
+    // One implementation for the button and the automation hook. They were two,
+    // and had already drifted: the hook reported no failure and revealed nothing.
+    fun createBundle(reveal: Boolean) {
+        if (bundleBusy) return
+        bundleBusy = true
+        bundleError = null
+        bundleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    runCatching { DiagnosticBundle.create(paths, disabledModules(), RenderBackend.current) }
+                }.onSuccess { zip ->
+                    lastBundlePath = zip
+                    if (reveal) SystemActions.openFile(zip.parent.toFile())
+                }.onFailure { bundleError = it.message ?: it::class.simpleName }
+            } finally {
+                bundleBusy = false
+            }
+        }
+    }
 
     NxSection(s.settingsSectionDiagnostics, titleModifier = titleModifier) {
         if (af.providesDebugPanel && showAprilDebug) {
@@ -138,20 +174,7 @@ internal fun DiagnosticsSection(
                     Flexible("settings_create_diag_bundle_btn", FlexibleKind.Button) {
                         NxButton(
                             label    = s.settingsCreateDiagnosticBundle,
-                            onClick  = {
-                                if (bundleBusy) return@NxButton
-                                bundleBusy = true
-                                bundleScope.launch {
-                                    val zip = withContext(Dispatchers.IO) {
-                                        runCatching { DiagnosticBundle.create(paths) }.getOrNull()
-                                    }
-                                    if (zip != null) {
-                                        lastBundlePath = zip
-                                        SystemActions.openFile(zip.parent.toFile())
-                                    }
-                                    bundleBusy = false
-                                }
-                            },
+                            onClick  = { createBundle(reveal = true) },
                             modifier = Modifier.fillMaxWidth(),
                             style    = NxButtonStyle.Secondary,
                             enabled  = !bundleBusy,
@@ -169,7 +192,7 @@ internal fun DiagnosticsSection(
                                     // file manager OR paste it into a comment.
                                     Toolkit.getDefaultToolkit().systemClipboard
                                         .setContents(StringSelection(zip.toString()), null)
-                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
+                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -178,22 +201,15 @@ internal fun DiagnosticsSection(
                         )
                     }
                 }
-                PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) {
-                    bundleBusy = true
-                    bundleScope.launch {
-                        val zip = withContext(Dispatchers.IO) {
-                            runCatching { DiagnosticBundle.create(paths) }.getOrNull()
-                        }
-                        if (zip != null) lastBundlePath = zip
-                        bundleBusy = false
-                    }
-                }
+                // No reveal under automation: a file manager opening on top of the
+                // window is not something a scripted run can dismiss.
+                PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) { createBundle(reveal = false) }
                 PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
                     val zip = lastBundlePath ?: return@PuppetClick
                     runCatching {
                         Toolkit.getDefaultToolkit().systemClipboard
                             .setContents(StringSelection(zip.toString()), null)
-                        SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
+                        SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
                     }
                 }
             }
@@ -204,6 +220,14 @@ internal fun DiagnosticsSection(
                 color    = NxTheme.colors.textSecondary,
                 modifier = Modifier.padding(start = 8.dp),
             )
+            bundleError?.let { reason ->
+                Text(
+                    text     = reason,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = NxTheme.colors.error,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
 
         // Restart into the boot recovery surface -- disable a broken module or

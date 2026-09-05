@@ -41,9 +41,14 @@ private val log = LoggerFactory.getLogger("SkinemaBackground")
  *
  * [frameStamp] is read inside [onDraw] so the pump bumping it invalidates the
  * draw scope -- the same snapshot-read trick VideoSurface uses.
+ *
+ * [takeFrame] is called exactly once per draw and its result is not kept: the
+ * drawing thread's most recent read is the one reference that keeps an image
+ * alive past the frame that superseded it, so a second read in the same draw
+ * would let the first be closed underneath.
  */
 internal class VideoFramePainter(
-    private val currentImage: () -> Image?,
+    private val takeFrame: () -> Image?,
     private val displaySize: Size,
     private val rotationDegrees: Int,
     private val frameStamp: () -> Int,
@@ -53,7 +58,7 @@ internal class VideoFramePainter(
 
     override fun DrawScope.onDraw() {
         frameStamp() // snapshot read -- a new frame invalidates this draw
-        val image = currentImage() ?: return
+        val image = takeFrame() ?: return
         val w = size.width
         val h = size.height
         drawIntoCanvas { canvas ->
@@ -99,15 +104,37 @@ private class BackgroundVideo(
     private val closeScope: CoroutineScope,
 ) : RememberObserver {
 
-    val player = VideoPlayer(path = file.toPath(), loop = loop, audio = false, hardware = hardware)
+    /**
+     * Null when the media natives will not load: a bundle that is missing, or
+     * from another FFmpeg line, fails as a [LinkageError] rather than an
+     * exception, and this runs during composition, so it used to take the
+     * wallpaper down with the window. The caller draws nothing instead, which
+     * is what it already does for a file that fails to decode.
+     */
+    val player: VideoPlayer? = try {
+        VideoPlayer(path = file.toPath(), loop = loop, audio = false, hardware = hardware)
+    } catch (e: LinkageError) {
+        log.error("Background media natives unavailable for {}", file.absolutePath, e)
+        null
+    }
 
     private val frames = VideoFrameImage()
 
     @Volatile
     private var released = false
 
-    /** The frame on screen; null before the first one lands and after release. */
-    val image: Image? get() = frames.image
+    /**
+     * The frame to draw, null before the first one lands and after release.
+     *
+     * Called once per draw, from the thread that draws. The reclaim gives back
+     * the borrow taken by the previous draw, so the superseded image is freed
+     * at the start of this frame rather than at the start of the next one: at
+     * 4K that is ~33 MB of native memory held one frame less.
+     */
+    fun takeFrame(): Image? {
+        frames.reclaim()
+        return frames.image
+    }
 
     /**
      * Copies a decoded frame into the Skia image. Ignored once released: the
@@ -132,7 +159,8 @@ private class BackgroundVideo(
         // waiting for that on the thread painting the next wallpaper is a freeze
         // over a change the user just made.
         frames.close()
-        closeScope.launch(Dispatchers.IO) { player.close() }
+        val engine = player ?: return
+        closeScope.launch(Dispatchers.IO) { engine.close() }
     }
 }
 
@@ -172,7 +200,9 @@ internal fun rememberSkinemaFrame(
             closeScope = closeScope,
         )
     }
-    val player = video.player
+    // No engine means the natives did not load; same draw-nothing contract as
+    // the decode-failure gate below.
+    val player = video.player ?: return null
 
     var frameStamp by remember(video) { mutableIntStateOf(0) }
     var displaySize by remember(video) { mutableStateOf<Size?>(null) }
@@ -210,7 +240,7 @@ internal fun rememberSkinemaFrame(
     val size = displaySize ?: return null
     return remember(video, size) {
         VideoFramePainter(
-            currentImage    = { video.image },
+            takeFrame       = { video.takeFrame() },
             displaySize     = size,
             rotationDegrees = player.rotationDegrees,
             frameStamp      = { frameStamp },

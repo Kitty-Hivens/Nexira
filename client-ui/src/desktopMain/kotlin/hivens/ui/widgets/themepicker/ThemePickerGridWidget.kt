@@ -37,23 +37,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxColorSurface
-import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 // Grid of every preset CustomTheme. Tapping a card writes
 // `selectedTheme.value` on the surface context; the preview widget
 // reads the same context and re-renders. Removing this widget hides
 // the picker -- the user keeps whatever theme was active at edit time
 // and must restore-to-default to see the grid again.
-@Widget(id = "theme.picker.grid", displayName = "widget.theme.picker.grid")
+@Widget(id = "theme.picker.grid", displayName = "widget.theme.picker.grid", drawsOwnSurface = true)
 @Composable
-fun ThemePickerGridWidget(instance: WidgetInstance) {
+fun ThemePickerGridWidget() {
     val ctx = LocalThemePickerContext.current
     val s = LocalStrings.current
     val selectedTheme by ctx.selectedTheme
@@ -91,7 +89,7 @@ private fun ThemeCard(
 
     Box(modifier = Modifier.aspectRatio(1.2f).scale(scale)) {
         NxColorSurface(
-            color    = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
+            color    = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f),
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(onClick = onClick)

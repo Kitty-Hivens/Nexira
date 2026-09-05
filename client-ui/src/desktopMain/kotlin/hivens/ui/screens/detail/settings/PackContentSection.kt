@@ -33,30 +33,39 @@ import org.koin.compose.koinInject
  * a plain empty/unavailable state.
  */
 @Composable
-internal fun PackContentSection(pack: PackInstance, onInstanceChange: (PackInstance) -> Unit) {
+internal fun PackContentSection(pack: PackInstance, adopt: (PackInstance) -> Unit) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     val mirrorClient: IMirrorPackClient = koinInject()
     val controller: LauncherController = koinInject()
     val isMirror = pack.packRef.origin == PackOrigin.Mirror
+    val version = pack.pinnedPackVersion ?: pack.packRef.version
 
     var manifest by remember(pack.id) { mutableStateOf<SmrtPackManifest?>(null) }
-    var state by remember(pack.id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var loading by remember(pack.id) { mutableStateOf(isMirror) }
 
-    LaunchedEffect(pack.id) {
+    // Keyed on the installed build, not the instance id: an update applied in the
+    // footer of this same window leaves the id alone, and the optional list it
+    // offers belongs to the build that is now on disk.
+    LaunchedEffect(pack.id, version) {
         if (!isMirror) {
             loading = false
             return@LaunchedEffect
         }
-        val version = pack.pinnedPackVersion ?: pack.packRef.version
+        loading = true
         val fetched = runCatching {
             if (!version.isNullOrBlank()) mirrorClient.fetchManifestVersion(pack.packRef.id, version)
             else mirrorClient.fetchManifest(pack.packRef.id)
         }.getOrNull()
         manifest = fetched
-        if (fetched != null) state = OptionalContentRules.enabledState(fetched.mods, pack.optionalContent)
         loading = false
+    }
+
+    // The switches read the instance record rather than a copy of it seeded once:
+    // the Content tab writes the same field, and this is what keeps the two
+    // surfaces from telling the user different things about the same mod.
+    val state = remember(manifest, pack.optionalContent) {
+        manifest?.let { OptionalContentRules.enabledState(it.mods, pack.optionalContent) }.orEmpty()
     }
 
     val optional = remember(manifest) { manifest?.let { OptionalContentRules.optionalMods(it.mods) }.orEmpty() }
@@ -77,8 +86,12 @@ internal fun PackContentSection(pack: PackInstance, onInstanceChange: (PackInsta
                 ) { enable ->
                     val m = manifest ?: return@NxToggle
                     val next = OptionalContentRules.applyToggle(m.mods, state, mod.filename, enable)
-                    state = next
-                    controller.setOptionalModsAsync(pack, m, OptionalContentRules.togglesFrom(m.mods, next))
+                    val toggles = OptionalContentRules.togglesFrom(m.mods, next)
+                    // Shown at once and composed onto by the next flip: the write
+                    // is the launcher's and lands behind it, and a pair of flips
+                    // made inside that window must not both start from the record.
+                    adopt(pack.copy(optionalContent = toggles))
+                    controller.setOptionalModsAsync(pack, m, toggles)
                 }
             }
         }

@@ -6,11 +6,10 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxToggle
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
 
 @Widget(id = "bg.enable.toggle", displayName = "widget.bg.enable.toggle")
 @Composable
-fun BgEnableToggleWidget(instance: WidgetInstance) {
+fun BgEnableToggleWidget() {
     val ctx = LocalBgSettingsContext.current
     val s = LocalStrings.current
     val settings by ctx.settings

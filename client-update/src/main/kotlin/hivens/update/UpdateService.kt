@@ -8,6 +8,7 @@ import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.core.data.ReleaseChannel
 import hivens.core.data.ReleaseManifest
@@ -35,6 +36,7 @@ class UpdateService(
     private val json: Json,
     dataDirectory: Path,
     private val settingsService: ISettingsService,
+    private val applicator: IUpdateApplicator,
     private val currentVersion: String = Branding.VERSION.removePrefix("v"),
 ) {
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
@@ -90,6 +92,26 @@ class UpdateService(
         private const val UPDATE_CHANNEL_META_URL =
             "https://raw.githubusercontent.com/$GITHUB_REPO/stable/meta/update-channel.json"
 
+        /**
+         * Where a release's notes are read in the user's own language.
+         *
+         * `CHANGELOG_EN.md` and its translations are the player-facing notes,
+         * written for the person using the launcher; `CHANGELOG.md` is the
+         * engineering log and is not read from here at all. English is one of
+         * these files rather than a case of its own, so what a reader gets does
+         * not depend on which language they picked.
+         *
+         * Read off `stable` rather than out of the release manifest, and rather
+         * than off the target's own tag. A section is keyed by version, so it is
+         * that version's notes wherever it is read from -- and reading the current
+         * file means a note written after a release was cut, or a correction to
+         * one, reaches the people it is for without cutting another release.
+         * Every version already published stays editable, which a field frozen
+         * into a manifest or a tag could never be.
+         */
+        private const val LOCALIZED_CHANGELOG_REF = "stable"
+        private const val RAW_BASE = "https://raw.githubusercontent.com/$GITHUB_REPO"
+
         // How many releases to fetch when the user opts into prereleases --
         // GitHub returns 30 per page by default; we never need that many to
         // find the most recently published non-draft entry.
@@ -122,10 +144,7 @@ class UpdateService(
      * Checks availability of updates.
      *
      * The selected channel (stable vs prerelease) and whether mandatory updates
-     * are honoured both come from [ISettingsService] -- see the experimental
-     * fields on `SettingsData`. The master `experimentalFeaturesEnabled` toggle
-     * gates both children: if it's off, both sub-toggles are forced to false
-     * regardless of their stored values.
+     * are honoured both come from [ISettingsService].
      */
     suspend fun checkForUpdate(): LauncherUpdate? = withContext(Dispatchers.IO) {
         try {
@@ -148,7 +167,7 @@ class UpdateService(
             // /releases/latest (which drops prereleases). Nightlies are then filtered
             // from the candidate below unless nightlyEnabled.
             val includePrereleases = channel.ordinal >= ReleaseChannel.Beta.ordinal || nightlyEnabled
-            val mandatoryEnabled = settings.experimentalFeaturesEnabled && settings.mandatoryUpdatesEnabled
+            val mandatoryEnabled = settings.mandatoryUpdatesEnabled
 
             logger.info(
                 "Checking for launcher updates (channel: {}, mandatory: {})",
@@ -231,6 +250,7 @@ class UpdateService(
                 release = release,
                 manifest = manifest,
                 changelog = fetchChangelogBetween(currentVersion, latestVersion, rangeReleases),
+                localizedNotes = fetchLocalizedNotes(release.tagName, settings.locale),
                 isMandatory = belowMandatoryFloor,
                 mandatoryReason = if (belowMandatoryFloor) channelMeta.reason else null,
                 criticalInRange = criticalHit != null,
@@ -317,7 +337,13 @@ class UpdateService(
         onProgress: (downloaded: Long, total: Long, speed: Double) -> Unit
     ): Path = withContext(Dispatchers.IO) {
         val fileName = update.downloadUrl.substringAfterLast("/")
-        val targetFile = updateDir.resolve(fileName)
+        // The applicator picks the destination: one that installs by replacing
+        // files wants the bytes beside its own install, so the install itself is
+        // a rename. That copy would otherwise happen after the process has been
+        // told to exit, where it costs the user a launcher frozen on screen for
+        // as long as it takes.
+        val targetFile = applicator.stagingPath(updateDir, fileName)
+        Files.createDirectories(targetFile.parent)
 
         // Same gate as [verifyChecksum], applied before a byte moves: an update with
         // no pinned hash is a verification failure and not a reason to skip the
@@ -359,6 +385,14 @@ class UpdateService(
     }
 
     fun cleanupOldUpdates() {
+        // Anything the applicator staged outside the updates directory: a
+        // download the user never installed would otherwise sit beside the
+        // launcher binary, one full image per version checked.
+        applicator.stagedLeftovers().forEach { staged ->
+            runCatching { Files.deleteIfExists(staged) }
+                .onSuccess { logger.debug("Deleted staged update: {}", staged) }
+                .onFailure { logger.warn("Could not delete staged update {}", staged, it) }
+        }
         try {
             Files.list(updateDir).use { stream ->
                 stream
@@ -386,6 +420,8 @@ class UpdateService(
         release: GitHubRelease,
         manifest: ReleaseManifest,
         changelog: String,
+        /** The target's player notes in the user's language, or null to fall back. */
+        localizedNotes: String? = null,
         isMandatory: Boolean = false,
         mandatoryReason: String? = null,
         // A release BETWEEN the installed version and this one was marked
@@ -408,7 +444,7 @@ class UpdateService(
             downloadUrl = asset.browserDownloadUrl,
             checksum = checksum,
             changelog = changelog,
-            highlights = manifest.highlights?.takeIf { it.isNotBlank() },
+            highlights = localizedNotes ?: manifest.highlights?.takeIf { it.isNotBlank() },
             releasePageUrl = "$GITHUB_RELEASE_PAGE/${release.tagName}",
             isCritical = isCritical,
             isMandatory = isMandatory,
@@ -449,7 +485,7 @@ class UpdateService(
      *
      * Returns null when:
      *   - the meta cooldown hasn't elapsed yet,
-     *   - mandatory updates are disabled in settings (master OFF or child OFF),
+     *   - mandatory updates are disabled in settings,
      *   - the channel meta file is missing / unreadable / has no floor,
      *   - the floor is at-or-below the installed version,
      *   - the subsequent release fetch fails for any reason.
@@ -464,9 +500,7 @@ class UpdateService(
             if (!shouldCheckMeta()) return@withContext null
 
             val settings = settingsService.getSettings()
-            val mandatoryEnabled = settings.experimentalFeaturesEnabled &&
-                                   settings.mandatoryUpdatesEnabled
-            if (!mandatoryEnabled) {
+            if (!settings.mandatoryUpdatesEnabled) {
                 updateLastMetaCheck()
                 return@withContext null
             }
@@ -545,6 +579,60 @@ class UpdateService(
             logger.warn("Failed to fetch or parse release-manifest.json", e)
             null
         }
+    }
+
+    /**
+     * The target release's player-facing notes in [locale], or null.
+     *
+     * One read of `CHANGELOG_<LANG>.md`, from which the section named by [tag] is
+     * taken. English goes through the same path as every other language: it is
+     * the file the others are translated from, not a special case, which is what
+     * makes a note correctable after a release in every language rather than in
+     * all but one.
+     *
+     * Null on anything at all -- no file for the language, no section for the
+     * version, a version nobody wrote notes for, no network. The caller then
+     * falls back to the copy CI froze into the release manifest, so a reader with
+     * no route to raw.githubusercontent still sees the release's notes, in
+     * English.
+     */
+    internal suspend fun fetchLocalizedNotes(tag: String, locale: String): String? {
+        val lang = locale.substringBefore('-').trim().lowercase()
+        if (lang.isEmpty()) return null
+        val url = "$RAW_BASE/$LOCALIZED_CHANGELOG_REF/CHANGELOG_${lang.uppercase()}.md"
+        return try {
+            val response = httpClient.get(url) { header("Accept", "text/plain") }
+            if (response.status.value != 200) {
+                logger.debug("No {} changelog at {}: {}", lang, tag, response.status)
+                null
+            } else {
+                extractVersionSection(response.bodyAsText(), tag.removePrefix("v"))
+            }
+        } catch (e: Exception) {
+            logger.debug("Failed to read the {} changelog at {}", lang, tag, e)
+            null
+        }
+    }
+
+    /**
+     * The body of one `## [version]` section, header line excluded.
+     *
+     * Matched with the closing bracket so `[2.4.0-beta]` cannot select
+     * `[2.4.0-beta5]`, and ended at the next version header rather than at any
+     * heading, because a section's own subheadings belong to it -- the localized
+     * files name that subheading differently per language anyway (`### Highlights`
+     * in one, `### Главное` in another), so looking for it by name would work in
+     * one language and silently return nothing in the next.
+     */
+    internal fun extractVersionSection(markdown: String, version: String): String? {
+        val header = "## [$version]"
+        val start = markdown.indexOf(header)
+        if (start == -1) return null
+        return markdown.substring(start + header.length)
+            .substringAfter('\n', "")
+            .substringBefore("\n## [")
+            .trim()
+            .ifBlank { null }
     }
 
     /**
@@ -747,25 +835,40 @@ class UpdateService(
      * fetched (the prerelease check); null means no list exists yet (the
      * stable path picks via `/releases/latest`) and one is fetched here.
      */
-    private suspend fun fetchChangelogBetween(
+    internal suspend fun fetchChangelogBetween(
         currentVersion: String,
         latestVersion: String,
         releases: List<GitHubRelease>?,
     ): String {
-        return (releases ?: fetchReleasesPage())
+        val sections = (releases ?: fetchReleasesPage())
             .filter { release ->
                 val v = release.tagName.removePrefix("v")
                 compareVersions(v, currentVersion) > 0 &&
                         compareVersions(v, latestVersion)  <= 0
             }
-            .sortedByDescending { it.tagName }
-            .mapNotNull { release ->
-                val section = extractWhatsChanged(release.body)
-                if (section.isBlank()) null  // skip releases with no parseable changelog
-                else "## ${release.tagName}\n\n$section"
+            // Newest first, by VERSION. Sorting the tag as text put nightly99 above
+            // nightly1219 and made "consecutive" mean nothing to the fold below.
+            .sortedWith { a, b ->
+                compareVersions(b.tagName.removePrefix("v"), a.tagName.removePrefix("v"))
             }
-            .joinToString("\n\n---\n\n")
-            .ifBlank { "No changelog available" }
+            .map { it.tagName to extractWhatsChanged(it.body) }
+            .filter { (_, section) -> section.isNotBlank() }
+
+        // Adjacent releases whose notes are identical are one entry spanning them.
+        // A nightly's notes are the development section as it stood, so consecutive
+        // nightlies carry the same text, and a reader twelve of them behind was
+        // handed twelve copies of it separated by rules.
+        return sections
+            .fold(mutableListOf<Pair<MutableList<String>, String>>()) { runs, (tag, section) ->
+                val last = runs.lastOrNull()
+                if (last != null && last.second == section) last.first += tag
+                else runs += mutableListOf(tag) to section
+                runs
+            }
+            .joinToString("\n\n---\n\n") { (tags, section) ->
+                val span = if (tags.size == 1) tags.first() else "${tags.first()} .. ${tags.last()}"
+                "## $span\n\n$section"
+            }
     }
 
     internal fun extractWhatsChanged(body: String?): String {

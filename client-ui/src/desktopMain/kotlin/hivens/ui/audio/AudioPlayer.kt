@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 // In-process audio playback for the MusicPlayerWidget, backed by Skinema
 // (FFmpeg via Panama, audio = true). Plays mp3 / ogg / flac / opus / vorbis /
@@ -24,7 +25,7 @@ import java.nio.file.Path
 // Every engine touch (open/play/pause/stop/setVolume) and the state poll loop
 // run on a single-thread dispatcher [engine], confining the mutable fields to
 // one thread: no locking, no torn reads, and -- because Skinema's close()
-// blocks up to five seconds joining the decode thread -- no UI-thread freeze.
+// blocks while it joins the decode thread -- no UI-thread freeze.
 // The public methods are fire-and-forget; widgets observe [state] / [volume].
 class AudioPlayer(private val scope: CoroutineScope) {
     private val log = LoggerFactory.getLogger(AudioPlayer::class.java)
@@ -117,10 +118,22 @@ class AudioPlayer(private val scope: CoroutineScope) {
         return try {
             VideoPlayer(path = file, loop = false, audio = true)
         } catch (e: Exception) {
-            log.error("Failed to open audio file {}", file, e)
-            _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
-            null
+            openFailed(file, e)
+        } catch (e: LinkageError) {
+            // A natives bundle that is missing, or from another FFmpeg line,
+            // fails as an Error rather than an Exception: the catch above never
+            // saw it, so a launcher whose media libraries will not load took the
+            // press of Play as a crash instead of a track that will not open.
+            // Narrower than Throwable on purpose: an OutOfMemoryError here is
+            // not a file that failed to open.
+            openFailed(file, e)
         }
+    }
+
+    private fun openFailed(file: Path, cause: Throwable): VideoPlayer? {
+        log.error("Failed to open audio file {}", file, cause)
+        _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+        return null
     }
 
     fun pause() {
@@ -192,7 +205,7 @@ class AudioPlayer(private val scope: CoroutineScope) {
                     releaseEngine()
                     break
                 }
-                delay(POLL_INTERVAL_MS)
+                delay(POLL_INTERVAL_MS.milliseconds)
             }
         }
     }

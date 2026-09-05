@@ -3,7 +3,6 @@ package hivens.launcher.component
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.launcher.ManifestProcessorService
-import kotlinx.serialization.json.Json
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,7 +22,6 @@ import kotlin.test.assertTrue
  */
 class ClasspathProviderTest {
 
-    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
     private lateinit var clientRoot: Path
 
     @BeforeTest
@@ -66,7 +64,7 @@ class ClasspathProviderTest {
     }
 
     private fun provider(osName: String) =
-        ClasspathProvider(ManifestProcessorService(json), osName = osName)
+        ClasspathProvider(ManifestProcessorService(), osName = osName)
 
     // ── Wrong-OS native JAR filter ──────────────────────────────────────────
 

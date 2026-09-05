@@ -69,8 +69,11 @@ class PackInstaller(
         // (required=false) seeds at its default_enabled. Sync places toggled-off
         // optionals as `.disabled` so a later flip is a rename, not a re-download.
         val optionalToggles = OptionalContentRules.defaultToggles(manifest.mods)
+        // The same manifest object everything below is recorded from. Handing sync a
+        // pack id instead let it fetch the pack's current build, so a user who picked
+        // an older one got that build's pin and baseline over the newest build's files.
         syncService.sync(
-            packId    = packId,
+            manifest  = manifest,
             clientDir = clientDir,
             progress  = progress,
             enabledState = OptionalContentRules.enabledState(manifest.mods, optionalToggles),
@@ -91,7 +94,10 @@ class PackInstaller(
             packRef               = PackReference(
                 origin  = PackOrigin.Mirror,
                 id      = packId,
-                version = manifest.packVersion,
+                // A mirror build that declares no version floats, same as the
+                // mrpack and CurseForge installers resolve it. The empty string
+                // would read as a pin at every later comparison.
+                version = manifest.packVersion.ifBlank { null },
             ),
             displayName           = summary.displayName,
             iconUrl               = summary.iconUrl,
@@ -99,7 +105,7 @@ class PackInstaller(
             instanceDirName       = instanceDir,
             createdAtEpoch        = Instant.now().epochSecond,
             lastPlayedEpochOrZero = 0L,
-            pinnedPackVersion     = manifest.packVersion,
+            pinnedPackVersion     = manifest.packVersion.ifBlank { null },
             runtime               = InstanceRuntime(),  // heap left to the global adaptive sizer
             optionalContent       = optionalToggles,
             forkedFrom            = null,

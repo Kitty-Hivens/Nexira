@@ -8,10 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import hivens.core.update.VersionChannel
-import hivens.ui.theme.BrutStyle
-import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.EncodedImageFormat
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -63,11 +60,11 @@ class VersionPickerWindowRenderTest {
     }
 
     /** Renders the picker over a pink field and returns the card's horizontal extent in px. */
-    private fun renderAndMeasureCard(width: Int, height: Int, style: StyleSpec, name: String): Int {
+    private fun renderAndMeasureCard(width: Int, height: Int, name: String): Int {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true, style = style) {
+            NxTheme(useDarkTheme = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFFE91E63))) {
                     VersionPickerWindow(
                         title = "Установка сборки",
@@ -127,19 +124,13 @@ class VersionPickerWindowRenderTest {
 
     @Test
     fun `card takes the host's width fraction and grows with the host`() {
-        val fhd = renderAndMeasureCard(1920, 1080, CelestiaStyle, "version-picker-fhd.png")
-        val twoK = renderAndMeasureCard(2560, 1440, CelestiaStyle, "version-picker-2k.png")
+        val fhd = renderAndMeasureCard(1920, 1080, "version-picker-fhd.png")
+        val twoK = renderAndMeasureCard(2560, 1440, "version-picker-2k.png")
 
         // 88% of the host, within a corner-rounding pixel or two at the sampled row.
         assertTrue(abs(fhd - 1690) <= 8, "FHD card width $fhd, expected ~1690 (0.88 of 1920)")
         assertTrue(abs(twoK - 2253) <= 8, "2K card width $twoK, expected ~2253 (0.88 of 2560)")
         // The point of the rule: a bigger host is a bigger window, not more margin.
         assertTrue(twoK > fhd + 400, "card did not grow with the host: $fhd -> $twoK")
-    }
-
-    @Test
-    fun `renders under Brut`() {
-        val width = renderAndMeasureCard(1920, 1080, BrutStyle, "version-picker-fhd-brut.png")
-        assertTrue(abs(width - 1690) <= 8, "Brut card width $width, expected ~1690")
     }
 }

@@ -1,6 +1,5 @@
 package hivens.ui
 
-import hivens.core.api.model.ServerProfile
 import hivens.core.data.PackOrigin
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -72,13 +71,31 @@ class NavBackStackTest {
     }
 
     @Test
-    fun topLevelDestinationResetsHistory() {
+    fun switchingTabsResetsHistory() {
         val nav = NavBackStack(Screen.Home)
-        nav.navigate(Screen.ServerSettings(ServerProfile()))
+        nav.navigate(Screen.ServerSettings("industrial"))
         assertTrue(nav.canGoBack)
-        nav.navigate(Screen.Library)
+        nav.switchTo(Screen.Library)
         assertEquals(Screen.Library, nav.current)
         assertFalse(nav.canGoBack)
+    }
+
+    /**
+     * The case that split the two calls apart. About is a rail entry and also a link
+     * inside Settings; when one call decided by destination, arriving from Settings
+     * wiped the history, so Back greyed out and the way on was the rail -- which also
+     * lost the settings category the reader had been in. A destination cannot know
+     * which of the two roles it is being used in; the caller can.
+     */
+    @Test
+    fun aLinkIntoARailDestinationKeepsTheWayBack() {
+        val nav = NavBackStack(Screen.Home)
+        nav.switchTo(Screen.Settings)
+        nav.navigate(Screen.About)
+
+        assertTrue(nav.canGoBack, "About opened from Settings must be able to go back")
+        assertTrue(nav.back())
+        assertEquals(Screen.Settings, nav.current)
     }
 
     @Test
@@ -87,9 +104,24 @@ class NavBackStackTest {
         nav.navigate(Screen.Home)
         assertFalse(nav.canGoBack)
 
-        nav.navigate(Screen.Library)
-        nav.navigate(Screen.Library)
+        nav.switchTo(Screen.Library)
+        nav.switchTo(Screen.Library)
         assertEquals(Screen.Library, nav.current)
+        assertFalse(nav.canGoBack, "the rail entry you are already on stays a single root")
+    }
+
+    @Test
+    fun switchingToTheScreenYouAreOnStillCollapsesAHistory() {
+        // The rail's own entry, clicked while a detail of it is open, is how a reader
+        // gets out of a drill-down -- it has to reset even though the target is what
+        // `current` would be after the pop.
+        val nav = NavBackStack(Screen.Library)
+        nav.navigate(Screen.PackDetail("inst-1"))
+        nav.navigate(Screen.Library)
+        assertTrue(nav.canGoBack)
+
+        nav.switchTo(Screen.Library)
+        assertEquals(listOf(Screen.Library), nav.trail)
         assertFalse(nav.canGoBack)
     }
 
@@ -111,7 +143,7 @@ class NavBackStackTest {
         nav.navigate(Screen.Library)
         // The earlier snapshot must not observe the later push.
         assertEquals(listOf(Screen.Home), snap)
-        assertEquals(listOf(Screen.Library), nav.trail)
+        assertEquals(listOf(Screen.Home, Screen.Library), nav.trail)
     }
 
     @Test
@@ -182,10 +214,10 @@ class NavBackStackTest {
     @Test
     fun tabHoppingNeverGrowsHistory() {
         val nav = NavBackStack(Screen.Home)
-        nav.navigate(Screen.Library)
-        nav.navigate(Screen.Browse)
-        nav.navigate(Screen.Settings)
-        nav.navigate(Screen.Profile)
+        nav.switchTo(Screen.Library)
+        nav.switchTo(Screen.Browse)
+        nav.switchTo(Screen.Settings)
+        nav.switchTo(Screen.Profile)
         assertEquals(Screen.Profile, nav.current)
         assertFalse(nav.canGoBack)
     }
@@ -195,10 +227,10 @@ class NavBackStackTest {
         // Wardrobe and About are nav-rail siblings: hopping among them must reset,
         // not pile up a "Profile > Wardrobe > About > Wardrobe" breadcrumb.
         val nav = NavBackStack(Screen.Profile)
-        nav.navigate(Screen.Wardrobe)
-        nav.navigate(Screen.About)
-        nav.navigate(Screen.Wardrobe)
-        nav.navigate(Screen.About)
+        nav.switchTo(Screen.Wardrobe)
+        nav.switchTo(Screen.About)
+        nav.switchTo(Screen.Wardrobe)
+        nav.switchTo(Screen.About)
         assertEquals(Screen.About, nav.current)
         assertEquals(listOf(Screen.About), nav.trail)
         assertFalse(nav.canGoBack)

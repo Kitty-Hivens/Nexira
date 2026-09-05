@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,10 +83,7 @@ fun PackCard(
     val art = rememberPackArt(instance)
     PuppetClick("library.pack.${instance.id}") { onOpenDetail() }
     val indications: IndicationCenter = koinInject()
-    // Remember the flow: launchIndication() ends in a fresh asStateFlow() wrapper each
-    // call, so collecting it inline would re-subscribe on every recomposition.
-    val indicationFlow = remember(instance.id) { indications.launchIndication(instance.id) }
-    val indication by indicationFlow.collectAsState()
+    val indication by indications.launchIndication(instance.id).collectAsState()
     Box(
         modifier = modifier
             .fillMaxWidth()

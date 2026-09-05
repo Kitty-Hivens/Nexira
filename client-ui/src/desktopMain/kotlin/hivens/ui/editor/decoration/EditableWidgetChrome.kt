@@ -70,8 +70,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalCanvasSlotSizeDp
 import hivens.widget.api.LocalCubeGeometry
 import hivens.widget.api.LocalLayoutGraph
@@ -113,8 +113,7 @@ fun EditableWidgetChrome(
     content: @Composable () -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
-    val chromeMotionMs = style.animationDurationMs(220)
+    val chromeMotionMs = Motion.fade.durationMs
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }
@@ -139,6 +138,13 @@ fun EditableWidgetChrome(
     // in-flight visual translation, committed to a target cell on release.
     val liveCell = rememberUpdatedState(instance.cell)
     val cubeGeo = rememberUpdatedState(LocalCubeGeometry.current)
+    // Same reason, for the values the flow-reorder branch hands on: a gesture that
+    // does not restart between drags would announce the position the widget held
+    // when it was first dragged, and commit through the host's first drop handler
+    // rather than the one built against the layout as it stands.
+    val liveIndex = rememberUpdatedState(index)
+    val liveInstance = rememberUpdatedState(instance)
+    val liveCommitDrop = rememberUpdatedState(onCommitDrop)
     var cubeDrag by remember { mutableStateOf(Offset.Zero) }
     // Cursor anchor for the right-click context menu (null = closed).
     var menuAnchor by remember { mutableStateOf<Offset?>(null) }
@@ -269,7 +275,12 @@ fun EditableWidgetChrome(
                             }
                         }
                     }
-                    .pointerInput(instance.instanceId, isCanvas) {
+                    // Keyed on the slot and its orientation as well as the widget:
+                    // which branch this gesture takes IS the orientation, and a
+                    // slot flipped from Column to CubeGrid under a widget left the
+                    // running gesture reordering a grid. Restarting between drags
+                    // costs nothing; mid-drag neither value can change.
+                    .pointerInput(instance.instanceId, path, orientation) {
                         awaitEachGesture {
                             // requireUnconsumed: yield to the hover affordances
                             // and resize handle stacked above (each consumes its
@@ -333,22 +344,27 @@ fun EditableWidgetChrome(
                                         ?: return@awaitEachGesture
                                     val bounds = widgetWindowBounds ?: return@awaitEachGesture
                                     controller.begin(
-                                        payload         = DragPayload.ExistingWidget(path, index, instance),
+                                        payload         = DragPayload.ExistingWidget(path, liveIndex.value, liveInstance.value),
                                         pointerInWindow = bounds.topLeft + slop.position,
                                         pickupOffset    = slop.position,
                                         widgetSize      = Offset(bounds.width, bounds.height),
                                         ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
                                     )
+                                    // Accumulated from the start, not re-read from the
+                                    // widget's live bounds each frame. The drop indicator
+                                    // is a real layout child, so the moment the hit-test
+                                    // names this slot the widget shifts by its height --
+                                    // and a pointer measured against the widget's own
+                                    // origin then jumped by that much, flipping the
+                                    // hit-test back. The two branches above already do it
+                                    // this way; this one was the odd one out.
                                     var last = bounds.topLeft + slop.position
                                     drag(slop.id) { change ->
-                                        val wb = widgetWindowBounds
-                                        if (wb != null) {
-                                            last = wb.topLeft + change.position
-                                            controller.update(last)
-                                        }
+                                        last += change.positionChange()
+                                        controller.update(last)
                                         change.consume()
                                     }
-                                    onCommitDrop(last)
+                                    liveCommitDrop.value(last)
                                     controller.end()
                                 }
                             }
@@ -427,8 +443,11 @@ fun EditableWidgetChrome(
     }
 
     // Right-click context menu (replaces the old hover affordance buttons): the
-    // widget's actions, anchored at the cursor. A right-drag in a cube slot resizes
-    // by cells; a right-click with no drag opens this.
+    // widget's actions, anchored at the cursor. Any secondary press opens it,
+    // drag or no drag: cube slots have no resize gesture. The geometry for one is
+    // written (cubeResizeSpan) and nothing calls it, which is worth saying here
+    // because the comment that stood in this place described the gesture as
+    // though it worked.
     menuAnchor?.let { anchor ->
         NxContextMenu(anchorInWindow = anchor, expanded = true, onDismissRequest = { menuAnchor = null }) {
             WidgetContextMenuContent(

@@ -3,7 +3,6 @@ package hivens.ui.widgets.bgsettings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,12 +26,10 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxIconButton
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.widget.model.Widget
-import hivens.widget.model.WidgetInstance
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +41,7 @@ import java.nio.file.Path
 
 @Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
 @Composable
-fun BgImagePickerWidget(instance: WidgetInstance) {
+fun BgImagePickerWidget() {
     val ctx = LocalBgSettingsContext.current
     val s = LocalStrings.current
     val settings by ctx.settings
@@ -58,6 +55,7 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
     // Read off the optimizer, not off local state: leaving the screen mid-transcode and
     // coming back used to show an idle picker over work that was still running.
     val optimizing by optimizer.optimizing.collectAsState()
+    val dialogSettings = rememberFileDialogSettings(s.backgroundPickFile)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(s.backgroundSectionImage)
@@ -74,12 +72,19 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                 modifier = Modifier.weight(1f),
                 onClick  = {
                     scope.launch {
-                        val picked = FileKit.openFilePicker(
-                            type           = FileKitType.File(extensions = listOf(
-                                "png", "jpg", "jpeg", "webp", "bmp", "gif", "apng",
-                                "mp4", "m4v", "mov", "webm", "mkv", "ogv",
+                        // What the dialog offers, not what the launcher accepts: the
+                        // decoders decide that (see backgroundMediaKind), and between
+                        // them they read far more than a native file dialog should
+                        // list. A container missing from here plays if it is picked
+                        // some other way.
+                        val picked = pickFile(
+                            type     = FileKitType.File(extensions = listOf(
+                                "png", "apng", "jpg", "jpeg", "webp", "bmp", "gif", "avif", "heic", "heif",
+                                "ico", "tif", "tiff",
+                                "mp4", "m4v", "mov", "webm", "mkv", "ogv", "avi", "mpg", "mpeg", "ts",
+                                "m2ts", "mts", "wmv", "asf", "flv", "3gp", "vob", "y4m",
                             )),
-                            dialogSettings = FileKitDialogSettings(title = s.backgroundPickFile),
+                            settings = dialogSettings,
                         )?.path ?: return@launch
                         // Time-based media (video, GIF, animated PNG/WebP) taller than
                         // the screen is transcoded down once and cached; optimize()
@@ -91,12 +96,12 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                         val resolved = if (timeBased && targetHeight > 0) {
                             try {
                                 optimizer.optimize(Path.of(picked), targetHeight).toString()
-                            } catch (e: CancellationException) {
+                            } catch (_: CancellationException) {
                                 // The user stopped the transcode: leave the wallpaper as
                                 // it was rather than setting the oversized source they
                                 // just declined to pay for.
                                 return@launch
-                            } catch (e: Exception) {
+                            } catch (_: Exception) {
                                 picked
                             }
                         } else {

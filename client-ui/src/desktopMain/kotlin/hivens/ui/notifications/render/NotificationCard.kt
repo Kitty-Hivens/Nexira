@@ -59,10 +59,10 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColors
 import hivens.ui.nx.NxTooltip
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.abs
@@ -81,14 +81,15 @@ fun NotificationCard(
     // appears already opened into stale history.
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
     val palette = NxTheme.colors
-    val style = LocalStyle.current
+    // Read here, not inside the drag coroutine: a role needs composition.
+    val swipeSpec = Motion.panelSlide.of<Float>()
     val accentColor = severityAccent(group.severity, group.kind, palette)
-    // Critical pulses only when the active style allows motion; Brut stays static.
-    val accentAlpha = if (group.severity == Severity.Critical && style.softGlowEnabled) criticalPulse() else 1f
+    // Critical pulses; everything else holds a steady accent.
+    val accentAlpha = if (group.severity == Severity.Critical) criticalPulse() else 1f
 
     val scope = rememberCoroutineScope()
     val offsetX = remember(group.sourceKey) { Animatable(0f) }
-    val cardShape = RoundedCornerShape(style.cardCorner)
+    val cardShape = MaterialTheme.shapes.medium
     val density = LocalDensity.current
     // Fade the card as it is dragged toward the edge; the slide-off + the
     // stack's exit fade finish the gesture on release.
@@ -99,18 +100,14 @@ fun NotificationCard(
             .widthIn(min = 320.dp, max = 420.dp)
             .offset { IntOffset(offsetX.value.toInt(), 0) }
             .alpha(1f - 0.55f * swipeFrac)
-            // Glass styles float on a soft shadow; flat (Brut) styles lean on a
-            // hard border instead -- the shadow has no flat-style mapping.
-            .then(if (style.softGlowEnabled) Modifier.shadow(8.dp, cardShape, clip = false) else Modifier)
+            // Lifted on a soft shadow while decorative effects are on; the border
+            // below is the flat alternative when they are not.
+            .shadow(8.dp, cardShape, clip = false)
             .clip(cardShape)
             // Toasts are transient alerts read against the live wallpaper -- even a
             // few percent of translucency tints them off-colour and reads as a glitch,
             // so they stay fully opaque regardless of the glass style.
             .background(palette.surface)
-            .then(
-                if (style.cardBorder > 0.dp) Modifier.border(style.cardBorder, palette.outline, cardShape)
-                else Modifier,
-            )
             // Swipe-to-dismiss: drag horizontally; past ~40% of the card width it
             // slides off and dismisses, otherwise it springs back. The close
             // button stays the keyboard / screen-reader path.
@@ -122,11 +119,11 @@ fun NotificationCard(
                         if (abs(dx) >= threshold) {
                             val target = if (dx > 0) size.width.toFloat() else -size.width.toFloat()
                             scope.launch {
-                                offsetX.animateTo(target, tween(style.animationDurationMs(180)))
+                                offsetX.animateTo(target, swipeSpec)
                                 onDismiss()
                             }
                         } else {
-                            scope.launch { offsetX.animateTo(0f, tween(style.animationDurationMs(180))) }
+                            scope.launch { offsetX.animateTo(0f, swipeSpec) }
                         }
                     },
                     onHorizontalDrag = { change, delta ->
@@ -331,12 +328,13 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 
 @Composable
 private fun criticalPulse(): Float {
+    val pulseRhythm = Motion.ownRhythm(CRITICAL_PULSE_MS)
     val transition = rememberInfiniteTransition(label = "critical-pulse")
     val v by transition.animateFloat(
         initialValue = 0.55f,
         targetValue  = 1.0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900),
+            animation = pulseRhythm.of(),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "critical-pulse-alpha",
@@ -365,3 +363,6 @@ private fun relativeTime(created: Instant, now: Instant, strings: AppStrings): S
         else             -> strings.notifTimeDays(seconds / 86_400)
     }
 }
+
+/** How fast a critical card pulses. */
+private const val CRITICAL_PULSE_MS = 900

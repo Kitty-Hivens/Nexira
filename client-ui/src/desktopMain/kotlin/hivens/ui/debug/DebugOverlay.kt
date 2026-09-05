@@ -42,7 +42,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import hivens.config.Branding
+import hivens.ui.diag.RenderBackend
 import hivens.ui.theme.NxTheme
+import kotlin.time.Duration.Companion.milliseconds
 
 // Fixed HUD palette: a debug overlay reads over any wallpaper/theme, so it is a
 // deliberate dark chip with light text rather than themed surfaces. The panel
@@ -192,7 +194,10 @@ private fun PerfHud(modifier: Modifier) {
     var heapUsed by remember { mutableStateOf(0L) }
     var heapMax by remember { mutableStateOf(0L) }
     var rss by remember { mutableStateOf(-1L) }
-    val renderApi = remember { runCatching { System.getProperty("skiko.renderApi") }.getOrNull() ?: "?" }
+    // The resolved backend. The property this used to read is a request the
+    // launcher never makes, so the HUD reported "?" even on a shell that had
+    // fallen back to software -- the one reading a perf HUD exists to catch.
+    val renderApi = remember { RenderBackend.current }
 
     // Sample fps over a short burst, then idle for a beat: this keeps the HUD from
     // pinning the app at full framerate the whole time it is shown (continuous frames
@@ -217,7 +222,7 @@ private fun PerfHud(modifier: Modifier) {
             heapUsed = (rt.totalMemory() - rt.freeMemory()) shr 20
             heapMax = rt.maxMemory() shr 20
             rss = withContext(Dispatchers.IO) { readRssMb() }
-            delay(500)
+            delay(500.milliseconds)
         }
     }
 

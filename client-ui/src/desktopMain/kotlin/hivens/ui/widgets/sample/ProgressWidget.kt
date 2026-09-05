@@ -21,7 +21,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.launcher.AutoSyncService
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Sources
@@ -44,7 +43,12 @@ data class ProgressProps(
 // a sync is in flight; collapses to a calm "idle" message otherwise.
 // Polished version of the dashboard's autosync strip, broken out so
 // the new home can host it independently.
-@Widget(id = "home.new.progress", displayName = "widget.home.new.progress", propsClass = ProgressProps::class)
+@Widget(
+    id = "home.new.progress",
+    displayName = "widget.home.new.progress",
+    propsClass = ProgressProps::class,
+    surface = """{"fill":"base","opacity":0.4,"padding":{"top":12.0}}""",
+)
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProgressProps>()
@@ -57,9 +61,6 @@ fun ProgressWidget(instance: WidgetInstance) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.40f))
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Text(
@@ -70,8 +71,8 @@ fun ProgressWidget(instance: WidgetInstance) {
         )
         Spacer(Modifier.height(8.dp))
 
-        when (val state = overall) {
-            is AutoSyncService.OverallState.InProgress -> InProgressBody(state)
+        when (overall) {
+            is AutoSyncService.OverallState.InProgress -> InProgressBody(overall)
             else                                       -> IdleBody(p.idleText.ifBlank { s.widgetProgressIdle })
         }
     }

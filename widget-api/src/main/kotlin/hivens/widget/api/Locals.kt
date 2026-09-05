@@ -11,7 +11,7 @@ import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotPath
-import hivens.widget.model.WidgetChrome
+import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 
 // Locals provided once near the application root. Static because the
@@ -46,14 +46,14 @@ val LocalWidgetDecorator: ProvidableCompositionLocal<WidgetDecorator> =
         { _, _, _, _, content -> content() }
     }
 
-// Paints the optional per-instance backing (WidgetChrome) around a widget --
-// PRODUCTION styling, applied whenever instance.chrome != null, not just in
+// Paints the optional per-instance surface around a widget --
+// PRODUCTION styling, applied whenever instance.surface != null, not just in
 // edit mode. Default = identity so the kernel stays Compose-token-agnostic;
-// :client-ui provides the real renderer (glass via glassSurfaceAlpha + corner
-// clip + padding), so the glass color follows the active style.
-typealias WidgetChromeRenderer = @Composable (chrome: WidgetChrome, content: @Composable () -> Unit) -> Unit
+// :client-ui provides the real renderer, so the plane follows the active palette
+// rather than anything the kernel knows about.
+typealias WidgetSurfaceRenderer = @Composable (surface: SurfaceSpec, content: @Composable () -> Unit) -> Unit
 
-val LocalWidgetChromeRenderer: ProvidableCompositionLocal<WidgetChromeRenderer> =
+val LocalWidgetSurfaceRenderer: ProvidableCompositionLocal<WidgetSurfaceRenderer> =
     staticCompositionLocalOf { { _, content -> content() } }
 
 // Rendered by SlotRenderer when a slot has no widgets. Default = nothing
@@ -135,10 +135,10 @@ val LocalWidgetStateHost: ProvidableCompositionLocal<WidgetStateHost> =
     }
 
 // Edit-mode slot reflow duration (ms). 0 = no animation (the production
-// default, since the only provider is the editor host). While editing, the
-// host supplies the active style's duration, so add / remove / resize reflow
-// animates in the editor only; under Brut that resolves to ~1ms (effectively
-// instant). Static is fine -- it changes only on the edit-mode toggle.
+// default, since the only provider is the editor host). While editing, the host
+// supplies the panelSlide role's duration, so add / remove / resize reflow
+// animates in the editor only. Static is fine -- it changes only on the
+// edit-mode toggle.
 val LocalSlotMotionMs: ProvidableCompositionLocal<Int> =
     staticCompositionLocalOf { 0 }
 

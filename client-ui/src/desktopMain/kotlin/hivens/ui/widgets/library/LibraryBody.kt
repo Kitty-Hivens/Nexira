@@ -64,7 +64,7 @@ fun LibraryBody(instance: WidgetInstance) {
     val packInstanceService: PackInstanceService = koinInject()
     val scope = rememberCoroutineScope()
     var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
-    val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
+    val instances by remember { repo.observe() }.collectAsState()
 
     if (instances.isEmpty()) {
         LibraryEmpty(
@@ -108,7 +108,7 @@ private fun LibraryList(
 ) {
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),
-        contentPadding      = PaddingValues(bottom = 16.dp),
+        contentPadding      = PaddingValues(bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(items = instances, key = { it.id }) { instance ->

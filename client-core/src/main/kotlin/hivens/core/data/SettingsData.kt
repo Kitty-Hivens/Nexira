@@ -20,21 +20,6 @@ enum class HomeView {
 }
 
 /**
- * Which visual style variant is active. Independent from palette
- * (themes live in `ThemeManager.CustomTheme`). Style governs form,
- * surface treatment, motion -- not color. See `hivens.ui.theme.StyleSpec`
- * for the token set and the two initial variants.
- *
- * - [Celestia] -- rounded corners, glass cards, soft glow, animations.
- *   Current default; matches the launcher's pre-Atelier feel.
- * - [Brut] -- hard corners, flat surfaces, no glow, no animations.
- *   Designed for the user's "жёсткий интерфейс" personal lean as one
- *   open direction under Atelier exploration.
- */
-@Serializable
-enum class UiStyle { Celestia, Brut }
-
-/**
  * Which source drives the dark/light choice. Exactly one is active:
  *
  * - [Manual] -- the user's own day/night toggle; [SettingsData.isDarkTheme] as set.
@@ -69,16 +54,76 @@ enum class AmberUpdatePolicy { Ask, SnapshotThenApply, Hold }
 fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
     if (s.themeMode == ThemeMode.System && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
 
+/**
+ * Folds the retired experimental master into the knobs it used to suppress.
+ *
+ * That master was read at four launch-path sites, so a user who switched it off
+ * was switching off mandatory-update enforcement, both auto-update passes and
+ * adaptive heap sizing -- whatever those knobs stored individually. Removing the
+ * gate without this would turn all four back on at the next start, silently and
+ * on someone who had deliberately turned them off.
+ *
+ * Applied once on load and cleared, so the fold cannot re-fire against knobs the
+ * user re-enables afterwards.
+ *
+ * The JVM-args builder and the mimic-version override are deliberately not
+ * folded: the gate only ever greyed out their rows, while
+ * `ServerSettingsState.jvmBuilderEnabled` and `SettingsRestoreHook` read the
+ * stored values directly. They were live with the master off, so switching the
+ * master off never expressed an intent to disable them.
+ */
+fun foldLegacyExperimentalGate(s: SettingsData): SettingsData =
+    if (s.experimentalFeaturesEnabled) s else s.copy(
+        experimentalFeaturesEnabled = true,
+        mandatoryUpdatesEnabled     = false,
+        autoSyncAllPacks            = false,
+        autoUpdatePacks             = false,
+        adaptiveMemoryEnabled       = false,
+    )
+
+/**
+ * Wallpapers below this luminance drive the dark theme.
+ *
+ * The comparison is strict, so exactly mid-grey resolves to the light theme.
+ * Nothing rides on which side takes the tie -- it is stated only because a
+ * threshold nobody wrote down is a threshold somebody later flips by accident.
+ */
+const val WALLPAPER_DARK_THRESHOLD = 0.5f
+
+/**
+ * The dark flag an automatic theme source wants, or null when nothing should
+ * change.
+ *
+ * Three sources write one boolean -- the manual toggle, the OS scheme, and the
+ * wallpaper's brightness -- and each had its own effect deciding when to fire,
+ * with the persist repeated alongside. Stated once here: the mode picks which
+ * source is listened to at all, a source with nothing to say (no wallpaper
+ * decoded yet, no readable OS scheme) says nothing, and a source that agrees
+ * with the current value asks for no write.
+ *
+ * Returning null rather than the unchanged value is the point: every caller
+ * both sets state and persists, and a settings file rewritten on every
+ * wallpaper tick is a write per frame during a crossfade.
+ */
+fun darkThemeFor(
+    mode: ThemeMode,
+    current: Boolean,
+    wallpaperLuminance: Float? = null,
+    systemDark: Boolean? = null,
+): Boolean? {
+    val wanted = when (mode) {
+        // The user said so; nothing automatic overrides that until they
+        // choose another mode.
+        ThemeMode.Manual -> null
+        ThemeMode.System -> systemDark
+        ThemeMode.Wallpaper -> wallpaperLuminance?.let { it < WALLPAPER_DARK_THRESHOLD }
+    }
+    return wanted?.takeIf { it != current }
+}
+
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,
-    /**
-     * Fallback default heap (MB) when an InstanceProfile doesn't
-     * specify its own. 6 GB matches modded-MC reality (SmartyCraft
-     * packs need 4-6 GB to be smooth); RamSelector caps the choice at
-     * 75% of detected system RAM so low-RAM systems still scale down.
-     */
-    val memoryMB: Int = 6144,
     val isDarkTheme: Boolean = true,
     /**
      * Derive the colour palette from the wallpaper (Material You / Monet): the
@@ -131,13 +176,15 @@ data class SettingsData(
      */
     val offlinePlayerName: String? = null,
 
-    // ── Experimental features ────────────────────────────────────────────
-    // Master gates its children -- switching it off disables every sub-toggle
-    // regardless of their stored values. Defaults ON so the section's tools
-    // (adaptive memory, JVM-args builder, the update-channel picker) are
-    // reachable out of the box; each child then carries its own safe default.
+    // ── Updates, launch and protocol ─────────────────────────────────────
 
-    /** Master switch for the entire experimental features section. */
+    /**
+     * Legacy master that used to gate the settings section these knobs lived in.
+     * Read only by [foldLegacyExperimentalGate], which folds a stored `false`
+     * into the knobs it actually suppressed and then clears itself; nothing else
+     * consults it. Kept as a field so that fold has something to read on a file
+     * written by an older build.
+     */
     val experimentalFeaturesEnabled: Boolean = true,
 
     /**
@@ -151,9 +198,10 @@ data class SettingsData(
 
     /**
      * Update channel the user follows (Release / Beta / Alpha / Dev / Git).
-     * Release/Beta/Alpha pick a GitHub release; Dev/Git build from source and
-     * are only reachable when [experimentalFeaturesEnabled] is on. Defaults to
-     * [ReleaseChannel.Release]; the user picks a channel in the update manager.
+     * Release/Beta/Alpha pick a GitHub release; Dev/Git build from source.
+     * Defaults to [ReleaseChannel.Release]. The settings surface offers the
+     * pre-releases toggle, which maps onto Release / Beta; the other channels
+     * are reached by editing the file.
      */
     val updateChannel: ReleaseChannel = ReleaseChannel.Release,
 
@@ -166,11 +214,23 @@ data class SettingsData(
     val nightlyChannel: Boolean = false,
 
     /**
-     * Sync all installed server packs in background on startup.
+     * Sync all installed SmartyCraft clients in background on startup.
      * "Installed" means a non-empty `clients/<server>/` directory --
-     * never triggers a many-GB first-time pack download out of nowhere.
+     * never triggers a many-GB first-time download out of nowhere.
      * Sequential to avoid bandwidth contention; ManifestCache makes the
      * common nothing-changed case complete in milliseconds.
+     *
+     * Not a sibling of [autoUpdatePacks] despite reading like one. That one
+     * moves a mirror instance between pinned manifests; this one re-runs the
+     * SmartyCraft sync, and carries two limits that are not going away:
+     *
+     *  * A two-factor account is never logged in from here. SmartyCraft mints a
+     *    uid per login and invalidates the previous one, so a background pass
+     *    would revoke the session the player just unlocked with a code. Such an
+     *    account therefore syncs only against a manifest cached by an earlier
+     *    manual login, and a server without one is skipped.
+     *  * The whole raw-server path is on its way out, so its defects are being
+     *    left alone rather than worked around here.
      *
      * Off by default: most users play 1-2 servers; this is maintainer-
      * grade convenience for users with many servers installed.
@@ -185,7 +245,12 @@ data class SettingsData(
      */
     val autoUpdatePacks: Boolean = true,
 
-    /** How the auto-updater treats an amber (structural) pending update. See [AmberUpdatePolicy]. */
+    /**
+     * How the unattended pass treats a pending update that changes Minecraft or the
+     * loader family, as graded by `classifyCompat` against the installed manifest.
+     * A mirror-instance concept only: [autoSyncAllPacks] has no such classification.
+     * See [AmberUpdatePolicy].
+     */
     val amberUpdatePolicy: AmberUpdatePolicy = AmberUpdatePolicy.Ask,
 
     /**
@@ -203,10 +268,11 @@ data class SettingsData(
     /**
      * Adaptive memory: let the profiler agent size each instance's heap from its
      * observed live-set + peak instead of the static per-instance heap. On by
-     * default (under the experimental master) -- the master switch that governs
-     * EVERY instance. An instance opts out only by pinning a specific RAM value
-     * (`fixedMemory` on `InstanceProfile` / `InstanceRuntime`); turning this off
-     * forces every instance back to its static heap.
+     * default, and the switch that governs EVERY instance -- this is the normal
+     * path a heap is decided by, not an alternative one. An instance opts out
+     * only by pinning a specific RAM value (`fixedMemory` on `InstanceProfile` /
+     * `InstanceRuntime`); turning this off forces every instance back to the
+     * machine-derived baseline.
      */
     val adaptiveMemoryEnabled: Boolean = true,
 
@@ -227,14 +293,6 @@ data class SettingsData(
      * for the option set.
      */
     val homeView: HomeView = HomeView.New,
-
-    /**
-     * Visual style variant. Independent from palette / color preset.
-     * Lets the user compare form/surface/motion approaches concretely
-     * rather than guessing in the abstract. Defaults to Celestia
-     * (current visual feel); see [UiStyle] for available variants.
-     */
-    val uiStyle: UiStyle = UiStyle.Celestia,
 
     /**
      * "Do not disturb": mute the live top-right notification popups. Events are
@@ -318,3 +376,15 @@ data class SettingsData(
      */
     val disabledModules: Set<String> = emptySet(),
 )
+
+/**
+ * Drops the face choice when [providerKey] is the provider it names.
+ *
+ * The choice outlives the account that carried it otherwise: nothing shows the
+ * setting once a single account is left, so a preference made months ago sits
+ * unreachable on disk and re-decides the shell's face the moment that provider
+ * is signed into again. A choice the user cannot see is not a choice they can
+ * be held to.
+ */
+fun SettingsData.releasingFace(providerKey: String): SettingsData =
+    if (preferredFaceProvider == providerKey) copy(preferredFaceProvider = null) else this

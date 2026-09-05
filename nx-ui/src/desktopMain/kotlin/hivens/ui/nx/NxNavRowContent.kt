@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /**
  * Leading icon + label for one vertical-nav entry, selected styling
@@ -28,7 +29,7 @@ fun NxNavRowContent(icon: IconKey, label: String, isSelected: Boolean) {
                else NxTheme.colors.textSecondary,
         modifier = Modifier.size(20.dp),
     )
-    Spacer(Modifier.width(12.dp))
+    Spacer(Modifier.width(Spacing.s12))
     Text(
         text  = label,
         style = MaterialTheme.typography.bodyMedium,

@@ -34,12 +34,12 @@ import javax.management.openmbean.CompositeData;
  * accumulates GC pause time, then writes a small JSON summary. No bytecode
  * transform, no contact with mods -- the server's integrity checks see an
  * ordinary client.
- *
+ * <p>
  * Deliberately plain Java targeting Java 8 bytecode: the same jar attaches to
  * legacy 1.7.10 / 1.12.2 packs (Java 8) and modern packs (Java 17+). It writes
  * nothing to stdout/stderr (the launcher scrapes the game console) and swallows
  * every error -- a profiler must never take the game down.
- *
+ * <p>
  * The summary is written periodically (every {@link #FLUSH_INTERVAL_SECONDS} s)
  * as well as on shutdown, so a hard exit that skips the shutdown hook (Forge
  * {@code Runtime.halt}, a native crash) still leaves a recent file behind.
@@ -54,7 +54,7 @@ public final class ProfilerAgent {
     private static final AtomicLong gcCount = new AtomicLong(0L);
     private static final AtomicLong gcPauseTotalMs = new AtomicLong(0L);
     private static final AtomicBoolean liveSetReliable = new AtomicBoolean(false);
-    private static final Set<String> heapPools = new HashSet<String>();
+    private static final Set<String> heapPools = new HashSet<>();
 
     /** Serializes the periodic flush against the final shutdown write so the two
      *  threads never race on the shared {@code <out>.tmp} staging file. */
@@ -68,7 +68,6 @@ public final class ProfilerAgent {
     // The flush executor is a session-lifetime daemon shut down via the shutdown hook
     // below, not a scoped resource -- try-with-resources would close it immediately,
     // and ScheduledExecutorService has no close() on this agent's Java 8 target.
-    @SuppressWarnings("resource")
     public static void premain(String agentArgs, Instrumentation inst) {
         try {
             String out = System.getProperty("nexira.profiler.out");

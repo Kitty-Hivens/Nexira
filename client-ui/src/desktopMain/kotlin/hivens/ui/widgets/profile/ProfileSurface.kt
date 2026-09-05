@@ -41,8 +41,8 @@ private const val SURFACE = "profile"
 // dedicated skin screen is built; the skin now leads the Account tab.
 // Header title stays in surface chrome -- a per-screen invariant the user
 // cannot meaningfully remove without losing the screen's identity. Inner
-// glass frame opts out of style.cardSurface so the screen stays glassy
-// under Brut, matching the Settings frame.
+// glass frame names its own plane rather than taking the default, matching the
+// Settings frame.
 //
 // Only one of `signin` / `account` renders at a time; the inactive slot is
 // unmounted so the editor's chrome decorator does not paint phantom chrome
@@ -74,11 +74,15 @@ fun ProfileSurface(
     // Per-provider sections each own their signed-in/out state, so the category
     // no longer flips with the session; default to the SmartyCraft section.
     val selectedCategory = remember { mutableStateOf(ProfileCategory.SmartyCraft) }
+    // Shared by every section that adds or removes an account, and by the face
+    // picker that has to stop offering one that is gone.
+    val accountsRevision = remember { mutableStateOf(0) }
 
-    val ctx = remember(session, selectedCategory) {
+    val ctx = remember(session, selectedCategory, accountsRevision) {
         ProfileContext(
             session          = session,
             selectedCategory = selectedCategory,
+            accountsRevision = accountsRevision,
             onLogin          = onLogin,
             onLogout         = onLogout,
         )
@@ -89,7 +93,7 @@ fun ProfileSurface(
     // only, so they no-op without a session.
     PuppetScreen("Profile")
     PuppetClick("profile.refreshSkin") { session?.let { skinManager.invalidate(it.playerName) } }
-    PuppetClick("profile.topUp")       { SystemActions.openUrl("http://smartycraft.ru/cabinet") }
+    PuppetClick("profile.topUp")       { SystemActions.openUrl("https://smartycraft.ru/cabinet") }
 
     CompositionLocalProvider(LocalProfileContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {

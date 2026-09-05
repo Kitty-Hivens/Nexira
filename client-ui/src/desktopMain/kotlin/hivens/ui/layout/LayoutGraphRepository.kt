@@ -1,16 +1,10 @@
 package hivens.ui.layout
 
 import hivens.widget.model.LayoutGraph
-import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
-import hivens.widget.model.WidgetKind
-import hivens.widget.model.flatMapInstances
 import hivens.widget.model.resetSurface
-import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -25,13 +19,13 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import hivens.core.data.NewerBuildData
 import hivens.core.data.ReadOnlyStore
 import hivens.core.io.AtomicFiles
+import hivens.ui.bootstrap.RecoveryIo
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -93,6 +87,11 @@ class LayoutGraphRepository(
     // flush() which then persists synchronously under the same mutex.
     private var pendingWrite: Job? = null
 
+    // Whether the state flow holds an edit the file does not. pendingWrite alone
+    // could not answer that: it is replaced on every update and nulled only by
+    // flush, so a long-completed job left flush believing a write was still owed.
+    @Volatile private var dirty = false
+
     fun observe(): StateFlow<LayoutGraph> = state.asStateFlow()
 
     fun value(): LayoutGraph = state.value
@@ -128,6 +127,7 @@ class LayoutGraphRepository(
             }
 
             state.value = next
+            dirty = true
 
             // Cancel-and-reschedule debounce. Coalesces drag-thrash
             // gestures into ~1 write per DEBOUNCE_MS window.
@@ -178,15 +178,16 @@ class LayoutGraphRepository(
      * call from a JVM shutdown hook (does no suspending I/O dispatch
      * switch; the calling thread does the file write directly).
      *
-     * No-op when nothing is pending and the on-disk file is already up
-     * to date.
+     * No-op when the file already matches the graph in memory. That matters
+     * beyond saving a write: this runs from a shutdown hook, and on the path
+     * where the recovery surface has just deleted the file, writing it back
+     * would undo the reset the user asked for.
      */
     suspend fun flush() {
         mutex.withLock {
-            val pending = pendingWrite
+            if (!dirty) return@withLock
+            pendingWrite?.cancel()
             pendingWrite = null
-            if (pending == null) return@withLock
-            pending.cancel()
             writeNow()
         }
     }
@@ -215,6 +216,18 @@ class LayoutGraphRepository(
                         "Loading read-only; this session will not write it back to avoid clobbering newer data.",
                     file, envelope.schemaVersion, SCHEMA_VERSION,
                 )
+            }
+            if (envelope.schemaVersion in 1 until LayoutReconcile.SURFACE_SCHEMA) {
+                // Deliberately not migrated: see LayoutReconcile.SURFACE_SCHEMA. The
+                // file is left on disk untouched and simply not read, so a build that
+                // still understands it can be gone back to.
+                log.warn(
+                    "Layout graph at {} is schema_version {} and describes widget surfaces in a form " +
+                        "with no faithful reading here; starting from the bundled default. " +
+                        "The file is left as it is.",
+                    file, envelope.schemaVersion,
+                )
+                return defaultGraph()
             }
             if (envelope.schemaVersion in 1 until SCHEMA_VERSION) {
                 _migratedFromSchema = envelope.schemaVersion
@@ -246,6 +259,10 @@ class LayoutGraphRepository(
     // The debounce coroutine acquires the mutex inside its launched
     // block; flush() invokes from inside its own mutex.withLock.
     private fun writeNow() {
+        if (RecoveryIo.stateWasReset) {
+            log.debug("Layout graph was reset from the recovery surface -- not writing the in-memory copy back")
+            return
+        }
         if (readOnly) {
             log.debug("Layout graph at {} is from a newer build -- skipping write-back", file)
             return
@@ -253,6 +270,7 @@ class LayoutGraphRepository(
         try {
             val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = state.value)
             AtomicFiles.writeString(file, json.encodeToString(envelope))
+            dirty = false
         } catch (e: Exception) {
             log.error("Failed to persist layout graph at {}", file, e)
         }
@@ -275,10 +293,13 @@ class LayoutGraphRepository(
 }
 
 /**
- * Schema migration ladder. Each step transforms a graph from version
- * N-1 to version N. Phase A bumps to v2 (forward-compat marker for
- * nested children -- the field defaults to empty, so v1 data parses
- * transparently as v2).
+ * Schema migration ladder. Each step transforms a graph from version N-1 to version N.
+ *
+ * Empty at present, and that is not an oversight. Everything below
+ * [LayoutReconcile.SURFACE_SCHEMA] is discarded at load rather than migrated, so the
+ * steps that once carried a graph from v1 to v7 are unreachable and have been removed
+ * with their tests. The mechanism stays because the next schema change will be an
+ * ordinary one: the format this build writes is built to grow rather than break.
  */
 internal object Migrations {
     fun apply(fromVersion: Int, graph: LayoutGraph): LayoutGraph {
@@ -298,25 +319,7 @@ internal object Migrations {
 
     private const val CURRENT = LayoutReconcile.CURRENT_SCHEMA
 
-    private fun step(toVersion: Int): Step = when (toVersion) {
-        // v1 -> v2: WidgetInstance gained a children field.
-        // v2 -> v3: WidgetInstance gained a nullable chrome field.
-        // Both add a defaulted field, so deserialization handles backward
-        // compat and the steps are identity.
-        2 -> Step.IDENTITY
-        3 -> Step.IDENTITY
-        // v3 -> v4: the nav rail unified onto the single nav.entry kind.
-        4 -> Step(::migrateNavToEntries)
-        // v4 -> v5: the Wardrobe (skins) nav entry joined the bundled rail.
-        5 -> Step(::insertWardrobeNavEntry)
-        // v5 -> v6: the shell gained a top bar. Relocate the three regions under
-        // a new appshell.body sub-surface and stack the bar over them.
-        6 -> Step(::migrateShellAddTopBar)
-        // v6 -> v7: the new home's default swapped quicklaunch for the
-        // art-backed hero and turned the welcome subtitle off.
-        7 -> Step(::migrateHomeHero)
-        else -> Step.IDENTITY
-    }
+    private fun step(toVersion: Int): Step = Step.IDENTITY
 
     private fun interface Step {
         fun apply(graph: LayoutGraph): LayoutGraph
@@ -325,167 +328,3 @@ internal object Migrations {
         }
     }
 }
-
-// Schema v3 -> v4: the nav rail unified onto a single configurable kind,
-// nav.entry. The retired kinds (the bundled navbuttons block, the per-item
-// nav.* widgets, the console/logout buttons) render nothing once dropped
-// from the registry, so a persisted leftrail must be rewritten or the rail
-// goes blank with no in-product way back except a surface reset. Applied
-// graph-wide so a retired nav widget dropped on any surface is converted
-// too, not only the bundled leftrail.
-private fun migrateNavToEntries(graph: LayoutGraph): LayoutGraph =
-    graph.flatMapInstances { w ->
-        when (w.kind.value) {
-            "appshell.leftrail.navbuttons" -> NAVBUTTONS_TARGETS.map { (token, target) ->
-                // Drop the block's chrome / weight / canvas: the monolith
-                // painted six bare rail items under one frame, so a single
-                // backing or weighted share must not replicate onto all six.
-                // The id derives from the (unique) original, so the six stay
-                // unique; the load-path sweep backstops the case where a
-                // derived id still clashes with a pre-existing one.
-                WidgetInstance(
-                    kind       = NAV_ENTRY,
-                    instanceId = "${w.instanceId}-$token",
-                    props      = navTargetProps(target),
-                )
-            }
-            "appshell.leftrail.consoletoggle" -> listOf(w.toNavEntry("Console"))
-            "appshell.leftrail.logout"        -> listOf(w.toNavEntry("Logout"))
-            "nav.home"     -> listOf(w.toNavEntry("Home"))
-            "nav.library"  -> listOf(w.toNavEntry("Library"))
-            "nav.browse"   -> listOf(w.toNavEntry("Browse"))
-            "nav.profile"  -> listOf(w.toNavEntry("Profile"))
-            "nav.settings" -> listOf(w.toNavEntry("Settings"))
-            "nav.about"    -> listOf(w.toNavEntry("About"))
-            else           -> listOf(w)
-        }
-    }
-
-// 1:1 conversion -- preserves chrome / weight / canvas, only kind + props change.
-private fun WidgetInstance.toNavEntry(target: String): WidgetInstance =
-    copy(kind = NAV_ENTRY, props = navTargetProps(target))
-
-// Schema v4 -> v5: the Wardrobe (skins) nav entry was added to the bundled rail.
-// Existing rails pre-date it, and the reconciler only seeds whole missing slots,
-// not new widgets inside a slot the user already has -- so inject it once, right
-// after the Profile entry (its bundled position). Idempotent: a graph that already
-// carries a Wardrobe entry is left as-is; a rail with no Profile entry (heavily
-// customised) is skipped rather than guessed at.
-private fun insertWardrobeNavEntry(graph: LayoutGraph): LayoutGraph {
-    if (graph.walkInstances().any { it.kind == NAV_ENTRY && navTarget(it) == "Wardrobe" }) return graph
-    var inserted = false
-    return graph.flatMapInstances { w ->
-        if (!inserted && w.kind == NAV_ENTRY && navTarget(w) == "Profile") {
-            inserted = true
-            listOf(
-                w,
-                WidgetInstance(
-                    kind = NAV_ENTRY,
-                    instanceId = "appshell-leftrail-nav-wardrobe",
-                    props = navTargetProps("Wardrobe"),
-                ),
-            )
-        } else {
-            listOf(w)
-        }
-    }
-}
-
-private fun navTarget(w: WidgetInstance): String? = (w.props["target"] as? JsonPrimitive)?.content
-
-// Raw-string props: client-launcher cannot see the NavTarget enum (it lives
-// in client-ui), and a Kotlin enum's default serial name equals its constant
-// name, so these strings decode straight into NavTarget. A NavTarget rename
-// would break the contract -- guarded by NavTargetSerialNameTest.
-private fun navTargetProps(target: String): JsonObject =
-    JsonObject(mapOf("target" to JsonPrimitive(target)))
-
-private val NAV_ENTRY = WidgetKind("nav.entry")
-
-// Top-to-bottom order of the retired monolith's six items.
-private val NAVBUTTONS_TARGETS = listOf(
-    "home" to "Home",
-    "library" to "Library",
-    "browse" to "Browse",
-    "profile" to "Profile",
-    "settings" to "Settings",
-    "about" to "About",
-)
-
-// Schema v5 -> v6: the shell root gained a top bar. The reconciler only ADDS
-// missing surfaces/slots; it never reshapes an existing slot, so a persisted
-// appshell.root/regions (the old Row of three regions) would keep the old shape
-// and never show the bar. Relocate whatever the user has in regions into the new
-// appshell.body sub-surface (props / weight / chrome preserved -- a heavily
-// customised rail is moved, not dropped), and replace regions with the Column of
-// [top, body]. appshell.body is created HERE so mergeMissingSurfaces won't seed
-// the bundled default body over the moved regions; appshell.topbar is left to the
-// merge to seed from the default (it carries no user data yet).
-private fun migrateShellAddTopBar(graph: LayoutGraph): LayoutGraph {
-    val root = graph.surfaces[SHELL_ROOT_SURFACE] ?: return graph
-    val regions = root.slots[REGIONS_SLOT] ?: return graph
-    // Idempotent: a graph already carrying the top region is left untouched.
-    if (regions.widgets.any { it.kind == REGION_TOP_KIND }) return graph
-
-    val body = SurfaceLayout(
-        slots = mapOf(
-            BODY_CONTENT_SLOT to SlotContent(widgets = regions.widgets, orientation = SlotOrientation.Row),
-        ),
-    )
-    val newRegions = SlotContent(
-        orientation = SlotOrientation.Column,
-        widgets = listOf(
-            WidgetInstance(kind = REGION_TOP_KIND, instanceId = "appshell-region-top-default"),
-            WidgetInstance(kind = REGION_BODY_KIND, instanceId = "appshell-region-body-default", weight = 1f),
-        ),
-    )
-    val newRoot = root.copy(slots = root.slots + (REGIONS_SLOT to newRegions))
-    return graph.copy(surfaces = graph.surfaces + (SHELL_ROOT_SURFACE to newRoot) + (SHELL_BODY_SURFACE to body))
-}
-
-private val SHELL_ROOT_SURFACE = SurfaceId("appshell.root")
-private val SHELL_BODY_SURFACE = SurfaceId("appshell.body")
-private val REGIONS_SLOT       = SlotId("regions")
-private val BODY_CONTENT_SLOT  = SlotId("content")
-private val REGION_TOP_KIND    = WidgetKind("appshell.region.top")
-private val REGION_BODY_KIND   = WidgetKind("appshell.region.body")
-
-// Schema v6 -> v7: the new home's default replaced the quicklaunch block with
-// the art-backed hero card and switched the welcome subtitle (permanent
-// onboarding copy) off. Applies ONLY while home.new/main still holds the
-// untouched v6 default -- the exact four bundled instance ids in their
-// bundled order. Any customised slot keeps the user's arrangement byte for
-// byte (the hero stays available from the editor palette). The kept
-// instances carry their existing props over; the welcome only gains
-// showSubtitle=false when the user never set that key themselves.
-private fun migrateHomeHero(graph: LayoutGraph): LayoutGraph {
-    val home = graph.surfaces[HOME_NEW_SURFACE] ?: return graph
-    val main = home.slots[HOME_MAIN_SLOT] ?: return graph
-    if (main.widgets.map { it.instanceId } != HOME_V6_DEFAULT_IDS) return graph
-
-    val byId = main.widgets.associateBy { it.instanceId }
-    val welcome = byId.getValue("home-new-welcome-default").let { w ->
-        if ("showSubtitle" in w.props) w
-        else w.copy(props = JsonObject(w.props + ("showSubtitle" to JsonPrimitive(false))))
-    }
-    val newMain = main.copy(
-        widgets = listOf(
-            welcome,
-            byId.getValue("home-new-spacer-default"),
-            WidgetInstance(kind = HOME_HERO_KIND, instanceId = "home-new-hero-default"),
-            byId.getValue("home-new-recent-default"),
-        ),
-    )
-    val newHome = home.copy(slots = home.slots + (HOME_MAIN_SLOT to newMain))
-    return graph.copy(surfaces = graph.surfaces + (HOME_NEW_SURFACE to newHome))
-}
-
-private val HOME_NEW_SURFACE = SurfaceId("home.new")
-private val HOME_MAIN_SLOT   = SlotId("main")
-private val HOME_HERO_KIND   = WidgetKind("home.new.hero")
-private val HOME_V6_DEFAULT_IDS = listOf(
-    "home-new-welcome-default",
-    "home-new-spacer-default",
-    "home-new-recent-default",
-    "home-new-quicklaunch-default",
-)

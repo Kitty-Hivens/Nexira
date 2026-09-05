@@ -1,16 +1,19 @@
 package hivens.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.HomeView
-import hivens.core.data.UiStyle
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
@@ -37,8 +40,6 @@ fun SettingsScreen(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
-    uiStyle: UiStyle,
-    onUiStyleChanged: (UiStyle) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
@@ -50,7 +51,13 @@ fun SettingsScreen(
 
     val initialSettings = remember { settingsService.getSettings() }
     val form            = remember { SettingsFormState(initialSettings) }
-    var selectedCategory by remember { mutableStateOf(SettingsCategory.Appearance) }
+    // Saved by name rather than ordinal: an ordinal would quietly point somewhere
+    // else the first time the enum is reordered.
+    var selectedCategory by rememberSaveable(
+        stateSaver = Saver(save = { it.name }, restore = { SettingsCategory.valueOf(it) }),
+    ) { mutableStateOf(SettingsCategory.Appearance) }
+
+    val sectionRetention = rememberSaveableStateHolder()
 
     fun save() {
         val toPersist = form.mergeInto(settingsService.getSettings())
@@ -78,12 +85,25 @@ fun SettingsScreen(
                     onSelect = { selectedCategory = it },
                 )
 
+                // One scroll state per category, so a category opens at its top.
+                // Shared, it survived the switch: reading the bottom of Console
+                // and clicking Advanced landed part-way down a page that had
+                // never been scrolled.
+                val categoryScroll = remember(selectedCategory) { ScrollState(0) }
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(categoryScroll)
+                        // Inside the scrolled content: without it the last plane
+                        // ended flush against the clip with its bevel cut through.
+                        .padding(bottom = 24.dp),
                 ) {
+                    // Section-local state -- a half-typed console art draft, a
+                    // filled-in field -- outlives a look at a neighbouring category.
+                    // The scroll above is deliberately NOT in here: a category opens
+                    // at its top, which is the whole point of keying it per category.
+                    sectionRetention.SaveableStateProvider(selectedCategory.name) {
                     when (selectedCategory) {
                         SettingsCategory.Appearance -> AppearanceSection(
                             form                         = form,
@@ -96,25 +116,24 @@ fun SettingsScreen(
                             onLocaleChanged              = onLocaleChanged,
                             homeView                     = homeView,
                             onHomeViewChanged            = onHomeViewChanged,
-                            uiStyle                      = uiStyle,
-                            onUiStyleChanged             = onUiStyleChanged,
                         )
-                        SettingsCategory.Console -> ConsoleSection(paths = paths)
+                        SettingsCategory.Console -> ConsoleSection()
                         SettingsCategory.Network -> NetworkSection()
                         SettingsCategory.Smarty -> SmartySection(
                             form = form,
                             save = ::save,
                         )
-                        SettingsCategory.Experimental -> ExperimentalSection(
+                        SettingsCategory.Advanced -> AdvancedSection(
+                            paths           = paths,
                             form            = form,
                             save            = ::save,
                             initialSettings = initialSettings,
                         )
-                        SettingsCategory.Advanced -> AdvancedSection(paths = paths, form = form, save = ::save)
                         SettingsCategory.Diagnostics -> DiagnosticsSection(
                             paths       = paths,
                             onOpenAbout = onOpenAbout,
                         )
+                    }
                     }
                 }
             }

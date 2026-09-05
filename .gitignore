@@ -100,3 +100,8 @@ GEMINI.md
 hs_err_pid*.log
 replay_pid*.log
 core.[0-9]*
+
+# Python bytecode from the lint scanners. They were standalone files until they
+# started sharing a module-discovery helper; importing it is what makes CPython
+# write a cache next to them.
+scripts/__pycache__/

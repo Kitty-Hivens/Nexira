@@ -20,9 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.nx.NxChoiceChip
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -51,11 +50,15 @@ data class TabContainerProps(
     @PropLabel("widget.container.tabs.label3") val label3: String = "",
 )
 
+// Transparent by default, for the same reason as the group container: the tab
+// bodies carry their own planes, and a plate behind them reads as a second card.
+// Named rather than absent so the editor has a value to raise.
 @Widget(
     id          = "container.tabs",
     displayName = "widget.container.tabs",
     slots       = ["tab_0", "tab_1", "tab_2"],
     propsClass  = TabContainerProps::class,
+    surface     = """{"fill":"base","opacity":0.0}""",
 )
 @Composable
 fun TabContainerWidget(instance: WidgetInstance) {
@@ -72,10 +75,10 @@ fun TabContainerWidget(instance: WidgetInstance) {
     Column(Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(count) { idx ->
-                TabChip(
+                NxChoiceChip(
                     label    = labels[idx],
                     selected = idx == activeIdx,
-                    onClick  = { active = idx },
+                    onToggle = { active = idx },
                 )
             }
         }
@@ -86,22 +89,4 @@ fun TabContainerWidget(instance: WidgetInstance) {
             modifier = Modifier.fillMaxWidth(),
         )
     }
-}
-
-@Composable
-private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        text       = label,
-        style      = MaterialTheme.typography.labelMedium,
-        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        modifier   = Modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(
-                if (selected) NxTheme.colors.primary.copy(alpha = 0.16f)
-                else glassSurfaceAlpha(0.4f),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    )
 }

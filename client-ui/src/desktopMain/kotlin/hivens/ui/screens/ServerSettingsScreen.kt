@@ -34,7 +34,9 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.utils.rememberFileDialogSettings
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -63,6 +65,9 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     // confirm dialog; the puppet hook runs it directly (automation bypass).
     val performResetClient = { state.resetClient(onBack) }
 
+    val iconDialogSettings = rememberFileDialogSettings(s.serverSettingsPickIcon)
+    val javaDialogSettings = rememberFileDialogSettings(s.serverSettingsPickJava)
+
     // Puppet ids prefixed with the server's assetDir so concurrent settings
     // dialogs (theoretical -- Nexira keeps only one open at a time today) stay
     // disambiguated, and tests can verify they're acting on the intended server.
@@ -81,7 +86,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     // Per-mod toggle. Mods load asynchronously -- registry mirrors what's
     // currently composed, so puppet calls before modsLoaded return 404.
     state.mods.forEach { mod ->
-        PuppetToggle("$pkey.mod.${mod.id}", state.modStates[mod.id] ?: mod.isDefault) {
+        PuppetToggle("$pkey.mod.${mod.id}", state.modStates[mod.id] ?: mod.enabledByDefault) {
             state.modStates[mod.id] = it
         }
     }
@@ -100,7 +105,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     .size(48.dp)
                     .clip(MaterialTheme.shapes.medium)
                     .background(NxTheme.colors.surface)
-                    .clickable { state.pickIcon(s.serverSettingsPickIcon) },
+                    .clickable { state.pickIcon(iconDialogSettings) },
                 contentAlignment = Alignment.Center
             ) {
                 val icon = state.serverIcon
@@ -147,7 +152,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     RamSelector(
                         isAuto = state.isAutoMode,
                         resolvedAutoMb = state.resolvedAutoMb,
-                        currentMb = state.memoryMb,
+                        // Nothing pinned: offer what the next launch would use anyway.
+                        currentMb = state.memoryMb.takeIf { it > 0 } ?: state.resolvedAutoMb,
                         // Auto un-pins (fixedMemory=false); picking a value pins (Fixed).
                         onAutoSelected = { state.isAutoMode = true },
                         onValueChanged = { state.memoryMb = it; state.isAutoMode = false },
@@ -176,7 +182,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         singleLine    = true,
                         colors        = settingsFieldColors(),
                         trailingIcon  = {
-                            IconButton(onClick = { state.pickJava(s.serverSettingsPickJava) }) {
+                            IconButton(onClick = { state.pickJava(javaDialogSettings) }) {
                                 Symbol(NxIcon.Folder, null, tint = NxTheme.colors.primary)
                             }
                         }
@@ -365,11 +371,11 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     } else {
                         AnimatedVisibility(
                             visible = state.modsLoaded,
-                            enter   = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
+                            enter   = slideInVertically(initialOffsetY = { 50 }, animationSpec = Motion.panelSlide.of()) + fadeIn(Motion.panelSlide.of())
                         ) {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(state.mods) { mod ->
-                                    val currentState = state.modStates[mod.id] ?: mod.isDefault
+                                    val currentState = state.modStates[mod.id] ?: mod.enabledByDefault
 
                                     ModItemCard(
                                         mod       = mod,

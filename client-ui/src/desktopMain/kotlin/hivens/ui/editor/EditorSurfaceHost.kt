@@ -50,8 +50,12 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -61,7 +65,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
-import hivens.core.data.UiStyle
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
@@ -87,24 +90,11 @@ import hivens.ui.icons.Symbol
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.layout.LayoutReconcile
 import hivens.ui.nx.AdaptiveWidth
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
-import hivens.ui.widgets.about.LocalAboutContext
-import hivens.ui.widgets.about.STUB_ABOUT
-import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
-import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
-import hivens.ui.widgets.home.classic.LocalHomeClassicContext
-import hivens.ui.widgets.home.new.LocalHomeNewContext
-import hivens.ui.widgets.library.LocalLibraryContext
-import hivens.ui.widgets.profile.LocalProfileContext
-import hivens.ui.widgets.profile.STUB_PROFILE
-import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
-import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
-import hivens.ui.widgets.shell.LocalLeftRailContext
-import hivens.ui.widgets.shell.LocalRightRailContext
-import hivens.ui.widgets.themepicker.LocalThemePickerContext
-import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalLayoutGraph
@@ -114,6 +104,7 @@ import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
+import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
@@ -151,8 +142,6 @@ fun EditorSurfaceHost(
     homeView: HomeView,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
-    uiStyle: UiStyle = UiStyle.Celestia,
-    onUiStyleChanged: (UiStyle) -> Unit = {},
     // The host now wraps the WHOLE shell Row (rails included) so the editor's
     // decorators reach rail widgets. These insets keep the chrome overlays
     // (pill / palette / prop panel / vignette) anchored over the center pane,
@@ -161,8 +150,9 @@ fun EditorSurfaceHost(
     centerEndInset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
-    val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView) {
-        availableSurfacesFor(currentScreen, homeView)
+    val graphForSurfaces = LocalLayoutGraph.current
+    val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView, graphForSurfaces) {
+        EditorSurfaces.availableFor(currentScreen, homeView, graphForSurfaces)
     }
     val controller: EditModeController = koinInject()
     val layoutRepo: LayoutGraphRepository = koinInject()
@@ -173,6 +163,9 @@ fun EditorSurfaceHost(
     var editing       by remember(availableSurfaces) { mutableStateOf(false) }
     var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
     var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
+    // Where a right-click landed while NOT editing, which is the only thing that
+    // opens the way in. Null closes the menu.
+    var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
     var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
     var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
     var selectedSurface by remember(availableSurfaces) {
@@ -199,10 +192,34 @@ fun EditorSurfaceHost(
         slotMenuCursor = null
         handleMenuOpen = false
     }
+
+    // One Escape backs out one step: an open slot menu first, then the slot
+    // selection, then edit mode itself. Named because two paths run it -- the
+    // Box's own key handler for when focus happens to be inside, and the
+    // window-level chord for every other time, which is most of them.
+    fun backOutOneStep() {
+        when {
+            handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
+            selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
+            else                                     -> editing = false
+        }
+    }
     // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, the surface
     // settings panel, and any slot selection, so re-entering does not silently reopen
     // the last panel with the palette still hidden.
     LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false; clearSlotSelection() } }
+
+    // Commit the arrangement at the points where the user has finished a
+    // thought: leaving edit mode, and moving to another surface. Writes are
+    // debounced 200ms, and the only other flush is the shutdown hook, so until
+    // now a crash inside that window took the last edit with it -- and an edit
+    // session can end without the process ending at all.
+    //
+    // Per-mutation flushing stays off the table: a drag mutates the graph every
+    // frame, and a synchronous disk write per frame is worse than the gap.
+    // Keyed on both, so it fires when either changes; flush is a no-op with
+    // nothing pending, which is what entering edit mode hits.
+    LaunchedEffect(editing, selectedSurface) { layoutRepo.flush() }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
@@ -228,6 +245,27 @@ fun EditorSurfaceHost(
     // (its Crossfade swaps screen content *inside* the host, not the
     // host itself) -- there is never a second, hidden host to flip into
     // edit mode behind the user's back.
+    // The window's key handler claims Escape only while this is true, so it has to
+    // be reported rather than inferred; cleared on dispose so a host that leaves the
+    // tree while editing does not leave Escape claimed behind it.
+    DisposableEffect(editing) {
+        controller.reportEditing(editing)
+        onDispose { controller.reportEditing(false) }
+    }
+
+    // Window-level Escape (AppShell onPreviewKeyEvent, gated on the flag above)
+    // bumps the signal; the same staged back-out runs here. `seen` initialises to
+    // the current tick for the same reason the toggle observer does.
+    LaunchedEffect(availableSurfaces) {
+        var seen = controller.editorEscapeSignal.value
+        snapshotFlow { controller.editorEscapeSignal.value }.collect { tick ->
+            if (tick != seen) {
+                seen = tick
+                if (editing) backOutOneStep()
+            }
+        }
+    }
+
     LaunchedEffect(availableSurfaces) {
         var seen = controller.editToggleSignal.value
         snapshotFlow { controller.editToggleSignal.value }.collect { tick ->
@@ -243,6 +281,9 @@ fun EditorSurfaceHost(
 
     val dragController = remember { DragController() }
     val registry       = remember { DropTargetRegistry() }
+    // Descriptor knowledge for the preset load below; the structural reconcile in
+    // the launcher has no registry to consult.
+    val widgetRegistry = LocalWidgetRegistry.current
     val focusManager   = LocalFocusManager.current
     val density        = LocalDensity.current
 
@@ -409,10 +450,10 @@ fun EditorSurfaceHost(
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotChromeModifier provides slotChromeFactory,
-        // Edit-mode reflow duration -- slot add / remove / resize animates while
-        // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
+        // Edit-mode reflow duration: slot add / remove / resize animates while
+        // editing, and nothing elsewhere.
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
-            LocalStyle.current.animationDurationMs(260)
+            Motion.panelSlide.durationMs
         } else 0,
         // Canvas slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
@@ -421,24 +462,40 @@ fun EditorSurfaceHost(
         } else {
             { _, _ -> }
         },
-        // Stub surface contexts. Surface composables that mount under
-        // content() override with the real values; widgets dropped on
-        // a foreign surface fall through to the stubs and render
-        // with no-op callbacks instead of crashing the launcher.
-        LocalHomeClassicContext provides STUB_HOME_CLASSIC,
-        LocalHomeNewContext     provides STUB_HOME_NEW,
-        LocalLibraryContext     provides STUB_LIBRARY,
-        LocalLeftRailContext    provides STUB_LEFTRAIL,
-        LocalRightRailContext     provides STUB_RIGHTRAIL,
-        LocalAboutContext         provides STUB_ABOUT,
-        LocalBgSettingsContext    provides STUB_BG_SETTINGS,
-        LocalProfileContext       provides STUB_PROFILE,
-        LocalServerDetailsContext provides STUB_SERVER_DETAILS,
-        LocalThemePickerContext   provides STUB_THEME_PICKER,
+        // Stub surface contexts, spread from the registry. Surface composables
+        // that mount under content() override with the real values; widgets
+        // dropped on a foreign surface fall through to the stubs and render
+        // with no-op callbacks instead of crashing the launcher. Derived rather
+        // than listed, so a surface that declares a stub is provided one by
+        // existing -- the closed wall this replaced let a new surface fall
+        // through it without a word.
+        *EditorSurfaces.stubs,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                // The way into edit mode for anyone who does not already know the
+                // chord. Right-clicking the background of the thing you want to
+                // rearrange is how every desktop offers this, so it is the gesture
+                // people try first -- and until now the only entrance was Ctrl+E,
+                // documented nowhere in the interface.
+                //
+                // Final pass, like the slot chrome: a press any widget claimed
+                // belongs to that widget. While editing this does nothing, because
+                // the slot chrome owns right-click there.
+                .pointerInput(editing) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                            if (editing || event.type != PointerEventType.Press) continue
+                            val change = event.changes.first()
+                            if (event.buttons.isSecondaryPressed && !change.isConsumed) {
+                                entryMenuAt = change.position
+                                change.consume()
+                            }
+                        }
+                    }
+                }
                 .onKeyEvent { ev ->
                     // Escape exits edit mode. Ctrl+E entry/toggle is
                     // handled at Window scope (see AppShell) so it works
@@ -446,14 +503,7 @@ fun EditorSurfaceHost(
                     // Box-level handler misses the chord when the side
                     // rails own focus.
                     if (editing && ev.type == KeyEventType.KeyUp && ev.key == Key.Escape) {
-                        // Staged: close an open slot menu, then drop the slot
-                        // selection, then exit edit mode (edit-exit stays the final
-                        // stage, matching the documented Ctrl+E / Escape contract).
-                        when {
-                            handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
-                            selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
-                            else                                     -> editing = false
-                        }
+                        backOutOneStep()
                         true
                     } else false
                 },
@@ -462,6 +512,23 @@ fun EditorSurfaceHost(
             // primary tint at very low alpha to communicate "this whole
             // pane is being edited", without obscuring content.
             content()
+
+            entryMenuAt?.let { at ->
+                NxContextMenu(
+                    anchorInWindow   = at,
+                    expanded         = true,
+                    onDismissRequest = { entryMenuAt = null },
+                ) {
+                    NxMenuItem(
+                        label = LocalStrings.current.editorEnterLayout,
+                        icon  = NxIcon.ViewQuilt,
+                        hint  = "Ctrl+E",
+                    ) {
+                        entryMenuAt = null
+                        editing = true
+                    }
+                }
+            }
 
             // Center-anchored chrome layer: inset past the left rail and right
             // panel so the vignette + overlays stay over the center pane exactly
@@ -513,7 +580,6 @@ fun EditorSurfaceHost(
                             createdAt     = System.currentTimeMillis(),
                             graph         = currentGraph,
                             customization = customization,
-                            uiStyle       = uiStyle,
                         )
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             presetRepo.save(envelope)
@@ -538,9 +604,28 @@ fun EditorSurfaceHost(
                             } ?: return@launch
                             when (result) {
                                 is LayoutReconcile.Result.Ok -> {
-                                    layoutRepo.update { result.graph }
+                                    // And the registry-aware pass on top of it: the
+                                    // structural one seeds missing surfaces and slots
+                                    // but knows nothing of widget descriptors, so a
+                                    // preset saved before a container declared a child
+                                    // slot arrives without it -- the slot draws its
+                                    // placeholder, highlights on hover, and silently
+                                    // swallows every drop until the next start
+                                    // reconciles what this wrote to disk.
+                                    val seeded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                        WidgetGraphReconciler.reconcile(
+                                            graph    = result.graph,
+                                            registry = widgetRegistry,
+                                        )
+                                    }
+                                    if (seeded.seededSlots > 0) {
+                                        log.info(
+                                            "Preset '{}': seeded {} declared container child slot(s)",
+                                            meta.name, seeded.seededSlots,
+                                        )
+                                    }
+                                    layoutRepo.update { seeded.graph }
                                     onCustomizationChanged(env.customization)
-                                    onUiStyleChanged(env.uiStyle)
                                     presetPanelOpen = false
                                 }
                                 is LayoutReconcile.Result.DuplicateId ->
@@ -670,7 +755,7 @@ private fun EditModePill(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val motionMs = LocalStyle.current.animationDurationMs(260)
+    val motionMs = Motion.panelSlide.durationMs
     AnimatedVisibility(
         visible  = active,
         enter    = fadeIn(tween(motionMs)) + slideInVertically(tween(motionMs)) { -it },
@@ -878,62 +963,27 @@ private fun ToolChip(
 }
 
 private fun surfaceIcon(surface: SurfaceId): IconKey =
-    when (surface.value) {
-        "appshell.root"      -> NxIcon.Dashboard
-        "appshell.leftrail"  -> NxIcon.ViewSidebar
-        "appshell.rightrail" -> NxIcon.ViewQuilt
-        "appshell.topbar"    -> NxIcon.Layers
-        "appshell.body"      -> NxIcon.ViewQuilt
-        "appshell.overlay"   -> NxIcon.Layers
-        else                 -> NxIcon.Home
-    }
+    EditorSurfaces.spec(surface)?.icon ?: NxIcon.Home
 
-private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
-    "appshell.root"       -> s.editorSurfShortShell
-    "home.classic"        -> s.editorSurfShortHome
-    "home.new"            -> s.editorSurfShortHome
-    "library"             -> s.editorSurfShortLibrary
-    "appshell.leftrail"   -> s.editorSurfShortLeftRail
-    "appshell.rightrail"  -> s.editorSurfShortRightRail
-    "appshell.topbar"     -> s.editorSurfShortTopBar
-    "appshell.body"       -> s.editorSurfShortBody
-    "appshell.overlay"    -> s.editorSurfShortOverlay
-    "about"               -> s.editorSurfShortAbout
-    "bg.settings"         -> s.editorSurfShortBg
-    "profile"             -> s.editorSurfShortProfile
-    "server.details"      -> s.editorSurfShortServer
-    "theme.picker"        -> s.editorSurfShortTheme
-    else                  -> surface.value
-}
+// Falls back to the raw id for a surface with no spec: better a visible
+// `home.experiment` in the picker than a blank chip, and the registry test
+// catches the omission before a build ships it.
+private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String =
+    EditorSurfaces.spec(surface)?.shortName?.invoke(s) ?: surface.value
 
-private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
-    "appshell.root"       -> s.editorSurfShell
-    "home.classic"        -> s.editorSurfHomeClassic
-    "home.new"            -> s.editorSurfHomeNew
-    "library"             -> s.editorSurfLibrary
-    "appshell.leftrail"   -> s.editorSurfLeftRail
-    "appshell.rightrail"  -> s.editorSurfRightRail
-    "appshell.topbar"     -> s.editorSurfTopBar
-    "appshell.body"       -> s.editorSurfBody
-    "appshell.overlay"    -> s.editorSurfOverlay
-    "about"               -> s.editorSurfAbout
-    "bg.settings"         -> s.editorSurfBg
-    "profile"             -> s.editorSurfProfile
-    "server.details"      -> s.editorSurfServer
-    "theme.picker"        -> s.editorSurfTheme
-    else                  -> surface.value
-}
+private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String =
+    EditorSurfaces.spec(surface)?.name?.invoke(s) ?: surface.value
 
 // Surfaces that expose surface-level settings (a SurfacePropertiesPanel),
-// distinct from per-widget props. Currently only the left nav rail.
+// distinct from per-widget props.
 private fun surfaceHasSettings(surface: SurfaceId?): Boolean =
-    surface?.value == "appshell.leftrail"
+    surface != null && EditorSurfaces.spec(surface)?.hasSettings == true
 
 // ── Vignette ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun EditModeVignette(active: Boolean) {
-    val motionMs = LocalStyle.current.animationDurationMs(320)
+    val motionMs = Motion.fade.durationMs
     val alpha by animateFloatAsState(
         targetValue   = if (active) 1f else 0f,
         animationSpec = tween(motionMs),
@@ -1002,41 +1052,4 @@ private fun transparentPointerIcon(): PointerIcon {
     val cursor = java.awt.Toolkit.getDefaultToolkit()
         .createCustomCursor(image, java.awt.Point(0, 0), "drag-ghost")
     return PointerIcon(cursor)
-}
-
-// ── Surface routing ─────────────────────────────────────────────────────────
-
-// All surfaces editable on the given screen. The first entry is the
-// "main" content surface and is selected by default; the two rails
-// follow. Other screens (Settings, Profile, etc.) are not widget-
-// composed yet and return an empty list (FAB stays hidden).
-private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<SurfaceId> {
-    // The center surface for this screen, or null for screens not yet widgetized.
-    val main: SurfaceId? = when (screen) {
-        Screen.Home -> when (homeView) {
-            HomeView.Classic      -> SurfaceId("home.classic")
-            HomeView.LibraryFirst -> SurfaceId("library")
-            HomeView.New          -> SurfaceId("home.new")
-        }
-        Screen.About                  -> SurfaceId("about")
-        Screen.BackgroundSettings     -> SurfaceId("bg.settings")
-        Screen.Library                -> SurfaceId("library")
-        Screen.Profile                -> SurfaceId("profile")
-        is Screen.ServerDetails       -> SurfaceId("server.details")
-        Screen.ThemePicker            -> SurfaceId("theme.picker")
-        // Other widget-composed surfaces from B.1 land here as the
-        // rest of the screens migrate over.
-        else                          -> null
-    }
-    // The shell + rails are always present, so they are editable from every
-    // screen even when the center is not yet a widget surface. The center
-    // surface (when there is one) is first, so it stays the default selection.
-    return listOfNotNull(main) + listOf(
-        SurfaceId("appshell.topbar"),
-        SurfaceId("appshell.overlay"),
-        SurfaceId("appshell.leftrail"),
-        SurfaceId("appshell.rightrail"),
-        SurfaceId("appshell.body"),
-        SurfaceId("appshell.root"),
-    )
 }

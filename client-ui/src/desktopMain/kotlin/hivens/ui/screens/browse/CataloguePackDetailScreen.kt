@@ -1,41 +1,29 @@
 package hivens.ui.screens.browse
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -47,10 +35,13 @@ import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.ImageGallery
 import hivens.ui.components.galleryMedia
 import hivens.ui.components.isPlayableVideoUrl
-import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxVerticalScrollbar
+import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.render.MarkdownHtml
@@ -58,7 +49,6 @@ import hivens.ui.render.openInBrowser
 import hivens.ui.screens.versions.PickerIntent
 import hivens.ui.screens.versions.PickerVersion
 import hivens.ui.screens.versions.VersionPickerWindow
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -77,9 +67,9 @@ import org.koin.compose.koinInject
  * cancels the download, and re-entering while it runs re-attaches to the live
  * progress instead of showing an idle button.
  *
- * The compat metadata (MC / loader / runtime / tags) renders in the in-page sidebar
- * for now; per the shell rule it will move into the contextual right rail once that
- * surface becomes screen-aware.
+ * Tags and what the pack runs on render in the flow of the description. The
+ * column that used to hold the latter is gone: it cost a column's width down the
+ * whole page to say three things, and a line says them without one.
  */
 @Composable
 fun CataloguePackDetailScreen(
@@ -91,12 +81,21 @@ fun CataloguePackDetailScreen(
     val s = LocalStrings.current
     val registry: PackCatalogueRegistry = koinInject()
     val installService: PackInstallService = koinInject()
+    val session: BrowseSession = koinInject()
 
     // Back is the top-bar breadcrumb's job now (no hero arrow), but automation
     // still needs a handle on it.
     PuppetClick("catalogue.detail.back") { onBack() }
 
-    var state by remember(origin, packId) { mutableStateOf<DetailState>(DetailState.Loading) }
+    // Opens on the page as it was last read, not on a spinner. The details are the
+    // same on the way back as they were on the way in, so rebuilding them from
+    // nothing meant the page a reader had just closed came back empty and filled in
+    // again in front of them.
+    var state by remember(origin, packId) {
+        mutableStateOf<DetailState>(
+            session.details(origin, packId)?.let { DetailState.Loaded(it) } ?: DetailState.Loading,
+        )
+    }
     var retryTick by remember(origin, packId) { mutableIntStateOf(0) }
     var showPicker by remember(origin, packId) { mutableStateOf(false) }
 
@@ -106,9 +105,7 @@ fun CataloguePackDetailScreen(
     val installs by installService.installs.collectAsState()
     val active = installs.values.firstOrNull { it.origin == origin && it.packId == packId }
     val installing = active?.let { snap ->
-        (snap.phase as? InstallPhase.Running)?.let { r ->
-            InstallProgress(snap.versionId, r.current, r.total, r.filename)
-        }
+        (snap.phase as? InstallPhase.Running)?.let { InstallProgress(snap.versionId) }
     }
     val installError = (active?.phase as? InstallPhase.Failed)?.message
 
@@ -138,28 +135,46 @@ fun CataloguePackDetailScreen(
     }
 
     LaunchedEffect(origin, packId, retryTick) {
-        state = DetailState.Loading
+        // Only a page with nothing on it says so. A refresh behind a page already
+        // read replaces it when it lands, the way the catalogue list does.
+        if (state !is DetailState.Loaded) state = DetailState.Loading
         state = try {
             val catalogue = registry.forOrigin(origin)
             if (catalogue == null) {
                 DetailState.Error(s.browseDetailErrorMessage)
             } else {
-                DetailState.Loaded(withContext(Dispatchers.IO) { catalogue.details(packId) })
+                val details = withContext(Dispatchers.IO) { catalogue.details(packId) }
+                session.putDetails(origin, packId, details)
+                DetailState.Loaded(details)
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            DetailState.Error(e.message ?: s.browseDetailErrorMessage)
+            // A source that failed while a page of its own is on screen keeps
+            // showing it: an error page loses more than the error explains.
+            (state as? DetailState.Loaded) ?: DetailState.Error(e.message ?: s.browseDetailErrorMessage)
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    // A bar to take hold of. A page this long is otherwise reachable only by the
+    // wheel: there is nothing to drag, and nothing showing how far down it goes.
+    //
+    // Revealed while scrolling, and by the cursor reaching the edge it lives on
+    // -- not by the cursor being anywhere on the page. The other lists in the app
+    // put this on a pane with something beside it, so leaving the pane hides the
+    // bar; here the pane is the whole window, and hover over all of it means the
+    // bar never idles away at all.
+    val scroll = rememberScrollState()
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
         val loaded = state as? DetailState.Loaded
         CatalogueHero(
             // Same floated-card rounding as the Library detail hero.
             modifier  = Modifier
                 .padding(start = 16.dp, top = 8.dp, end = 16.dp)
-                .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
+                .clip(MaterialTheme.shapes.medium),
             title     = loaded?.details?.title ?: packId,
             tagline   = loaded?.details?.tagline.orEmpty(),
             iconUrl   = loaded?.details?.iconUrl,
@@ -202,7 +217,22 @@ fun CataloguePackDetailScreen(
                 onRetry    = { retryTick++ },
                 modifier   = Modifier.fillMaxWidth().padding(32.dp),
             )
-            is DetailState.Loaded -> DetailBody(details = st.details, installing = installing, installError = installError)
+            is DetailState.Loaded -> DetailBody(details = st.details, installError = installError)
+        }
+    }
+        Box(
+            modifier         = Modifier
+                .align(Alignment.CenterEnd)
+                .width(SCROLLBAR_GUTTER)
+                .fillMaxHeight()
+                .hoverable(hover),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            NxVerticalScrollbar(
+                adapter  = rememberScrollbarAdapter(scroll),
+                revealed = hovered || scroll.isScrollInProgress,
+                modifier = Modifier.fillMaxHeight().padding(vertical = 4.dp),
+            )
         }
     }
 
@@ -248,32 +278,98 @@ fun CataloguePackDetailScreen(
     }
 }
 
-/** "Minecraft 1.12.2 . Forge", skipping whichever half the source did not declare. */
+/** "Minecraft 1.12.2  Forge", skipping whichever half the source did not declare. */
 private fun runtimeLineOf(v: CataloguePackVersion): String? = listOfNotNull(
     v.mcVersions.firstOrNull()?.let { "Minecraft $it" },
     v.loaders.firstOrNull()?.replaceFirstChar(Char::uppercase),
 ).joinToString("  ").takeIf { it.isNotBlank() }
 
 @Composable
-private fun DetailBody(details: CataloguePackDetails, installing: InstallProgress?, installError: String?) {
+private fun DetailBody(details: CataloguePackDetails, installError: String?) {
     val s = LocalStrings.current
     // A body link to a video (direct file or a service page) opens in-app; the
     // rest go to the browser as before.
     var videoLink by remember { mutableStateOf<String?>(null) }
-    Row(
-        modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    val hasGallery = details.gallery.isNotEmpty()
+    var tab by remember(details.origin, details.id) { mutableStateOf(DetailTab.Description) }
+    // Full width, sharing the hero's edges. It was briefly centred under a ceiling,
+    // which was not a decision about this page: the side column had been removed
+    // twenty minutes earlier, the description was left running edge to edge, and the
+    // ceiling went in to compensate for that. What it actually did was split the page
+    // -- the hero above spans the window, so the block under it hung in the middle
+    // with neither edge lining up with anything. One page, one measure.
+    NxSurface(
+        level    = NxSurfaceLevel.Raised,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
     ) {
-        Column(modifier = Modifier.weight(2f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (details.galleryUrls.isNotEmpty()) {
-                ImageGallery(media = galleryMedia(details.galleryUrls, details.galleryThumbUrls))
+        Column(
+            modifier            = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            val facts = remember(details) { compatFacts(details) }
+            if (facts.isNotEmpty()) {
+                // What the pack runs on, in the flow of the page. It used to be a
+                // column of label-and-value rows beside the description, which
+                // reserved a column's width down the whole page to say three
+                // things and pushed the reading of it into a narrower measure than
+                // it deserved. Three facts are a line, not a panel.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement   = Arrangement.spacedBy(6.dp),
+                ) { facts.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
             }
-            details.bodyMarkdown?.let {
-                MarkdownHtml(
-                    markdown = it,
+            if (details.tags.isNotEmpty()) {
+                // In the flow of the page rather than in a column of their own. The
+                // side column this used to share was carrying one short block down
+                // the height of a long description, and reserving that width did
+                // more damage to the reading of the page than the block was worth.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement   = Arrangement.spacedBy(6.dp),
+                ) { details.tags.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
+            }
+            // The gallery is a place of its own, not a strip at the head of the
+            // description. Screenshots and prose want opposite widths, and a grid
+            // of them above the text pushes the text off the first screen of a
+            // page whose text is the point. The tab is offered only when there
+            // are shots -- a lone tab is not a choice, it is a label.
+            if (hasGallery) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    NxChoiceChip(s.browseDetailTabDescription, selected = tab == DetailTab.Description) {
+                        tab = DetailTab.Description
+                    }
+                    NxChoiceChip(s.browseDetailTabGallery, selected = tab == DetailTab.Gallery) {
+                        tab = DetailTab.Gallery
+                    }
+                }
+                PuppetClick("catalogue.detail.tab.description") { tab = DetailTab.Description }
+                PuppetClick("catalogue.detail.tab.gallery") { tab = DetailTab.Gallery }
+            }
+            val body = details.bodyMarkdown
+            when {
+                hasGallery && tab == DetailTab.Gallery -> ImageGallery(media = remember(details) { galleryMedia(details.gallery) })
+                !body.isNullOrBlank() -> MarkdownHtml(
+                    markdown = body,
                     modifier = Modifier.fillMaxWidth(),
                     onLink   = { url -> if (isPlayableVideoUrl(url)) videoLink = url else openInBrowser(url) },
                 )
+                // A source that says nothing about its pack used to end the card at
+                // the tag row, so the page was two thin bars over the wallpaper and
+                // read as a page that had failed to load rather than as a pack with
+                // nothing written about it. A blank string did the same through a
+                // markdown block with no content in it.
+                else -> Box(
+                    modifier         = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text  = s.browseDetailNoDescription,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = NxTheme.colors.textSecondary,
+                    )
+                }
             }
 
             if (installError != null) {
@@ -284,62 +380,44 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             // the screen cannot. Two of them on one install was the state the
             // surface was built to end.
         }
-
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            val v = details.versions.firstOrNull()
-            SidebarBlock(title = s.browseDetailCompatTitle) {
-                v?.mcVersions?.firstOrNull()?.let { MetaRow(s.browseDetailCompatMc, it) }
-                v?.loaders?.firstOrNull()?.let { MetaRow(s.browseDetailCompatLoader, it.replaceFirstChar { c -> c.uppercase() }) }
-                details.runtimeLabel?.let { MetaRow(s.browseDetailCompatJava, it) }
-            }
-            if (details.tags.isNotEmpty()) {
-                SidebarBlock(title = s.browseDetailTagsTitle) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { details.tags.forEach { Chip(it) } }
-                }
-            }
-        }
     }
     videoLink?.let { url ->
         FullscreenVideo(url = url, onDismiss = { videoLink = null })
     }
 }
 
-@Composable
-private fun SidebarBlock(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-        Box(
-            modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(glassSurfaceAlpha(0.6f)).padding(16.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { content() }
-        }
-    }
-}
 
-@Composable
-private fun MetaRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun Chip(text: String) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        shape   = MaterialTheme.shapes.extraSmall,
-        label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textPrimary) },
-        colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = glassSurfaceAlpha(0.4f),
-            disabledLabelColor     = NxTheme.colors.textPrimary,
-        ),
-        border  = null,
+/**
+ * What the pack runs on, as short phrases, in the order a person asks for them:
+ * the game first, then what loads the mods into it, then the runtime under both.
+ *
+ * Read off the newest version rather than off the pack, because a pack does not
+ * have a Minecraft version -- its builds do, and the newest is the one the
+ * install button reaches for. A source silent on any of the three contributes
+ * nothing rather than a placeholder: "Loader: unknown" is worse than a line that
+ * does not mention loaders.
+ */
+internal fun compatFacts(details: CataloguePackDetails): List<String> {
+    val newest = details.versions.firstOrNull()
+    return listOfNotNull(
+        newest?.mcVersions?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { "Minecraft $it" },
+        newest?.loaders?.firstOrNull()?.takeIf { it.isNotBlank() }?.replaceFirstChar(Char::uppercase),
+        details.runtimeLabel?.takeIf { it.isNotBlank() },
     )
 }
 
-private data class InstallProgress(val versionId: String, val current: Int, val total: Int, val filename: String)
+/** How near the edge the cursor has to come to call the scrollbar up. */
+private val SCROLLBAR_GUTTER = 28.dp
+
+/** The two halves of a pack page: what it says about itself, and what it looks like. */
+private enum class DetailTab { Description, Gallery }
+
+/**
+ * Which version is being installed. Only the identity is read: the activity
+ * surface narrates the progress, and the counters this used to carry were being
+ * rebuilt every frame for a block that no longer exists.
+ */
+private data class InstallProgress(val versionId: String)
 
 private sealed class DetailState {
     object Loading : DetailState()

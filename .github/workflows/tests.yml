@@ -1,11 +1,17 @@
 name: Tests
 
-# Unit-test matrix on every code PR.
+# Unit-test matrix on every code PR and every code push to a working branch.
 #
-# build_release.yml runs the same suites minus widget-processor, but only on a release tag --
-# so OS-specific regressions stayed invisible until a tag was cut (that is how
-# a macOS native-classifier assumption and Windows path-separator asserts once
-# reached a release and blocked it). This workflow runs them at PR time instead.
+# build_release.yml runs these suites on a release tag -- so OS-specific
+# regressions stayed invisible until a tag was cut (that is how a macOS
+# native-classifier assumption and Windows path-separator asserts once reached a
+# release and blocked it). This workflow runs them at PR time instead.
+#
+# dev is in the push list because work lands there as direct commits, not as
+# pull requests. Without it the first run of any test on that code is the nightly
+# tag, which puts hours and a stack of unrelated commits between a break and the
+# report -- exactly the gap that let a macOS-only watch assumption and a
+# composition that never rendered both reach a nightly.
 #
 # Full 3-OS matrix, deliberately NOT Linux-only: the failures that motivated
 # this were all green on Linux, so a Linux-only PR run would not have caught
@@ -23,7 +29,15 @@ on:
       - 'gradle.properties'
       - '.github/workflows/tests.yml'
   push:
-    branches: [stable]
+    branches: [dev, stable]
+    # Same filter as the PR trigger: a CHANGELOG or docs commit on dev should not
+    # spend a three-OS matrix.
+    paths:
+      - '**.kt'
+      - '**.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - '.github/workflows/tests.yml'
 
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.ref }}
@@ -51,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
@@ -65,12 +79,21 @@ jobs:
       # single starved core. The video-transcode test opts in through
       # NEXIRA_TEST_VIDEO and no-ops without it, so no media natives are needed.
       #
-      # Every module that has tests is listed. A suite left out of this line is a
-      # suite nobody runs: the widget kernel's default-layout drift guard sat red
-      # on both branches through several releases because :widget-model:test was
-      # absent here. The rest are pure JVM -- no display, no native tray, no
-      # network, no spawned yt-dlp -- so they cost seconds and cover the design
-      # system, the widget kernel, all three auth providers and both java agents.
+      # Every module that has tests is listed, and check-ci-suites.py fails the
+      # build when that stops being true. A suite left out of this line is a suite
+      # nobody runs: the widget kernel's default-layout drift guard sat red on both
+      # branches through several releases because :widget-model:test was absent
+      # here, and the widget loader -- the runtime half of the same validator the
+      # KSP processor enforces at compile time -- was absent for as long again.
+      #
+      # The worked example module is here for the same reason: it is the only thing
+      # in the tree that compiles against the widget ABI from outside, so its
+      # packaging test is what notices an ABI change the launcher's own modules
+      # cannot see.
+      #
+      # The rest are pure JVM -- no display, no native tray, no network, no spawned
+      # yt-dlp -- so they cost seconds and cover the design system, the widget
+      # kernel, all three auth providers and both java agents.
       - name: Run unit tests
         run: >-
           ./gradlew
@@ -79,8 +102,9 @@ jobs:
           :client-cli:test :client-media:test :client-tray:test
           :client-ui:desktopTest :client-i18n:desktopTest :client-render3d:desktopTest
           :client-easter:desktopTest :nx-ui:desktopTest
-          :widget-api:test :widget-model:test :widget-processor:test
+          :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test
           :authlib-agent:test :profiler-agent:test
+          :experimental:client-boot:test :examples:widget-pixelplayer:test
           --continue
 
       # The runtime-module guard is a config-time read with no compilation behind
@@ -89,16 +113,23 @@ jobs:
       - name: Verify runtime modules
         run: ./gradlew :client-ui:verifyRuntimeModules
 
+      # Gradle's daemon keeps the .lock files under ~/.gradle/caches open for as
+      # long as it lives. On Windows another process cannot read an open file, so
+      # setup-java's post-job cache save runs tar into "Device or resource busy"
+      # on modules-2.lock and five others, and abandons the whole archive. The
+      # cache is therefore never written, which is why it is never found either --
+      # every Windows run re-downloads the dependencies it already had.
+      #
+      # POSIX runners have no such rule and save fine, so this is Windows-only.
+      - name: Release Gradle's file locks before the cache is saved
+        if: always() && runner.os == 'Windows'
+        run: ./gradlew --stop
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
-          path: |
-            client-config/build/reports/tests/
-            client-core/build/reports/tests/
-            client-launcher/build/reports/tests/
-            client-update/build/reports/tests/
-            client-ui/build/reports/tests/
-            client-i18n/build/reports/tests/
-            client-render3d/build/reports/tests/
+          # Every module, not a hand-kept subset -- a suite whose report is not
+          # collected is one whose failure has to be read off the raw log.
+          path: '*/build/reports/tests/'

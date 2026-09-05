@@ -41,9 +41,14 @@ class WidgetRegistryProcessor(
                     id = extracted.id,
                     displayName = extracted.displayName.ifBlank { funcName },
                     removable = extracted.removable,
+                    drawsOwnSurface = extracted.drawsOwnSurface,
                     slots = extracted.slots,
                     propsClassFqn = extracted.propsClassFqn,
                     functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",
+                    takesInstance = extracted.takesInstance,
+                    provides = extracted.provides,
+                    injects = extracted.injects,
+                    surfaceJson = extracted.surfaceJson,
                 ),
                 containingFile = symbol.containingFile,
                 symbol = symbol,
@@ -78,10 +83,30 @@ class WidgetRegistryProcessor(
             return emptyList()
         }
 
+        // A contract read by someone and offered by no one. Reported as a
+        // warning rather than an error: a plugin-supplied provider is the point
+        // of the SPI, so a build with only the consumer in it is a legitimate
+        // state -- what is not legitimate is nobody noticing.
+        val byWidget = widgets.associateBy { it.model }
+        injectorsWithoutProvider(widgets.map { it.model }).forEach { (model, unmet) ->
+            env.logger.warn(
+                "@Widget '${model.id}' injects ${unmet.joinToString()} but no widget in this build " +
+                    "provides it -- the registry will hand it null on every frame.",
+                byWidget[model]?.symbol,
+            )
+        }
+
         emitGeneratedFile(widgets)
         emitted = true
         return emptyList()
     }
+
+    // Overridable so a second module carrying widgets emits a distinct object:
+    // two modules on one classpath cannot both own hivens.widget.generated.
+    // GeneratedWidgetRegistry, and the one that lost would take its widgets with
+    // it silently. Defaults keep the existing module's output byte-identical.
+    private val registryPackage = env.options["widgetRegistryPackage"] ?: DEFAULT_GENERATED_PACKAGE
+    private val registryName = env.options["widgetRegistryName"] ?: DEFAULT_GENERATED_NAME
 
     private fun emitGeneratedFile(widgets: List<WidgetEntry>) {
         val sourceFiles = widgets.mapNotNull { it.containingFile }.toTypedArray()
@@ -91,12 +116,27 @@ class WidgetRegistryProcessor(
         val deps = Dependencies(aggregating = true, sources = sourceFiles)
         env.codeGenerator.createNewFile(
             dependencies = deps,
-            packageName = GENERATED_PACKAGE,
-            fileName = GENERATED_FILE_NAME,
+            packageName = registryPackage,
+            fileName = registryName,
             extensionName = "kt",
         ).use { stream ->
             stream.writer(Charsets.UTF_8).use { writer ->
-                writer.write(renderRegistry(widgets.map { it.model }))
+                writer.write(renderRegistry(widgets.map { it.model }, registryPackage, registryName))
+            }
+        }
+
+        // Discovery for a module loaded from a jar at runtime. Naming the
+        // provider here rather than agreeing a class name with the loader means
+        // a module author picks whatever names they like and still gets found;
+        // the only thing both sides have to agree on is the interface.
+        env.codeGenerator.createNewFileByPath(
+            dependencies = deps,
+            path = REGISTRY_SERVICE_FILE,
+            extensionName = "",
+        ).use { stream ->
+            stream.writer(Charsets.UTF_8).use { writer ->
+                writer.write(providerFqn(registryPackage, registryName))
+                writer.write("\n")
             }
         }
     }

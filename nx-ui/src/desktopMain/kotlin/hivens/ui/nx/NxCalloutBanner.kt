@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -21,6 +20,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 
 /** Severity of a [NxCalloutBanner]; drives its accent colour and default glyph. */
 enum class NxCalloutTone { Info, Warning, Error }
@@ -58,13 +58,13 @@ fun NxCalloutBanner(
             .clip(shape)
             .background(accent.copy(alpha = 0.12f))
             .border(1.dp, accent.copy(alpha = 0.4f), shape)
-            .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(Spacing.s14),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
     ) {
         Symbol(glyph, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
         Column(
             modifier            = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s8),
         ) {
             if (title != null) {
                 Text(title, style = MaterialTheme.typography.titleSmall, color = accent, fontWeight = FontWeight.Bold)

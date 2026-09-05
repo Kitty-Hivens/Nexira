@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +50,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
+import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.AppStrings
@@ -61,7 +61,6 @@ import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -82,11 +81,10 @@ import hivens.ui.skin3d.asSource
 import hivens.ui.skin3d.layered
 import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
+import hivens.ui.utils.pickFile
+import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.profile.SkinHero
-import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,7 +94,7 @@ import org.koin.compose.koinInject
 import java.io.File
 import java.nio.file.Files
 
-private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
+private const val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
 // Caption strip under every card. Fixed so a card with a delete button (an
 // IconButton is taller than a bare label) lines up with the "+" import tile and
@@ -111,6 +109,10 @@ private val CardCaptionHeight = 24.dp
 fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
     val s = LocalStrings.current
     PuppetScreen("Wardrobe")
+    // The window frame carries the visible back arrow, so the screen draws none.
+    // Automation has no frame to click, and without this the wardrobe was the one
+    // screen a driver could enter and not leave.
+    PuppetClick("wardrobe.back") { onBack() }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
@@ -185,6 +187,7 @@ private fun Wardrobe(session: SessionData) {
     var selectedDefault by remember { mutableStateOf<DefaultSkinProvider.DefaultSkin?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val dialogSettings = rememberFileDialogSettings()
 
     val data by produceState(WardrobeData(), refreshKey) {
         value = withContext(Dispatchers.IO) {
@@ -202,34 +205,60 @@ private fun Wardrobe(session: SessionData) {
     // decodes exactly once -- a refresh re-lists the index without re-decoding
     // or re-rasterizing anything already on screen, which is what used to
     // hitch the whole grid on every apply.
+    //
+    // Decoding is IO and the map is snapshot state: the read happens on the pool,
+    // the write on the composition's own thread. Assigning from inside the worker
+    // used whatever snapshot the coroutine had inherited and threw once that one
+    // had been left behind.
     val bitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
     LaunchedEffect(data) {
-        withContext(Dispatchers.IO) {
-            for (entry in data.skins + data.capes) {
-                if (bitmaps.containsKey(entry.id)) continue
-                library.bytes(entry.id)?.let(::decodeSkin)?.let { bitmaps[entry.id] = it }
-            }
+        for (entry in data.skins + data.capes) {
+            if (bitmaps.containsKey(entry.id)) continue
+            val decoded = withContext(Dispatchers.IO) { library.bytes(entry.id)?.let(::decodeSkin) } ?: continue
+            bitmaps[entry.id] = decoded
         }
     }
 
     // Default skins are extracted from a provisioned client jar on the IO pool; the
     // grid stays empty until that resolves (or no client jar carries them yet).
-    val defaults by produceState(emptyList<DefaultSkinProvider.DefaultSkin>()) {
+    val defaults by produceState(emptyList()) {
         value = withContext(Dispatchers.IO) { defaultSkinProvider.list() }
     }
     val defaultBitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
     LaunchedEffect(defaults) {
-        withContext(Dispatchers.IO) {
-            for (def in defaults) {
-                if (defaultBitmaps.containsKey(def.name)) continue
-                runCatching { Files.readAllBytes(def.file) }.getOrNull()
-                    ?.let(::decodeSkin)?.let { defaultBitmaps[def.name] = it }
-            }
+        for (def in defaults) {
+            if (defaultBitmaps.containsKey(def.name)) continue
+            val decoded = withContext(Dispatchers.IO) {
+                runCatching { Files.readAllBytes(def.file) }.getOrNull()?.let(::decodeSkin)
+            } ?: continue
+            defaultBitmaps[def.name] = decoded
         }
     }
 
     val selectedBitmap = selectedId?.let { bitmaps[it] }
     val defaultBitmap = selectedDefault?.let { defaultBitmaps[it.name] }
+
+    // A card's whole surface selects and the trash sits inside it, so a near-miss
+    // used to be the last thing that happened to an imported file: delete went
+    // straight to the library with no confirm and nothing to undo it with.
+    var pendingDelete by remember { mutableStateOf<String?>(null) }
+    pendingDelete?.let { id ->
+        DestructiveConfirmDialog(
+            title        = s.wardrobeDeleteTitle,
+            body         = s.wardrobeDeleteBody,
+            confirmLabel = s.editorDelete,
+            onConfirm    = {
+                scope.launch {
+                    withContext(Dispatchers.IO) { library.delete(id) }
+                    bitmaps.remove(id)
+                    if (selectedId == id) selectedId = null
+                    if (selectedCapeId == id) selectedCapeId = null
+                    refreshKey++
+                }
+            },
+            onDismiss    = { pendingDelete = null },
+        )
+    }
     val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
 
     // Cape capability. Fast path: a fresh login already said "no clan", no
@@ -238,11 +267,10 @@ private fun Wardrobe(session: SessionData) {
     // never resolve their clan flag).
     var capeRole by remember { mutableStateOf(ClanRole.Unknown) }
     LaunchedEffect(scSession?.playerName, scSession?.clan, scSession?.clanResolved) {
-        val sc = scSession
         capeRole = when {
-            sc == null -> ClanRole.Unknown
-            sc.clanResolved && sc.clan == null -> ClanRole.NoClan
-            else -> clanRoles.eligibility(sc.playerName)
+            scSession == null -> ClanRole.Unknown
+            scSession.clanResolved && scSession.clan == null -> ClanRole.NoClan
+            else -> clanRoles.eligibility(scSession.playerName)
         }
     }
     val showCapes = capeSectionVisible(scSession != null, capeRole)
@@ -253,19 +281,20 @@ private fun Wardrobe(session: SessionData) {
     // skin change surfaces as a new entry on the next open, an identical one dedups.
     LaunchedEffect(session.playerName) {
         val bytes = skinManager.getRawSkinBytes(session.playerName) ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) {
+        val primed = withContext(Dispatchers.IO) {
             // No pixel hash -> no dedup, so skip rather than accumulate a copy per open.
-            val sha = skinContentHash(bytes) ?: return@withContext
+            val sha = skinContentHash(bytes) ?: return@withContext null
             val entry = library.addUnique(bytes, session.playerName, slim = false, now = System.currentTimeMillis(), sha = sha)
             library.markApplied(entry.id, System.currentTimeMillis())
-            decodeSkin(bytes)?.let { bitmaps[entry.id] = it }
+            decodeSkin(bytes)?.let { entry.id to it }
         }
+        primed?.let { (id, bitmap) -> bitmaps[id] = bitmap }
         refreshKey++
     }
 
     fun importInto(kind: SkinLibrary.Kind, select: (String) -> Unit) {
         scope.launch {
-            val picked = FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png")))
+            val picked = pickFile(type = FileKitType.File(extensions = listOf("png")), settings = dialogSettings)
             val file = picked?.path?.let { File(it) } ?: return@launch
             val bytes = withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrNull() } ?: return@launch
             val entry = withContext(Dispatchers.IO) {
@@ -276,7 +305,7 @@ private fun Wardrobe(session: SessionData) {
             }
             // Prime the decode cache from the bytes in hand so the preview
             // flips to the import without a placeholder frame.
-            withContext(Dispatchers.IO) { decodeSkin(bytes)?.let { bitmaps[entry.id] = it } }
+            withContext(Dispatchers.IO) { decodeSkin(bytes) }?.let { bitmaps[entry.id] = it }
             select(entry.id)
             refreshKey++
         }
@@ -426,14 +455,7 @@ private fun Wardrobe(session: SessionData) {
                         selected = entry.id == selectedId,
                         isActive = entry.id == data.activeSkinId,
                         onClick = { selectedId = entry.id; selectedDefault = null },
-                        onDelete = {
-                            scope.launch {
-                                withContext(Dispatchers.IO) { library.delete(entry.id) }
-                                bitmaps.remove(entry.id)
-                                if (selectedId == entry.id) selectedId = null
-                                refreshKey++
-                            }
-                        },
+                        onDelete = { pendingDelete = entry.id },
                     )
                 }
 
@@ -459,14 +481,7 @@ private fun Wardrobe(session: SessionData) {
                             selected = entry.id == selectedCapeId,
                             isActive = entry.id == data.activeCapeId,
                             onClick = { selectedCapeId = entry.id },
-                            onDelete = {
-                                scope.launch {
-                                    withContext(Dispatchers.IO) { library.delete(entry.id) }
-                                    bitmaps.remove(entry.id)
-                                    if (selectedCapeId == entry.id) selectedCapeId = null
-                                    refreshKey++
-                                }
-                            },
+                            onDelete = { pendingDelete = entry.id },
                         )
                     }
                 }
@@ -503,16 +518,17 @@ private fun SkinCard(
     onDelete: (() -> Unit)?,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(style.cardCorner))
-            .background(NxTheme.colors.background.copy(alpha = 0.4f))
-            .border(
-                width = if (selected) 2.dp else 0.dp,
-                color = if (selected) NxTheme.colors.primary else NxTheme.colors.primary.copy(alpha = 0f),
-                shape = RoundedCornerShape(style.cardCorner),
+            // Before the clip, not after: a stroke is centred on the outline, so
+            // half of it falls outside the shape and drawing it inside the clip
+            // left a half-width ring the corner antialiasing then ate.
+            .then(
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
+                else Modifier
             )
+            .clip(MaterialTheme.shapes.medium)
+            .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -565,11 +581,10 @@ private fun CardCaption(name: String, modifier: Modifier = Modifier) {
 @Composable
 private fun AddTile(onClick: () -> Unit) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(style.cardCorner))
-            .background(glassSurfaceAlpha(0.4f))
+            .clip(MaterialTheme.shapes.medium)
+            .background(NxTheme.colors.surface.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -594,16 +609,17 @@ private fun CapeCard(
     onDelete: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(style.cardCorner))
-            .background(NxTheme.colors.background.copy(alpha = 0.4f))
-            .border(
-                width = if (selected) 2.dp else 0.dp,
-                color = if (selected) NxTheme.colors.primary else NxTheme.colors.primary.copy(alpha = 0f),
-                shape = RoundedCornerShape(style.cardCorner),
+            // Before the clip, not after: a stroke is centred on the outline, so
+            // half of it falls outside the shape and drawing it inside the clip
+            // left a half-width ring the corner antialiasing then ate.
+            .then(
+                if (selected) Modifier.border(2.dp, NxTheme.colors.primary, MaterialTheme.shapes.medium)
+                else Modifier
             )
+            .clip(MaterialTheme.shapes.medium)
+            .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .clickable(onClick = onClick)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

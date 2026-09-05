@@ -9,6 +9,7 @@ import hivens.core.data.HeapProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
+import hivens.core.data.RuntimePrefs
 import hivens.core.data.SessionData
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.HeapDeriver
@@ -28,6 +29,8 @@ import hivens.launcher.security.JavaBinary
 import hivens.launcher.security.LaunchEnvironment
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 import java.io.OutputStream
@@ -64,12 +67,12 @@ internal class LauncherService(
      *
      * @see [ILauncherService.launchClientWithLogs]
      */
+    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
     override suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean,
         onLog: (String, LauncherLogType) -> Unit
     ): SpawnResult = try {
@@ -81,7 +84,7 @@ internal class LauncherService(
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, profile.fixedMemory),
             instanceDir = clientRootPath,
-            baseMemoryMb = baselineMemory(profile.fixedMemory, profile.memoryMb, allocatedMemoryMB, SystemMemory.totalPhysicalMb()),
+            baseMemoryMb = baselineMemory(profile.fixedMemory, profile.memoryMb, SystemMemory.totalPhysicalMb()),
         )
         val memory = adaptive.memoryMb
 
@@ -120,15 +123,15 @@ internal class LauncherService(
         SpawnResult.Failed(LaunchError.Internal(e.message ?: ""))
     }
 
+    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
     override suspend fun launchClient(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int
     ): SpawnResult {
         return launchClientWithLogs(
-            sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB,
+            sessionData, serverProfile, clientRootPath, javaExecutablePath,
             adaptiveEnabled = false,
         ) { _, _ -> /* Logs are ignored */ }
     }
@@ -139,7 +142,6 @@ internal class LauncherService(
         runtime: InstanceRuntime,
         clientRootPath: Path,
         javaPathOverride: Path?,
-        allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean,
         redirectAuthHost: Boolean,
         useNetworkAgent: Boolean,
@@ -157,7 +159,7 @@ internal class LauncherService(
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
-            baseMemoryMb = baselineMemory(runtime.fixedMemory, runtime.memoryMb, allocatedMemoryMB, SystemMemory.totalPhysicalMb()),
+            baseMemoryMb = baselineMemory(runtime.fixedMemory, runtime.memoryMb, SystemMemory.totalPhysicalMb()),
         )
         val memory = adaptive.memoryMb
 
@@ -405,14 +407,10 @@ internal class LauncherService(
             runtime.copy(libraries = runtime.libraries.map { if (it === target) it.copy(path = newPath) else it })
 
         /**
-         * Memory allocation rule: profile's per-instance value wins when positive,
-         * otherwise the launcher's globally allocated value is used. Anything below
-         * 768 MB is bumped to 1024 MB to keep modded clients viable.
+         * A pinned heap as the launch will use it: anything below 768 MB is bumped
+         * to 1024 MB, which is the floor a modded client needs to be viable at all.
          */
-        internal fun normalizeMemory(profileMb: Int, allocatedMb: Int): Int {
-            val raw = if (profileMb > 0) profileMb else allocatedMb
-            return if (raw < 768) 1024 else raw
-        }
+        internal fun normalizeMemory(profileMb: Int): Int = if (profileMb < 768) 1024 else profileMb
 
         /**
          * Whether the adaptive heap sizer applies to an instance: the global signal
@@ -425,28 +423,32 @@ internal class LauncherService(
         /**
          * The baseline heap before any adaptive refinement. A pinned instance
          * ([fixedMemory]) keeps its explicit [profileMb] (respected as-is, even above
-         * the machine ceiling -- a deliberate value is the user's call); an unpinned
-         * instance uses the machine-aware [AutomaticHeap] baseline, which is also the
+         * the machine ceiling -- a deliberate value is the user's call); everything
+         * else uses the machine-aware [AutomaticHeap] baseline, which is also the
          * cold-start the adaptive sizer grows from. Pure.
+         *
+         * "Everything else" includes an instance flagged as pinned that names no
+         * heap. That combination is not reachable from the UI -- pinning happens by
+         * choosing a number, which is what writes one -- so a record carrying it has
+         * been edited by hand, and the machine baseline is a better answer for it
+         * than a stored constant was.
          */
         internal fun baselineMemory(
             fixedMemory: Boolean,
             profileMb: Int,
-            allocatedMb: Int,
             systemRamMb: Int,
-        ): Int = if (fixedMemory) normalizeMemory(profileMb, allocatedMb)
+        ): Int = if (fixedMemory && profileMb > 0) normalizeMemory(profileMb)
                  else AutomaticHeap.compute(systemRamMb)
 
         /**
          * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s
-         * fallback ladder but pulls the override from [InstanceRuntime]
-         * instead of the legacy [InstanceProfile]. The runtime's
-         * `javaPath` lands here as the highest priority; without it the
-         * caller's pre-resolved [defaultPath] wins (LauncherController
+         * fallback ladder minus its managed-Java step, which the pack path
+         * has already taken: [RuntimePrefs.javaPath] wins, and without it
+         * the caller's pre-resolved [defaultPath] does (LauncherController
          * already consulted JavaManager for the pack's Java major).
          */
         internal fun resolvePackJavaPath(
-            runtime: InstanceRuntime,
+            runtime: RuntimePrefs,
             defaultPath: Path,
         ): String {
             val explicit = runtime.javaPath
@@ -465,7 +467,7 @@ internal class LauncherService(
          */
         internal suspend fun resolveJavaPath(
             javaManager: IJavaManager,
-            profile: InstanceProfile,
+            profile: RuntimePrefs,
             defaultPath: Path,
             version: String
         ): String {
@@ -488,7 +490,10 @@ internal class LauncherService(
  * the orchestrator sends [terminate] first to let the wait return.
  */
 private class ProcessLaunchHandle(private val process: Process) : LaunchHandle {
-    override suspend fun awaitExit(): Int = process.waitFor()
+    // On IO by its own doing rather than by the caller's promise: the wait is
+    // unbounded, and a blocking wait that borrows whatever thread it was called on
+    // is one refactor away from parking a dispatcher that had other work.
+    override suspend fun awaitExit(): Int = withContext(Dispatchers.IO) { process.waitFor() }
 
     /**
      * SIGTERM, then SIGKILL if the game did not take the hint.

@@ -10,7 +10,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,7 +50,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.NavSelectionStyle
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -56,8 +58,8 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
 import hivens.ui.nx.NxSwitch
+import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.customization.HexField
 
 // Right-edge settings panel for a whole SURFACE (region), distinct from the
@@ -84,18 +86,17 @@ fun SurfacePropertiesPanel(
         modifier = modifier,
     ) {
         val s = LocalStrings.current
-        val style = LocalStyle.current
-        // Draggable dock: the header drags this offset (session-scoped), like the
+            // Draggable dock: the header drags this offset (session-scoped), like the
         // widget palette, so the panel can be pulled off the right edge.
-        var offset by remember { mutableStateOf(Offset.Zero) }
+        val offset = rememberDockOffset()
         Column(
             modifier = Modifier
-                .graphicsLayer { translationX = offset.x; translationY = offset.y }
+                .graphicsLayer { translationX = offset.value.x; translationY = offset.value.y }
                 .width(320.dp)
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-                .shadow(elevation = style.panelElevation, shape = RoundedCornerShape(style.panelCorner))
-                .clip(RoundedCornerShape(style.panelCorner))
+                .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
+                .clip(MaterialTheme.shapes.large)
                 // Solid surface, no glass: a settings panel must stay readable and
                 // not composite with the layers it floats over.
                 .background(NxTheme.colors.surface),
@@ -106,9 +107,18 @@ fun SurfacePropertiesPanel(
                 modifier              = Modifier
                     .fillMaxWidth()
                     .pointerInput(Unit) {
-                        detectDragGestures { change, drag ->
-                            change.consume()
-                            offset += drag
+                        // No slop: a header is a handle. detectDragGestures holds the
+                        // first few pixels back before it reports anything, which on a
+                        // short strip reads as the panel refusing to be grabbed. The
+                        // editor's own widget drag starts on the press for this reason.
+                        // requireUnconsumed yields to the close button sitting in here.
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            drag(down.id) { change ->
+                                change.consume()
+                                offset.drag(change.positionChange())
+                            }
                         }
                     }
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
@@ -162,12 +172,11 @@ private fun NavSelectionControl(
     onChange: (CustomizationSettings) -> Unit,
 ) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
+            .clip(MaterialTheme.shapes.medium)
             .background(settingsRowBackground())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -189,16 +198,16 @@ private fun NavSelectionControl(
                 val selected = customization.navSelectionStyle == variant
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(style.buttonCorner))
+                        .clip(MaterialTheme.shapes.small)
                         .background(
                             if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
-                            else glassSurfaceAlpha(0.4f),
+                            else NxTheme.colors.surface.copy(alpha = 0.4f),
                         )
                         .border(
                             width = 1.dp,
                             color = if (selected) NxTheme.colors.primary
                             else NxTheme.colors.outline.copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(style.buttonCorner),
+                            shape = MaterialTheme.shapes.small,
                         )
                         .clickable { onChange(customization.copy(navSelectionStyle = variant)) }
                         .padding(horizontal = 8.dp, vertical = 6.dp),

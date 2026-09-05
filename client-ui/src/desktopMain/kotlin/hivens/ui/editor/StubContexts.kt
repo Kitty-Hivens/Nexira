@@ -29,7 +29,6 @@ internal val STUB_HOME_CLASSIC = HomeClassicContext(
     initialSelectedServer = null,
     onServerSelected      = {},
     onSessionUpdated      = {},
-    onCloseApp            = {},
     onOpenServerSettings  = {},
     onOpenDetails         = {},
 )
@@ -49,6 +48,7 @@ internal val STUB_LEFTRAIL = LeftRailContext(
     currentScreen   = Screen.Home,
     isAuthenticated = false,
     onScreenChange  = {},
+    onSwitchTab     = {},
     onLogout        = {},
 )
 

@@ -10,18 +10,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import hivens.ui.theme.LocalStyle
 
 /**
- * The badge shell every small labelled tag in the app is cut from: one height,
- * one corner, one gap, all read from the active style's badge spec so a skin can
- * turn every badge square in one step.
+ * The shell every small labelled tag in the app is cut from: one height, one
+ * corner, one gap, decided here so the tags cannot drift apart.
  *
  * Colours are the caller's, because that is the only axis the badges genuinely
  * differ on -- [NxMetaChip] derives them from a tone, the source badge from the
@@ -43,21 +44,19 @@ internal fun NxPill(
     dot: Color? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    val badge = LocalStyle.current.badgeStyle
-    val shape = badge.shape()
+    val shape = RoundedCornerShape(pillCorner)
     Row(
         modifier = modifier
-            .height(badge.height)
+            .height(pillHeight)
             .clip(shape)
             .background(container)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = badge.horizontalPadding),
+            .padding(horizontal = pillPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(badge.gap),
+        horizontalArrangement = Arrangement.spacedBy(pillGap),
     ) {
-        // The dot takes the badge's own corner, so a square skin gets a square
-        // marker instead of a lone circle.
-        if (dot != null) Box(Modifier.size(badge.dotSize).clip(shape).background(dot))
+        // The dot takes the shell's corner, so it stays the same shape as what holds it.
+        if (dot != null) Box(Modifier.size(dotSize).clip(shape).background(dot))
         Text(
             text       = text,
             style      = MaterialTheme.typography.labelSmall,
@@ -67,3 +66,9 @@ internal fun NxPill(
         )
     }
 }
+
+private val pillCorner = CornerSize(50)
+private val pillHeight = 22.dp
+private val pillPadding = 9.dp
+private val pillGap = 6.dp
+private val dotSize = 7.dp

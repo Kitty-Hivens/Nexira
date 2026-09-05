@@ -20,9 +20,9 @@ import hivens.ui.scene3d.Node
 import hivens.ui.scene3d.OrthoCamera
 import hivens.ui.scene3d.Scene3DState
 import hivens.ui.scene3d.Scene3DView
-import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.delay
 import kotlin.math.PI
+import kotlin.time.Duration.Companion.milliseconds
 
 // Live 3D Minecraft-skin view. Builds the posable rig from [buildRig] and
 // hosts it in a Scene3DView: the scene traversal (double-sided alpha-tested
@@ -104,11 +104,12 @@ fun SkinView3D(
 
     var dragging by remember { mutableStateOf(false) }
 
-    // Honour the style engine's motion token: Brut sets animationMultiplier = 0
-    // ("motion off"), so the idle spin stops and pose retargets snap to their
-    // end state. Dragging always works regardless.
-    val motion = LocalStyle.current.animationMultiplier
-    SideEffect { state.motionMultiplier = motion }
+    // The scene drives its own clock and takes a multiplier rather than a
+    // still/not question, so an idle spin slows before it stops. Nothing varies it
+    // today -- the style axis that carried a motion token is gone -- so the state's
+    // own default stands and nothing is pushed. A reduce-motion preference would
+    // arrive from the customization layer and write here.
+    val motion = state.motionMultiplier
 
     // A spin nobody is looking at is a spin worth not drawing. The window
     // losing focus does not hide the figure, so this trades a frozen model in
@@ -139,7 +140,7 @@ fun SkinView3D(
             if (!autoSpin && state.animator.isSettled(state.timeMs)) return@LaunchedEffect
             var last = withFrameMillis { it }
             while (true) {
-                delay(MIN_ADVANCE_MS)
+                delay(MIN_ADVANCE_MS.milliseconds)
                 val now = withFrameMillis { it }
                 val delta = now - last
                 last = now

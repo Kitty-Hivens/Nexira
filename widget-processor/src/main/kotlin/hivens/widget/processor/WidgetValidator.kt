@@ -9,9 +9,17 @@ import com.google.devtools.ksp.symbol.Modifier
 // Shared rule-set for what a @Widget composable must look like. The KSP
 // processor validates Kotlin sources at compile time; Phase E's plugin
 // loader will validate java.lang.reflect.Method at runtime. The rules
-// are the same: top-level + @Composable + single WidgetInstance param
-// + no inline/suspend/extension + non-blank id. Centralising them here
-// keeps the two entry points consistent.
+// are the same: top-level + @Composable + at most one WidgetInstance
+// param + no inline/suspend/extension + non-blank id. Centralising them
+// here keeps the two entry points consistent.
+//
+// The parameter is optional because most widgets never read it. A widget
+// draws from its surface context and its own state; the instance carries
+// props and the instance id, which only a widget that declares props or
+// keeps per-instance state needs. Forcing every declaration to name a
+// value it cannot use made almost half of them carry a parameter for the
+// registry's convenience, and taught an author that the warning on it is
+// noise to be ignored.
 internal object WidgetValidator {
 
     private const val WIDGET_ANNOTATION_FQN = "hivens.widget.model.Widget"
@@ -19,16 +27,27 @@ internal object WidgetValidator {
     private const val WIDGET_INSTANCE_FQN = "hivens.widget.model.WidgetInstance"
 
     private const val SERIALIZABLE_ANNOTATION_FQN = "kotlinx.serialization.Serializable"
+    private const val PROVIDES_SERVICE_FQN = "hivens.widget.model.ProvidesService"
+    private const val INJECT_SERVICE_FQN = "hivens.widget.model.InjectService"
 
     // Annotation args extracted from a valid @Widget declaration.
     data class Extracted(
         val id: String,
         val displayName: String,
         val removable: Boolean,
+        val drawsOwnSurface: Boolean,
         val slots: List<String>,
         // FQN of the @Serializable props class, or null for Unit::class
         // (a propless widget).
         val propsClassFqn: String?,
+        /** Whether the declaration takes the instance; false for a bare `fun Name()`. */
+        val takesInstance: Boolean,
+        /** Contracts declared via @ProvidesService, by FQN. */
+        val provides: List<String>,
+        /** Contracts declared via @InjectService, by FQN. */
+        val injects: List<String>,
+        /** The default plane as JSON, already checked to parse. Null for none. */
+        val surfaceJson: String?,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -58,20 +77,23 @@ internal object WidgetValidator {
         }
 
         val params = symbol.parameters
-        if (params.size != 1) {
+        if (params.size > 1) {
             env.logger.error(
-                "@Widget composables must take exactly one parameter (instance: WidgetInstance)",
+                "@Widget composables take at most one parameter (instance: WidgetInstance)",
                 symbol,
             )
             return null
         }
-        val paramType = params[0].type.resolve().declaration.qualifiedName?.asString()
-        if (paramType != WIDGET_INSTANCE_FQN) {
-            env.logger.error(
-                "@Widget composable parameter must be hivens.widget.model.WidgetInstance, got $paramType",
-                symbol,
-            )
-            return null
+        val takesInstance = params.isNotEmpty()
+        if (takesInstance) {
+            val paramType = params[0].type.resolve().declaration.qualifiedName?.asString()
+            if (paramType != WIDGET_INSTANCE_FQN) {
+                env.logger.error(
+                    "@Widget composable parameter must be hivens.widget.model.WidgetInstance, got $paramType",
+                    symbol,
+                )
+                return null
+            }
         }
 
         if (Modifier.INLINE in symbol.modifiers || Modifier.SUSPEND in symbol.modifiers) {
@@ -87,8 +109,10 @@ internal object WidgetValidator {
         val id = (args["id"] as? String).orEmpty()
         val displayName = (args["displayName"] as? String).orEmpty()
         val removable = (args["removable"] as? Boolean) ?: true
+        val drawsOwnSurface = (args["drawsOwnSurface"] as? Boolean) ?: false
         // KSP reports Array<String> annotation values as List<*>.
         val rawSlots = (args["slots"] as? List<*>).orEmpty().filterIsInstance<String>()
+        val rawSurface = (args["surface"] as? String).orEmpty().trim()
 
         if (id.isBlank()) {
             env.logger.error("@Widget id must be non-blank", symbol)
@@ -149,14 +173,68 @@ internal object WidgetValidator {
                 )
                 return null
             }
+            // Props reach the body through the instance and nowhere else, so a
+            // props class on a declaration that does not take one is a form the
+            // author can fill in and never read.
+            if (!takesInstance) {
+                env.logger.error(
+                    "@Widget '$id' declares propsClass '$propsClassFqn' but takes no instance " +
+                        "-- add `instance: WidgetInstance` to read them",
+                    symbol,
+                )
+                return null
+            }
         }
 
+        // Until now nothing in the processor referenced the two service
+        // A malformed default plane is a build error rather than a widget that
+        // quietly draws none: it is a literal in source, so the author is right here
+        // and the cost of telling them is one line.
+        val surface = if (rawSurface.isEmpty()) null else {
+            val parsed = runCatching {
+                kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                    .decodeFromString(hivens.widget.model.SurfaceSpec.serializer(), rawSurface)
+            }
+            if (parsed.isFailure) {
+                env.logger.error(
+                    "@Widget surface is not a SurfaceSpec: ${parsed.exceptionOrNull()?.message}",
+                    symbol,
+                )
+                return null
+            }
+            rawSurface
+        }
+
+        // annotations, so a widget could claim a contract it never registers,
+        // or read one no widget provides, and the build stayed quiet either
+        // way. Carrying them through is what lets the mismatch be seen.
         return Extracted(
             id = id,
             displayName = displayName,
             removable = removable,
+            drawsOwnSurface = drawsOwnSurface,
             slots = sanitized,
             propsClassFqn = propsClassFqn,
+            takesInstance = takesInstance,
+            provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
+            injects = symbol.serviceContracts(INJECT_SERVICE_FQN, "services"),
+            surfaceJson = surface,
         )
+    }
+
+    /**
+     * FQNs listed in [annotationFqn]'s vararg [argument], empty when the widget
+     * carries no such annotation. KSP hands a vararg of KClass over as a list
+     * of KSType.
+     */
+    private fun KSFunctionDeclaration.serviceContracts(annotationFqn: String, argument: String): List<String> {
+        val annotation = annotations.firstOrNull {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == annotationFqn
+        } ?: return emptyList()
+        val raw = annotation.arguments.firstOrNull { it.name?.asString() == argument }?.value
+        return (raw as? List<*>).orEmpty()
+            .filterIsInstance<KSType>()
+            .mapNotNull { it.declaration.qualifiedName?.asString() }
+            .distinct()
     }
 }

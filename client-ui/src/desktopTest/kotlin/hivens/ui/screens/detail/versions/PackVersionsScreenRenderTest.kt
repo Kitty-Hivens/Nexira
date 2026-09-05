@@ -12,7 +12,7 @@ import hivens.core.api.dto.smrt.SmrtLoader
 import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.api.dto.smrt.SmrtDiffEntry
 import hivens.core.api.dto.smrt.SmrtDiffUpdate
-import hivens.core.api.dto.smrt.SmrtManifestBuild
+import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtMinecraft
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -33,14 +33,20 @@ import hivens.core.update.UpdateCheck
 import hivens.core.update.UpdateDirection
 import hivens.core.update.UpdateOutcome
 import hivens.core.update.UpdatePlan
-import hivens.ui.theme.BrutStyle
-import hivens.ui.theme.CelestiaStyle
+import hivens.launcher.PackOperationService
+import hivens.launcher.instance.InstanceSizeService
+import hivens.launcher.launch.RunningPackSource
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
@@ -71,7 +77,7 @@ class PackVersionsScreenRenderTest {
 
     private class FakeRepo(private val pack: PackInstance) : IPackRepository {
         private val flow = MutableStateFlow(listOf(pack))
-        override fun observe(): Flow<List<PackInstance>> = flow
+        override fun observe(): StateFlow<List<PackInstance>> = flow
         override suspend fun list(): List<PackInstance> = listOf(pack)
         override suspend fun get(id: String): PackInstance? = pack.takeIf { it.id == id }
         override suspend fun put(instance: PackInstance) {}
@@ -80,13 +86,37 @@ class PackVersionsScreenRenderTest {
 
     private object FakeUpdater : PackUpdater {
         val builds = listOf(
-            SmrtManifestBuild("0.1.2", "beta", "2026-07-19T02:14:01Z", fingerprint = "ff", modsCount = 3, assetsCount = 1),
-            SmrtManifestBuild(
+            PackBuild("0.1.2", "beta", "2026-07-19T02:14:01Z", fingerprint = "ff", modsCount = 3, assetsCount = 1),
+            PackBuild(
                 "0.1.1", "beta", "2026-07-19T02:12:58Z", fingerprint = "ff",
                 changelog = "Куратор объясняет: обновлены рендер-моды, добавлен Iris.",
                 modsCount = 3, assetsCount = 1,
             ),
-            SmrtManifestBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", fingerprint = "aa", modsCount = 2, assetsCount = 0),
+            PackBuild("SNAPSHOT-0.0.0-2026.07.17", "beta", "2026-07-17T22:25:16Z", fingerprint = "aa", modsCount = 2, assetsCount = 0),
+            // Builds from a source that publishes no counts and no fingerprint, so
+            // the row has to hold up with half its second line missing. It says
+            // what it runs on instead, which is the half a listing can always give.
+            PackBuild(
+                "1.4.2", "release", "2026-07-16T10:00:00Z",
+                changelog = "Fixed a crash on world load.",
+                minecraftVersion = "1.21.1", loaderName = "neoforge",
+            ),
+            PackBuild(
+                "1.4.1", "release", "2026-07-02T10:00:00Z",
+                minecraftVersion = "1.20.1", loaderName = "fabric",
+            ),
+            // Two builds wearing the same label. Modrinth publishes one version
+            // per loader and they routinely share a version_number, so a list
+            // keyed by the label throws "key was already used" and takes the
+            // shell with it. These render only because identity is separate.
+            PackBuild(
+                "2.8.0+1.21.11", "release", "2026-06-20T10:00:00Z", id = "mrv-fabric",
+                minecraftVersion = "1.21.1", loaderName = "fabric",
+            ),
+            PackBuild(
+                "2.8.0+1.21.11", "release", "2026-06-20T10:00:00Z", id = "mrv-neoforge",
+                minecraftVersion = "1.21.1", loaderName = "neoforge",
+            ),
         )
         override suspend fun checkForUpdate(instance: PackInstance, forceRefresh: Boolean): UpdateCheck = UpdateCheck.UpToDate
         override suspend fun previewSwitch(instance: PackInstance, targetVersion: String): UpdateCheck =
@@ -99,8 +129,8 @@ class PackVersionsScreenRenderTest {
             targetVersion: String?,
             progress: ((Int, Int, String) -> Unit)?,
         ): UpdateOutcome = UpdateOutcome.AlreadyCurrent
-        override suspend fun availableBuilds(instance: PackInstance): List<SmrtManifestBuild> = builds
-        override fun availableBuildsStream(instance: PackInstance): Flow<List<SmrtManifestBuild>> = flowOf(builds)
+        override suspend fun availableBuilds(instance: PackInstance): List<PackBuild> = builds
+        override fun availableBuildsStream(instance: PackInstance): Flow<List<PackBuild>> = flowOf(builds)
         override fun listSnapshots(instance: PackInstance): List<PackSnapshot> =
             listOf(PackSnapshot("snap-1", 1_752_900_000_000L, "0.1.0"))
         override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance = instance
@@ -139,25 +169,37 @@ class PackVersionsScreenRenderTest {
         override fun report(id: String, status: PackUpdateStatus) {}
     }
 
-    private fun render(width: Int, height: Int, style: StyleSpec, name: String) {
+    /** Nothing is playing, so the running-pack guard stays out of the way. */
+    private object IdleLaunches : RunningPackSource {
+        override val runningPackInstanceId: StateFlow<String?> = MutableStateFlow(null)
+    }
+
+    private fun render(width: Int, height: Int, name: String) {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         startKoin {
             modules(module {
                 single<IPackRepository> { FakeRepo(pack) }
                 single<PackUpdater> { FakeUpdater }
                 single<IMirrorPackClient> { FakeMirror }
                 single<PackUpdateStatusHub> { FakeHub }
+                single<RunningPackSource> { IdleLaunches }
                 single { ModIconResolver(resolveProjectIcon = { null }) }
+                // The screen narrates whatever operation the instance is running,
+                // its own switch included, so it reaches for the app-scoped owner.
+                single { InstanceSizeService(dataDir = Path.of("/tmp/render"), scope = scope) }
+                single { PackOperationService(scope = scope, sizes = get()) }
             })
         }
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true, style = style) {
-                Box(Modifier.fillMaxSize().background(Color(0xFF102030))) {
+            NxTheme(useDarkTheme = true) {
+                Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {
                     PackVersionsScreen(instanceId = "1", onBack = {})
                 }
             }
         }
+        val painted: Double
         try {
             // Pump frames so the screen's suspend loads (build list, preview, diff)
             // land before the captured frame -- a single render would freeze the
@@ -168,17 +210,54 @@ class PackVersionsScreenRenderTest {
                 frameNanos += 16_000_000L
                 Thread.sleep(10)
             }
-            val png = scene.render(frameNanos).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
-            Files.write(out, png.bytes)
+            val frame = scene.render(frameNanos)
+            Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
+            painted = paintedFraction(frame)
         } finally {
             scene.close()
         }
-        assertTrue(Files.size(out) > 0, "rendered PNG is non-empty")
+        // A composition that throws still encodes a perfectly valid PNG of the bare
+        // backdrop, so file size says nothing about whether the screen is on it.
+        // Ask the frame instead.
+        assertTrue(painted > MIN_PAINTED, "the screen covers ${(painted * 100).toInt()}% of the frame -- it did not render")
     }
 
-    @Test fun `renders at FHD under Celestia`() = render(1920, 1080, CelestiaStyle, "pack-versions-fhd-celestia.png")
+    /**
+     * Share of sampled pixels that are not the bare backdrop the scene was cleared
+     * to. Sampled on a stride: this separates a drawn screen from an empty one, and
+     * does not need to be exact to do that.
+     */
+    private fun paintedFraction(frame: Image): Double {
+        val bmp = Bitmap.makeFromImage(frame)
+        var painted = 0
+        var sampled = 0
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                if (bmp.getColor(x, y) != BACKDROP) painted++
+                sampled++
+                x += 4
+            }
+            y += 4
+        }
+        return painted.toDouble() / sampled
+    }
 
-    @Test fun `renders at FHD under Brut`() = render(1920, 1080, BrutStyle, "pack-versions-fhd-brut.png")
+    @Test fun `renders at FHD under Celestia`() = render(1920, 1080, "pack-versions-fhd-celestia.png")
 
-    @Test fun `renders at 2K under Celestia`() = render(2560, 1440, CelestiaStyle, "pack-versions-2k-celestia.png")
+
+    @Test fun `renders at 2K under Celestia`() = render(2560, 1440, "pack-versions-2k-celestia.png")
+
+    private companion object {
+        /** What the scene is cleared to, so anything else on the frame is the screen. */
+        val BACKDROP = 0xFF102030.toInt()
+
+        /**
+         * Well under what a drawn screen covers and well over the stray pixels an
+         * empty one leaves (a partial spinner). Not a layout assertion -- it only
+         * has to tell "rendered" from "did not".
+         */
+        const val MIN_PAINTED = 0.10
+    }
 }

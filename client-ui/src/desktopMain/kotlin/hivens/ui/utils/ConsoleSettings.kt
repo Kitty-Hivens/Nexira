@@ -1,10 +1,22 @@
 package hivens.ui.utils
 
+import hivens.core.io.AtomicFiles
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Persisted console preferences. Mirrors the `BackgroundManager` /
@@ -107,14 +119,66 @@ data class FilterRule(
     val enabled: Boolean = true,
 )
 
-class ConsoleSettingsManager(
+/**
+ * The one owner of `console.json`.
+ *
+ * Three surfaces read these preferences -- Settings > Console, the standalone
+ * console window and the pack's Logs tab -- and each used to load the file into
+ * state of its own and write the whole record back on any edit. The shell's copy
+ * was taken once at startup and never reloaded, so an edit made in Settings never
+ * reached a running console, and the next flip of a switch in that console wrote
+ * the startup copy back over the rules Settings had added. One published value
+ * means an edit is seen everywhere the moment it is made, and the next edit is
+ * built on the value every surface is already rendering.
+ *
+ * Persistence is debounced: the sliders report continuously while dragged, and a
+ * durable write per pointer sample is both wasted and felt. The published value
+ * is live regardless, so a killed tail loses at most the last quarter second of a
+ * drag -- the same trade the background settings make.
+ */
+class ConsoleSettingsStore(
     configPath: Path,
     private val json: Json,
+    private val scope: CoroutineScope,
+    /** Where the write itself runs. A test drives it on its own scheduler. */
+    private val writeDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val log = LoggerFactory.getLogger(ConsoleSettingsManager::class.java)
+    private val log = LoggerFactory.getLogger(ConsoleSettingsStore::class.java)
     private val settingsFile = configPath.resolve("console.json")
 
-    fun load(): ConsoleSettings {
+    private val _settings = MutableStateFlow(load())
+    val settings: StateFlow<ConsoleSettings> = _settings.asStateFlow()
+
+    private var writer: Job? = null
+
+    /** The value the debounced write has not put on disk yet, if any. */
+    @Volatile private var unwritten: ConsoleSettings? = null
+
+    init {
+        // A quit right after a toggle is a discrete edit, not a drag tail: the
+        // debounce must not be what loses it. The scope this store writes on is
+        // cancelled by its own shutdown hook, so the flush is a hook of its own --
+        // the same shape the pack registry uses to close its environment.
+        Runtime.getRuntime().addShutdownHook(Thread({ flush() }, "console-settings-flush"))
+    }
+
+    /** The value every surface renders from right now. */
+    val current: ConsoleSettings get() = _settings.value
+
+    /** Publish an edit and persist it. Bounded knobs are clamped on the way in. */
+    fun update(next: ConsoleSettings) {
+        val coerced = next.coerced()
+        _settings.value = coerced
+        unwritten = coerced
+        writer?.cancel()
+        writer = scope.launch {
+            delay(WRITE_DEBOUNCE_MS.milliseconds)
+            withContext(writeDispatcher) { save(coerced) }
+            if (unwritten == coerced) unwritten = null
+        }
+    }
+
+    private fun load(): ConsoleSettings {
         if (!Files.exists(settingsFile)) return ConsoleSettings()
         return try {
             json.decodeFromString<ConsoleSettings>(Files.readString(settingsFile)).coerced()
@@ -124,12 +188,23 @@ class ConsoleSettingsManager(
         }
     }
 
-    fun save(settings: ConsoleSettings) {
+    /** Write whatever the debounce still owes. Idempotent; runs on the caller's thread. */
+    fun flush() {
+        unwritten?.let {
+            unwritten = null
+            save(it)
+        }
+    }
+
+    private fun save(settings: ConsoleSettings) {
         try {
-            Files.createDirectories(settingsFile.parent)
-            Files.writeString(settingsFile, json.encodeToString(settings.coerced()))
+            AtomicFiles.writeString(settingsFile, json.encodeToString(settings))
         } catch (e: Exception) {
             log.error("Failed to save console settings", e)
         }
+    }
+
+    private companion object {
+        const val WRITE_DEBOUNCE_MS = 250L
     }
 }

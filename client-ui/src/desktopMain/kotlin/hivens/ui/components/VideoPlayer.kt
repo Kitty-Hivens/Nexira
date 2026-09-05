@@ -71,7 +71,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import kotlin.time.Duration.Companion.milliseconds
+
+private val log = LoggerFactory.getLogger("VideoPlayer")
 
 /**
  * Interactive video player over a LOCAL file (Skinema is local-only -- a URL goes
@@ -103,17 +107,20 @@ fun VideoPlayer(
     onRequestFullscreen: (() -> Unit)? = null,
     onExitFullscreen: (() -> Unit)? = null,
 ) {
-    val s = LocalStrings.current
     // Skinema disabled by boot recovery -> render the same unavailable chrome the
     // Failed state shows, without constructing the native player.
     if (!SkinemaGate.enabled) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            Text(s.videoError, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
-        }
+        VideoUnavailable(modifier)
         return
     }
     val video = rememberInlineVideo(path, loop, audio)
-    val player = video.player
+    // Same chrome again when the natives themselves would not load: the engine
+    // is built during composition, so an unhandled failure there is the window
+    // going down rather than one video refusing to play.
+    val player = video.player ?: run {
+        VideoUnavailable(modifier)
+        return
+    }
 
     val state = rememberPlayerState(player)
     val isPlaying = state == SkinemaPlayer.State.Playing
@@ -149,7 +156,7 @@ fun VideoPlayer(
                 SkinemaPlayer.State.Paused  -> handoff?.playing = false
                 else                        -> Unit
             }
-            delay(200)
+            delay(200.milliseconds)
         }
     }
     val durationNanos = player.durationNanos ?: 0L
@@ -173,7 +180,7 @@ fun VideoPlayer(
     LaunchedEffect(player, lastPointerNanos, isPlaying) {
         pointerIdle = false
         if (isPlaying) {
-            delay(CONTROLS_IDLE_MS)
+            delay(CONTROLS_IDLE_MS.milliseconds)
             pointerIdle = true
         }
     }
@@ -204,10 +211,7 @@ fun VideoPlayer(
         when (state) {
             SkinemaPlayer.State.Opening, SkinemaPlayer.State.Seeking ->
                 CircularProgressIndicator(Modifier.align(Alignment.Center).size(36.dp), color = Color.White)
-            is SkinemaPlayer.State.Failed ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.videoError, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
-                }
+            is SkinemaPlayer.State.Failed -> VideoUnavailable(Modifier.fillMaxSize())
             else -> {}
         }
 
@@ -258,7 +262,7 @@ fun VideoPlayer(
  * The close itself is handed to the app scope. It joins the decode thread, which
  * may be in the middle of a seek run, and the swap between the inline player and
  * the fullscreen one disposes this player while the user is waiting for the
- * other -- exactly where a five-second join would be felt as a frozen window.
+ * other -- exactly where that join would be felt as a frozen window.
  */
 private class InlineVideo(
     path: Path,
@@ -267,9 +271,20 @@ private class InlineVideo(
     private val closeScope: CoroutineScope,
 ) : RememberObserver {
 
-    // Hardware decode where a device is available (AUTO falls back to software
-    // per file), so a 4K clip is not decoded on the CPU.
-    val player = SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO)
+    /**
+     * Hardware decode where a device is available (AUTO falls back to software
+     * per file), so a 4K clip is not decoded on the CPU.
+     *
+     * Null when the media natives will not load. That failure is a
+     * [LinkageError] rather than an exception, and it lands during composition,
+     * so it used to leave the caller with nothing to catch it.
+     */
+    val player: SkinemaPlayer? = try {
+        SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO)
+    } catch (e: LinkageError) {
+        log.error("Video natives unavailable for {}", path, e)
+        null
+    }
 
     @Volatile
     private var released = false
@@ -283,7 +298,20 @@ private class InlineVideo(
     private fun release() {
         if (released) return
         released = true
-        closeScope.launch(Dispatchers.IO) { player.close() }
+        val engine = player ?: return
+        closeScope.launch(Dispatchers.IO) { engine.close() }
+    }
+}
+
+/** What a video shows when there is no engine to play it: the disabled module, absent natives, a file that failed. */
+@Composable
+private fun VideoUnavailable(modifier: Modifier) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Text(
+            text  = LocalStrings.current.videoError,
+            color = Color.White.copy(alpha = 0.85f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 

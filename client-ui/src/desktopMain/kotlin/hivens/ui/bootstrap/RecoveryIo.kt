@@ -1,6 +1,7 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -20,11 +21,33 @@ import java.nio.file.Path
 object RecoveryIo {
 
     // Customization leaf files, each of which its owner re-seeds when absent
-    // (ThemeManager, BackgroundManager, ConsoleSettings, WidgetStateStore). Kept
-    // as literals mirroring those owners -- they are not Storage constants there.
-    private val CUSTOMIZATION_FILES = listOf("themes.json", "background.json", "console.json", "widget-state.json")
+    // (ThemeManager, BackgroundManager, ConsoleSettings). Kept as literals
+    // mirroring those owners -- they are not Storage constants there.
+    private val CUSTOMIZATION_FILES = listOf("themes.json", "background.json", "console.json")
+
+    // Not one of the above, and not a reset the appearance button is allowed to
+    // make: this file is what the user typed into their widgets, and nothing else
+    // holds a copy of it.
+    private const val WIDGET_STATE_FILE = "widget-state.json"
 
     private val pretty = Json { prettyPrint = true }
+
+    /**
+     * Whether this process has deleted state files out from under its own
+     * in-memory copies of them.
+     *
+     * The resets below run while the launcher is up, holding stores loaded from
+     * the very files being deleted. Their shutdown hooks then wrote those copies
+     * straight back, so a reset survived exactly as long as it took to relaunch
+     * and the next boot loaded the same broken state -- which is the whole of
+     * what these buttons are for.
+     *
+     * Once set it stays set: after a reset nothing in memory is authoritative
+     * any more, and the surface that offers these buttons relaunches anyway.
+     */
+    @Volatile
+    var stateWasReset: Boolean = false
+        private set
 
     // -- module registry --------------------------------------------------
 
@@ -45,10 +68,31 @@ object RecoveryIo {
     // -- resets -----------------------------------------------------------
 
     /** Delete the widget layout graph so it re-seeds the bundled default next boot. */
-    fun resetLayout(dataDir: Path) = deleteQuietly(dataDir.resolve(Storage.LAYOUT_GRAPH_FILE))
+    fun resetLayout(dataDir: Path) {
+        stateWasReset = true
+        deleteQuietly(dataDir.resolve(Storage.LAYOUT_GRAPH_FILE))
+    }
 
-    /** Delete theme / background / console / widget-state so each re-seeds its default. */
-    fun resetCustomization(dataDir: Path) = CUSTOMIZATION_FILES.forEach { deleteQuietly(dataDir.resolve(it)) }
+    /** Delete theme / background / console so each re-seeds its default. */
+    fun resetCustomization(dataDir: Path) {
+        stateWasReset = true
+        CUSTOMIZATION_FILES.forEach { deleteQuietly(dataDir.resolve(it)) }
+    }
+
+    /**
+     * Delete the per-instance widget state: scratchpad bodies, checklist items,
+     * whatever else a widget kept for the user.
+     *
+     * Its own reset rather than part of [resetCustomization], because none of that
+     * is appearance and none of it exists anywhere else. It is offered at all
+     * because a widget that chokes on its own stored entry has no other way out --
+     * [hivens.ui.widgets.state.WidgetStateStore] already survives a corrupt FILE by
+     * starting empty, so the whole-store case never needed a button.
+     */
+    fun resetWidgetState(dataDir: Path) {
+        stateWasReset = true
+        deleteQuietly(dataDir.resolve(WIDGET_STATE_FILE))
+    }
 
     /**
      * Reset settings to defaults while KEEPING `disabledModules` -- else the reset
@@ -69,6 +113,17 @@ object RecoveryIo {
         )
     }
 
+    /**
+     * Clears the reset latch. Internal for unit tests only.
+     *
+     * [stateWasReset] is process-global and deliberately one-way, so a single
+     * test that calls a reset would otherwise silence every store's writes for
+     * the rest of the fork and fail unrelated tests.
+     */
+    internal fun resetForTests() {
+        stateWasReset = false
+    }
+
     // -- helpers ----------------------------------------------------------
 
     private fun modulesArray(ids: Set<String>) = JsonArray(ids.sorted().map { JsonPrimitive(it) })
@@ -81,8 +136,7 @@ object RecoveryIo {
 
     private fun writeSettings(dataDir: Path, root: JsonObject) {
         runCatching {
-            Files.createDirectories(dataDir)
-            Files.writeString(dataDir.resolve(Storage.SETTINGS_FILE), pretty.encodeToString(JsonObject.serializer(), root))
+            AtomicFiles.writeString(dataDir.resolve(Storage.SETTINGS_FILE), pretty.encodeToString(JsonObject.serializer(), root))
         }
     }
 

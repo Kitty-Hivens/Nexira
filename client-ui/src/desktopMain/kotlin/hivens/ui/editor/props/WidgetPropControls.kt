@@ -26,10 +26,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxSwitch
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
 import hivens.ui.widgets.customization.LabeledSlider
@@ -143,8 +146,9 @@ private fun ColorRow(label: String, hex: String, onChange: (String) -> Unit) {
     }
 }
 
+/** A free-text row. Also the fill control: one field carrying a value or a name. */
 @Composable
-private fun StringRow(label: String, value: String, onChange: (String) -> Unit) {
+internal fun StringRow(label: String, value: String, onChange: (String) -> Unit) {
     var text by remember(value) { mutableStateOf(value) }
     Row(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -163,7 +167,7 @@ private fun StringRow(label: String, value: String, onChange: (String) -> Unit) 
                 .weight(1f)
                 .height(36.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(glassSurfaceAlpha(0.4f))
+                .background(NxTheme.colors.surface.copy(alpha = 0.4f))
                 .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.CenterStart,
@@ -203,7 +207,7 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .background(glassSurfaceAlpha(0.4f))
+                    .background(NxTheme.colors.surface.copy(alpha = 0.4f))
                     .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                     .clickable { expanded = true }
                     .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -219,4 +223,51 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
             }
         }
     }
+}
+
+/**
+ * A row that opens a group of refinements.
+ *
+ * Local to the prop panel rather than a design-system primitive: it has one caller,
+ * and a disclosure row moves to nx-ui when a second one wants it rather than on the
+ * guess that one will.
+ */
+@Composable
+internal fun DisclosureRow(label: String, expanded: Boolean, onToggle: () -> Unit) {
+    Row(
+        // Hugs its label and takes a pill. Full width plus a default indication drew
+        // the press and focus states as a rectangle spanning the whole panel, which
+        // is neither the shape of the control nor the size of it.
+        Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Symbol(
+            icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
+            contentDescription = null,
+            tint = NxTheme.colors.textSecondary,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = NxTheme.colors.textSecondary,
+        )
+    }
+}
+
+/** A whole-dp slider for one corner or one side, in the range both share. */
+@Composable
+internal fun CornerRow(label: String, value: Float, onChange: (Float) -> Unit) {
+    LabeledSlider(
+        label         = label,
+        value         = value,
+        range         = 0f..40f,
+        format        = "%.0f",
+        keyStep       = 1f,
+        onValueChange = onChange,
+    )
 }

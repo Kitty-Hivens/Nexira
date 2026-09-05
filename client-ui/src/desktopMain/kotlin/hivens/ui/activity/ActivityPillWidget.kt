@@ -66,10 +66,9 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxProgressBar
-import hivens.ui.surface.FrostTier
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -79,6 +78,7 @@ import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.milliseconds
 
 /** How the measure is drawn. See the design review for what each costs. */
 @Serializable
@@ -97,7 +97,6 @@ data class PillProps(
     // floats over arbitrary content so it cannot let anything read through, and
     // once it cannot, every coat above the body is either invisible or a second
     // fill shifting a tone the ladder already chose.
-    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Clear,
     @PropLabel("widget.activity.pill.heightDp") @PropRange(40.0, 76.0) val heightDp: Int = 56,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
     @PropLabel("widget.activity.pill.showActions") val showActions: Boolean = true,
@@ -123,6 +122,7 @@ data class PillProps(
     id = "appshell.activity.pill",
     displayName = "widget.activity.pill",
     propsClass = PillProps::class,
+    drawsOwnSurface = true,
 )
 @Composable
 fun ActivityPillWidget(instance: WidgetInstance) {
@@ -132,7 +132,6 @@ fun ActivityPillWidget(instance: WidgetInstance) {
     val selections: SelectionRegistry = koinInject()
     val selection by selections.selection.collectAsState()
     val activities by registry.activities.collectAsState()
-    val style = LocalStyle.current
     val s = LocalStrings.current
 
     // One line, so one subject. A failure outranks live work -- it is the only
@@ -165,16 +164,16 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                 // an overshoot. It is not yet a panel and does not pretend to be
                 // one -- there is nothing to read until it has drawn itself out.
                 enter = slideInVertically(
-                    animationSpec = tween(style.animationDurationMs(260), easing = ArriveEasing),
+                    animationSpec = Motion.emphasis.of(),
                     initialOffsetY = { it * 2 },
                 ) + scaleIn(
-                    animationSpec = tween(style.animationDurationMs(260), easing = ArriveEasing),
+                    animationSpec = Motion.emphasis.of(),
                     initialScale = 0.5f,
-                ) + fadeIn(tween(style.animationDurationMs(160))),
+                ) + fadeIn(Motion.fade.of()),
                 exit = scaleOut(
-                    animationSpec = tween(style.animationDurationMs(200)),
+                    animationSpec = Motion.fade.of(),
                     targetScale = 0.96f,
-                ) + fadeOut(tween(style.animationDurationMs(160))),
+                ) + fadeOut(Motion.fade.of()),
             ) {
                 val hasBody = selection != null || subject != null
                 if (hasBody) {
@@ -184,8 +183,12 @@ fun ActivityPillWidget(instance: WidgetInstance) {
                     // ball being swapped for a bar.
                     val birthKey = selection?.let { "selection" } ?: subject?.key
                     var open by remember(birthKey) { mutableStateOf(false) }
+                    // Opens once the arrival has finished, so the two stages read
+                    // as one object rather than overlapping. Read out here: a role
+                    // needs composition, the effect body does not have it.
+                    val arrivalMs = Motion.emphasis.durationMs.toLong()
                     LaunchedEffect(birthKey) {
-                        delay(style.animationDurationMs(220).toLong())
+                        delay(arrivalMs.milliseconds)
                         open = true
                     }
                     // Selection takes the body. What the launcher is doing on its
@@ -216,19 +219,18 @@ internal fun Pill(
     maxWidth: Dp,
     open: Boolean = true,
 ) {
-    val style = LocalStyle.current
     val colors = NxTheme.colors
     val height = props.heightDp.dp
     // A panel's corner, not a capsule's. A fully rounded object at this size
     // reads as a chip no matter what is in it; the radius is what makes it a
-    // container. It comes from the panel token so the form axis still decides --
-    // Brut takes it to near-square without a switch of its own.
+    // container. It comes from the panel token, so the pill keeps no radius of
+    // its own to drift out of step.
     //
     // While the object is opening it travels from a circle to that radius, which
     // is the second half of the arrival: one shape becoming another.
     val corner by animateDpAsState(
-        targetValue = if (open) style.panelCorner else height / 2,
-        animationSpec = tween(style.animationDurationMs(380), easing = OpenEasing),
+        targetValue = if (open) 14.dp else height / 2,
+        animationSpec = Motion.reveal.of(),
         label = "pillCorner",
     )
     val shape = RoundedCornerShape(corner)
@@ -251,17 +253,17 @@ internal fun Pill(
             // and the surplus becomes a gap down the middle, which reads as two
             // unrelated clusters rather than one object.
             .widthIn(max = maxWidth)
-            .animateContentSize(tween(style.animationDurationMs(380), easing = OpenEasing))
+            .animateContentSize(Motion.reveal.of())
             .clip(shape),
         shape = shape,
-        tier = props.frostTier,
-        // It floats over the page, so it casts. Missing here while the selection
-        // body set it meant the same object gained a shadow the moment a selection
-        // took over and lost it again afterwards.
-        elevated = true,
+        // It floats over the page, so it casts, at the depth a floating panel is
+        // given. Missing here while the selection body set it meant the same object
+        // gained a shadow the moment a selection took over and lost it again
+        // afterwards.
+        shadowDp = 18f,
         // Opaque body: the object floats over arbitrary content, so the
         // legibility floor cannot depend on what happens to be behind it.
-        opaque = true,
+        opacity = 1f,
     ) {
         // Rule 5: the measure is a property of the object, not a widget parked
         // inside it. Both overlays measure against the surface's OWN bounds via
@@ -368,16 +370,15 @@ private fun EdgeMeasure(
     modifier: Modifier,
 ) {
     val trackColor = NxTheme.colors.textSecondary.copy(alpha = 0.22f)
-    val style = LocalStyle.current
     // A job whose size is not known yet still has to look alive. A static track
     // reads as stalled, which is what a launcher does for the first seconds of
     // every install -- exactly when the user is watching hardest.
-    val sweep = if (fraction == null && style.animationMultiplier > 0f) {
+    val sweep = if (fraction == null) {
         rememberInfiniteTransition(label = "pillSweep").animateFloat(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(style.animationDurationMs(1_600), easing = LinearEasing),
+                animation = Motion.sweep.of(),
                 repeatMode = RepeatMode.Restart,
             ),
             label = "pillSweepValue",
@@ -406,8 +407,9 @@ private fun EdgeMeasure(
         val arc = Path()
 
         when {
-            // Unknown size: a short arc travelling the perimeter.
-            fraction == null && sweep != null -> {
+            // Unknown size: a short arc travelling the perimeter. sweep is non-null
+            // exactly when fraction is null, so this is the whole of that case.
+            sweep != null -> {
                 val span = total * INDETERMINATE_SPAN
                 val head = total * sweep
                 measure.getSegment(head, (head + span).coerceAtMost(total), arc, true)
@@ -416,13 +418,7 @@ private fun EdgeMeasure(
                     measure.getSegment(0f, head + span - total, arc, true)
                 }
             }
-            // Unknown size with motion off: a still, dimmed full perimeter. Busy,
-            // not a percentage.
-            fraction == null -> {
-                drawPath(outline, color.copy(alpha = 0.35f), style = Stroke(width = strokeWidth))
-                return@Canvas
-            }
-            fraction <= 0f -> return@Canvas
+            fraction == null || fraction <= 0f -> return@Canvas
             else -> measure.getSegment(0f, total * fraction.coerceIn(0f, 1f), arc, true)
         }
         drawPath(arc, color, style = Stroke(width = strokeWidth))
@@ -513,11 +509,3 @@ private const val STACK_MAX = 3
 
 /** How far each face hides behind the one in front of it. */
 private val STACK_OVERLAP = 8.dp
-
-
-
-/** Arrival: overshoots, the way something landing does. */
-private val ArriveEasing = CubicBezierEasing(0.15f, 1.4f, 0.64f, 0.96f)
-
-/** Opening: fast then settling, with no overshoot to fight the arrival's. */
-private val OpenEasing = CubicBezierEasing(0.16f, 0.84f, 0.28f, 1f)

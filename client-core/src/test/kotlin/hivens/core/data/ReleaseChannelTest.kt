@@ -65,7 +65,7 @@ class ReleaseChannelTest {
 
     @Test
     fun `settings without updateChannel default to Release`() {
-        val loaded = json.decodeFromString<SettingsData>("""{"memoryMB":4096}""")
+        val loaded = json.decodeFromString<SettingsData>("""{"locale":"de"}""")
         assertEquals(ReleaseChannel.Release, loaded.updateChannel)
     }
 

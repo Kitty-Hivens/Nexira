@@ -6,11 +6,12 @@ import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.v2.ScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 
 // One look for every list bar (Rule 0). Geometry and the 40%/75% textSecondary mix
@@ -43,24 +44,24 @@ fun NxVerticalScrollbar(
 @Composable
 private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
     val base  = NxTheme.colors.textSecondary
-    val style = LocalStyle.current
-    // Reveal fades in at once; hiding waits out the idle pause, then fades. The fade and
-    // the thumb's hover crossfade route through the style so reduced-motion collapses
-    // them; the idle pause is fixed UX pacing, not motion, so it stays put. The corner
-    // follows buttonCorner so a Brut UI gets a square bar, not a lone rounded one.
+    // Reveal fades in at once; hiding waits out the idle pause, then fades. The corner
+    // follows buttonCorner so the bar agrees with the buttons beside it.
     val alpha by animateFloatAsState(
         targetValue   = if (revealed) 1f else 0f,
+        // Duration and curve come from the fade role; the idle pause before
+        // hiding is UX pacing rather than motion, so it is not scaled with it.
         animationSpec = tween(
-            durationMillis = style.animationDurationMs(if (revealed) FadeInMs else FadeOutMs),
+            durationMillis = Motion.fade.durationMs,
             delayMillis    = if (revealed) 0 else IdleFadeDelayMs,
+            easing         = Motion.fade.easing,
         ),
         label = "nxScrollbarAlpha",
     )
     return ScrollbarStyle(
         minimalHeight       = MinLength,
         thickness           = Thickness,
-        shape               = RoundedCornerShape(style.buttonCorner),
-        hoverDurationMillis = style.animationDurationMs(HoverCrossfadeMs),
+        shape               = MaterialTheme.shapes.small,
+        hoverDurationMillis = Motion.colorShift.durationMs,
         unhoverColor        = base.copy(alpha = 0.40f * alpha),
         hoverColor          = base.copy(alpha = 0.75f * alpha),
     )

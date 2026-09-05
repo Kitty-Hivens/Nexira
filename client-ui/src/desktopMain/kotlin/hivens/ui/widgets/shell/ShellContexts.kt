@@ -13,6 +13,8 @@ data class LeftRailContext(
     val currentScreen: Screen,
     val isAuthenticated: Boolean,
     val onScreenChange: (Screen) -> Unit,
+    /** What a rail entry does: switch to a fresh context rather than push. */
+    val onSwitchTab: (Screen) -> Unit,
     val onLogout: () -> Unit,
 )
 

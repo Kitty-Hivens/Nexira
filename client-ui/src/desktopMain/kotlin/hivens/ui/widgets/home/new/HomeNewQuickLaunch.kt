@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
@@ -34,22 +33,24 @@ data class QuickLaunchProps(
 // recently installed when nothing has been played. Empty repo elides
 // the widget entirely -- HomeNewRecent already shows the install CTA
 // in that state and two empty cards would be noisy.
-@Widget(id = "home.new.quicklaunch", displayName = "widget.home.new.quicklaunch", propsClass = QuickLaunchProps::class)
+@Widget(
+    id = "home.new.quicklaunch",
+    displayName = "widget.home.new.quicklaunch",
+    propsClass = QuickLaunchProps::class,
+    surface = """{"fill":"base","opacity":0.45,"padding":{"top":12.0}}""",
+)
 @Composable
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val p = instance.rememberProps<QuickLaunchProps>()
     val s = LocalStrings.current
-    val qt = rememberQuickLaunchTarget() ?: return
-    val target = qt.target
+    val quickLaunch = rememberQuickLaunchTarget() ?: return
+    val target = quickLaunch.target
 
     val label = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(glassSurfaceAlpha(0.45f))
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -78,7 +79,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            QuickLaunchButton(qt = qt, defaultLabel = p.buttonLabel.ifBlank { s.homeQuickButton })
+            QuickLaunchButton(quickLaunch = quickLaunch, defaultLabel = p.buttonLabel.ifBlank { s.homeQuickButton })
         }
     }
 }

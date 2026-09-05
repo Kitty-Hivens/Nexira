@@ -51,6 +51,7 @@ import hivens.tray.LibTrayController
 import hivens.tray.TrayController
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
@@ -65,10 +66,13 @@ import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.CompositeWidgetRegistry
+import hivens.widget.loader.WidgetModuleLoader
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.command
 import hivens.ui.debug.DebugOverlayState
+import hivens.ui.screens.browse.BrowseSession
 import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
@@ -95,6 +99,9 @@ val uiModule = module {
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
     single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
     single { GameConsoleService(get()) }
+    // One owner of console.json for the three surfaces that read it: the shell's
+    // window, Settings > Console and the pack's Logs tab.
+    single { ConsoleSettingsStore(get<Path>(), get(), get()) }
     // AWT-backed icon downscaler for the content scanner (the engine module
     // stays free of java.desktop; the seam interface lives in core).
     single<IconProcessor> { ImageIoIconProcessor() }
@@ -102,14 +109,50 @@ val uiModule = module {
     // shell recomposition + the crash-restart loop; inert on release builds.
     single { DebugOverlayState() }
 
+    // What Browse last showed per source and query, so flipping sources or
+    // stepping out of the screen comes back to the list instead of a spinner.
+    single { BrowseSession() }
+
     // System tray (client-tray seam): one libtray-backed impl. A plain single, so
     // client-cli -- which never injects it -- never loads libtray's natives.
     single<TrayController> { LibTrayController() }
 
-    // Widget kernel registry. KSP-generated; entries land as @Widget
-    // composables are added across the codebase. Kernel-1 starts the
-    // registry empty -- surface refactors arrive in kernel-3.
-    single<WidgetRegistry> { GeneratedWidgetRegistry }
+    // Widget kernel registry. The generated object is one source among however
+    // many the build carries: the kernel was always meant to accept widgets from
+    // outside a single compilation (the validator's rules apply to a reflected
+    // method, the processor warns rather than fails on a contract nobody here
+    // provides), and the composite is the part that was never written.
+    //
+    // Order is precedence and the built-in registry comes first, so a
+    // contributed widget cannot take over a kind the application depends on --
+    // the shell regions and the sign-in panel are non-removable because a layout
+    // without them has no navigation and no way to sign in, and shadowing them
+    // by id would be that removal through a side door.
+    single<WidgetRegistry> {
+        val contributed = WidgetModuleLoader(get<Path>().resolve(Storage.WIDGETS_DIR)).scan()
+        val sources = listOf(GeneratedWidgetRegistry) + contributed.loaded.map { it.registry }
+        // Parallel to sources, so a diagnostic can name a module rather than an
+        // index into a list the reader cannot see.
+        val labels = listOf("built-in") + contributed.loaded.map { it.id }
+        val registry = CompositeWidgetRegistry(sources)
+
+        val log = LoggerFactory.getLogger("Widgets")
+        log.info(
+            "Widget registry: {} kinds from {} source(s) [{}]",
+            registry.all().size, sources.size, labels.joinToString(", "),
+        )
+        // A contribution that loses its id loses it silently otherwise: the
+        // widget simply never appears, and nothing anywhere says why. The
+        // composite deliberately has no logger of its own, so the diagnostic
+        // gets read out here, where one exists.
+        registry.shadowed.forEach {
+            log.warn(
+                "Widget '{}' from '{}' is shadowed by '{}' and will not be used",
+                it.kind.value, labels[it.bySource], labels[it.heldBy],
+            )
+        }
+        registry
+    }
 
     // Cross-widget service registry (Phase D). One global instance per
     // launcher process. Provider widgets register via provideService
@@ -353,8 +396,8 @@ fun main(args: Array<String>) {
     )
 
     // Boot inversion: the window goes up FIRST (ShellHost renders the
-    // threshold), and everything slow -- pending data-dir move, NetworkState
-    // restore, migration detect, Koin -- runs here behind the live boot
+    // threshold), and everything slow -- pending data-dir move, migration
+    // detect, Koin -- runs here behind the live boot
     // screen. Daemon thread so a user closing the window mid-boot is not
     // held hostage by a stuck phase.
     val bootOutcome = MutableStateFlow<BootOutcome?>(null)
@@ -482,6 +525,7 @@ private fun runShellWithRecovery(
                             dataDir = pre.core.initialPaths.dataDir,
                             reason = reason,
                             onExit = { exitApplication() },
+                            locale = pre.peek.locale,
                         )
                     } else {
                         // The restart flag lets ShellHost skip the threshold only

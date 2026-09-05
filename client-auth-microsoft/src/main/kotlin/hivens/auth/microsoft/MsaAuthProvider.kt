@@ -23,14 +23,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Microsoft (MSA) auth via the OAuth 2.0 device-code grant, then the Xbox Live
  * -> XSTS -> Minecraft-services token exchange + profile fetch.
  *
- * Runs on the proxy-free [HttpClientProvider] (login.microsoftonline.com /
- * *.xboxlive.com / api.minecraftservices.com must be reached DIRECTLY, never
- * through the SmartyCraft SOCKS channel). Implements [AuthProvider] so the
+ * Runs on the direct [HttpClientProvider] (login.microsoftonline.com /
+ * *.xboxlive.com / api.minecraftservices.com must be reached under strict TLS,
+ * never over the SmartyCraft channel, whose client honours a user-granted SSL
+ * bypass -- a Microsoft token must not travel over a connection the user told
+ * the launcher to trust unconditionally). Implements [AuthProvider] so the
  * registry/gate see it as a provider, and [DeviceCodeAuthProvider] as the
  * interactive entry point; [login] and [completeTwoFactor] are unsupported --
  * there is no username/password path.
@@ -80,7 +83,7 @@ class MsaAuthProvider(
         var waitedMs = 0L
         val maxMs = challenge.expiresInSeconds.coerceAtLeast(1) * 1000L
         while (waitedMs < maxMs) {
-            delay(intervalMs)            // also the cancellation point: dialog dismiss aborts here
+            delay(intervalMs.milliseconds)            // also the cancellation point: dialog dismiss aborts here
             waitedMs += intervalMs
             val resp = http.post(TOKEN_URL) {
                 contentType(ContentType.Application.FormUrlEncoded)

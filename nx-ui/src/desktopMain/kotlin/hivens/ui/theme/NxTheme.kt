@@ -1,5 +1,7 @@
 package hivens.ui.theme
 
+import androidx.compose.foundation.DefaultContextMenuRepresentation
+import androidx.compose.foundation.LocalContextMenuRepresentation
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -9,6 +11,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.nx.ThemeStateLayer
 
@@ -27,8 +33,6 @@ data class NxColors(
     val onSurface: Color,
     val textPrimary: Color,
     val textSecondary: Color,
-    val glassBackground: Color,
-    val glassAlpha: Float,
     val success: Color,
     val outline: Color,
     // Severity accents for notifications. `success` already doubles as
@@ -81,8 +85,6 @@ internal val DarkColorPalette = NxColors(
     onSurface = Color.White,
     textPrimary = Color(0xFFEEEEEE),
     textSecondary = Color(0xFFB0B0B0),
-    glassBackground = Color(0xFF000000), // Base for glass
-    glassAlpha = 0.60f, // Glass transparency (dark)
     success = Color(0xFF4CAF50),
     outline = Color(0xFF444444),
     progressAccent = Color(0xFF6A84FF),
@@ -115,8 +117,14 @@ internal val LightColorPalette = NxColors(
     primary = Color(0xFF5E68C0),       // Soft indigo (instead of harsh purple)
     primaryVariant = Color(0xFF3F51B5),
     secondary = Color(0xFF26A69A),     // Calm teal
-    background = Color(0xFFF5F7FA),    // Very light gray (not white!)
-    surface = Color(0xFFFFFFFF),       // White cards
+    // The page is the extreme of the ladder, and every plane descends from it --
+    // the mirror of the dark theme, where the page is the darkest thing on screen
+    // and planes rise away from it. It used to sit in the MIDDLE: `surface` was
+    // white and therefore lighter than the page, `surfaceContainer` darker, so
+    // depth had no direction and a card cleared the page by 2.84 L* in one
+    // direction while a panel cleared it by 2.84 in the other. See the tiers below.
+    background = Color(0xFFFFFFFF),
+    surface = Color(0xFFECEEF2),
     surfaceVariant = Color(0xFFE8EAF0),
     error = Color(0xFFD32F2F),
     onPrimary = Color.White,
@@ -130,8 +138,6 @@ internal val LightColorPalette = NxColors(
     // everywhere and under the large-text one on half the ladder. Same hue and
     // saturation, lower lightness.
     textSecondary = Color(0xFF4F626B),
-    glassBackground = Color(0xFFFFFFFF),
-    glassAlpha = 0.65f,                // Slightly more opacity for readability
     // Darker than the dark theme's #4CAF50, like every other severity accent
     // here. Lightening it for a light ground put it at 1.9:1 against the
     // container plane -- under even the large-text floor -- while the same token
@@ -157,9 +163,18 @@ internal val LightColorPalette = NxColors(
     onSecondaryContainer = Color(0xFF0A3B33),
     tertiaryContainer = Color(0xFFF6E2CE),
     onTertiaryContainer = Color(0xFF4A2A09),
-    surfaceContainerLow  = Color(0xFFF0F2F6),
-    surfaceContainer     = Color(0xFFEAECF2),
-    surfaceContainerHigh = Color(0xFFE2E5EC),
+    // L* 100 / 96.99 / 94.05 / 91.30 / 87.82 counting `background` and `surface`
+    // above. Spread over 12.2 L* where it used to cover 9.1 with the page in the
+    // middle of it, so the pairs that actually sit next to each other clear the
+    // threshold at which two flat fields read as separate planes: page to a widget
+    // is 5.95 (was 2.84), page to a card is 8.70 (was 3.76).
+    //
+    // The floor is `textSecondary`, which needs 4.5:1 against any plane it is read
+    // on and therefore caps the deepest rung at L* 86.5. The bottom rung sits 1.32
+    // above that, so this ladder cannot go deeper without moving the text with it.
+    surfaceContainerLow  = Color(0xFFF6F6FA),
+    surfaceContainer     = Color(0xFFE4E6EC),
+    surfaceContainerHigh = Color(0xFFDADCE4),
     decorativeRamp = listOf(
         Color(0xFF6D28D9), Color(0xFF0284C7), Color(0xFF059669), Color(0xFFD97706),
         Color(0xFFDB2777), Color(0xFF0D9488), Color(0xFFEA580C), Color(0xFF4F46E5),
@@ -173,34 +188,45 @@ val LocalNxColors = staticCompositionLocalOf<NxColors> {
 // --- THEME WITH ANIMATION AND SUPPORT FOR CUSTOM THEMES ---
 
 /**
- * The palette a theme starts from, before presets, accent overrides and the tonal
- * expansion land on top. Wallpaper seeding (Monet) applies only when it is switched
- * on AND a seed was extracted; either half missing falls back to the fixed palette,
- * which is what the off state of the switch has to mean -- a preset then reads as it
- * was designed instead of tinted by whatever is behind the window.
+ * The palette a theme starts from, before accent overrides and the tonal expansion
+ * land on top.
+ *
+ * One seed, two places it can come from. The wallpaper supplies it while seeding is
+ * switched on and an image actually yielded one; otherwise the active preset does,
+ * through its own lead colour. Neither is a wholesale replacement: [generatedNxColors]
+ * keeps every plane's tone and spends the seed on hue and chroma, so a ground stays
+ * exactly as light or dark as it was and only changes colour.
+ *
+ * The preset used to reach no further than five accent fields. With no wallpaper --
+ * the state a fresh install is in -- nothing seeded anything, so every preset drew
+ * the same near-black ground and choosing one changed almost nothing on screen.
  */
-internal fun resolveBasePalette(dark: Boolean, seed: Int?, fromWallpaper: Boolean): NxColors {
+internal fun resolveBasePalette(dark: Boolean, seed: Int?, fromWallpaper: Boolean, themeSeed: Int?): NxColors {
     val fixed = if (dark) DarkColorPalette else LightColorPalette
-    return if (fromWallpaper && seed != null) seededNxColors(fixed, seed, dark) else fixed
+    val effective = seed.takeIf { fromWallpaper } ?: themeSeed ?: return fixed
+    return seededNxColors(fixed, effective, dark)
 }
 
 @Composable
 fun NxTheme(
     useDarkTheme: Boolean = true,
     customTheme: CustomTheme? = null,
-    style: StyleSpec = CelestiaStyle,
     // Material You: when [paletteFromWallpaper] is on and a [paletteSeed] (ARGB,
     // extracted from the wallpaper) is available, the base palette is generated from
     // it -- tinted tonal surfaces seeded by the background. Otherwise the fixed
-    // Celestia palette. Defaulted so other call sites (the console window) are unaffected.
+    // palette. Defaulted so other call sites (the console window) are unaffected.
     paletteSeed: Int? = null,
     paletteFromWallpaper: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val customization = LocalCustomization.current
 
-    // Base palette: fixed Celestia, or wallpaper-seeded (Monet) when enabled.
-    val baseColors = resolveBasePalette(useDarkTheme, paletteSeed, paletteFromWallpaper)
+    // Base palette: seeded from the wallpaper when that is on and an image gave a
+    // seed, otherwise from the preset's own lead colour, otherwise fixed.
+    val themeSeed = remember(customTheme?.primary) {
+        customTheme?.primary?.let { CustomTheme.parseHexColor(it).toArgb() }
+    }
+    val baseColors = resolveBasePalette(useDarkTheme, paletteSeed, paletteFromWallpaper, themeSeed)
 
     val themedColors = if (customTheme != null) {
         baseColors.copy(
@@ -245,8 +271,7 @@ fun NxTheme(
     // staticCompositionLocalOf) re-invalidated every reader of it ~30 times per
     // switch, recomposing + redrawing the whole tree on the single UI thread --
     // that was the freeze on toggle. The light<->dark transition is carried by
-    // the circular reveal instead (theme/ThemeReveal.kt); Brut had no color
-    // animation to begin with.
+    // the circular reveal instead (theme/ThemeReveal.kt).
     val activePalette = targetColors
 
     // M3 ColorScheme
@@ -280,17 +305,13 @@ fun NxTheme(
         )
     }
 
-    // Provide LocalStyle alongside the palette so child composables can
-    // read StyleSpec tokens without a separate CompositionLocalProvider
-    // chain at every entry point.
     CompositionLocalProvider(
-        LocalNxColors provides activePalette,
-        LocalStyle          provides style,
-        LocalMonoFamily     provides nexiraMonoFamily(),
+        LocalNxColors   provides activePalette,
+        LocalMonoFamily provides nexiraMonoFamily(),
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            shapes      = style.toMaterialShapes(),
+            shapes      = NexiraShapes,
             typography  = nexiraTypography(),
         ) {
             // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its
@@ -299,15 +320,48 @@ fun NxTheme(
             // LocalContentColor is anchored to the palette because with no root M3
             // Surface it defaults to Black, leaving the ambient state-layer wash
             // near-invisible on dark; M3 components still override it inside.
+            // The right-click menu a text field opens is drawn by foundation, not by
+            // us, and it defaults to an unthemed light popup that lands on a dark
+            // panel looking like a different program. One representation at the root
+            // reaches every field, since a field never provides its own.
+            val contextMenu = remember(activePalette) {
+                DefaultContextMenuRepresentation(
+                    backgroundColor = activePalette.surface,
+                    textColor       = activePalette.textPrimary,
+                    itemHoverColor  = activePalette.primary.copy(alpha = 0.14f),
+                )
+            }
             CompositionLocalProvider(
                 LocalIndication provides ThemeStateLayer,
                 LocalContentColor provides activePalette.textPrimary,
+                LocalContextMenuRepresentation provides contextMenu,
             ) {
                 content()
             }
         }
     }
 }
+
+/**
+ * The one place a corner radius is decided.
+ *
+ * Material's own bundle rather than a token object beside it: `MaterialTheme.shapes`
+ * is already what a call site reaches for, `Card`, `Button`, dialogs and sheets read
+ * it without being told, and a component that wants the card corner asks for
+ * [Shapes.medium] instead of importing a constant. A second vocabulary next to this
+ * one is what the style axis was.
+ *
+ * `small` is the button corner and `medium` the card corner, which is the pairing the
+ * primitives assume: a chip, a field and a scrollbar take `small`, a plane takes
+ * `medium`, and a floating panel takes `large`.
+ */
+internal val NexiraShapes: Shapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small      = RoundedCornerShape(8.dp),
+    medium     = RoundedCornerShape(12.dp),
+    large      = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(24.dp),
+)
 
 // Easy access via NxTheme.colors
 object NxTheme {

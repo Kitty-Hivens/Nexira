@@ -1,5 +1,6 @@
 package hivens.launcher.component
 
+import hivens.core.api.model.NeoForgeArgs
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OfflineIdentity
@@ -13,7 +14,9 @@ import kotlin.test.*
 
 class GameCommandBuilderTest {
 
-    private val builder = GameCommandBuilder()
+    // Pinned rather than left to the environment: the default reads WAYLAND_DISPLAY,
+    // which would make every assertion here depend on the session the tests run in.
+    private val builder = GameCommandBuilder(waylandSession = false)
 
     // ─── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -86,6 +89,55 @@ class GameCommandBuilderTest {
         userProfile = profile(memoryMb = memoryMb, jvmArgs = jvmArgs),
         classpath = classpath
     )
+
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FML early window
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private fun buildUnder(waylandSession: Boolean, version: String = "1.21.1"): List<String> =
+        GameCommandBuilder(waylandSession = waylandSession).build(
+            javaExec      = "/usr/bin/java",
+            memoryMB      = 4096,
+            clientRoot    = clientRoot,
+            serverProfile = server(version = version),
+            session       = session(),
+            userProfile   = profile(),
+            classpath     = if (version.startsWith("1.21")) neoForgeClasspath else legacyClasspath,
+        )
+
+    /**
+     * A surface nobody is looking at gets no frame callbacks on Wayland, so FML's
+     * early window stalls the moment the user switches workspace and its
+     * one-second handoff to Minecraft fails, ending the launch. Skipping the
+     * early window removes the handoff rather than racing it.
+     */
+    @Test
+    fun `a wayland session skips FML's early window`() {
+        val cmd = buildUnder(waylandSession = true)
+        assertTrue(
+            cmd.contains("-Dfml.earlyprogresswindow=false"),
+            "the early window must be off where its handoff can be starved",
+        )
+    }
+
+    @Test
+    fun `elsewhere the early window is left alone`() {
+        val cmd = buildUnder(waylandSession = false)
+        assertFalse(
+            cmd.any { it.startsWith("-Dfml.earlyprogresswindow") },
+            "nothing was wrong with the early window off Wayland, so it keeps its loading bar",
+        )
+    }
+
+    @Test
+    fun `the legacy path gets the same treatment`() {
+        val cmd = buildUnder(waylandSession = true, version = "1.7.10")
+        assertTrue(
+            cmd.contains("-Dfml.earlyprogresswindow=false"),
+            "the flag is inert where there is no early window, and correct where there is",
+        )
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // getNativesDir
@@ -436,7 +488,7 @@ class GameCommandBuilderTest {
     @Test
     fun `1_21_1 backend neoForgeArgs override defaults`() {
         val srv = server(version = "1.21.1").copy(
-            neoForgeArgs = mapOf("neoForgeVersion" to "99.0.0")
+            neoForgeArgs = NeoForgeArgs(neoForgeVersion = "99.0.0")
         )
         val cmd = builder.build(
             javaExec = "/usr/bin/java",
@@ -520,13 +572,13 @@ class GameCommandBuilderTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Custom ignoreModulesList from server profile
+    // Custom ignored modules from server profile
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `1_21_1 uses custom ignoreModulesList when provided`() {
+    fun `1_21_1 uses the profile's ignored modules when provided`() {
         val srv = server(version = "1.21.1").copy(
-            ignoreModulesList = "client,custom-module,another"
+            ignoredModules = listOf("client", "custom-module", "another")
         )
         val cmd = builder.build(
             javaExec = "/usr/bin/java",
@@ -579,6 +631,35 @@ class GameCommandBuilderTest {
         redirectAuthHost = redirectAuthHost,
         authlibAgentJarPath = authlibAgentJarPath,
     )
+
+
+    /**
+     * The path that actually broke: a pack launch on Hyprland died at the handoff
+     * because the user switched workspace while the pack loaded.
+     */
+    @Test
+    fun `a pack launch on wayland skips the early window too`() {
+        val cmd = GameCommandBuilder(waylandSession = true).buildPackCommand(
+            javaExec            = "/usr/bin/java",
+            memoryMB            = 4096,
+            gameDir             = Path.of("/tmp/instances/Industrial"),
+            sharedAssetsDir     = Path.of("/tmp/shared/assets"),
+            sharedLibrariesDir  = Path.of("/tmp/shared/libraries"),
+            nativesDirName      = "bin/natives-1.12.2",
+            versionLabel        = "Forge 1.12.2",
+            javaMajor           = 8,
+            runtime             = forgeRuntime(),
+            session             = session(),
+            jvmArgsOverride     = null,
+        )
+        assertTrue(cmd.contains("-Dfml.earlyprogresswindow=false"), "the pack path is the one that broke")
+    }
+
+    @Test
+    fun `a pack launch elsewhere keeps the early window`() {
+        val cmd = packCommand()
+        assertFalse(cmd.any { it.startsWith("-Dfml.earlyprogresswindow") })
+    }
 
     @Test
     fun `buildPackCommand redirects the auth hosts for a mirror-derived pack`() {

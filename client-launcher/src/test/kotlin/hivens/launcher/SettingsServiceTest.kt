@@ -16,6 +16,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * #189 -- SettingsService is read by Compose UI threads (settings screen
@@ -60,11 +61,11 @@ class SettingsServiceTest {
         val file = workDir / "settings.json"
         val svc = SettingsService(json, file)
 
-        svc.saveSettings(SettingsData(memoryMB = 8192, locale = "de"))
+        svc.saveSettings(SettingsData(javaPath = "/opt/jdk/bin/java", locale = "de"))
 
         // Fresh instance reads the persisted state.
         val reloaded = SettingsService(json, file)
-        assertEquals(8192, reloaded.getSettings().memoryMB)
+        assertEquals("/opt/jdk/bin/java", reloaded.getSettings().javaPath)
         assertEquals("de", reloaded.getSettings().locale)
     }
 
@@ -81,7 +82,7 @@ class SettingsServiceTest {
             file,
             """
             {
-              "memoryMB": 8192,
+              "javaPath": "/opt/jdk/bin/java",
               "locale": "de",
               "homeView": "Future"
             }
@@ -91,7 +92,7 @@ class SettingsServiceTest {
         val svc = SettingsService(json, file)
         val loaded = svc.getSettings()
 
-        assertEquals(8192, loaded.memoryMB, "non-enum fields must survive the coercion")
+        assertEquals("/opt/jdk/bin/java", loaded.javaPath, "non-enum fields must survive the coercion")
         assertEquals("de", loaded.locale, "non-enum fields must survive the coercion")
         assertEquals(
             SettingsData().homeView,
@@ -121,16 +122,56 @@ class SettingsServiceTest {
             file,
             """
             {
-              "memoryMB": 8192,
+              "javaPath": "/opt/jdk/bin/java",
               "disabledModules": ["keyring", "future-module"]
             }
             """.trimIndent(),
         )
         val loaded = SettingsService(json, file).getSettings()
-        assertEquals(8192, loaded.memoryMB, "sibling fields must survive an unknown module id")
+        assertEquals("/opt/jdk/bin/java", loaded.javaPath, "sibling fields must survive an unknown module id")
         assertEquals(setOf("keyring", "future-module"), loaded.disabledModules)
         assertEquals(ModuleId.Keyring, ModuleId.fromId("keyring"))
         assertEquals(null, ModuleId.fromId("future-module"), "unknown id maps to no module")
+    }
+
+    /**
+     * The in-process lock below serialises this launcher's own writers. It says
+     * nothing about what the FILE looks like mid-write, and that is what matters
+     * on a crash or a full disk: `reload` cannot tell truncated JSON from absent
+     * JSON, so a half-written settings.json comes back as defaults and the user
+     * loses every setting with nothing in the UI to say so.
+     *
+     * A reader that never holds the lock -- the next boot, a second instance, a
+     * backup -- must only ever see a whole file.
+     */
+    @Test
+    fun `a reader outside the lock never catches settings mid-write`(): Unit = runBlocking {
+        val file = workDir / "settings.json"
+        val svc = SettingsService(json, file)
+        // Big enough that a single non-atomic write cannot land in one go, so a
+        // direct write would be caught truncated rather than passing by luck.
+        val bulk = (1..4000).map { "module-$it" }.toSet()
+        svc.saveSettings(SettingsData(javaPath = "/j/2048", disabledModules = bulk))
+
+        var reads = 0
+        coroutineScope {
+            val writer = async(Dispatchers.IO) {
+                repeat(60) { i -> svc.saveSettings(SettingsData(javaPath = "/j/$i", disabledModules = bulk)) }
+            }
+            val reader = async(Dispatchers.IO) {
+                while (writer.isActive) {
+                    val text = runCatching { Files.readString(file) }.getOrNull() ?: continue
+                    reads++
+                    // Never empty and never partial: the file is published whole or
+                    // not at all.
+                    assertTrue(text.isNotEmpty(), "settings.json was observed truncated to nothing")
+                    json.decodeFromString<SettingsData>(text)
+                }
+            }
+            writer.await()
+            reader.await()
+        }
+        assertTrue(reads > 0, "the reader never got a look in -- the test proves nothing")
     }
 
     @Test
@@ -146,11 +187,15 @@ class SettingsServiceTest {
         coroutineScope {
             (1..200).map { i ->
                 async(Dispatchers.IO) {
-                    svc.saveSettings(SettingsData(memoryMB = i * 16))
+                    svc.saveSettings(SettingsData(javaPath = "/j/${i * 16}"))
                     val read = svc.getSettings()
-                    // memoryMB is the only thing varied -- verify it's a value
-                    // we actually wrote (not a ghost composite of two writes).
-                    assertEquals(read.memoryMB % 16, 0, "torn write detected: ${read.memoryMB}")
+                    // javaPath is the only thing varied -- verify it is a value we
+                    // actually wrote (not a ghost composite of two writes).
+                    val written = read.javaPath?.removePrefix("/j/")?.toIntOrNull()
+                    assertTrue(
+                        written != null && written % 16 == 0,
+                        "torn write detected: ${read.javaPath}",
+                    )
                 }
             }.awaitAll()
         }

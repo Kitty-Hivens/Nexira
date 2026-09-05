@@ -25,8 +25,8 @@ import hivens.auth.AuthProvider
 import hivens.auth.OfflineAuthProvider
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
-import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
+import hivens.launcher.network.CertificateTrustGate
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
 import hivens.ui.components.MicrosoftSignInButton
@@ -57,9 +57,10 @@ fun LoginPanel(
 ) {
     val authService: AuthProvider              = koinInject()
     val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
-    val credentialsManager: AccountStore = koinInject()
+    val credentialsManager: AccountStore       = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
+    val certificateGate: CertificateTrustGate  = koinInject()
     val offlineProvider: OfflineAuthProvider   = koinInject()
     val settingsService: ISettingsService      = koinInject()
     val s            = LocalStrings.current
@@ -74,7 +75,6 @@ fun LoginPanel(
     var rememberMe   by remember { mutableStateOf(settingsService.getSettings().saveCredentials) }
     var isLoading    by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var sslWarning   by remember { mutableStateOf(false) }
 
     // The choice outlives the panel, so it is persisted on the flip rather than at
     // login: a user who unticks and then closes the window without signing in has
@@ -118,7 +118,6 @@ fun LoginPanel(
         if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
         focusManager.clearFocus()
         isLoading             = true
-        sslWarning            = false
         errorMessage          = null
         twoFactorUnsupported  = false
         hivens.core.diag.ActionRing.record("Login attempt: user=$login")
@@ -159,7 +158,14 @@ fun LoginPanel(
                     "Login failed (auth): user=$login ssl=${e.isSslError} msg=${e.message?.take(80)}"
                 )
                 when {
-                    e.isSslError -> sslWarning = true
+                    // The certificate question is the shell's to ask now, so the form
+                    // no longer draws its own copy of it: the same refusal reaches the
+                    // roster and the news, and one dialog for one decision beats a
+                    // banner that only the login path could raise. The retry rides
+                    // along -- accepting here means the user wanted to sign in.
+                    e.isSslError -> certificateGate.request(protocolConfig.sslBypassHost) {
+                        doLogin(insecureAuthService)
+                    }
                     else         -> errorMessage = e.message
                         ?.replace("java.lang.Exception: ", "")
                         ?.substringAfter("API: ")
@@ -267,68 +273,6 @@ fun LoginPanel(
             color      = NxTheme.colors.textPrimary
         )
 
-        // ── SSL warning banner ────────────────────────────────────────────
-        if (sslWarning) {
-            NxCalloutBanner(
-                tone  = NxCalloutTone.Warning,
-                title = s.sslWarningTitle,
-                body  = s.sslWarningBody,
-            ) {
-                // Trust-duration prompt + 3 grant buttons. Each click both
-                // grants the bypass for that duration AND retries login --
-                // single-click UX. Cancel button is on its own row above so
-                // the dangerous actions don't accidentally read as the same
-                // affordance as the safe one.
-                OutlinedButton(
-                    onClick  = { sslWarning = false },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape    = MaterialTheme.shapes.small
-                ) {
-                    Text(s.sslWarningCancel, color = NxTheme.colors.textSecondary)
-                }
-                Text(
-                    text  = s.sslWarningTrustPrompt,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary,
-                )
-                val acceptColors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.warnAccent)
-                fun acceptFor(unit: java.time.temporal.ChronoUnit, amount: Long, label: String) {
-                    // 100-year future for "always" -- long enough that no user
-                    // will outlive it, short enough to not overflow ISO-8601
-                    // formatting that a far-future Instant.MAX would.
-                    val until = java.time.Instant.now().plus(amount, unit)
-                    hivens.core.diag.ActionRing.record(
-                        "SSL bypass accepted by user (login retry) -- granted: $label",
-                    )
-                    NetworkState.grantBypass(protocolConfig.sslBypassHost, until)
-                    doLogin(insecureAuthService)
-                }
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick  = { acceptFor(java.time.temporal.ChronoUnit.HOURS, 1, "1 hour") },
-                        modifier = Modifier.weight(1f),
-                        shape    = MaterialTheme.shapes.small,
-                        colors   = acceptColors,
-                    ) { Text(s.sslWarningTrustHour, color = Color.Black) }
-                    Button(
-                        onClick  = { acceptFor(java.time.temporal.ChronoUnit.DAYS, 30, "30 days") },
-                        modifier = Modifier.weight(1f),
-                        shape    = MaterialTheme.shapes.small,
-                        colors   = acceptColors,
-                    ) { Text(s.sslWarningTrust30Days, color = Color.Black) }
-                    Button(
-                        onClick  = { acceptFor(java.time.temporal.ChronoUnit.DAYS, 36500, "always (100y)") },
-                        modifier = Modifier.weight(1f),
-                        shape    = MaterialTheme.shapes.small,
-                        colors   = acceptColors,
-                    ) { Text(s.sslWarningTrustAlways, color = Color.Black) }
-                }
-            }
-        }
-
         // ── 2FA unsupported banner ────────────────────────────────────────
         if (twoFactorUnsupported) {
             NxCalloutBanner(
@@ -365,7 +309,7 @@ fun LoginPanel(
         // ── Fields ────────────────────────────────────────────────────────
         OutlinedTextField(
             value         = login,
-            onValueChange = { login = it; errorMessage = null; sslWarning = false; twoFactorUnsupported = false },
+            onValueChange = { login = it; errorMessage = null; twoFactorUnsupported = false },
             label         = { Text(s.loginUsername) },
             modifier      = Modifier.fillMaxWidth(),
             singleLine    = true,
@@ -377,12 +321,11 @@ fun LoginPanel(
         PuppetField("login.username", login) {
             login = it
             errorMessage = null
-            sslWarning = false
         }
 
         OutlinedTextField(
             value                = password,
-            onValueChange        = { password = it; errorMessage = null; sslWarning = false; twoFactorUnsupported = false },
+            onValueChange        = { password = it; errorMessage = null; twoFactorUnsupported = false },
             label                = { Text(s.loginPassword) },
             modifier             = Modifier.fillMaxWidth(),
             singleLine           = true,
@@ -398,7 +341,6 @@ fun LoginPanel(
         PuppetField("login.password", password) {
             password = it
             errorMessage = null
-            sslWarning = false
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {

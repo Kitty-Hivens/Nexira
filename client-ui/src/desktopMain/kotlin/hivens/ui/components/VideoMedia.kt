@@ -200,7 +200,7 @@ internal fun FetchStatus(fetch: MediaFetch, onCancel: () -> Unit) {
             style = MaterialTheme.typography.bodySmall,
         )
         NxProgressBar(progress = fetch.fraction, modifier = Modifier.width(180.dp))
-        byteLabel(fetch)?.let {
+        byteLabel(fetch, s)?.let {
             Text(
                 text  = it,
                 color = Color.White.copy(alpha = 0.6f),
@@ -231,14 +231,14 @@ private fun fetchLabel(fetch: MediaFetch, s: AppStrings): String = when (fetch) 
 }
 
 /** "12.4 MB / 45.6 MB", or just what has arrived while the size is unknown. */
-private fun byteLabel(fetch: MediaFetch): String? {
+private fun byteLabel(fetch: MediaFetch, s: AppStrings): String? {
     val (done, total) = when (fetch) {
         is MediaFetch.Downloading    -> fetch.doneBytes to fetch.totalBytes
         is MediaFetch.InstallingTool -> fetch.doneBytes to fetch.totalBytes
         else                         -> return null
     }
     if (done <= 0L) return null
-    return if (total > 0L) "${humanSize(done)} / ${humanSize(total)}" else humanSize(done)
+    return if (total > 0L) "${humanSize(done, s)} / ${humanSize(total, s)}" else humanSize(done, s)
 }
 
 @Composable

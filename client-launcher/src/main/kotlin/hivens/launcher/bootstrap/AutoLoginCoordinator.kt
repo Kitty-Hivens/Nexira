@@ -25,10 +25,13 @@ import org.slf4j.LoggerFactory
  *   failure (or no configured client id) trust the cached token -- the MC
  *   token lives ~24h, and a stale one is rejected at launch, the same recovery
  *   as a stale SC token.
+ * - **Two-factor account.** Go with the stored session and make no request at
+ *   all: a login mints a new uid and invalidates the previous one, so asking
+ *   would revoke the session the player unlocked with a code. Checked before
+ *   the password, since the token is what this branch trusts.
  * - **Cached password present.** Attempt a real login. On
- *   [TwoFactorRequiredException], trust the cached accessToken in `saved`
- *   (2FA accounts already paid the 2FA cost when they got that token --
- *   re-validating on every startup defeats the point). On
+ *   [TwoFactorRequiredException], trust the cached accessToken in `saved` and
+ *   return it marked, so the caller can arm the guard above. On
  *   [AuthException] with `isSslError`, stop at [Resolution.CertificateUntrusted]
  *   and leave the decision to the user.
  *   On any other failure, return null and let the user re-enter manually.
@@ -112,25 +115,41 @@ object AutoLoginCoordinator {
             return Resolution.Success((refreshed ?: saved).copy(serverId = lastServerId))
         }
 
+        // A known two-factor account is never signed in from here. The damage is
+        // the REQUEST, not its refusal: SmartyCraft mints a uid per login and
+        // invalidates the previous one, so this call revokes the session the
+        // player unlocked with a code, and a game already running is dropped with
+        // a username verification error moments after the launcher window opens.
+        // Nothing on screen connects the two. AutoSyncService gates the same call
+        // for the same reason.
+        //
+        // Ahead of the cached-password read, because the token is what this branch
+        // goes with and an account that never saved a password still has one.
+        if (saved.twoFactor) {
+            ActionRing.record("Auto-login: two-factor account, going with the session in hand")
+            return Resolution.Success(saved.copy(serverId = lastServerId))
+        }
+
         val cachedPass = saved.cachedPassword ?: return Resolution.NoCredentials
         val server = lastServerId ?: Protocol.DEFAULT_SERVER_ID
 
         return try {
             Resolution.Success(authService.login(saved.playerName, cachedPass, server))
         } catch (e: TwoFactorRequiredException) {
-            // 2FA accounts already paid the 2FA cost when they got the
-            // cached accessToken. Re-validating with login() just
-            // re-triggers the gate on every launcher startup -- which
-            // is what the cached accessToken is supposed to prevent.
-            // Trust the cache: promote `saved` straight to Authenticated.
-            // If the token is actually stale, the server will reject it
-            // at game launch and the user re-logs in from the credentials
-            // form -- same recovery path as a server-side logout. Fix
-            // for the "double login on every launch with 2FA" report.
+            // First contact with the gate: the flag is set by whoever meets it, and
+            // an account restored from a build that predates the flag meets it here.
+            // The demand itself is the evidence, so the session comes back marked and
+            // the caller persists it -- otherwise the guard above stays unarmed and
+            // every launch spends another login.
+            //
+            // The cached accessToken is what the shell opens on. A 2FA account already
+            // paid for it, and a launch demands a session minted for that launch
+            // regardless, so a stale one costs a code at launch rather than a sign-in
+            // on every start.
             ActionRing.record(
                 "Auto-login: 2FA account, trusting cached accessToken (uid=${e.uid?.take(8) ?: "<missing>"})"
             )
-            Resolution.Success(saved.copy(serverId = lastServerId))
+            Resolution.Success(saved.copy(serverId = lastServerId, twoFactor = true))
         } catch (e: AuthException) {
             when {
                 e.isSslError -> {

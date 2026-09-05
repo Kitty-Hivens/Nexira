@@ -17,10 +17,7 @@ import androidx.compose.ui.unit.dp
 import hivens.media.MediaFetch
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.StyleSpec
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -44,16 +41,26 @@ class FetchStatusRenderTest {
 
     private var progressAccent: Color = Color.Unspecified
 
+    /**
+     * One phase, driven through a run of frames rather than sampled at an
+     * instant, and every frame kept.
+     *
+     * A single frame says nothing about a wait whose size is unknown. The sweep
+     * takes its zero from the first frame it is handed and restarts each lap; at
+     * both of those moments its segment sits off the left edge of the track and
+     * inks nothing at all. Reading one frame asserts that the scene started the
+     * animation on the frame this file had in mind, which an off-screen scene on
+     * a loaded machine does not promise, and a run of frames does not need.
+     */
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun render(name: String, style: StyleSpec = CelestiaStyle, scale: Float = 1f, content: @Composable () -> Unit): Bitmap {
+    private fun render(name: String, scale: Float = 1f, content: @Composable () -> Unit): List<Bitmap> {
         val scene = ImageComposeScene(
             width   = (width * scale).toInt(),
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(useDarkTheme = true, style = style) {
+            NxTheme(useDarkTheme = true) {
                 CompositionLocalProvider(
-                    LocalStyle provides style,
                     LocalStrings provides EnglishStrings,
                 ) {
                     progressAccent = NxTheme.colors.progressAccent
@@ -67,17 +74,21 @@ class FetchStatusRenderTest {
                 }
             }
         }
-        // Two frames, not one. The first starts the clock; an indeterminate sweep
-        // begins its segment off the left edge of the track and draws nothing at
-        // all at time zero, so a single frame would show an empty bar and say
-        // nothing about whether the measure works.
-        scene.render(0L)
-        val image = scene.render(SETTLE_NANOS)
-        scene.close()
         val out = File("build/render").apply { mkdirs() }
-        image.encodeToData(EncodedImageFormat.PNG)?.bytes
-            ?.let { File(out, "video-fetch-$name@${scale.toInt()}x.png").writeBytes(it) }
-        return Bitmap.makeFromImage(image)
+        val shots = ArrayList<Bitmap>(FRAMES)
+        var t = 0L
+        repeat(FRAMES) { frame ->
+            val image = scene.render(t)
+            // The sheet keeps the last frame, the wait mid-stride.
+            if (frame == FRAMES - 1) {
+                image.encodeToData(EncodedImageFormat.PNG)?.bytes
+                    ?.let { File(out, "video-fetch-$name@${scale.toInt()}x.png").writeBytes(it) }
+            }
+            shots += Bitmap.makeFromImage(image)
+            t += FRAME_NANOS
+        }
+        scene.close()
+        return shots
     }
 
     private fun accentPixels(bmp: Bitmap): Int {
@@ -101,23 +112,32 @@ class FetchStatusRenderTest {
         )
         for ((name, fetch) in phases) {
             render(name, scale = 2f) { FetchStatus(fetch) {} }
-            val bmp = render(name) { FetchStatus(fetch) {} }
-            assertTrue(accentPixels(bmp) > 0, "$name: the measure must draw something")
+            val shots = render(name) { FetchStatus(fetch) {} }
+            assertTrue(shots.any { accentPixels(it) > 0 }, "$name: the measure must draw something")
         }
     }
 
     @Test
     fun `a measured download inks less than a finished one`() {
+        // The last frame: the eased fill has landed there, so the two runs are
+        // compared at their settled lengths rather than mid-tween.
         fun inked(done: Long, total: Long, name: String) =
-            accentPixels(render(name) { FetchStatus(MediaFetch.Downloading(done, total)) {} })
+            accentPixels(render(name) { FetchStatus(MediaFetch.Downloading(done, total)) {} }.last())
 
         val quarter = inked(10L * 1024 * 1024, 40L * 1024 * 1024, "measure-quarter")
         val whole = inked(40L * 1024 * 1024, 40L * 1024 * 1024, "measure-whole")
         assertTrue(whole > quarter, "the bar must grow with the download: $quarter -> $whole")
     }
 
-    /** Far enough into the sweep to be on the track, short of a full lap. */
-    private val SETTLE_NANOS = 400_000_000L
+    /** One frame to the next, the cadence the app itself draws at. */
+    private val FRAME_NANOS = 16_000_000L
+
+    /**
+     * Frames per phase. A quarter of the sweep's lap, so the segment is on the
+     * track in nearly all of them whichever frame the animation took for its
+     * zero, and long enough for the eased fill of a measured phase to land.
+     */
+    private val FRAMES = 25
 
     private fun Color.toArgbInt(): Int =
         (0xFF shl 24) or ((red * 255).toInt() shl 16) or ((green * 255).toInt() shl 8) or (blue * 255).toInt()

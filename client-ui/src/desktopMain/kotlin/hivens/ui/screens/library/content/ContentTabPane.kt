@@ -21,6 +21,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,11 +52,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
-import hivens.launcher.modrinth.ModrinthClient
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
-import io.github.vinceglb.filekit.path
 import hivens.core.data.PackInstance
 import hivens.launcher.instance.ContentKind
 import hivens.launcher.instance.InstalledContent
@@ -66,24 +65,32 @@ import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.RetryStateBlock
+import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxKebabButton
+import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxPanelGroup
+import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSwitch
+import hivens.ui.nx.NxToggle
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxVerticalScrollbar
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
+import hivens.ui.utils.rememberFileDialogSettings
 import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Library PackDetail Content tab. Reads what is ACTUALLY installed under the
@@ -103,8 +110,12 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
     val state = rememberContentTabState(instance)
     val selections: SelectionRegistry = koinInject()
+    val addDialogSettings = rememberFileDialogSettings(s.contentAddFiles)
 
     LaunchedEffect(state) { state.load() }
+    // Separate from load(): this one runs for as long as the tab is on screen,
+    // picking up anything added to the folders from outside the launcher.
+    LaunchedEffect(state) { state.watchContentFolders() }
 
     // The selection lives on the activity surface, so this view publishes it and
     // takes it back down on the way out. Leaving the tab with rows still ticked
@@ -146,7 +157,7 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     }
 
     Column(
-        modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier            = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Toolbar(
@@ -154,14 +165,20 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
             onQuery        = { state.query = it },
             filter         = state.filter,
             onFilter       = { state.filter = it },
+            filters        = state.filters,
+            onFilters      = { state.filters = it },
+            offersOptional = state.hasOptional,
+            offersOwner    = state.hasPackContent,
+            shownCount     = state.visible.size,
+            scannedCount   = state.scannedCount,
             // Adding mods is gated behind detach; resource / shader packs can be added
             // any time (switch to their filter to target that folder). "Find projects"
             // is the Modrinth MOD browser, so it stays mod-gated.
-            canAdd         = state.isLocal ||
+            canAdd         = state.canAddContent ||
                 state.filter.kind == ContentKind.ResourcePack ||
                 state.filter.kind == ContentKind.ShaderPack,
-            canFindProjects = state.isLocal,
-            onAddFiles     = { state.addFiles(s.contentAddFiles) },
+            canFindProjects = state.canAddContent,
+            onAddFiles     = { state.addFiles(addDialogSettings) },
             onFindProjects = state::startBrowsing,
         )
 
@@ -248,12 +265,19 @@ private fun Toolbar(
     onQuery: (String) -> Unit,
     filter: ContentFilter,
     onFilter: (ContentFilter) -> Unit,
+    filters: ContentFilters,
+    onFilters: (ContentFilters) -> Unit,
+    offersOptional: Boolean,
+    offersOwner: Boolean,
+    shownCount: Int,
+    scannedCount: Int,
     canAdd: Boolean,
     canFindProjects: Boolean,
     onAddFiles: () -> Unit,
     onFindProjects: () -> Unit,
 ) {
     val s = LocalStrings.current
+    var filtersOpen by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         ContentSearch(query, onQuery, s.contentSearchPlaceholder)
         Row(
@@ -261,16 +285,147 @@ private fun Toolbar(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment     = Alignment.CenterVertically,
         ) {
-            FilterChip(s.contentFilterAll, filter == ContentFilter.All) { onFilter(ContentFilter.All) }
-            FilterChip(s.contentFilterMods, filter == ContentFilter.Mods) { onFilter(ContentFilter.Mods) }
-            FilterChip(s.contentFilterResourcePacks, filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
-            FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
-            Spacer(Modifier.weight(1f))
+            Row(
+                modifier              = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                FilterChip(s.contentFilterAll, filter == ContentFilter.All) { onFilter(ContentFilter.All) }
+                FilterChip(s.contentFilterMods, filter == ContentFilter.Mods) { onFilter(ContentFilter.Mods) }
+                FilterChip(s.contentFilterResourcePacks, filter == ContentFilter.ResourcePacks) { onFilter(ContentFilter.ResourcePacks) }
+                FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
+            }
+            // The chips answer what kind of thing a row is; everything that
+            // narrows WITHIN a section lives in one panel, so the row does not
+            // grow a control per axis.
+            ContentFilterButton(
+                filters        = filters,
+                onFilters      = onFilters,
+                offersOptional = offersOptional,
+                offersOwner    = offersOwner,
+                shownCount     = shownCount,
+                scannedCount   = scannedCount,
+            )
             if (canFindProjects) {
                 NxButton(label = s.contentFindProjects, onClick = onFindProjects, style = NxButtonStyle.Secondary, icon = NxIcon.Search, compact = true)
             }
             if (canAdd) {
                 NxButton(label = s.contentAddFiles, onClick = onAddFiles, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
+            }
+        }
+    }
+}
+
+/**
+ * The filter trigger and its panel.
+ *
+ * Badged with the number of active axes and tinted while any is on: a list quietly
+ * shorter than the folder reads as content having gone missing, and the badge is
+ * what separates "nothing matches" from "nothing is there".
+ *
+ * An axis whose data the pack does not carry is not offered -- a local pack curates
+ * nothing, so "optional" and "who added it" would be questions with one answer.
+ */
+@Composable
+private fun ContentFilterButton(
+    filters: ContentFilters,
+    onFilters: (ContentFilters) -> Unit,
+    offersOptional: Boolean,
+    offersOwner: Boolean,
+    shownCount: Int,
+    scannedCount: Int,
+) {
+    val s = LocalStrings.current
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Box(contentAlignment = Alignment.TopEnd) {
+            NxIconButton(
+                // Turns into the close while the panel is out, and the panel's own
+                // close lands on this exact spot -- so the control the user pressed
+                // reads as having become the corner of what opened. Otherwise the
+                // plain funnel: the crossed-out one reads as "no filtering", which
+                // is the opposite of what an active filter means, so the badge and
+                // the tint carry that instead.
+                icon               = if (open) NxIcon.Close else NxIcon.FilterAlt,
+                contentDescription = s.contentFiltersTitle,
+                onClick            = { open = !open },
+                tint               = if (filters.isEmpty && !open) NxTheme.colors.textSecondary
+                                     else NxTheme.colors.primary,
+            )
+            if (!filters.isEmpty && !open) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 2.dp, end = 2.dp)
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(NxTheme.colors.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text       = filters.activeCount.toString(),
+                        style      = MaterialTheme.typography.labelSmall,
+                        color      = NxTheme.colors.onPrimary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+        NxPopoverPanel(
+            expanded         = open,
+            onDismissRequest = { open = false },
+            title            = s.contentFiltersTitle,
+            footer           = {
+                Text(
+                    text  = s.contentFiltersShown(shownCount, scannedCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxTheme.colors.textSecondary,
+                )
+                NxButton(
+                    label   = s.contentFiltersReset,
+                    onClick = { onFilters(ContentFilters()) },
+                    style   = NxButtonStyle.Tertiary,
+                    enabled = !filters.isEmpty,
+                    compact = true,
+                )
+            },
+        ) {
+            if (offersOptional) {
+                // A chip, not a settings toggle: every axis in this panel is asked
+                // the same way, and a switch row among chip rows reads as a
+                // different kind of thing than it is.
+                NxPanelGroup(s.contentFilterGroupCurated, hint = s.contentFilterOptionalOnlyHint) {
+                    NxChoiceChip(s.contentFilterOptionalOnly, filters.optionalOnly) {
+                        onFilters(filters.copy(optionalOnly = !filters.optionalOnly))
+                    }
+                }
+            }
+            NxPanelGroup(s.contentFilterGroupStatus) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    NxChoiceChip(s.contentFilterAny, filters.status == ContentStatus.Any) {
+                        onFilters(filters.copy(status = ContentStatus.Any))
+                    }
+                    NxChoiceChip(s.contentFilterEnabled, filters.status == ContentStatus.Enabled) {
+                        onFilters(filters.copy(status = ContentStatus.Enabled))
+                    }
+                    NxChoiceChip(s.contentFilterDisabled, filters.status == ContentStatus.Disabled) {
+                        onFilters(filters.copy(status = ContentStatus.Disabled))
+                    }
+                }
+            }
+            if (offersOwner) {
+                NxPanelGroup(s.contentFilterGroupOwner) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        NxChoiceChip(s.contentFilterAny, filters.owner == ContentOwner.Any) {
+                            onFilters(filters.copy(owner = ContentOwner.Any))
+                        }
+                        NxChoiceChip(s.contentFilterOwnerPack, filters.owner == ContentOwner.Pack) {
+                            onFilters(filters.copy(owner = ContentOwner.Pack))
+                        }
+                        NxChoiceChip(s.contentFilterOwnerUser, filters.owner == ContentOwner.User) {
+                            onFilters(filters.copy(owner = ContentOwner.User))
+                        }
+                    }
+                }
             }
         }
     }
@@ -305,7 +460,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (selected) NxTheme.colors.primary else glassSurfaceAlpha(0.5f))
+            .background(if (selected) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
@@ -314,6 +469,8 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             style      = MaterialTheme.typography.labelLarge,
             color      = if (selected) Color.White else NxTheme.colors.textSecondary,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
         )
     }
 }
@@ -350,7 +507,7 @@ private fun ContentRow(
             .clip(MaterialTheme.shapes.small)
             .background(
                 if (selected) NxTheme.colors.primary.copy(alpha = 0.14f)
-                else glassSurfaceAlpha(0.4f),
+                else NxTheme.colors.surface.copy(alpha = 0.4f),
             )
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -453,23 +610,18 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
 @Composable
 private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifier: Modifier, onBack: () -> Unit) {
     val s = LocalStrings.current
-    val modrinth: ModrinthClient = koinInject()
+    val state = rememberModBrowserState(mcVersion, loader, modsDir)
     val scope = rememberCoroutineScope()
-    var query by remember { mutableStateOf("") }
-    var submitted by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<ModrinthSearchHit>?>(null) }
-    var installed by remember { mutableStateOf(emptySet<String>()) }
-    var working by remember { mutableStateOf(emptySet<String>()) }
 
-    // Debounce typing, then search on the settled query.
-    LaunchedEffect(query) { delay(350); submitted = query }
-    LaunchedEffect(submitted, mcVersion, loader) {
-        results = null
-        results = runCatching { withContext(Dispatchers.IO) { modrinth.searchMods(submitted, mcVersion, loader).hits } }.getOrDefault(emptyList())
-    }
+    // Debounce typing, then search on the settled query. The timer is a
+    // composition concern; both halves of the query live on the holder, so a
+    // rebuilt one cannot leave them disagreeing.
+    LaunchedEffect(state, state.query) { delay(350.milliseconds); state.submitted = state.query }
+    var retryTick by remember(state) { mutableIntStateOf(0) }
+    LaunchedEffect(state, state.submitted, retryTick) { state.runSearch(state.submitted) }
 
     Column(
-        modifier            = modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier            = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -478,13 +630,21 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
             }
             Text(s.contentFindProjects, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
         }
-        ContentSearch(query, { query = it }, s.contentSearchPlaceholder)
+        ContentSearch(state.query, { state.query = it }, s.contentSearchPlaceholder)
 
-        val r = results
+        val r = state.results
         when {
             r == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
+            state.searchFailed -> RetryStateBlock(
+                title      = s.modBrowserErrorTitle,
+                message    = s.modBrowserErrorMessage,
+                retryLabel = s.contentTabRetry,
+                onRetry    = { retryTick++ },
+                modifier   = Modifier.fillMaxSize().padding(20.dp),
+                titleStyle = MaterialTheme.typography.titleMedium,
+            )
             r.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
             }
@@ -497,21 +657,10 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
                         items(items = r, key = { it.projectId }) { hit ->
                             ModResultRow(
                                 hit       = hit,
-                                installed = hit.projectId in installed,
-                                working   = hit.projectId in working,
-                                onInstall = {
-                                    working = working + hit.projectId
-                                    scope.launch {
-                                        runCatching {
-                                            modrinth.bestModVersion(hit.projectId, mcVersion, loader)?.let { v ->
-                                                val f = v.primaryFile()
-                                                modrinth.downloadTo(f.url, modsDir.resolve(f.filename))
-                                            }
-                                        }
-                                        working = working - hit.projectId
-                                        installed = installed + hit.projectId
-                                    }
-                                },
+                                installed = hit.projectId in state.installed,
+                                working   = hit.projectId in state.working,
+                                failed    = hit.projectId in state.failed,
+                                onInstall = { scope.launch { state.installMod(hit) } },
                             )
                         }
                     }
@@ -523,11 +672,11 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
 }
 
 @Composable
-private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Boolean, onInstall: () -> Unit) {
+private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Boolean, failed: Boolean, onInstall: () -> Unit) {
     val s = LocalStrings.current
     val shape = RoundedCornerShape(7.dp)
     Row(
-        modifier              = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(glassSurfaceAlpha(0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
+        modifier              = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(NxTheme.colors.surface.copy(alpha = 0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -547,6 +696,12 @@ private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Bo
         when {
             installed -> Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.primary, size = 20.dp)
             working   -> CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            // A download that did not land says so and offers the action again.
+            // Silence here reads as success, which is the failure this replaced.
+            failed    -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Symbol(NxIcon.Warning, contentDescription = s.contentInstallFailed, tint = NxTheme.colors.error, size = 18.dp)
+                NxButton(label = s.contentInstallRetry, onClick = onInstall, style = NxButtonStyle.Secondary)
+            }
             else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
         }
     }
@@ -589,7 +744,7 @@ private fun ContentDetailsDialog(
                 description?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
                 }
-                MetaLine(s.contentDetailSize, humanSize(content.sizeBytes))
+                MetaLine(s.contentDetailSize, humanSize(content.sizeBytes, s))
                 license?.let {
                     Text(s.contentTabModLicensePrefix(it), style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
                 }

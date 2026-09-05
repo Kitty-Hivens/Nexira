@@ -7,10 +7,23 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * User-config files inside a synced client install that the launcher
- * must NEVER overwrite even when the server's manifest claims they're
- * stale. Without this gate, every server-side modpack push would erase
- * a player's hand-tuned settings.
+ * User-config files inside a `clients/` install that the launcher must NEVER
+ * overwrite even when the server's manifest claims they're stale. Without this
+ * gate, every server-side modpack push would erase a player's hand-tuned
+ * settings.
+ *
+ * Scope is the SmartyCraft server-list path and nothing else. That path
+ * downloads whatever the server lists and keeps no record of what it wrote last
+ * time, so a list of names to leave alone is the only thing standing between an
+ * update and the player's settings -- a workaround for how that path behaves,
+ * not a design. It retires when that path does.
+ *
+ * Mirror packs do not use this and must not: they keep the installed version's
+ * manifest as a baseline, so the reconciler distinguishes a file the pack
+ * shipped from one the player wrote and decides each on its own evidence. A
+ * name-based list cannot make that distinction, and carrying it there was
+ * actively harmful -- a listed name was skipped in both directions, so a pack
+ * could not deliver its own `servers.dat` at all.
  *
  * Defaults cover in-game settings (`options.txt`, `servers.dat`) and
  * per-mod state directories that mod authors traditionally store

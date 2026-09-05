@@ -11,6 +11,7 @@ import java.nio.file.Path
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -98,6 +99,35 @@ class XodusPackRepositoryTest {
         val r2 = XodusPackRepository(d.resolve("db"), d.resolve("packs.json"), json).also { repos.add(it) }
         assertEquals(listOf("recovered"), r2.list().map { it.id })
         assertTrue(Files.exists(d.resolve("packs.json.migrated")))
+    }
+
+    @Test
+    fun `a reference that names no pack never reaches the registry`() = runTest {
+        val r = repo(tempData())
+        r.put(instance("a"))
+        val dangling = instance("b").copy(packRef = PackReference(PackOrigin.Mirror, ""))
+        assertFailsWith<IllegalArgumentException> { r.put(dangling) }
+        assertNull(r.get("b"))
+        assertEquals(listOf("a"), r.list().map { it.id })
+    }
+
+    @Test
+    fun `a blank version written by an older build loads as floating`() = runTest {
+        val d = tempData()
+        val stored = instance("legacy").copy(
+            packRef = PackReference(PackOrigin.Mirror, "pack", ""),
+            pinnedPackVersion = "",
+        )
+        Files.writeString(
+            d.resolve("packs.json"),
+            """{"schema_version":1,"instances":[${json.encodeToString(PackInstance.serializer(), stored)}]}""",
+        )
+        val loaded = repo(d).get("legacy")!!
+        assertNull(loaded.packRef.version)
+        assertNull(loaded.pinnedPackVersion)
+        // Repaired on the way in, so a later write of the same instance is accepted.
+        repos.first().put(loaded)
+        assertEquals(listOf("legacy"), repos.first().list().map { it.id })
     }
 
     @Test
