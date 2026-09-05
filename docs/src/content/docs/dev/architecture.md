@@ -159,9 +159,9 @@ Adoption of the style tokens is uneven. Corner radius is read widely; motion and
 
 ## Testing and what runs
 
-Roughly 1780 test methods. The engine and the widget model are covered densely. The UI is covered thinly, and its visual output has only a few assertions: most render tests assert that a non-empty image was produced, not what is in it.
+Roughly 2550 test methods. The engine and the widget model are covered densely. The UI is covered thinly, and its visual output has only a few assertions: most render tests assert that a non-empty image was produced, not what is in it.
 
-Continuous integration on a pull request runs eight suites -- `client-config`, `client-core`, `client-launcher`, `client-update`, `client-ui`, `client-i18n`, `client-render3d` and `widget-processor` -- across Linux, macOS and Windows. The design system, the widget model and runtime, the auth modules, the CLI, media, tray and the two agents are not run there.
+Continuous integration on a pull request runs every module that has tests -- twenty three suites -- across Linux, macOS and Windows. It used to run eight, and each module left out of that list was one whose regressions reached a release: the widget loader is the runtime half of the validator the KSP processor enforces at build time, and the worked example is the only thing in the tree compiled against the widget ABI from outside, so it is what notices an ABI change the launcher's own modules cannot see.
 
 Two custom scanners do run strictly on every pull request: one fails on a user-facing string hardcoded outside the localisation layer, the other on process metadata in comments. Neither keeps a module list, because a list is how `nx-ui` went unscanned when it was split out: the comment scanner takes every top-level directory carrying sources, and the string scanner asks each build file whether Compose is applied. A new module is covered the day it lands.
 

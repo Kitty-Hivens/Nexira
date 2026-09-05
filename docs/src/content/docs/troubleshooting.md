@@ -69,7 +69,9 @@ Check your credentials on [smartycraft.ru](https://www.smartycraft.ru). The laun
 
 **2FA accounts**
 
-Two-factor authentication is **not supported in Nexira**. The SMARTYcraft 2FA flow is not part of the documented protocol and the launcher cannot complete login on a 2FA-protected account. Disable 2FA on smartycraft.ru if you need to use Nexira.
+Two-factor authentication works. Signing in on an account that has it asks for the code and completes the login.
+
+What to know about it: SMARTYcraft ends the previous session every time an account signs in, and the launcher has to sign in again to hand the game a session it can vouch for. So a launch on a two-factor account asks for a fresh code, and starting a second game ends the first one's session. The launcher never signs such an account in on its own, for the same reason -- neither on startup nor from a background sync -- so opening it while you are in game leaves that game alone.
 
 ---
 
@@ -88,7 +90,7 @@ Open the console (wrench icon → Copy All) and look for Java errors. Common cau
 
 **Custom JVM flags break the launch**
 
-The experimental **JVM Args Builder** (Settings → Experimental → JVM Args) lets you set custom GC, JIT, CDS and JFR flags. If a configuration breaks the launch, reset to defaults from the same screen.
+The **JVM args builder** (Settings → Advanced → Launch, then the builder button in a pack's or a server's settings) lets you set custom GC, JIT, CDS and JFR flags. If a configuration breaks the launch, reset to defaults from the same screen.
 
 ---
 
@@ -96,17 +98,19 @@ The experimental **JVM Args Builder** (Settings → Experimental → JVM Args) l
 
 **News feed empty / can't fetch server list**
 
-Nexira reaches SMARTYcraft over a direct HTTPS connection. If that host is unreachable from your network, the feed and the server list stay empty -- there is no alternate route. A VPN or a system-level proxy is the workaround.
+Neither the news nor the server list needs an account, so an empty rail on a launcher you have not signed into means the host was not reached. Nexira reaches SMARTYcraft over a direct HTTPS connection, and if that host is unreachable from your network both stay empty -- there is no alternate route. A VPN or a system-level proxy is the workaround.
+
+If the host answers but its certificate has expired, the launcher asks about it wherever the refusal happened rather than only inside the login form. Accepting once puts the news and the server list back.
 
 **Stale data dir warnings**
 
-If you moved the data directory through **Settings → Data dir → Move**, the relocation applies on the next launcher start. The bootstrap config at `~/.nexira.conf` records the target; check that file if migration appears stuck.
+If you moved the data directory through **Settings → Advanced → Data directory**, the relocation applies on the next launcher start. The bootstrap config at `~/.nexira.conf` records the target; check that file if migration appears stuck.
 
 ---
 
 ## Offline mode
 
-Enable **Offline mode** in Settings → Behavior to skip authentication and file sync.
+Enable **Offline mode** in Settings → Appearance → Behavior to skip authentication and file sync.
 
 :::caution
 Offline mode requires at least one prior online launch on the same server (the launcher uses the cached file manifest from that session).
