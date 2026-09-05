@@ -15,16 +15,25 @@ Releases are tagged from `stable` via `build_release.yml`.
 
 ## ── Changelog ──
 
-Each released version's entry in `CHANGELOG.md` should open with a short
-`### Highlights` section — 2-5 user-facing bullets explaining what the user
-actually notices. The detailed `### Added` / `### Changed` / `### Fixed` /
-`### Removed` blocks below stay for the GitHub release page and changelog
-readers.
+Two files, two audiences, and they are not two depths of the same text.
 
-The CI build extracts the Highlights block, embeds it in `release-manifest.json`
-alongside the binaries, and `UpdateService` shows it in the in-app update
-dialog. Releases without a Highlights block fall back to rendering the full
-changelog there.
+`CHANGELOG.md` is the engineering log. Name the classes, the files and the
+mechanism, and the reason behind the change. A contributor reads it, and
+nobody else has to.
+
+`CHANGELOG_EN.md` is what the release means for the person using the launcher,
+written in their terms: what changed on screen, what stopped going wrong, what
+the launcher now refuses to do. `CHANGELOG_RU.md` and `CHANGELOG_DE.md` are
+its translations. An entry can matter in one file and be invisible in the
+other, in either direction. Keep the version headers and dates identical so an
+entry can be matched across.
+
+CI reads `CHANGELOG_EN.md` for the release page's "What's New" and freezes a
+copy into `release-manifest.json`. The launcher prefers the reader's own
+language read live off `stable`, so a note fixed after a release still reaches
+them. `CHANGELOG.md` becomes the release page's "What's Changed". A release
+with no player notes falls back to showing the engineering log in the update
+dialog.
 
 ## ── Commit style ──
 

@@ -25,9 +25,14 @@ data class ReleaseManifest(
     @SerialName("publishedAt") val publishedAt: String? = null,
 
     /**
-     * User-facing one-paragraph summary extracted from the `### Highlights`
-     * subsection of the CHANGELOG entry. Null when no Highlights block
-     * exists; clients fall back to the full changelog.
+     * The release's player-facing note, as CI found it in `CHANGELOG_EN.md`.
+     *
+     * A frozen copy, and the fallback rather than the source: the launcher
+     * prefers the reader's own language read live off `stable`, so a note
+     * corrected or translated after the release still reaches them. This is
+     * what a launcher with no route to raw.githubusercontent falls back on.
+     * Null when the release has no player notes, and clients then fall back to
+     * the full changelog.
      */
     @SerialName("highlights") val highlights: String? = null,
 

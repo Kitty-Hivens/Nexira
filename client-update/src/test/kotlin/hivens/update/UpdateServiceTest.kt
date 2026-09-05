@@ -241,18 +241,45 @@ class UpdateServiceTest {
     }
 
     /**
-     * English costs no request: the manifest the check already fetched carries it.
-     * The staged response would answer any URL, so a non-null return here would
-     * mean a read that should not have happened.
+     * English is a language here, not the absence of one. It used to be answered
+     * from the release manifest instead, which froze it: a note corrected after
+     * the release reached every reader except the ones it was written for.
      */
     @Test
-    fun `English notes are answered without reading a localized file`() = runTest {
+    fun `English notes are read from the English file like any other language`() = runTest {
         val service = createService(
-            MockResponse(urlContains = "CHANGELOG", body = russianChangelog),
+            MockResponse(urlContains = "CHANGELOG_EN.md", body = englishChangelog),
+            MockResponse(urlContains = "releases", body = "[]"),
+        )
+        val notes = service.fetchLocalizedNotes("v2.4.0-beta5", "en")
+        assertNotNull(notes)
+        assertTrue("The first thing." in notes, "the English notes did not arrive: $notes")
+    }
+
+    /**
+     * A file that cannot be read is not an error the reader should see: the
+     * manifest carries a frozen copy, so the caller falls back to it.
+     */
+    @Test
+    fun `English with no file reachable falls back rather than failing`() = runTest {
+        val service = createService(
+            MockResponse(urlContains = "CHANGELOG_EN.md", body = "Not Found", status = HttpStatusCode.NotFound),
             MockResponse(urlContains = "releases", body = "[]"),
         )
         assertNull(service.fetchLocalizedNotes("v2.4.0-beta5", "en"))
     }
+
+    private val englishChangelog = """
+        # What's New
+
+        ## [2.4.0-beta5] - 2026-08-05
+
+        Release summary.
+
+        ### Highlights
+        - The first thing.
+        - The second thing.
+    """.trimIndent()
 
     @Test
     fun `a translated release reads its own tag`() = runTest {

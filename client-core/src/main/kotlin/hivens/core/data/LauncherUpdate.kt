@@ -3,10 +3,12 @@ package hivens.core.data
 import kotlinx.serialization.Serializable
 
 /**
- * Available launcher update. [highlights] is the user-facing TL;DR pulled
- * from the release's `### Highlights` block; null for legacy releases (UI
- * falls back to [changelog], the aggregated `## What's Changed` body
- * across versions between the installed and the latest).
+ * Available launcher update. [highlights] is the release's player-facing note,
+ * written for the person using the launcher rather than cut from the
+ * engineering log: `CHANGELOG_EN.md` and its translations. Null for a release
+ * that has none (a nightly, or anything predating the file), and the UI then
+ * falls back to [changelog] -- the aggregated `## What's Changed` body across
+ * the versions between the installed one and the latest.
  */
 @Serializable
 data class LauncherUpdate(

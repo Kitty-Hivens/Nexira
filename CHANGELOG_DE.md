@@ -1,7 +1,12 @@
 # Änderungen
 
-Changelog von Nexira auf Deutsch. Gepflegt ab Version 2.3.4-beta4; die
-vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
+Was jede Nexira-Version für die Person bedeutet, die den Launcher benutzt.
+Gepflegt ab Version 2.3.4-beta4, das englische Original steht in
+[CHANGELOG_EN.md](./CHANGELOG_EN.md).
+
+Das Entwicklungsprotokoll ist ein eigenes Dokument:
+[CHANGELOG.md](./CHANGELOG.md). Es nennt Klassen und Mechanismen und muss
+nicht gelesen werden, um eine Version zu verstehen.
 
 ## [2.4.0-beta5] - 2026-08-05
 

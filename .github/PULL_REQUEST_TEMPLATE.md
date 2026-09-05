@@ -10,4 +10,5 @@ _Closes #_
 
 - [ ] Tested locally
 - [ ] `./gradlew :client-core:test :client-launcher:test` passes
-- [ ] CHANGELOG.md updated
+- [ ] CHANGELOG.md updated (the engineering log)
+- [ ] CHANGELOG_EN.md updated, if a player would notice this
