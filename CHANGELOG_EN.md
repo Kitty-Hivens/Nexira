@@ -17,8 +17,22 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-05
+
+2.4.0 is what the previews and betas of this line were building toward. Most of it is the surface layer: what a panel is made of, whether the number you set reaches the pixel, and whether the launcher gets out of the way once the game is running. The rest is a list of things that quietly did not work, several of which could cost you an account, a session, or something you had typed.
+
 ### Highlights
-- **Release notes are written for you now, not extracted from developer notes.** What you see when the launcher offers an update used to be a summary sitting on top of a changelog full of class names, and in English it was frozen at release time so a mistake in it could never be corrected. It is its own file in every language now, this one, and fixing a note no longer needs a new release.
+- **Your layout resets once, on the first start.** A panel is described in numbers you can set now, rather than in preset names that each moved three values at once. There is no honest way to read the old descriptions as the new ones, so the arrangement goes back to the one the launcher ships with. Your old file is left on disk, untouched.
+- **The appearance controls do what they say.** The opacity slider moved nothing at all before: every panel drew at one fixed value on a dark theme and refused to be see-through at all on a light one. Blur now blurs what is actually behind a panel instead of a copy of the wallpaper, a panel stops painting a hard square behind its own rounded corners, and it can be a squircle, a star or a polygon.
+- **A two-factor account stops being thrown out of the game.** Opening the launcher signed you in again, and SmartyCraft kills the previous session on every sign-in, so the game you were already playing dropped you with a verification error moments later and nothing on screen connected the two.
+- **The launcher gets out of the way whichever way you started the game.** Hiding after launch only worked from the classic dashboard. A pack started from the Library, from its own page, after a two-factor prompt or after an offline retry left the window standing in front of the game.
+- **The window opens at full size, immediately.** It used to open small and be resized after the first frame was already drawn, which showed about two seconds of white around one correctly drawn corner.
+- **Installing an update stops looking like a freeze.** The launcher sat on screen, no longer drawing, for the whole swap, and on Linux wrote two full copies of itself to do it. The window goes down first now, and the install is a rename.
+- **Update notes arrive in your language.** Every label in the update dialog was translated except the one thing you open it for. The Russian and German notes existed and were read by nothing at all. They are their own document now, written for you rather than cut out of the developer log, and a note can be corrected without cutting another release.
+- **News goes past three items, and shows up before you sign in.** The rail read from a payload that carries three and always has, so asking for twenty gave you three; it reads the site's archive now, a page at a time as you scroll. Neither the news nor the server list needs an account, but both were empty until you signed in, because the only place to accept the server's certificate was inside the login form.
+- **Picking an older build installs that build.** The version picker recorded the build you chose and downloaded the newest one, so what was on disk was never what the launcher thought it had.
+- **Nothing quietly takes your things.** Reset customization on the recovery screen deleted the notes and checklists you had typed into widgets, and asked nothing first. A launcher started while the system keyring was locked erased your saved account for good. A mod whose download failed reported itself installed.
+- **Your session stays out of the logs.** A response the launcher could not read was written to the log with your uid and session token in it, and from there into any diagnostic bundle you sent for support.
 
 ## [2.4.0-beta5] - 2026-08-05
 

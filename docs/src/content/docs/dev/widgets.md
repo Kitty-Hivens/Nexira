@@ -31,6 +31,8 @@ Optional arguments to `@Widget`:
 - `removable` -- set false to hide the remove control. For widgets whose absence would break a surface.
 - `slots` -- ids of drop targets this widget exposes for nested widgets. Container widgets only.
 - `propsClass` -- a `@Serializable` data class of tunable settings. Every field needs a default. The editor builds a form from it; the widget reads values with `instance.rememberProps<T>()`.
+- `surface` -- the plane the widget sits on, as a `SurfaceSpec` in the same JSON the layout file carries. Blank (the default) means no plane: the widget draws its content and nothing behind it. The processor decodes the string at build time and fails the build on a malformed one. Declare the plane here rather than drawing it yourself, and the user can then reshape it from the editor.
+- `drawsOwnSurface` -- set true for a widget that paints its own plane in its body. Blank `surface` means "no plane, and one may be added"; this says "a plane exists and the kernel did not draw it", so the editor stops offering a second one on top. Reach for it only where a record cannot describe the plane: a shape that animates, or one that changes with the widget's own state.
 
 Wrong signatures fail the build with a diagnostic rather than at runtime.
 
