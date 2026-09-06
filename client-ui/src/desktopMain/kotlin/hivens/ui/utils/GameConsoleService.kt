@@ -469,10 +469,19 @@ class GameConsoleService(
      * Route a typed console line: a registered in-launcher command runs locally and
      * returns true; anything else is forwarded to the game's stdin (a no-op when no
      * game is running).
+     *
+     * While a game owns the input row the game gets the bare line first, and a
+     * launcher command has to be asked for with a leading slash. `help` is the
+     * most typed word at a server console and it belongs to the server. Before
+     * the launcher had commands of its own the question could not come up. With
+     * no game attached both spellings run locally, so the slash is a way to be
+     * heard over the game rather than a syntax anyone has to learn.
      */
     fun submitConsoleInput(text: String): Boolean {
-        val local = localCommands[text.trim().lowercase()]
-        if (local != null) { local(); return true }
+        val trimmed = text.trim()
+        val explicit = trimmed.startsWith("/")
+        val local = localCommands[trimmed.removePrefix("/").lowercase()]
+        if (local != null && (explicit || !canSendCommands)) { local(); return true }
         sendCommand(text)
         return false
     }

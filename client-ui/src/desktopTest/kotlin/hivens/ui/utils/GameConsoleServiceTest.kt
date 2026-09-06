@@ -154,6 +154,45 @@ class GameConsoleServiceTest {
     }
 
     @Test
+    fun `with a game attached the bare line belongs to the game`() {
+        val svc = service()
+        var ranLocally = 0
+        val toGame = mutableListOf<String>()
+        svc.registerLocalCommand("help") { ranLocally += 1 }
+        svc.attachCommandSink { toGame += it }
+
+        assertEquals(false, svc.submitConsoleInput("help"), "a server console owns the word help")
+        assertEquals(listOf("help"), toGame)
+        assertEquals(0, ranLocally)
+
+        assertEquals(true, svc.submitConsoleInput("/help"), "the slash asks to be heard over the game")
+        assertEquals(1, ranLocally)
+        assertEquals(listOf("help"), toGame, "the slashed line is not also forwarded")
+    }
+
+    @Test
+    fun `with no game attached both spellings run locally`() {
+        val svc = service()
+        var ranLocally = 0
+        svc.registerLocalCommand("mem") { ranLocally += 1 }
+
+        assertTrue(svc.submitConsoleInput("mem"))
+        assertTrue(svc.submitConsoleInput("/mem"))
+        assertEquals(2, ranLocally)
+    }
+
+    @Test
+    fun `an unknown line still reaches the game`() {
+        val svc = service()
+        val toGame = mutableListOf<String>()
+        svc.registerLocalCommand("mem") { }
+        svc.attachCommandSink { toGame += it }
+
+        assertEquals(false, svc.submitConsoleInput("/gamerule keepInventory true"))
+        assertEquals(listOf("/gamerule keepInventory true"), toGame, "a slash is a minecraft command too")
+    }
+
+    @Test
     fun `clear empties the buffer`() = runBlocking {
         val svc = service()
         svc.append("x")

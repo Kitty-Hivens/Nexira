@@ -46,6 +46,8 @@ import hivens.core.diag.ActionRing
 import hivens.core.security.SslBypassStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.launcher.platform.AppRelauncher
+import hivens.ui.console.ConsoleCommands
 import hivens.ui.debug.DebugOverlay
 import hivens.ui.debug.DebugOverlayState
 import hivens.ui.debug.IdentitySlotChromeModifier
@@ -150,6 +152,7 @@ import java.awt.Toolkit
 import java.awt.event.AWTEventListener
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
+import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 // 2-column Library + sidebar starts collapsing visibly below this width;
@@ -312,14 +315,28 @@ fun FrameWindowScope.AppShellContent(
 
     val settings = remember { settingsService.getSettings() }
 
-    // Dev-only: also expose the UI-debug overlay through a console command (F9 is
-    // the primary toggle). Registered once; the console service is a process
-    // singleton, and registration is a no-op guard on a release build.
+    // The console's own commands, declared in ConsoleCommands. Registered once;
+    // the console service is a process singleton. The UI-debug toggle is among
+    // them only on a build that has the overlay (F9 stays the primary way in).
+    // The input row appears as soon as anything is registered, so from here the
+    // console takes typed commands with no game running.
     LaunchedEffect(Unit) {
-        if (debugOverlay.available) {
-            gameConsole.registerLocalCommand("uidebug") { debugOverlay.toggle() }
-            gameConsole.registerLocalCommand("ui-debug") { debugOverlay.toggle() }
-        }
+        val overlayToggle: (() -> Unit)? = if (debugOverlay.available) debugOverlay::toggle else null
+        ConsoleCommands.registerAll(
+            console = gameConsole,
+            scope = applicationScope,
+            debugOverlayToggle = overlayToggle,
+            // Busy from the first prepare step, not from the moment a game
+            // process exists: the download and the unpack run in this process.
+            launcherIsBusy = {
+                val state = controller.state.value
+                state !is LaunchState.Idle && state !is LaunchState.Error
+            },
+            // Same self-relaunch the recovery restart uses: spawn the binary again
+            // and let this process go. False means there is nothing to spawn (a
+            // dev run), and then nothing happens at all.
+            restartWorld = { if (AppRelauncher.relaunch()) exitProcess(0) else false },
+        )
     }
 
     // Native maximize/restore for the undecorated window -- the WM owns the
