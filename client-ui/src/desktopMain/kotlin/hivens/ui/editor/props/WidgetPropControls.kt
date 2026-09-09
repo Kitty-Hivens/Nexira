@@ -26,8 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.nx.NxContextMenu
-import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxSelect
 import hivens.ui.nx.NxSwitch
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -184,9 +183,16 @@ internal fun StringRow(label: String, value: String, onChange: (String) -> Unit)
     }
 }
 
+/**
+ * One enum-valued property.
+ *
+ * The plate this used to draw was a rectangle with a border and no caret, which is
+ * the shape of a disabled text field rather than of a choice: the only way to find
+ * out it opened anything was to click it. [NxSelect] is the control that shape was
+ * imitating.
+ */
 @Composable
 private fun ChoiceRow(label: String, options: List<String>, selected: String, onChange: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -199,29 +205,13 @@ private fun ChoiceRow(label: String, options: List<String>, selected: String, on
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(140.dp),
         )
-        Box(modifier = Modifier.weight(1f)) {
-            Text(
-                text     = selected,
-                style    = MaterialTheme.typography.bodySmall,
-                color    = NxTheme.colors.textPrimary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(NxTheme.colors.surface.copy(alpha = 0.4f))
-                    .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                    .clickable { expanded = true }
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-            )
-            NxContextMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { opt ->
-                    NxMenuItem(
-                        label    = opt,
-                        selected = opt == selected,
-                        onClick  = { onChange(opt); expanded = false },
-                    )
-                }
-            }
-        }
+        NxSelect(
+            options  = options,
+            selected = selected,
+            onSelect = onChange,
+            label    = { it },
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
