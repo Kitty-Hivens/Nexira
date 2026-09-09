@@ -14,7 +14,15 @@ enum class AppLocale(
 ) {
     RUSSIAN("Русский", "ru"),
     ENGLISH("English", "en"),
-    GERMAN("Deutsch", "de");
+    GERMAN("Deutsch", "de"),
+
+    /**
+     * Carries its own alpha marker, in Latin so it reads whatever language the
+     * picker is being read in. The translation was not written by a native
+     * speaker, and the label is the place to say so: a warning in the list is
+     * better than a surprise once the interface has switched.
+     */
+    JAPANESE("日本語 (alpha)", "ja");
 
     companion object {
         fun fromTag(tag: String): AppLocale =
@@ -30,6 +38,7 @@ fun stringsFor(locale: AppLocale): AppStrings = when (locale) {
     AppLocale.RUSSIAN -> RussianStrings
     AppLocale.ENGLISH -> EnglishStrings
     AppLocale.GERMAN  -> GermanStrings
+    AppLocale.JAPANESE -> JapaneseStrings
 }
 
 // ============================================================================

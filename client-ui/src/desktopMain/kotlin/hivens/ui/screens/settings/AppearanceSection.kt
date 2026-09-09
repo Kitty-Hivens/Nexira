@@ -35,6 +35,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxMenuMark
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxSwitch
@@ -44,6 +45,7 @@ import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.LocalThemeReveal
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
@@ -87,7 +89,14 @@ internal fun AppearanceSection(
             trailing = {
                 Box {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(currentLocale.displayName, color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
+                        // The picker lists every locale under its own name, so a row can carry a
+                        // script the UI face has no glyphs for even while the interface is Latin.
+                        Text(
+                            currentLocale.displayName,
+                            color = NxTheme.colors.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = familyForText(currentLocale.displayName),
+                        )
                         Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary)
                     }
                     NxContextMenu(
@@ -98,6 +107,10 @@ internal fun AppearanceSection(
                             NxMenuItem(
                                 label    = locale.displayName,
                                 selected = locale == currentLocale,
+                                // One question, four answers: the check mark on the
+                                // row already in force said nothing about the other
+                                // three being answers to the same thing.
+                                mark     = NxMenuMark.Radio,
                                 onClick  = { langExpanded = false; onLocaleChanged(locale) },
                             )
                             PuppetClick("settings.language.${locale.name}") {

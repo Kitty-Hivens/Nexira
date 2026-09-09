@@ -35,6 +35,7 @@ import hivens.ui.nx.InitialsAvatar
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -121,6 +122,7 @@ fun HomeNewHero(instance: WidgetInstance) {
                 )
                 Text(
                     text       = target.displayName,
+                    fontFamily = familyForText(target.displayName),
                     style      = MaterialTheme.typography.titleLarge,
                     color      = Color.White,
                     fontWeight = FontWeight.SemiBold,

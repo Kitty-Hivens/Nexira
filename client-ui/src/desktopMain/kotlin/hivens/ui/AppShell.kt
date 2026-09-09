@@ -103,6 +103,8 @@ import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.NxTheme
+import hivens.ui.text.uiFaceCovers
+import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
@@ -596,6 +598,17 @@ fun FrameWindowScope.AppShellContent(
     LocaleProvider(locale = currentLocale) {
         val s = LocalStrings.current
 
+        // Which face draws the interface. Roboto Flex is subset to Latin,
+        // Cyrillic and Greek, so a locale outside those has to be drawn by the
+        // bundled CJK face or it leaves the bundle for whatever the host has --
+        // which on a machine without a CJK font is boxes. The question is asked
+        // of the locale's own strings rather than of a list of language tags, so
+        // the next locale that needs this is picked up without touching a list
+        // here. A handful of structural labels is enough: if the interface is in
+        // that language at all, they are in it too.
+        val uiNeedsCjk = !uiFaceCovers(s.settingsTitle + s.navLibrary + s.aboutTitle)
+        val uiFamily = if (uiNeedsCjk) nexiraCjkFamily() else null
+
         // Came back from a crash restart: surface a one-shot notice so the reload
         // -- which resets the current screen -- is not silent. consumeRecovered()
         // is one-shot, so a normal start stays quiet.
@@ -942,6 +955,7 @@ fun FrameWindowScope.AppShellContent(
                 customTheme  = customTheme,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
+                uiFamily     = uiFamily,
             ) {
                 ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
@@ -1032,6 +1046,7 @@ fun FrameWindowScope.AppShellContent(
                 customTheme  = customTheme,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
+                uiFamily     = uiFamily,
             ) {
                 DebugOverlay(debugOverlay)
                 // Inside the theme on purpose: the prompts are Dialogs with their own

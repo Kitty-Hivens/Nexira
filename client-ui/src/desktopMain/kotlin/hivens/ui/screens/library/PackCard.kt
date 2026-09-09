@@ -50,6 +50,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.Dimens
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import java.time.Duration
 import java.time.Instant
@@ -124,6 +125,7 @@ fun PackCard(
                     ) {
                         Text(
                             text       = instance.displayName,
+                            fontFamily = familyForText(instance.displayName),
                             style      = MaterialTheme.typography.titleMedium,
                             color      = Color.White,
                             fontWeight = FontWeight.SemiBold,

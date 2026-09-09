@@ -81,6 +81,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
 import hivens.ui.utils.rememberFileDialogSettings
@@ -531,6 +532,7 @@ private fun ContentRow(
         Column(Modifier.weight(1f)) {
             Text(
                 text       = content.displayName,
+                fontFamily = familyForText(content.displayName),
                 style      = MaterialTheme.typography.bodyMedium,
                 color      = NxTheme.colors.textPrimary.copy(alpha = dim),
                 fontWeight = FontWeight.SemiBold,
@@ -733,7 +735,13 @@ private fun ContentDetailsDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text(content.displayName, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                Text(
+                    content.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = NxTheme.colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = familyForText(content.displayName),
+                )
                 content.version?.let {
                     Text(it, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
                 }

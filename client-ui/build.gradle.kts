@@ -602,7 +602,7 @@ packaging {
         // zip-9 cut squashfs-zstd-22 output by 8 MB (AppImage path) and
         // xz -9e output by 13 MB (Inno Setup LZMA2/ultra64 proxy).
         vmKind.set("server")
-        includeLocales.set("en,ru,de")
+        includeLocales.set("en,ru,de,ja")
         // stripDebug / noHeaderFiles / noManPages default to true via
         // PackagingPlugin's conventions -- omitted intentionally.
     }

@@ -87,10 +87,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfLibrary },
             shortName = { it.editorSurfShortLibrary },
             stub      = LocalLibraryContext provides STUB_LIBRARY,
-            // Two ways in: the Library screen, and Home configured to open on it.
-            mountedOn = { screen, view ->
-                screen == Screen.Library || (screen == Screen.Home && view == HomeView.LibraryFirst)
-            },
+            mountedOn = { screen, _ -> screen == Screen.Library },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("about"),

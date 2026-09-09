@@ -42,6 +42,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -150,6 +151,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
         ) {
             Text(
                 text       = pack.displayName,
+                fontFamily = familyForText(pack.displayName),
                 style      = MaterialTheme.typography.bodyMedium,
                 color      = Color.White,
                 fontWeight = FontWeight.SemiBold,

@@ -144,14 +144,10 @@ fun AppLayout(
                                     onSignIn = { onScreenChange(Screen.Profile) },
                                 )
                             }
-                            // The pack-centric variants run on LOCAL data (pack repo,
-                            // layout graph) and render signed-out; their launch
+                            // The pack-centric variant runs on LOCAL data (pack repo,
+                            // layout graph) and renders signed-out; its launch
                             // affordances degrade per-widget (offline / sign-in)
                             // instead of gating the whole page on an SC session.
-                            HomeView.LibraryFirst -> LibraryScreen(
-                                appState       = appState,
-                                onScreenChange = onScreenChange,
-                            )
                             HomeView.New -> NewHomeScreen(
                                 appState         = appState,
                                 onScreenChange   = onScreenChange,
