@@ -103,3 +103,69 @@ data class PolygonShape(
         return Outline.Generic(scaled)
     }
 }
+
+/** Which pair of ends a [ChamferedRectShape] cuts. */
+enum class ChamferAxis { Horizontal, Vertical }
+
+/**
+ * A rectangle with one or both ends cut to a point.
+ *
+ * The cut is a LENGTH, not a fraction, which is the whole reason this is not a
+ * [PolygonShape]. A regular hexagon normalised into the footprint stretches its
+ * diagonals with the box, so a four-letter label and a forty-character one end
+ * up with different geometry although they are the same element. Here the point
+ * is [startCutDp] deep whatever the box does, which is what makes the form usable
+ * for a tooltip or a tag whose width follows its text.
+ *
+ * Both cuts give a long hexagon, one gives a tag pointing that way, neither gives
+ * a plain rectangle, so the family is one shape rather than three. Each cut is
+ * capped at half the cut axis, past which the two points would cross.
+ *
+ * [roundingDp] is worth one warning. Rounding a corner of a rectangle cuts across
+ * it and the edges still reach the bounds, but rounding a POINT pulls the apex
+ * back along the cut axis, by `r * (1 / sin(half angle) - 1)`, so the sharper the
+ * point the more it retreats. A 12dp cut on a 20dp half height gives back about
+ * 0.56 of the radius at each end. The cross axis is untouched, so a plane using
+ * this shape still meets its box top and bottom and stands off it at the points.
+ */
+data class ChamferedRectShape(
+    val startCutDp: Float,
+    val endCutDp: Float,
+    /** Vertex rounding in dp, resolved like [SmoothedRectShape]'s so it does not grow with the plane. */
+    val roundingDp: Float = 0f,
+    val smoothing: Float = 0f,
+    val axis: ChamferAxis = ChamferAxis.Horizontal,
+) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val along = if (axis == ChamferAxis.Horizontal) size.width else size.height
+        val across = if (axis == ChamferAxis.Horizontal) size.height else size.width
+        val cap = along / 2f
+        val start = (startCutDp * density.density).coerceIn(0f, cap)
+        val end = (endCutDp * density.density).coerceIn(0f, cap)
+        val corner = CornerRounding(
+            (roundingDp * density.density).coerceAtLeast(0f),
+            smoothing.coerceIn(0f, 1f),
+        )
+
+        // Built along the cut axis and mapped out of it, so the vertical case is
+        // the same six points read the other way round rather than a second body.
+        val mid = across / 2f
+        val pts = buildList {
+            if (start > 0f) add(0f to mid)
+            add(start to 0f)
+            add(along - end to 0f)
+            if (end > 0f) add(along to mid)
+            add(along - end to across)
+            add(start to across)
+        }
+        val flat = FloatArray(pts.size * 2)
+        pts.forEachIndexed { i, (u, v) ->
+            val x = if (axis == ChamferAxis.Horizontal) u else v
+            val y = if (axis == ChamferAxis.Horizontal) v else u
+            flat[i * 2] = x
+            flat[i * 2 + 1] = y
+        }
+        val polygon = RoundedPolygon(vertices = flat, perVertexRounding = List(pts.size) { corner })
+        return Outline.Generic(polygon.toPath())
+    }
+}
