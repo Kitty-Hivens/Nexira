@@ -193,6 +193,33 @@ internal fun AdvancedSection(
 
     Spacer(Modifier.height(16.dp))
 
+    // The news widget's second channel. There is no toggle beside it because the
+    // field IS the switch: blank means the channel is not configured and nothing is
+    // fetched for it. Debounced like the mimic field, and for the same reason --
+    // save() is a synchronous file write.
+    NxSection(s.settingsSectionNews) {
+        Text(s.settingsAltNewsFeed, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
+        Text(
+            text  = s.settingsAltNewsFeedDesc,
+            style = MaterialTheme.typography.bodySmall,
+            color = NxTheme.colors.textSecondary,
+        )
+        NxField(
+            value         = form.altNewsFeedUrl,
+            onValueChange = { form.altNewsFeedUrl = it },
+            placeholder   = ALT_NEWS_FEED_PLACEHOLDER,
+            modifier      = Modifier.fillMaxWidth(),
+        )
+        PuppetField("settings.altNewsFeed", form.altNewsFeedUrl) { form.altNewsFeedUrl = it }
+        LaunchedEffect(form.altNewsFeedUrl) {
+            if (form.altNewsFeedUrl == (initialSettings.altNewsFeedUrl ?: "")) return@LaunchedEffect
+            delay(400.milliseconds)
+            save()
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+
     NxSection(s.settingsSectionDataDir) {
         Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
         Text(
@@ -282,3 +309,6 @@ internal fun AdvancedSection(
         )
     }
 }
+
+/** What the alternate-feed field shows while empty. A URL needs no translation. */
+private const val ALT_NEWS_FEED_PLACEHOLDER = "https://example.com/rss.xml"

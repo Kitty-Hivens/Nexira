@@ -127,6 +127,11 @@ object RussianStrings : AppStrings {
     override val newsTitle   = "Новости проекта"
     override val newsEmpty   = "Новостей пока нет..."
     override val newsFilterPlaceholder = "Фильтр новостей"
+    override val newsAltNoAddress      = "Адрес ленты не задан"
+    override val settingsSectionNews   = "Новости"
+    override val settingsAltNewsFeed   = "Альтернативная лента"
+    override val settingsAltNewsFeedDesc =
+        "Адрес RSS или Atom для второго канала виджета новостей. Его строки не открываются в источнике, загружается только их текст."
     override val newsFilterClear        = "Сбросить фильтр"
     override val railCollapse           = "Свернуть панель"
     override val railExpand             = "Развернуть панель"
@@ -1146,6 +1151,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.maxItems" to "Макс. элементов (0 = все)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Показывать заголовок",
         "widget.appshell.rightrail.compactnews.imageSource" to "Источник картинки",
+        "widget.appshell.rightrail.compactnews.channel" to "Канал",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
         "widget.bg.fx.blur" to "Размытие",

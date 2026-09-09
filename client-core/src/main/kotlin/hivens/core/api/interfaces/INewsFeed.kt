@@ -1,5 +1,6 @@
 package hivens.core.api.interfaces
 
+import hivens.core.data.NewsChannelPolicy
 import hivens.core.data.NewsPage
 
 /**
@@ -12,6 +13,13 @@ import hivens.core.data.NewsPage
  * the reader scrolls.
  */
 interface INewsFeed {
+    /**
+     * What a surface may do with this channel's entries -- see [NewsChannelPolicy].
+     * Defaulted, so the launcher's own upstream keeps behaving as it always has and
+     * only a channel with something to restrict says so.
+     */
+    val policy: NewsChannelPolicy get() = NewsChannelPolicy()
+
     /**
      * News [page], 1-based, newest first. An unreachable or unreadable source
      * returns an empty page rather than throwing, so a rail that cannot load its

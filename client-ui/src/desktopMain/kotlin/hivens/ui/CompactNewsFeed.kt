@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.core.api.interfaces.INewsFeed
 import hivens.core.data.NewsItem
+import hivens.core.data.NewsOrder
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -46,17 +47,29 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * The news rail, over whichever channel it is handed.
+ *
+ * The channel is a parameter rather than a Koin lookup because there is more than
+ * one now, and what the reader may do with the rows is the channel's call and not
+ * this renderer's: [INewsFeed.policy] decides whether a row opens at its source
+ * and in what order the entries are presented. [unavailable] replaces the empty
+ * state and its retry for a channel that cannot work as configured -- a retry that
+ * can never succeed is worse than a sentence saying what is missing.
+ */
 @Composable
 fun CompactNewsFeed(
     sslBypass: Boolean = false,
     maxItems: Int = 0,
     showTitle: Boolean = true,
     imageSource: NewsImageSource = NewsImageSource.Thumbnail,
+    feed: INewsFeed = koinInject(),
+    unavailable: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    val feed: INewsFeed = koinInject()
     val protocolConfig: ServerProtocolConfig = koinInject()
     val s       = LocalStrings.current
+    val policy  = feed.policy
 
     var news    by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -120,7 +133,7 @@ fun CompactNewsFeed(
         }
     }
 
-    LaunchedEffect(retryTick, sslBypass) {
+    LaunchedEffect(retryTick, sslBypass, feed) {
         // Initial composition + bypass changes: use the cache-aware path,
         // since the first call has nothing cached and bypass-driven retries
         // only make sense when news is empty anyway (working strips
@@ -173,11 +186,19 @@ fun CompactNewsFeed(
         }
     }
 
-    val shown = remember(news, settled, maxItems) {
-        news.asSequence()
-            .filter { settled.isBlank() || it.title.contains(settled, ignoreCase = true) }
-            .let { seq -> if (maxItems > 0) seq.take(maxItems) else seq }
-            .toList()
+    // What the rail shows out of what is loaded. A feed-ordered channel takes the
+    // head of the list, which is the newest; a sampled one draws its handful at
+    // random out of everything, so an unchanging set does not park the same few
+    // lines at the top of the rail for weeks. The draw is inside remember, so it
+    // holds still while the rail is open and is re-made when it is reopened or
+    // when another page arrives.
+    val shown = remember(news, settled, maxItems, policy.order) {
+        val matching = news.filter { settled.isBlank() || it.title.contains(settled, ignoreCase = true) }
+        when {
+            maxItems <= 0 -> matching
+            policy.order == NewsOrder.Sample -> matching.shuffled().take(maxItems)
+            else -> matching.take(maxItems)
+        }
     }
 
     // One formatter for the whole list: built per row it was a pattern parse per
@@ -221,15 +242,18 @@ fun CompactNewsFeed(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text  = s.newsEmpty,
+                            text  = unavailable ?: s.newsEmpty,
                             style = MaterialTheme.typography.bodySmall,
                             color = NxTheme.colors.textSecondary,
                         )
                         // Explicit retry covers the "network came back but no
                         // setting was touched" path -- the LaunchedEffect above
-                        // only re-runs on bypass changes.
-                        TextButton(onClick = { retryTick++ }) {
-                            Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
+                        // only re-runs on bypass changes. Withheld when the channel
+                        // is not merely empty but unconfigured: nothing to retry.
+                        if (unavailable == null) {
+                            TextButton(onClick = { retryTick++ }) {
+                                Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
@@ -260,6 +284,7 @@ fun CompactNewsFeed(
                                     baseUrl     = protocolConfig.baseUrl,
                                     imageSource = imageSource,
                                     dateFormat  = dateFormat,
+                                    opensSource = policy.opensSource,
                                 )
                                 HorizontalDivider(
                                     color    = NxTheme.colors.outline,
@@ -479,6 +504,7 @@ private fun CompactNewsItem(
     baseUrl: String,
     imageSource: NewsImageSource,
     dateFormat: DateTimeFormatter,
+    opensSource: Boolean = true,
 ) {
     // The entry's page is addressed by its id, so every row opens -- which the
     // arrow hint says. It used to be gated on the row having an image, from when
@@ -500,43 +526,63 @@ private fun CompactNewsItem(
     }?.takeIf { it != wanted }
 
     Row(
+        // Not clickable when the channel says its rows do not open: the row is text
+        // then, and the arrow below is withheld with it rather than pointing at
+        // something that does nothing.
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { SystemActions.openUrl("$baseUrl/news${item.id}") }
+            .then(
+                if (opensSource) {
+                    Modifier.clickable { SystemActions.openUrl("$baseUrl/news${item.id}") }
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Thumbnail
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(NxTheme.colors.surface)
-        ) {
-            // The fallback rides on the failure rather than on a subcomposition
-            // per row: a row is cheap and there are hundreds of them. Keyed on the
-            // url so a recycled row starts over rather than inheriting a miss.
-            var missing by remember(wanted) { mutableStateOf(false) }
-            val model = if (missing) alternate else wanted
-            if (model != null) {
-                AsyncImage(
-                    model              = model,
-                    contentDescription = null,
-                    contentScale       = ContentScale.Crop,
-                    modifier           = Modifier.fillMaxSize(),
-                    onError            = { if (!missing && alternate != null) missing = true },
-                )
+        // The thumbnail, and only when there is one to draw. It used to be an
+        // unconditional 38dp plate, which kept a mixed feed's rows aligned at the
+        // cost of a column of empty squares down a feed that carries no images at
+        // all -- and a channel of plain text is one of those by design.
+        if (wanted != null) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(NxTheme.colors.surface)
+            ) {
+                // The fallback rides on the failure rather than on a subcomposition
+                // per row: a row is cheap and there are hundreds of them. Keyed on the
+                // url so a recycled row starts over rather than inheriting a miss.
+                var missing by remember(wanted) { mutableStateOf(false) }
+                val model = if (missing) alternate else wanted
+                if (model != null) {
+                    AsyncImage(
+                        model              = model,
+                        contentDescription = null,
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                        onError            = { if (!missing && alternate != null) missing = true },
+                    )
+                }
             }
         }
 
         Column(modifier = Modifier.weight(1f)) {
+            // Two lines for a headline, more for a row that is only text. An entry
+            // with no date under it and no picture beside it is not a headline
+            // standing in for an article: it IS the whole entry, and cutting it at
+            // two lines cuts the end off the sentence. Still capped, so one absurdly
+            // long line cannot take the whole rail.
+            val plainText = date == null && wanted == null
             Text(
                 text       = item.title,
                 style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color      = NxTheme.colors.textPrimary,
-                maxLines   = 2,
+                maxLines   = if (plainText) 4 else 2,
                 overflow   = TextOverflow.Ellipsis
             )
             if (date != null) {
@@ -550,11 +596,13 @@ private fun CompactNewsItem(
         }
 
         // Subtle arrow hint that item is clickable
-        Text(
-            text  = "›",
-            style = MaterialTheme.typography.bodyMedium,
-            color = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
-        )
+        if (opensSource) {
+            Text(
+                text  = "›",
+                style = MaterialTheme.typography.bodyMedium,
+                color = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
+            )
+        }
     }
 }
 

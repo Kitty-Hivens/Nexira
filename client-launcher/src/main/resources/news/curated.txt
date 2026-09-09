@@ -1,0 +1,78 @@
+# The curated news channel's pool. One entry per line; blank lines and lines
+# starting with # are skipped. No dates, no links: the rail draws these as plain
+# lines and they open nowhere.
+#
+# <dataDir>/news-curated.txt replaces this file when it exists, and is re-read on
+# every open, so the pool can grow without a rebuild.
+#
+# ── What makes a line land ──────────────────────────────────────────────────
+#
+# The mechanic is a magnitude that reads as a typo. Three shapes carry it:
+#
+#   a percentage with no base, because growth measured from something tiny is
+#   always absurd and the absurdity is the arithmetic rather than the subject;
+#
+#   an inversion, where the thing that must be smaller is larger;
+#
+#   a collapsed distance, where two things nobody would put in one sentence turn
+#   out to be neighbours.
+#
+# The failure mode is trivia. "Did you know an octopus has three hearts" is cosy,
+# not absurd, and it does not survive being read twice.
+#
+# ── Two rules ───────────────────────────────────────────────────────────────
+#
+# The rail is SHAPED like a news feed, so a reader takes what is on it as fact.
+# An invented number does not land as a joke, it lands as misinformation, and the
+# joke was never the number: it is that the real one sounds invented. Verify what
+# you write. A line that turns out to be wrong is not a line that was funny.
+#
+# Whatever goes here reaches everyone running the build, on the panel they opened
+# to see whether their pack updated, not the one person it was aimed at.
+#
+# The pool below is a starting set. Roughly a magnitude more entries than the
+# widget shows at once, so the draw does not repeat itself.
+
+# Collapsed distances
+Клеопатра жила ближе по времени к изобретению iPhone, чем к постройке пирамиды Хеопса.
+Тираннозавр жил ближе по времени к нам, чем к стегозавру.
+Акулы появились раньше деревьев.
+Оксфордский университет старше империи ацтеков.
+Мамонты ещё жили, когда в Египте уже строили пирамиды.
+Последняя казнь на гильотине во Франции состоялась в тот же год, когда вышли «Звёздные войны».
+Факсы ещё работали в британском здравоохранении, когда на Марсе уже летал вертолёт.
+Nokia начинала с бумажной фабрики, а Nintendo с игральных карт.
+
+# Inversions
+На Венере сутки длиннее года.
+Сатурн настолько разрежен, что в достаточно большой ванне он бы плавал.
+Свет доходит от Солнца до Земли за восемь минут, а из ядра Солнца наружу пробирается десятки тысяч лет.
+Кода в современном автомобиле больше, чем в истребителе пятого поколения.
+Ближайшая к нам звезда после Солнца дальше Плутона примерно в семь тысяч раз.
+В стакане воды молекул больше, чем стаканов воды во всех океанах Земли.
+Муравьи по общей массе перевешивают всех диких птиц и млекопитающих вместе.
+Бактериальных клеток в человеческом теле примерно столько же, сколько собственных.
+Гелий на Земле дороже добывать, чем найти во вселенной: это второй по распространённости элемент.
+Медь в проводах вашего дома старше Солнечной системы: она сделана в звёздах.
+
+# Percentages without a base
+Около половины всего трафика в интернете создают не люди.
+Почти половина всей электронной почты в мире это спам.
+Порядка девяноста процентов всех данных, существующих сегодня, созданы за последние несколько лет.
+Больше половины людей на планете пользуются устройством, которого не существовало, когда они родились.
+Девяносто девять процентов всех видов, когда-либо живших на Земле, вымерли.
+Двадцать процентов всей произведённой человечеством стали ушло на то, что стоит без движения.
+
+# Absurd magnitudes
+Возможных партий в шахматах больше, чем атомов в наблюдаемой вселенной.
+Перетасованная колода из пятидесяти двух карт почти наверняка легла в порядке, которого не существовало никогда прежде.
+В группе из двадцати трёх человек шанс совпадения дней рождения превышает половину.
+Первый жёсткий диск IBM весил около тонны и хранил меньше, чем одна фотография с телефона.
+Кровеносные сосуды одного человека, вытянутые в линию, обогнули бы Землю несколько раз.
+ДНК одного человека, размотанная в нить, дотянулась бы до Солнца и обратно сотни раз.
+Средний человек проводит во сне около двадцати шести лет жизни.
+За время, пока читается эта строка, в теле сменилось несколько миллионов клеток.
+Всемирная паутина в 1993 году состояла из нескольких сотен сайтов.
+В японском языке больше двадцати способов сказать «я».
+Человек и банан имеют порядка половины общих генов.
+Пыли из космоса на Землю выпадает десятки тонн в сутки.

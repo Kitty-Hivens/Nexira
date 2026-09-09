@@ -135,6 +135,22 @@ interface AppStrings {
     val newsTitle: String
     val newsEmpty: String
     val newsFilterPlaceholder: String
+
+    /**
+     * The alternate news channel with no address configured. Said instead of the
+     * empty state and its retry: there is nothing to retry, and a control that
+     * cannot succeed is worse than a sentence naming what is missing.
+     */
+    val newsAltNoAddress: String
+
+    /**
+     * The news plane in Settings and the one control on it: the address of the
+     * widget's second channel. Empty is the off state -- nothing is fetched for
+     * that channel while the field is blank.
+     */
+    val settingsSectionNews: String
+    val settingsAltNewsFeed: String
+    val settingsAltNewsFeedDesc: String
     val newsFilterClear: String
 
     // --- Right rail ---

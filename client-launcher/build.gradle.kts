@@ -12,6 +12,10 @@ dependencies {
     implementation(project(":client-auth-microsoft"))
 
     implementation(libs.commons.compress)
+    // XML for the syndication news channel. jsoup's XML parser resolves no DTD and
+    // no external entity, which is what parsing a document from a user-supplied
+    // address requires.
+    implementation(libs.jsoup)
     implementation(libs.jbsdiff)
     // Xodus (JetBrains): pure-JVM embedded KV, backs the disk cache. No JNA/JNI --
     // fits the no-native-in-launcher policy below.

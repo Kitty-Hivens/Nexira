@@ -129,6 +129,11 @@ object EnglishStrings : AppStrings {
     override val newsTitle   = "Project news"
     override val newsEmpty   = "No news yet..."
     override val newsFilterPlaceholder = "Filter news"
+    override val newsAltNoAddress      = "No feed address set"
+    override val settingsSectionNews   = "News"
+    override val settingsAltNewsFeed   = "Alternate feed"
+    override val settingsAltNewsFeedDesc =
+        "An RSS or Atom address for the news widget's second channel. Its rows do not open at their source, and only their text is fetched."
     override val newsFilterClear        = "Clear filter"
     override val railCollapse           = "Collapse panel"
     override val railExpand             = "Expand panel"
@@ -1130,6 +1135,7 @@ object EnglishStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.maxItems" to "Max items (0 = all)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Show title",
         "widget.appshell.rightrail.compactnews.imageSource" to "Image source",
+        "widget.appshell.rightrail.compactnews.channel" to "Channel",
         "widget.bg.enable.toggle" to "Background on/off",
         "widget.bg.fx.animspeed" to "Animation speed",
         "widget.bg.fx.blur" to "Blur",

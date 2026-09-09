@@ -319,6 +319,21 @@ data class SettingsData(
      */
     val audioVolume: Float = 1.0f,
 
+    // ── News ───────────────────────────────────────────────────────
+
+    /**
+     * RSS or Atom address for the news widget's alternate channel.
+     *
+     * Null by default and nothing reads it until it is set: no default feed
+     * ships, and the launcher makes no request for this channel while the field
+     * is empty. Only http and https are honoured -- the field is hand-editable,
+     * and a local-file address in it would turn a news rail into a disk reader.
+     *
+     * The channel it feeds is deliberately narrow: its rows do not open at their
+     * source and only their text is fetched. See NewsChannelPolicy.
+     */
+    val altNewsFeedUrl: String? = null,
+
     // ── Smarty server controls ───────────────────────────────────────────
 
     /**
