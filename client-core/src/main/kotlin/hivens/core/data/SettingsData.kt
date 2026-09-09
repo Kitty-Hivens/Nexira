@@ -307,6 +307,18 @@ data class SettingsData(
      */
     val doNotDisturb: Boolean = false,
 
+    // ── Audio ────────────────────────────────────────────────────────────
+
+    /**
+     * Playback loudness, 0..1, as the player widgets last left it.
+     *
+     * Stored because loudness belongs to the listener rather than to the track:
+     * it used to be full on every launch, so someone who keeps it at a tenth got
+     * the first second of the next session at ten times what they set. Written
+     * once a drag settles rather than on every frame of it -- see AudioPlayer.
+     */
+    val audioVolume: Float = 1.0f,
+
     // ── Smarty server controls ───────────────────────────────────────────
 
     /**

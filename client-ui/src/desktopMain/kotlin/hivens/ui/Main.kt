@@ -225,10 +225,21 @@ val uiModule = module {
     // fire-and-forget.
     single { EditModeController(repo = get(), scope = get()) }
 
-    // Audio engine for MusicPlayerWidget. Survives recomposition;
-    // playback state lives in the singleton so swapping the widget
-    // out of the layout does not stop playback.
-    single { AudioPlayer(scope = get()) }
+    // Audio engine for the player widgets. Survives recomposition; playback state
+    // lives in the singleton so swapping the widget out of the layout does not stop
+    // playback. Loudness is seeded from and written back to the settings file, the
+    // same way the notification mute is: it is a property of the listener, and it
+    // used to be reset to full on every launch.
+    single {
+        val settings: ISettingsService = get()
+        AudioPlayer(
+            scope         = get(),
+            initialVolume = settings.getSettings().audioVolume,
+            persistVolume = { level ->
+                settings.saveSettings(settings.getSettings().copy(audioVolume = level))
+            },
+        )
+    }
 
     // Media resolvers feeding the local-only Skinema player (client-media).
     // Wired here: the UI is their only consumer, the launch engine does not

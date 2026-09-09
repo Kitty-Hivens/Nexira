@@ -55,6 +55,7 @@ import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
 import hivens.widget.model.InjectService
@@ -125,13 +126,17 @@ internal fun PlaybackMiniControl(
                     modifier           = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(10.dp))
+                // Off the file's tags, so the face is picked per string; see
+                // familyForText.
+                val shortTitle = currentTitleShort(state, track, s)
                 Text(
-                    text       = currentTitleShort(state, track, s),
+                    text       = shortTitle,
                     style      = MaterialTheme.typography.bodyMedium,
                     color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
+                    fontFamily = familyForText(shortTitle),
                     modifier   = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(10.dp))
