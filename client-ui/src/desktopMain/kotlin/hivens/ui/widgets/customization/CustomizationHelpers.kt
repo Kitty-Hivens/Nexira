@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +29,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.sliderKeyboardAdjust
+import hivens.ui.nx.NxSliderTrack
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.toWidgetColorOrNull
 
@@ -51,21 +50,16 @@ internal fun LabeledSlider(
             color    = NxTheme.colors.textSecondary,
             modifier = Modifier.width(150.dp),
         )
-        // Box owns hover-focus + arrow keys (fine adjustment); the Slider keeps
-        // the pointer drag.
-        Box(Modifier.weight(1f).sliderKeyboardAdjust(value, range, keyStep, onValueChange)) {
-            Slider(
-                value         = value,
-                onValueChange = onValueChange,
-                valueRange    = range,
-                modifier      = Modifier.fillMaxWidth(),
-                colors        = SliderDefaults.colors(
-                    thumbColor         = NxTheme.colors.primary,
-                    activeTrackColor   = NxTheme.colors.primary,
-                    inactiveTrackColor = NxTheme.colors.outline.copy(alpha = 0.2f),
-                ),
-            )
-        }
+        // The library's own track, so a property row and a settings row draw the
+        // same control. The modifier owns hover-focus and the arrow keys; the track
+        // owns the pointer.
+        NxSliderTrack(
+            value         = value,
+            range         = range,
+            onValueChange = onValueChange,
+            compact       = true,
+            modifier      = Modifier.weight(1f).sliderKeyboardAdjust(value, range, keyStep, onValueChange),
+        )
         Text(
             text     = format.format(value * displayMultiplier),
             style    = MaterialTheme.typography.labelSmall,
