@@ -1189,6 +1189,13 @@ object RussianStrings : AppStrings {
         "widget.home.new.music" to "Музыкальный плеер",
         "widget.home.new.music.title" to "Заголовок",
         "widget.home.new.playback.mini" to "Мини-плеер",
+        "widget.home.new.player.readout" to "Плеер: табло",
+        "widget.home.new.player.readout.showTotal" to "Показывать длительность",
+        "widget.home.new.player.seeded" to "Плеер: цвет от обложки",
+        "widget.home.new.player.seeded.showAlbum" to "Показывать альбом",
+        "widget.home.new.player.seeded.tint" to "Подмес обложки",
+        "widget.home.new.player.cover" to "Плеер с обложкой",
+        "widget.home.new.player.cover.showAlbum" to "Показывать альбом",
         "widget.home.new.progress" to "Фоновая активность",
         "widget.home.new.progress.idleText" to "Текст простоя",
         "widget.home.new.progress.title" to "Заголовок",
@@ -1393,6 +1400,13 @@ object RussianStrings : AppStrings {
     override val audioOpenFile         = "Открыть файл"
     override val audioPickTrack        = "Выбери трек"
     override val audioVolume           = "Громкость"
+    override val audioRepeat           = "Повтор"
+    override val audioRepeatOff        = "Выключен"
+    override val audioRepeatOne        = "Один трек"
+    override val audioRepeatQueue      = "Вся очередь"
+    override val audioPlaybackOptions  = "Воспроизведение"
+    override val audioSkipNext         = "Следующий трек"
+    override val audioSkipPrevious     = "Предыдущий трек"
     override val audioNoFile           = "Без файла"
     override val audioStatusReady      = "Готов"
     override val audioStatusPlaying    = "Играет"

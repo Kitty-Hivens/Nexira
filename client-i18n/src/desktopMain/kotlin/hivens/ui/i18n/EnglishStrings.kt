@@ -1173,6 +1173,13 @@ object EnglishStrings : AppStrings {
         "widget.home.new.music" to "Music player",
         "widget.home.new.music.title" to "Heading",
         "widget.home.new.playback.mini" to "Mini player",
+        "widget.home.new.player.readout" to "Player: readout",
+        "widget.home.new.player.readout.showTotal" to "Show total length",
+        "widget.home.new.player.seeded" to "Player: seeded by the cover",
+        "widget.home.new.player.seeded.showAlbum" to "Show album",
+        "widget.home.new.player.seeded.tint" to "Cover tint",
+        "widget.home.new.player.cover" to "Cover player",
+        "widget.home.new.player.cover.showAlbum" to "Show album",
         "widget.home.new.progress" to "Background activity",
         "widget.home.new.progress.idleText" to "Idle text",
         "widget.home.new.progress.title" to "Heading",
@@ -1377,6 +1384,13 @@ object EnglishStrings : AppStrings {
     override val audioOpenFile         = "Open file"
     override val audioPickTrack        = "Pick a track"
     override val audioVolume           = "Volume"
+    override val audioRepeat           = "Repeat"
+    override val audioRepeatOff        = "Off"
+    override val audioRepeatOne        = "One track"
+    override val audioRepeatQueue      = "Whole queue"
+    override val audioPlaybackOptions  = "Playback"
+    override val audioSkipNext         = "Next track"
+    override val audioSkipPrevious     = "Previous track"
     override val audioNoFile           = "No file"
     override val audioStatusReady      = "Ready"
     override val audioStatusPlaying    = "Playing"

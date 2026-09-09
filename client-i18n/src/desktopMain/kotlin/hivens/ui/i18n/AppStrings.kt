@@ -1353,6 +1353,24 @@ interface AppStrings {
     val audioOpenFile: String
     val audioPickTrack: String
     val audioVolume: String
+
+    /**
+     * The repeat mode and its three answers. Three and not a boolean because
+     * the two useful loops are different questions: this one thing again, or
+     * round the whole set.
+     */
+    val audioRepeat: String
+    val audioRepeatOff: String
+    val audioRepeatOne: String
+    val audioRepeatQueue: String
+    /**
+     * The heading of the player's own options panel: what the transport row has
+     * no room for and the picture must not lose room to.
+     */
+    val audioPlaybackOptions: String
+    /** The two skips, which name themselves on a tooltip because they are glyphs. */
+    val audioSkipNext: String
+    val audioSkipPrevious: String
     val audioNoFile: String
     val audioStatusReady: String
     val audioStatusPlaying: String

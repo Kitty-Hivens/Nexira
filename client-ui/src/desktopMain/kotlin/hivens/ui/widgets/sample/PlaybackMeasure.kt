@@ -33,9 +33,50 @@ internal fun timelineLabel(state: PlaybackState): String {
     return "${formatMs(pos)} / ${formatMs(dur)}"
 }
 
-private fun formatMs(ms: Long): String {
-    val totalSeconds = ms / 1000
-    val m = totalSeconds / 60
+/** Where the track is now, or empty when nothing is loaded. */
+internal fun elapsedLabel(state: PlaybackState): String = when (state) {
+    is PlaybackState.Playing -> formatMs(state.positionMs)
+    is PlaybackState.Paused  -> formatMs(state.positionMs)
+    is PlaybackState.Ready   -> formatMs(0L)
+    else                     -> ""
+}
+
+/** How long the track is, or empty while the container has not said. */
+internal fun totalLabel(state: PlaybackState): String {
+    val dur = when (state) {
+        is PlaybackState.Playing -> state.durationMs
+        is PlaybackState.Paused  -> state.durationMs
+        is PlaybackState.Ready   -> state.durationMs
+        else                     -> 0L
+    }
+    return if (dur <= 0L) "" else formatMs(dur)
+}
+
+/** The loaded track's length in milliseconds, 0 when it is not known yet. */
+internal fun durationMsOf(state: PlaybackState): Long = when (state) {
+    is PlaybackState.Playing -> state.durationMs
+    is PlaybackState.Paused  -> state.durationMs
+    is PlaybackState.Ready   -> state.durationMs
+    else                     -> 0L
+}
+
+/**
+ * A timecode, with an hours field only once there are hours.
+ *
+ * It used to be minutes and seconds alone, so an hour printed as `60:00` and a
+ * ninety-minute file as `90:00`: readable as a number, wrong as a clock, and the
+ * kind of thing that never shows up until somebody loads a set or a podcast. Hours
+ * are not padded and are omitted entirely below one, so the ordinary four-minute
+ * track still reads `4:55` rather than `0:04:55`.
+ *
+ * Negative input is clamped rather than formatted: a position below zero is a bug
+ * upstream, and `-1:-5` on a card is a worse way to learn about it than a clock
+ * parked at the start.
+ */
+internal fun formatMs(ms: Long): String {
+    val totalSeconds = ms.coerceAtLeast(0L) / 1000
+    val h = totalSeconds / 3600
+    val m = (totalSeconds % 3600) / 60
     val s = totalSeconds % 60
-    return "%d:%02d".format(m, s)
+    return if (h > 0L) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }

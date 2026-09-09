@@ -1175,6 +1175,13 @@ object GermanStrings : AppStrings {
         "widget.home.new.music" to "Musikplayer",
         "widget.home.new.music.title" to "Überschrift",
         "widget.home.new.playback.mini" to "Mini-Player",
+        "widget.home.new.player.readout" to "Player: Anzeige",
+        "widget.home.new.player.readout.showTotal" to "Gesamtlänge anzeigen",
+        "widget.home.new.player.seeded" to "Player: Farbe vom Cover",
+        "widget.home.new.player.seeded.showAlbum" to "Album anzeigen",
+        "widget.home.new.player.seeded.tint" to "Cover-Anteil",
+        "widget.home.new.player.cover" to "Cover-Player",
+        "widget.home.new.player.cover.showAlbum" to "Album anzeigen",
         "widget.home.new.progress" to "Hintergrundaktivität",
         "widget.home.new.progress.idleText" to "Leerlauftext",
         "widget.home.new.progress.title" to "Überschrift",
@@ -1379,6 +1386,13 @@ object GermanStrings : AppStrings {
     override val audioOpenFile         = "Datei öffnen"
     override val audioPickTrack        = "Track auswählen"
     override val audioVolume           = "Lautstärke"
+    override val audioRepeat           = "Wiederholen"
+    override val audioRepeatOff        = "Aus"
+    override val audioRepeatOne        = "Ein Titel"
+    override val audioRepeatQueue      = "Ganze Warteschlange"
+    override val audioPlaybackOptions  = "Wiedergabe"
+    override val audioSkipNext         = "Nächster Titel"
+    override val audioSkipPrevious     = "Vorheriger Titel"
     override val audioNoFile           = "Keine Datei"
     override val audioStatusReady      = "Bereit"
     override val audioStatusPlaying    = "Spielt"
