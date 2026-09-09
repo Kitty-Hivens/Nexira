@@ -127,9 +127,8 @@ private fun Body(selection: Selection, s: AppStrings, props: PillProps, labelled
                 compact = true,
             )
         } else {
-            NxTooltip(text = s.selectionClear) {
-                NxIconButton(NxIcon.Close, s.selectionClear, selection.clear)
-            }
+            // No wrapper: the button raises its own name now.
+            NxIconButton(NxIcon.Close, s.selectionClear, selection.clear)
         }
         if (props.showActions && selection.actions.isNotEmpty()) {
             Spacer(Modifier.width(if (labelled) CLUSTER_GAP else 4.dp))
@@ -168,11 +167,14 @@ private fun Verbs(selection: Selection, s: AppStrings, labelled: Boolean) {
                         compact = true,
                     )
                 } else {
+                    // The outer tooltip carries WHY the verb is blocked, which the
+                    // button cannot know, so it must not also raise the bare name.
                     NxIconButton(
                         icon = action.kind.icon(),
                         contentDescription = name,
                         onClick = action.run,
                         enabled = action.blockedReason == null,
+                        tooltip = false,
                     )
                 }
             }
