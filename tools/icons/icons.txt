@@ -107,3 +107,9 @@ Widgets
 Wifi
 WifiOff
 WrapText
+SkipNext
+SkipPrevious
+Repeat
+RepeatOne
+QueueMusic
+Shuffle
