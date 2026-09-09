@@ -6,13 +6,18 @@ import kotlinx.serialization.Serializable
  * Which Home surface the user is currently running. Set in Settings.
  * [New] (labelled "Modern") is the default widget-composed home; the
  * toggle also reaches the legacy [Classic] Dashboard (SC server grid +
- * launch panel + always-on right panel) and the [LibraryFirst] IA
- * (Library + Browse + sliding login panel + unified card).
+ * launch panel + always-on right panel).
+ *
+ * A `LibraryFirst` option used to sit between them, opening Home straight onto
+ * the Library. It is gone: the Library screen was already one click away in the
+ * rail, so the choice bought a second route to the same surface and nothing
+ * else. A settings file still naming it decodes to [New], because the shared
+ * Json coerces an unknown enum value to the field's default rather than
+ * throwing.
  */
 @Serializable
 enum class HomeView {
     Classic,
-    LibraryFirst,
     // [New] -- widget-composed home (Phase 1 / kernel-3), the default surface.
     // Carries the welcome / recent-packs / quick-launch widgets; the expressive
     // build-out happens as user customization in later phases.
@@ -288,8 +293,8 @@ data class SettingsData(
 
     /**
      * Which Home surface to render. Defaults to the modern widget-composed
-     * home ([HomeView.New]); the classic Dashboard and the Library-first IA
-     * stay reachable from the Home-view toggle at any time. See [HomeView]
+     * home ([HomeView.New]); the classic Dashboard stays reachable from the
+     * Home-view toggle at any time. See [HomeView]
      * for the option set.
      */
     val homeView: HomeView = HomeView.New,

@@ -599,9 +599,8 @@ object RussianStrings : AppStrings {
     override val navBrowse  = "Каталог"
 
     override val settingsHomeViewTitle   = "Главный экран"
-    override val settingsHomeViewSub     = "Современный экран включён по умолчанию. Классический Dashboard и Library-first доступны в любой момент."
+    override val settingsHomeViewSub     = "Современный экран включён по умолчанию. Классический Dashboard доступен в любой момент."
     override val settingsHomeViewClassic = "Классический"
-    override val settingsHomeViewLibrary = "Library (alpha)"
     override val settingsHomeViewNew     = "Современный"
 
 
