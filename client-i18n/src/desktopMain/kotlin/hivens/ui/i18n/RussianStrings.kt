@@ -576,7 +576,7 @@ object RussianStrings : AppStrings {
 
     // --- Data dir migration UI ---
     override val migrationWelcome      = "Добро пожаловать в Nexira"
-    override val migrationDescription  = "Nexira теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
+    override val migrationDescription  = "Aura теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
     override val migrationFromHeader   = "Откуда"
     override val migrationToHeader     = "Куда"
     override fun migrationSize(megabytes: Int, files: Int) =
