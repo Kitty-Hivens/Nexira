@@ -32,7 +32,24 @@ class BundledFontCoverageTest {
     private val ui by lazy { face("roboto_flex_regular.ttf") }
     private val cjk by lazy { face("noto_cjk_jp.ttf") }
 
-    private fun Typeface.covers(cp: Int) = getUTF32Glyph(cp) != 0.toShort()
+    private val uiMap by lazy { ui.mappedCodepoints() }
+    private val cjkMap by lazy { cjk.mappedCodepoints() }
+
+    /**
+     * Asked of the file rather than of [Typeface.getUTF32Glyph], which is the
+     * platform font manager's answer and differs between platforms: CoreText
+     * reports the UI face as drawing a tab and a byte order mark, so this test
+     * failed on macOS alone while the table it checks was right everywhere.
+     */
+    private fun Set<Int>.covers(cp: Int) = cp in this
+
+    /** Both sides of the disagreement, so a failure is readable without a rerun. */
+    private fun describe(cp: Int): String = "U+%04X table=%s ui=%s cjk=%s".format(
+        cp,
+        needsCjkFace(String(Character.toChars(cp))),
+        uiMap.covers(cp),
+        cjkMap.covers(cp),
+    )
 
     /**
      * The table answers "would switching help", so the invariant is against BOTH
@@ -45,10 +62,10 @@ class BundledFontCoverageTest {
         val disagreements = (0x0000..0xFFFF)
             .filter { Character.isDefined(it) }
             .filter { cp ->
-                needsCjkFace(String(Character.toChars(cp))) != (cjk.covers(cp) && !ui.covers(cp))
+                needsCjkFace(String(Character.toChars(cp))) != (cjkMap.covers(cp) && !uiMap.covers(cp))
             }
         assertEquals(
-            emptyList(), disagreements.take(12),
+            emptyList(), disagreements.take(12).map(::describe),
             "${disagreements.size} codepoints where the generated table and the fonts disagree; " +
                 "rerun tools/fonts/regenerate.py",
         )
@@ -73,15 +90,15 @@ class BundledFontCoverageTest {
             '\uA789' to "modifier colon, what a tagger writes where a filename cannot hold one",
             '\uFEFF' to "byte order mark",
         ).forEach { (ch, what) ->
-            assertTrue(!ui.covers(ch.code), "the premise moved: the UI face now draws $what")
-            assertTrue(!cjk.covers(ch.code), "the premise moved: the CJK face now draws $what")
+            assertTrue(!uiMap.covers(ch.code), "the premise moved: the UI face now draws $what")
+            assertTrue(!cjkMap.covers(ch.code), "the premise moved: the CJK face now draws $what")
             assertTrue(
                 !needsCjkFace("Sacrifice$ch"),
                 "a Latin title carrying $what must stay on the UI face",
             )
         }
         // The one of the ten that IS a reason: the CJK face really draws it.
-        assertTrue(cjk.covers(0x2011), "the premise moved: the CJK face lost the non-breaking hyphen")
+        assertTrue(cjkMap.covers(0x2011), "the premise moved: the CJK face lost the non-breaking hyphen")
         assertTrue(needsCjkFace("Higurashi\u2011Kai"), "only the CJK face draws a non-breaking hyphen")
     }
 
@@ -89,7 +106,7 @@ class BundledFontCoverageTest {
     fun `every block the subsetter was told to keep is in the CJK face`() {
         val absent = (BUNDLED_BLOCKS.flatMap { it.second } + REQUIRED_SYMBOLS.map { it.code })
             .filter { Character.isDefined(it) }
-            .filterNot { cjk.covers(it) }
+            .filterNot { cjkMap.covers(it) }
             .filterNot { cp -> KNOWN_SOURCE_GAPS.any { cp in it } }
         assertEquals(
             emptyList(), absent.take(12),
@@ -138,7 +155,7 @@ class BundledFontCoverageTest {
             "追憶のサクラメント", "Taka feat. めらみぽっぷ", "日本語", "欢迎", "한국어", "Sacrifice ☆",
         ).forEach { s ->
             assertTrue(needsCjkFace(s), "\"$s\" should not have stayed on the UI face")
-            assertEquals("", s.filterNot { cjk.covers(it.code) }, "not covered in \"$s\"")
+            assertEquals("", s.filterNot { cjkMap.covers(it.code) }, "not covered in \"$s\"")
         }
         listOf("Sacrifice", "Привет", "Grüße", "Xin chào", "Ґуля", "€1").forEach {
             assertTrue(!needsCjkFace(it), "\"$it\" should have stayed on the UI face")
