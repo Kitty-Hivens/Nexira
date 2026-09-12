@@ -257,12 +257,23 @@ jobs:
 
       - name: Resolve version
         id: version
+        env:
+          # Through the environment rather than interpolated into the script, so
+          # the input cannot end up as shell.
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            ver="$GITHUB_REF_NAME"
           else
-            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            ver="$INPUT_VERSION"
           fi
+          # The leading v is stripped on BOTH paths. Only the tag path used to do
+          # it, and nothing downstream repairs the difference: Gradle takes
+          # -PappVersion verbatim, and Inno's VersionInfoVersion is a digits-only
+          # PE header field that strips a prerelease suffix and never a prefix.
+          # A workflow_dispatch of "v2.4.1" therefore built Linux and macOS and
+          # failed Windows alone, which is the kind of asymmetry nobody looks for.
+          echo "value=${ver#v}" >> "$GITHUB_OUTPUT"
 
       - name: Extract release notes from CHANGELOG.md
         id: extract

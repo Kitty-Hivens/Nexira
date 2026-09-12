@@ -45,6 +45,7 @@ import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import java.io.File
 import java.nio.file.Path
 import java.time.Instant
@@ -184,6 +185,7 @@ private fun WorldCard(world: WorldEntry) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text       = world.displayName,
+                fontFamily = familyForText(world.displayName),
                 style      = MaterialTheme.typography.bodyLarge,
                 color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,

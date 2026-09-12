@@ -88,6 +88,7 @@ import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
 import hivens.ui.utils.ConsoleSettingsStore
@@ -489,6 +490,7 @@ private fun Hero(
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text       = pack.displayName,
+                        fontFamily = familyForText(pack.displayName),
                         style      = MaterialTheme.typography.headlineMedium,
                         color      = Color.White,
                         fontWeight = FontWeight.Bold,

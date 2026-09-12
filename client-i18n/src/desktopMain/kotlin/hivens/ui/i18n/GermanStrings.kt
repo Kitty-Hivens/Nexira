@@ -127,6 +127,11 @@ object GermanStrings : AppStrings {
     override val newsTitle   = "Projektneuigkeiten"
     override val newsEmpty   = "Noch keine Neuigkeiten..."
     override val newsFilterPlaceholder = "Neuigkeiten filtern"
+    override val newsAltNoAddress      = "Keine Feed-Adresse festgelegt"
+    override val settingsSectionNews   = "Neuigkeiten"
+    override val settingsAltNewsFeed   = "Alternativer Feed"
+    override val settingsAltNewsFeedDesc =
+        "Eine RSS- oder Atom-Adresse für den zweiten Kanal des Nachrichten-Widgets. Seine Zeilen öffnen ihre Quelle nicht, und es wird nur ihr Text geladen."
     override val newsFilterClear        = "Filter zurücksetzen"
     override val railCollapse           = "Leiste einklappen"
     override val railExpand             = "Leiste ausklappen"
@@ -575,7 +580,7 @@ object GermanStrings : AppStrings {
 
     // --- Data dir migration UI ---
     override val migrationWelcome      = "Willkommen bei Nexira"
-    override val migrationDescription  = "Nexira heißt jetzt Nexira. Vor dem Start müssen deine vorhandenen Daten an den neuen Ort kopiert werden. Der alte Ordner bleibt als Sicherung unberührt; lösche ihn manuell, sobald alles funktioniert."
+    override val migrationDescription  = "Aura heißt jetzt Nexira. Vor dem Start müssen deine vorhandenen Daten an den neuen Ort kopiert werden. Der alte Ordner bleibt als Sicherung unberührt; lösche ihn manuell, sobald alles funktioniert."
     override val migrationFromHeader   = "Von"
     override val migrationToHeader     = "Nach"
     override fun migrationSize(megabytes: Int, files: Int) =
@@ -598,9 +603,8 @@ object GermanStrings : AppStrings {
     override val navBrowse  = "Durchsuchen"
 
     override val settingsHomeViewTitle   = "Startansicht"
-    override val settingsHomeViewSub     = "Der moderne Startbildschirm ist die Vorgabe. Klassisches Dashboard und Library-first-Ansicht bleiben jederzeit umschaltbar."
+    override val settingsHomeViewSub     = "Der moderne Startbildschirm ist die Vorgabe. Das klassische Dashboard bleibt jederzeit umschaltbar."
     override val settingsHomeViewClassic = "Klassisch"
-    override val settingsHomeViewLibrary = "Library (Alpha)"
     override val settingsHomeViewNew     = "Modern"
 
 
@@ -1133,6 +1137,7 @@ object GermanStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.maxItems" to "Max. Einträge (0 = alle)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Titel anzeigen",
         "widget.appshell.rightrail.compactnews.imageSource" to "Bildquelle",
+        "widget.appshell.rightrail.compactnews.channel" to "Kanal",
         "widget.bg.enable.toggle" to "Hintergrund an/aus",
         "widget.bg.fx.animspeed" to "Animationstempo",
         "widget.bg.fx.blur" to "Unschärfe",
@@ -1176,6 +1181,15 @@ object GermanStrings : AppStrings {
         "widget.home.new.music" to "Musikplayer",
         "widget.home.new.music.title" to "Überschrift",
         "widget.home.new.playback.mini" to "Mini-Player",
+        "widget.home.new.player.timeline" to "Player: die Karte ist die Zeitachse",
+        "widget.home.new.player.timeline.fill" to "Abgespielter Anteil",
+        "widget.home.new.player.readout" to "Player: Anzeige",
+        "widget.home.new.player.readout.showTotal" to "Gesamtlänge anzeigen",
+        "widget.home.new.player.seeded" to "Player: Farbe vom Cover",
+        "widget.home.new.player.seeded.showAlbum" to "Album anzeigen",
+        "widget.home.new.player.seeded.tint" to "Cover-Anteil",
+        "widget.home.new.player.cover" to "Cover-Player",
+        "widget.home.new.player.cover.showAlbum" to "Album anzeigen",
         "widget.home.new.progress" to "Hintergrundaktivität",
         "widget.home.new.progress.idleText" to "Leerlauftext",
         "widget.home.new.progress.title" to "Überschrift",
@@ -1380,6 +1394,13 @@ object GermanStrings : AppStrings {
     override val audioOpenFile         = "Datei öffnen"
     override val audioPickTrack        = "Track auswählen"
     override val audioVolume           = "Lautstärke"
+    override val audioRepeat           = "Wiederholen"
+    override val audioRepeatOff        = "Aus"
+    override val audioRepeatOne        = "Ein Titel"
+    override val audioRepeatQueue      = "Ganze Warteschlange"
+    override val audioPlaybackOptions  = "Wiedergabe"
+    override val audioSkipNext         = "Nächster Titel"
+    override val audioSkipPrevious     = "Vorheriger Titel"
     override val audioNoFile           = "Keine Datei"
     override val audioStatusReady      = "Bereit"
     override val audioStatusPlaying    = "Spielt"

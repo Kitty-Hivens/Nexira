@@ -135,6 +135,22 @@ interface AppStrings {
     val newsTitle: String
     val newsEmpty: String
     val newsFilterPlaceholder: String
+
+    /**
+     * The alternate news channel with no address configured. Said instead of the
+     * empty state and its retry: there is nothing to retry, and a control that
+     * cannot succeed is worse than a sentence naming what is missing.
+     */
+    val newsAltNoAddress: String
+
+    /**
+     * The news plane in Settings and the one control on it: the address of the
+     * widget's second channel. Empty is the off state -- nothing is fetched for
+     * that channel while the field is blank.
+     */
+    val settingsSectionNews: String
+    val settingsAltNewsFeed: String
+    val settingsAltNewsFeedDesc: String
     val newsFilterClear: String
 
     // --- Right rail ---
@@ -650,7 +666,6 @@ interface AppStrings {
     val settingsHomeViewTitle: String
     val settingsHomeViewSub: String
     val settingsHomeViewClassic: String
-    val settingsHomeViewLibrary: String
     val settingsHomeViewNew: String
 
     // --- UI style variant picker (in Settings -> Interface) ---
@@ -1354,6 +1369,24 @@ interface AppStrings {
     val audioOpenFile: String
     val audioPickTrack: String
     val audioVolume: String
+
+    /**
+     * The repeat mode and its three answers. Three and not a boolean because
+     * the two useful loops are different questions: this one thing again, or
+     * round the whole set.
+     */
+    val audioRepeat: String
+    val audioRepeatOff: String
+    val audioRepeatOne: String
+    val audioRepeatQueue: String
+    /**
+     * The heading of the player's own options panel: what the transport row has
+     * no room for and the picture must not lose room to.
+     */
+    val audioPlaybackOptions: String
+    /** The two skips, which name themselves on a tooltip because they are glyphs. */
+    val audioSkipNext: String
+    val audioSkipPrevious: String
     val audioNoFile: String
     val audioStatusReady: String
     val audioStatusPlaying: String

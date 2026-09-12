@@ -36,6 +36,43 @@ fun getGitVersion(providerFactory: ProviderFactory): String {
 val appVersion = providers.gradleProperty("appVersion")
     .getOrElse(getGitVersion(providers))
 
+/**
+ * Maintenance entry points for the generated assets. They exist so the scripts do
+ * not have to be remembered by path, and they are deliberately not wired into any
+ * build: the outputs are committed, and the scripts need fonts installed on the
+ * machine that runs them, which no CI runner has.
+ */
+fun Project.registerAssetTask(name: String, script: String, what: String) =
+    tasks.register<Exec>(name) {
+        group = "nexira assets"
+        description = what
+        workingDir = rootDir
+        commandLine("python3", script)
+        // Exec would otherwise report a missing interpreter as a Gradle internal
+        // failure rather than as the missing prerequisite it is.
+        isIgnoreExitValue = true
+        doLast {
+            val code = executionResult.get().exitValue
+            if (code != 0) {
+                throw GradleException(
+                    "$script exited with $code. It needs python3 with fontTools, plus the " +
+                        "source fonts installed locally; see the header of the script.",
+                )
+            }
+        }
+    }
+
+registerAssetTask(
+    "regenerateFonts",
+    "tools/fonts/regenerate.py",
+    "Re-subsets the bundled CJK face and regenerates the UI face's coverage table",
+)
+registerAssetTask(
+    "regenerateIcons",
+    "tools/icons/regenerate.py",
+    "Re-subsets the Material Symbols font from tools/icons/icons.txt",
+)
+
 // Repositories centralized in settings.gradle.kts (dependencyResolutionManagement
 // with FAIL_ON_PROJECT_REPOS). Only version + group are set per-project here.
 allprojects {

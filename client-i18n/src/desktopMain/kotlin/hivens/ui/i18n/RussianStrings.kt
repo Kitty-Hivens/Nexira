@@ -127,6 +127,11 @@ object RussianStrings : AppStrings {
     override val newsTitle   = "Новости проекта"
     override val newsEmpty   = "Новостей пока нет..."
     override val newsFilterPlaceholder = "Фильтр новостей"
+    override val newsAltNoAddress      = "Адрес ленты не задан"
+    override val settingsSectionNews   = "Новости"
+    override val settingsAltNewsFeed   = "Альтернативная лента"
+    override val settingsAltNewsFeedDesc =
+        "Адрес RSS или Atom для второго канала виджета новостей. Его строки не открываются в источнике, загружается только их текст."
     override val newsFilterClear        = "Сбросить фильтр"
     override val railCollapse           = "Свернуть панель"
     override val railExpand             = "Развернуть панель"
@@ -576,7 +581,7 @@ object RussianStrings : AppStrings {
 
     // --- Data dir migration UI ---
     override val migrationWelcome      = "Добро пожаловать в Nexira"
-    override val migrationDescription  = "Nexira теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
+    override val migrationDescription  = "Aura теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
     override val migrationFromHeader   = "Откуда"
     override val migrationToHeader     = "Куда"
     override fun migrationSize(megabytes: Int, files: Int) =
@@ -599,9 +604,8 @@ object RussianStrings : AppStrings {
     override val navBrowse  = "Каталог"
 
     override val settingsHomeViewTitle   = "Главный экран"
-    override val settingsHomeViewSub     = "Современный экран включён по умолчанию. Классический Dashboard и Library-first доступны в любой момент."
+    override val settingsHomeViewSub     = "Современный экран включён по умолчанию. Классический Dashboard доступен в любой момент."
     override val settingsHomeViewClassic = "Классический"
-    override val settingsHomeViewLibrary = "Library (alpha)"
     override val settingsHomeViewNew     = "Современный"
 
 
@@ -1147,6 +1151,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.maxItems" to "Макс. элементов (0 = все)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Показывать заголовок",
         "widget.appshell.rightrail.compactnews.imageSource" to "Источник картинки",
+        "widget.appshell.rightrail.compactnews.channel" to "Канал",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
         "widget.bg.fx.blur" to "Размытие",
@@ -1190,6 +1195,15 @@ object RussianStrings : AppStrings {
         "widget.home.new.music" to "Музыкальный плеер",
         "widget.home.new.music.title" to "Заголовок",
         "widget.home.new.playback.mini" to "Мини-плеер",
+        "widget.home.new.player.timeline" to "Плеер: карточка как шкала",
+        "widget.home.new.player.timeline.fill" to "Заливка проигранного",
+        "widget.home.new.player.readout" to "Плеер: табло",
+        "widget.home.new.player.readout.showTotal" to "Показывать длительность",
+        "widget.home.new.player.seeded" to "Плеер: цвет от обложки",
+        "widget.home.new.player.seeded.showAlbum" to "Показывать альбом",
+        "widget.home.new.player.seeded.tint" to "Подмес обложки",
+        "widget.home.new.player.cover" to "Плеер с обложкой",
+        "widget.home.new.player.cover.showAlbum" to "Показывать альбом",
         "widget.home.new.progress" to "Фоновая активность",
         "widget.home.new.progress.idleText" to "Текст простоя",
         "widget.home.new.progress.title" to "Заголовок",
@@ -1394,6 +1408,13 @@ object RussianStrings : AppStrings {
     override val audioOpenFile         = "Открыть файл"
     override val audioPickTrack        = "Выбери трек"
     override val audioVolume           = "Громкость"
+    override val audioRepeat           = "Повтор"
+    override val audioRepeatOff        = "Выключен"
+    override val audioRepeatOne        = "Один трек"
+    override val audioRepeatQueue      = "Вся очередь"
+    override val audioPlaybackOptions  = "Воспроизведение"
+    override val audioSkipNext         = "Следующий трек"
+    override val audioSkipPrevious     = "Предыдущий трек"
     override val audioNoFile           = "Без файла"
     override val audioStatusReady      = "Готов"
     override val audioStatusPlaying    = "Играет"

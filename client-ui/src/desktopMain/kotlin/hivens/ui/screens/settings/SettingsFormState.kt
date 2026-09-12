@@ -45,6 +45,7 @@ internal class SettingsFormState(initial: SettingsData) {
     var strictModVerification  by mutableStateOf(initial.strictModVerification)
     var useNetworkAgent        by mutableStateOf(initial.useNetworkAgent)
     var useSmartycraftAuthLib  by mutableStateOf(initial.useSmartycraftAuthLib)
+    var altNewsFeedUrl         by mutableStateOf(initial.altNewsFeedUrl ?: "")
     // Simple pre-releases toggle: ON maps updateChannel to Beta (previews + betas),
     // OFF to Release. The old 5-channel picker is gone; nightly is a separate config
     // flag (SettingsData.nightlyChannel), never surfaced here.
@@ -78,6 +79,10 @@ internal class SettingsFormState(initial: SettingsData) {
             strictModVerification       = strictModVerification,
             useNetworkAgent             = useNetworkAgent,
             useSmartycraftAuthLib       = useSmartycraftAuthLib,
+            // Blank is the off state for this one, and null is how the field
+            // stores it: an empty string would read as a configured address that
+            // fails every validation downstream.
+            altNewsFeedUrl              = altNewsFeedUrl.trim().ifBlank { null },
             updateChannel               = if (preReleasesEnabled) ReleaseChannel.Beta else ReleaseChannel.Release,
         )
     }

@@ -8,6 +8,22 @@ Das Entwicklungsprotokoll ist ein eigenes Dokument:
 [CHANGELOG.md](./CHANGELOG.md). Es nennt Klassen und Mechanismen und muss
 nicht gelesen werden, um eine Version zu verstehen.
 
+## [2.4.1] - 2026-09-12
+
+Japanisch kommt als Oberflächensprache hinzu, als experimentell markiert. Mitgeliefert wird eine Schrift, die es zeichnen kann, sodass japanischer, chinesischer und koreanischer Text aus dem eigenen Bestand des Launchers kommt und nicht davon abhängt, was auf dem System installiert ist. Das gilt auch für Titel- und Pack-Namen, in welcher Sprache die Oberfläche auch läuft.
+
+Die meiste Arbeit ging in die Musik. Statt einer Form gibt es jetzt vier Player: einer vom Cover geführt, einer der die Farbe der Karte vom Cover nimmt, einer ganz ohne Bild mit der Zeit als Hauptsache, und einer, bei dem sich die Karte selbst füllt, während der Titel läuft. Mehrere Dateien lassen sich auf einmal wählen und reihen sich in eine Warteschlange, vor und zurück springen funktioniert, ebenso das Wiederholen eines Titels oder der ganzen Schlange. Die Lautstärke bleibt zwischen den Sitzungen erhalten statt bei jedem Start wieder auf voll zu springen.
+
+Menüs und Auswahllisten gehen aus dem Element auf, das angeklickt wurde, statt daneben zu erscheinen, bleiben am Bildschirmrand im Fenster und scrollen, statt unten hinauszulaufen. Schaltflächen ohne Beschriftung sagen beim Überfahren, was sie tun: vorher konnten das vier Stellen im ganzen Launcher. Der Lautstärkeregler sieht wieder aus wie ein Regler und nicht wie ein Balken mit einer Lücke.
+
+Die Nachrichtenleiste kann einen zweiten Kanal zeigen: eine Auswahl, die mitgeliefert wird und nichts zu konfigurieren verlangt, oder jede RSS- oder Atom-Adresse aus den Einstellungen. Zeilen dieses Kanals sind nur Text. Sie öffnen nichts und laden keine Bilder, der ganze Kanal kostet also eine Anfrage an die eine Adresse, die du angegeben hast.
+
+Ein untätiger Launcher gibt Speicher an das System zurück, von etwa 610 MB auf etwa 375 MB, ohne dass eine Obergrenze gesenkt wird, sodass für schwere Momente genauso viel Platz bleibt.
+
+Packs mit einem Mod, der weitere Jars in sich trägt, Scalar darunter, verlieren diese Dateien nicht mehr: bisher wurden sie gelöscht und die Sitzung wenige Sekunden nach dem Start beendet.
+
+Der Windows-Installer baut wieder. Die Startseite mit der Bibliothek zuerst entfällt: die Bibliothek war ohnehin einen Klick entfernt in der Seitenleiste, also war es ein zweiter Weg zum selben Bildschirm.
+
 ## [2.4.0] - 2026-09-05
 
 2.4.0 ist das, worauf die Previews und Betas dieser Reihe hingearbeitet haben. Das meiste betrifft die Oberfläche: woraus eine Fläche besteht, ob die Zahl, die du einstellst, beim Pixel ankommt, und ob der Launcher aus dem Weg geht, sobald das Spiel läuft. Der Rest ist eine Liste von Dingen, die still nicht funktionierten, und einige davon konnten dich ein Konto, eine Sitzung oder etwas Getipptes kosten.

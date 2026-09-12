@@ -62,6 +62,7 @@ import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import hivens.ui.widgets.services.MusicPlayerService
@@ -173,20 +174,28 @@ internal fun MusicPlayerCard(
                 AlbumArtBlock(track)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
+                    // Everything below comes off the file's tags or out of the
+                    // widget's own props, so the face is chosen per string: the
+                    // bundled UI face covers Latin, Cyrillic and Greek and
+                    // nothing else, and a title it cannot draw would otherwise
+                    // fall through to whatever the host has, or to boxes.
                     Text(
                         text       = heading,
                         style      = MaterialTheme.typography.labelLarge,
                         color      = NxTheme.colors.textSecondary,
                         fontWeight = FontWeight.Medium,
+                        fontFamily = familyForText(heading),
                     )
                     Spacer(Modifier.height(2.dp))
+                    val title = currentTitle(state, track, s)
                     Text(
-                        text       = currentTitle(state, track, s),
+                        text       = title,
                         style      = MaterialTheme.typography.titleMedium,
                         color      = NxTheme.colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
+                        fontFamily = familyForText(title),
                     )
                     if (state is PlaybackState.Error) {
                         Text(
@@ -195,12 +204,14 @@ internal fun MusicPlayerCard(
                             color = NxTheme.colors.error,
                         )
                     } else {
+                        val sub = subtitle(state, track, s)
                         Text(
-                            text     = subtitle(state, track, s),
-                            style    = MaterialTheme.typography.bodySmall,
-                            color    = NxTheme.colors.textSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            text       = sub,
+                            style      = MaterialTheme.typography.bodySmall,
+                            color      = NxTheme.colors.textSecondary,
+                            maxLines   = 1,
+                            overflow   = TextOverflow.Ellipsis,
+                            fontFamily = familyForText(sub),
                         )
                     }
                 }

@@ -89,7 +89,9 @@ import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
+import hivens.launcher.news.CuratedNewsFeed
 import hivens.launcher.news.SmartyCraftNewsFeed
+import hivens.launcher.news.SyndicationNewsFeed
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
@@ -902,6 +904,25 @@ val appModule = module {
         )
     }
 
+    // The second channel: any RSS or Atom address the user names, or nothing at
+    // all while the field is empty -- no default feed ships and no request is made
+    // for this until one is set. Registered under its own concrete type rather
+    // than as a second INewsFeed so nothing resolves it by accident: a surface
+    // asking for "the news feed" still gets the launcher's own.
+    // The channel that needs nothing configured: a pool of lines bundled with the
+    // launcher, overridable at <dataDir>/news-curated.txt so it can grow without a
+    // rebuild. No request, ever.
+    single { CuratedNewsFeed(dataDir = get()) }
+
+    single {
+        val settings: ISettingsService = get()
+        SyndicationNewsFeed(
+            clientProvider = get<HttpClientProvider>(),
+            url = { settings.getSettings().altNewsFeedUrl },
+            cache = altNewsCache(),
+        )
+    }
+
     // Pack registry on Xodus (<dataDir>/db): installed PackInstances persisted one
     // entry per id so a mutation is an O(1) put, not a full-file rewrite. Migrates a
     // legacy packs.json on first open (renamed to *.migrated). Empty -> empty list.
@@ -990,6 +1011,23 @@ private fun Scope.newsCache() =
             ttlMs = 10 * 60_000L,
             staleTtlMs = Long.MAX_VALUE,
             maxEntries = 64,
+            shouldStore = { it.items.isNotEmpty() },
+        ),
+    )
+
+/**
+ * The alternate channel's own cache, under its own name: the key inside is the
+ * feed address, and two channels sharing one namespace would be one channel
+ * answering for the other. Fewer entries because there is one document per
+ * address rather than a page per scroll.
+ */
+private fun Scope.altNewsCache() =
+    get<CacheFactory>().createInMemory<NewsPage>(
+        "news-alt",
+        CacheConfig(
+            ttlMs = 10 * 60_000L,
+            staleTtlMs = Long.MAX_VALUE,
+            maxEntries = 8,
             shouldStore = { it.items.isNotEmpty() },
         ),
     )

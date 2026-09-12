@@ -9,6 +9,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
@@ -217,6 +218,11 @@ fun NxTheme(
     // palette. Defaulted so other call sites (the console window) are unaffected.
     paletteSeed: Int? = null,
     paletteFromWallpaper: Boolean = false,
+    // The face every text role is drawn with. Null keeps the bundled Latin face;
+    // a locale whose own strings that face cannot cover passes the bundled CJK
+    // one instead, which is the only way the interface stays inside the bundle
+    // rather than borrowing whatever the host happens to have.
+    uiFamily: FontFamily? = null,
     content: @Composable () -> Unit
 ) {
     val customization = LocalCustomization.current
@@ -308,11 +314,15 @@ fun NxTheme(
     CompositionLocalProvider(
         LocalNxColors   provides activePalette,
         LocalMonoFamily provides nexiraMonoFamily(),
+        // Resolved once here rather than per call site: a font family is a cache
+        // key in the resolver, and familyForText is asked inside Text parameters
+        // that recompose with the playback position.
+        LocalCjkFamily  provides nexiraCjkFamily(),
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
             shapes      = NexiraShapes,
-            typography  = nexiraTypography(),
+            typography  = nexiraTypography(uiFamily ?: nexiraSansFamily()),
         ) {
             // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its
             // default ripple into LocalIndication, so the app-wide state layer must

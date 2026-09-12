@@ -32,6 +32,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.familyForText
 import hivens.ui.widgets.home.new.rememberQuickLaunchTarget
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -132,6 +133,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                 )
                 Text(
                     text  = target.displayName,
+                    fontFamily = familyForText(target.displayName),
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (ready) Color.White.copy(alpha = 0.85f)
                             else NxTheme.colors.textSecondary.copy(alpha = 0.7f),

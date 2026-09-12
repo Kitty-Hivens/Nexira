@@ -18,12 +18,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -60,7 +57,9 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxField
+import hivens.ui.nx.NxMenuAlign
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxMenuMark
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -338,16 +337,29 @@ private fun NewLocalPackDialog(
                             // unclipped square whose corners poke past the field's rounded shape.
                             modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) mcMenuOpen = true },
                         )
-                        NxContextMenu(expanded = mcMenuOpen && versions.isNotEmpty(), onDismissRequest = { mcMenuOpen = false }) {
-                            Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
-                                matches.forEach { v ->
-                                    NxMenuItem(label = v, selected = v == mc) { mc = v; mcMenuOpen = false }
+                        // The list hangs off the field's leading edge and takes its
+                        // width, because it belongs to that field; the menu owns the
+                        // height cap and the scroll, and the snapshots switch is a
+                        // footer so it stays reachable with sixty versions listed.
+                        NxContextMenu(
+                            expanded         = mcMenuOpen && versions.isNotEmpty(),
+                            onDismissRequest = { mcMenuOpen = false },
+                            align            = NxMenuAlign.Start,
+                            maxHeight        = 240.dp,
+                            matchAnchorWidth = true,
+                            footer           = {
+                                NxMenuItem(
+                                    label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots,
+                                    icon = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
+                                ) { showSnapshots = !showSnapshots }
+                            },
+                        ) {
+                            matches.forEach { v ->
+                                NxMenuItem(label = v, selected = v == mc, mark = NxMenuMark.Radio) {
+                                    mc = v
+                                    mcMenuOpen = false
                                 }
                             }
-                            NxMenuItem(
-                                label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots,
-                                icon = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
-                            ) { showSnapshots = !showSnapshots }
                         }
                     }
                     PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }

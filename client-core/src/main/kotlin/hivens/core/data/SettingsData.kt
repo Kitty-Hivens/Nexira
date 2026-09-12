@@ -6,13 +6,18 @@ import kotlinx.serialization.Serializable
  * Which Home surface the user is currently running. Set in Settings.
  * [New] (labelled "Modern") is the default widget-composed home; the
  * toggle also reaches the legacy [Classic] Dashboard (SC server grid +
- * launch panel + always-on right panel) and the [LibraryFirst] IA
- * (Library + Browse + sliding login panel + unified card).
+ * launch panel + always-on right panel).
+ *
+ * A `LibraryFirst` option used to sit between them, opening Home straight onto
+ * the Library. It is gone: the Library screen was already one click away in the
+ * rail, so the choice bought a second route to the same surface and nothing
+ * else. A settings file still naming it decodes to [New], because the shared
+ * Json coerces an unknown enum value to the field's default rather than
+ * throwing.
  */
 @Serializable
 enum class HomeView {
     Classic,
-    LibraryFirst,
     // [New] -- widget-composed home (Phase 1 / kernel-3), the default surface.
     // Carries the welcome / recent-packs / quick-launch widgets; the expressive
     // build-out happens as user customization in later phases.
@@ -288,8 +293,8 @@ data class SettingsData(
 
     /**
      * Which Home surface to render. Defaults to the modern widget-composed
-     * home ([HomeView.New]); the classic Dashboard and the Library-first IA
-     * stay reachable from the Home-view toggle at any time. See [HomeView]
+     * home ([HomeView.New]); the classic Dashboard stays reachable from the
+     * Home-view toggle at any time. See [HomeView]
      * for the option set.
      */
     val homeView: HomeView = HomeView.New,
@@ -301,6 +306,33 @@ data class SettingsData(
      * Off by default; toggled from the history widget's mute button.
      */
     val doNotDisturb: Boolean = false,
+
+    // ── Audio ────────────────────────────────────────────────────────────
+
+    /**
+     * Playback loudness, 0..1, as the player widgets last left it.
+     *
+     * Stored because loudness belongs to the listener rather than to the track:
+     * it used to be full on every launch, so someone who keeps it at a tenth got
+     * the first second of the next session at ten times what they set. Written
+     * once a drag settles rather than on every frame of it -- see AudioPlayer.
+     */
+    val audioVolume: Float = 1.0f,
+
+    // ── News ───────────────────────────────────────────────────────
+
+    /**
+     * RSS or Atom address for the news widget's alternate channel.
+     *
+     * Null by default and nothing reads it until it is set: no default feed
+     * ships, and the launcher makes no request for this channel while the field
+     * is empty. Only http and https are honoured -- the field is hand-editable,
+     * and a local-file address in it would turn a news rail into a disk reader.
+     *
+     * The channel it feeds is deliberately narrow: its rows do not open at their
+     * source and only their text is fetched. See NewsChannelPolicy.
+     */
+    val altNewsFeedUrl: String? = null,
 
     // ── Smarty server controls ───────────────────────────────────────────
 

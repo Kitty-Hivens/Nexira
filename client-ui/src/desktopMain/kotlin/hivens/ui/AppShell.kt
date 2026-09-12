@@ -46,6 +46,8 @@ import hivens.core.diag.ActionRing
 import hivens.core.security.SslBypassStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.launcher.platform.AppRelauncher
+import hivens.ui.console.ConsoleCommands
 import hivens.ui.debug.DebugOverlay
 import hivens.ui.debug.DebugOverlayState
 import hivens.ui.debug.IdentitySlotChromeModifier
@@ -101,6 +103,8 @@ import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.NxTheme
+import hivens.ui.text.needsCjkFace
+import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
@@ -150,6 +154,7 @@ import java.awt.Toolkit
 import java.awt.event.AWTEventListener
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
+import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 // 2-column Library + sidebar starts collapsing visibly below this width;
@@ -312,14 +317,28 @@ fun FrameWindowScope.AppShellContent(
 
     val settings = remember { settingsService.getSettings() }
 
-    // Dev-only: also expose the UI-debug overlay through a console command (F9 is
-    // the primary toggle). Registered once; the console service is a process
-    // singleton, and registration is a no-op guard on a release build.
+    // The console's own commands, declared in ConsoleCommands. Registered once;
+    // the console service is a process singleton. The UI-debug toggle is among
+    // them only on a build that has the overlay (F9 stays the primary way in).
+    // The input row appears as soon as anything is registered, so from here the
+    // console takes typed commands with no game running.
     LaunchedEffect(Unit) {
-        if (debugOverlay.available) {
-            gameConsole.registerLocalCommand("uidebug") { debugOverlay.toggle() }
-            gameConsole.registerLocalCommand("ui-debug") { debugOverlay.toggle() }
-        }
+        val overlayToggle: (() -> Unit)? = if (debugOverlay.available) debugOverlay::toggle else null
+        ConsoleCommands.registerAll(
+            console = gameConsole,
+            scope = applicationScope,
+            debugOverlayToggle = overlayToggle,
+            // Busy from the first prepare step, not from the moment a game
+            // process exists: the download and the unpack run in this process.
+            launcherIsBusy = {
+                val state = controller.state.value
+                state !is LaunchState.Idle && state !is LaunchState.Error
+            },
+            // Same self-relaunch the recovery restart uses: spawn the binary again
+            // and let this process go. False means there is nothing to spawn (a
+            // dev run), and then nothing happens at all.
+            restartWorld = { if (AppRelauncher.relaunch()) exitProcess(0) else false },
+        )
     }
 
     // Native maximize/restore for the undecorated window -- the WM owns the
@@ -578,6 +597,17 @@ fun FrameWindowScope.AppShellContent(
     CompositionLocalProvider(LocalAprilFools provides af) {
     LocaleProvider(locale = currentLocale) {
         val s = LocalStrings.current
+
+        // Which face draws the interface. Roboto Flex is subset to Latin,
+        // Cyrillic and Greek, so a locale outside those has to be drawn by the
+        // bundled CJK face or it leaves the bundle for whatever the host has --
+        // which on a machine without a CJK font is boxes. The question is asked
+        // of the locale's own strings rather than of a list of language tags, so
+        // the next locale that needs this is picked up without touching a list
+        // here. A handful of structural labels is enough: if the interface is in
+        // that language at all, they are in it too.
+        val uiNeedsCjk = needsCjkFace(s.settingsTitle + s.navLibrary + s.aboutTitle)
+        val uiFamily = if (uiNeedsCjk) nexiraCjkFamily() else null
 
         // Came back from a crash restart: surface a one-shot notice so the reload
         // -- which resets the current screen -- is not silent. consumeRecovered()
@@ -925,6 +955,7 @@ fun FrameWindowScope.AppShellContent(
                 customTheme  = customTheme,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
+                uiFamily     = uiFamily,
             ) {
                 ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
@@ -1015,6 +1046,7 @@ fun FrameWindowScope.AppShellContent(
                 customTheme  = customTheme,
                 paletteSeed  = wallpaperSeed,
                 paletteFromWallpaper = paletteFromWallpaper,
+                uiFamily     = uiFamily,
             ) {
                 DebugOverlay(debugOverlay)
                 // Inside the theme on purpose: the prompts are Dialogs with their own

@@ -129,6 +129,11 @@ object EnglishStrings : AppStrings {
     override val newsTitle   = "Project news"
     override val newsEmpty   = "No news yet..."
     override val newsFilterPlaceholder = "Filter news"
+    override val newsAltNoAddress      = "No feed address set"
+    override val settingsSectionNews   = "News"
+    override val settingsAltNewsFeed   = "Alternate feed"
+    override val settingsAltNewsFeedDesc =
+        "An RSS or Atom address for the news widget's second channel. Its rows do not open at their source, and only their text is fetched."
     override val newsFilterClear        = "Clear filter"
     override val railCollapse           = "Collapse panel"
     override val railExpand             = "Expand panel"
@@ -576,7 +581,7 @@ object EnglishStrings : AppStrings {
 
     // --- Data dir migration UI ---
     override val migrationWelcome      = "Welcome to Nexira"
-    override val migrationDescription  = "Nexira is now Nexira. Your existing data needs to be copied to the new location before the launcher can start. Your old folder is left untouched as a backup; you can delete it manually once everything works."
+    override val migrationDescription  = "Aura is now Nexira. Your existing data needs to be copied to the new location before the launcher can start. Your old folder is left untouched as a backup; you can delete it manually once everything works."
     override val migrationFromHeader   = "From"
     override val migrationToHeader     = "To"
     override fun migrationSize(megabytes: Int, files: Int) =
@@ -599,9 +604,8 @@ object EnglishStrings : AppStrings {
     override val navBrowse  = "Browse"
 
     override val settingsHomeViewTitle   = "Home view"
-    override val settingsHomeViewSub     = "The modern home is the default. The classic Dashboard and the Library-first surface stay one switch away."
+    override val settingsHomeViewSub     = "The modern home is the default. The classic Dashboard stays one switch away."
     override val settingsHomeViewClassic = "Classic"
-    override val settingsHomeViewLibrary = "Library (alpha)"
     override val settingsHomeViewNew     = "Modern"
 
 
@@ -1131,6 +1135,7 @@ object EnglishStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.maxItems" to "Max items (0 = all)",
         "widget.appshell.rightrail.compactnews.showTitle" to "Show title",
         "widget.appshell.rightrail.compactnews.imageSource" to "Image source",
+        "widget.appshell.rightrail.compactnews.channel" to "Channel",
         "widget.bg.enable.toggle" to "Background on/off",
         "widget.bg.fx.animspeed" to "Animation speed",
         "widget.bg.fx.blur" to "Blur",
@@ -1174,6 +1179,15 @@ object EnglishStrings : AppStrings {
         "widget.home.new.music" to "Music player",
         "widget.home.new.music.title" to "Heading",
         "widget.home.new.playback.mini" to "Mini player",
+        "widget.home.new.player.timeline" to "Player: the body is the timeline",
+        "widget.home.new.player.timeline.fill" to "Played-part ink",
+        "widget.home.new.player.readout" to "Player: readout",
+        "widget.home.new.player.readout.showTotal" to "Show total length",
+        "widget.home.new.player.seeded" to "Player: seeded by the cover",
+        "widget.home.new.player.seeded.showAlbum" to "Show album",
+        "widget.home.new.player.seeded.tint" to "Cover tint",
+        "widget.home.new.player.cover" to "Cover player",
+        "widget.home.new.player.cover.showAlbum" to "Show album",
         "widget.home.new.progress" to "Background activity",
         "widget.home.new.progress.idleText" to "Idle text",
         "widget.home.new.progress.title" to "Heading",
@@ -1378,6 +1392,13 @@ object EnglishStrings : AppStrings {
     override val audioOpenFile         = "Open file"
     override val audioPickTrack        = "Pick a track"
     override val audioVolume           = "Volume"
+    override val audioRepeat           = "Repeat"
+    override val audioRepeatOff        = "Off"
+    override val audioRepeatOne        = "One track"
+    override val audioRepeatQueue      = "Whole queue"
+    override val audioPlaybackOptions  = "Playback"
+    override val audioSkipNext         = "Next track"
+    override val audioSkipPrevious     = "Previous track"
     override val audioNoFile           = "No file"
     override val audioStatusReady      = "Ready"
     override val audioStatusPlaying    = "Playing"
