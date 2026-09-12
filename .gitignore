@@ -104,4 +104,8 @@ core.[0-9]*
 # Python bytecode from the lint scanners. They were standalone files until they
 # started sharing a module-discovery helper; importing it is what makes CPython
 # write a cache next to them.
-scripts/__pycache__/
+# Python bytecode, from any tool directory rather than only scripts/. The
+# rule existed for one path and the file under it was already tracked, so it
+# went on being committed: an ignore does not reach a file git already has.
+__pycache__/
+*.pyc
