@@ -13,11 +13,10 @@ import kotlin.test.assertTrue
  */
 class LocaleFormatParityTest {
 
-    private val locales = mapOf(
-        "EnglishStrings" to EnglishStrings,
-        "RussianStrings" to RussianStrings,
-        "GermanStrings"  to GermanStrings,
-    )
+    // Taken from the enum rather than listed here, so a locale added to the
+    // picker is checked without this list being remembered. It was not
+    // remembered: Japanese shipped while this map still named three locales.
+    private val locales = AppLocale.entries.associate { it.name to stringsFor(it) }
 
     // '%', optional argument index, flags, optional width/precision, then a
     // value-consuming conversion letter. Space and ',' are deliberately excluded
