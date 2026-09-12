@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
@@ -22,7 +21,6 @@ import hivens.ui.i18n.LocaleProvider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
-import org.jetbrains.skia.Image as SkImage
 import java.io.File
 import java.nio.file.Paths
 import kotlin.test.Test
@@ -40,13 +38,7 @@ import kotlin.test.Test
  */
 class SeededPlayerRenderProbe {
 
-    private val cover by lazy {
-        val f = File(
-            "SAMPLE_PATH_REMOVED" +
-                "SAMPLE_PATH_REMOVED",
-        )
-        if (f.isFile) SkImage.makeFromEncoded(f.readBytes()).toComposeImageBitmap() else null
-    }
+    private val cover by lazy { ProbeSample.cover() }
 
     private fun playing(pos: Long) = PlaybackState.Playing(
         file = Paths.get("/music/audio.mp3"), positionMs = pos, durationMs = 295_000L,

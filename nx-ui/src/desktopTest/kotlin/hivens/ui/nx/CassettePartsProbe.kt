@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
-import org.jetbrains.skia.Image as SkImage
 import java.io.File
 import kotlin.math.acos
 import kotlin.math.atan2
@@ -115,7 +113,7 @@ class CassettePartsProbe {
     private val hollow = Color(0xFF0B0908)
 
     private val cover: ImageBitmap by lazy {
-        SkImage.makeFromEncoded(File("SAMPLE_PATH_REMOVED").readBytes()).toComposeImageBitmap()
+        ProbeSample.cover()
     }
 
     @OptIn(ExperimentalComposeUiApi::class)

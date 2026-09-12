@@ -1181,6 +1181,8 @@ object GermanStrings : AppStrings {
         "widget.home.new.music" to "Musikplayer",
         "widget.home.new.music.title" to "Überschrift",
         "widget.home.new.playback.mini" to "Mini-Player",
+        "widget.home.new.player.timeline" to "Player: die Karte ist die Zeitachse",
+        "widget.home.new.player.timeline.fill" to "Abgespielter Anteil",
         "widget.home.new.player.readout" to "Player: Anzeige",
         "widget.home.new.player.readout.showTotal" to "Gesamtlänge anzeigen",
         "widget.home.new.player.seeded" to "Player: Farbe vom Cover",

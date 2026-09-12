@@ -1179,6 +1179,8 @@ object EnglishStrings : AppStrings {
         "widget.home.new.music" to "Music player",
         "widget.home.new.music.title" to "Heading",
         "widget.home.new.playback.mini" to "Mini player",
+        "widget.home.new.player.timeline" to "Player: the body is the timeline",
+        "widget.home.new.player.timeline.fill" to "Played-part ink",
         "widget.home.new.player.readout" to "Player: readout",
         "widget.home.new.player.readout.showTotal" to "Show total length",
         "widget.home.new.player.seeded" to "Player: seeded by the cover",

@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,7 +46,6 @@ import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import org.jetbrains.skia.EncodedImageFormat
-import org.jetbrains.skia.Image as SkImage
 import java.io.File
 import kotlin.math.sqrt
 import kotlin.test.Test
@@ -74,17 +72,14 @@ class MoreConceptsProbe {
         0.2398f, 0.0f,
     )
 
-    private fun load(p: String): ImageBitmap =
-        SkImage.makeFromEncoded(File(p).readBytes()).toComposeImageBitmap()
-
     /**
      * The reference art, and the same art reduced to 14 px and blown back up,
      * which is how concept K gets its ground: a real blur is not available in the
      * software renderer these sheets are drawn with, and a downsample reads the
      * same at this size.
      */
-    private val cover: ImageBitmap by lazy { load(SAMPLE_COVER) }
-    private val coverBlur: ImageBitmap by lazy { load(SAMPLE_COVER_BLUR) }
+    private val cover: ImageBitmap by lazy { ProbeSample.cover() }
+    private val coverBlur: ImageBitmap by lazy { ProbeSample.coverBlur() }
 
     @OptIn(ExperimentalComposeUiApi::class)
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
@@ -289,13 +284,6 @@ class MoreConceptsProbe {
                 }
             }
         }
-    }
-    private companion object {
-        private const val SAMPLE_DIR =
-            "SAMPLE_PATH_REMOVED" +
-                "SAMPLE_PATH_REMOVED"
-        const val SAMPLE_COVER = "$SAMPLE_DIR/cover.jpg"
-        const val SAMPLE_COVER_BLUR = "$SAMPLE_DIR/cover-blur.jpg"
     }
 
 

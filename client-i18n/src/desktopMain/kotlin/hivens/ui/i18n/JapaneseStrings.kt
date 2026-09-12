@@ -1185,6 +1185,8 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.music" to "音楽プレーヤー",
         "widget.home.new.music.title" to "見出し",
         "widget.home.new.playback.mini" to "ミニプレーヤー",
+        "widget.home.new.player.timeline" to "プレイヤー: カード全体が進行バー",
+        "widget.home.new.player.timeline.fill" to "再生済みの塗り",
         "widget.home.new.player.readout" to "プレイヤー: 時刻表示",
         "widget.home.new.player.readout.showTotal" to "全体の長さを表示",
         "widget.home.new.player.seeded" to "プレイヤー: ジャケットの色",

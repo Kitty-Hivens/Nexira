@@ -1195,6 +1195,8 @@ object RussianStrings : AppStrings {
         "widget.home.new.music" to "Музыкальный плеер",
         "widget.home.new.music.title" to "Заголовок",
         "widget.home.new.playback.mini" to "Мини-плеер",
+        "widget.home.new.player.timeline" to "Плеер: карточка как шкала",
+        "widget.home.new.player.timeline.fill" to "Заливка проигранного",
         "widget.home.new.player.readout" to "Плеер: табло",
         "widget.home.new.player.readout.showTotal" to "Показывать длительность",
         "widget.home.new.player.seeded" to "Плеер: цвет от обложки",

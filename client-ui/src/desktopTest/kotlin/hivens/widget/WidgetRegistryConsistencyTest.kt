@@ -67,6 +67,8 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.seeded",
             // no artwork at all: the time is the hero, for a corpus with no covers
             "home.new.player.readout",
+            // no bar at all: the filled part of the card IS the position
+            "home.new.player.timeline",
             // inline video player (URL prop, expand-to-full)
             "home.new.video",
             // unified configurable nav rail item
@@ -209,6 +211,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.cover",
             "home.new.player.seeded",
             "home.new.player.readout",
+            "home.new.player.timeline",
             "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",

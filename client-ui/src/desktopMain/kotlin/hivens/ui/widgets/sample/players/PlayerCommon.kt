@@ -67,7 +67,7 @@ internal fun rememberAudioFilesPicker(
                     type     = FileKitType.File(extensions = AUDIO_EXTENSIONS),
                     settings = settings,
                 )
-                picked?.mapNotNull { file -> file.path?.let(Paths::get) }
+                picked?.map { file -> Paths.get(file.path) }
                     ?.takeIf { it.isNotEmpty() }
                     ?.let(onPicked)
             }

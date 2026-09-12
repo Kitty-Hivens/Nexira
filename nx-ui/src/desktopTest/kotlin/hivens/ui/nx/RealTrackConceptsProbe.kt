@@ -31,7 +31,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,7 +44,6 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.seedFromImage
 import org.jetbrains.skia.EncodedImageFormat
-import org.jetbrains.skia.Image as SkImage
 import java.io.File
 import kotlin.math.cos
 import kotlin.math.sin
@@ -90,10 +88,7 @@ class RealTrackConceptsProbe {
      * transcript, and a probe that refuses to run is a probe that gets deleted
      * again.
      */
-    private val cover: ImageBitmap? by lazy {
-        val f = File(SAMPLE_COVER)
-        if (f.isFile) SkImage.makeFromEncoded(f.readBytes()).toComposeImageBitmap() else null
-    }
+    private val cover: ImageBitmap? by lazy { ProbeSample.cover() }
 
     @OptIn(ExperimentalComposeUiApi::class)
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
@@ -280,16 +275,6 @@ class RealTrackConceptsProbe {
         }
     }
 
-    private companion object {
-        /**
-         * Where the reference track's cover is looked for. An absolute path
-         * outside the repository on purpose: the sample is a real commercial
-         * release and does not belong in the tree.
-         */
-        const val SAMPLE_COVER =
-            "SAMPLE_PATH_REMOVED" +
-                "SAMPLE_PATH_REMOVED"
-    }
 
     @Test
     fun probe() {

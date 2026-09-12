@@ -62,7 +62,7 @@ import kotlin.test.Test
 class CursedPlayerProbe {
 
     private val cover: ImageBitmap by lazy {
-        val full = SkImage.makeFromEncoded(File("SAMPLE_PATH_REMOVED").readBytes())
+        val full = ProbeSample.coverImage()
         // Resampled to nothing on purpose, then stretched back over the card.
         SkImage.makeFromBitmap(
             org.jetbrains.skia.Bitmap().apply {
