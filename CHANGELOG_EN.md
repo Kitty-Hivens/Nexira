@@ -18,6 +18,10 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-09-12
+
+Packs on 1.7.10 stop ending their own session seconds after launch. Two mods put a jar next to the others while the game is starting: IndustrialCraft 2 unpacks a library it carries inside itself, and CodeChickenCore moves mods the pack already had into a folder of its own. Both looked like someone had tampered with the pack. The launcher now recognises a file one of the pack's own jars was carrying, and a file that is one of the pack's mods moved somewhere else, matched on its contents rather than on its name, so a file swapped under a familiar name is still caught.
+
 ## [2.4.1] - 2026-09-12
 
 Japanese joins the interface languages, marked experimental. The launcher now carries a font that can draw it, so Japanese, Chinese and Korean text renders from the launcher's own bundle instead of depending on what your system happens to have installed. That goes for track titles and pack names too, whatever language the interface is in.

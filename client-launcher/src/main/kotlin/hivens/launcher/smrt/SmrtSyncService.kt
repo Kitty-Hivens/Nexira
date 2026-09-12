@@ -124,7 +124,7 @@ class SmrtSyncService(
             // SC laid mods out under mods/<mcversion>/ and a duplicate coremod loaded
             // twice. Since the sweep only ever removes archives the manifest does not
             // name, the migration case needs nothing extra.
-            pruneForeignEntries(clientDir, expected)
+            pruneForeignEntries(clientDir, expected, manifest.mods.associate { it.filename to it.sha1 })
 
             writeSourceMarker(marker, SOURCE_MIRROR)
             writeRoster(clientDir, expected)
@@ -292,7 +292,7 @@ class SmrtSyncService(
             return@withContext RosterVerdict(verified = false)
         }
         val sweep = InstanceMutationLock.withLock(clientDir) {
-            pruneForeignEntries(clientDir, roster)
+            pruneForeignEntries(clientDir, roster, expected.orEmpty())
         }
         if (sweep.blocked.isNotEmpty()) {
             log.warn(
@@ -341,7 +341,9 @@ class SmrtSyncService(
                 log.warn("mods inspect: no roster for {}, nothing to hold it to", clientDir.fileName)
                 return@withContext RosterInspection(checkable = false)
             }
-            val foreign = foreignEntries(clientDir, roster).map { (_, relText) -> relText }.sorted()
+            val foreign = foreignEntries(clientDir, roster, expected.orEmpty())
+                .map { (_, relText) -> relText }
+                .sorted()
             val digests = if (expected == null) DigestScan() else digestScan(clientDir, expected)
             RosterInspection(
                 foreign = foreign,
@@ -460,7 +462,11 @@ class SmrtSyncService(
      * as foreign has to be the same in both, or a launch would be held to one
      * standard and the session that follows it to another.
      */
-    private fun foreignEntries(clientDir: Path, expected: Set<String>): List<Pair<Path, String>> {
+    private fun foreignEntries(
+        clientDir: Path,
+        expected: Set<String>,
+        digests: Map<String, String> = emptyMap(),
+    ): List<Pair<Path, String>> {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return emptyList()
         val found = mutableListOf<Pair<Path, String>>()
@@ -498,11 +504,25 @@ class SmrtSyncService(
                     // The allowance is not "this directory is exempt". `mods/` and
                     // `mods/<mcversion>/` are both read by the loader, so exempting
                     // the directory would leave a place to put a jar that runs and
-                    // is never questioned. What is allowed is the exact set of
-                    // names a trusted jar declared it would unpack, and those jars'
-                    // own bytes are held to the pack's digests, so the declaration
-                    // cannot be edited without the check above catching it.
-                    p.parent.parent == modsDir && p.fileName.toString() in unpacked.value
+                    // is never questioned. Two things earn a file its place there
+                    // instead, and both are answered by the pack's own contents.
+                    //
+                    // Either a jar the roster vouches for is carrying that name, by
+                    // declaring it in `ContainedDeps` or simply by having it packed
+                    // inside; those jars' own bytes are held to the pack's digests,
+                    // so what they carry cannot be edited without the check above
+                    // catching it.
+                    //
+                    // Or the file IS one of the pack's mods, moved down a level by
+                    // something that runs at startup: CodeChickenCore's dependency
+                    // loader relocates what it finds into `mods/<mcversion>/`, so
+                    // the instance ends up with the pack's own jar somewhere the
+                    // pack never put it. That one is matched on bytes, not just on
+                    // the name, so the move is recognised and a substitution under
+                    // a familiar name is not.
+                    val name = p.fileName.toString()
+                    p.parent.parent == modsDir &&
+                        (name in unpacked.value || isRelocatedPackMod(p, name, digests))
                 }
                 if (keep) return@forEach
                 // Joined over the path's own segments rather than toString(): the
@@ -537,9 +557,28 @@ class SmrtSyncService(
                 val name = entry.fileName.toString()
                 if (name !in expected || !ModArchives.isLoadable(name)) continue
                 names += ModArchives.containedDeps(entry)
+                names += ModArchives.carriedArchiveNames(entry)
             }
         }
         return names
+    }
+
+    /**
+     * Whether the file beside the mods is one of the pack's own, put there by
+     * something that moved it rather than by someone adding it.
+     *
+     * Held to the bytes the pack declared, not to the name alone: the name is what
+     * a substitution would copy, and the digest is what it cannot. Answers false
+     * when the pack shipped no digest for that name, which is the case for an
+     * instance old enough to predate the baseline, so those keep the older and
+     * stricter reading.
+     */
+    private fun isRelocatedPackMod(file: Path, name: String, digests: Map<String, String>): Boolean {
+        val want = digests[name]?.takeIf { it.isNotBlank() } ?: return false
+        val actual = runCatching { fileOpRetry("roster relocated $name") { sha1Of(file) } }
+            .onFailure { log.warn("mods enforce: cannot read {}: {}", name, it.toString()) }
+            .getOrNull()
+        return actual != null && actual.equals(want, ignoreCase = true)
     }
 
     /**
@@ -551,10 +590,14 @@ class SmrtSyncService(
      * Walked deepest-first so a directory is considered after its children; one that
      * still holds a kept file refuses to delete and is left alone.
      */
-    private fun pruneForeignEntries(clientDir: Path, expected: Set<String>): Sweep {
+    private fun pruneForeignEntries(
+        clientDir: Path,
+        expected: Set<String>,
+        digests: Map<String, String> = emptyMap(),
+    ): Sweep {
         val removed = mutableListOf<String>()
         val blocked = mutableListOf<String>()
-        for ((path, relText) in foreignEntries(clientDir, expected)) {
+        for ((path, relText) in foreignEntries(clientDir, expected, digests)) {
             runCatching { fileOpRetry("smrt drop foreign $path") { Files.delete(path) } }
                 .onSuccess { removed += relText }
                 // Only regular files reach this point, so a refusal is always an

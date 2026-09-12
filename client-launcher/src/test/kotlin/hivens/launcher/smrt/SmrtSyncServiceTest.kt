@@ -500,6 +500,22 @@ class SmrtSyncServiceTest {
         return out.toByteArray()
     }
 
+    /** A jar that simply has another archive packed inside it, declaring nothing. */
+    private fun jarCarrying(vararg entries: String): ByteArray {
+        val manifest = Manifest().apply {
+            mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
+        }
+        val out = ByteArrayOutputStream()
+        JarOutputStream(out, manifest).use { jar ->
+            entries.forEach { path ->
+                jar.putNextEntry(java.util.zip.ZipEntry(path))
+                jar.write("PACKED".toByteArray())
+                jar.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
+
     /**
      * Scalar is the case: a coremod that carries a Scala runtime and has FML lay it
      * out under `mods/<mcversion>/` once the game is up. Those files appear after
@@ -596,6 +612,58 @@ class SmrtSyncServiceTest {
         val verdict = syncService().enforceRoster(dir, baseline)
 
         assertEquals(listOf("1.12.2/scala-library-2.11.1.jar"), verdict.removed)
+    }
+
+    /**
+     * IndustrialCraft 2's case: a jar packed inside a mod, laid out by that mod
+     * into a directory of its own choosing (`mods/ic2/`) and declared in no
+     * manifest at all. The name still comes from a jar the roster vouches for,
+     * which is the whole test.
+     */
+    @Test
+    fun `a jar packed inside a rostered mod is not foreign where that mod lays it out`() = runTest {
+        val dir = tempDir("carried")
+        Files.createDirectories(dir.resolve("mods/ic2"))
+        val ic2 = jarCarrying("lib/EJML-core-0.26.jar")
+        Files.write(dir.resolve("mods/IndustrialCraft.jar"), ic2)
+        Files.write(dir.resolve("mods/ic2/EJML-core-0.26.jar"), "LIB".toByteArray())
+        val baseline = mapOf("IndustrialCraft.jar" to sha1Hex(ic2))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertTrue(verdict.removed.isEmpty(), "the mod is carrying that exact name")
+        assertTrue(Files.exists(dir.resolve("mods/ic2/EJML-core-0.26.jar")))
+    }
+
+    /**
+     * CodeChickenCore's dependency loader moves what it finds into
+     * `mods/<mcversion>/`, so the pack's own jar ends up somewhere the pack never
+     * put it, and the original is gone from the top level.
+     */
+    @Test
+    fun `a pack mod moved down a level by the loader is recognised by its bytes`() = runTest {
+        val dir = tempDir("relocated")
+        Files.createDirectories(dir.resolve("mods/1.7.10"))
+        Files.write(dir.resolve("mods/1.7.10/Baubles-1.7.10-1.0.1.10.jar"), "GENUINE".toByteArray())
+        val baseline = mapOf("Baubles-1.7.10-1.0.1.10.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertTrue(verdict.removed.isEmpty(), "same name and same bytes as the pack's own mod")
+        assertTrue(Files.exists(dir.resolve("mods/1.7.10/Baubles-1.7.10-1.0.1.10.jar")))
+    }
+
+    /** The bytes are what the name cannot carry: a swap under a pack name still goes. */
+    @Test
+    fun `a different jar under a relocated pack name is still foreign`() = runTest {
+        val dir = tempDir("relocated-swap")
+        Files.createDirectories(dir.resolve("mods/1.7.10"))
+        Files.write(dir.resolve("mods/1.7.10/Baubles-1.7.10-1.0.1.10.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("Baubles-1.7.10-1.0.1.10.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertEquals(listOf("1.7.10/Baubles-1.7.10-1.0.1.10.jar"), verdict.removed)
     }
 
     /** FML unpacks one level down. Deeper is nowhere it puts anything. */
