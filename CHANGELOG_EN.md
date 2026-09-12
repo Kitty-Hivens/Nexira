@@ -9,13 +9,30 @@ names classes, files and mechanisms and is where a contributor looks. Nothing
 here should require reading it. Same versions and dates in both, so an entry
 can be matched across.
 
-`CHANGELOG_RU.md` and `CHANGELOG_DE.md` are this file in other languages. The
-launcher reads whichever matches the interface language and shows it in the
-update dialog, so a section here is the release note a player actually sees.
+`CHANGELOG_RU.md`, `CHANGELOG_DE.md` and `CHANGELOG_JA.md` are this file in
+other languages, one per interface language and named by that language's own
+tag. The launcher reads whichever matches and shows it in the update dialog,
+so a section here is the release note a player actually sees.
 One physical line per paragraph, no manual wrapping: these notes are rendered
 verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
+
+## [2.4.1] - 2026-09-12
+
+Japanese joins the interface languages, marked experimental. The launcher now carries a font that can draw it, so Japanese, Chinese and Korean text renders from the launcher's own bundle instead of depending on what your system happens to have installed. That goes for track titles and pack names too, whatever language the interface is in.
+
+Music got most of the work. There are four player widgets to choose between now instead of one shape: one led by the album art, one that takes its colour from the cover, one that shows no picture and makes the time the hero, and one where the card itself fills up as the track plays. You can pick several files at once and they queue up, skip forward and back, and repeat one track or the whole queue. The volume is remembered between sessions instead of jumping back to full every launch.
+
+Menus and dropdowns open out of the control you clicked rather than appearing beside it, stay on screen near an edge, and scroll instead of running off the bottom. Icon-only buttons say what they are when you hover them, which before this they did in four places in the whole launcher. The volume slider is a slider again rather than a bar with a gap in it.
+
+The news panel can show a second channel: a selection that ships with the launcher and needs nothing set up, or any RSS or Atom address you put in settings. Rows on that channel are text and nothing else. They do not open anywhere and no images are fetched for them, so the whole channel costs one request to the one address you named.
+
+An idle launcher now gives memory back to the system, dropping from about 610 MB to about 375 MB without lowering any ceiling, so heavy moments still have the room they had.
+
+Packs with a mod that carries other jars inside itself, Scalar among them, no longer have those files deleted and the session ended a few seconds after launch.
+
+The Windows installer builds again. The Library-first home option is gone: the Library was always one click away in the sidebar, so it was a second road to the same screen.
 
 ## [2.4.0] - 2026-09-05
 
