@@ -25,6 +25,11 @@ verbatim, where a hand-wrapped line would render as a <br> staircase.
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-09-12
+
+### Fixed
+- The two undeclared ways a mod puts a jar beside the mods, each of which ended the session as tampering. `ContainedDeps` is the declared route and the guard already knew it, but on 1.7.10 both of the others turned up in one launch. IndustrialCraft 2 keeps `lib/EJML-core-0.26.jar` packed inside itself and lays it out under `mods/ic2/`, naming neither the file nor the directory anywhere a manifest reader would look, so `ModArchives.carriedArchiveNames` reads the carried names out of the jar rather than out of a list written here. CodeChickenCore's dependency loader does the reverse and moves jars the pack already shipped into `mods/<mcversion>/`, leaving the pack's own mods where the pack never put them. `SmrtSyncService.isRelocatedPackMod` recognises those by the digest the pack declared rather than by the name, so a move is allowed and a substitution under a familiar name still is not. The directory stays unexempted because the loader reads it, and an instance with no baseline has no digests to match, so it keeps the stricter reading.
+
 ## [2.4.1] - 2026-09-12
 
 ### Added

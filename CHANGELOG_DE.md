@@ -8,6 +8,10 @@ Das Entwicklungsprotokoll ist ein eigenes Dokument:
 [CHANGELOG.md](./CHANGELOG.md). Es nennt Klassen und Mechanismen und muss
 nicht gelesen werden, um eine Version zu verstehen.
 
+## [2.4.2] - 2026-09-12
+
+Packs auf 1.7.10 beenden ihre eigene Sitzung nicht mehr Sekunden nach dem Start. Zwei Mods legen während des Startens eine Jar neben die anderen: IndustrialCraft 2 packt eine Bibliothek aus, die es in sich trägt, und CodeChickenCore verschiebt Mods, die das Pack ohnehin schon hatte, in einen eigenen Ordner. Beides sah aus, als hätte jemand das Pack verändert. Der Launcher erkennt jetzt eine Datei, die eine der Jars des Packs in sich trug, und eine Datei, die selbst ein Mod des Packs ist und nur verschoben wurde, geprüft am Inhalt statt am Namen, sodass eine unter einem vertrauten Namen ausgetauschte Datei weiterhin auffällt.
+
 ## [2.4.1] - 2026-09-12
 
 Japanisch kommt als Oberflächensprache hinzu, als experimentell markiert. Mitgeliefert wird eine Schrift, die es zeichnen kann, sodass japanischer, chinesischer und koreanischer Text aus dem eigenen Bestand des Launchers kommt und nicht davon abhängt, was auf dem System installiert ist. Das gilt auch für Titel- und Pack-Namen, in welcher Sprache die Oberfläche auch läuft.
