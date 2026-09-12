@@ -18,6 +18,12 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-09-12
+
+Packs stop being called tampered with over files their own mods write. The launcher was watching everything under the mods folder, and it now watches the two places the game actually loads from, so a mod's own cache or a library it unpacks for itself is left alone. The same change closes a hole in the other direction: a mod dropped in as a plain folder rather than a jar used to load without ever being questioned, and is reported now.
+
+A pack that kept shrinking its own memory gets it back. The launcher works out how much a pack needs from previous sessions, and a launch that died in the first seconds counted as one of them, so a run of failed launches walked the figure down to its floor and left it there. Only a session that lasted counts now, and the figure can go back up.
+
 ## [2.4.2] - 2026-09-12
 
 Packs on 1.7.10 stop ending their own session seconds after launch. Two mods put a jar next to the others while the game is starting: IndustrialCraft 2 unpacks a library it carries inside itself, and CodeChickenCore moves mods the pack already had into a folder of its own. Both looked like someone had tampered with the pack. The launcher now recognises a file one of the pack's own jars was carrying, and a file that is one of the pack's mods moved somewhere else, matched on its contents rather than on its name, so a file swapped under a familiar name is still caught.
