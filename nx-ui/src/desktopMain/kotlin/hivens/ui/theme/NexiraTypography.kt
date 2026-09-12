@@ -18,7 +18,7 @@ import hivens.nx.ui.generated.resources.roboto_flex_bold
 import hivens.nx.ui.generated.resources.roboto_flex_medium
 import hivens.nx.ui.generated.resources.roboto_flex_regular
 import hivens.nx.ui.generated.resources.roboto_flex_semibold
-import hivens.ui.text.uiFaceCovers
+import hivens.ui.text.needsCjkFace
 import org.jetbrains.compose.resources.Font
 
 /**
@@ -105,7 +105,7 @@ val LocalCjkFamily = staticCompositionLocalOf<FontFamily?> { null }
  */
 @Composable
 fun familyForText(text: String): FontFamily? = when {
-    uiFaceCovers(text) -> null
+    !needsCjkFace(text) -> null
     // The theme's single instance where there is one. The fallback is for a
     // surface composed outside NxTheme: reading the local alone would hand such a
     // caller null, which is not "use the style's face", it is a CJK string drawn

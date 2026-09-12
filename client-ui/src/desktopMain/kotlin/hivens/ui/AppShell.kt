@@ -103,7 +103,7 @@ import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.NxTheme
-import hivens.ui.text.uiFaceCovers
+import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.SystemTheme
@@ -606,7 +606,7 @@ fun FrameWindowScope.AppShellContent(
         // the next locale that needs this is picked up without touching a list
         // here. A handful of structural labels is enough: if the interface is in
         // that language at all, they are in it too.
-        val uiNeedsCjk = !uiFaceCovers(s.settingsTitle + s.navLibrary + s.aboutTitle)
+        val uiNeedsCjk = needsCjkFace(s.settingsTitle + s.navLibrary + s.aboutTitle)
         val uiFamily = if (uiNeedsCjk) nexiraCjkFamily() else null
 
         // Came back from a crash restart: surface a one-shot notice so the reload

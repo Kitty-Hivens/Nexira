@@ -3,7 +3,7 @@ package hivens.ui.theme
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
-import hivens.ui.text.uiFaceCovers
+import hivens.ui.text.needsCjkFace
 import org.jetbrains.skia.FontMgr
 import org.jetbrains.skia.Typeface
 import java.io.File
@@ -34,16 +34,55 @@ class BundledFontCoverageTest {
 
     private fun Typeface.covers(cp: Int) = getUTF32Glyph(cp) != 0.toShort()
 
+    /**
+     * The table answers "would switching help", so the invariant is against BOTH
+     * faces. Checking it against the UI face alone is what let a byte order mark,
+     * a narrow no-break space and a word joiner count as reasons to leave: the UI
+     * face has none of them, and neither does the face they were being sent to.
+     */
     @Test
-    fun `the generated table matches the face it was generated from`() {
+    fun `the generated table agrees with both shipped faces`() {
         val disagreements = (0x0000..0xFFFF)
             .filter { Character.isDefined(it) }
-            .filter { uiFaceCovers(String(Character.toChars(it))) != ui.covers(it) }
+            .filter { cp ->
+                needsCjkFace(String(Character.toChars(cp))) != (cjk.covers(cp) && !ui.covers(cp))
+            }
         assertEquals(
             emptyList(), disagreements.take(12),
-            "${disagreements.size} codepoints where the generated table and the font disagree; " +
+            "${disagreements.size} codepoints where the generated table and the fonts disagree; " +
                 "rerun tools/fonts/regenerate.py",
         )
+    }
+
+    /**
+     * The ten that started this. Nine of them draw nothing in either face, so
+     * switching for one buys a missing glyph AND a 7.8 MB face, and they turn up
+     * in real tag data constantly: a byte order mark at the head of a string read
+     * off a file most of all.
+     */
+    @Test
+    fun `a character neither face draws is not a reason to leave the UI face`() {
+        listOf(
+            '\u0009' to "tab",
+            '\u000A' to "newline",
+            '\u000D' to "carriage return",
+            '\u2028' to "line separator",
+            '\u2029' to "paragraph separator",
+            '\u202F' to "narrow no-break space",
+            '\u2060' to "word joiner",
+            '\uA789' to "modifier colon, what a tagger writes where a filename cannot hold one",
+            '\uFEFF' to "byte order mark",
+        ).forEach { (ch, what) ->
+            assertTrue(!ui.covers(ch.code), "the premise moved: the UI face now draws $what")
+            assertTrue(!cjk.covers(ch.code), "the premise moved: the CJK face now draws $what")
+            assertTrue(
+                !needsCjkFace("Sacrifice$ch"),
+                "a Latin title carrying $what must stay on the UI face",
+            )
+        }
+        // The one of the ten that IS a reason: the CJK face really draws it.
+        assertTrue(cjk.covers(0x2011), "the premise moved: the CJK face lost the non-breaking hyphen")
+        assertTrue(needsCjkFace("Higurashi\u2011Kai"), "only the CJK face draws a non-breaking hyphen")
     }
 
     @Test
@@ -98,11 +137,11 @@ class BundledFontCoverageTest {
         listOf(
             "追憶のサクラメント", "Taka feat. めらみぽっぷ", "日本語", "欢迎", "한국어", "Sacrifice ☆",
         ).forEach { s ->
-            assertTrue(!uiFaceCovers(s), "\"$s\" should not have stayed on the UI face")
+            assertTrue(needsCjkFace(s), "\"$s\" should not have stayed on the UI face")
             assertEquals("", s.filterNot { cjk.covers(it.code) }, "not covered in \"$s\"")
         }
         listOf("Sacrifice", "Привет", "Grüße", "Xin chào", "Ґуля", "€1").forEach {
-            assertTrue(uiFaceCovers(it), "\"$it\" should have stayed on the UI face")
+            assertTrue(!needsCjkFace(it), "\"$it\" should have stayed on the UI face")
         }
     }
 

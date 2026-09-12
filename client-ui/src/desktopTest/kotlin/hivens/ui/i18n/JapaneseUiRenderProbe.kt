@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.text.uiFaceCovers
+import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.nexiraCjkFamily
@@ -73,7 +73,7 @@ class JapaneseUiRenderProbe {
             LocaleProvider(locale) {
                 val s = LocalStrings.current
                 // The same decision AppShell makes, not a copy of its outcome.
-                val family = if (uiFaceCovers(s.settingsTitle + s.navLibrary + s.aboutTitle)) {
+                val family = if (!needsCjkFace(s.settingsTitle + s.navLibrary + s.aboutTitle)) {
                     null
                 } else {
                     nexiraCjkFamily()
