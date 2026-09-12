@@ -65,5 +65,31 @@ object ModArchives {
             }
         }.getOrDefault(emptySet())
 
+    /**
+     * The names of archives packed inside [jar], wherever they sit in it, reduced
+     * to their file name.
+     *
+     * `ContainedDeps` is the declared, loader-driven way to carry a dependency;
+     * this is the undeclared one, and it is just as common. IndustrialCraft 2
+     * keeps `lib/EJML-core-0.26.jar` inside itself and lays it out under
+     * `mods/ic2/` on its own, naming neither the file nor the directory anywhere a
+     * manifest reader would find them.
+     *
+     * Used only to recognise a file that appeared beside the mods as something a
+     * trusted jar was carrying, so the name has to come from the jar rather than
+     * from a list written here.
+     */
+    fun carriedArchiveNames(jar: Path): Set<String> =
+        runCatching {
+            JarFile(jar.toFile()).use { archive ->
+                archive.entries()
+                    .asSequence()
+                    .filterNot { it.isDirectory }
+                    .map { it.name.substringAfterLast('/') }
+                    .filter { isLoadable(it) }
+                    .toSet()
+            }
+        }.getOrDefault(emptySet())
+
     private const val CONTAINED_DEPS = "ContainedDeps"
 }
