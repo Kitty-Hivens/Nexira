@@ -13,12 +13,16 @@ import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
+import java.util.jar.Attributes
+import java.util.jar.JarOutputStream
+import java.util.jar.Manifest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -479,6 +483,134 @@ class SmrtSyncServiceTest {
 
         assertTrue(verdict.verified)
         assertTrue(verdict.removed.isEmpty())
+    }
+
+    /**
+     * A jar built for real, because the rule under test reads a manifest attribute
+     * out of one. The other fixtures here are plain bytes under a `.jar` name,
+     * which is all a name comparison ever needed.
+     */
+    private fun jarDeclaring(vararg contained: String): ByteArray {
+        val manifest = Manifest().apply {
+            mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
+            if (contained.isNotEmpty()) mainAttributes.putValue("ContainedDeps", contained.joinToString(" "))
+        }
+        val out = ByteArrayOutputStream()
+        JarOutputStream(out, manifest).use { }
+        return out.toByteArray()
+    }
+
+    /**
+     * Scalar is the case: a coremod that carries a Scala runtime and has FML lay it
+     * out under `mods/<mcversion>/` once the game is up. Those files appear after
+     * the launch, in the window the session guard watches, and used to read as an
+     * instance modifying itself.
+     */
+    @Test
+    fun `what a rostered jar declares it unpacks is not foreign`() = runTest {
+        val dir = tempDir("contained-deps")
+        Files.createDirectories(dir.resolve("mods/1.12.2"))
+        val scalar = jarDeclaring("scala-library-2.11.1.jar", "scala-reflect-2.11.1.jar")
+        Files.write(dir.resolve("mods/scalar.jar"), scalar)
+        Files.write(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar"), "RUNTIME".toByteArray())
+        Files.write(dir.resolve("mods/1.12.2/scala-reflect-2.11.1.jar"), "RUNTIME".toByteArray())
+        val baseline = mapOf("scalar.jar" to sha1Hex(scalar))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertTrue(verdict.verified)
+        assertTrue(verdict.removed.isEmpty(), "the loader unpacked these out of a jar the pack vouches for")
+        assertTrue(Files.exists(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar")))
+        assertTrue(Files.exists(dir.resolve("mods/1.12.2/scala-reflect-2.11.1.jar")))
+    }
+
+    /**
+     * The allowance is a set of names, not an exemption for the directory. Both
+     * `mods/` and `mods/<mcversion>/` are read by the loader, so a directory-wide
+     * pass would be a place to run code from unquestioned.
+     */
+    @Test
+    fun `an undeclared jar beside the unpacked ones is still foreign`() = runTest {
+        val dir = tempDir("contained-deps-stranger")
+        Files.createDirectories(dir.resolve("mods/1.12.2"))
+        val scalar = jarDeclaring("scala-library-2.11.1.jar")
+        Files.write(dir.resolve("mods/scalar.jar"), scalar)
+        Files.write(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar"), "RUNTIME".toByteArray())
+        Files.write(dir.resolve("mods/1.12.2/freecam.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("scalar.jar" to sha1Hex(scalar))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertEquals(listOf("1.12.2/freecam.jar"), verdict.removed)
+        assertTrue(Files.exists(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar")), "the declared one stays")
+    }
+
+    /** Only a jar the roster already names gets a say, or one planted jar would clear the way for others. */
+    @Test
+    fun `a foreign jar cannot declare its way past the sweep`() = runTest {
+        val dir = tempDir("contained-deps-laundering")
+        Files.createDirectories(dir.resolve("mods/1.12.2"))
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+        Files.write(dir.resolve("mods/cheat.jar"), jarDeclaring("payload.jar"))
+        Files.write(dir.resolve("mods/1.12.2/payload.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertEquals(setOf("cheat.jar", "1.12.2/payload.jar"), verdict.removed.toSet())
+    }
+
+    /**
+     * The names are read off the jar each time rather than remembered, so moving
+     * the carrier to a build that ships a different runtime version needs nothing
+     * here, and what the old build unpacked stops being declared and goes.
+     */
+    @Test
+    fun `moving the carrier to another build re-reads its names and sweeps the old ones`() = runTest {
+        val dir = tempDir("contained-deps-bumped")
+        Files.createDirectories(dir.resolve("mods/1.12.2"))
+        val bumped = jarDeclaring("scala-library-2.11.12.jar")
+        Files.write(dir.resolve("mods/scalar.jar"), bumped)
+        Files.write(dir.resolve("mods/1.12.2/scala-library-2.11.12.jar"), "RUNTIME".toByteArray())
+        // left behind by the build the pack used to pin
+        Files.write(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar"), "OLD".toByteArray())
+        val baseline = mapOf("scalar.jar" to sha1Hex(bumped))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertEquals(listOf("1.12.2/scala-library-2.11.1.jar"), verdict.removed, "the superseded runtime goes")
+        assertTrue(Files.exists(dir.resolve("mods/1.12.2/scala-library-2.11.12.jar")), "the one it declares now stays")
+    }
+
+    /** A mod switched off unpacks nothing, so it vouches for nothing. */
+    @Test
+    fun `a disabled carrier does not vouch for what it would have unpacked`() = runTest {
+        val dir = tempDir("contained-deps-disabled")
+        Files.createDirectories(dir.resolve("mods/1.12.2"))
+        val scalar = jarDeclaring("scala-library-2.11.1.jar")
+        Files.write(dir.resolve("mods/scalar.jar.disabled"), scalar)
+        Files.write(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar"), "LEFTOVER".toByteArray())
+        val sha = sha1Hex(scalar)
+        val baseline = mapOf("scalar.jar" to sha, "scalar.jar.disabled" to sha)
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertEquals(listOf("1.12.2/scala-library-2.11.1.jar"), verdict.removed)
+    }
+
+    /** FML unpacks one level down. Deeper is nowhere it puts anything. */
+    @Test
+    fun `a declared name deeper than the unpack directory is still foreign`() = runTest {
+        val dir = tempDir("contained-deps-depth")
+        Files.createDirectories(dir.resolve("mods/1.12.2/nested"))
+        val scalar = jarDeclaring("scala-library-2.11.1.jar")
+        Files.write(dir.resolve("mods/scalar.jar"), scalar)
+        Files.write(dir.resolve("mods/1.12.2/nested/scala-library-2.11.1.jar"), "CHEAT".toByteArray())
+        val baseline = mapOf("scalar.jar" to sha1Hex(scalar))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertEquals(listOf("1.12.2/nested/scala-library-2.11.1.jar"), verdict.removed)
     }
 
     /** Instances predating the baseline keep the older, weaker answer. */

@@ -1,5 +1,8 @@
 package hivens.launcher.util
 
+import java.nio.file.Path
+import java.util.jar.JarFile
+
 /**
  * File names a Minecraft mod loader will pick up out of `mods/`.
  *
@@ -27,4 +30,40 @@ object ModArchives {
         val lower = fileName.lowercase()
         return LOADABLE_SUFFIXES.any { lower.endsWith(it) }
     }
+
+    /**
+     * The jar names [jar] declares it carries inside itself, from the
+     * `ContainedDeps` manifest attribute. Empty for the overwhelming majority of
+     * mods, which declare nothing.
+     *
+     * FML unpacks these into `mods/<mcversion>/` the first time it loads the jar,
+     * so they appear on disk after the game starts and are nobody's doing but the
+     * loader's. Scalar is the case that matters here: its whole purpose is to hand
+     * a Scala runtime to a loader that ships none, and it does that by carrying
+     * twelve jars and having FML lay them out.
+     *
+     * Read through [JarFile] rather than by hand so the manifest's continuation
+     * lines are folded back together first. The attribute is one long
+     * space-separated list and wraps at 72 bytes, which splits names across lines
+     * in the middle of a word.
+     *
+     * A name with a path separator in it is dropped. The attribute names files at
+     * the jar's root, and anything else is either malformed or an attempt to
+     * describe somewhere the extraction does not go.
+     */
+    fun containedDeps(jar: Path): Set<String> =
+        runCatching {
+            JarFile(jar.toFile()).use { archive ->
+                archive.manifest
+                    ?.mainAttributes
+                    ?.getValue(CONTAINED_DEPS)
+                    ?.split(' ')
+                    ?.map(String::trim)
+                    ?.filter { it.isNotEmpty() && '/' !in it && '\\' !in it }
+                    ?.toSet()
+                    .orEmpty()
+            }
+        }.getOrDefault(emptySet())
+
+    private const val CONTAINED_DEPS = "ContainedDeps"
 }

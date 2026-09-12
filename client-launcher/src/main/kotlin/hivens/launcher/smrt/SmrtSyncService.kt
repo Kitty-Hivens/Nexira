@@ -464,6 +464,11 @@ class SmrtSyncService(
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return emptyList()
         val found = mutableListOf<Pair<Path, String>>()
+        // Computed on first use and only when something nested is actually being
+        // judged, because building it opens every rostered jar to read one
+        // manifest. An instance with nothing under a subdirectory, which is
+        // almost all of them, never pays for it.
+        val unpacked = lazy { unpackedDepNames(modsDir, expected) }
         Files.walk(modsDir).use { stream ->
             stream.sorted(Comparator.reverseOrder()).forEach { p ->
                 if (p == modsDir) return@forEach
@@ -482,7 +487,23 @@ class SmrtSyncService(
                 // Only what a loader would execute. A config, or a leftover .tmp
                 // beside the mods, is not a way to run code.
                 if (!ModArchives.isLoadable(p.fileName.toString())) return@forEach
-                val keep = p.parent == modsDir && p.fileName.toString() in expected
+                val keep = if (p.parent == modsDir) {
+                    p.fileName.toString() in expected
+                } else {
+                    // One level down, and named by a jar the roster already
+                    // vouches for. That is where FML lays out a mod's
+                    // `ContainedDeps`, and it does so after the game has started,
+                    // which is the window this rule is read in.
+                    //
+                    // The allowance is not "this directory is exempt". `mods/` and
+                    // `mods/<mcversion>/` are both read by the loader, so exempting
+                    // the directory would leave a place to put a jar that runs and
+                    // is never questioned. What is allowed is the exact set of
+                    // names a trusted jar declared it would unpack, and those jars'
+                    // own bytes are held to the pack's digests, so the declaration
+                    // cannot be edited without the check above catching it.
+                    p.parent.parent == modsDir && p.fileName.toString() in unpacked.value
+                }
                 if (keep) return@forEach
                 // Joined over the path's own segments rather than toString(): the
                 // report is read by a person and matched against manifest paths, both
@@ -491,6 +512,34 @@ class SmrtSyncService(
             }
         }
         return found
+    }
+
+    /**
+     * The file names the rostered jars in `mods/` declare they carry inside
+     * themselves, which FML unpacks a level down once the game is running.
+     *
+     * Only jars the roster names are asked. A jar that is itself foreign has no
+     * say in what else may stay, or planting one jar would launder every name it
+     * cared to list. An optional the player turned off is not asked either: it
+     * sits there as `.disabled`, no loader opens it, so nothing of it is unpacked
+     * and anything left under its name is a leftover to sweep.
+     *
+     * Nothing about which names these are is written down here. They are read from
+     * whatever jar is on disk under the rostered name, so a pack that moves to a
+     * different build of the carrier gets that build's names, and the previous
+     * build's unpacked files stop being declared and are swept on the next pass.
+     */
+    private fun unpackedDepNames(modsDir: Path, expected: Set<String>): Set<String> {
+        val names = mutableSetOf<String>()
+        Files.newDirectoryStream(modsDir).use { entries ->
+            for (entry in entries) {
+                if (!Files.isRegularFile(entry)) continue
+                val name = entry.fileName.toString()
+                if (name !in expected || !ModArchives.isLoadable(name)) continue
+                names += ModArchives.containedDeps(entry)
+            }
+        }
+        return names
     }
 
     /**
