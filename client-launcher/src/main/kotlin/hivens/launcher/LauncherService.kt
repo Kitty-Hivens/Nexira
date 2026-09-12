@@ -372,7 +372,9 @@ internal class LauncherService(
         val samples = HeapDeriver.foldSample(profile.recentSamples, last, ProfilerProfileStore.SAMPLE_WINDOW)
 
         // 1024 == the modded-client floor normalizeMemory also enforces.
-        val derived = HeapDeriver.derive(samples, SystemMemory.totalPhysicalMb(), floorMb = 1024)
+        val derived = HeapDeriver.derive(
+            samples, SystemMemory.totalPhysicalMb(), floorMb = 1024, current = profile.derivedHeapMb,
+        )
         if (samples != profile.recentSamples || derived != profile.derivedHeapMb) {
             profilerStore.writeProfile(
                 instanceDir,

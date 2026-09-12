@@ -7,6 +7,9 @@ import kotlin.test.assertNull
 
 class HeapDeriverTest {
 
+    /** Long enough to be a session rather than a startup that fell over. */
+    private val PLAYED = 10 * 60_000L
+
     @Test
     fun `live-set term drives when it exceeds the peak term`() {
         // 2048*1.5 = 3072 vs 1000*1.1 = 1100 -> 3072, within [1024, 16384*0.75]
@@ -45,9 +48,9 @@ class HeapDeriverTest {
     @Test
     fun `rolling derive takes the largest reliable live set and the largest peak`() {
         val recent = listOf(
-            ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true),
-            ProfilerMetrics(liveSetMb = 0,    peakHeapMb = 5000, liveSetReliable = false), // unreliable: peak still counts
-            ProfilerMetrics(liveSetMb = 1200, peakHeapMb = 1500, liveSetReliable = true),
+            ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true, sessionMs = PLAYED),
+            ProfilerMetrics(liveSetMb = 0,    peakHeapMb = 5000, liveSetReliable = false, sessionMs = PLAYED), // unreliable: peak still counts
+            ProfilerMetrics(liveSetMb = 1200, peakHeapMb = 1500, liveSetReliable = true, sessionMs = PLAYED),
         )
         // maxLive(reliable) = 3000 -> *1.5 = 4500; maxPeak(any) = 5000 -> *1.1 = 5500 -> 5500 wins
         assertEquals(5500, HeapDeriver.derive(recent, machineRamMb = 16384, floorMb = 1024))
@@ -56,7 +59,7 @@ class HeapDeriverTest {
     @Test
     fun `rolling derive ignores an unreliable session's live set but keeps its peak`() {
         val recent = listOf(
-            ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 4000, liveSetReliable = false), // bogus live, ignored
+            ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 4000, liveSetReliable = false, sessionMs = PLAYED), // bogus live, ignored
         )
         // live term skipped (unreliable); peak 4000*1.1 = 4400
         assertEquals(4400, HeapDeriver.derive(recent, machineRamMb = 16384, floorMb = 1024))
@@ -67,7 +70,7 @@ class HeapDeriverTest {
         assertNull(HeapDeriver.derive(emptyList(), machineRamMb = 16384, floorMb = 1024))
         assertNull(
             HeapDeriver.derive(
-                listOf(ProfilerMetrics(liveSetMb = 0, peakHeapMb = 0, liveSetReliable = false)),
+                listOf(ProfilerMetrics(liveSetMb = 0, peakHeapMb = 0, liveSetReliable = false, sessionMs = PLAYED)),
                 machineRamMb = 16384, floorMb = 1024,
             ),
         )
@@ -76,8 +79,8 @@ class HeapDeriverTest {
     @Test
     fun `foldSample keeps an unreliable session that still has a positive peak`() {
         // ChoKO's first file: no major GC -> liveSet 0 / unreliable, but peak 2732 is real.
-        val prior = listOf(ProfilerMetrics(liveSetMb = 1000, peakHeapMb = 1500, liveSetReliable = true))
-        val zeroLivePositivePeak = ProfilerMetrics(liveSetMb = 0, peakHeapMb = 2732, liveSetReliable = false)
+        val prior = listOf(ProfilerMetrics(liveSetMb = 1000, peakHeapMb = 1500, liveSetReliable = true, sessionMs = PLAYED))
+        val zeroLivePositivePeak = ProfilerMetrics(liveSetMb = 0, peakHeapMb = 2732, liveSetReliable = false, sessionMs = PLAYED)
         assertEquals(prior + zeroLivePositivePeak, HeapDeriver.foldSample(prior, zeroLivePositivePeak, 5))
     }
 
@@ -86,23 +89,23 @@ class HeapDeriverTest {
         // No GC AND peak 0 (near-instant crash): nothing to learn -> must not enter the
         // window, or a run of them would push the good samples out and collapse the heap.
         val good = listOf(
-            ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true),
-            ProfilerMetrics(liveSetMb = 0,    peakHeapMb = 5000, liveSetReliable = false),
+            ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true, sessionMs = PLAYED),
+            ProfilerMetrics(liveSetMb = 0,    peakHeapMb = 5000, liveSetReliable = false, sessionMs = PLAYED),
         )
-        val zeroSignal = ProfilerMetrics(liveSetMb = 0, peakHeapMb = 0, liveSetReliable = false)
+        val zeroSignal = ProfilerMetrics(liveSetMb = 0, peakHeapMb = 0, liveSetReliable = false, sessionMs = PLAYED)
         assertEquals(good, HeapDeriver.foldSample(good, zeroSignal, 5))
     }
 
     @Test
     fun `foldSample on a null session leaves the window unchanged`() {
-        val good = listOf(ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true))
+        val good = listOf(ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true, sessionMs = PLAYED))
         assertEquals(good, HeapDeriver.foldSample(good, null, 5))
     }
 
     @Test
     fun `foldSample evicts the oldest sample when the window is full`() {
-        val recent = (1..5).map { ProfilerMetrics(liveSetMb = it * 100, peakHeapMb = it * 100, liveSetReliable = true) }
-        val newest = ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 9000, liveSetReliable = true)
+        val recent = (1..5).map { ProfilerMetrics(liveSetMb = it * 100, peakHeapMb = it * 100, liveSetReliable = true, sessionMs = PLAYED) }
+        val newest = ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 9000, liveSetReliable = true, sessionMs = PLAYED)
         val folded = HeapDeriver.foldSample(recent, newest, 5)
         assertEquals(5, folded.size)
         assertEquals(recent.drop(1) + newest, folded)
@@ -120,9 +123,41 @@ class HeapDeriverTest {
         // reliability filter: a plain liveSetMb>0 check would wrongly derive 9000*1.5.
         assertNull(
             HeapDeriver.derive(
-                listOf(ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 0, liveSetReliable = false)),
+                listOf(ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 0, liveSetReliable = false, sessionMs = PLAYED)),
                 machineRamMb = 16384, floorMb = 1024,
             ),
+        )
+    }
+
+    @Test
+    fun `foldSample drops a session that ended in the first seconds`() {
+        // Real shape: the content guard ended two launches at 1.3s and 1.5s, and both
+        // had a peak, so the zero-signal test let them through. Three such records were
+        // the whole window, and the heap sat on the floor from then on.
+        val good = listOf(ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true, sessionMs = PLAYED))
+        val aborted = ProfilerMetrics(liveSetMb = 0, peakHeapMb = 53, liveSetReliable = false, sessionMs = 1_491)
+        assertEquals(good, HeapDeriver.foldSample(good, aborted, 5))
+    }
+
+    @Test
+    fun `without a reliable live set the heap may rise but not fall`() {
+        // A roomy heap never fills, so no major GC settles the live set and the peak sits
+        // far below the demand. Read as the answer it walks the heap down every session.
+        val unreliable = listOf(ProfilerMetrics(liveSetMb = 0, peakHeapMb = 551, liveSetReliable = false, sessionMs = PLAYED))
+        assertEquals(
+            4096,
+            HeapDeriver.derive(unreliable, machineRamMb = 16384, floorMb = 1024, current = 4096),
+            "peak alone would say 1024",
+        )
+    }
+
+    @Test
+    fun `a reliable live set is allowed to bring the heap down`() {
+        val measured = listOf(ProfilerMetrics(liveSetMb = 1200, peakHeapMb = 1500, liveSetReliable = true, sessionMs = PLAYED))
+        assertEquals(
+            1800,
+            HeapDeriver.derive(measured, machineRamMb = 16384, floorMb = 1024, current = 8192),
+            "1200*1.5 = 1800, and a measured live set is evidence enough to shrink",
         )
     }
 }

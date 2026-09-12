@@ -19,6 +19,13 @@ object HeapDeriver {
     const val DEFAULT_PEAK_HEADROOM = 1.1  // multiplier over the observed peak
 
     /**
+     * How long a session must last to count as a measurement. Well short of a
+     * play session and well past a startup that fell over: the runs this exists
+     * to reject ended in seconds.
+     */
+    const val MIN_SESSION_MS = 60_000L
+
+    /**
      * Single-sample derive. [liveSetMb] is the post-major-GC retained heap (pass 0
      * when no reliable live set was observed -- e.g. a concurrent collector that
      * never reports a major cycle); [peakHeapMb] is the high-water usage, valid
@@ -51,13 +58,23 @@ object HeapDeriver {
         recent: List<ProfilerMetrics>,
         machineRamMb: Int,
         floorMb: Int,
+        current: Int? = null,
         headroom: Double = DEFAULT_HEADROOM,
         peakHeadroom: Double = DEFAULT_PEAK_HEADROOM,
     ): Int? {
         val maxLive = recent.filter { it.liveSetReliable && it.liveSetMb > 0 }.maxOfOrNull { it.liveSetMb } ?: 0
         val maxPeak = recent.filter { it.peakHeapMb > 0 }.maxOfOrNull { it.peakHeapMb } ?: 0
         if (maxLive == 0 && maxPeak == 0) return null
-        return derive(maxLive, maxPeak, machineRamMb, floorMb, headroom, peakHeadroom)
+        val want = derive(maxLive, maxPeak, machineRamMb, floorMb, headroom, peakHeadroom)
+        // Peak alone is a floor under the demand, not a measure of it: a heap
+        // roomy enough never fills, so the collector never runs, the live set is
+        // never established and the high-water mark sits far below what the pack
+        // would use if it were asked. Reading that as the answer walks the heap
+        // down every session, and the smaller it gets the more it looks justified.
+        // Without one reliable live set in the window the heap may rise, never
+        // fall.
+        val measured = recent.any { it.liveSetReliable && it.liveSetMb > 0 }
+        return if (measured || current == null) want else maxOf(want, current)
     }
 
     /**
@@ -74,7 +91,21 @@ object HeapDeriver {
         window: Int,
     ): List<ProfilerMetrics> {
         val keep = window.coerceAtLeast(0)
-        if (last == null || (!last.liveSetReliable && last.peakHeapMb <= 0)) return recent.takeLast(keep)
+        if (last == null || !carriesSignal(last)) return recent.takeLast(keep)
         return (recent + last).takeLast(keep)
     }
+
+    /**
+     * Whether a session says anything about what the pack needs.
+     *
+     * A record with no major GC and no peak is the obvious nothing. A session
+     * that ended in the first seconds is the less obvious one: it allocated, it
+     * collected, it has a peak, and every number in it describes a startup that
+     * never reached a world. Those arrive in runs -- a crash loop, or a launch
+     * the content guard keeps ending -- and a window of them is enough to put the
+     * heap on the floor and keep it there, because the starved sessions that
+     * follow then report a peak pinned to the ceiling they were given.
+     */
+    private fun carriesSignal(m: ProfilerMetrics): Boolean =
+        (m.liveSetReliable || m.peakHeapMb > 0) && m.sessionMs >= MIN_SESSION_MS
 }
