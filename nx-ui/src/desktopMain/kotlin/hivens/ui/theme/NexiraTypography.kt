@@ -3,6 +3,7 @@ package hivens.ui.theme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -72,7 +73,22 @@ fun nexiraMonoFamily(): FontFamily = FontFamily(
  * Regenerate with tools/fonts/regenerate_cjk.py.
  */
 @Composable
-fun nexiraCjkFamily(): FontFamily = FontFamily(Font(Res.font.noto_cjk_jp, FontWeight.Normal))
+fun nexiraCjkFamily(): FontFamily {
+    val face = Font(Res.font.noto_cjk_jp, FontWeight.Normal)
+    return remember(face) { FontFamily(face) }
+}
+
+/**
+ * The one CJK family for the whole application, provided by [NxTheme].
+ *
+ * Read this rather than calling [nexiraCjkFamily] from a call site. A family is a
+ * cache key in the font resolver, and a fresh instance per call is a fresh entry
+ * per call: [familyForText] is asked inside `Text` parameters that recompose with
+ * the playback position, five times a second, so a per-call family turned a
+ * 7.8 MB face into an unbounded set of registered typefaces. That is heap on Linux
+ * and a native font object per entry on macOS.
+ */
+val LocalCjkFamily = staticCompositionLocalOf<FontFamily?> { null }
 
 /**
  * Which face to draw [text] with, for text the app did not write: a track title
@@ -88,8 +104,14 @@ fun nexiraCjkFamily(): FontFamily = FontFamily(Font(Res.font.noto_cjk_jp, FontWe
  * turns up in a Russian interface constantly, and it is the string that decides.
  */
 @Composable
-fun familyForText(text: String): FontFamily? =
-    if (uiFaceCovers(text)) null else nexiraCjkFamily()
+fun familyForText(text: String): FontFamily? = when {
+    uiFaceCovers(text) -> null
+    // The theme's single instance where there is one. The fallback is for a
+    // surface composed outside NxTheme: reading the local alone would hand such a
+    // caller null, which is not "use the style's face", it is a CJK string drawn
+    // by a face that has no CJK in it, silently and only on some screens.
+    else -> LocalCjkFamily.current ?: nexiraCjkFamily()
+}
 
 /**
  * DejaVu Sans, bundled solely because it carries the full Braille block (U+2800)

@@ -314,6 +314,10 @@ fun NxTheme(
     CompositionLocalProvider(
         LocalNxColors   provides activePalette,
         LocalMonoFamily provides nexiraMonoFamily(),
+        // Resolved once here rather than per call site: a font family is a cache
+        // key in the resolver, and familyForText is asked inside Text parameters
+        // that recompose with the playback position.
+        LocalCjkFamily  provides nexiraCjkFamily(),
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
