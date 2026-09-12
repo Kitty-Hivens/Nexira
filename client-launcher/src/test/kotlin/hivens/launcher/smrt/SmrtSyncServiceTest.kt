@@ -205,7 +205,10 @@ class SmrtSyncServiceTest {
 
         assertTrue(verdict.verified, "the sync above wrote a roster, so the check could be made")
         assertFalse(Files.exists(dir.resolve("mods/wurst.jar")), "foreign jar removed")
-        assertFalse(Files.exists(dir.resolve("mods/extra/hidden.jar")), "foreign jar in a subdirectory removed")
+        assertTrue(
+            Files.exists(dir.resolve("mods/extra/hidden.jar")),
+            "a subdirectory holding no mod is not a place the loader reads",
+        )
         assertTrue(Files.exists(dir.resolve("mods/req.jar")), "pack mod kept")
         assertTrue(
             Files.exists(dir.resolve("mods/opt.jar.disabled")),
@@ -222,9 +225,9 @@ class SmrtSyncServiceTest {
             "a leading dot must not smuggle a jar past the sweep -- the loader still loads it",
         )
         assertEquals(
-            setOf("wurst.jar", "extra/hidden.jar", ".cheat.jar"),
+            setOf("wurst.jar", ".cheat.jar"),
             verdict.removed.toSet(),
-            "only loadable archives outside the roster are touched",
+            "only loadable archives where the loader reads them are touched",
         )
     }
 
@@ -500,22 +503,6 @@ class SmrtSyncServiceTest {
         return out.toByteArray()
     }
 
-    /** A jar that simply has another archive packed inside it, declaring nothing. */
-    private fun jarCarrying(vararg entries: String): ByteArray {
-        val manifest = Manifest().apply {
-            mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
-        }
-        val out = ByteArrayOutputStream()
-        JarOutputStream(out, manifest).use { jar ->
-            entries.forEach { path ->
-                jar.putNextEntry(java.util.zip.ZipEntry(path))
-                jar.write("PACKED".toByteArray())
-                jar.closeEntry()
-            }
-        }
-        return out.toByteArray()
-    }
-
     /**
      * Scalar is the case: a coremod that carries a Scala runtime and has FML lay it
      * out under `mods/<mcversion>/` once the game is up. Those files appear after
@@ -615,23 +602,21 @@ class SmrtSyncServiceTest {
     }
 
     /**
-     * IndustrialCraft 2's case: a jar packed inside a mod, laid out by that mod
-     * into a directory of its own choosing (`mods/ic2/`) and declared in no
-     * manifest at all. The name still comes from a jar the roster vouches for,
-     * which is the whole test.
+     * IndustrialCraft 2's case: a jar a mod unpacks into a directory of its own
+     * choosing. FML reads `mods/` and `mods/<mcversion>/` and neither read
+     * recurses, so nothing will load it but the mod that put it there.
      */
     @Test
-    fun `a jar packed inside a rostered mod is not foreign where that mod lays it out`() = runTest {
+    fun `an archive in a mod's own directory is not foreign`() = runTest {
         val dir = tempDir("carried")
         Files.createDirectories(dir.resolve("mods/ic2"))
-        val ic2 = jarCarrying("lib/EJML-core-0.26.jar")
-        Files.write(dir.resolve("mods/IndustrialCraft.jar"), ic2)
+        Files.write(dir.resolve("mods/IndustrialCraft.jar"), "GENUINE".toByteArray())
         Files.write(dir.resolve("mods/ic2/EJML-core-0.26.jar"), "LIB".toByteArray())
-        val baseline = mapOf("IndustrialCraft.jar" to sha1Hex(ic2))
+        val baseline = mapOf("IndustrialCraft.jar" to sha1Hex("GENUINE".toByteArray()))
 
         val verdict = syncService().enforceRoster(dir, baseline)
 
-        assertTrue(verdict.removed.isEmpty(), "the mod is carrying that exact name")
+        assertTrue(verdict.removed.isEmpty(), "nothing reads a mod's own directory")
         assertTrue(Files.exists(dir.resolve("mods/ic2/EJML-core-0.26.jar")))
     }
 
@@ -666,9 +651,9 @@ class SmrtSyncServiceTest {
         assertEquals(listOf("1.7.10/Baubles-1.7.10-1.0.1.10.jar"), verdict.removed)
     }
 
-    /** FML unpacks one level down. Deeper is nowhere it puts anything. */
+    /** FML unpacks one level down, and reads nothing deeper. */
     @Test
-    fun `a declared name deeper than the unpack directory is still foreign`() = runTest {
+    fun `a declared name deeper than the unpack directory is left alone`() = runTest {
         val dir = tempDir("contained-deps-depth")
         Files.createDirectories(dir.resolve("mods/1.12.2/nested"))
         val scalar = jarDeclaring("scala-library-2.11.1.jar")
@@ -678,7 +663,7 @@ class SmrtSyncServiceTest {
 
         val verdict = syncService().enforceRoster(dir, baseline)
 
-        assertEquals(listOf("1.12.2/nested/scala-library-2.11.1.jar"), verdict.removed)
+        assertTrue(verdict.removed.isEmpty(), "nothing loads from two levels down")
     }
 
     /** Instances predating the baseline keep the older, weaker answer. */
@@ -854,7 +839,10 @@ class SmrtSyncServiceTest {
         syncService().sync(parsed(), dir)
 
         assertFalse(Files.exists(mods.resolve("foreign.jar")), "foreign jar survived a completed sync")
-        assertFalse(Files.exists(mods.resolve("nested/buried.jar")), "nested payload survived a completed sync")
+        // Nothing reads `mods/nested/`, so what sits in it is a mod's belongings
+        // rather than a way to run code. The sweep stopped claiming otherwise when
+        // holding that line meant meeting a new mechanism on every launch.
+        assertTrue(Files.exists(mods.resolve("nested/buried.jar")), "a mod's own directory is not swept")
         assertTrue(Files.exists(mods.resolve("req.jar")), "the pack's own mod is in place")
     }
 
@@ -886,5 +874,73 @@ class SmrtSyncServiceTest {
         const val REQ_URL = "https://mirror.test/req.jar"
         const val OPT_URL = "https://mirror.test/opt.jar"
         const val SERVERS_URL = "https://mirror.test/servers.dat"
+    }
+
+    /**
+     * Carpenter's Blocks writes a generated texture cache into its own directory
+     * while the game runs. It is a zip, which the 1.7.10 discovery would read as
+     * a mod anywhere the loader looks, and this is not one of those places.
+     */
+    @Test
+    fun `a zip a mod generates in its own directory is not foreign`() = runTest {
+        val dir = tempDir("generated")
+        Files.createDirectories(dir.resolve("mods/carpentersblocks"))
+        Files.write(dir.resolve("mods/CarpentersBlocks.jar"), "GENUINE".toByteArray())
+        Files.write(
+            dir.resolve("mods/carpentersblocks/CarpentersBlocksCachedResources.zip"),
+            "TEXTURES".toByteArray(),
+        )
+        val baseline = mapOf("CarpentersBlocks.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertTrue(verdict.removed.isEmpty())
+    }
+
+    /** The version directory is read by the loader, so the standard there is unchanged. */
+    @Test
+    fun `an undeclared jar in the version directory is still foreign`() = runTest {
+        val dir = tempDir("version-dir-strict")
+        Files.createDirectories(dir.resolve("mods/1.7.10"))
+        Files.write(dir.resolve("mods/1.7.10/freecam.jar"), "CHEAT".toByteArray())
+
+        val verdict = syncService().enforceRoster(dir, mapOf("req.jar" to sha1Hex("X".toByteArray())))
+
+        assertEquals(listOf("1.7.10/freecam.jar"), verdict.removed)
+    }
+
+    /**
+     * The shape the archive rule never looked at. Forge adds a directory it finds
+     * beside the mods as a candidate and reads it as an unpacked mod, so classes
+     * dropped there run, and `.class` is not a name the sweep treats as loadable.
+     */
+    @Test
+    fun `a mod unpacked into a directory beside the mods is foreign`() = runTest {
+        val dir = tempDir("exploded")
+        Files.createDirectories(dir.resolve("mods/cheat/wurst"))
+        Files.write(dir.resolve("mods/cheat/mcmod.info"), "[{\"modid\":\"wurst\"}]".toByteArray())
+        Files.write(dir.resolve("mods/cheat/wurst/Main.class"), "CAFEBABE".toByteArray())
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+        val baseline = mapOf("req.jar" to sha1Hex("GENUINE".toByteArray()))
+
+        val verdict = syncService().enforceRoster(dir, baseline)
+
+        assertFalse(verdict.verified, "an unpacked mod must not leave the instance vouched for")
+        assertEquals(listOf("cheat"), verdict.blocked)
+        assertTrue(Files.exists(dir.resolve("mods/cheat/mcmod.info")), "reported, not deleted")
+    }
+
+    /** A directory a mod fills with its own data is not a mod. */
+    @Test
+    fun `a mod's data directory is not read as an unpacked mod`() = runTest {
+        val dir = tempDir("not-exploded")
+        Files.createDirectories(dir.resolve("mods/carpentersblocks"))
+        Files.write(dir.resolve("mods/carpentersblocks/cache.zip"), "TEXTURES".toByteArray())
+        Files.write(dir.resolve("mods/req.jar"), "GENUINE".toByteArray())
+
+        val verdict = syncService().enforceRoster(dir, mapOf("req.jar" to sha1Hex("GENUINE".toByteArray())))
+
+        assertTrue(verdict.verified)
+        assertTrue(verdict.blocked.isEmpty())
     }
 }

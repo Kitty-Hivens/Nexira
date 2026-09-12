@@ -489,40 +489,49 @@ class SmrtSyncService(
                 // loader will happily read (its discovery matches `.+\.jar`, leading
                 // dot and all). Testing the first segment alone let that one through.
                 if (rel.nameCount > 1 && rel.getName(0).toString().startsWith(".")) return@forEach
+                if (Files.isDirectory(p)) {
+                    // A directory is a mod candidate in its own right: FML adds one it
+                    // finds beside the mods as a ContainerType.DIR and reads it as an
+                    // unpacked mod. Archives get all the attention and this shape got
+                    // none, so a mod dropped in unpacked was the one way past the sweep
+                    // that nothing here looked at. Reported, never deleted, for the
+                    // same reason the rest of the directories are not.
+                    if (!p.fileName.toString().startsWith(".") && loaderReads(p, modsDir) && looksLikeMod(p)) {
+                        found += p to rel.joinToString("/")
+                    }
+                    return@forEach
+                }
                 if (!Files.isRegularFile(p)) return@forEach
                 // Only what a loader would execute. A config, or a leftover .tmp
                 // beside the mods, is not a way to run code.
                 if (!ModArchives.isLoadable(p.fileName.toString())) return@forEach
-                val keep = if (p.parent == modsDir) {
-                    p.fileName.toString() in expected
-                } else {
-                    // One level down, and named by a jar the roster already
-                    // vouches for. That is where FML lays out a mod's
-                    // `ContainedDeps`, and it does so after the game has started,
-                    // which is the window this rule is read in.
-                    //
-                    // The allowance is not "this directory is exempt". `mods/` and
-                    // `mods/<mcversion>/` are both read by the loader, so exempting
-                    // the directory would leave a place to put a jar that runs and
-                    // is never questioned. Two things earn a file its place there
-                    // instead, and both are answered by the pack's own contents.
-                    //
-                    // Either a jar the roster vouches for is carrying that name, by
-                    // declaring it in `ContainedDeps` or simply by having it packed
-                    // inside; those jars' own bytes are held to the pack's digests,
-                    // so what they carry cannot be edited without the check above
-                    // catching it.
-                    //
-                    // Or the file IS one of the pack's mods, moved down a level by
-                    // something that runs at startup: CodeChickenCore's dependency
-                    // loader relocates what it finds into `mods/<mcversion>/`, so
-                    // the instance ends up with the pack's own jar somewhere the
-                    // pack never put it. That one is matched on bytes, not just on
-                    // the name, so the move is recognised and a substitution under
-                    // a familiar name is not.
-                    val name = p.fileName.toString()
-                    p.parent.parent == modsDir &&
-                        (name in unpacked.value || isRelocatedPackMod(p, name, digests))
+                // Where the loader actually looks. FML reads `mods/` and, if it
+                // exists, `mods/<mcversion>/`, and neither read recurses: Loader
+                // calls findModDirMods on exactly those two. An archive anywhere
+                // else under `mods/` is a mod's own storage, opened by that mod if
+                // at all, and guarding it means meeting a new mechanism every time
+                // one of them writes something. IndustrialCraft 2 unpacks a library
+                // into `mods/ic2/`, Carpenter's Blocks caches generated textures in
+                // `mods/carpentersblocks/`, and neither is a way to run code that
+                // the pack did not ship.
+                val keep = when {
+                    p.parent == modsDir -> p.fileName.toString() in expected
+                    p.parent.parent == modsDir && isVersionDir(p.parent.fileName.toString()) -> {
+                        // The version directory is read by the loader, so the same
+                        // standard as the top level applies, answered by the pack's
+                        // own contents. Either a jar the roster vouches for declared
+                        // it would unpack that name, which is how FML lays out a
+                        // `ContainedDeps`, and that jar's own bytes are held to the
+                        // pack's digests. Or the file IS one of the pack's mods,
+                        // moved down here by something that runs at startup:
+                        // CodeChickenCore's dependency loader relocates what it
+                        // finds, leaving nothing at the top level. That one is
+                        // matched on bytes, so the move is recognised and a
+                        // substitution under a familiar name is not.
+                        val name = p.fileName.toString()
+                        name in unpacked.value || isRelocatedPackMod(p, name, digests)
+                    }
+                    else -> true
                 }
                 if (keep) return@forEach
                 // Joined over the path's own segments rather than toString(): the
@@ -557,11 +566,46 @@ class SmrtSyncService(
                 val name = entry.fileName.toString()
                 if (name !in expected || !ModArchives.isLoadable(name)) continue
                 names += ModArchives.containedDeps(entry)
-                names += ModArchives.carriedArchiveNames(entry)
             }
         }
         return names
     }
+
+    /** Whether the loader reads this directory's contents as mod candidates. */
+    private fun loaderReads(dir: Path, modsDir: Path): Boolean {
+        val parent = dir.parent ?: return false
+        return parent == modsDir ||
+            (parent.parent == modsDir && isVersionDir(parent.fileName.toString()))
+    }
+
+    /**
+     * Whether a directory holds a mod rather than a mod's belongings.
+     *
+     * Metadata first, since that is what a mod is identified by, and then classes,
+     * since Forge will take an `@Mod` annotation without any metadata file at all.
+     * The walk is bounded: this runs on directories a mod fills with its own data,
+     * and reading all of one to answer a question the first few entries settle
+     * would be paid on every launch.
+     */
+    private fun looksLikeMod(dir: Path): Boolean {
+        if (MOD_METADATA.any { Files.isRegularFile(dir.resolve(it)) }) return true
+        return runCatching {
+            Files.walk(dir).use { stream ->
+                stream.limit(MOD_SCAN_LIMIT).anyMatch { it.fileName?.toString()?.endsWith(".class") == true }
+            }
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Whether a directory under `mods/` is the one the loader also reads.
+     *
+     * Named after the Minecraft version and nothing else, so it is recognised by
+     * shape rather than by being told: the callers that hold the manifest and the
+     * callers that hold only a roster have to answer this the same way, and a mod
+     * does not name its own storage directory `1.7.10`.
+     */
+    private fun isVersionDir(name: String): Boolean =
+        name.isNotEmpty() && name.all { it.isDigit() || it == '.' } && name.any { it.isDigit() }
 
     /**
      * Whether the file beside the mods is one of the pack's own, put there by
@@ -598,6 +642,14 @@ class SmrtSyncService(
         val removed = mutableListOf<String>()
         val blocked = mutableListOf<String>()
         for ((path, relText) in foreignEntries(clientDir, expected, digests)) {
+            // An unpacked mod is reported and left where it is. Deleting a tree the
+            // launcher did not create is a different kind of act from dropping a
+            // stray jar, and the instance is held unverified either way, which is
+            // what actually keeps it from being played.
+            if (Files.isDirectory(path)) {
+                blocked += relText
+                continue
+            }
             runCatching { fileOpRetry("smrt drop foreign $path") { Files.delete(path) } }
                 .onSuccess { removed += relText }
                 // Only regular files reach this point, so a refusal is always an
@@ -793,5 +845,11 @@ class SmrtSyncService(
         private const val ROSTER_FILE = ".nexira-mods"
         private const val SOURCE_MIRROR = "mirror"
         private const val MODS_PREFIX = "mods/"
+
+        /** What a mod is identified by when it sits unpacked in a directory. */
+        private val MOD_METADATA = listOf("mcmod.info", "META-INF/mods.toml", "fabric.mod.json")
+
+        /** How far into such a directory to look for a class before giving up. */
+        private const val MOD_SCAN_LIMIT = 400L
     }
 }
