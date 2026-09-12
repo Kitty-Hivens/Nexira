@@ -8,6 +8,12 @@ Das Entwicklungsprotokoll ist ein eigenes Dokument:
 [CHANGELOG.md](./CHANGELOG.md). Es nennt Klassen und Mechanismen und muss
 nicht gelesen werden, um eine Version zu verstehen.
 
+## [2.4.3] - 2026-09-12
+
+Packs gelten nicht mehr als verändert, nur weil ihre eigenen Mods Dateien schreiben. Der Launcher beobachtete alles im Mods-Ordner und beobachtet jetzt die beiden Stellen, aus denen das Spiel tatsächlich lädt, sodass der eigene Cache eines Mods oder eine Bibliothek, die es sich selbst auspackt, unangetastet bleibt. Dieselbe Änderung schließt eine Lücke in der Gegenrichtung: Ein Mod, der als einfacher Ordner statt als Jar abgelegt wurde, lud bisher, ohne je hinterfragt zu werden, und wird jetzt gemeldet.
+
+Ein Pack, das seinen eigenen Speicher immer weiter kürzte, bekommt ihn zurück. Der Launcher bemisst den Bedarf aus vorherigen Sitzungen, und ein Start, der in den ersten Sekunden starb, zählte wie jeder andere, sodass eine Reihe fehlgeschlagener Starts den Wert bis auf seine Untergrenze trieb und dort ließ. Jetzt zählt nur eine Sitzung, die gedauert hat, und der Wert kann wieder steigen.
+
 ## [2.4.2] - 2026-09-12
 
 Packs auf 1.7.10 beenden ihre eigene Sitzung nicht mehr Sekunden nach dem Start. Zwei Mods legen während des Startens eine Jar neben die anderen: IndustrialCraft 2 packt eine Bibliothek aus, die es in sich trägt, und CodeChickenCore verschiebt Mods, die das Pack ohnehin schon hatte, in einen eigenen Ordner. Beides sah aus, als hätte jemand das Pack verändert. Der Launcher erkennt jetzt eine Datei, die eine der Jars des Packs in sich trug, und eine Datei, die selbst ein Mod des Packs ist und nur verschoben wurde, geprüft am Inhalt statt am Namen, sodass eine unter einem vertrauten Namen ausgetauschte Datei weiterhin auffällt.

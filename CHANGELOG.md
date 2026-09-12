@@ -25,6 +25,12 @@ verbatim, where a hand-wrapped line would render as a <br> staircase.
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-09-12
+
+### Fixed
+- The content guard is aimed at what the loader reads rather than at everything under `mods/`. Four mods put an archive there during one launch and each had needed a rule of its own: a manifest `ContainedDeps`, a library unpacked into `mods/ic2/`, jars a dependency loader moved into `mods/<mcversion>/`, and a texture cache written into `mods/carpentersblocks/`. Forge's `Loader` calls `findModDirMods` on `mods/` and, when it exists, on `mods/<mcversion>/`, and neither read recurses, so an archive anywhere else is a mod's own storage and is left alone. The rule also never looked at the other shape found in those two directories. A directory is a candidate in its own right, read as an unpacked mod through `ContainerType.DIR`, and `.class` is not a name the sweep treats as loadable, so a mod dropped in unpacked was the one shape that ran unquestioned while a jar buried where nothing reads was swept diligently. A directory the loader reads is now checked for a mod, by its metadata or by the classes it carries, and reported rather than deleted, because removing a tree the launcher did not create is a different act from dropping a stray jar. The instance is held unverified either way. `ModArchives.carriedArchiveNames` goes with the per-mod rules it was written for. The guarantee narrows from no archive anywhere under `mods/` that the pack did not ship, to nothing the loader will run that the pack did not ship.
+- The adaptive heap stops learning from launches that failed. `HeapDeriver` already rejected a record with no GC and no peak, but an aborted launch has both, and those arrive in runs, so a window fills with them and the good samples are evicted: an instance was found at 1024 MB on three samples, a crash at mod init and two launches the content guard ended at 1.5 and 1.3 seconds. A session now has to have lasted a minute to count as a measurement. The live set is the quieter half. It is only established when a major collection settles it, so an instance roomy enough never to fill reports none at all and leaves the peak as the only reading, and peak is a floor under the demand rather than a measure of it. Taking it as the answer shrank the heap every session, and each smaller heap made the next reading look better justified. Without one reliable live set in the window the heap may now rise and not fall.
+
 ## [2.4.2] - 2026-09-12
 
 ### Fixed
