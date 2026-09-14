@@ -8,6 +8,20 @@ Das Entwicklungsprotokoll ist ein eigenes Dokument:
 [CHANGELOG.md](./CHANGELOG.md). Es nennt Klassen und Mechanismen und muss
 nicht gelesen werden, um eine Version zu verstehen.
 
+## [2.4.4] - 2026-09-15
+
+Pakete, deren Mods auf CurseForge liegen, werden wieder vollständig installiert. Der Launcher konnte von Modrinth und vom Spiegel laden, eine auf CurseForge veröffentlichte Mod ließ er stillschweigend aus. Das Paket galt danach als verändert, die Anmeldung blieb aus und der Server ließ niemanden herein, ohne dass auf dem Bildschirm ein Grund stand. Diese Mods werden jetzt wie alle anderen geladen, und ein CurseForge-Schlüssel ist dafür nicht nötig: den Link löst der Spiegel im Voraus auf.
+
+Eine Mod, deren Autor die Weitergabe durch Dritte untersagt hat, wird gesondert behandelt. Sie lässt sich nirgends herunterladen, und der Launcher sagt das nun auch so, statt veraltet zu wirken, denn ein Update würde hier nichts ändern.
+
+Das Prüfen und Reparieren eines Pakets benennt, was sich nicht laden ließ, statt das Paket für vollständig zu erklären. Und wer eine solche Mod selbst abgelegt hat, dem wird sie angerechnet: eine Datei, die dem entspricht, was das Paket beschreibt, darf von Ihnen stammen.
+
+Ein Paket, dessen Liste einen für diese Version unverständlichen Eintrag enthält, wird bis auf diesen Eintrag vollständig installiert. Zuvor verhinderte ein einzelner solcher Eintrag, dass die Liste überhaupt gelesen wurde.
+
+Die Auswahl optionaler Mods übersteht eine Paketaktualisierung auch bei Mods von CurseForge und wird nicht mehr zurückgesetzt, wenn sich der Dateiname mit der Version ändert.
+
+Mods von CurseForge zeigen ihr Symbol, sofern eines zu finden ist.
+
 ## [2.4.3] - 2026-09-12
 
 Packs gelten nicht mehr als verändert, nur weil ihre eigenen Mods Dateien schreiben. Der Launcher beobachtete alles im Mods-Ordner und beobachtet jetzt die beiden Stellen, aus denen das Spiel tatsächlich lädt, sodass der eigene Cache eines Mods oder eine Bibliothek, die es sich selbst auspackt, unangetastet bleibt. Dieselbe Änderung schließt eine Lücke in der Gegenrichtung: Ein Mod, der als einfacher Ordner statt als Jar abgelegt wurde, lud bisher, ohne je hinterfragt zu werden, und wird jetzt gemeldet.

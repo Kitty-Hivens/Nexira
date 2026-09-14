@@ -164,9 +164,142 @@ class SmrtManifestParseTest {
     }
 
     @Test
+    fun `a curseforge source decodes with its ids and its resolved url`() {
+        // The mirror resolves a file id to a link at build time, because doing
+        // that needs its API key, so the launcher reads the url straight off the
+        // manifest and never talks to CurseForge. The pair travels beside it: a
+        // signed link expires, and the ids are what still say whose file it was.
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "Curse",
+            "pack_version": "1.0.0",
+            "generated_at": "2026-09-15T00:00:00Z",
+            "minecraft": {"version": "1.12.2"},
+            "loader": {"name": "forge", "version": "14.23.5.2860"},
+            "java": {"major": 8},
+            "mods": [
+                {
+                    "filename": "Served.jar",
+                    "sha1": "2222222222222222222222222222222222222222",
+                    "size_bytes": 300,
+                    "source": {
+                        "type": "curseforge", "project_id": 69162, "file_id": 2920433,
+                        "url": "https://edge.forgecdn.net/files/2920/433/CoFHCore.jar"
+                    }
+                },
+                {
+                    "filename": "NamedOnly.jar",
+                    "sha1": "3333333333333333333333333333333333333333",
+                    "size_bytes": 400,
+                    "source": {"type": "curseforge", "project_id": 1, "file_id": 2}
+                }
+            ]
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        val served = pm.mods.first { it.filename == "Served.jar" }.source
+        assertIs<SmrtSource.CurseForge>(served)
+        assertEquals(69162L, served.projectId)
+        assertEquals(2920433L, served.fileId)
+        assertEquals("https://edge.forgecdn.net/files/2920/433/CoFHCore.jar", served.url)
+
+        // No url is not a malformed entry: it is a project whose author has
+        // turned off third-party distribution, so the mirror names the file and
+        // may not hand it over. The sync skips it and says so.
+        val named = pm.mods.first { it.filename == "NamedOnly.jar" }.source
+        assertIs<SmrtSource.CurseForge>(named)
+        assertNull(named.url)
+
+        val reDecoded: SmrtPackManifest =
+            json.decodeFromString(json.encodeToString(SmrtPackManifest.serializer(), pm))
+        assertIs<SmrtSource.CurseForge>(reDecoded.mods.first { it.filename == "Served.jar" }.source)
+        assertIs<SmrtSource.CurseForge>(reDecoded.mods.first { it.filename == "NamedOnly.jar" }.source)
+    }
+
+    /**
+     * A type this client knows, shaped the way it does not. The lenient decoder
+     * promised to answer this like an unknown type and did not: the exception
+     * escaped and took the whole manifest with it, so one entry the mirror and the
+     * launcher disagree about cost the pack every other entry too.
+     */
+    @Test
+    fun `a known source type with a payload that does not fit folds to Unknown`() {
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "Malformed",
+            "pack_version": "1.0.0",
+            "generated_at": "2026-09-15T00:00:00Z",
+            "minecraft": {"version": "1.12.2"},
+            "loader": {"name": "forge", "version": "14.23.5.2860"},
+            "java": {"major": 8},
+            "mods": [
+                {
+                    "filename": "Widened.jar",
+                    "sha1": "4444444444444444444444444444444444444444",
+                    "size_bytes": 500,
+                    "source": {"type": "curseforge", "project_id": "not-a-number", "file_id": 2920433}
+                },
+                {
+                    "filename": "Fine.jar",
+                    "sha1": "5555555555555555555555555555555555555555",
+                    "size_bytes": 600,
+                    "source": {"type": "smrt_cache", "url": "https://example/v1/cache/x.jar"}
+                }
+            ]
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        assertEquals(2, pm.mods.size, "the sibling entry must survive the one that did not decode")
+        assertIs<SmrtSource.Unknown>(pm.mods.first { it.filename == "Widened.jar" }.source)
+        assertIs<SmrtSource.SmrtCache>(pm.mods.first { it.filename == "Fine.jar" }.source)
+    }
+
+    /** The same promise on the auth block: an unreadable one leaves the pack unrestricted. */
+    @Test
+    fun `a smartycraft auth block that does not fit decodes as null`() {
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "MalformedAuth",
+            "pack_version": "1.0.0",
+            "generated_at": "2026-09-15T00:00:00Z",
+            "minecraft": {"version": "1.12.2"},
+            "loader": {"name": "forge", "version": "14.23.5.2860"},
+            "java": {"major": 8},
+            "auth": {"kind": "smartycraft", "server_id": {"nested": "object"}}
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        assertNull(pm.auth, "an auth block that cannot be read must not abort the manifest")
+        assertEquals("MalformedAuth", pm.packId)
+    }
+
+    /**
+     * A CurseForge project id identifies the mod as stably as a Modrinth one, so an
+     * optional pinned there keeps the player's on/off choice across a version bump
+     * rather than falling back to a filename that carries the mod version.
+     */
+    @Test
+    fun `an optional pinned on curseforge is keyed by its project id`() {
+        val entry = hivens.core.api.dto.smrt.SmrtModEntry(
+            filename = "JourneyMap-1.12.2-5.7.1.jar",
+            sha1 = "6".repeat(40),
+            sizeBytes = 700,
+            required = false,
+            source = SmrtSource.CurseForge(projectId = 32274, fileId = 2916002, url = "https://edge/jm.jar"),
+        )
+        assertEquals("curseforge:32274", entry.stableKey)
+
+        // The curator's own slug still outranks it.
+        assertEquals("journeymap", entry.copy(slug = "journeymap").stableKey)
+    }
+
+    @Test
     fun `unknown source type folds to Unknown without failing the whole manifest`() {
-        // Forward-compat: a mirror that gains github_release / curseforge on a
-        // single entry must not abort the entire decode. The unknown entry
+        // Forward-compat: a mirror that gains github_release or another provider
+        // on a single entry must not abort the entire decode. The unknown entry
         // becomes SmrtSource.Unknown (install skips it); siblings still parse.
         val payload = """
         {

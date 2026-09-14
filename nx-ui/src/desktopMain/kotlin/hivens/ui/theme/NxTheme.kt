@@ -48,6 +48,7 @@ data class NxColors(
     val originSmartycraft: Color,
     val originMirror: Color,
     val originModrinth: Color,
+    val originCurseforge: Color,
     val originLocal: Color,
     // --- Material-3 tonal expansion ---
     // A third accent plus muted "container" fills and layered surface tiers, so UI
@@ -94,6 +95,7 @@ internal val DarkColorPalette = NxColors(
     originSmartycraft = Color(0xFF8B5CF6), // violet
     originMirror      = Color(0xFF3B82F6), // blue
     originModrinth    = Color(0xFF22C55E), // green
+    originCurseforge  = Color(0xFFF16436), // orange
     originLocal       = Color(0xFF9CA3AF), // grey
     // Tonal expansion -- placeholders; the builder re-derives containers + tertiary
     // from the live accents. Surface tiers below are the real dark-ground values.
@@ -154,6 +156,7 @@ internal val LightColorPalette = NxColors(
     originSmartycraft = Color(0xFF6D28D9), // deeper violet for light bg
     originMirror      = Color(0xFF2563EB), // deeper blue
     originModrinth    = Color(0xFF16A34A), // deeper green
+    originCurseforge  = Color(0xFFC2410C), // deeper orange for light bg
     originLocal       = Color(0xFF64748B), // slate
     // Tonal expansion -- placeholders re-derived by the builder; surface tiers real.
     tertiary = Color(0xFFB5651D),
