@@ -22,7 +22,11 @@ import java.security.MessageDigest
  *     life of the resolver -- a Library PackDetail rendering 50 rows
  *     of mods from 10 distinct Modrinth projects fires at most 10
  *     network calls.
- *  3. Returns null. UI layer renders the letter-avatar fallback.
+ *  3. Any other source: the manifest's own sha1 through the same
+ *     hash lookup [resolveByFile] uses, so a mod published on
+ *     CurseForge and on Modrinth alike is found without holding a
+ *     CurseForge key.
+ *  4. Returns null. UI layer renders the letter-avatar fallback.
  *
  * The lambda indirection (vs. holding a [SmrtPackClient] directly)
  * keeps tests free of HTTP mocking -- tests pass a stub lambda that
@@ -75,8 +79,19 @@ class ModIconResolver(
             return resolved
         }
 
-        // 3. smrt_cache / smrt_static without an explicit iconUrl: nothing to do.
-        return null
+        // 3. Every other source, by the file's own hash.
+        //
+        // Asking CurseForge what a project looks like needs a CurseForge key, which
+        // this launcher does not have and does not want: the mirror holds the one
+        // key in the system and resolves links with it at build time. But the
+        // manifest already carries the file's sha1, and Modrinth answers "which
+        // version owns this hash" for anyone. A mod published in both places
+        // therefore keeps its icon, and one published in neither falls through to
+        // the letter avatar exactly as before.
+        //
+        // Reached only for an entry the mirror gave no icon_url, and cached per
+        // hash with nulls included, so a list resolves each unknown file once.
+        return iconByHash(mod.sha1, mod.filename)
     }
 
     /**
@@ -88,6 +103,20 @@ class ModIconResolver(
      */
     suspend fun resolveByFile(file: Path): String? {
         val sha1 = withContext(Dispatchers.IO) { runCatching { sha1Of(file) }.getOrNull() } ?: return null
+        return iconByHash(sha1, file.fileName.toString())
+    }
+
+    /**
+     * The hash half, shared by the installed-file path and by a manifest entry
+     * whose source carries no icon of its own. [label] names the subject in a log
+     * line and nothing else.
+     *
+     * Nulls are cached like answers: a file Modrinth does not know is not going to
+     * become known on the next re-render, and a lookup that failed is not worth
+     * repeating per frame either.
+     */
+    private suspend fun iconByHash(sha1: String, label: String): String? {
+        if (sha1.isBlank()) return null
 
         mutex.withLock {
             if (hashCache.containsKey(sha1)) return hashCache[sha1]
@@ -96,7 +125,7 @@ class ModIconResolver(
         val resolved = try {
             resolveIconByHash(sha1)
         } catch (e: Exception) {
-            log.warn("Modrinth icon-by-hash lookup failed for {}: {}", file.fileName, e.message)
+            log.warn("Modrinth icon-by-hash lookup failed for {}: {}", label, e.message)
             null
         }
         mutex.withLock { hashCache[sha1] = resolved }
