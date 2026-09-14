@@ -7,6 +7,7 @@ import hivens.core.api.dto.smrt.SmrtSource
 import hivens.core.api.interfaces.IPackSyncService
 import hivens.core.api.interfaces.RosterInspection
 import hivens.core.api.interfaces.RosterVerdict
+import hivens.core.diag.ActionRing
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
@@ -103,15 +104,20 @@ class SmrtSyncService(
             // different sizes, and one request at a time meant a 300 MB resource pack
             // stalled every mod behind it -- the plan lets the engine overlap them and
             // split the large ones into blocks.
-            val plan = ArrayList<Transfer>(manifest.mods.size + manifest.assets.size)
+            val sink = PlanSink()
             for (mod in manifest.mods) {
                 val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
-                planMod(mod, clientDir, enabled)?.let { plan += it }
+                sink.accept("$MODS_PREFIX${mod.filename}", planMod(mod, clientDir, enabled))
             }
             for (asset in manifest.assets) {
-                planAsset(asset, clientDir)?.let { plan += it }
+                sink.accept(asset.dest, planAsset(asset, clientDir))
             }
-            transfers.fetchAll(plan) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
+            // An install that could not place everything still places the rest, which
+            // is the older decision and the right one. What was missing was anyone
+            // saying so outside the log: the pack then reaches the game short of a mod
+            // and the loader, or the server, is what brings it up.
+            reportUnfetchable(manifest.packId, sink.unfetchable)
+            transfers.fetchAll(sink.transfers) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
 
             // Drop manifest-removed mods and catch foreign payloads that
             // the wipe missed (an SC sync ran between two mirror syncs
@@ -158,14 +164,20 @@ class SmrtSyncService(
     ): RepairReport = withContext(Dispatchers.IO) {
         InstanceMutationLock.withLock(clientDir) {
             val total = manifest.mods.size + manifest.assets.size
-            val suspect = ArrayList<Transfer>()
+            // Keyed the way the engine keys its own half of this report, by the name
+            // of the file that would have landed. One report, one language: a repair
+            // that named some entries by path and others by filename would read as
+            // two different things having gone wrong.
+            val sink = PlanSink()
             for (mod in manifest.mods) {
                 val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
-                planMod(mod, clientDir, enabled)?.let { suspect += it }
+                val name = if (enabled) mod.filename else "${mod.filename}.disabled"
+                sink.accept(name, planMod(mod, clientDir, enabled))
             }
             for (asset in manifest.assets) {
-                planAsset(asset, clientDir)?.let { suspect += it }
+                sink.accept(asset.dest.substringAfterLast('/'), planAsset(asset, clientDir))
             }
+            val suspect = sink.transfers
             log.info("repair: pack={}, {} of {} entries need a closer look", manifest.packId, suspect.size, total)
             val report = transfers.verifyAndRepair(suspect) { p ->
                 progress?.invoke(p.filesDone, p.filesTotal, p.current)
@@ -179,15 +191,28 @@ class SmrtSyncService(
             // Only when the repair actually finished, though: a run that could not
             // fetch half the pack has not established anything, and vouching for it
             // would hand the next launch a token over an instance still missing files.
-            if (report.failed.isEmpty()) {
+            //
+            // An entry nothing can fetch counts against the run exactly like one the
+            // transfer could not finish. It is absent from the instance either way,
+            // and the difference (nobody may serve it, rather than the attempt broke)
+            // belongs in the reason beside its name, not in whether the pack is called
+            // whole. Reporting it intact was how a repair told the player their pack
+            // was fine while a mod was missing from it.
+            val failed = report.failed + sink.unfetchable
+            if (failed.isEmpty()) {
                 writeRoster(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
             } else {
-                log.warn("repair: {} entr(ies) still unresolved -- instance stays unverified: {}", report.failed.size, report.failed.keys)
+                log.warn("repair: {} entr(ies) still unresolved -- instance stays unverified: {}", failed.size, failed.keys)
             }
 
             // Everything the local check cleared counts as intact: it was measured
-            // against the same manifest, just without a round trip.
-            report.copy(checked = total, intact = total - suspect.size + report.intact)
+            // against the same manifest, just without a round trip. What could not be
+            // fetched was measured too, and failed.
+            report.copy(
+                checked = total,
+                intact  = total - suspect.size - sink.unfetchable.size + report.intact,
+                failed  = failed,
+            )
         }
     }
 
@@ -221,7 +246,7 @@ class SmrtSyncService(
 
         // Same shape as a full sync: the local moves and drops happen while the plan
         // is built, then everything that needs the network goes in one batch.
-        val fetches = ArrayList<Transfer>(plan.toAdd.size + plan.toUpdate.size + plan.conflicts.size)
+        val sink = PlanSink()
         for (path in plan.toAdd + plan.toUpdate) {
             val entry = index[path] ?: continue
             if (path.startsWith(MODS_PREFIX)) {
@@ -232,19 +257,21 @@ class SmrtSyncService(
                 val dest = if (enabled) active else disabled
                 val stale = if (enabled) disabled else active
                 runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
-                plan(dest, entry.sha1, entry.size, entry.source, "mod $filename")?.let { fetches += it }
+                sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "mod $filename"))
             } else {
                 val dest = resolveSafe(clientDir, path, "asset $path")
-                plan(dest, entry.sha1, entry.size, entry.source, "asset $path")?.let { fetches += it }
+                sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "asset $path"))
             }
         }
 
         for (path in plan.conflicts) {
             val entry = index[path] ?: continue
             val dest = resolveSafe(clientDir, "$path.new", "conflict $path")
-            plan(dest, entry.sha1, entry.size, entry.source, "conflict $path")?.let { fetches += it }
+            sink.accept("$path.new", plan(dest, entry.sha1, entry.size, entry.source, "conflict $path"))
         }
 
+        reportUnfetchable(manifest.packId, sink.unfetchable)
+        val fetches = sink.transfers
         transfers.fetchAll(fetches) { p ->
             progress?.invoke(p.filesDone, total, p.current)
         }
@@ -408,6 +435,49 @@ class SmrtSyncService(
     private data class Sweep(val removed: List<String>, val blocked: List<String>)
 
     private data class ResolvableEntry(val source: SmrtSource, val sha1: String, val size: Long)
+
+    /**
+     * What a pass over one manifest entry decided.
+     *
+     * Three outcomes rather than a nullable transfer, because two of them used to
+     * arrive as the same `null`: the file is already right, and there is no way to
+     * obtain it at all. A repair counted both as intact, so a pack missing a mod
+     * nobody may serve came back reported whole, which is worse than the gap it
+     * was hiding.
+     */
+    private sealed interface Planned {
+        /** Fetch it. */
+        data class Fetch(val transfer: Transfer) : Planned
+
+        /** The bytes on disk are the ones the manifest names. */
+        data object UpToDate : Planned
+
+        /** Nothing here can produce this file, in words a player is meant to read. */
+        data class Unfetchable(val reason: String) : Planned
+    }
+
+    /**
+     * What one pass planned, collected: the transfers to run, and the entries
+     * nothing could produce.
+     *
+     * Every caller has to answer all three outcomes, and they answer them the same
+     * way, so the sorting lives here instead of in each of them. [name] is the
+     * caller's to choose, because the two audiences differ: a repair report has to
+     * name an entry the way the transfer engine names the other half of the same
+     * report, while a log line about an install is read against manifest paths.
+     */
+    private class PlanSink {
+        val transfers = ArrayList<Transfer>()
+        val unfetchable = LinkedHashMap<String, String>()
+
+        fun accept(name: String, planned: Planned) {
+            when (planned) {
+                is Planned.Fetch -> transfers += planned.transfer
+                is Planned.Unfetchable -> unfetchable[name] = planned.reason
+                Planned.UpToDate -> Unit
+            }
+        }
+    }
 
     private fun buildEntryIndex(manifest: SmrtPackManifest): Map<String, ResolvableEntry> {
         val index = LinkedHashMap<String, ResolvableEntry>()
@@ -661,6 +731,25 @@ class SmrtSyncService(
     }
 
     /**
+     * Says, once per pass, what the pack asked for and nobody could supply.
+     *
+     * The log line is for whoever reads a log. The action ring is the one a player
+     * reaches without being told to look: an install that quietly places less than
+     * the pack describes ends at a loader or a server refusing it, and neither of
+     * those names the mod or says the launcher already knew.
+     */
+    private fun reportUnfetchable(packId: String, unfetchable: Map<String, String>) {
+        if (unfetchable.isEmpty()) return
+        log.warn(
+            "smrt sync: pack={} placed {} fewer entr(ies) than it names: {}",
+            packId, unfetchable.size, unfetchable,
+        )
+        ActionRing.record(
+            "$packId: ${unfetchable.size} file(s) the pack names could not be fetched (${unfetchable.keys.joinToString()})",
+        )
+    }
+
+    /**
      * The set of `mods/` names the installed pack consists of, one per line. Written
      * on every sync and update so a launch can hold the instance to it without asking
      * the mirror; read back as a set, blank lines dropped.
@@ -702,7 +791,7 @@ class SmrtSyncService(
         mod: SmrtModEntry,
         clientDir: Path,
         enabled: Boolean,
-    ): Transfer? = withContext(Dispatchers.IO) {
+    ): Planned = withContext(Dispatchers.IO) {
         val modsDir = clientDir.resolve("mods")
         val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
         val disabledDest = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
@@ -712,8 +801,11 @@ class SmrtSyncService(
         if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
             Files.createDirectories(dest.parent)
             fileOpRetry("smrt sync move ${mod.filename}") { Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING) }
-            return@withContext null
+            return@withContext Planned.UpToDate
         }
+        // The variant under the other name cannot be the manifest's bytes: the move
+        // above is what claims it when it is. So whatever is left there is stale by
+        // definition, whether or not the entry itself can be fetched.
         runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
         plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
@@ -733,7 +825,7 @@ class SmrtSyncService(
      * `servers.dat` or its JEI settings at all -- the pack ships the server list on
      * purpose, and the exemption silently dropped it.
      */
-    private suspend fun planAsset(asset: SmrtAssetEntry, clientDir: Path): Transfer? {
+    private suspend fun planAsset(asset: SmrtAssetEntry, clientDir: Path): Planned {
         val dest = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
         return plan(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
     }
@@ -763,7 +855,8 @@ class SmrtSyncService(
         resolveWithinRoot(root, relative, label)
 
     /**
-     * The transfer for one manifest entry, or null when there is nothing to fetch.
+     * What one manifest entry needs: see [Planned] for the three answers and why
+     * two of them are not the same one.
      *
      * The up-to-date check happens here rather than being left to the engine
      * because of what sits between: a `modrinth` source needs an API round trip to
@@ -776,12 +869,20 @@ class SmrtSyncService(
         expectedSize: Long,
         source: SmrtSource,
         label: String,
-    ): Transfer? {
+    ): Planned {
+        // Asked before anything about the source, because the file being right is
+        // the end this is all for. An entry nothing here can fetch may still be on
+        // disk: the log for one tells the player to install it by hand, and having
+        // done so they are owed silence rather than a warning and a repair that
+        // reports their pack broken.
+        if (isUpToDate(dest, expectedSha1, expectedSize)) {
+            return Planned.UpToDate
+        }
         if (source is SmrtSource.Unknown) {
             // Forward-compat: a source type this launcher version does not
             // understand. Skip the entry instead of failing the whole sync.
             log.warn("smrt sync: skipping {} -- unsupported source type; update the launcher to install it", label)
-            return null
+            return Planned.Unfetchable("the launcher does not understand where this is published")
         }
         if (source is SmrtSource.CurseForge && source.url == null) {
             // Named but not served: the project's author has turned off
@@ -793,18 +894,17 @@ class SmrtSyncService(
                 "smrt sync: skipping {} -- its author disallows third-party distribution (curseforge {}/{}), so it has to be installed by hand",
                 label, source.projectId, source.fileId,
             )
-            return null
-        }
-        if (isUpToDate(dest, expectedSha1, expectedSize)) {
-            return null
+            return Planned.Unfetchable("its author disallows third-party distribution, so it has to be installed by hand")
         }
         val url = resolveUrl(source)
         log.debug("smrt sync: fetching {} <- {}", label, url)
-        return Transfer(
-            url = url,
-            dest = dest,
-            expect = Digest(DigestAlgorithm.SHA1, expectedSha1),
-            size = expectedSize,
+        return Planned.Fetch(
+            Transfer(
+                url = url,
+                dest = dest,
+                expect = Digest(DigestAlgorithm.SHA1, expectedSha1),
+                size = expectedSize,
+            )
         )
     }
 
@@ -829,7 +929,7 @@ class SmrtSyncService(
             val v = modrinth.resolveVersion(source.projectId, source.versionId)
             v.primaryFile().url
         }
-        // Unreachable: downloadIfNeeded skips Unknown before resolving a URL.
+        // Unreachable: `plan` answers Unfetchable before resolving a URL.
         // Kept exhaustive so a new SmrtSource variant forces a decision here.
         is SmrtSource.Unknown    -> error("resolveUrl called on an unsupported source")
     }

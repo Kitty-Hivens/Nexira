@@ -991,6 +991,53 @@ class SmrtSyncServiceTest {
         assertTrue(Files.exists(dir.resolve("mods/served.jar")), "the entry that can be served still lands")
     }
 
+    /**
+     * The repair used to report such a pack whole. `plan` answered "nothing to
+     * fetch" for an entry it was already right about and for one it could never
+     * obtain, the two arrived as the same null, and everything outside the suspect
+     * list was counted intact. So the one button a player presses when a pack looks
+     * wrong told them it was fine, with the mod still missing.
+     */
+    @Test
+    fun `repair reports an entry nobody may serve rather than counting it intact`() = runTest {
+        val dir = tempDir("curseforge-repair")
+        val service = curseforgeService()
+        val manifest = parsed(curseforgeManifest())
+        service.sync(manifest, dir)
+
+        val report = service.verifyAndRepair(dir, manifest)
+
+        assertEquals(2, report.checked)
+        assertEquals(1, report.intact, "only the entry that could be placed is intact")
+        assertEquals(setOf("withheld.jar"), report.failed.keys, "named the way the engine names its own failures")
+        assertTrue(
+            report.failed.getValue("withheld.jar").contains("third-party distribution"),
+            "the reason has to say which of the two skips this was, got: ${report.failed.getValue("withheld.jar")}",
+        )
+    }
+
+    /**
+     * The log tells the player to install such a mod by hand. Having done so they
+     * are owed silence: the file matches what the manifest names, and a pass that
+     * asked about the source before looking at the disk called their pack broken
+     * for a mod that was sitting right there.
+     */
+    @Test
+    fun `an entry installed by hand counts as intact even though nothing could fetch it`() = runTest {
+        val dir = tempDir("curseforge-by-hand")
+        val service = curseforgeService()
+        val manifest = parsed(curseforgeManifest())
+        service.sync(manifest, dir)
+
+        // What the player is told to do: put the file there themselves.
+        Files.write(dir.resolve("mods/withheld.jar"), reqBytes)
+
+        val report = service.verifyAndRepair(dir, manifest)
+
+        assertEquals(2, report.intact, "both entries are the bytes the manifest names")
+        assertTrue(report.failed.isEmpty(), "nothing is missing, so nothing is unresolved")
+    }
+
     /** A directory a mod fills with its own data is not a mod. */
     @Test
     fun `a mod's data directory is not read as an unpacked mod`() = runTest {
