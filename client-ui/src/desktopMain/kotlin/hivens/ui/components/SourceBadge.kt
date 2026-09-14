@@ -31,6 +31,7 @@ fun SourceBadge(source: SmrtSource, modifier: Modifier = Modifier) {
         is SmrtSource.Modrinth   -> "Modrinth"
         is SmrtSource.SmrtCache  -> "Mirror"
         is SmrtSource.SmrtStatic -> "Static"
+        is SmrtSource.CurseForge -> "CurseForge"
         is SmrtSource.Unknown    -> "Unknown"
     }
     NxSourceBadge(label = label, color = NxTheme.colors.source(source), modifier = modifier)

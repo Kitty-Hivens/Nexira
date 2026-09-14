@@ -783,6 +783,18 @@ class SmrtSyncService(
             log.warn("smrt sync: skipping {} -- unsupported source type; update the launcher to install it", label)
             return null
         }
+        if (source is SmrtSource.CurseForge && source.url == null) {
+            // Named but not served: the project's author has turned off
+            // third-party distribution, so the mirror may say whose file this
+            // is and may not hand it over. A different thing from a type we do
+            // not know, and the log says which so nobody goes looking for a
+            // launcher update that would not help.
+            log.warn(
+                "smrt sync: skipping {} -- its author disallows third-party distribution (curseforge {}/{}), so it has to be installed by hand",
+                label, source.projectId, source.fileId,
+            )
+            return null
+        }
         if (isUpToDate(dest, expectedSha1, expectedSize)) {
             return null
         }
@@ -809,6 +821,10 @@ class SmrtSyncService(
     private suspend fun resolveUrl(source: SmrtSource): String = when (source) {
         is SmrtSource.SmrtCache  -> source.url
         is SmrtSource.SmrtStatic -> source.url
+        // The mirror resolved this at build time, which is why no key is
+        // needed here. `plan` has already skipped the entry when it is absent.
+        is SmrtSource.CurseForge -> source.url
+            ?: error("curseforge ${source.projectId}/${source.fileId} carries no url")
         is SmrtSource.Modrinth   -> {
             val v = modrinth.resolveVersion(source.projectId, source.versionId)
             v.primaryFile().url

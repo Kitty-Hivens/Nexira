@@ -164,6 +164,60 @@ class SmrtManifestParseTest {
     }
 
     @Test
+    fun `a curseforge source decodes with its ids and its resolved url`() {
+        // The mirror resolves a file id to a link at build time, because doing
+        // that needs its API key, so the launcher reads the url straight off the
+        // manifest and never talks to CurseForge. The pair travels beside it: a
+        // signed link expires, and the ids are what still say whose file it was.
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "Curse",
+            "pack_version": "1.0.0",
+            "generated_at": "2026-09-15T00:00:00Z",
+            "minecraft": {"version": "1.12.2"},
+            "loader": {"name": "forge", "version": "14.23.5.2860"},
+            "java": {"major": 8},
+            "mods": [
+                {
+                    "filename": "Served.jar",
+                    "sha1": "2222222222222222222222222222222222222222",
+                    "size_bytes": 300,
+                    "source": {
+                        "type": "curseforge", "project_id": 69162, "file_id": 2920433,
+                        "url": "https://edge.forgecdn.net/files/2920/433/CoFHCore.jar"
+                    }
+                },
+                {
+                    "filename": "NamedOnly.jar",
+                    "sha1": "3333333333333333333333333333333333333333",
+                    "size_bytes": 400,
+                    "source": {"type": "curseforge", "project_id": 1, "file_id": 2}
+                }
+            ]
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        val served = pm.mods.first { it.filename == "Served.jar" }.source
+        assertIs<SmrtSource.CurseForge>(served)
+        assertEquals(69162L, served.projectId)
+        assertEquals(2920433L, served.fileId)
+        assertEquals("https://edge.forgecdn.net/files/2920/433/CoFHCore.jar", served.url)
+
+        // No url is not a malformed entry: it is a project whose author has
+        // turned off third-party distribution, so the mirror names the file and
+        // may not hand it over. The sync skips it and says so.
+        val named = pm.mods.first { it.filename == "NamedOnly.jar" }.source
+        assertIs<SmrtSource.CurseForge>(named)
+        assertNull(named.url)
+
+        val reDecoded: SmrtPackManifest =
+            json.decodeFromString(json.encodeToString(SmrtPackManifest.serializer(), pm))
+        assertIs<SmrtSource.CurseForge>(reDecoded.mods.first { it.filename == "Served.jar" }.source)
+        assertIs<SmrtSource.CurseForge>(reDecoded.mods.first { it.filename == "NamedOnly.jar" }.source)
+    }
+
+    @Test
     fun `unknown source type folds to Unknown without failing the whole manifest`() {
         // Forward-compat: a mirror that gains github_release / curseforge on a
         // single entry must not abort the entire decode. The unknown entry

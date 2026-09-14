@@ -206,8 +206,27 @@ sealed class SmrtSource {
     data class SmrtStatic(val url: String) : SmrtSource()
 
     /**
+     * A file published on CurseForge. [url] is the download the mirror
+     * resolved at build time and is what the launcher fetches: turning a file
+     * id into a link needs the mirror's API key, so a launcher never talks to
+     * CurseForge, the same way it never needs a key of its own.
+     *
+     * [url] is absent exactly when the project's author has disabled
+     * third-party distribution. The pair is still worth carrying there and
+     * everywhere else: it says whose file this is in a form that outlives the
+     * link, which is signed and expires.
+     */
+    @Serializable
+    @SerialName("curseforge")
+    data class CurseForge(
+        @SerialName("project_id") val projectId: Long,
+        @SerialName("file_id") val fileId: Long,
+        val url: String? = null,
+    ) : SmrtSource()
+
+    /**
      * A `type` this client does not understand -- a mirror that gained
-     * `github_release` / `curseforge` before the launcher learned it. The
+     * `github_release` or another provider before the launcher learned it. The
      * entry is kept so the rest of the manifest still decodes; the install
      * path skips it rather than failing the whole pack. Never emitted by us,
      * so the sentinel discriminator only appears on a cache round-trip.
@@ -239,6 +258,7 @@ object SmrtSourceLenientSerializer : KSerializer<SmrtSource> {
             "modrinth"    -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.Modrinth.serializer(), obj)
             "smrt_cache"  -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.SmrtCache.serializer(), obj)
             "smrt_static" -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.SmrtStatic.serializer(), obj)
+            "curseforge"  -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.CurseForge.serializer(), obj)
             else          -> SmrtSource.Unknown
         }
     }
