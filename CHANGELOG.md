@@ -25,6 +25,11 @@ verbatim, where a hand-wrapped line would render as a <br> staircase.
 
 ## [Unreleased]
 
+## [2.4.4] - 2026-09-15
+
+### Fixed
+- `SmrtSource` learns the `curseforge` variant, so a pack that pins mods there installs them. The sealed class knew three types and folded anything else to `Unknown`, which `SmrtSyncService.plan` skips by design; the mirror gained a CurseForge pin and five packs moved most of their mods onto it, so between four and sixty-one mods per pack were left out of every install with nothing logged but a forward-compat warning. The instance then failed `enforceRoster` and launched without a token, which is the only symptom a player sees. The variant carries `project_id`, `file_id` and the `url` the mirror resolved at build time: turning a file id into a link needs the mirror's API key, so `resolveUrl` reads the manifest and the launcher never talks to CurseForge. A `url` is absent exactly when the project's author has disabled third-party distribution, and that entry is skipped on its own branch with its own message, because in a log it is indistinguishable from an unsupported type and only one of the two is fixed by updating. `SourceBadge` and `NxColors.source` are exhaustive over the sealed class, so both were decided rather than defaulted, and CurseForge gets its own brand colour in each theme.
+
 ## [2.4.3] - 2026-09-12
 
 ### Fixed

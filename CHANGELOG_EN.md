@@ -18,6 +18,12 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.4] - 2026-09-15
+
+Packs whose mods live on CurseForge install completely again. The launcher could fetch from Modrinth and from the mirror, and a mod published on CurseForge was quietly left out. The pack then looked modified, the login was withheld and the server would not let you in, with nothing on screen to say why. Those mods now download like any other, and no CurseForge key is needed for it: the mirror resolves the link in advance.
+
+A mod whose author has turned off third-party distribution is handled on its own. There is nowhere to fetch it from, and the launcher now says that rather than sounding out of date, because updating would not help.
+
 ## [2.4.3] - 2026-09-12
 
 Packs stop being called tampered with over files their own mods write. The launcher was watching everything under the mods folder, and it now watches the two places the game actually loads from, so a mod's own cache or a library it unpacks for itself is left alone. The same change closes a hole in the other direction: a mod dropped in as a plain folder rather than a jar used to load without ever being questioned, and is reported now.
