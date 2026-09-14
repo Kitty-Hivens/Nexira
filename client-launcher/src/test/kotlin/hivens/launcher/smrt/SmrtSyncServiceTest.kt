@@ -874,6 +874,7 @@ class SmrtSyncServiceTest {
         const val REQ_URL = "https://mirror.test/req.jar"
         const val OPT_URL = "https://mirror.test/opt.jar"
         const val SERVERS_URL = "https://mirror.test/servers.dat"
+        const val CF_URL = "https://edge.forgecdn.test/files/2920/433/served.jar"
     }
 
     /**
@@ -928,6 +929,66 @@ class SmrtSyncServiceTest {
         assertFalse(verdict.verified, "an unpacked mod must not leave the instance vouched for")
         assertEquals(listOf("cheat"), verdict.blocked)
         assertTrue(Files.exists(dir.resolve("mods/cheat/mcmod.info")), "reported, not deleted")
+    }
+
+    // --- mods a pack pins on CurseForge ---
+
+    private val cfBytes = "CURSEFORGE".toByteArray()
+
+    /**
+     * Both shapes the mirror emits for a CurseForge pin: the ids with the link it
+     * resolved at build time, and the ids alone for a project whose author has
+     * turned off third-party distribution.
+     */
+    private fun curseforgeManifest() = """
+        {"schema_version":2,"pack_id":"test","pack_version":"1","generated_at":"now",
+         "minecraft":{"version":"1.12.2"},"loader":{"name":"forge","version":"14.23.5.2860"},"java":{"major":8},
+         "mods":[
+           {"filename":"served.jar","sha1":"${sha1(cfBytes)}","size_bytes":${cfBytes.size},"required":true,
+            "source":{"type":"curseforge","project_id":69162,"file_id":2920433,"url":"$CF_URL"}},
+           {"filename":"withheld.jar","sha1":"${sha1(reqBytes)}","size_bytes":${reqBytes.size},"required":true,
+            "source":{"type":"curseforge","project_id":1,"file_id":2}}
+         ],"assets":[]}
+    """.trimIndent()
+
+    private fun curseforgeService(): SmrtSyncService = serviceWith(
+        MockEngine { req ->
+            when (req.url.toString()) {
+                CF_URL -> respond(ByteReadChannel(cfBytes), HttpStatusCode.OK)
+                else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+            }
+        }
+    )
+
+    /**
+     * The defect this pins: a type the sealed class did not know folded to the
+     * unknown sentinel, and the install skipped every mod pinned on CurseForge
+     * without failing anything. The link is the mirror's own, resolved when the
+     * build was made, so nothing here talks to CurseForge or needs a key for it.
+     */
+    @Test
+    fun `a mod pinned on curseforge is fetched from the link the mirror resolved`() = runTest {
+        val dir = tempDir("curseforge")
+
+        curseforgeService().sync(parsed(curseforgeManifest()), dir)
+
+        assertContentEquals(cfBytes, Files.readAllBytes(dir.resolve("mods/served.jar")))
+    }
+
+    /**
+     * An entry the mirror may name and may not serve. It is skipped the way an
+     * unsupported type is, rather than failing the sync, so the rest of the pack
+     * still installs and the one file that cannot be fetched is the only thing
+     * missing.
+     */
+    @Test
+    fun `a curseforge entry with no link is skipped and the rest of the pack lands`() = runTest {
+        val dir = tempDir("curseforge-withheld")
+
+        curseforgeService().sync(parsed(curseforgeManifest()), dir)
+
+        assertFalse(Files.exists(dir.resolve("mods/withheld.jar")), "there is nowhere to fetch it from")
+        assertTrue(Files.exists(dir.resolve("mods/served.jar")), "the entry that can be served still lands")
     }
 
     /** A directory a mod fills with its own data is not a mod. */

@@ -219,8 +219,8 @@ class SmrtManifestParseTest {
 
     @Test
     fun `unknown source type folds to Unknown without failing the whole manifest`() {
-        // Forward-compat: a mirror that gains github_release / curseforge on a
-        // single entry must not abort the entire decode. The unknown entry
+        // Forward-compat: a mirror that gains github_release or another provider
+        // on a single entry must not abort the entire decode. The unknown entry
         // becomes SmrtSource.Unknown (install skips it); siblings still parse.
         val payload = """
         {
