@@ -24,6 +24,14 @@ Packs whose mods live on CurseForge install completely again. The launcher could
 
 A mod whose author has turned off third-party distribution is handled on its own. There is nowhere to fetch it from, and the launcher now says that rather than sounding out of date, because updating would not help.
 
+Checking and repairing a pack names what it could not fetch instead of calling the pack whole. And once you have put such a mod in place yourself, the check accepts it: a file that matches what the pack describes is yours to have put there.
+
+A pack whose listing holds one entry this version cannot make sense of installs the rest of itself. Before, that single entry stopped the whole listing from being read.
+
+Your choice of optional mods survives a pack update for mods hosted on CurseForge, rather than resetting when the file name changes with the version.
+
+Mods from CurseForge show their icon wherever one can be found.
+
 ## [2.4.3] - 2026-09-12
 
 Packs stop being called tampered with over files their own mods write. The launcher was watching everything under the mods folder, and it now watches the two places the game actually loads from, so a mod's own cache or a library it unpacks for itself is left alone. The same change closes a hole in the other direction: a mod dropped in as a plain folder rather than a jar used to load without ever being questioned, and is reported now.
