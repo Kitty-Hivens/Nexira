@@ -27,7 +27,7 @@ data class PackFieldChange(val from: String, val to: String)
  * historical manifest but deliberately serves no diff endpoint, so
  * "what changed in this build" is computed from two manifests here.
  *
- * Mod identity is [SmrtModEntry.stableKey] (slug -> modrinth project -> filename)
+ * Mod identity is [SmrtModEntry.stableKey] (slug -> the source's project id -> filename)
  * with a second pairing pass over the leftovers by normalized filename stem:
  * slug-less `smrt_cache` mods rename on every version bump, and without the stem
  * pass each bump would read as a remove plus an unrelated add. Asset identity is

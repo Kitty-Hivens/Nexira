@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.LoggerFactory
 
 /**
  * Wire shape of a v2 smrt mirror pack manifest. Mirrors the
@@ -107,6 +108,7 @@ fun SmrtAuth.toDomain(): PackAuthRequirement = when (this) {
  */
 object SmrtAuthLenientSerializer : KSerializer<SmrtAuth?> {
     private val delegate = SmrtAuth.serializer().nullable
+    private val log = LoggerFactory.getLogger(SmrtAuthLenientSerializer::class.java)
     override val descriptor: SerialDescriptor = delegate.descriptor
 
     override fun deserialize(decoder: Decoder): SmrtAuth? {
@@ -116,7 +118,15 @@ object SmrtAuthLenientSerializer : KSerializer<SmrtAuth?> {
         val obj = element as? JsonObject ?: return null
         val kind = obj["kind"]?.jsonPrimitive?.contentOrNull
         return when (kind) {
-            "smartycraft" -> jsonDecoder.json.decodeFromJsonElement(SmrtAuth.Smartycraft.serializer(), obj)
+            // Same reading as the unknown kind, and for the same reason as in
+            // [SmrtSourceLenientSerializer]: a block this client cannot make sense
+            // of leaves the pack unrestricted rather than unopenable. The launcher
+            // then asks for no sign-in where the mirror wanted one, so it is logged
+            // at a level somebody reads.
+            "smartycraft" -> runCatching {
+                jsonDecoder.json.decodeFromJsonElement(SmrtAuth.Smartycraft.serializer(), obj)
+            }.onFailure { log.warn("smrt manifest: a {} auth block did not decode, the pack is read as unrestricted", kind, it) }
+                .getOrNull()
             else          -> null
         }
     }
@@ -154,8 +164,9 @@ data class SmrtModEntry(
      * [hivens.core.data.ContentToggle] key (via [stableKey]) so a user's
      * on/off choice survives a pack-version bump -- the [filename] carries the
      * mod version and changes on every update. Optional and additive: absent
-     * means [stableKey] falls back to the Modrinth project id, then the
-     * filename. The mirror should author this for non-Modrinth optionals.
+     * means [stableKey] falls back to the source's own project id, then the
+     * filename. The mirror should author this for an optional whose source
+     * carries no project id of its own.
      */
     val slug: String? = null,
     @Serializable(with = SmrtSourceLenientSerializer::class)
@@ -164,14 +175,20 @@ data class SmrtModEntry(
 ) {
     /**
      * Version-stable key for persisting optional-content toggles. Prefers the
-     * curator [slug], then a Modrinth `project_id`, then the [filename] as a
-     * last resort (which DOES change across versions -- it keeps pre-slug packs
-     * keyed on something, at the cost of orphaning on a bump). Computed, so it
-     * is not serialized. See issue #339.
+     * curator [slug], then the project id of whichever host publishes the file,
+     * then the [filename] as a last resort (which DOES change across versions --
+     * it keeps pre-slug packs keyed on something, at the cost of orphaning on a
+     * bump). Computed, so it is not serialized. See issue #339.
+     *
+     * A CurseForge project id is as stable as a Modrinth one and identifies the
+     * same thing, so an optional mod pinned there keeps the player's choice across
+     * a version bump instead of falling back to a filename that carries the mod
+     * version in it.
      */
     val stableKey: String
         get() = slug
             ?: (source as? SmrtSource.Modrinth)?.let { "modrinth:${it.projectId}" }
+            ?: (source as? SmrtSource.CurseForge)?.let { "curseforge:${it.projectId}" }
             ?: filename
 }
 
@@ -249,18 +266,29 @@ sealed class SmrtSource {
  */
 object SmrtSourceLenientSerializer : KSerializer<SmrtSource> {
     private val delegate = SmrtSource.serializer()
+    private val log = LoggerFactory.getLogger(SmrtSourceLenientSerializer::class.java)
     override val descriptor: SerialDescriptor = delegate.descriptor
 
     override fun deserialize(decoder: Decoder): SmrtSource {
         val jsonDecoder = decoder as? JsonDecoder ?: return delegate.deserialize(decoder)
         val obj = jsonDecoder.decodeJsonElement() as? JsonObject ?: return SmrtSource.Unknown
-        return when (obj["type"]?.jsonPrimitive?.contentOrNull) {
-            "modrinth"    -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.Modrinth.serializer(), obj)
-            "smrt_cache"  -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.SmrtCache.serializer(), obj)
-            "smrt_static" -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.SmrtStatic.serializer(), obj)
-            "curseforge"  -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.CurseForge.serializer(), obj)
-            else          -> SmrtSource.Unknown
+        val type = obj["type"]?.jsonPrimitive?.contentOrNull
+        val serializer: KSerializer<out SmrtSource> = when (type) {
+            "modrinth"    -> SmrtSource.Modrinth.serializer()
+            "smrt_cache"  -> SmrtSource.SmrtCache.serializer()
+            "smrt_static" -> SmrtSource.SmrtStatic.serializer()
+            "curseforge"  -> SmrtSource.CurseForge.serializer()
+            else          -> return SmrtSource.Unknown
         }
+        // A type this client knows, carrying a payload it does not: a field renamed,
+        // a number where a string used to be, an id that outgrew what parses here.
+        // Left to throw it aborts the whole manifest, so ONE entry the mirror and
+        // the launcher disagree about costs the pack every other entry as well --
+        // which is the exact failure the unknown-type branch exists to avoid, and
+        // there is no reason for the two to end differently.
+        return runCatching { jsonDecoder.json.decodeFromJsonElement(serializer, obj) }
+            .onFailure { log.warn("smrt manifest: a {} source did not decode, the entry is treated as unsupported", type, it) }
+            .getOrDefault(SmrtSource.Unknown)
     }
 
     override fun serialize(encoder: Encoder, value: SmrtSource) {
