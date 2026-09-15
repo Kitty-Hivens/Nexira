@@ -77,6 +77,10 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.record",
             // portrait, for the rail every landscape card was wrong in
             "home.new.player.column",
+            // nothing but the artwork until the pointer arrives
+            "home.new.player.tile",
+            // the smallest presence that still plays: a ring, a glyph, a tooltip
+            "home.new.player.token",
             // inline video player (URL prop, expand-to-full)
             "home.new.video",
             // unified configurable nav rail item
@@ -224,6 +228,8 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.ground",
             "home.new.player.record",
             "home.new.player.column",
+            "home.new.player.tile",
+            "home.new.player.token",
             "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",
