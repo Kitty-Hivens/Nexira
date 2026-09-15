@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -19,6 +20,9 @@ import hivens.ui.audio.Waveform
 import hivens.ui.audio.WaveformCache
 import hivens.ui.audio.resampleTo
 import java.nio.file.Path
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * The envelope of [file], or null until it has been measured.
@@ -141,6 +145,76 @@ internal fun WaveformColumn(
         }
     }
 }
+
+/**
+ * The envelope bent into a ring, radiating outward from [innerRadius].
+ *
+ * A third composable rather than a mode on the first, because almost nothing is
+ * shared once the bars stop being axis aligned: each one is a line at its own
+ * angle, the played part is an arc rather than a prefix of a row, and the count
+ * comes from the circumference rather than from a width. What it does share is
+ * the rule that the count comes from the room available, which matters more here
+ * than anywhere: bars crowded onto a small circle overlap into a solid disc.
+ *
+ * The ring starts at twelve o'clock and runs clockwise, which is where a listener
+ * expects a played share to start and the direction they expect it to travel.
+ */
+@Composable
+internal fun WaveformRing(
+    waveform: Waveform?,
+    fraction: Float,
+    played: Color,
+    remaining: Color,
+    innerRadius: Float,
+    modifier: Modifier = Modifier,
+    strokeWidth: Dp = 2.dp,
+    spacing: Dp = 3.dp,
+    /**
+     * How much of the room outside the label the loudest bar may take. Short of
+     * the whole of it on purpose: bars that reach the edge read as rays coming
+     * off a sun rather than as a ring around a disc, and the shape stops being an
+     * object and becomes a burst.
+     */
+    reach: Float = 0.78f,
+) {
+    val density = LocalDensity.current
+    val strokePx = with(density) { strokeWidth.toPx() }.coerceAtLeast(1f)
+    val spacingPx = with(density) { spacing.toPx() }.coerceAtLeast(1f)
+
+    Canvas(modifier) {
+        val centreX = size.width / 2f
+        val centreY = size.height / 2f
+        val inner = innerRadius.coerceAtLeast(1f)
+        val room = ((size.minDimension / 2f - inner) * reach.coerceIn(0.1f, 1f)).coerceAtLeast(1f)
+        val count = ((2.0 * PI * inner) / spacingPx).toInt().coerceIn(12, MAX_RING_BARS)
+        val bars = waveform.bars(count)
+        val cut = count * fraction.coerceIn(0f, 1f)
+        val floor = room * FLOOR_SHARE
+        for (i in 0 until count) {
+            val angle = (-90.0 + i * 360.0 / count) * PI / 180.0
+            val cos = cos(angle).toFloat()
+            val sin = sin(angle).toFloat()
+            val length = (bars[i] * room).coerceAtLeast(floor)
+            drawLine(
+                color = if (i < cut) played else remaining,
+                start = Offset(centreX + cos * inner, centreY + sin * inner),
+                end = Offset(centreX + cos * (inner + length), centreY + sin * (inner + length)),
+                strokeWidth = strokePx,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+/**
+ * A ceiling on the ring's bars.
+ *
+ * A large disc would otherwise ask for more of them than the envelope has
+ * buckets, and resampling upward repeats values, so past this the ring stops
+ * gaining detail and starts drawing the same bar twice at slightly different
+ * angles.
+ */
+private const val MAX_RING_BARS = 240
 
 /** The envelope reduced to [count] bars, or a flat resting row when there is none. */
 private fun Waveform?.bars(count: Int): FloatArray {

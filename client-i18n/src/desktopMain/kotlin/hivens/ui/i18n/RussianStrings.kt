@@ -1210,6 +1210,10 @@ object RussianStrings : AppStrings {
         "widget.home.new.player.wave.showTimes" to "Показывать время",
         "widget.home.new.player.ground" to "Плеер: обложка как фон",
         "widget.home.new.player.ground.dim" to "Затемнение",
+        "widget.home.new.player.record" to "Плеер: пластинка",
+        "widget.home.new.player.record.showCaption" to "Подпись под диском",
+        "widget.home.new.player.column" to "Плеер: колонка",
+        "widget.home.new.player.column.showCover" to "Показывать обложку",
         "widget.home.new.progress" to "Фоновая активность",
         "widget.home.new.progress.idleText" to "Текст простоя",
         "widget.home.new.progress.title" to "Заголовок",
@@ -1420,6 +1424,7 @@ object RussianStrings : AppStrings {
     override val audioRepeatQueue      = "Вся очередь"
     override val audioPlaybackOptions  = "Воспроизведение"
     override val audioSkipNext         = "Следующий трек"
+    override val audioQueue = "Очередь"
     override val audioSkipPrevious     = "Предыдущий трек"
     override val audioNoFile           = "Без файла"
     override val audioStatusReady      = "Готов"

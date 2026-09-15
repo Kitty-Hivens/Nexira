@@ -73,6 +73,10 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.wave",
             // both of the file's own pictures at once: the cover blurred into a ground, the envelope on it
             "home.new.player.ground",
+            // one square and no words: the cover is a disc and the envelope rings it
+            "home.new.player.record",
+            // portrait, for the rail every landscape card was wrong in
+            "home.new.player.column",
             // inline video player (URL prop, expand-to-full)
             "home.new.video",
             // unified configurable nav rail item
@@ -218,6 +222,8 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.timeline",
             "home.new.player.wave",
             "home.new.player.ground",
+            "home.new.player.record",
+            "home.new.player.column",
             "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",

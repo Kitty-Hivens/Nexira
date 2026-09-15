@@ -1196,6 +1196,10 @@ object GermanStrings : AppStrings {
         "widget.home.new.player.wave.showTimes" to "Zeiten anzeigen",
         "widget.home.new.player.ground" to "Player: das Cover ist der Grund",
         "widget.home.new.player.ground.dim" to "Abdunklung",
+        "widget.home.new.player.record" to "Player: die Schallplatte",
+        "widget.home.new.player.record.showCaption" to "Titel unter der Scheibe",
+        "widget.home.new.player.column" to "Player: die Spalte",
+        "widget.home.new.player.column.showCover" to "Cover anzeigen",
         "widget.home.new.progress" to "Hintergrundaktivität",
         "widget.home.new.progress.idleText" to "Leerlauftext",
         "widget.home.new.progress.title" to "Überschrift",
@@ -1406,6 +1410,7 @@ object GermanStrings : AppStrings {
     override val audioRepeatQueue      = "Ganze Warteschlange"
     override val audioPlaybackOptions  = "Wiedergabe"
     override val audioSkipNext         = "Nächster Titel"
+    override val audioQueue = "Warteschlange"
     override val audioSkipPrevious     = "Vorheriger Titel"
     override val audioNoFile           = "Keine Datei"
     override val audioStatusReady      = "Bereit"

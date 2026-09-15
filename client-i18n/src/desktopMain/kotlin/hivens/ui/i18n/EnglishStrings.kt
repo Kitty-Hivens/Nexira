@@ -1194,6 +1194,10 @@ object EnglishStrings : AppStrings {
         "widget.home.new.player.wave.showTimes" to "Show elapsed and total",
         "widget.home.new.player.ground" to "Player: the cover is the ground",
         "widget.home.new.player.ground.dim" to "Darkening",
+        "widget.home.new.player.record" to "Player: the record",
+        "widget.home.new.player.record.showCaption" to "Show the title under the disc",
+        "widget.home.new.player.column" to "Player: the column",
+        "widget.home.new.player.column.showCover" to "Show the artwork",
         "widget.home.new.progress" to "Background activity",
         "widget.home.new.progress.idleText" to "Idle text",
         "widget.home.new.progress.title" to "Heading",
@@ -1404,6 +1408,7 @@ object EnglishStrings : AppStrings {
     override val audioRepeatQueue      = "Whole queue"
     override val audioPlaybackOptions  = "Playback"
     override val audioSkipNext         = "Next track"
+    override val audioQueue = "Queue"
     override val audioSkipPrevious     = "Previous track"
     override val audioNoFile           = "No file"
     override val audioStatusReady      = "Ready"

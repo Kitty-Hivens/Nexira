@@ -1393,6 +1393,9 @@ interface AppStrings {
     val audioPlaybackOptions: String
     /** The two skips, which name themselves on a tooltip because they are glyphs. */
     val audioSkipNext: String
+
+    /** Group label over the queue controls in a player's options panel. */
+    val audioQueue: String
     val audioSkipPrevious: String
     val audioNoFile: String
     val audioStatusReady: String

@@ -1200,6 +1200,10 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.player.wave.showTimes" to "経過と全体の時間を表示",
         "widget.home.new.player.ground" to "プレイヤー: ジャケットが背景",
         "widget.home.new.player.ground.dim" to "暗さ",
+        "widget.home.new.player.record" to "プレイヤー: レコード",
+        "widget.home.new.player.record.showCaption" to "ディスクの下に曲名を表示",
+        "widget.home.new.player.column" to "プレイヤー: 縦型",
+        "widget.home.new.player.column.showCover" to "ジャケットを表示",
         "widget.home.new.progress" to "背景の処理",
         "widget.home.new.progress.idleText" to "待機中の文",
         "widget.home.new.progress.title" to "見出し",
@@ -1410,6 +1414,7 @@ object JapaneseStrings : AppStrings {
     override val audioRepeatQueue = "キュー全体"
     override val audioPlaybackOptions = "再生"
     override val audioSkipNext = "次の曲"
+    override val audioQueue = "キュー"
     override val audioSkipPrevious = "前の曲"
     override val audioNoFile = "ファイルなし"
     override val audioStatusReady = "準備完了"
