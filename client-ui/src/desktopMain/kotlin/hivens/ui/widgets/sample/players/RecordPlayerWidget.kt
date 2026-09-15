@@ -53,11 +53,13 @@ import hivens.ui.nx.NxTooltip
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.sample.progressFraction
+import hivens.ui.widgets.sample.durationMsOf
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -93,6 +95,7 @@ data class RecordPlayerProps(
      */
     @PropLabel("widget.home.new.player.record.showCaption") val showCaption: Boolean = false,
     /** How wide the disc may be, in points. A ceiling, not a size. */
+    @PropRange(min = 72.0, max = 420.0)
     @PropLabel("widget.home.new.player.record.size") val size: Int = 168,
 )
 
@@ -136,6 +139,7 @@ fun RecordPlayerWidget(instance: WidgetInstance) {
         onRepeat    = { player.setRepeat(it) },
         onSkipNext  = { player.skipToNext() },
         onSkipPrev  = { player.skipToPrevious() },
+        onSeek      = { player.seek(it) },
     )
 }
 
@@ -157,6 +161,7 @@ internal fun RecordPlayerCard(
     onRepeat: (RepeatMode) -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrev: () -> Unit,
+    onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -172,10 +177,16 @@ internal fun RecordPlayerCard(
     Column(modifier.playerObject(maxSide), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.fillMaxWidth()) {
             NxTooltip(text = caption, enabled = !showCaption) {
+                val duration = durationMsOf(state)
                 BoxWithConstraints(
                     Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
+                        // The envelope round the label is the measure, so it takes the
+                        // scrub as well. The label itself belongs to the transport.
+                        .seekByAngle(LABEL_SHARE) { at ->
+                            if (loaded && duration > 0L) onSeek((at * duration).toLong())
+                        }
                         // The disc is the only affordance this shape has, so with
                         // nothing loaded it has to be the one that opens a file.
                         .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier),

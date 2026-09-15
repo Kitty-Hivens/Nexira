@@ -57,6 +57,7 @@ import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.sample.elapsedLabel
+import hivens.ui.widgets.sample.durationMsOf
 import hivens.ui.widgets.sample.progressFraction
 import hivens.ui.widgets.sample.totalLabel
 import hivens.ui.widgets.services.MusicPlayerService
@@ -64,6 +65,7 @@ import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -102,6 +104,7 @@ data class ColumnPlayerProps(
      * this kind is drawn for one, so a wide slot gets a column rather than a
      * card stretched into the shape of one.
      */
+    @PropRange(min = 88.0, max = 320.0)
     @PropLabel("widget.home.new.player.column.size") val size: Int = 148,
 )
 
@@ -145,6 +148,7 @@ fun ColumnPlayerWidget(instance: WidgetInstance) {
         onRepeat    = { player.setRepeat(it) },
         onSkipNext  = { player.skipToNext() },
         onSkipPrev  = { player.skipToPrevious() },
+        onSeek      = { player.seek(it) },
     )
 }
 
@@ -166,6 +170,7 @@ internal fun ColumnPlayerCard(
     onRepeat: (RepeatMode) -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrev: () -> Unit,
+    onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -203,6 +208,11 @@ internal fun ColumnPlayerCard(
                         fraction  = progressFraction(state),
                         played    = palette.primary,
                         remaining = palette.textSecondary.copy(alpha = 0.26f),
+                        onSeekFraction = if (loaded && durationMsOf(state) > 0L) {
+                            { at -> onSeek((at * durationMsOf(state)).toLong()) }
+                        } else {
+                            null
+                        },
                         modifier  = Modifier.width(stripWidth).fillMaxHeight(),
                     )
                     Spacer(Modifier.width(10.dp))

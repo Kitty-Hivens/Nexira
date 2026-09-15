@@ -63,6 +63,7 @@ import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -98,6 +99,7 @@ data class TilePlayerProps(
      */
     @PropLabel("widget.home.new.player.tile.showCaption") val showCaption: Boolean = true,
     /** How wide the tile may be, in points. A ceiling, not a size. */
+    @PropRange(min = 72.0, max = 480.0)
     @PropLabel("widget.home.new.player.tile.size") val size: Int = 196,
 )
 

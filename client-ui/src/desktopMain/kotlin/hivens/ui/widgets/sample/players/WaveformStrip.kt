@@ -2,6 +2,8 @@ package hivens.ui.widgets.sample.players
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
@@ -21,7 +23,9 @@ import hivens.ui.audio.WaveformCache
 import hivens.ui.audio.resampleTo
 import java.nio.file.Path
 import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 
 /**
@@ -110,9 +114,13 @@ internal fun WaveformStrip(
  *
  * A separate composable rather than an axis flag on the one above, because what
  * differs is not only which way the bars run: they grow from one edge here
- * instead of from the middle, the played part is the top rather than the left,
- * and there is no drag, since a vertical scrub in a rail is a gesture the rail
- * itself wants.
+ * instead of from the middle and the played part is the top rather than the
+ * left.
+ *
+ * It does take a drag. The worry was that a vertical scrub inside a rail is a
+ * gesture the rail wants for scrolling, but a rail scrolls on the wheel and a
+ * drag that starts on a child is the child's: what the caution actually bought
+ * was a measure people could see and could not move.
  */
 @Composable
 internal fun WaveformColumn(
@@ -123,12 +131,25 @@ internal fun WaveformColumn(
     modifier: Modifier = Modifier,
     barHeight: Dp = 3.dp,
     gap: Dp = 1.dp,
+    onSeekFraction: ((Float) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val slotPx = with(density) { (barHeight + gap).toPx() }.coerceAtLeast(1f)
     val barPx = with(density) { barHeight.toPx() }.coerceAtLeast(1f)
 
-    Canvas(modifier) {
+    val gestures = if (onSeekFraction == null) Modifier else Modifier.pointerInput(onSeekFraction) {
+        val height = size.height.toFloat()
+        detectTapGestures { onSeekFraction((it.y / height).coerceIn(0f, 1f)) }
+    }.then(
+        Modifier.pointerInput(onSeekFraction) {
+            val height = size.height.toFloat()
+            detectVerticalDragGestures { change, _ ->
+                onSeekFraction((change.position.y / height).coerceIn(0f, 1f))
+            }
+        },
+    )
+
+    Canvas(modifier.then(gestures)) {
         val count = (size.height / slotPx).toInt().coerceAtLeast(1)
         val bars = waveform.bars(count)
         val floor = size.width * FLOOR_SHARE
@@ -230,3 +251,50 @@ private fun Waveform?.bars(count: Int): FloatArray {
  * than as a quiet passage, and the lead-in of a great many tracks is silent.
  */
 private const val FLOOR_SHARE = 0.08f
+
+/**
+ * Seeking round a ring: a press or a drag lands where the angle points.
+ *
+ * Twelve o'clock is the start and it runs clockwise, matching what the ring
+ * draws, so the position follows the finger rather than the arithmetic.
+ *
+ * Presses nearer the middle than [innerFraction] are left alone. The middle of
+ * every ring-shaped player holds its transport, and a shape whose whole face is
+ * one gesture would either swallow the press meant for the button or seek to
+ * wherever the button happens to sit.
+ */
+internal fun Modifier.seekByAngle(
+    innerFraction: Float,
+    onSeekFraction: ((Float) -> Unit)?,
+): Modifier {
+    if (onSeekFraction == null) return this
+    return pointerInput(onSeekFraction, innerFraction) {
+        val centre = Offset(size.width / 2f, size.height / 2f)
+        val inner = size.width.coerceAtMost(size.height) / 2f * innerFraction
+
+        fun report(at: Offset) {
+            val dx = at.x - centre.x
+            val dy = at.y - centre.y
+            if (hypot(dx, dy) < inner) return
+            // atan2 answers from three o'clock and counts anticlockwise on a
+            // screen's y-down axes, so a quarter turn puts zero at the top and the
+            // sweep runs the way the arc is drawn.
+            val turns = (atan2(dy, dx) / (2.0 * PI) + 0.25).toFloat()
+            onSeekFraction(((turns % 1f) + 1f) % 1f)
+        }
+
+        awaitPointerEventScope {
+            while (true) {
+                // Unconsumed only: the transport in the middle and the overflow on
+                // the ring are children drawn over this, and a press one of them
+                // took is not also a seek.
+                val down = awaitFirstDown(requireUnconsumed = true)
+                report(down.position)
+                do {
+                    val event = awaitPointerEvent()
+                    event.changes.firstOrNull()?.let { report(it.position) }
+                } while (event.changes.any { it.pressed })
+            }
+        }
+    }
+}

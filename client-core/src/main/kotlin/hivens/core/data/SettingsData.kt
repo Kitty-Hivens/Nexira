@@ -319,6 +319,23 @@ data class SettingsData(
      */
     val audioVolume: Float = 1.0f,
 
+    /**
+     * The queue as it stood, and which entry of it was loaded.
+     *
+     * Kept for the same reason the loudness is: what somebody was listening to is
+     * theirs rather than the session's, and a player that comes back empty every
+     * launch asks them to find the folder again before it is a player at all.
+     *
+     * Paths as text, because a queue is a list of files on this machine and
+     * nothing here needs to be portable. An entry that has since been moved or
+     * deleted is dropped on the way back in rather than kept as a row that cannot
+     * play.
+     */
+    val audioQueue: List<String> = emptyList(),
+
+    /** Which entry of [audioQueue] was loaded, or -1 for none. */
+    val audioQueueIndex: Int = -1,
+
     // ── News ───────────────────────────────────────────────────────
 
     /**

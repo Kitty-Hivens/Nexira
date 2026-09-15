@@ -14,6 +14,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -40,6 +41,18 @@ class AudioPlayer(
      * drag across the whole track is one write and not one per frame.
      */
     private val persistVolume: (Float) -> Unit = {},
+    /**
+     * The queue as the last session left it, and which entry was loaded.
+     *
+     * Restored without opening anything: the engine is what costs a decode thread
+     * and a device, and [play] already opens on demand for a track whose engine
+     * was released. So a launch comes back to the track that was there, named and
+     * ready, and pays for it only when somebody presses play.
+     */
+    initialQueue: List<Path> = emptyList(),
+    initialIndex: Int = -1,
+    /** Where a settled queue goes. Debounced, off the engine thread. */
+    private val persistQueue: (List<Path>, Int) -> Unit = { _, _ -> },
 ) {
     private val log = LoggerFactory.getLogger(AudioPlayer::class.java)
 
@@ -117,6 +130,38 @@ class AudioPlayer(
     /** The entry the engine is on, derived rather than stored so the two cannot part. */
     private val loadedFile: Path? get() = _queue.value.getOrNull(_queueIndex.value)
 
+    private var queueWrite: Job? = null
+
+    init {
+        // Files that have since moved take their entry with them rather than
+        // sitting in the queue as a row that cannot play, and the index follows
+        // whatever is left.
+        val surviving = initialQueue.filter { runCatching { Files.isRegularFile(it) }.getOrDefault(false) }
+        if (surviving.isNotEmpty()) {
+            _queue.value = surviving
+            val index = initialIndex.coerceIn(0, surviving.lastIndex)
+            _queueIndex.value = index
+            _state.value = PlaybackState.Ready(surviving[index], positionMs = 0L, durationMs = 0L)
+        }
+    }
+
+    /**
+     * Writes the queue once it has settled.
+     *
+     * Debounced for the same reason the loudness is: the settings file is a
+     * read-modify-write of the whole document, and stepping through a queue with
+     * the skip button would otherwise write it once per press.
+     */
+    private fun rememberQueue() {
+        val files = _queue.value
+        val index = _queueIndex.value
+        queueWrite?.cancel()
+        queueWrite = scope.launch {
+            delay(QUEUE_WRITE_DELAY_MS.milliseconds)
+            withContext(Dispatchers.IO) { runCatching { persistQueue(files, index) } }
+        }
+    }
+
     /** One file: a queue of one, so every path through the player is the same path. */
     fun open(file: Path) = open(listOf(file))
 
@@ -134,6 +179,7 @@ class AudioPlayer(
             log.info("Audio open requested: {} file(s)", files.size)
             _queue.value = files
             loadAt(0, autoplay = false)
+            rememberQueue()
         }
     }
 
@@ -149,6 +195,7 @@ class AudioPlayer(
             val start = _queue.value.size
             _queue.value = _queue.value + files
             if (hadNothing) loadAt(start, autoplay = false)
+            rememberQueue()
         }
     }
 
@@ -194,6 +241,7 @@ class AudioPlayer(
                 edit.reload -> loadAt(edit.index, autoplay = started)
                 else -> _queueIndex.value = edit.index
             }
+            rememberQueue()
         }
     }
 
@@ -209,6 +257,7 @@ class AudioPlayer(
         val file = _queue.value.getOrNull(index) ?: return
         closeCurrent()
         _queueIndex.value = index
+        rememberQueue()
         started = autoplay
         // Metadata belongs to the file, so this is the only place it is dropped: a
         // track that ended, or was stopped, is still the track that is loaded.
@@ -436,6 +485,7 @@ class AudioPlayer(
     private companion object {
         const val POLL_INTERVAL_MS = 200L
         const val VOLUME_WRITE_DELAY_MS = 500L
+        const val QUEUE_WRITE_DELAY_MS = 800L
     }
 }
 

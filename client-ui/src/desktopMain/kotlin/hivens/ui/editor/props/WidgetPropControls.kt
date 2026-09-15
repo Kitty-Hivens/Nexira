@@ -96,8 +96,93 @@ internal fun PropFieldRow(
                 format        = "%.2f",
                 onValueChange = { onChange(JsonPrimitive(it)) },
             )
+        // A number with no range still has to stay a number. Without this it fell
+        // through to the free-text row below, which writes whatever was typed: a
+        // word went into an integer field, the props then failed to decode, and
+        // the widget came back at its defaults with nothing saying why.
+        element.kind == PrimitiveKind.INT ->
+            NumberRow(label, cur.content, decimals = false) { onChange(JsonPrimitive(it.toLong())) }
+        element.kind == PrimitiveKind.FLOAT || element.kind == PrimitiveKind.DOUBLE ->
+            NumberRow(label, cur.content, decimals = true) { onChange(JsonPrimitive(it)) }
         else ->
             StringRow(label, cur.content) { onChange(JsonPrimitive(it)) }
+    }
+}
+
+/**
+ * A field that only takes a number.
+ *
+ * Refuses the keystroke rather than accepting it and complaining afterwards: a
+ * character that cannot be part of a number never reaches the text, so there is
+ * no invalid state to show, explain or recover from. An empty field and a lone
+ * minus sign are allowed while typing, because both are on the way to a number,
+ * and neither is reported until it is one.
+ */
+@Composable
+private fun NumberRow(
+    label: String,
+    value: String,
+    decimals: Boolean,
+    onChange: (Double) -> Unit,
+) {
+    var text by remember(value) { mutableStateOf(value) }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text     = label,
+            style    = MaterialTheme.typography.bodySmall,
+            color    = NxTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(140.dp),
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(36.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(NxTheme.colors.surface.copy(alpha = 0.4f))
+                .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            BasicTextField(
+                value         = text,
+                onValueChange = { typed ->
+                    if (!isNumeric(typed, decimals)) return@BasicTextField
+                    text = typed
+                    typed.toDoubleOrNull()?.let(onChange)
+                },
+                singleLine    = true,
+                textStyle     = TextStyle(color = NxTheme.colors.textPrimary, fontSize = 13.sp),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
+                modifier      = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * Whether [text] is a number or on its way to being one.
+ *
+ * Pure, and separate from the field because it is the whole of the rule: what a
+ * keystroke filter lets through is easy to get wrong in the direction that traps
+ * somebody mid-edit, and every case worth arguing about is a one-line assertion.
+ */
+internal fun isNumeric(text: String, decimals: Boolean): Boolean {
+    if (text.isEmpty() || text == "-") return true
+    val body = text.removePrefix("-")
+    if (body.isEmpty()) return false
+    // ASCII digits rather than Char.isDigit, which is Unicode-aware and answers
+    // true for an Arabic-Indic three that toDoubleOrNull will not parse. The
+    // filter has to agree with the parser, or a character is accepted into the
+    // field and can never resolve into a value.
+    return if (decimals) {
+        body.count { it == '.' } <= 1 && body.all { it in '0'..'9' || it == '.' }
+    } else {
+        body.all { it in '0'..'9' }
     }
 }
 

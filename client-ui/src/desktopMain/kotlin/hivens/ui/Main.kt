@@ -233,11 +233,22 @@ val uiModule = module {
     // used to be reset to full on every launch.
     single {
         val settings: ISettingsService = get()
+        val saved = settings.getSettings()
         AudioPlayer(
             scope         = get(),
-            initialVolume = settings.getSettings().audioVolume,
+            initialVolume = saved.audioVolume,
             persistVolume = { level ->
                 settings.saveSettings(settings.getSettings().copy(audioVolume = level))
+            },
+            initialQueue  = saved.audioQueue.mapNotNull { runCatching { Path.of(it) }.getOrNull() },
+            initialIndex  = saved.audioQueueIndex,
+            persistQueue  = { files, index ->
+                settings.saveSettings(
+                    settings.getSettings().copy(
+                        audioQueue      = files.map { it.toString() },
+                        audioQueueIndex = index,
+                    ),
+                )
             },
         )
     }
