@@ -41,25 +41,35 @@ internal object ProbeSample {
     }
 
     /**
-     * A stand-in that cannot be mistaken for artwork.
+     * A stand-in that cannot be mistaken for artwork, and survives being blurred.
      *
      * Deliberately blocky and off-palette: a sheet reviewed with a plausible
      * picture on it is a sheet where nobody notices the sample was missing, and
      * one of these probes exists to show what a real cover does to the colour of
      * the card around it.
+     *
+     * Large regions rather than the fine checkerboard this used to be. A card
+     * that blurs its cover into a ground turns an eight by eight check into one
+     * flat wash, so the sheet came out looking correct while proving nothing
+     * about the blur or about the light it is supposed to give the text. Four
+     * quadrants of clashing colour and a disc across them blur into something
+     * with a top and a bottom, which is what such a card actually has to cope
+     * with.
      */
     private fun placeholder(side: Int = 512): ImageBitmap {
         val bitmap = Bitmap().apply { allocN32Pixels(side, side) }
         val canvas = Canvas(bitmap)
-        canvas.clear(0xFF3B2F5C.toInt())
-        val paint = Paint().apply { color = 0xFF5A4A8A.toInt() }
-        val step = side / 8f
-        for (row in 0 until 8) {
-            for (column in 0 until 8) {
-                if ((row + column) % 2 != 0) continue
-                canvas.drawRect(Rect.makeXYWH(column * step, row * step, step, step), paint)
-            }
-        }
+        canvas.clear(0xFF1B2440.toInt())
+        val half = side / 2f
+        val paint = Paint()
+        paint.color = 0xFFB03A2E.toInt()
+        canvas.drawRect(Rect.makeXYWH(0f, 0f, half, half), paint)
+        paint.color = 0xFF2E8B57.toInt()
+        canvas.drawRect(Rect.makeXYWH(half, half, half, half), paint)
+        paint.color = 0xFFE8C36B.toInt()
+        canvas.drawCircle(half, half * 0.85f, side * 0.22f, paint)
+        paint.color = 0xFF2E86AB.toInt()
+        canvas.drawRect(Rect.makeXYWH(0f, side * 0.78f, side.toFloat(), side * 0.22f), paint)
         return SkImage.makeFromBitmap(bitmap).toComposeImageBitmap()
     }
 }

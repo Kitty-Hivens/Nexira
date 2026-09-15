@@ -69,6 +69,10 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.readout",
             // no bar at all: the filled part of the card IS the position
             "home.new.player.timeline",
+            // no artwork either: the track's own envelope is the picture and the measure
+            "home.new.player.wave",
+            // both of the file's own pictures at once: the cover blurred into a ground, the envelope on it
+            "home.new.player.ground",
             // inline video player (URL prop, expand-to-full)
             "home.new.video",
             // unified configurable nav rail item
@@ -212,6 +216,8 @@ class WidgetRegistryConsistencyTest {
             "home.new.player.seeded",
             "home.new.player.readout",
             "home.new.player.timeline",
+            "home.new.player.wave",
+            "home.new.player.ground",
             "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",
