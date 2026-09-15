@@ -8,6 +8,7 @@ import hivens.core.api.interfaces.IPackSyncService
 import hivens.core.api.interfaces.RosterInspection
 import hivens.core.api.interfaces.RosterVerdict
 import hivens.core.diag.ActionRing
+import hivens.core.io.AtomicFiles
 import hivens.core.io.InstanceMutationLock
 import hivens.core.io.fileOpRetry
 import hivens.core.io.resolveWithinRoot
@@ -105,9 +106,10 @@ class SmrtSyncService(
             // stalled every mod behind it -- the plan lets the engine overlap them and
             // split the large ones into blocks.
             val sink = PlanSink()
+            val stuck = mutableListOf<Path>()
             for (mod in manifest.mods) {
                 val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
-                sink.accept("$MODS_PREFIX${mod.filename}", planMod(mod, clientDir, enabled))
+                sink.accept("$MODS_PREFIX${mod.filename}", planMod(mod, clientDir, enabled, stuck))
             }
             for (asset in manifest.assets) {
                 sink.accept(asset.dest, planAsset(asset, clientDir))
@@ -118,6 +120,7 @@ class SmrtSyncService(
             // and the loader, or the server, is what brings it up.
             reportUnfetchable(manifest.packId, sink.unfetchable)
             transfers.fetchAll(sink.transfers) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
+            reportStuckVariants(manifest.packId, sweepStale(stuck))
 
             // Drop manifest-removed mods and catch foreign payloads that
             // the wipe missed (an SC sync ran between two mirror syncs
@@ -169,10 +172,11 @@ class SmrtSyncService(
             // that named some entries by path and others by filename would read as
             // two different things having gone wrong.
             val sink = PlanSink()
+            val stuck = mutableListOf<Path>()
             for (mod in manifest.mods) {
                 val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
                 val name = if (enabled) mod.filename else "${mod.filename}.disabled"
-                sink.accept(name, planMod(mod, clientDir, enabled))
+                sink.accept(name, planMod(mod, clientDir, enabled, stuck))
             }
             for (asset in manifest.assets) {
                 sink.accept(asset.dest.substringAfterLast('/'), planAsset(asset, clientDir))
@@ -182,6 +186,7 @@ class SmrtSyncService(
             val report = transfers.verifyAndRepair(suspect) { p ->
                 progress?.invoke(p.filesDone, p.filesTotal, p.current)
             }
+            reportStuckVariants(manifest.packId, sweepStale(stuck))
             // A verify is a full comparison against the manifest, so it is exactly the
             // moment the instance can be vouched for -- write the roster here too.
             // Without this, "verify and repair" checked every file and still left the
@@ -247,6 +252,7 @@ class SmrtSyncService(
         // Same shape as a full sync: the local moves and drops happen while the plan
         // is built, then everything that needs the network goes in one batch.
         val sink = PlanSink()
+        val stuck = mutableListOf<Path>()
         for (path in plan.toAdd + plan.toUpdate) {
             val entry = index[path] ?: continue
             if (path.startsWith(MODS_PREFIX)) {
@@ -256,7 +262,12 @@ class SmrtSyncService(
                 val disabled = resolveSafe(clientDir, "$path.disabled", "mod $filename")
                 val dest = if (enabled) active else disabled
                 val stale = if (enabled) disabled else active
+                // Kept, not dropped: see planMod. An update of a mod the player
+                // switched off is exactly where the stale variant IS the active jar.
+                // `add`, not `+=`: a Path is itself an Iterable<Path>, so the operator
+                // resolves to the one that appends its ELEMENTS and returns a new list.
                 runCatching { fileOpRetry("update drop stale $filename") { Files.deleteIfExists(stale) } }
+                    .onFailure { stuck.add(stale) }
                 sink.accept(path, plan(dest, entry.sha1, entry.size, entry.source, "mod $filename"))
             } else {
                 val dest = resolveSafe(clientDir, path, "asset $path")
@@ -276,6 +287,9 @@ class SmrtSyncService(
             progress?.invoke(p.filesDone, total, p.current)
         }
         current = fetches.size
+        // Before the relabel below, which declines while both names exist and would
+        // otherwise leave the switched-off mod loading under its active name.
+        reportStuckVariants(manifest.packId, sweepStale(stuck))
 
         for (path in plan.toDelete) {
             current++
@@ -738,6 +752,46 @@ class SmrtSyncService(
      * the pack describes ends at a loader or a server refusing it, and neither of
      * those names the mod or says the launcher already knew.
      */
+    /**
+     * Asks a second time for the variants something was holding while the plan was
+     * built, and answers with whatever still will not go.
+     *
+     * Worth asking twice because the two attempts sit either side of the transfers:
+     * a game still shutting down, or a scanner reading the jar, has had the length
+     * of a download to let go of it. Windows is where this matters, since a running
+     * JVM keeps its mod jars open without delete-sharing.
+     */
+    private fun sweepStale(stale: List<Path>): List<String> {
+        val left = mutableListOf<String>()
+        for (path in stale) {
+            runCatching { fileOpRetry("smrt sync drop stale ${path.fileName}") { Files.deleteIfExists(path) } }
+                .onFailure { left += path.fileName.toString() }
+        }
+        return left
+    }
+
+    /**
+     * Says when a mod the player switched off is still the one on disk under its
+     * loadable name.
+     *
+     * Only the active variant is worth a word. A leftover `.disabled` is a file no
+     * loader opens, so it costs disk and nothing else, while an active jar is the
+     * mod running in the game after the player asked for it not to. The wording
+     * matches the toggle path's, because it is the same promise: the choice is
+     * recorded and takes effect once whatever holds the file lets go.
+     */
+    private fun reportStuckVariants(packId: String, stuck: List<String>) {
+        val loadable = stuck.filterNot { it.endsWith(".disabled") }
+        if (loadable.isEmpty()) return
+        log.warn(
+            "smrt sync: pack={} could not drop {} active variant(s) of switched-off mods: {}",
+            packId, loadable.size, loadable,
+        )
+        ActionRing.record(
+            "$packId: ${loadable.size} file(s) held open, the content change applies after the game restarts (${loadable.joinToString()})",
+        )
+    }
+
     private fun reportUnfetchable(packId: String, unfetchable: Map<String, String>) {
         if (unfetchable.isEmpty()) return
         log.warn(
@@ -762,8 +816,18 @@ class SmrtSyncService(
             ?.getOrNull()
             .orEmpty()
 
+    /**
+     * Published whole or not at all, because this file is the next launch's delete
+     * list. A truncating write leaves a window where the roster is a prefix of
+     * itself, and a prefix is indistinguishable from a shorter pack: nothing in it
+     * carries a count or a digest to disagree with. What the sweep then reads is a
+     * list that does not name the rest of the pack's own mods, and it removes them.
+     *
+     * The failure mode this trades for is keeping the PREVIOUS roster, which names
+     * a build that was on disk and is the safe end of the two.
+     */
     private fun writeRoster(clientDir: Path, expected: Set<String>) {
-        runCatching { clientDir.resolve(ROSTER_FILE).toFile().writeText(expected.sorted().joinToString("\n")) }
+        runCatching { AtomicFiles.writeString(clientDir.resolve(ROSTER_FILE), expected.sorted().joinToString("\n")) }
             .onFailure { log.warn("smrt sync: failed to write mods roster", it) }
     }
 
@@ -774,8 +838,9 @@ class SmrtSyncService(
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
 
+    /** Published the same way as the roster: a half-written marker reads as a different source. */
     private fun writeSourceMarker(marker: Path, value: String) {
-        runCatching { marker.toFile().writeText(value) }
+        runCatching { AtomicFiles.writeString(marker, value) }
             .onFailure { log.warn("smrt sync: failed to write source marker", it) }
     }
 
@@ -791,6 +856,7 @@ class SmrtSyncService(
         mod: SmrtModEntry,
         clientDir: Path,
         enabled: Boolean,
+        stuck: MutableList<Path> = mutableListOf(),
     ): Planned = withContext(Dispatchers.IO) {
         val modsDir = clientDir.resolve("mods")
         val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
@@ -806,7 +872,15 @@ class SmrtSyncService(
         // The variant under the other name cannot be the manifest's bytes: the move
         // above is what claims it when it is. So whatever is left there is stale by
         // definition, whether or not the entry itself can be fetched.
+        //
+        // The outcome is kept rather than dropped. When this is the ACTIVE jar of a
+        // mod the player turned off, a holder that outlives the retry leaves it
+        // loading: the new copy is fetched beside it under the disabled name, the
+        // relabel step then declines because both names exist, and the roster lists
+        // both on purpose, so the sweep will not take either. The toggle silently
+        // does not happen. [sweepStale] asks again once the transfers are done.
         runCatching { fileOpRetry("smrt sync drop stale ${mod.filename}") { Files.deleteIfExists(stale) } }
+            .onFailure { stuck.add(stale) }
         plan(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
@@ -955,12 +1029,29 @@ class SmrtSyncService(
          */
         const val EXPECTED_SCHEMA = 2
 
-        private const val SOURCE_MARKER_FILE = ".nexira-sync-source"
+        internal const val SOURCE_MARKER_FILE = ".nexira-sync-source"
 
         /** Names `mods/` may hold, written by sync/update and enforced on launch. */
-        private const val ROSTER_FILE = ".nexira-mods"
+        internal const val ROSTER_FILE = ".nexira-mods"
         private const val SOURCE_MIRROR = "mirror"
         private const val MODS_PREFIX = "mods/"
+
+        /**
+         * What the instance says about ITSELF rather than about its content, kept
+         * beside the files instead of in the registry.
+         *
+         * Neither is a manifest path, so an instance scan never sees them and
+         * nothing that works from the manifest can put them back. A snapshot has to
+         * carry them by name or a rollback restores the files of one build under
+         * the roster of another, and where the registry holds no baseline to
+         * outrank it that roster is the next launch's delete list.
+         *
+         * That capture is hardlinked, which is why both of them are published by
+         * replacing the file rather than by truncating it in place: a writer that
+         * reuses the inode rewrites the snapshot's copy along with the live one, and
+         * the rollback then restores the bytes it was supposed to undo.
+         */
+        internal val INSTANCE_STATE_FILES = listOf(ROSTER_FILE, SOURCE_MARKER_FILE)
 
         /** What a mod is identified by when it sits unpacked in a directory. */
         private val MOD_METADATA = listOf("mcmod.info", "META-INF/mods.toml", "fabric.mod.json")
