@@ -1178,8 +1178,6 @@ object EnglishStrings : AppStrings {
         "widget.home.new.hero.showMeta" to "Metadata",
         "widget.home.new.launchbutton" to "Launch button",
         "widget.home.new.launchbutton.label" to "Label",
-        "widget.home.new.music" to "Music player",
-        "widget.home.new.music.title" to "Heading",
         "widget.home.new.playback.mini" to "Mini player",
         "widget.home.new.player.timeline" to "Player: the body is the timeline",
         "widget.home.new.player.timeline.fill" to "Played-part ink",

@@ -64,7 +64,7 @@ import kotlin.io.path.name
 
 // Mini transport for the cross-widget music service. Reads
 // MusicPlayerService from the registry; if no provider is currently
-// mounted (the user removed the MusicPlayerWidget, or hasn't dropped
+// mounted (the user removed the player widget, or hasn't dropped
 // one yet) shows a muted disabled state instead of disappearing or
 // crashing. Demonstrates the bidirectional read+write loop end to
 // end: sliding the volume here moves it on the main player, tapping
@@ -227,7 +227,7 @@ private fun TransportButton(
     }
 }
 
-// Smaller cousin of MusicPlayerWidget's VolumeBar, scoped down so it
+// Smaller cousin of the player cards' volume control, scoped down so it
 // fits inside a single transport row. Same gesture model.
 @Composable
 private fun MiniVolumeBar(

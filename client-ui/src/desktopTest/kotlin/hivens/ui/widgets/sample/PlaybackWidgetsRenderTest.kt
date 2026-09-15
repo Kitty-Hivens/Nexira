@@ -14,7 +14,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
+import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
+import hivens.ui.widgets.sample.players.ReadoutPlayerCard
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
@@ -32,7 +34,7 @@ import kotlin.test.assertTrue
  * assertions pin the three things the surfaces were reported wrong on.
  *
  * The widgets pull their subject from Koin and the service registry, so what is
- * exercised here is the presentation -- [MusicPlayerCard] and
+ * exercised here is the presentation -- [ReadoutPlayerCard] and
  * [PlaybackMiniControl] handed state directly.
  */
 class PlaybackWidgetsRenderTest {
@@ -86,16 +88,36 @@ class PlaybackWidgetsRenderTest {
 
     @Composable
     private fun Sheet() {
-        MusicPlayerCard(
-            heading     = "Music",
+        Card()
+        Mini()
+    }
+
+    @Composable
+    private fun Card() {
+        // The card this guard was written against is retired. The complaint it
+        // came from is not, and it is about any player that draws its own plane,
+        // so the guard moves to one of the kinds that replaced it rather than
+        // going with the file.
+        ReadoutPlayerCard(
             state       = playing(0.35f),
             track       = track,
             volume      = 0.7f,
+            repeat      = RepeatMode.Off,
+            queueSize   = 1,
+            showTotal   = true,
             onPick      = {},
             onPlayPause = {},
             onStop      = {},
             onVolume    = {},
+            onRepeat    = {},
+            onSkipNext  = {},
+            onSkipPrev  = {},
+            onSeek      = {},
         )
+    }
+
+    @Composable
+    private fun Mini() {
         PlaybackMiniControl(
             state       = playing(0.35f),
             track       = track,
@@ -113,11 +135,18 @@ class PlaybackWidgetsRenderTest {
         val cases = listOf("dark" to true, "light" to false)
         for ((name, dark) in cases) {
             render(dark, name, scale = 2f) { Sheet() }
-            val bmp = render(dark, name) { Sheet() }
 
-            val card = bmp.getColor(bmp.width / 2, (bmp.height * 0.14f).toInt())
-            val mini = bmp.getColor(bmp.width / 2, (bmp.height * 0.66f).toInt())
-            val page = bmp.getColor(bmp.width - 4, bmp.height - 4)
+            // Each surface on its own sheet, sampled at its own top-left corner
+            // rather than at a fraction of a sheet holding both. The fractions
+            // were tied to the stacking order and to the height of the card that
+            // used to be first: swapping that card moved the second surface out
+            // from under its sample point, and the guard failed for a reason that
+            // had nothing to do with what it guards.
+            val cardBmp = render(dark, "$name-card") { Card() }
+            val miniBmp = render(dark, "$name-mini") { Mini() }
+            val card = cardBmp.getColor(cardBmp.width / 2, PLANE_PROBE_Y)
+            val mini = miniBmp.getColor(miniBmp.width / 2, PLANE_PROBE_Y)
+            val page = cardBmp.getColor(cardBmp.width - 4, cardBmp.height - 4)
             assertTrue(!near(card, page, tolerance = 6), "$name: the card body must not match the page: ${hex(card)} vs ${hex(page)}")
             assertTrue(!near(mini, page, tolerance = 6), "$name: the mini body must not match the page: ${hex(mini)} vs ${hex(page)}")
         }
@@ -168,6 +197,12 @@ class PlaybackWidgetsRenderTest {
         abs(((a shr 16) and 0xFF) - ((b shr 16) and 0xFF)) < tolerance &&
             abs(((a shr 8) and 0xFF) - ((b shr 8) and 0xFF)) < tolerance &&
             abs((a and 0xFF) - (b and 0xFF)) < tolerance
+
+    /**
+     * A few rows below the top padding, which is inside any surface drawn first
+     * on the sheet and outside none of them.
+     */
+    private val PLANE_PROBE_Y = 24
 
     private fun hex(c: Int) = "#%06X".format(c and 0xFFFFFF)
 }

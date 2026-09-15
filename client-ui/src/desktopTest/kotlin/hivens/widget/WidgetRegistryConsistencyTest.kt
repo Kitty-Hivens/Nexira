@@ -59,8 +59,6 @@ class WidgetRegistryConsistencyTest {
             "home.new.spacer",
             "home.new.progress",
             "home.new.launchbutton",
-            // editor-3.7 music
-            "home.new.music",
             // the cover-led player, first of the new player kinds
             "home.new.player.cover",
             // the same artwork leading a differently: the card takes the cover's colour
@@ -219,7 +217,6 @@ class WidgetRegistryConsistencyTest {
             "home.new.progress",
             "home.new.welcome",
             "home.new.launchbutton",
-            "home.new.music",
             "home.new.player.cover",
             "home.new.player.seeded",
             "home.new.player.readout",

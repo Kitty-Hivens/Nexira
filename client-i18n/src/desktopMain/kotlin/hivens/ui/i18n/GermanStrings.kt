@@ -1180,8 +1180,6 @@ object GermanStrings : AppStrings {
         "widget.home.new.hero.showMeta" to "Metadaten",
         "widget.home.new.launchbutton" to "Startknopf",
         "widget.home.new.launchbutton.label" to "Beschriftung",
-        "widget.home.new.music" to "Musikplayer",
-        "widget.home.new.music.title" to "Überschrift",
         "widget.home.new.playback.mini" to "Mini-Player",
         "widget.home.new.player.timeline" to "Player: die Karte ist die Zeitachse",
         "widget.home.new.player.timeline.fill" to "Abgespielter Anteil",

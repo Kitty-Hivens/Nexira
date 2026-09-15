@@ -4,6 +4,8 @@ import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
+import hivens.widget.model.flatMapInstances
 import hivens.widget.model.resetSurface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -295,11 +297,10 @@ class LayoutGraphRepository(
 /**
  * Schema migration ladder. Each step transforms a graph from version N-1 to version N.
  *
- * Empty at present, and that is not an oversight. Everything below
- * [LayoutReconcile.SURFACE_SCHEMA] is discarded at load rather than migrated, so the
- * steps that once carried a graph from v1 to v7 are unreachable and have been removed
- * with their tests. The mechanism stays because the next schema change will be an
- * ordinary one: the format this build writes is built to grow rather than break.
+ * Everything below [LayoutReconcile.SURFACE_SCHEMA] is discarded at load rather than
+ * migrated, so the steps that once carried a graph from v1 to v7 are unreachable and
+ * were removed with their tests. What is here is the ordinary kind of change the
+ * mechanism was kept for.
  */
 internal object Migrations {
     fun apply(fromVersion: Int, graph: LayoutGraph): LayoutGraph {
@@ -319,7 +320,38 @@ internal object Migrations {
 
     private const val CURRENT = LayoutReconcile.CURRENT_SCHEMA
 
-    private fun step(toVersion: Int): Step = Step.IDENTITY
+    private fun step(toVersion: Int): Step = when (toVersion) {
+        9 -> RetireTheOldMusicPlayer
+        else -> Step.IDENTITY
+    }
+
+    /**
+     * The music player that predates the concept sheet becomes the cover-led one.
+     *
+     * Its widget is gone, and a kind the registry does not know is a widget the
+     * renderer skips: a silent hole where somebody had put a player, with nothing
+     * on screen to say what happened or how to get it back. So the instance is
+     * kept and re-pointed at the nearest successor, which is the kind that also
+     * leads with the artwork and carries the transport in a row.
+     *
+     * The props go back to the successor's defaults rather than being carried
+     * across. The old kind's only setting was a heading, and the new one has no
+     * heading to put it in, so there is nothing to preserve and a stale key would
+     * decode to a default anyway.
+     */
+    private val RetireTheOldMusicPlayer = Step { graph ->
+        graph.flatMapInstances { widget ->
+            if (widget.kind.value != RETIRED_MUSIC_PLAYER) {
+                listOf(widget)
+            } else {
+                listOf(widget.copy(kind = WidgetKind(MUSIC_PLAYER_SUCCESSOR), props = JsonObject(emptyMap())))
+            }
+        }
+    }
+
+    private const val RETIRED_MUSIC_PLAYER = "home.new.music"
+
+    private const val MUSIC_PLAYER_SUCCESSOR = "home.new.player.cover"
 
     private fun interface Step {
         fun apply(graph: LayoutGraph): LayoutGraph

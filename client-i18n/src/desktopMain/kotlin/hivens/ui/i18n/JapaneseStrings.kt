@@ -1184,8 +1184,6 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.hero.showMeta" to "付随情報",
         "widget.home.new.launchbutton" to "起動ボタン",
         "widget.home.new.launchbutton.label" to "ラベル",
-        "widget.home.new.music" to "音楽プレーヤー",
-        "widget.home.new.music.title" to "見出し",
         "widget.home.new.playback.mini" to "ミニプレーヤー",
         "widget.home.new.player.timeline" to "プレイヤー: カード全体が進行バー",
         "widget.home.new.player.timeline.fill" to "再生済みの塗り",

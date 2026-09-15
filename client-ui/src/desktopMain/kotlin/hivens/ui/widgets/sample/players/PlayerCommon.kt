@@ -25,9 +25,9 @@ import kotlinx.coroutines.launch
  * What the player kinds share: the file dialog and the two strings every one of
  * them puts on screen.
  *
- * Deliberately not shared with the older `MusicPlayerWidget`. Its own copies are
- * private to it and tangled with a layout that is on its way out, so reaching
- * into them would couple the new shapes to the one they are meant to replace.
+ * Written fresh rather than lifted out of the player these kinds replaced. Its
+ * own copies were private to it and tangled with a layout that was on its way
+ * out, and that widget is now gone.
  */
 
 /**

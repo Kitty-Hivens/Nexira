@@ -35,7 +35,7 @@ class LayoutReconcileTest {
 
     @Test
     fun `CURRENT_SCHEMA is the schema this build migrates up to`() {
-        assertEquals(8, LayoutReconcile.CURRENT_SCHEMA)
+        assertEquals(9, LayoutReconcile.CURRENT_SCHEMA)
     }
 
 
