@@ -999,6 +999,9 @@ class SmrtSyncService(
         // needed here. `plan` has already skipped the entry when it is absent.
         is SmrtSource.CurseForge -> source.url
             ?: error("curseforge ${source.projectId}/${source.fileId} carries no url")
+        // A release asset is public, so the mirror hands over a plain link and
+        // there is nothing to resolve.
+        is SmrtSource.Github     -> source.url
         is SmrtSource.Modrinth   -> {
             val v = modrinth.resolveVersion(source.projectId, source.versionId)
             v.primaryFile().url

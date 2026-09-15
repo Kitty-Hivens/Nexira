@@ -8,6 +8,10 @@ Das Entwicklungsprotokoll ist ein eigenes Dokument:
 [CHANGELOG.md](./CHANGELOG.md). Es nennt Klassen und Mechanismen und muss
 nicht gelesen werden, um eine Version zu verstehen.
 
+## [Unreleased]
+
+Mods, die bisher der Spiegelserver selbst verteilt hat, kommen jetzt direkt von dort, wo ihre Autoren sie veroeffentlichen. Am Installieren eines Packs aendert sich nichts: die Dateien kommen wie bisher an und werden wie bisher geprueft, und der Launcher zeigt an, welche davon von GitHub stammen.
+
 ## [2.4.4] - 2026-09-15
 
 Pakete, deren Mods auf CurseForge liegen, werden wieder vollständig installiert. Der Launcher konnte von Modrinth und vom Spiegel laden, eine auf CurseForge veröffentlichte Mod ließ er stillschweigend aus. Das Paket galt danach als verändert, die Anmeldung blieb aus und der Server ließ niemanden herein, ohne dass auf dem Bildschirm ein Grund stand. Diese Mods werden jetzt wie alle anderen geladen, und ein CurseForge-Schlüssel ist dafür nicht nötig: den Link löst der Spiegel im Voraus auf.

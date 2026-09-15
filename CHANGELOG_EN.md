@@ -18,6 +18,8 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+Mods the mirror hosted itself now come straight from where their authors publish them. Nothing changes in how a pack installs: the files arrive the same way and are checked the same way, and the launcher shows which of them came from GitHub.
+
 ## [2.4.4] - 2026-09-15
 
 Packs whose mods live on CurseForge install completely again. The launcher could fetch from Modrinth and from the mirror, and a mod published on CurseForge was quietly left out. The pack then looked modified, the login was withheld and the server would not let you in, with nothing on screen to say why. Those mods now download like any other, and no CurseForge key is needed for it: the mirror resolves the link in advance.

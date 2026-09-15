@@ -48,6 +48,36 @@ class SmrtManifestFieldsTest {
         assertNull(unknown?.presenceClass)
     }
 
+    private fun withSource(source: String) = """
+        {"schema_version":2,"pack_id":"p","pack_version":"0.1.2","generated_at":"t",
+         "minecraft":{"version":"1.21.1"},"loader":{"name":"neoforge","version":"21.1.186"},"java":{"major":21},
+         "mods":[{"filename":"a.jar","sha1":"aa","size_bytes":1,"source":$source}]}
+    """.trimIndent()
+
+    @Test
+    fun `a github source decodes and keys an optional toggle by its asset`() {
+        val body = withSource(
+            """{"type":"github","repo":"Kitty-Hivens/hidemymods","tag":"v0.2.0",
+                "asset":"hidemymods-1.7.10.jar",
+                "url":"https://github.com/Kitty-Hivens/hidemymods/releases/download/v0.2.0/hidemymods-1.7.10.jar"}""",
+        )
+        val mod = json.decodeFromString(SmrtPackManifest.serializer(), body).mods.single()
+        val source = mod.source as SmrtSource.Github
+        assertEquals("Kitty-Hivens/hidemymods", source.repo)
+        assertEquals("v0.2.0", source.tag)
+        assertEquals("hidemymods-1.7.10.jar", source.asset)
+        // the tag is the version, so the toggle key must not carry it
+        assertEquals("github:Kitty-Hivens/hidemymods/hidemymods-1.7.10.jar", mod.stableKey)
+    }
+
+    @Test
+    fun `an unknown source type leaves the rest of the manifest readable`() {
+        val body = withSource("""{"type":"gopher","url":"gopher://x"}""")
+        val m = json.decodeFromString(SmrtPackManifest.serializer(), body)
+        assertEquals(SmrtSource.Unknown, m.mods.single().source)
+        assertEquals("p", m.packId)
+    }
+
     @Test
     fun `summary decodes the read-time derived fields`() {
         val body = """

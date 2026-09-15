@@ -49,6 +49,7 @@ data class NxColors(
     val originMirror: Color,
     val originModrinth: Color,
     val originCurseforge: Color,
+    val originGithub: Color,
     val originLocal: Color,
     // --- Material-3 tonal expansion ---
     // A third accent plus muted "container" fills and layered surface tiers, so UI
@@ -96,6 +97,10 @@ internal val DarkColorPalette = NxColors(
     originMirror      = Color(0xFF3B82F6), // blue
     originModrinth    = Color(0xFF22C55E), // green
     originCurseforge  = Color(0xFFF16436), // orange
+    // GitHub's own palette is monochrome, so the badge is too: near-white here,
+    // near-black on the light ground, which is far enough off originLocal's
+    // mid-grey to read as a different source rather than as no source.
+    originGithub      = Color(0xFFE6EDF3),
     originLocal       = Color(0xFF9CA3AF), // grey
     // Tonal expansion -- placeholders; the builder re-derives containers + tertiary
     // from the live accents. Surface tiers below are the real dark-ground values.
@@ -157,6 +162,7 @@ internal val LightColorPalette = NxColors(
     originMirror      = Color(0xFF2563EB), // deeper blue
     originModrinth    = Color(0xFF16A34A), // deeper green
     originCurseforge  = Color(0xFFC2410C), // deeper orange for light bg
+    originGithub      = Color(0xFF24292F),
     originLocal       = Color(0xFF64748B), // slate
     // Tonal expansion -- placeholders re-derived by the builder; surface tiers real.
     tertiary = Color(0xFFB5651D),

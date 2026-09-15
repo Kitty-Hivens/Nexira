@@ -189,6 +189,7 @@ data class SmrtModEntry(
         get() = slug
             ?: (source as? SmrtSource.Modrinth)?.let { "modrinth:${it.projectId}" }
             ?: (source as? SmrtSource.CurseForge)?.let { "curseforge:${it.projectId}" }
+            ?: (source as? SmrtSource.Github)?.let { "github:${it.repo}/${it.asset}" }
             ?: filename
 }
 
@@ -242,8 +243,27 @@ sealed class SmrtSource {
     ) : SmrtSource()
 
     /**
-     * A `type` this client does not understand -- a mirror that gained
-     * `github_release` or another provider before the launcher learned it. The
+     * A file published as a GitHub release asset. [url] is where the launcher
+     * fetches it, and unlike a CurseForge link it is public, derivable and
+     * never expires, so it is always present.
+     *
+     * The three fields are carried beside it because they are what the pack
+     * actually named. A release can be retagged or deleted, at which point the
+     * link is the only thing that stops working and these still say what was
+     * meant.
+     */
+    @Serializable
+    @SerialName("github")
+    data class Github(
+        val repo: String,
+        val tag: String,
+        val asset: String,
+        val url: String,
+    ) : SmrtSource()
+
+    /**
+     * A `type` this client does not understand -- a mirror that gained another
+     * provider before the launcher learned it. The
      * entry is kept so the rest of the manifest still decodes; the install
      * path skips it rather than failing the whole pack. Never emitted by us,
      * so the sentinel discriminator only appears on a cache round-trip.
@@ -278,6 +298,7 @@ object SmrtSourceLenientSerializer : KSerializer<SmrtSource> {
             "smrt_cache"  -> SmrtSource.SmrtCache.serializer()
             "smrt_static" -> SmrtSource.SmrtStatic.serializer()
             "curseforge"  -> SmrtSource.CurseForge.serializer()
+            "github"      -> SmrtSource.Github.serializer()
             else          -> return SmrtSource.Unknown
         }
         // A type this client knows, carrying a payload it does not: a field renamed,
