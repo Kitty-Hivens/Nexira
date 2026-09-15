@@ -184,12 +184,19 @@ data class SmrtModEntry(
      * same thing, so an optional mod pinned there keeps the player's choice across
      * a version bump instead of falling back to a filename that carries the mod
      * version in it.
+     *
+     * A GitHub source is keyed by the repository alone. The tag is the version by
+     * definition, and the asset name carries it just as often (`mymod-1.2.3.jar`),
+     * so either one re-keys the entry at every release, which is the exact failure
+     * this key exists to prevent. The repository is what stays put. It cannot tell
+     * apart two assets of one repository in one pack, and that is what [slug] is
+     * for -- the curator names the rare case rather than every entry paying for it.
      */
     val stableKey: String
         get() = slug
             ?: (source as? SmrtSource.Modrinth)?.let { "modrinth:${it.projectId}" }
             ?: (source as? SmrtSource.CurseForge)?.let { "curseforge:${it.projectId}" }
-            ?: (source as? SmrtSource.Github)?.let { "github:${it.repo}/${it.asset}" }
+            ?: (source as? SmrtSource.Github)?.let { "github:${it.repo}" }
             ?: filename
 }
 

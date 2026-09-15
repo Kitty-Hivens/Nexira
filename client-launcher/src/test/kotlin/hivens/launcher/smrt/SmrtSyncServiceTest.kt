@@ -875,6 +875,7 @@ class SmrtSyncServiceTest {
         const val OPT_URL = "https://mirror.test/opt.jar"
         const val SERVERS_URL = "https://mirror.test/servers.dat"
         const val CF_URL = "https://edge.forgecdn.test/files/2920/433/served.jar"
+        const val GH_URL = "https://github.test/Kitty-Hivens/hidemymods/releases/download/v0.2.0/hidemymods-1.7.10.jar"
     }
 
     /**
@@ -1036,6 +1037,43 @@ class SmrtSyncServiceTest {
 
         assertEquals(2, report.intact, "both entries are the bytes the manifest names")
         assertTrue(report.failed.isEmpty(), "nothing is missing, so nothing is unresolved")
+    }
+
+    // --- mods pinned to a GitHub release ---
+
+    private val ghBytes = "GITHUB-RELEASE-ASSET".toByteArray()
+
+    private fun githubManifest() = """
+        {"schema_version":2,"pack_id":"test","pack_version":"1","generated_at":"now",
+         "minecraft":{"version":"1.7.10"},"loader":{"name":"forge","version":"10.13.4.1614"},"java":{"major":8},
+         "mods":[
+           {"filename":"hidemymods.jar","sha1":"${sha1(ghBytes)}","size_bytes":${ghBytes.size},"required":true,
+            "source":{"type":"github","repo":"Kitty-Hivens/hidemymods","tag":"v0.2.0",
+                      "asset":"hidemymods-1.7.10.jar","url":"$GH_URL"}}
+         ],"assets":[]}
+    """.trimIndent()
+
+    /**
+     * A release asset is public, so the manifest carries the finished link and the
+     * install path has nothing to resolve. The point of the test is that the entry
+     * reaches the transfer at all: before the variant existed it folded to the
+     * unknown sentinel and `plan` skipped it without failing anything.
+     */
+    @Test
+    fun `a mod pinned to a github release is fetched from the link the manifest carries`() = runTest {
+        val dir = tempDir("github-release")
+        val service = serviceWith(
+            MockEngine { req ->
+                when (req.url.toString()) {
+                    GH_URL -> respond(ByteReadChannel(ghBytes), HttpStatusCode.OK)
+                    else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+                }
+            }
+        )
+
+        service.sync(parsed(githubManifest()), dir)
+
+        assertContentEquals(ghBytes, Files.readAllBytes(dir.resolve("mods/hidemymods.jar")))
     }
 
     // --- the roster is published whole, or the previous one stands ---

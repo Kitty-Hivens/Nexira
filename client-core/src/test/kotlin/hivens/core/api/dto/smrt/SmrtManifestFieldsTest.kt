@@ -55,7 +55,7 @@ class SmrtManifestFieldsTest {
     """.trimIndent()
 
     @Test
-    fun `a github source decodes and keys an optional toggle by its asset`() {
+    fun `a github source decodes and keys an optional toggle by its repository`() {
         val body = withSource(
             """{"type":"github","repo":"Kitty-Hivens/hidemymods","tag":"v0.2.0",
                 "asset":"hidemymods-1.7.10.jar",
@@ -66,8 +66,32 @@ class SmrtManifestFieldsTest {
         assertEquals("Kitty-Hivens/hidemymods", source.repo)
         assertEquals("v0.2.0", source.tag)
         assertEquals("hidemymods-1.7.10.jar", source.asset)
-        // the tag is the version, so the toggle key must not carry it
-        assertEquals("github:Kitty-Hivens/hidemymods/hidemymods-1.7.10.jar", mod.stableKey)
+        // Neither the tag nor the asset name may reach the key: both carry the
+        // version, the tag by definition and the asset name by convention, and
+        // either one re-keys the entry at the next release. The repository stays.
+        assertEquals("github:Kitty-Hivens/hidemymods", mod.stableKey)
+    }
+
+    /**
+     * The property the key exists for, stated as the release it has to survive:
+     * the same mod at a new tag, published under a versioned asset name, is the
+     * same entry and keeps whatever the player chose for it.
+     */
+    @Test
+    fun `a github release bump does not re-key the entry`() {
+        fun keyAt(tag: String, asset: String) = json.decodeFromString(
+            SmrtPackManifest.serializer(),
+            withSource(
+                """{"type":"github","repo":"Kitty-Hivens/hidemymods","tag":"$tag","asset":"$asset",
+                    "url":"https://github.com/Kitty-Hivens/hidemymods/releases/download/$tag/$asset"}""",
+            ),
+        ).mods.single().stableKey
+
+        assertEquals(
+            keyAt("v0.2.0", "hidemymods-0.2.0.jar"),
+            keyAt("v0.3.1", "hidemymods-0.3.1.jar"),
+            "a new release is the same optional mod, so the toggle must follow it",
+        )
     }
 
     @Test
