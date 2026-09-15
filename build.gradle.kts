@@ -194,6 +194,16 @@ subprojects {
         systemProperty("junit.jupiter.execution.timeout.default", "2m")
         systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
 
+        // Probe switches reach the test worker. Gradle does not forward -D to a
+        // forked test JVM, so the invocation the probes document in their own
+        // KDoc was true only through the environment-variable half of it, and a
+        // probe asked for by system property quietly did not run.
+        // systemPropertiesPrefixedBy registers the read with the configuration
+        // cache, for the same reason the CI flag above goes through a provider.
+        providers.systemPropertiesPrefixedBy("nexira.probe.").get().forEach { (key, value) ->
+            systemProperty(key, value)
+        }
+
         // A deadlocked test worker is worse than a failing one: GitHub withholds
         // a job's log until the job ends, so a hang yields no test report and no
         // stack -- just a job sitting on the 6-hour limit while the release
