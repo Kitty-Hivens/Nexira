@@ -85,7 +85,7 @@ internal fun PackDataSection(
             val report = updates.verifyAndRepair(pack) { current, total, path ->
                 progress(current, total, path.substringAfterLast('/'))
             }
-            PackOperationPhase.Repaired(report.checked, report.repaired.size)
+            PackOperationPhase.Repaired(report.checked, report.repaired.size, report.failed.keys.toList())
         }
     }
 

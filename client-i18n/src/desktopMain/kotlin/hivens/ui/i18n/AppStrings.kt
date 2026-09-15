@@ -1048,6 +1048,13 @@ interface AppStrings {
     val packBusyRunningConfirm: String
     /** Outcome line: how much was looked at, and how much had to be put back. */
     fun packSettingsRepairDone(checked: Int, repaired: Int): String
+
+    /**
+     * A repair that ended with entries it could not put right. [names] is an
+     * already-shortened, comma-joined list, because what a player does about most
+     * of these is place the file by hand and they need to know which file.
+     */
+    fun packSettingsRepairIncomplete(checked: Int, repaired: Int, failed: Int, names: String): String
     fun packSettingsRepairProgress(current: Int, total: Int, name: String): String
     val packSettingsDangerZone: String
     val packSettingsDelete: String

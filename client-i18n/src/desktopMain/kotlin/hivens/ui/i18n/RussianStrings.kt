@@ -979,6 +979,8 @@ object RussianStrings : AppStrings {
     override val packBusyRunningConfirm         = "Всё равно продолжить"
     override fun packSettingsRepairDone(checked: Int, repaired: Int) =
         if (repaired == 0) "Проверено файлов: $checked, все целы" else "Проверено файлов: $checked, восстановлено: $repaired"
+    override fun packSettingsRepairIncomplete(checked: Int, repaired: Int, failed: Int, names: String) =
+        "Проверено файлов: $checked, восстановлено: $repaired, не удалось получить: $failed ($names)"
     override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "Проверка $current/$total: $name"
     override val packSettingsDangerZone         = "Опасная зона"
     override val packSettingsDelete             = "Удалить сборку"

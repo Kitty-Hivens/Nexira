@@ -70,6 +70,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
+import hivens.ui.utils.shortNameList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -407,6 +408,22 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                 text  = s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.success,
+            )
+            // A repair that left something unresolved is not a success line. The
+            // instance is short of a file the pack names either way, and saying so
+            // in the same green as "all intact" is what let a half-finished repair
+            // read as a finished one.
+            phase is PackOperationPhase.Repaired && phase.failed.isNotEmpty() -> Text(
+                text  = s.packSettingsRepairIncomplete(
+                    phase.checked,
+                    phase.repaired,
+                    phase.failed.size,
+                    shortNameList(phase.failed),
+                ),
+                style    = MaterialTheme.typography.labelSmall,
+                color    = colors.warnAccent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             phase is PackOperationPhase.Repaired -> Text(
                 text  = s.packSettingsRepairDone(phase.checked, phase.repaired),

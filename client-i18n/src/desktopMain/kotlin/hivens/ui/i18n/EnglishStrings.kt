@@ -976,6 +976,8 @@ object EnglishStrings : AppStrings {
     override val packBusyRunningConfirm         = "Do it anyway"
     override fun packSettingsRepairDone(checked: Int, repaired: Int) =
         if (repaired == 0) "Checked $checked files, all intact" else "Checked $checked files, restored $repaired"
+    override fun packSettingsRepairIncomplete(checked: Int, repaired: Int, failed: Int, names: String) =
+        "Checked $checked files, restored $repaired, could not fetch $failed: $names"
     override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "Checking $current/$total: $name"
     override val packSettingsDangerZone         = "Danger zone"
     override val packSettingsDelete             = "Delete pack"
