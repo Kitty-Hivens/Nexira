@@ -141,6 +141,23 @@ class TilePlayerRenderProbe {
         }
     }
 
+    /**
+     * A slot far wider than the object, which is the shape of the defect these
+     * four had: `fillMaxWidth` plus a square aspect handed a home-screen slot made
+     * a token seventeen hundred points across. What is drawn here is one tile and
+     * one token in a sheet several times their own width, so the sheet is mostly
+     * empty if the cap holds and mostly object if it does not.
+     */
+    @Test
+    fun capped() {
+        sheet("capped", 700, 320, dark = true) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+                tile(track, chrome = false)
+                token(track, chrome = false)
+            }
+        }
+    }
+
     /** Both at the ends of their size range, where the thresholds live. */
     @Test
     fun widths() {

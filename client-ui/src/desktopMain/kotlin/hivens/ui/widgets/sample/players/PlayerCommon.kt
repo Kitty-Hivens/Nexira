@@ -1,6 +1,12 @@
 package hivens.ui.widgets.sample.players
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.remember
 import hivens.ui.audio.AudioError
 import hivens.ui.audio.PlaybackState
@@ -140,3 +146,20 @@ private fun repeatIcon(mode: RepeatMode): IconKey = when (mode) {
     // Queue is the size of the thing being looped, not the looping.
     RepeatMode.Queue -> NxIcon.QueueMusic
 }
+
+/**
+ * Fills the slot, and puts an object of at most [maxSide] in the middle of it.
+ *
+ * Four of the kinds are drawn as one grid cell: a tile, a disc, a token, a
+ * column for a rail. They are sized in the concept sheet and they mean nothing
+ * stretched, so a slot's width is a ceiling rather than an instruction. Handed a
+ * home-screen slot, `fillMaxWidth` plus a square aspect made a token seventeen
+ * hundred points across and swallowed the page.
+ *
+ * A chain rather than a wrapper, deliberately: `wrapContentWidth` is what lets
+ * the content measure smaller than the slot and sit centred in the rest, so the
+ * cap costs no extra layout node and nothing inside the card has to know. What
+ * a `BoxWithConstraints` inside it reads is already the capped width.
+ */
+internal fun Modifier.playerObject(maxSide: Dp): Modifier =
+    fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = maxSide)

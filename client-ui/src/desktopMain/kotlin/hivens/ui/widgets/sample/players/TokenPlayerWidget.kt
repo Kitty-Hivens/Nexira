@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
@@ -95,6 +96,12 @@ data class TokenPlayerProps(
      * as a control, for a placement where it is decoration first.
      */
     @PropLabel("widget.home.new.player.token.showCover") val showCover: Boolean = false,
+    /**
+     * How wide the token may be, in points. A ceiling rather than a size: a
+     * slot narrower than this gets a smaller token instead of one that spills
+     * out of it.
+     */
+    @PropLabel("widget.home.new.player.token.size") val size: Int = 96,
 )
 
 @Widget(
@@ -130,6 +137,7 @@ fun TokenPlayerWidget(instance: WidgetInstance) {
         repeat      = repeat,
         queueSize   = queue.size,
         showCover   = p.showCover,
+        maxSide     = p.size.coerceIn(48, 320).dp,
         chrome      = hovered,
         onPick      = openTracks,
         onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
@@ -156,6 +164,7 @@ internal fun TokenPlayerCard(
     repeat: RepeatMode,
     queueSize: Int,
     showCover: Boolean,
+    maxSide: Dp = 96.dp,
     chrome: Boolean,
     onPick: () -> Unit,
     onPlayPause: () -> Unit,
@@ -184,7 +193,7 @@ internal fun TokenPlayerCard(
     NxTooltip(text = caption) {
         NxSurface(
             level    = NxSurfaceLevel.Floating,
-            modifier = modifier.fillMaxWidth().aspectRatio(1f),
+            modifier = modifier.playerObject(maxSide).aspectRatio(1f),
             shape    = CircleShape,
         ) {
             BoxWithConstraints(

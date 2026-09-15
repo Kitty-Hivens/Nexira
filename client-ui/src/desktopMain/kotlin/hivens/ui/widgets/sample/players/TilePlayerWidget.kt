@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
@@ -96,6 +97,8 @@ data class TilePlayerProps(
      * a poor deal for a corpus where half the files have no cover to recognise.
      */
     @PropLabel("widget.home.new.player.tile.showCaption") val showCaption: Boolean = true,
+    /** How wide the tile may be, in points. A ceiling, not a size. */
+    @PropLabel("widget.home.new.player.tile.size") val size: Int = 196,
 )
 
 @Widget(
@@ -131,6 +134,7 @@ fun TilePlayerWidget(instance: WidgetInstance) {
         repeat      = repeat,
         queueSize   = queue.size,
         showCaption = p.showCaption,
+        maxSide     = p.size.coerceIn(72, 480).dp,
         chrome      = hovered,
         onPick      = openTracks,
         onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
@@ -159,6 +163,7 @@ internal fun TilePlayerCard(
     repeat: RepeatMode,
     queueSize: Int,
     showCaption: Boolean,
+    maxSide: Dp = 196.dp,
     chrome: Boolean,
     onPick: () -> Unit,
     onPlayPause: () -> Unit,
@@ -185,7 +190,7 @@ internal fun TilePlayerCard(
 
     BoxWithConstraints(
         modifier
-            .fillMaxWidth()
+            .playerObject(maxSide)
             .aspectRatio(1f)
             .clip(MaterialTheme.shapes.medium)
             .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier),

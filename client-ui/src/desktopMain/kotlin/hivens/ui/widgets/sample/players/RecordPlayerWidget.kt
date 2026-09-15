@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
@@ -91,6 +92,8 @@ data class RecordPlayerProps(
      * placement where nobody is going to hover.
      */
     @PropLabel("widget.home.new.player.record.showCaption") val showCaption: Boolean = false,
+    /** How wide the disc may be, in points. A ceiling, not a size. */
+    @PropLabel("widget.home.new.player.record.size") val size: Int = 168,
 )
 
 @Widget(
@@ -125,6 +128,7 @@ fun RecordPlayerWidget(instance: WidgetInstance) {
         repeat      = repeat,
         queueSize   = queue.size,
         showCaption = p.showCaption,
+        maxSide     = p.size.coerceIn(72, 420).dp,
         onPick      = openTracks,
         onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
         onStop      = { player.stop() },
@@ -145,6 +149,7 @@ internal fun RecordPlayerCard(
     repeat: RepeatMode,
     queueSize: Int,
     showCaption: Boolean,
+    maxSide: Dp = 168.dp,
     onPick: () -> Unit,
     onPlayPause: () -> Unit,
     onStop: () -> Unit,
@@ -164,7 +169,7 @@ internal fun RecordPlayerCard(
     val artist = track?.artist
     val caption = if (artist.isNullOrBlank()) name else "$name  ·  $artist"
 
-    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.playerObject(maxSide), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.fillMaxWidth()) {
             NxTooltip(text = caption, enabled = !showCaption) {
                 BoxWithConstraints(

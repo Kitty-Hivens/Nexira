@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
@@ -96,6 +97,12 @@ data class ColumnPlayerProps(
      * of which every file has and a cover does not.
      */
     @PropLabel("widget.home.new.player.column.showCover") val showCover: Boolean = true,
+    /**
+     * How wide the column may be, in points. A rail is narrow by nature and
+     * this kind is drawn for one, so a wide slot gets a column rather than a
+     * card stretched into the shape of one.
+     */
+    @PropLabel("widget.home.new.player.column.size") val size: Int = 148,
 )
 
 @Widget(
@@ -130,6 +137,7 @@ fun ColumnPlayerWidget(instance: WidgetInstance) {
         repeat      = repeat,
         queueSize   = queue.size,
         showCover   = p.showCover,
+        maxSide     = p.size.coerceIn(88, 320).dp,
         onPick      = openTracks,
         onPlayPause = { if (state is PlaybackState.Playing) player.pause() else player.play() },
         onStop      = { player.stop() },
@@ -150,6 +158,7 @@ internal fun ColumnPlayerCard(
     repeat: RepeatMode,
     queueSize: Int,
     showCover: Boolean,
+    maxSide: Dp = 148.dp,
     onPick: () -> Unit,
     onPlayPause: () -> Unit,
     onStop: () -> Unit,
@@ -167,7 +176,7 @@ internal fun ColumnPlayerCard(
 
     NxSurface(
         level    = NxSurfaceLevel.Floating,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.playerObject(maxSide),
         shape    = MaterialTheme.shapes.medium,
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
