@@ -145,6 +145,18 @@ kotlin {
                 // libtray now enters transitively via :client-tray; only
                 // libnotify (SystemNotifier) is consumed directly here.
                 implementation(libs.libnotify)
+                // The media session the desktop sees: media keys, and the panel widget
+                // that shows what is playing. D-Bus only, so it neither opens a device
+                // nor argues with skinema over one. Ships no natives: it binds the
+                // libdbus already on the machine, and says so and stands down where
+                // there is none.
+                implementation(libs.libsound.core)
+                implementation(libs.libsound.session)
+                // The output channel. What it buys over the JavaSound line skinema
+                // opens for itself is a stream the system mixer shows under our own
+                // name with its own volume, and PipeWire spoken natively rather than
+                // through its PulseAudio server.
+                implementation(libs.libsound.audio)
                 // Video / animated-image backgrounds (hivens.ui.background): FFmpeg via
                 // Panama. skinema-compose brings -core + -skiko; the decode natives are
                 // per-platform classifier jars, unpacked to a per-user cache on first use.

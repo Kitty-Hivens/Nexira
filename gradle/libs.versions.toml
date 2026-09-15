@@ -122,6 +122,12 @@ skinema           = "0.8.0"
 # an UnsatisfiedLinkError on the first frame. Bump both, or neither.
 skinemaNatives    = "9.0.1-1"
 
+# System audio (Kitty-Hivens/libsound) -- Panama bindings to the libpulse and
+# libdbus the machine already has. Ships no natives of its own, unlike skinema,
+# so there is no per-platform classifier to keep in step: what it needs is on
+# the system or the feature reports itself absent.
+libsound          = "0.2.0"
+
 # ── Test ─────────────────────────────────────────────────────────────────────
 # One version for the whole platform: JUnit 6 merged the Jupiter 5.x and Platform
 # 1.x lines that used to be tracked apart. The agents held the build on 5.x while
@@ -192,6 +198,15 @@ libvault                        = { group = "dev.hivens", name = "libvault", ver
 # per-platform runtimeOnly classifiers, declared directly in client-ui.
 skinema-compose                 = { group = "dev.hivens", name = "skinema-compose", version.ref = "skinema" }
 skinema-skiko                   = { group = "dev.hivens", name = "skinema-skiko",   version.ref = "skinema" }
+
+# libsound-core carries the contracts and the session types a consumer compiles
+# against; -session carries MPRIS and its two siblings. libsound-dbus arrives
+# with it and is not depended on directly. -audio is the output channel itself:
+# a named stream the desktop mixer shows, and PipeWire natively rather than
+# through its PulseAudio server.
+libsound-core                   = { group = "dev.hivens", name = "libsound-core",    version.ref = "libsound" }
+libsound-session                = { group = "dev.hivens", name = "libsound-session", version.ref = "libsound" }
+libsound-audio                  = { group = "dev.hivens", name = "libsound-audio",   version.ref = "libsound" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.

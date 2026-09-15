@@ -42,6 +42,7 @@ import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
+import hivens.ui.audio.MediaSessionBridge
 import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
@@ -239,6 +240,21 @@ val uiModule = module {
                 settings.saveSettings(settings.getSettings().copy(audioVolume = level))
             },
         )
+    }
+
+    // What the desktop sees of the player: MPRIS on Linux, the platform's own
+    // elsewhere. createdAtStart because nothing composes it -- a media session is
+    // not a widget, and a launcher whose keys only work once somebody has opened
+    // the right screen is a launcher whose keys do not work.
+    //
+    // It claims no device, so it neither competes with the engine nor depends on
+    // one being open, and a desktop with no session bus simply gets nothing.
+    single(createdAtStart = true) {
+        MediaSessionBridge(
+            player = get(),
+            scope  = get(),
+            artDir = get<Path>().resolve("media-session"),
+        ).also { it.start() }
     }
 
     // Media resolvers feeding the local-only Skinema player (client-media).
