@@ -98,8 +98,9 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
-import hivens.ui.utils.humanSize
 import hivens.ui.theme.decorativeColor
+import hivens.ui.utils.humanSize
+import hivens.ui.utils.shortNameList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.withContext
@@ -895,10 +896,24 @@ private fun StatusRow(operation: PackOperation?) {
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.success,
             )
+            // Green is for a repair that resolved everything it looked at. One that
+            // could not is reported as such here too, or the same run reads as a
+            // success on this screen and as a shortfall on the settings one.
             is PackOperationPhase.Repaired -> Text(
-                text  = s.packSettingsRepairDone(phase.checked, phase.repaired),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.success,
+                text     = if (phase.failed.isEmpty()) {
+                    s.packSettingsRepairDone(phase.checked, phase.repaired)
+                } else {
+                    s.packSettingsRepairIncomplete(
+                        phase.checked,
+                        phase.repaired,
+                        phase.failed.size,
+                        shortNameList(phase.failed),
+                    )
+                },
+                style    = MaterialTheme.typography.labelSmall,
+                color    = if (phase.failed.isEmpty()) colors.success else colors.warnAccent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             is PackOperationPhase.Failed -> Text(
                 text     = s.packVersionsFailed(phase.message),

@@ -1,6 +1,8 @@
 package hivens.core.api.interfaces
 
 import hivens.core.api.dto.smrt.SmrtModEntry
+import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.net.RepairReport
 import java.nio.file.Path
 
 /**
@@ -58,6 +60,27 @@ interface IPackSyncService {
      * [expected], so it cannot manufacture a finding.
      */
     suspend fun inspectRoster(clientDir: Path, expected: Map<String, String>? = null): RosterInspection
+
+    /**
+     * Measures the instance against [manifest] and fetches whatever does not match.
+     *
+     * On the launch path this is what a failed [enforceRoster] leads to. An
+     * instance can fall behind the pack it claims to be without anyone editing it:
+     * a launcher that could not install some entry now can, and the files it
+     * skipped are still the ones on disk. The verdict alone would send that launch
+     * on without a token and say nothing, while the fix is a download the launcher
+     * is perfectly able to make.
+     *
+     * Throws whatever the network throws. The caller decides what an unreachable
+     * mirror means for the launch, because that answer differs between a launch,
+     * which can go on unverified, and a repair the user asked for, which cannot.
+     */
+    suspend fun verifyAndRepair(
+        clientDir: Path,
+        manifest: SmrtPackManifest,
+        enabledState: Map<String, Boolean> = emptyMap(),
+        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+    ): RepairReport
 }
 
 /**

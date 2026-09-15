@@ -23,8 +23,20 @@ sealed interface PackOperationPhase {
     /** A finished update: the build now installed. */
     data class Updated(val version: String) : PackOperationPhase
 
-    /** A finished repair. Says what it looked at, not just that it ran. */
-    data class Repaired(val checked: Int, val repaired: Int) : PackOperationPhase
+    /**
+     * A finished repair. Says what it looked at, not just that it ran.
+     *
+     * [failed] names what the run could not put right, and it is carried rather
+     * than counted away: a repair that could not fetch half the pack used to reach
+     * the surface as the same success line as one that found nothing wrong, and the
+     * names are the only part a player can act on, since the answer to most of them
+     * is to place the file by hand.
+     */
+    data class Repaired(
+        val checked: Int,
+        val repaired: Int,
+        val failed: List<String> = emptyList(),
+    ) : PackOperationPhase
     data class Failed(val message: String) : PackOperationPhase
 }
 

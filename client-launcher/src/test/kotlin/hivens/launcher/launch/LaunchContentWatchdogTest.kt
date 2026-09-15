@@ -57,6 +57,15 @@ class LaunchContentWatchdogTest {
             val i = calls.getAndIncrement()
             return script.getOrElse(i) { script.last() }
         }
+
+        /** The watchdog never repairs: it reports so the caller can decide. */
+        override suspend fun verifyAndRepair(
+            clientDir: Path,
+            manifest: hivens.core.api.dto.smrt.SmrtPackManifest,
+            enabledState: Map<String, Boolean>,
+            progress: ((current: Int, total: Int, path: String) -> Unit)?,
+        ): hivens.core.net.RepairReport = error("the watchdog does not repair")
+
     }
 
     @Test
@@ -96,6 +105,15 @@ class LaunchContentWatchdogTest {
         override suspend fun inspectRoster(clientDir: Path, expected: Map<String, String>?): RosterInspection =
             if (Files.exists(watched)) RosterInspection(foreign = listOf(watched.fileName.toString()))
             else RosterInspection()
+
+        /** The watchdog never repairs: it reports so the caller can decide. */
+        override suspend fun verifyAndRepair(
+            clientDir: Path,
+            manifest: hivens.core.api.dto.smrt.SmrtPackManifest,
+            enabledState: Map<String, Boolean>,
+            progress: ((current: Int, total: Int, path: String) -> Unit)?,
+        ): hivens.core.net.RepairReport = error("the watchdog does not repair")
+
     }
 
     /**

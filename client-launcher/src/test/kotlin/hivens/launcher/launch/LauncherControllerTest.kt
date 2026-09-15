@@ -564,6 +564,53 @@ class LauncherControllerTest {
     )
 
     /**
+     * A toggle owns one field and must write only that one.
+     *
+     * The record the Content tab holds was captured when it rendered. An apply
+     * committing in between moves the pinned version and both manifests, and writing
+     * the captured copy back whole put all three back to the build the update had
+     * just left, so a checkbox silently undid an update.
+     */
+    @Test
+    fun `an optional-content flip does not write back the build the update just left`() = runTest {
+        val stale = packInstance("i-toggle")
+        // What the registry holds by the time the flip lands: the apply has moved on.
+        val applied = stale.copy(
+            packRef = stale.packRef.copy(version = "2026.06.01.1"),
+            pinnedPackVersion = "2026.06.01.1",
+        )
+        val puts = mutableListOf<hivens.core.data.PackInstance>()
+        coEvery { packRepository.get("i-toggle") } returns applied
+        coJustRun { packRepository.put(capture(puts)) }
+
+        val controller = newController(this)
+        val returned = controller.setOptionalMods(
+            instance = stale,
+            manifest = hivens.core.api.dto.smrt.SmrtPackManifest(
+                schemaVersion = 2,
+                packId        = "modern-explorer",
+                packVersion   = "2026.06.01.1",
+                generatedAt   = "2026-06-01T00:00:00Z",
+                minecraft     = hivens.core.api.dto.smrt.SmrtMinecraft("1.12.2"),
+                loader        = hivens.core.api.dto.smrt.SmrtLoader("forge", "14.23.5.2922"),
+                java          = hivens.core.api.dto.smrt.SmrtJava(8),
+            ),
+            toggles = listOf(hivens.core.data.ContentToggle("modrinth:abc", enabled = false)),
+        )
+        advanceUntilIdle()
+
+        val written = puts.single()
+        assertEquals("2026.06.01.1", written.pinnedPackVersion, "the flip must not roll the pin back")
+        assertEquals("2026.06.01.1", written.packRef.version, "nor the reference it was applied to")
+        assertEquals(
+            listOf(hivens.core.data.ContentToggle("modrinth:abc", enabled = false)),
+            written.optionalContent,
+            "and the field the toggle does own is the one that changed",
+        )
+        assertEquals("2026.06.01.1", returned.pinnedPackVersion, "the caller adopts the record as written")
+    }
+
+    /**
      * Stopping one pack and starting another immediately is allowed: abort sets Idle
      * while the first launch is still parked in a wait that cancellation cannot
      * interrupt. When it finally wakes -- after the second game is live -- everything
@@ -659,6 +706,115 @@ class LauncherControllerTest {
         )
         Files.createDirectories(sandbox.resolve("instances").resolve(instance.instanceDirName))
         return instance
+    }
+
+    /**
+     * The shape a launcher update leaves behind: a version that could not install
+     * some of the pack's entries is replaced by one that can, and what it skipped is
+     * still what sits in `mods/`. The roster check reads that as the instance not
+     * being the pack, which is true, and used to answer by dropping the token and
+     * saying nothing, over files the launcher could simply fetch.
+     */
+    @Test
+    fun `an instance behind its pack is brought in line instead of launching without a token`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh-token")
+
+        // Behind the pack at the gate, in line once the missing files are fetched.
+        coEvery { packSyncService.enforceRoster(any(), any()) } returnsMany listOf(
+            hivens.core.api.interfaces.RosterVerdict(verified = false, mismatched = listOf("Botania.jar")),
+            hivens.core.api.interfaces.RosterVerdict(verified = true),
+        )
+        coEvery { smrtPackClient.fetchManifestVersion("test-sc", "v1") } returns hivens.core.api.dto.smrt.SmrtPackManifest(
+            schemaVersion = 2,
+            packId        = "test-sc",
+            packVersion   = "v1",
+            generatedAt   = "2026-09-15T00:00:00Z",
+            minecraft     = hivens.core.api.dto.smrt.SmrtMinecraft("1.12.2"),
+            loader        = hivens.core.api.dto.smrt.SmrtLoader("forge", "14.23.5.2922"),
+            java          = hivens.core.api.dto.smrt.SmrtJava(8),
+        )
+        coEvery { packSyncService.verifyAndRepair(any(), any(), any(), any()) } returns hivens.core.net.RepairReport(
+            checked = 1, intact = 0, repaired = listOf("Botania.jar"), bytesFetched = 100L, failed = emptyMap(),
+        )
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val sessionPassed = slot<SessionData>()
+        val boundPassed = slot<Boolean>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = capture(sessionPassed),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaPathOverride   = any(),
+                adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
+                boundLaunch        = capture(boundPassed), seal = any(), displayName = any(),
+                onLog              = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { packSyncService.verifyAndRepair(any(), any(), any(), any()) }
+        coVerify(exactly = 2) { packSyncService.enforceRoster(any(), any()) }
+        assertEquals(
+            "fresh-token",
+            sessionPassed.captured.accessToken,
+            "once the instance matches the pack again the launch keeps its session",
+        )
+        assertTrue(boundPassed.captured, "and it is still the bound launch it always was")
+    }
+
+    /** A mirror that cannot be reached is not a reason to refuse a launch that was already going to be refused. */
+    @Test
+    fun `a repair that cannot reach the mirror leaves the launch unverified rather than failing it`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        coEvery { packSyncService.enforceRoster(any(), any()) } returns
+            hivens.core.api.interfaces.RosterVerdict(verified = false, mismatched = listOf("Botania.jar"))
+        coEvery { smrtPackClient.fetchManifestVersion(any(), any()) } throws java.io.IOException("offline")
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val sessionPassed = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = capture(sessionPassed),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaPathOverride   = any(),
+                adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
+                boundLaunch        = any(), seal = any(), displayName = any(),
+                onLog              = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value, "the launch still happens")
+        assertEquals("", sessionPassed.captured.accessToken, "and it happens without a token, as before")
     }
 
     @Test

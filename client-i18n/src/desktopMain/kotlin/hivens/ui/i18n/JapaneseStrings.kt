@@ -982,6 +982,8 @@ object JapaneseStrings : AppStrings {
     override val packBusyRunningConfirm = "それでも実行"
     override fun packSettingsRepairDone(checked: Int, repaired: Int) =
         if (repaired == 0) "$checked 件を確認、すべて健全です" else "$checked 件を確認、$repaired 件を復元しました"
+    override fun packSettingsRepairIncomplete(checked: Int, repaired: Int, failed: Int, names: String) =
+        "$checked 件を確認、$repaired 件を復元、$failed 件は取得できませんでした: $names"
     override fun packSettingsRepairProgress(current: Int, total: Int, name: String) = "確認中 $current/$total: ${name}"
     override val packSettingsDangerZone = "取り扱い注意"
     override val packSettingsDelete = "パックを削除"

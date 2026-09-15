@@ -4,6 +4,7 @@ import hivens.core.data.PackInstance
 import hivens.core.io.deleteTree
 import hivens.core.io.AtomicFiles
 import hivens.core.update.PackSnapshot
+import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -48,7 +49,12 @@ class PackSnapshotService(
         val filesDir = dir.resolve("files")
         Files.createDirectories(filesDir)
         val captured = ArrayList<String>()
-        for (rel in managedRealPaths) {
+        // The pack's files, plus the two the instance keeps about itself. Those two
+        // are not manifest paths, so a scan never lists them and a restore driven by
+        // the manifest cannot put them back: without capturing them by name here, a
+        // rollback leaves the previous build's mods under the roster of the build it
+        // rolled back from, and that roster is what the next launch deletes by.
+        for (rel in managedRealPaths + SmrtSyncService.INSTANCE_STATE_FILES) {
             val src = root.resolve(rel).normalize()
             if (!src.startsWith(root) || !Files.isRegularFile(src)) continue
             val dst = filesDir.resolve(rel)

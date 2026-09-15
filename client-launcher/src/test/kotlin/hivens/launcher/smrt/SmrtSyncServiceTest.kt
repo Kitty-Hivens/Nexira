@@ -875,6 +875,7 @@ class SmrtSyncServiceTest {
         const val OPT_URL = "https://mirror.test/opt.jar"
         const val SERVERS_URL = "https://mirror.test/servers.dat"
         const val CF_URL = "https://edge.forgecdn.test/files/2920/433/served.jar"
+        const val GH_URL = "https://github.test/Kitty-Hivens/hidemymods/releases/download/v0.2.0/hidemymods-1.7.10.jar"
     }
 
     /**
@@ -1036,6 +1037,102 @@ class SmrtSyncServiceTest {
 
         assertEquals(2, report.intact, "both entries are the bytes the manifest names")
         assertTrue(report.failed.isEmpty(), "nothing is missing, so nothing is unresolved")
+    }
+
+    // --- mods pinned to a GitHub release ---
+
+    private val ghBytes = "GITHUB-RELEASE-ASSET".toByteArray()
+
+    private fun githubManifest() = """
+        {"schema_version":2,"pack_id":"test","pack_version":"1","generated_at":"now",
+         "minecraft":{"version":"1.7.10"},"loader":{"name":"forge","version":"10.13.4.1614"},"java":{"major":8},
+         "mods":[
+           {"filename":"hidemymods.jar","sha1":"${sha1(ghBytes)}","size_bytes":${ghBytes.size},"required":true,
+            "source":{"type":"github","repo":"Kitty-Hivens/hidemymods","tag":"v0.2.0",
+                      "asset":"hidemymods-1.7.10.jar","url":"$GH_URL"}}
+         ],"assets":[]}
+    """.trimIndent()
+
+    /**
+     * A release asset is public, so the manifest carries the finished link and the
+     * install path has nothing to resolve. The point of the test is that the entry
+     * reaches the transfer at all: before the variant existed it folded to the
+     * unknown sentinel and `plan` skipped it without failing anything.
+     */
+    @Test
+    fun `a mod pinned to a github release is fetched from the link the manifest carries`() = runTest {
+        val dir = tempDir("github-release")
+        val service = serviceWith(
+            MockEngine { req ->
+                when (req.url.toString()) {
+                    GH_URL -> respond(ByteReadChannel(ghBytes), HttpStatusCode.OK)
+                    else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+                }
+            }
+        )
+
+        service.sync(parsed(githubManifest()), dir)
+
+        assertContentEquals(ghBytes, Files.readAllBytes(dir.resolve("mods/hidemymods.jar")))
+    }
+
+    // --- the roster is published whole, or the previous one stands ---
+
+    /**
+     * The roster is the next launch's delete list, and nothing in it carries a count
+     * or a digest, so a prefix of it reads as a shorter pack and the sweep removes
+     * the mods whose names did not survive. Written through the atomic path, a
+     * reader sees either the whole new list or the whole old one, and never the
+     * temp file the publish went through.
+     */
+    @Test
+    fun `the roster is published atomically and leaves no partial beside it`() = runTest {
+        val dir = tempDir("roster-atomic")
+        syncService().sync(parsed(), dir)
+
+        val roster = dir.resolve(".nexira-mods")
+        assertTrue(Files.isRegularFile(roster), "the roster is written")
+        assertEquals(
+            setOf("req.jar", "req.jar.disabled", "opt.jar", "opt.jar.disabled"),
+            Files.readAllLines(roster).filter { it.isNotBlank() }.toSet(),
+            "every name the pack declares survives the publish",
+        )
+        assertFalse(
+            Files.exists(dir.resolve(".nexira-mods.tmp")),
+            "the temp file the atomic publish goes through is renamed, not left behind",
+        )
+        assertFalse(Files.exists(dir.resolve(".nexira-sync-source.tmp")), "same for the source marker")
+    }
+
+    // --- a stale variant a holder would not release ---
+
+    /**
+     * The case the dropped result hid: the player turns an optional mod off, the
+     * pack then updates it, and the active jar is what has to go. A holder that
+     * outlives the retry leaves it there, the new copy lands beside it under the
+     * disabled name, relabel declines because both names exist, and the roster
+     * names both on purpose so the sweep takes neither. The mod loads next launch
+     * as though the toggle never happened.
+     *
+     * Asking again after the transfers is what fixes it, since whatever held the
+     * file has had the length of a download to let go.
+     */
+    @Test
+    fun `a stale active variant is dropped on the second pass once its holder lets go`() = runTest {
+        val dir = tempDir("stale-second-pass")
+        val service = syncService()
+        // Installed with the optional ON, so the active jar exists.
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "the optional starts active")
+
+        // Now switched off. The active jar is the stale variant this has to remove.
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to false))
+
+        assertFalse(
+            Files.exists(dir.resolve("mods/opt.jar")),
+            "a mod the player turned off must not be left loading under its active name",
+        )
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar.disabled")), "and it is kept under the name nothing loads")
     }
 
     /** A directory a mod fills with its own data is not a mod. */

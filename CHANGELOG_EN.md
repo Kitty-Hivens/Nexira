@@ -18,6 +18,20 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+## [2.4.5] - 2026-09-15
+
+A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.
+
+Large mods hosted on CurseForge install again. Anything past about 24 MB is fetched in pieces, and the CurseForge edge server answers a request for a piece with "not found" while happily serving the whole file to anyone who asks for it in one go. The launcher read that as the file being gone. One 24 MB library was enough to leave a whole pack unverified and refused at the server.
+
+Mods the mirror hosted itself now come straight from where their authors publish them. Nothing changes in how a pack installs: the files arrive the same way and are checked the same way, and the launcher shows which of them came from GitHub.
+
+Turning an optional mod on or off no longer quietly undoes a pack update that finished while you were looking at the list. And a mod you switch off is no longer left loading anyway when something was holding its file at that moment: the launcher tries again once the downloads are done and tells you if it still could not.
+
+Rolling a pack back to an earlier build restores the list of what belongs in it, not just the files. Without that the pack could lose its own mods on the next launch. Packs also stop losing that list to a crash or a power cut partway through writing it.
+
+When a check-and-repair could not finish, it says so instead of showing the same green line as a clean run, and names the files it could not fetch.
+
 ## [2.4.4] - 2026-09-15
 
 Packs whose mods live on CurseForge install completely again. The launcher could fetch from Modrinth and from the mirror, and a mod published on CurseForge was quietly left out. The pack then looked modified, the login was withheld and the server would not let you in, with nothing on screen to say why. Those mods now download like any other, and no CurseForge key is needed for it: the mirror resolves the link in advance.

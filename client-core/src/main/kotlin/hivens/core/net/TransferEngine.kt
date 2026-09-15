@@ -653,7 +653,29 @@ class TransferEngine(
                     Probe(total, resp.headers[HttpHeaders.ETag])
                 }
                 resp.status.isSuccess() -> throw RangeIgnoredException(url)
-                else -> throw httpFailure(url, resp)
+                else -> {
+                    val failure = httpFailure(url, resp)
+                    // A host can refuse the ranged request and still serve the whole
+                    // object. CurseForge's edge CDN does exactly that: `bytes=0-0`
+                    // comes back 404, while the same URL with no Range answers 302 to
+                    // a host that has the file, and the 200 there even advertises
+                    // `accept-ranges: bytes`. From here the refusal is
+                    // indistinguishable from the object genuinely being absent, so
+                    // the way to tell them apart is to stop asking for a range: the
+                    // plain GET either brings the file or returns the same status,
+                    // and then it is the real answer rather than one about ranges.
+                    //
+                    // Only for a status that will not change on its own. A retryable
+                    // one is asked again instead, since giving up on blocks for the
+                    // rest of a large transfer over a 503 is a worse trade than the
+                    // wait.
+                    if (failure.retryable) throw failure
+                    log.debug(
+                        "transfer: {} refused a ranged request ({}), streaming {} whole instead",
+                        url, failure.status, t.dest.fileName,
+                    )
+                    throw RangeIgnoredException(url)
+                }
             }
         }
     }

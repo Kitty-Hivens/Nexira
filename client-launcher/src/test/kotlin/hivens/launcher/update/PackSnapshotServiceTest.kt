@@ -3,6 +3,7 @@ package hivens.launcher.update
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.core.io.AtomicFiles
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.test.Test
@@ -45,6 +46,70 @@ class PackSnapshotServiceTest {
         assertEquals("old-a", Files.readString(modsDir.resolve("a.jar")), "captured file restored")
         assertFalse(Files.exists(modsDir.resolve("b.jar")), "apply-added file removed")
         assertEquals("1", restored.id, "pre-update record returned")
+    }
+
+    /**
+     * The roster is not a manifest path, so the scan never lists it and a restore
+     * driven by the manifest cannot put it back. Left behind, it names the build
+     * that was rolled back FROM, and on an instance whose registry holds no
+     * baseline to outrank it, that file IS the next launch's delete list: the sweep
+     * reads it and removes the restored build's own mods.
+     */
+    @Test
+    fun `a rollback puts back the roster of the build it restores`() {
+        val dataDir = Files.createTempDirectory("snap-roster")
+        val dir = "inst"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        val modsDir = clientDir.resolve("mods")
+        Files.createDirectories(modsDir)
+        Files.writeString(modsDir.resolve("a.jar"), "old-a")
+        Files.writeString(clientDir.resolve(".nexira-mods"), "a.jar\na.jar.disabled")
+        Files.writeString(clientDir.resolve(".nexira-sync-source"), "mirror")
+        val svc = PackSnapshotService(dataDir, json)
+        val managed = setOf("mods/a.jar", "mods/b.jar")
+        val snap = svc.capture(clientDir, instance(dir), managed, "s1", 1L)
+
+        // The apply: a.jar is replaced, b.jar arrives, and the roster is rewritten
+        // to name the new build.
+        //
+        // The roster goes through AtomicFiles because that is how the sync publishes
+        // it, and the distinction is the one the capture rests on: a hardlink holds
+        // the pre-update bytes only while the writer replaces the file (a new inode)
+        // rather than truncating it in place, which would rewrite the snapshot's
+        // copy along with the live one.
+        Files.delete(modsDir.resolve("a.jar"))
+        Files.writeString(modsDir.resolve("a.jar"), "new-a")
+        Files.writeString(modsDir.resolve("b.jar"), "new-b")
+        AtomicFiles.writeString(clientDir.resolve(".nexira-mods"), "a.jar\na.jar.disabled\nb.jar\nb.jar.disabled")
+
+        svc.restore(clientDir, dir, snap.id, managed)
+
+        assertEquals(
+            listOf("a.jar", "a.jar.disabled"),
+            Files.readAllLines(clientDir.resolve(".nexira-mods")).filter { it.isNotBlank() },
+            "the roster has to describe the build that is now on disk, not the one undone",
+        )
+        assertEquals("mirror", Files.readString(clientDir.resolve(".nexira-sync-source")).trim())
+    }
+
+    /** An instance that had no roster when it was captured must not get one invented for it. */
+    @Test
+    fun `a snapshot taken without a roster restores without inventing one`() {
+        val dataDir = Files.createTempDirectory("snap-no-roster")
+        val dir = "inst"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        val modsDir = clientDir.resolve("mods")
+        Files.createDirectories(modsDir)
+        Files.writeString(modsDir.resolve("a.jar"), "old-a")
+        val svc = PackSnapshotService(dataDir, json)
+        val snap = svc.capture(clientDir, instance(dir), setOf("mods/a.jar"), "s1", 1L)
+
+        svc.restore(clientDir, dir, snap.id, setOf("mods/a.jar"))
+
+        assertFalse(
+            Files.exists(clientDir.resolve(".nexira-mods")),
+            "nothing was captured, so there is nothing to put back",
+        )
     }
 
     @Test

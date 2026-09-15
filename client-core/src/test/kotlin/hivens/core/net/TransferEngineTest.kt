@@ -47,6 +47,13 @@ class TransferEngineTest {
      */
     private class Host(val body: ByteArray) {
         var ignoreRanges = false
+
+        /**
+         * Status for a request that carries a Range, while a plain one is served
+         * normally. CurseForge's edge CDN answers `bytes=0-0` with 404 and the same
+         * URL without a Range with a redirect to a host that has the file.
+         */
+        var rangeStatus: HttpStatusCode? = null
         var forced: HttpStatusCode? = null
         var failNext = 0
         var truncateNext = 0
@@ -63,6 +70,7 @@ class TransferEngineTest {
         val rangeHeader = req.headers[HttpHeaders.Range]
         synchronized(host) { host.ranges += rangeHeader }
         host.forced?.let { return@MockEngine respond("forced", it) }
+        host.rangeStatus?.let { if (rangeHeader != null) return@MockEngine respond("no ranges here", it) }
         if (host.failNext > 0) {
             host.failNext--
             return@MockEngine respond("busy", HttpStatusCode.ServiceUnavailable)
@@ -161,6 +169,49 @@ class TransferEngineTest {
     private fun journalOf(dest: Path): Path = dest.resolveSibling("${dest.fileName}.part.state")
 
     // ── whole-body transfers ──────────────────────────────────────────────────
+
+    /**
+     * The shape CurseForge's edge CDN has: a ranged request is refused outright
+     * while the object is served whole to anyone who does not ask for a range.
+     *
+     * The probe asks with `bytes=0-0`, so a transfer over the parallel threshold
+     * used to read that refusal as the object being absent and fail the whole
+     * fetch. It is a claim about ranges, not about the file, and the plain GET is
+     * what settles which.
+     */
+    @Test
+    fun `a host that refuses ranges outright still gets the file streamed`() = runTest {
+        val dir = tempDir("xfer-range-refused")
+        val dest = dir.resolve("big.bin")
+        val host = Host(payload).apply { rangeStatus = HttpStatusCode.NotFound }
+
+        // Over the threshold, so this starts as a block transfer and has to demote.
+        val moved = engine(mapOf(URL to host)).fetch(Transfer(URL, dest, payloadSha1, payload.size.toLong()))
+
+        assertContentEquals(payload, Files.readAllBytes(dest))
+        assertEquals(payload.size.toLong(), moved)
+        assertTrue(host.ranges.any { it != null }, "the probe did ask for a range first")
+        assertTrue(host.ranges.any { it == null }, "and the retry asked without one")
+    }
+
+    /**
+     * The other half of the same status: when the object really is gone, both the
+     * ranged probe and the plain GET say so, and the transfer fails with that
+     * answer rather than looping over a demotion.
+     */
+    @Test
+    fun `a file that is genuinely absent still fails`() = runTest {
+        val dir = tempDir("xfer-really-404")
+        val dest = dir.resolve("gone.bin")
+        val host = Host(payload).apply { forced = HttpStatusCode.NotFound }
+
+        val failure = runCatching {
+            engine(mapOf(URL to host)).fetch(Transfer(URL, dest, payloadSha1, payload.size.toLong()))
+        }
+
+        assertTrue(failure.isFailure, "a missing object must not be reported as fetched")
+        assertFalse(Files.exists(dest))
+    }
 
     @Test
     fun `a file lands and verifies`() = runTest {

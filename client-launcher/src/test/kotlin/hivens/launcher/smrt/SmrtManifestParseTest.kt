@@ -298,9 +298,11 @@ class SmrtManifestParseTest {
 
     @Test
     fun `unknown source type folds to Unknown without failing the whole manifest`() {
-        // Forward-compat: a mirror that gains github_release or another provider
-        // on a single entry must not abort the entire decode. The unknown entry
-        // becomes SmrtSource.Unknown (install skips it); siblings still parse.
+        // Forward-compat: a mirror that gains a provider this client has never
+        // heard of, on a single entry, must not abort the entire decode. The
+        // unknown entry becomes SmrtSource.Unknown (install skips it); siblings
+        // still parse. The type here is deliberately nothing anyone plans to
+        // add, so it cannot quietly become a known one and stop testing this.
         val payload = """
         {
             "schema_version": 2,
@@ -315,7 +317,7 @@ class SmrtManifestParseTest {
                     "filename": "FromTheFuture.jar",
                     "sha1": "0000000000000000000000000000000000000000",
                     "size_bytes": 100,
-                    "source": {"type": "github_release", "repo": "owner/repo", "tag": "v1"}
+                    "source": {"type": "gopher", "host": "example", "selector": "/mods/x"}
                 },
                 {
                     "filename": "Known.jar",

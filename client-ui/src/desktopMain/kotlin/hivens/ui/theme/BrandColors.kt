@@ -28,6 +28,7 @@ fun NxColors.source(source: SmrtSource): Color = when (source) {
     is SmrtSource.SmrtCache  -> originMirror
     is SmrtSource.SmrtStatic -> originLocal
     is SmrtSource.CurseForge -> originCurseforge
+    is SmrtSource.Github     -> originGithub
     is SmrtSource.Unknown    -> originLocal
 }
 
