@@ -734,10 +734,20 @@ class LauncherController(
         // back to Microsoft for any mirror pack, so it is true of a solo pack as well
         // and would put every instance under the strict rule again.
         val serverBound = manifestSnapshot.authRequirement != null
-        val verdict = if (serverBound) {
+        val firstLook = if (serverBound) {
             smrtSyncService.enforceRoster(clientDir, modBaseline(refreshedInstance))
         } else {
             RosterVerdict(verified = true)
+        }
+        // An instance can fall behind the pack without anyone touching it: a version
+        // that could not install some entry is followed by one that can, and what it
+        // skipped is still what is on disk. That reads here exactly like tampering,
+        // and the launch would go on with no token and no word about why, over files
+        // the launcher can simply fetch. So it fetches them and asks again.
+        val verdict = if (serverBound && !firstLook.verified && !settings.isOfflineMode) {
+            catchUpWithPack(clientDir, refreshedInstance, firstLook)
+        } else {
+            firstLook
         }
         if (verdict.mismatched.isNotEmpty()) {
             ActionRing.record(
@@ -862,6 +872,63 @@ class LauncherController(
                 }
             },
         )
+    }
+
+    /**
+     * Fetches whatever the instance is missing against its pinned build, then asks
+     * the roster again and answers with the second verdict.
+     *
+     * Reached only when the first look already failed, so the cost lands on the
+     * launches that were going to be refused anyway. The repair is measured against
+     * the PINNED manifest rather than the mirror's latest, for the same reason the
+     * repair button is: this brings the instance up to the build the player has, and
+     * measuring against a newer one would turn a launch into an update nobody asked
+     * for.
+     *
+     * Every failure here leaves the first verdict standing. A mirror that cannot be
+     * reached, a build the mirror has retired, an entry nobody may serve: none of
+     * them is a reason to refuse the launch, because the launch was already going to
+     * proceed unverified. What changes is only whether it needed to.
+     */
+    private suspend fun catchUpWithPack(
+        clientDir: Path,
+        instance: PackInstance,
+        firstLook: RosterVerdict,
+    ): RosterVerdict {
+        val version = instance.pinnedPackVersion ?: instance.packRef.version
+        setStage(PrepareStage.SYNC, 0.25f)
+        ActionRing.record(
+            "Pack launch ${instance.displayName}: instance does not match the pack, fetching what is missing",
+        )
+        val repaired = runCatching {
+            val manifest = if (version != null) {
+                smrtPackClient.fetchManifestVersion(instance.packRef.id, version)
+            } else {
+                smrtPackClient.fetchManifest(instance.packRef.id)
+            }
+            val enabled = OptionalContentRules.enabledState(manifest.mods, instance.optionalContent)
+            smrtSyncService.verifyAndRepair(clientDir, manifest, enabled) { current, total, path ->
+                // The SYNC stage's own sub-range, so the bar moves during what is
+                // otherwise a silent wait on a hundred-file walk.
+                setStage(PrepareStage.SYNC, 0.25f + 0.25f * (if (total > 0) current.toFloat() / total else 0f))
+            }
+        }.onFailure {
+            logger.warn("Pack launch {}: could not bring the instance in line: {}", instance.displayName, it.toString())
+            ActionRing.record("Pack launch ${instance.displayName}: could not fetch what is missing (${it.message ?: "unreachable"})")
+        }.getOrNull() ?: return firstLook
+
+        if (repaired.failed.isNotEmpty()) {
+            ActionRing.record(
+                "Pack launch ${instance.displayName}: ${repaired.failed.size} file(s) still missing after fetching (${repaired.failed.keys.joinToString()})",
+            )
+        }
+        val second = smrtSyncService.enforceRoster(clientDir, modBaseline(instance))
+        if (second.verified) {
+            ActionRing.record(
+                "Pack launch ${instance.displayName}: brought in line with the pack, ${repaired.repaired.size} file(s) restored",
+            )
+        }
+        return second
     }
 
     /**

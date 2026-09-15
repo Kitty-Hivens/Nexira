@@ -159,11 +159,11 @@ class SmrtSyncService(
      *
      * Protected paths are left alone. A config the user edited is not damage.
      */
-    suspend fun verifyAndRepair(
+    override suspend fun verifyAndRepair(
         clientDir: Path,
         manifest: SmrtPackManifest,
-        enabledState: Map<String, Boolean> = emptyMap(),
-        progress: ((current: Int, total: Int, path: String) -> Unit)? = null,
+        enabledState: Map<String, Boolean>,
+        progress: ((current: Int, total: Int, path: String) -> Unit)?,
     ): RepairReport = withContext(Dispatchers.IO) {
         InstanceMutationLock.withLock(clientDir) {
             val total = manifest.mods.size + manifest.assets.size

@@ -708,6 +708,115 @@ class LauncherControllerTest {
         return instance
     }
 
+    /**
+     * The shape a launcher update leaves behind: a version that could not install
+     * some of the pack's entries is replaced by one that can, and what it skipped is
+     * still what sits in `mods/`. The roster check reads that as the instance not
+     * being the pack, which is true, and used to answer by dropping the token and
+     * saying nothing, over files the launcher could simply fetch.
+     */
+    @Test
+    fun `an instance behind its pack is brought in line instead of launching without a token`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh-token")
+
+        // Behind the pack at the gate, in line once the missing files are fetched.
+        coEvery { packSyncService.enforceRoster(any(), any()) } returnsMany listOf(
+            hivens.core.api.interfaces.RosterVerdict(verified = false, mismatched = listOf("Botania.jar")),
+            hivens.core.api.interfaces.RosterVerdict(verified = true),
+        )
+        coEvery { smrtPackClient.fetchManifestVersion("test-sc", "v1") } returns hivens.core.api.dto.smrt.SmrtPackManifest(
+            schemaVersion = 2,
+            packId        = "test-sc",
+            packVersion   = "v1",
+            generatedAt   = "2026-09-15T00:00:00Z",
+            minecraft     = hivens.core.api.dto.smrt.SmrtMinecraft("1.12.2"),
+            loader        = hivens.core.api.dto.smrt.SmrtLoader("forge", "14.23.5.2922"),
+            java          = hivens.core.api.dto.smrt.SmrtJava(8),
+        )
+        coEvery { packSyncService.verifyAndRepair(any(), any(), any(), any()) } returns hivens.core.net.RepairReport(
+            checked = 1, intact = 0, repaired = listOf("Botania.jar"), bytesFetched = 100L, failed = emptyMap(),
+        )
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val sessionPassed = slot<SessionData>()
+        val boundPassed = slot<Boolean>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = capture(sessionPassed),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaPathOverride   = any(),
+                adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
+                boundLaunch        = capture(boundPassed), seal = any(), displayName = any(),
+                onLog              = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { packSyncService.verifyAndRepair(any(), any(), any(), any()) }
+        coVerify(exactly = 2) { packSyncService.enforceRoster(any(), any()) }
+        assertEquals(
+            "fresh-token",
+            sessionPassed.captured.accessToken,
+            "once the instance matches the pack again the launch keeps its session",
+        )
+        assertTrue(boundPassed.captured, "and it is still the bound launch it always was")
+    }
+
+    /** A mirror that cannot be reached is not a reason to refuse a launch that was already going to be refused. */
+    @Test
+    fun `a repair that cannot reach the mirror leaves the launch unverified rather than failing it`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        coEvery { packSyncService.enforceRoster(any(), any()) } returns
+            hivens.core.api.interfaces.RosterVerdict(verified = false, mismatched = listOf("Botania.jar"))
+        coEvery { smrtPackClient.fetchManifestVersion(any(), any()) } throws java.io.IOException("offline")
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val sessionPassed = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = capture(sessionPassed),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaPathOverride   = any(),
+                adaptiveEnabled    = any(),
+                redirectAuthHost   = any(),
+                boundLaunch        = any(), seal = any(), displayName = any(),
+                onLog              = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value, "the launch still happens")
+        assertEquals("", sessionPassed.captured.accessToken, "and it happens without a token, as before")
+    }
+
     @Test
     fun `pack with SC requirement re-auths before spawn and uses the refreshed session`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
