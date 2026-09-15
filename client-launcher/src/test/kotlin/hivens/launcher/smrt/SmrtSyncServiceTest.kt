@@ -1038,6 +1038,65 @@ class SmrtSyncServiceTest {
         assertTrue(report.failed.isEmpty(), "nothing is missing, so nothing is unresolved")
     }
 
+    // --- the roster is published whole, or the previous one stands ---
+
+    /**
+     * The roster is the next launch's delete list, and nothing in it carries a count
+     * or a digest, so a prefix of it reads as a shorter pack and the sweep removes
+     * the mods whose names did not survive. Written through the atomic path, a
+     * reader sees either the whole new list or the whole old one, and never the
+     * temp file the publish went through.
+     */
+    @Test
+    fun `the roster is published atomically and leaves no partial beside it`() = runTest {
+        val dir = tempDir("roster-atomic")
+        syncService().sync(parsed(), dir)
+
+        val roster = dir.resolve(".nexira-mods")
+        assertTrue(Files.isRegularFile(roster), "the roster is written")
+        assertEquals(
+            setOf("req.jar", "req.jar.disabled", "opt.jar", "opt.jar.disabled"),
+            Files.readAllLines(roster).filter { it.isNotBlank() }.toSet(),
+            "every name the pack declares survives the publish",
+        )
+        assertFalse(
+            Files.exists(dir.resolve(".nexira-mods.tmp")),
+            "the temp file the atomic publish goes through is renamed, not left behind",
+        )
+        assertFalse(Files.exists(dir.resolve(".nexira-sync-source.tmp")), "same for the source marker")
+    }
+
+    // --- a stale variant a holder would not release ---
+
+    /**
+     * The case the dropped result hid: the player turns an optional mod off, the
+     * pack then updates it, and the active jar is what has to go. A holder that
+     * outlives the retry leaves it there, the new copy lands beside it under the
+     * disabled name, relabel declines because both names exist, and the roster
+     * names both on purpose so the sweep takes neither. The mod loads next launch
+     * as though the toggle never happened.
+     *
+     * Asking again after the transfers is what fixes it, since whatever held the
+     * file has had the length of a download to let go.
+     */
+    @Test
+    fun `a stale active variant is dropped on the second pass once its holder lets go`() = runTest {
+        val dir = tempDir("stale-second-pass")
+        val service = syncService()
+        // Installed with the optional ON, so the active jar exists.
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "the optional starts active")
+
+        // Now switched off. The active jar is the stale variant this has to remove.
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to false))
+
+        assertFalse(
+            Files.exists(dir.resolve("mods/opt.jar")),
+            "a mod the player turned off must not be left loading under its active name",
+        )
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar.disabled")), "and it is kept under the name nothing loads")
+    }
+
     /** A directory a mod fills with its own data is not a mod. */
     @Test
     fun `a mod's data directory is not read as an unpacked mod`() = runTest {
