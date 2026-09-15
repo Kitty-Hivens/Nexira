@@ -10,7 +10,19 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
-Mods, die bisher der Spiegelserver selbst verteilt hat, kommen jetzt direkt von dort, wo ihre Autoren sie veroeffentlichen. Am Installieren eines Packs aendert sich nichts: die Dateien kommen wie bisher an und werden wie bisher geprueft, und der Launcher zeigt an, welche davon von GitHub stammen.
+## [2.4.5] - 2026-09-15
+
+Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.
+
+Große Mods von CurseForge lassen sich wieder installieren. Alles über etwa 24 MB wird in Teilen geladen, und der Edge-Server von CurseForge beantwortet die Anfrage nach einem Teil mit "nicht gefunden", während er dieselbe Datei am Stück jedem aushändigt. Der Launcher las das als "die Datei ist weg". Eine einzige 24-MB-Bibliothek reichte, damit ein ganzes Pack ungeprüft blieb und der Server es abwies.
+
+Mods, die bisher der Spiegelserver selbst verteilt hat, kommen jetzt direkt von dort, wo ihre Autoren sie veröffentlichen. Am Installieren eines Packs ändert sich nichts: die Dateien kommen wie bisher an und werden wie bisher geprüft, und der Launcher zeigt an, welche davon von GitHub stammen.
+
+Eine optionale Mod ein- oder auszuschalten macht keine Paketaktualisierung mehr still rückgängig, die fertig wurde, während die Liste offen war. Und eine abgeschaltete Mod bleibt nicht mehr trotzdem geladen, wenn ihre Datei gerade festgehalten wurde: der Launcher versucht es nach den Downloads erneut und sagt Bescheid, wenn es weiterhin nicht ging.
+
+Ein Pack auf einen früheren Stand zurückzusetzen stellt auch die Liste dessen wieder her, was hineingehört, nicht nur die Dateien. Ohne sie konnte das Pack beim nächsten Start seine eigenen Mods verlieren. Diese Liste geht jetzt auch bei einem Absturz oder Stromausfall mitten im Schreiben nicht mehr verloren.
+
+Konnte ein Prüfen und Reparieren nicht zu Ende gebracht werden, sagt es das, statt dieselbe grüne Zeile wie ein sauberer Durchlauf zu zeigen, und nennt die Dateien, die es nicht laden konnte.
 
 ## [2.4.4] - 2026-09-15
 
