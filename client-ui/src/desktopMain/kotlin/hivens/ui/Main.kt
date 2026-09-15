@@ -43,6 +43,7 @@ import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.MediaSessionBridge
+import hivens.ui.audio.SystemAudioOutput
 import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
@@ -242,6 +243,7 @@ val uiModule = module {
             },
             initialQueue  = saved.audioQueue.mapNotNull { runCatching { Path.of(it) }.getOrNull() },
             initialIndex  = saved.audioQueueIndex,
+            output        = get(),
             persistQueue  = { files, index ->
                 settings.saveSettings(
                     settings.getSettings().copy(
@@ -252,6 +254,13 @@ val uiModule = module {
             },
         )
     }
+
+    // Where the sound leaves. One connection to the sound server for the process,
+    // opened on the first track rather than at startup, and a stream per track on
+    // top of it. A machine it cannot reach falls back to the line skinema opens
+    // for itself, so this is an improvement to how the sound is labelled and never
+    // a condition on it playing.
+    single(createdAtStart = false) { SystemAudioOutput() }
 
     // What the desktop sees of the player: MPRIS on Linux, the platform's own
     // elsewhere. createdAtStart because nothing composes it -- a media session is

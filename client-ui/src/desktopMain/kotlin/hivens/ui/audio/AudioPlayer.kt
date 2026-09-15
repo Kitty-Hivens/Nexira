@@ -53,6 +53,15 @@ class AudioPlayer(
     initialIndex: Int = -1,
     /** Where a settled queue goes. Debounced, off the engine thread. */
     private val persistQueue: (List<Path>, Int) -> Unit = { _, _ -> },
+    /**
+     * Where the sound leaves, when the system will have it under our own name.
+     *
+     * Null, and skinema opens a line for itself exactly as it always did. That is
+     * the fallback and not a degraded mode: what the system output buys is a
+     * stream the mixer shows as Nexira rather than as an anonymous JVM, and
+     * losing that must never cost the sound itself.
+     */
+    private val output: SystemAudioOutput? = null,
 ) {
     private val log = LoggerFactory.getLogger(AudioPlayer::class.java)
 
@@ -311,7 +320,7 @@ class AudioPlayer(
             return null
         }
         return try {
-            VideoPlayer(path = file, loop = false, audio = true)
+            VideoPlayer(path = file, loop = false, audio = true, sink = output?.sink())
         } catch (e: Exception) {
             openFailed(file, e)
         } catch (e: LinkageError) {
