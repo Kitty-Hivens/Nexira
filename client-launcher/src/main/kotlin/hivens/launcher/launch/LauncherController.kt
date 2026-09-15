@@ -97,9 +97,16 @@ class LauncherController(
         manifest: SmrtPackManifest,
         toggles: List<ContentToggle>,
     ): PackInstance {
-        val updated = instance.copy(optionalContent = toggles)
+        // Re-read, then change the one field this owns. The record the caller holds
+        // was captured when the tab rendered, and an apply committing in between
+        // moves the pinned version, the installed manifest and the cached one. Writing
+        // the captured copy back whole restores all three to the build the update had
+        // just left, so a checkbox would silently undo an update. The two other
+        // writers in this file already re-read for the same reason.
+        val current = packRepository.get(instance.id) ?: instance
+        val updated = current.copy(optionalContent = toggles)
         packRepository.put(updated)
-        val clientDir = dataDirectory.resolve("instances").resolve(instance.instanceDirName)
+        val clientDir = dataDirectory.resolve("instances").resolve(updated.instanceDirName)
         val deferred = withContext(Dispatchers.IO) {
             InstanceMutationLock.withLock(clientDir) {
                 smrtSyncService.relabel(

@@ -564,6 +564,53 @@ class LauncherControllerTest {
     )
 
     /**
+     * A toggle owns one field and must write only that one.
+     *
+     * The record the Content tab holds was captured when it rendered. An apply
+     * committing in between moves the pinned version and both manifests, and writing
+     * the captured copy back whole put all three back to the build the update had
+     * just left, so a checkbox silently undid an update.
+     */
+    @Test
+    fun `an optional-content flip does not write back the build the update just left`() = runTest {
+        val stale = packInstance("i-toggle")
+        // What the registry holds by the time the flip lands: the apply has moved on.
+        val applied = stale.copy(
+            packRef = stale.packRef.copy(version = "2026.06.01.1"),
+            pinnedPackVersion = "2026.06.01.1",
+        )
+        val puts = mutableListOf<hivens.core.data.PackInstance>()
+        coEvery { packRepository.get("i-toggle") } returns applied
+        coJustRun { packRepository.put(capture(puts)) }
+
+        val controller = newController(this)
+        val returned = controller.setOptionalMods(
+            instance = stale,
+            manifest = hivens.core.api.dto.smrt.SmrtPackManifest(
+                schemaVersion = 2,
+                packId        = "modern-explorer",
+                packVersion   = "2026.06.01.1",
+                generatedAt   = "2026-06-01T00:00:00Z",
+                minecraft     = hivens.core.api.dto.smrt.SmrtMinecraft("1.12.2"),
+                loader        = hivens.core.api.dto.smrt.SmrtLoader("forge", "14.23.5.2922"),
+                java          = hivens.core.api.dto.smrt.SmrtJava(8),
+            ),
+            toggles = listOf(hivens.core.data.ContentToggle("modrinth:abc", enabled = false)),
+        )
+        advanceUntilIdle()
+
+        val written = puts.single()
+        assertEquals("2026.06.01.1", written.pinnedPackVersion, "the flip must not roll the pin back")
+        assertEquals("2026.06.01.1", written.packRef.version, "nor the reference it was applied to")
+        assertEquals(
+            listOf(hivens.core.data.ContentToggle("modrinth:abc", enabled = false)),
+            written.optionalContent,
+            "and the field the toggle does own is the one that changed",
+        )
+        assertEquals("2026.06.01.1", returned.pinnedPackVersion, "the caller adopts the record as written")
+    }
+
+    /**
      * Stopping one pack and starting another immediately is allowed: abort sets Idle
      * while the first launch is still parked in a wait that cancellation cannot
      * interrupt. When it finally wakes -- after the second game is live -- everything
