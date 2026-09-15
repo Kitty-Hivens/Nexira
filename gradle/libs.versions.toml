@@ -30,7 +30,7 @@ coroutines        = "1.11.0"
 # which has no stable release on any line the desktop target has used. The
 # version here is the alpha paired with the compose core above; the two move
 # together, and the pairing is the only thing that makes an alpha acceptable.
-composeMaterial3  = "1.12.0-alpha03"
+composeMaterial3  = "1.13.0-alpha01"
 # androidx graphics-shapes -- rounded polygons with corner SMOOTHING (squircles)
 # and star/polygon outlines, which RoundedCornerShape cannot express. Already on
 # the classpath transitively; declared so the source depends on it deliberately.
