@@ -463,25 +463,50 @@ internal class GameCommandBuilder(
     }
 
     /**
-     * Ordered `-cp` for a pack: bootstrap jars (launchwrapper / asm /
-     * bootstraplauncher / foundation) first, then the client jar, then the rest
-     * -- mirrors the proven legacy Forge classpath ordering. `foundation` is
-     * Cleanroom's launchwrapper replacement (its `Foundation` bootstrap starts
-     * FMLTweaker), so it takes launchwrapper's boot-first slot. Mods are NOT
-     * here; the loader scans the per-instance mods/ dir.
+     * Ordered `-cp` for a pack: the libraries in the order the loader declared
+     * them, with the client jar inserted right after the last bootstrap jar
+     * (launchwrapper / asm / bootstraplauncher / foundation), which is what
+     * keeps the bootstrap ahead of the client the way the legacy Forge path
+     * always did. `foundation` is Cleanroom's launchwrapper replacement, whose
+     * `Foundation` bootstrap starts FMLTweaker, so it counts as one. Mods stay
+     * off this list. The loader scans the per-instance mods/ dir for them.
+     *
+     * Only the client jar moves, and that matters. Hoisting the bootstrap jars
+     * to the front instead, which is what this did before, also lifted them over
+     * loader jars declared ahead of them, and classpath order decides which
+     * duplicate RESOURCE wins as much as which class. Three jars in a 1.12.2
+     * launch carry a root `log4j2.xml`: the vanilla client, the loader core
+     * (forge universal, cleanroom) and Cleanroom's foundation. So the hoist was
+     * choosing the logging config, and it chose wrong both times. For Cleanroom
+     * it picked foundation's, whose pattern calls a `%rgbFormat` converter that
+     * nothing in the runtime registers, so log4j read `%r` as "millis since
+     * start", left `gbFormat` as a literal and dropped the message. That pattern
+     * also keeps its `%n` inside the missing converter, which is why stdout
+     * arrived without a single newline and [LineAssembler] had to fall back to
+     * splitting on the record header. For legacy Forge it picked the vanilla
+     * client's, which carries neither the `[%logger]` field nor the
+     * `forge.logging.*` levels. Declared order hands each loader the config it
+     * ships.
      */
     private fun packClasspath(runtime: ResolvedRuntime): String {
         val libPaths = runtime.libraries.map { it.path }
-        val (boot, rest) = libPaths.partition { p ->
-            val n = p.fileName.toString().lowercase()
-            n.contains("launchwrapper") || n.contains("asm") ||
-                n.contains("bootstraplauncher") || n.contains("foundation")
-        }
+        // A vanilla runtime has no bootstrap jar at all, so indexOfLast answers
+        // -1 and the client jar lands at the head of the classpath.
+        val afterBootstrap = libPaths.indexOfLast { isBootstrapJar(it) } + 1
         // listOf(clientJar), NOT `+ clientJar`: a Path is Iterable<Path> over its
         // name segments, so `List<Path> + Path` would spread the client jar into
         // its path components instead of appending it as one classpath entry.
-        return (boot + listOf(runtime.clientJar) + rest)
-            .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
+        val ordered = libPaths.take(afterBootstrap) +
+            listOf(runtime.clientJar) +
+            libPaths.drop(afterBootstrap)
+        return ordered.joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
+    }
+
+    /** A jar the loader boots through before Minecraft's own classes are touched. */
+    private fun isBootstrapJar(path: Path): Boolean {
+        val name = path.fileName.toString().lowercase()
+        return name.contains("launchwrapper") || name.contains("asm") ||
+            name.contains("bootstraplauncher") || name.contains("foundation")
     }
 
     /**

@@ -598,12 +598,16 @@ class GameCommandBuilderTest {
     // buildPackCommand -- profile-driven pack launch (loader-resolved runtime)
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // Mirrors the shape a real 1.12.2 Forge pack merges into: the vanilla base
+    // first, then the loader's own additions in the order its version json
+    // declares them (universal, asm, launchwrapper). The bootstrap jars are NOT
+    // at the head of the list, which is the case that matters for `-cp` ordering.
     private fun forgeRuntime() = ResolvedRuntime(
         libraries = listOf(
-            ResolvedLibrary(MavenCoord.parse("net.minecraft:launchwrapper:1.12"), Path.of("/libs/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar")),
-            ResolvedLibrary(MavenCoord.parse("org.ow2.asm:asm-debug-all:5.2"), Path.of("/libs/org/ow2/asm/asm-debug-all/5.2/asm-debug-all-5.2.jar")),
             ResolvedLibrary(MavenCoord.parse("com.google.guava:guava:21.0"), Path.of("/libs/com/google/guava/guava/21.0/guava-21.0.jar")),
             ResolvedLibrary(MavenCoord.parse("net.minecraftforge:forge:1.12.2-14.23.5.2860"), Path.of("/libs/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.ow2.asm:asm-debug-all:5.2"), Path.of("/libs/org/ow2/asm/asm-debug-all/5.2/asm-debug-all-5.2.jar")),
+            ResolvedLibrary(MavenCoord.parse("net.minecraft:launchwrapper:1.12"), Path.of("/libs/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar")),
         ),
         clientJar = Path.of("/libs/net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar"),
         mainClass = "net.minecraft.launchwrapper.Launch",
@@ -713,30 +717,51 @@ class GameCommandBuilderTest {
         assertEquals("net.minecraftforge.fml.common.launcher.FMLTweaker", cmd[cmd.indexOf("--tweakClass") + 1])
     }
 
+    /**
+     * The loader's declared order is what decides which of the duplicate root
+     * `log4j2.xml` resources wins (the vanilla client ships one, so does the
+     * Forge universal jar). Reordering the libraries to put the bootstrap first
+     * handed that choice to the client jar and cost the launch Forge's own
+     * logging config.
+     */
     @Test
-    fun `buildPackCommand classpath is bootstrap-first, client is one entry, excludes mods`() {
+    fun `buildPackCommand keeps the declared library order and slots the client after the bootstrap`() {
+        val rt = forgeRuntime()
+        val client = rt.clientJar.toAbsolutePath().toString()
         val cmd = packCommand()
         val parts = cmd[cmd.indexOf("-cp") + 1].split(sep)
-        assertTrue(parts[0].contains("launchwrapper") || parts[0].contains("asm"), "bootstrap jar first, got ${parts[0]}")
+        assertEquals(
+            rt.libraries.map { it.path.toAbsolutePath().toString() },
+            parts.filterNot { it == client },
+            "libraries must keep the order the loader declared, got: $parts",
+        )
         // The full client path must be ONE entry -- guards the Path-is-Iterable
         // `+` gotcha that split the jar into its individual path segments.
+        val clientIdx = parts.indexOf(client)
+        assertTrue(clientIdx >= 0, "client jar must be a single full-path cp entry, got: $parts")
         assertTrue(
-            parts.contains(forgeRuntime().clientJar.toAbsolutePath().toString()),
-            "client jar must be a single full-path cp entry, got: $parts",
+            parts.indexOfFirst { it.contains("launchwrapper") } < clientIdx,
+            "the bootstrap must still precede the client jar, got: $parts",
+        )
+        assertTrue(
+            parts.indexOfFirst { it.contains("forge-1.12.2") } < clientIdx,
+            "the loader core must precede the client jar so its log4j2.xml wins, got: $parts",
         )
         assertTrue(parts.none { it.contains("${File.separator}mods${File.separator}") }, "mods stay off the classpath")
     }
 
     // A Cleanroom runtime -- launchwrapper-family like forgeRuntime, but the
     // bootstrap is top.outlands.foundation.boot.Foundation (launchwrapper's
-    // replacement) rather than launchwrapper itself.
+    // replacement) rather than launchwrapper itself. The order follows the
+    // installer's version.json, which declares the loader core well ahead of asm
+    // and foundation.
     private fun cleanroomRuntime() = ResolvedRuntime(
         libraries = listOf(
             ResolvedLibrary(MavenCoord.parse("com.google.guava:guava:33.6.0-jre"), Path.of("/libs/com/google/guava/guava/33.6.0-jre/guava-33.6.0-jre.jar")),
+            ResolvedLibrary(MavenCoord.parse("com.cleanroommc:cleanroom:0.6.4-alpha"), Path.of("/libs/com/cleanroommc/cleanroom/0.6.4-alpha/cleanroom-0.6.4-alpha.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.lwjgl:lwjgl-glfw:3.4.1"), Path.of("/libs/org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1.jar")),
             ResolvedLibrary(MavenCoord.parse("org.ow2.asm:asm:9.10.1"), Path.of("/libs/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar")),
             ResolvedLibrary(MavenCoord.parse("top.outlands:foundation:0.19.8"), Path.of("/libs/top/outlands/foundation/0.19.8/foundation-0.19.8.jar")),
-            ResolvedLibrary(MavenCoord.parse("org.lwjgl:lwjgl-glfw:3.4.1"), Path.of("/libs/org/lwjgl/lwjgl-glfw/3.4.1/lwjgl-glfw-3.4.1.jar")),
-            ResolvedLibrary(MavenCoord.parse("com.cleanroommc:cleanroom:0.6.4-alpha"), Path.of("/libs/com/cleanroommc/cleanroom/0.6.4-alpha/cleanroom-0.6.4-alpha.jar")),
         ),
         clientJar = Path.of("/libs/net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar"),
         mainClass = "top.outlands.foundation.boot.Foundation",
@@ -745,17 +770,26 @@ class GameCommandBuilderTest {
         javaMajor = 25,
     )
 
+    /**
+     * The Cleanroom core and foundation both ship a root `log4j2.xml`, and
+     * foundation's names a `%rgbFormat` converter that exists in no jar of the
+     * runtime. Whichever lands first on `-cp` therefore decides whether the game
+     * logs its messages or a stream of `748gbFormat` with no newlines in it.
+     * Declared order keeps the core in front, which is the config that works.
+     */
     @Test
-    fun `buildPackCommand puts the Cleanroom Foundation bootstrap ahead of the client jar`() {
+    fun `buildPackCommand leaves the Cleanroom core ahead of foundation and both ahead of the client`() {
         val rt = cleanroomRuntime()
         val cmd = packCommand(rt, javaMajor = 25)
         val parts = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        val coreIdx = parts.indexOfFirst { it.contains("cleanroom-") }
         val foundationIdx = parts.indexOfFirst { it.contains("foundation") }
         val clientIdx = parts.indexOf(rt.clientJar.toAbsolutePath().toString())
+        assertTrue(coreIdx >= 0, "cleanroom core jar present, got: $parts")
         assertTrue(foundationIdx >= 0, "foundation jar present, got: $parts")
         assertTrue(clientIdx >= 0, "client jar is one entry, got: $parts")
-        assertTrue(foundationIdx < clientIdx, "Foundation must precede the client jar; got: $parts")
-        assertTrue(parts[0].contains("foundation") || parts[0].contains("asm"), "bootstrap jar first, got ${parts[0]}")
+        assertTrue(coreIdx < foundationIdx, "the core must keep its declared slot ahead of foundation, got: $parts")
+        assertTrue(foundationIdx < clientIdx, "Foundation must precede the client jar, got: $parts")
     }
 
     // A modern (BootstrapLauncher) runtime -- drives modernClasspath, unlike the
