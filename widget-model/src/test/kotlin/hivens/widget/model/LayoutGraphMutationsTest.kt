@@ -84,32 +84,52 @@ class LayoutGraphMutationsTest {
         )
     }
 
-    // ── Phase G: slot orientation + grid columns + widget weight ──────
+    // ── Slot mode: flow, and the unit a placement slot measures in ────
 
     @Test
-    fun `setSlotOrientation changes the slot orientation`() {
-        val out = seed(w1).setSlotOrientation(rootPath, SlotOrientation.Row)
-        assertEquals(SlotOrientation.Row, out.surfaces[home]?.slots?.get(main)?.orientation)
+    fun `setFlow changes the slot's arrangement`() {
+        val out = seed(w1).setFlow(rootPath, FlowSpec.Row)
+        assertEquals(FlowSpec.Row, out.surfaces[home]?.slots?.get(main)?.flow)
     }
 
     @Test
-    fun `setSlotOrientation to the same value is identity`() {
+    fun `setFlow to the same value is identity`() {
         val graph = seed(w1)
-        assertSame(graph, graph.setSlotOrientation(rootPath, SlotOrientation.Column))
+        assertSame(graph, graph.setFlow(rootPath, FlowSpec.Column))
     }
 
     @Test
-    fun `setGridColumns updates and clamps to the 1 to MAX range`() {
-        assertEquals(3, seed(w1).setGridColumns(rootPath, 3).surfaces[home]?.slots?.get(main)?.gridColumns)
-        assertEquals(1, seed(w1).setGridColumns(rootPath, 0).surfaces[home]?.slots?.get(main)?.gridColumns)
-        assertEquals(GRID_COLUMNS_MAX, seed(w1).setGridColumns(rootPath, 99).surfaces[home]?.slots?.get(main)?.gridColumns)
+    fun `a grid is a horizontal flow that wraps into equal cells`() {
+        val out = seed(w1).setFlow(rootPath, FlowSpec.grid(3))
+        val flow = out.surfaces[home]?.slots?.get(main)?.flow!!
+        assertEquals(true, flow.horizontal)
+        assertEquals(3, flow.wrap)
+        assertEquals(true, flow.uniform)
+    }
+
+    @Test
+    fun `setGrid updates and clamps to the 0 to MAX range`() {
+        assertEquals(3, seed(w1).setGrid(rootPath, 3).surfaces[home]?.slots?.get(main)?.grid)
+        assertEquals(0, seed(w1).setGrid(rootPath, -4).surfaces[home]?.slots?.get(main)?.grid)
+        assertEquals(GRID_MAX, seed(w1).setGrid(rootPath, 999).surfaces[home]?.slots?.get(main)?.grid)
+    }
+
+    @Test
+    fun `setGrid does not rescale what is already placed`() {
+        val placed = seed(w1).setPlacement(rootPath, "i1", Placement(x = 7f, y = 2f))
+        val out = placed.setGrid(rootPath, 6)
+        assertEquals(
+            Placement(x = 7f, y = 2f),
+            out.mainWidgets().first().placement,
+            "the number means cells now rather than dp, and reinterpreting it is the user's call",
+        )
     }
 
     @Test
     fun `setWidgetWeight sets weight on the matching widget only`() {
         val out = seed(w1, w2).setWidgetWeight(rootPath, "i2", 2f)
-        assertEquals(2f, out.mainWidgets().first { it.instanceId == "i2" }.weight)
-        assertEquals(0f, out.mainWidgets().first { it.instanceId == "i1" }.weight)
+        assertEquals(2f, out.mainWidgets().first { it.instanceId == "i2" }.placement?.weight)
+        assertNull(out.mainWidgets().first { it.instanceId == "i1" }.placement)
     }
 
     @Test
@@ -121,35 +141,40 @@ class LayoutGraphMutationsTest {
     @Test
     fun `setWidgetWeight coerces a negative weight to zero`() {
         val out = seed(w1).setWidgetWeight(rootPath, "i1", -5f)
-        assertEquals(0f, out.mainWidgets().first { it.instanceId == "i1" }.weight)
+        assertNull(
+            out.mainWidgets().first().placement,
+            "zero is the default, and an all-default record is no record at all",
+        )
     }
 
     @Test
-    fun `setWidgetWeight to the same weight is identity`() {
-        // w1 defaults to weight 0f -- re-setting 0f must not allocate a new graph.
+    fun `setWidgetWeight to the weight it already had is identity`() {
+        // w1 carries no placement -- writing the default back must not mint one,
+        // or every no-op transform starts allocating a new graph.
         val graph = seed(w1)
         assertSame(graph, graph.setWidgetWeight(rootPath, "i1", 0f))
     }
 
-    // ── Canvas placement (Canvas slot mode) ───────────────────────────
+    // ── Placement ─────────────────────────────────────────────────────
 
     @Test
-    fun `setCanvasPlacement sets placement on the matching widget only`() {
-        val out = seed(w1, w2).setCanvasPlacement(rootPath, "i2", CanvasPlacement(10f, 20f, 100f, 50f, 3))
-        assertEquals(CanvasPlacement(10f, 20f, 100f, 50f, 3), out.mainWidgets().first { it.instanceId == "i2" }.canvas)
-        assertNull(out.mainWidgets().first { it.instanceId == "i1" }.canvas)
+    fun `setPlacement sets it on the matching widget only`() {
+        val p = Placement(x = 10f, y = 20f, width = 100f, height = 50f, z = 3)
+        val out = seed(w1, w2).setPlacement(rootPath, "i2", p)
+        assertEquals(p, out.mainWidgets().first { it.instanceId == "i2" }.placement)
+        assertNull(out.mainWidgets().first { it.instanceId == "i1" }.placement)
     }
 
     @Test
-    fun `setCanvasPlacement to the same placement is identity`() {
-        val placed = seed(w1).setCanvasPlacement(rootPath, "i1", CanvasPlacement(x = 5f))
-        assertSame(placed, placed.setCanvasPlacement(rootPath, "i1", CanvasPlacement(x = 5f)))
+    fun `setPlacement to the same record is identity`() {
+        val placed = seed(w1).setPlacement(rootPath, "i1", Placement(x = 5f))
+        assertSame(placed, placed.setPlacement(rootPath, "i1", Placement(x = 5f)))
     }
 
     @Test
-    fun `setCanvasPlacement on unknown instance is identity`() {
+    fun `setPlacement on unknown instance is identity`() {
         val graph = seed(w1)
-        assertSame(graph, graph.setCanvasPlacement(rootPath, "ghost", CanvasPlacement(x = 1f)))
+        assertSame(graph, graph.setPlacement(rootPath, "ghost", Placement(x = 1f)))
     }
 
     @Test
@@ -158,14 +183,16 @@ class LayoutGraphMutationsTest {
             .setWidgetOffset(rootPath, "i1", 40f, 60f)
             .setWidgetSize(rootPath, "i1", 200f, 120f)
         assertEquals(
-            CanvasPlacement(x = 40f, y = 60f, width = 200f, height = 120f),
-            out.mainWidgets().first { it.instanceId == "i1" }.canvas,
+            Placement(x = 40f, y = 60f, width = 200f, height = 120f),
+            out.mainWidgets().first { it.instanceId == "i1" }.placement,
         )
     }
 
     @Test
     fun `setWidgetSize coerces negatives to zero`() {
-        val p = seed(w1).setWidgetSize(rootPath, "i1", -10f, -5f).mainWidgets().first { it.instanceId == "i1" }.canvas
+        val p = seed(w1).setWidgetOffset(rootPath, "i1", 1f, 1f)
+            .setWidgetSize(rootPath, "i1", -10f, -5f)
+            .mainWidgets().first().placement
         assertEquals(0f, p?.width)
         assertEquals(0f, p?.height)
     }
@@ -173,140 +200,159 @@ class LayoutGraphMutationsTest {
     @Test
     fun `setWidgetZ sets the layer`() {
         val out = seed(w1).setWidgetZ(rootPath, "i1", 5)
-        assertEquals(5, out.mainWidgets().first { it.instanceId == "i1" }.canvas?.z)
+        assertEquals(5, out.mainWidgets().first().placement?.z)
     }
 
-    // ── Seed-on-switch (flip to Canvas) ───────────────────────────────
+    @Test
+    fun `setWidgetAnchor normalises a value it does not know`() {
+        val out = seed(w1).setWidgetAnchor(rootPath, "i1", "sideways")
+        assertNull(
+            out.mainWidgets().first().placement,
+            "an unrecognised anchor is the default one, and the default record is no record",
+        )
+        val real = seed(w1).setWidgetAnchor(rootPath, "i1", "  BottomEnd ")
+        assertEquals(Placement.BOTTOM_END, real.mainWidgets().first().placement?.anchor)
+    }
+
+    // ── Seeding when a slot becomes a placement slot ───────────────────
 
     @Test
-    fun `setSlotOrientation to Canvas seeds a staggered grid onto null-placement widgets`() {
+    fun `setFlow to null seeds a staggered grid onto the unplaced`() {
         val w4 = WidgetInstance(WidgetKind("d"), "i4", JsonObject(emptyMap()))
-        val out = seed(w1, w2, w3, w4).setSlotOrientation(rootPath, SlotOrientation.Canvas)
-        val placed = out.mainWidgets().associate { it.instanceId to it.canvas }
-        assertEquals(CanvasPlacement(x = 16f, y = 16f, z = 0), placed["i1"])
-        assertEquals(CanvasPlacement(x = 236f, y = 16f, z = 1), placed["i2"])
-        assertEquals(CanvasPlacement(x = 456f, y = 16f, z = 2), placed["i3"])
-        assertEquals(CanvasPlacement(x = 16f, y = 176f, z = 3), placed["i4"]) // wraps to row 1
-        assertEquals(SlotOrientation.Canvas, out.surfaces[home]?.slots?.get(main)?.orientation)
+        val out = seed(w1, w2, w3, w4).setFlow(rootPath, null)
+        val placed = out.mainWidgets().associate { it.instanceId to it.placement }
+        assertEquals(Placement(x = 16f, y = 16f, z = 0), placed["i1"])
+        assertEquals(Placement(x = 236f, y = 16f, z = 1), placed["i2"])
+        assertEquals(Placement(x = 456f, y = 16f, z = 2), placed["i3"])
+        assertEquals(Placement(x = 16f, y = 176f, z = 3), placed["i4"]) // wraps to the next row
+        assertNull(out.surfaces[home]?.slots?.get(main)?.flow)
     }
 
     @Test
-    fun `setSlotOrientation to Canvas preserves an already-placed widget`() {
-        val pre = seed(w1, w2).setCanvasPlacement(rootPath, "i1", CanvasPlacement(x = 500f, y = 500f, z = 9))
-        val out = pre.setSlotOrientation(rootPath, SlotOrientation.Canvas)
-        val placed = out.mainWidgets().associate { it.instanceId to it.canvas }
-        assertEquals(CanvasPlacement(x = 500f, y = 500f, z = 9), placed["i1"]) // kept
-        assertEquals(CanvasPlacement(x = 236f, y = 16f, z = 1), placed["i2"])  // seeded at its index
+    fun `setFlow to null preserves an already-placed widget`() {
+        val pre = seed(w1, w2).setPlacement(rootPath, "i1", Placement(x = 500f, y = 500f, z = 9))
+        val out = pre.setFlow(rootPath, null)
+        val placed = out.mainWidgets().associate { it.instanceId to it.placement }
+        assertEquals(Placement(x = 500f, y = 500f, z = 9), placed["i1"]) // kept
+        assertEquals(Placement(x = 236f, y = 16f, z = 1), placed["i2"])  // seeded at its index
     }
 
     @Test
-    fun `setSlotOrientation to a non-Canvas orientation only flips, no seeding`() {
-        val out = seed(w1, w2).setSlotOrientation(rootPath, SlotOrientation.Row)
-        assertEquals(SlotOrientation.Row, out.surfaces[home]?.slots?.get(main)?.orientation)
-        assertNull(out.mainWidgets().first { it.instanceId == "i1" }.canvas)
-        assertNull(out.mainWidgets().first { it.instanceId == "i2" }.canvas)
+    fun `setFlow to another flow only flips, no seeding`() {
+        val out = seed(w1, w2).setFlow(rootPath, FlowSpec.Row)
+        assertEquals(FlowSpec.Row, out.surfaces[home]?.slots?.get(main)?.flow)
+        assertNull(out.mainWidgets().first { it.instanceId == "i1" }.placement)
+        assertNull(out.mainWidgets().first { it.instanceId == "i2" }.placement)
     }
 
     @Test
-    fun `setSlotOrientation to the current orientation is identity`() {
-        val graph = seed(w1) // defaults to Column
-        assertSame(graph, graph.setSlotOrientation(rootPath, SlotOrientation.Column))
+    fun `setFlow to null twice is idempotent`() {
+        val once = seed(w1, w2).setFlow(rootPath, null)
+        assertSame(once, once.setFlow(rootPath, null))
     }
 
     @Test
-    fun `setSlotOrientation to Canvas twice is idempotent`() {
-        val once = seed(w1, w2).setSlotOrientation(rootPath, SlotOrientation.Canvas)
-        assertSame(once, once.setSlotOrientation(rootPath, SlotOrientation.Canvas))
+    fun `seedPlacement staggers free placement into rows of three`() {
+        assertEquals(Placement(x = 16f, y = 16f, z = 0), seedPlacement(0, grid = 0))
+        assertEquals(Placement(x = 456f, y = 16f, z = 2), seedPlacement(2, grid = 0))
+        assertEquals(Placement(x = 16f, y = 176f, z = 3), seedPlacement(3, grid = 0))
     }
 
     @Test
-    fun `seededCanvasPlacement wraps into columns`() {
-        assertEquals(CanvasPlacement(x = 16f, y = 16f, z = 0), seededCanvasPlacement(0))
-        assertEquals(CanvasPlacement(x = 456f, y = 16f, z = 2), seededCanvasPlacement(2))
-        assertEquals(CanvasPlacement(x = 16f, y = 176f, z = 3), seededCanvasPlacement(3))
+    fun `seedPlacement in a lattice takes the first free cell in reading order`() {
+        val taken = listOf(
+            WidgetInstance(WidgetKind("k"), "a", placement = Placement(x = 0f, y = 0f, width = 1f, height = 1f)),
+            WidgetInstance(WidgetKind("k"), "b", placement = Placement(x = 1f, y = 0f, width = 1f, height = 1f)),
+        )
+        assertEquals(
+            Placement(x = 0f, y = 1f, width = 1f, height = 1f),
+            seedPlacement(index = 2, grid = 2, existing = taken),
+            "two columns, both of row zero spoken for, so the next one is the row below",
+        )
     }
 
-    // ── CubeGrid: cell seeding + snap placement (no overlap, no compaction) ──
+    @Test
+    fun `setFlow to a lattice seeds one-by-one cells in reading order`() {
+        val w4  = WidgetInstance(WidgetKind("d"), "i4", JsonObject(emptyMap()))
+        val out = seed(w1, w2, w3, w4).setGrid(rootPath, 2).setFlow(rootPath, null)
+        val cells = out.mainWidgets().associate { it.instanceId to (it.placement?.x to it.placement?.y) }
+        assertEquals(0f to 0f, cells["i1"])
+        assertEquals(1f to 0f, cells["i2"])
+        assertEquals(0f to 1f, cells["i3"])
+        assertEquals(1f to 1f, cells["i4"])
+    }
 
-    private fun cubeContent(vararg pairs: Pair<String, GridCell>): SlotContent =
+    // ── Lattice collision: snap, never evict, never compact ───────────
+
+    private fun latticeContent(vararg pairs: Pair<String, Placement>): SlotContent =
         SlotContent(
-            widgets     = pairs.map { (id, c) -> WidgetInstance(WidgetKind("k"), id, JsonObject(emptyMap()), cell = c) },
-            orientation = SlotOrientation.CubeGrid,
-            gridColumns = 4,
+            widgets = pairs.map { (id, p) -> WidgetInstance(WidgetKind("k"), id, JsonObject(emptyMap()), placement = p) },
+            flow    = null,
+            grid    = 4,
         )
 
-    private fun SlotContent.cellOf(id: String): GridCell? = widgets.first { it.instanceId == id }.cell
+    private fun cell(col: Int, row: Int, w: Int = 1, h: Int = 1) =
+        Placement(x = col.toFloat(), y = row.toFloat(), width = w.toFloat(), height = h.toFloat())
+
+    private fun SlotContent.placementOf(id: String): Placement? = widgets.first { it.instanceId == id }.placement
 
     @Test
-    fun `setSlotOrientation to CubeGrid seeds 1x1 cells in flow order`() {
-        val w4  = WidgetInstance(WidgetKind("d"), "i4", JsonObject(emptyMap()))
-        val out = seed(w1, w2, w3, w4).setSlotOrientation(rootPath, SlotOrientation.CubeGrid)
-        val cells = out.mainWidgets().associate { it.instanceId to it.cell }
-        // gridColumns default = 2 -> two per row, row-major.
-        assertEquals(GridCell(0, 0), cells["i1"])
-        assertEquals(GridCell(1, 0), cells["i2"])
-        assertEquals(GridCell(0, 1), cells["i3"])
-        assertEquals(GridCell(1, 1), cells["i4"])
-        assertEquals(SlotOrientation.CubeGrid, out.surfaces[home]?.slots?.get(main)?.orientation)
+    fun `placeInGrid snaps the moved widget to a free target, others fixed`() {
+        val out = placeInGrid(latticeContent("a" to cell(0, 0), "b" to cell(2, 0)), "a", cell(1, 0), columns = 4)
+        assertEquals(cell(1, 0), out.placementOf("a"))
+        assertEquals(cell(2, 0), out.placementOf("b"))
     }
 
     @Test
-    fun `placeInCubeGrid snaps the moved widget to a free target, others fixed`() {
-        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(2, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
-        assertEquals(GridCell(1, 0), out.cellOf("a"))
-        assertEquals(GridCell(2, 0), out.cellOf("b"))
+    fun `placeInGrid snaps to the nearest free cell when the target is occupied`() {
+        // a -> b's cell (1,0): occupied, so a snaps to the nearest free one; b never moves.
+        val out = placeInGrid(latticeContent("a" to cell(0, 0), "b" to cell(1, 0)), "a", cell(1, 0), columns = 4)
+        assertEquals(cell(0, 0), out.placementOf("a"))
+        assertEquals(cell(1, 0), out.placementOf("b"))
     }
 
     @Test
-    fun `placeInCubeGrid snaps to the nearest free cell when the target is occupied`() {
-        // a -> b's cell (1,0): occupied, so a snaps to the nearest free cell (0,0); b never moves.
-        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
-        assertEquals(GridCell(0, 0), out.cellOf("a"))
-        assertEquals(GridCell(1, 0), out.cellOf("b"))
+    fun `placeInGrid never compacts -- gaps are preserved`() {
+        // b floats at row 3; moving a must NOT pull b upward. This is a snap grid,
+        // not a packer, and a gap somebody left is a gap they meant.
+        val out = placeInGrid(latticeContent("a" to cell(0, 0), "b" to cell(0, 3)), "a", cell(0, 0), columns = 4)
+        assertEquals(cell(0, 0), out.placementOf("a"))
+        assertEquals(cell(0, 3), out.placementOf("b"))
     }
 
     @Test
-    fun `placeInCubeGrid never compacts -- gaps are preserved`() {
-        // b floats at row 3; moving a must NOT pull b upward (this is a snap grid, not a packer).
-        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(0, 3)), "a", GridCell(0, 0), columns = 4)
-        assertEquals(GridCell(0, 0), out.cellOf("a"))
-        assertEquals(GridCell(0, 3), out.cellOf("b"))
+    fun `placeInGrid clamps span and column into the lattice`() {
+        val out = placeInGrid(latticeContent("a" to cell(0, 0)), "a", cell(3, 0, w = 5), columns = 4)
+        val a = out.placementOf("a")!!
+        assertEquals(4f, a.width) // 5 clamped to the column count
+        assertEquals(0f, a.x)     // and the anchor clamped into [0, columns - span]
     }
 
     @Test
-    fun `placeInCubeGrid clamps span and column into the grid`() {
-        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0)), "a", GridCell(col = 3, row = 0, colSpan = 5), columns = 4)
-        val a = out.cellOf("a")!!
-        assertEquals(4, a.colSpan) // 5 clamped to columns
-        assertEquals(0, a.col)     // col clamped into [0, columns - span]
+    fun `placeInGrid is identity when nothing moves`() {
+        val c = latticeContent("a" to cell(0, 0), "b" to cell(1, 0))
+        assertSame(c, placeInGrid(c, "a", cell(0, 0), columns = 4))
     }
 
     @Test
-    fun `placeInCubeGrid is identity when nothing moves`() {
-        val c = cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0))
-        assertSame(c, placeInCubeGrid(c, "a", GridCell(0, 0), columns = 4))
+    fun `resizeInGrid clamps the span so it cannot grow over a neighbour`() {
+        val out = resizeInGrid(latticeContent("a" to cell(0, 0), "b" to cell(1, 0)), "a", width = 3f, height = 1f, columns = 4)
+        assertEquals(1f, out.placementOf("a")!!.width)
+        assertEquals(cell(1, 0), out.placementOf("b"))
     }
 
     @Test
-    fun `resizeInCubeGrid clamps the span so it cannot grow over a neighbour`() {
-        // a (0,0) asks for 3 wide but b sits at (1,0): a stays 1 wide, b never moves.
-        val out = resizeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0)), "a", colSpan = 3, rowSpan = 1, columns = 4)
-        assertEquals(1, out.cellOf("a")!!.colSpan)
-        assertEquals(GridCell(1, 0), out.cellOf("b"))
+    fun `resizeInGrid grows into free space`() {
+        val out = resizeInGrid(latticeContent("a" to cell(0, 0), "b" to cell(3, 0)), "a", width = 2f, height = 2f, columns = 4)
+        val a = out.placementOf("a")!!
+        assertEquals(2f, a.width)
+        assertEquals(2f, a.height)
     }
 
     @Test
-    fun `resizeInCubeGrid grows into free space`() {
-        val out = resizeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(3, 0)), "a", colSpan = 2, rowSpan = 2, columns = 4)
-        val a = out.cellOf("a")!!
-        assertEquals(2, a.colSpan)
-        assertEquals(2, a.rowSpan)
-    }
-
-    @Test
-    fun `placeWidgetInCell on unknown instance is identity`() {
-        val g = LayoutGraph(surfaces = mapOf(home to SurfaceLayout(slots = mapOf(main to cubeContent("a" to GridCell(0, 0))))))
-        assertSame(g, g.placeWidgetInCell(rootPath, "ghost", GridCell(1, 1), 4))
+    fun `placeWidgetInGrid on unknown instance is identity`() {
+        val g = LayoutGraph(surfaces = mapOf(home to SurfaceLayout(slots = mapOf(main to latticeContent("a" to cell(0, 0))))))
+        assertSame(g, g.placeWidgetInGrid(rootPath, "ghost", cell(1, 1), 4))
     }
 
     @Test

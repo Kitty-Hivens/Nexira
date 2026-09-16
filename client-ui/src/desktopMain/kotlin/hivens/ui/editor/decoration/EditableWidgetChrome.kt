@@ -61,7 +61,8 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.canvasDragOffset
 import hivens.ui.editor.canvasResizeSize
-import hivens.ui.editor.cubeDragCell
+import hivens.ui.editor.gridDragCell
+import hivens.ui.editor.gridResizeSpan
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
@@ -72,12 +73,12 @@ import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
-import hivens.widget.api.LocalCanvasSlotSizeDp
-import hivens.widget.api.LocalCubeGeometry
+import hivens.widget.api.LocalPlacementSlotSizeDp
+import hivens.widget.api.LocalGridGeometry
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
-import hivens.widget.model.GridCell
-import hivens.widget.model.SlotOrientation
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.Placement
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
@@ -106,7 +107,7 @@ fun EditableWidgetChrome(
     controller: DragController,
     editController: EditModeController,
     registry: DropTargetRegistry,
-    orientation: SlotOrientation,
+    flow: FlowSpec?,
     onRemove: () -> Unit,
     onEditProps: () -> Unit,
     onCommitDrop: (committedPointer: Offset) -> Unit,
@@ -122,22 +123,24 @@ fun EditableWidgetChrome(
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
         ?.instance?.instanceId == instance.instanceId
 
-    val isRow = orientation == SlotOrientation.Row
-    val isCanvas = orientation == SlotOrientation.Canvas
-    val isCubeGrid = orientation == SlotOrientation.CubeGrid
+    val isRow = flow?.horizontal == true
+    // A placement slot is one the flow is absent from. Whether it measures in
+    // cells or in dp is the lattice geometry's answer, published by the renderer
+    // and null when the slot is free.
+    val isPlaced = flow == null
     // Live placement read from inside the long-lived drag gesture: the
     // pointerInput is keyed only on instanceId so it does not restart
     // mid-drag, and without this the gesture would capture a stale start
     // placement on the second drag of the same widget.
-    val liveCanvas = rememberUpdatedState(instance.canvas)
+    val livePlacement = rememberUpdatedState(instance.placement)
     // Live canvas slot size for the move-clamp (published by SlotRenderer's
     // Canvas branch; Zero outside a Canvas slot disables clamping).
-    val liveSlotSize = rememberUpdatedState(LocalCanvasSlotSizeDp.current)
-    // Cube-grid move: the widget's current cell + the slot's cell geometry, read
-    // live so the long-lived gesture sees the latest values. cubeDrag is the
-    // in-flight visual translation, committed to a target cell on release.
-    val liveCell = rememberUpdatedState(instance.cell)
-    val cubeGeo = rememberUpdatedState(LocalCubeGeometry.current)
+    val liveSlotSize = rememberUpdatedState(LocalPlacementSlotSizeDp.current)
+    // The slot's lattice geometry, read live so the long-lived gesture sees the
+    // latest values. Null in a free placement slot, where the unit is already the
+    // dp. latticeDrag is the in-flight visual translation, committed to a cell on
+    // release.
+    val gridGeo = rememberUpdatedState(LocalGridGeometry.current)
     // Same reason, for the values the flow-reorder branch hands on: a gesture that
     // does not restart between drags would announce the position the widget held
     // when it was first dragged, and commit through the host's first drop handler
@@ -145,7 +148,7 @@ fun EditableWidgetChrome(
     val liveIndex = rememberUpdatedState(index)
     val liveInstance = rememberUpdatedState(instance)
     val liveCommitDrop = rememberUpdatedState(onCommitDrop)
-    var cubeDrag by remember { mutableStateOf(Offset.Zero) }
+    var latticeDrag by remember { mutableStateOf(Offset.Zero) }
     // Cursor anchor for the right-click context menu (null = closed).
     var menuAnchor by remember { mutableStateOf<Offset?>(null) }
     val resizeCursor = remember { PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)) }
@@ -159,7 +162,7 @@ fun EditableWidgetChrome(
     val isLastInSlot = index == slotCount - 1
     val dropTargetPath = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
     val dropInsertionIdx = if (activeDrag != null && dropTargetPath == path) {
-        registry.insertionIndexInSlot(path, activeDrag.pointerInWindow, orientation)
+        registry.insertionIndexInSlot(path, activeDrag.pointerInWindow, flow)
     } else -1
     val showIndicatorBefore = dropInsertionIdx == index
     val showIndicatorAfter  = isLastInSlot && dropInsertionIdx == slotCount
@@ -212,14 +215,14 @@ fun EditableWidgetChrome(
     val widgetBox: @Composable () -> Unit = {
         Box(
             modifier = Modifier
-                // A cube widget owns its whole cell: fill it so the hover border and the
+                // A widget in a lattice owns its whole cell: fill it so the hover border and the
                 // matchParentSize body overlay cover the cell, not just the (smaller)
                 // content -- otherwise a right-click on the empty cell area / gutter falls
                 // through to the slot chrome and opens the layout menu. Edit-mode only
                 // (the decorator is identity in production, so the cell renders as before).
-                .then(if (isCubeGrid) Modifier.fillMaxSize() else Modifier)
-                // Live cube-move translation; zero except while dragging a cube widget.
-                .graphicsLayer { translationX = cubeDrag.x; translationY = cubeDrag.y }
+                .then(if (isPlaced && gridGeo.value != null) Modifier.fillMaxSize() else Modifier)
+                // Live lattice-move translation; zero except while dragging in one.
+                .graphicsLayer { translationX = latticeDrag.x; translationY = latticeDrag.y }
                 .hoverable(interaction)
                 // Hover border drawn INSIDE the widget's own bounds (drawWithContent,
                 // not Modifier.border on a padded box) so edit mode never reflows the
@@ -277,10 +280,10 @@ fun EditableWidgetChrome(
                     }
                     // Keyed on the slot and its orientation as well as the widget:
                     // which branch this gesture takes IS the orientation, and a
-                    // slot flipped from Column to CubeGrid under a widget left the
-                    // running gesture reordering a grid. Restarting between drags
+                    // slot flipped from a flow to placement under a widget left the
+                    // running gesture reordering a lattice. Restarting between drags
                     // costs nothing; mid-drag neither value can change.
-                    .pointerInput(instance.instanceId, path, orientation) {
+                    .pointerInput(instance.instanceId, path, flow) {
                         awaitEachGesture {
                             // requireUnconsumed: yield to the hover affordances
                             // and resize handle stacked above (each consumes its
@@ -289,13 +292,37 @@ fun EditableWidgetChrome(
                             // Claim the press so a tap never reaches the content.
                             down.consume()
                             when {
-                                isCanvas -> {
-                                    // Absolute move: apply each frame's delta to the
+                                // The lattice branch goes first, because a lattice
+                                // slot is also a placement slot and the finer answer
+                                // has to win.
+                                isPlaced && gridGeo.value != null -> {
+                                    // Lattice move: follow the pointer live, then commit
+                                    // to a cell on release. Nobody else moves: a target
+                                    // that collides snaps to the nearest free cell.
+                                    val start = livePlacement.value ?: Placement()
+                                    var acc = Offset.Zero
+                                    drag(down.id) { change ->
+                                        acc += change.positionChange()
+                                        latticeDrag = acc
+                                        change.consume()
+                                    }
+                                    gridGeo.value?.let { geo ->
+                                        val (col, row) = gridDragCell(
+                                            start.x.toInt(), start.y.toInt(),
+                                            acc.x, acc.y, density,
+                                            geo.cellDp, geo.gutterDp, geo.columns,
+                                        )
+                                        editController.moveWidgetInGrid(path, instance.instanceId, col, row, geo.columns)
+                                    }
+                                    latticeDrag = Offset.Zero
+                                }
+                                isPlaced -> {
+                                    // Free move: apply each frame's delta to the
                                     // current (already-clamped) position and re-seat,
                                     // so dragging past an edge and back responds at
                                     // once -- no dead-zone from an unbounded
                                     // accumulator. canvasDragOffset clamps the output.
-                                    val p = liveCanvas.value
+                                    val p = livePlacement.value
                                     var curX = p?.x ?: 0f
                                     var curY = p?.y ?: 0f
                                     drag(down.id) { change ->
@@ -315,27 +342,6 @@ fun EditableWidgetChrome(
                                         editController.setWidgetOffset(path, instance.instanceId, nx, ny)
                                         change.consume()
                                     }
-                                }
-                                isCubeGrid -> {
-                                    // Cube move: follow the pointer live (cubeDrag), then
-                                    // commit to the nearest cell on release. placeWidgetInCell
-                                    // resolves collisions + compacts, so the grid reflows.
-                                    val start = liveCell.value ?: GridCell()
-                                    var acc = Offset.Zero
-                                    drag(down.id) { change ->
-                                        acc += change.positionChange()
-                                        cubeDrag = acc
-                                        change.consume()
-                                    }
-                                    cubeGeo.value?.let { geo ->
-                                        val (col, row) = cubeDragCell(
-                                            start.col, start.row,
-                                            acc.x, acc.y, density,
-                                            geo.cellWidthDp, geo.gutterDp, geo.columns,
-                                        )
-                                        editController.moveWidgetToCell(path, instance.instanceId, col, row, geo.columns)
-                                    }
-                                    cubeDrag = Offset.Zero
                                 }
                                 else -> {
                                     // Flow reorder: drive the existing DnD controller
@@ -378,7 +384,7 @@ fun EditableWidgetChrome(
             // baseline when the placement size is 0 (intrinsic) so the first
             // drag does not jump from nothing.
             AnimatedVisibility(
-                visible  = isHovered && !isCubeGrid,
+                visible  = isHovered,
                 enter    = fadeIn(tween(chromeMotionMs)),
                 exit     = fadeOut(tween(chromeMotionMs)),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
@@ -397,8 +403,9 @@ fun EditableWidgetChrome(
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 down.consume()
-                                val p = liveCanvas.value
+                                val p = livePlacement.value
                                 val wb = widgetWindowBounds
+                                val geo = gridGeo.value
                                 val startW = (p?.width ?: 0f).takeIf { it > 0f }
                                     ?: ((wb?.width ?: 0f) / density)
                                 val startH = (p?.height ?: 0f).takeIf { it > 0f }
@@ -408,8 +415,21 @@ fun EditableWidgetChrome(
                                 drag(down.id) { change ->
                                     accX += change.positionChange().x
                                     accY += change.positionChange().y
-                                    val (nw, nh) = canvasResizeSize(startW, startH, accX, accY, density)
-                                    editController.setWidgetSize(path, instance.instanceId, nw, nh)
+                                    if (geo != null) {
+                                        // One gesture, two units: a lattice slot sizes in
+                                        // whole cells, so the same drag quantises instead
+                                        // of writing a dp extent.
+                                        val (cw, ch) = gridResizeSpan(
+                                            (p?.width ?: 1f).toInt().coerceAtLeast(1),
+                                            (p?.height ?: 1f).toInt().coerceAtLeast(1),
+                                            accX, accY, density,
+                                            geo.cellDp, geo.gutterDp, geo.columns,
+                                        )
+                                        editController.resizeWidgetInGrid(path, instance.instanceId, cw, ch, geo.columns)
+                                    } else {
+                                        val (nw, nh) = canvasResizeSize(startW, startH, accX, accY, density)
+                                        editController.setWidgetSize(path, instance.instanceId, nw, nh)
+                                    }
                                     change.consume()
                                 }
                             }
@@ -429,7 +449,7 @@ fun EditableWidgetChrome(
         // Canvas: the widget is positioned by SlotRenderer's outer offset Box.
         // No flow wrapper and no drop bars -- insertion index is meaningless
         // under free placement.
-        isCanvas || isCubeGrid -> widgetBox()
+        isPlaced -> widgetBox()
         isRow -> Row(modifier = Modifier.fillMaxHeight(), verticalAlignment = Alignment.Top) {
             if (showIndicatorBefore) DropIndicator(isRow = true)
             widgetBox()
@@ -444,14 +464,11 @@ fun EditableWidgetChrome(
 
     // Right-click context menu (replaces the old hover affordance buttons): the
     // widget's actions, anchored at the cursor. Any secondary press opens it,
-    // drag or no drag: cube slots have no resize gesture. The geometry for one is
-    // written (cubeResizeSpan) and nothing calls it, which is worth saying here
-    // because the comment that stood in this place described the gesture as
-    // though it worked.
+    // drag or no drag.
     menuAnchor?.let { anchor ->
         NxContextMenu(anchorInWindow = anchor, expanded = true, onDismissRequest = { menuAnchor = null }) {
             WidgetContextMenuContent(
-                isCanvas       = isCanvas,
+                isPlaced       = isPlaced,
                 removable      = descriptor.removable,
                 path           = path,
                 instanceId     = instance.instanceId,
@@ -493,7 +510,7 @@ fun EditableWidgetChrome(
 // graph live for the z bounds; each item closes the menu.
 @Composable
 private fun WidgetContextMenuContent(
-    isCanvas: Boolean,
+    isPlaced: Boolean,
     removable: Boolean,
     path: SlotPath,
     instanceId: String,
@@ -506,13 +523,13 @@ private fun WidgetContextMenuContent(
     val s = LocalStrings.current
     val graph = LocalLayoutGraph.current
     NxMenuItem(s.editorConfigure) { onConfigure() }
-    if (isCanvas) {
+    if (isPlaced) {
         NxMenuItem(s.editorToFront) {
-            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
+            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.placement?.z ?: 0 } ?: 0
             editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()
         }
         NxMenuItem(s.editorToBack) {
-            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
+            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.placement?.z ?: 0 } ?: 0
             editController.setWidgetZ(path, instanceId, minZ - 1); onClose()
         }
     }

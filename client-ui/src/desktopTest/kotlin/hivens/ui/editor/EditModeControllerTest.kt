@@ -1,11 +1,11 @@
 package hivens.ui.editor
 
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.widget.model.GRID_COLUMNS_MAX
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.GRID_MAX
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
@@ -69,7 +69,7 @@ class EditModeControllerTest {
     }
 
     @Test
-    fun `nudgeGridColumns adjusts the live count and clamps to 1 and MAX`() = runBlocking {
+    fun `nudgeWrap adjusts the live line length and clamps to 0 and MAX`() = runBlocking {
         val repo = LayoutGraphRepository(
             tmpDir.resolve("layout-graph.json"),
             Json { ignoreUnknownKeys = true; encodeDefaults = true },
@@ -81,33 +81,32 @@ class EditModeControllerTest {
             LayoutGraph(surfaces = mapOf(
                 SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
                     SlotId("main") to SlotContent(
-                        widgets     = listOf(WidgetInstance(WidgetKind("a"), "i1", JsonObject(emptyMap()))),
-                        orientation = SlotOrientation.Grid,
-                        gridColumns = 2,
+                        widgets = listOf(WidgetInstance(WidgetKind("a"), "i1", JsonObject(emptyMap()))),
+                        flow    = FlowSpec.grid(2),
                     ),
                 )),
             ))
         }
 
-        ctl.nudgeGridColumns(path, 1)
-        awaitColumns(repo, path, 3)
+        ctl.nudgeWrap(path, 1)
+        awaitWrap(repo, path, 3)
 
-        ctl.nudgeGridColumns(path, -1)
-        awaitColumns(repo, path, 2)
+        ctl.nudgeWrap(path, -1)
+        awaitWrap(repo, path, 2)
 
         // Serialized reads inside each write compose without a lost update: five
         // decrements from 2 settle on the model's lower clamp, not a stale 2 - 5.
-        repeat(5) { ctl.nudgeGridColumns(path, -1) }
-        awaitColumns(repo, path, 1)
+        repeat(5) { ctl.nudgeWrap(path, -1) }
+        awaitWrap(repo, path, 0)
 
-        repeat(GRID_COLUMNS_MAX + 5) { ctl.nudgeGridColumns(path, 1) }
-        awaitColumns(repo, path, GRID_COLUMNS_MAX)
+        repeat(GRID_MAX + 5) { ctl.nudgeWrap(path, 1) }
+        awaitWrap(repo, path, GRID_MAX)
     }
 
-    private suspend fun awaitColumns(repo: LayoutGraphRepository, path: SlotPath, expected: Int) {
+    private suspend fun awaitWrap(repo: LayoutGraphRepository, path: SlotPath, expected: Int) {
         withTimeout(3000) {
-            while (repo.value().traverse(path)?.gridColumns != expected) delay(5)
+            while (repo.value().traverse(path)?.flow?.wrap != expected) delay(5)
         }
-        assertEquals(expected, repo.value().traverse(path)?.gridColumns)
+        assertEquals(expected, repo.value().traverse(path)?.flow?.wrap)
     }
 }

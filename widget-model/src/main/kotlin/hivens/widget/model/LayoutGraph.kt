@@ -1,6 +1,5 @@
 package hivens.widget.model
 
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -8,9 +7,7 @@ import kotlinx.serialization.json.JsonObject
 // Compose stability of this type is intentionally NOT marked here --
 // @Immutable lives in androidx.compose.runtime and widget-model must
 // stay Compose-free (CLI / TUI / launcher consumers don't carry the
-// Compose runtime). Stability is addressed when Phase B.5 introduces
-// typed-props, replacing JsonObject with serializer-registry-backed
-// instances that satisfy Compose's auto-stability heuristics.
+// Compose runtime).
 @Serializable
 data class WidgetInstance(
     val kind: WidgetKind,
@@ -19,19 +16,15 @@ data class WidgetInstance(
     // Sub-widgets for container kinds. Keyed by SlotId of a slot the
     // descriptor declared via @Widget(slots = ...). Empty for leaves.
     // Held as a typed field rather than smuggled inside `props` because
-    // future mixin hooks (transformProps in Phase C) must not be able
-    // to corrupt the layout tree.
+    // future mixin hooks must not be able to corrupt the layout tree.
     val children: Map<SlotId, SlotContent> = emptyMap(),
-    // Phase G: relative size along the slot's main axis when the slot is
-    // Row/Column. 0 = natural/wrap size; > 0 = a weighted share. Set via
-    // the edit-mode drag-dividers.
-    val weight: Float = 0f,
-    // Absolute placement when the enclosing slot is Canvas. Null for flow
-    // slots (Column/Row/Grid) -- back-compat default for old layouts.
-    val canvas: CanvasPlacement? = null,
-    // Cell placement when the enclosing slot is CubeGrid (col/row + span in cells).
-    // Null for non-grid slots -- back-compat default for old layouts.
-    val cell: GridCell? = null,
+    /**
+     * Where this widget sits and how big it is. Null means nothing has said,
+     * which is what lets a slot flipping into placement mode tell the widgets
+     * it must seed from the ones already arranged. A flow slot reads the weight
+     * and the two sizes out of it and ignores the rest.
+     */
+    val placement: Placement? = null,
     // Per-instance surface the kernel paints around the widget. Null = none --
     // back-compat default for a widget that wants no plane of its own. The
     // editor's "Surface" section sets it on ANY widget, propless included.
@@ -39,59 +32,26 @@ data class WidgetInstance(
     val surface: SurfaceSpec? = null,
 )
 
-// Phase G: how a slot arranges its widgets. Column (default) reproduces
-// the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows
-// them into `gridColumns` uniform cells (order-driven); Canvas places each
-// widget at an absolute offset + size; CubeGrid places each widget at an
-// addressed cell rectangle (col/row + span) and packs the slot on move/resize.
-// Unknown is the forward-compat sentinel: a newer build's orientation read here
-// folds to Unknown (never emitted intentionally) and renders as Column, rather
-// than silently coercing to Column and discarding the real value's identity.
-@Serializable
-enum class SlotOrientation { Column, Row, Grid, Canvas, CubeGrid, Unknown }
-
-/** Persistence codec that folds an unknown wire orientation to [SlotOrientation.Unknown]. */
-object SlotOrientationSerializer : KSerializer<SlotOrientation> by LenientEnumSerializer(
-    SlotOrientation.entries.toTypedArray(),
-    SlotOrientation.Unknown,
-    SlotOrientation.serializer(),
-)
-
-// Absolute placement of a widget inside a Canvas slot. x/y are dp offsets
-// from the slot's top-left; width/height 0 means intrinsic/wrap (dp when set);
-// z is the paint order (higher renders in front). Used only on Canvas slots.
-@Serializable
-data class CanvasPlacement(
-    val x: Float = 0f,
-    val y: Float = 0f,
-    val width: Float = 0f,
-    val height: Float = 0f,
-    val z: Int = 0,
-)
-
-// Cell placement of a widget inside a CubeGrid slot: 0-based column/row from the
-// slot's top-left and a span in cells; z is the paint/stack order. Integer cells
-// (vs CanvasPlacement's dp) -- a CubeGrid snaps to whole cells.
-@Serializable
-data class GridCell(
-    val col: Int = 0,
-    val row: Int = 0,
-    val colSpan: Int = 1,
-    val rowSpan: Int = 1,
-    val z: Int = 0,
-)
-
+/**
+ * One slot's children, and how they are arranged.
+ *
+ * [flow] non-null derives each child's position from the sequence. Null hands
+ * that to each child's own [WidgetInstance.placement]. [grid] is the unit that
+ * placement is measured in: 0 is one dp, N is one cell of an N-column lattice.
+ *
+ * A slot in flow mode ignores [grid], and a slot in placement mode ignores
+ * [flow] by being null. Neither is cleared when the mode changes, so flipping a
+ * slot and flipping it back costs nothing.
+ */
 @Serializable
 data class SlotContent(
     val widgets: List<WidgetInstance> = emptyList(),
-    @Serializable(with = SlotOrientationSerializer::class)
-    val orientation: SlotOrientation = SlotOrientation.Column,
-    // Column count when orientation == Grid; ignored otherwise.
-    val gridColumns: Int = 2,
+    val flow: FlowSpec? = FlowSpec.Column,
+    val grid: Int = 0,
 )
 
-/** Upper bound for [SlotContent.gridColumns]; the grid-column stepper clamps to it. */
-const val GRID_COLUMNS_MAX = 12
+/** Upper bound for [SlotContent.grid] and for [FlowSpec.wrap]; the steppers clamp to it. */
+const val GRID_MAX = 48
 
 @Serializable
 data class SurfaceLayout(val slots: Map<SlotId, SlotContent> = emptyMap())
@@ -154,9 +114,21 @@ fun LayoutGraph.moveWidget(
     }
 
     // Destination must exist (top-level slot or nested container slot).
-    if (traverse(to) == null) return this
+    val target = traverse(to) ?: return this
 
-    return removeWidget(from, instanceId).insertWidget(to, widget, toIndex)
+    // A widget arriving in a placement slot needs somewhere to be. It used to
+    // arrive with whatever it carried from a flow slot, which is nothing, and
+    // then drew at the slot's origin on top of whatever was already there. The
+    // seed is the same one a slot flipping into placement mode hands out, so a
+    // widget that walks in and a widget that was already there are placed by
+    // one rule.
+    val seeded = if (target.flow == null && widget.placement == null) {
+        widget.copy(placement = seedPlacement(target.widgets.size, target.grid, target.widgets))
+    } else {
+        widget
+    }
+
+    return removeWidget(from, instanceId).insertWidget(to, seeded, toIndex)
 }
 
 // Replaces the props JsonObject on a single widget addressed by
@@ -183,9 +155,7 @@ fun LayoutGraph.updateWidgetSurface(
 
 // Every per-instance transform is the same three steps: find the instance in the
 // slot, leave the graph alone when [edit] returns what was already there, and
-// otherwise rebuild the list with that one widget replaced. Written out five
-// times, it was five chances for the no-op contract to be spelled differently --
-// and one of them did not check at all.
+// otherwise rebuild the list with that one widget replaced.
 //
 // Returning the same SlotContent is what makes a no-op a real one: [mutate]
 // decides by reference identity, so an edit that changes nothing has to hand the
@@ -201,189 +171,234 @@ private fun LayoutGraph.updateInstance(
     content.copy(widgets = content.widgets.map { if (it.instanceId == instanceId) next else it })
 }
 
-// Phase G layout transforms. Slot orientation + grid column count are
-// slot-level; widget weight is per-instance. Each is a no-op (identity
-// return) when the value is unchanged or the slot/instance is missing --
-// same contract as the transforms above.
-fun LayoutGraph.setSlotOrientation(path: SlotPath, orientation: SlotOrientation): LayoutGraph =
+// ── Slot mode ────────────────────────────────────────────────────────
+
+/**
+ * Sets the slot's arrangement. Null puts it in placement mode and seeds a
+ * position onto every widget that does not carry one, so nothing piles at the
+ * origin. Widgets already placed keep what they had, which makes the flip
+ * idempotent.
+ */
+fun LayoutGraph.setFlow(path: SlotPath, flow: FlowSpec?): LayoutGraph =
     mutate(path) { content ->
-        if (content.orientation == orientation) return@mutate content
-        when (orientation) {
-            // Flipping to Canvas: seed a staggered grid onto widgets with no
-            // placement yet, so they don't all pile at (0,0). Already-placed
-            // widgets keep their placement -- re-entering Canvas is idempotent.
-            SlotOrientation.Canvas -> content.copy(
-                orientation = SlotOrientation.Canvas,
-                widgets = content.widgets.mapIndexed { i, w ->
-                    if (w.canvas != null) w else w.copy(canvas = seededCanvasPlacement(i))
-                },
-            )
-            // Flipping to CubeGrid: seed 1x1 cells in flow order onto unplaced
-            // widgets; already-placed widgets keep their cell.
-            SlotOrientation.CubeGrid -> content.copy(
-                orientation = SlotOrientation.CubeGrid,
-                widgets = seededCubeGrid(content.widgets, content.gridColumns),
-            )
-            else -> content.copy(orientation = orientation)
-        }
+        if (content.flow == flow) return@mutate content
+        if (flow != null) return@mutate content.copy(flow = flow)
+        content.copy(flow = null, widgets = seedPlacements(content.widgets, content.grid))
     }
 
-// Staggered default placement for the Nth not-yet-placed widget when a slot
-// flips to Canvas. width/height 0 keeps intrinsic size until the user resizes;
-// z = index preserves the prior stacking order as the initial paint order.
-// Pure + deterministic so the seed cascade is unit-testable.
-fun seededCanvasPlacement(
-    index: Int,
-    columns: Int = 3,
-    cellWidth: Float = 220f,
-    cellHeight: Float = 160f,
-    marginX: Float = 16f,
-    marginY: Float = 16f,
-): CanvasPlacement {
-    val col = index % columns
-    val row = index / columns
-    return CanvasPlacement(
-        x = marginX + col * cellWidth,
-        y = marginY + row * cellHeight,
-        z = index,
-    )
+/**
+ * Sets the unit a placement slot measures in: 0 for dp, N for an N-column
+ * lattice. Clamped to [GRID_MAX]. Changing it does not rewrite the positions
+ * already stored, because a number that means cells and a number that means dp
+ * are the user's to reinterpret, and silently rescaling would move everything
+ * under them.
+ */
+fun LayoutGraph.setGrid(path: SlotPath, grid: Int): LayoutGraph =
+    mutate(path) { content ->
+        val coerced = grid.coerceIn(0, GRID_MAX)
+        if (content.grid == coerced) content else content.copy(grid = coerced)
+    }
+
+// ── Placement ────────────────────────────────────────────────────────
+
+/** Replaces one widget's whole placement record. */
+fun LayoutGraph.setPlacement(path: SlotPath, instanceId: String, placement: Placement): LayoutGraph =
+    updateInstance(path, instanceId) { it.copy(placement = placement) }
+
+fun LayoutGraph.setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float): LayoutGraph =
+    updatePlacement(path, instanceId) { it.copy(x = x, y = y) }
+
+fun LayoutGraph.setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float): LayoutGraph =
+    updatePlacement(path, instanceId) {
+        it.copy(width = width.coerceAtLeast(0f), height = height.coerceAtLeast(0f))
+    }
+
+fun LayoutGraph.setWidgetZ(path: SlotPath, instanceId: String, z: Int): LayoutGraph =
+    updatePlacement(path, instanceId) { it.copy(z = z) }
+
+fun LayoutGraph.setWidgetAnchor(path: SlotPath, instanceId: String, anchor: String): LayoutGraph =
+    updatePlacement(path, instanceId) { it.copy(anchor = parseAnchor(anchor)) }
+
+fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Float): LayoutGraph =
+    updatePlacement(path, instanceId) { it.copy(weight = weight.coerceAtLeast(0f)) }
+
+/**
+ * Reads the widget's current placement (or the default when it carries none),
+ * applies [edit], and writes it back, so offset, size, z, anchor and weight
+ * edits compose without clobbering one another mid-drag.
+ */
+private fun LayoutGraph.updatePlacement(
+    path: SlotPath,
+    instanceId: String,
+    edit: (Placement) -> Placement,
+): LayoutGraph = updateInstance(path, instanceId) { widget ->
+    val next = edit(widget.placement ?: Placement())
+    // An all-default record normalises back to nothing, the same way an
+    // all-default surface does. Two things need it: setting a field to the value
+    // it already had on a widget that carries no placement has to stay a no-op,
+    // or the identity contract every transform rests on breaks; and "unplaced"
+    // has to remain expressible, because that is what a slot flipping into
+    // placement mode looks for when it decides whom to seed.
+    widget.copy(placement = next.takeUnless { it == Placement() })
 }
 
-// Seeds 1x1 cells in row-major flow onto widgets without one when a slot flips to
-// CubeGrid; already-placed widgets keep their cell. Pure + deterministic.
-fun seededCubeGrid(widgets: List<WidgetInstance>, columns: Int): List<WidgetInstance> {
-    val cols = columns.coerceIn(1, GRID_COLUMNS_MAX)
-    val taken = widgets.mapNotNull { it.cell }.toMutableList()
-    fun occupied(c: Int, r: Int) = taken.any { g -> c >= g.col && c < g.col + g.colSpan && r >= g.row && r < g.row + g.rowSpan }
+// ── Seeding ──────────────────────────────────────────────────────────
+
+/**
+ * A position for the widget at [index] in a slot that measures in [grid].
+ *
+ * Free placement staggers into rows of three so a fresh set does not pile at the
+ * origin. A lattice takes the first free cell in reading order, so widgets land
+ * the way they read. Pure and deterministic, so the cascade is unit-testable.
+ */
+fun seedPlacement(index: Int, grid: Int, existing: List<WidgetInstance> = emptyList()): Placement {
+    if (grid <= 0) {
+        val columns = 3
+        return Placement(
+            x = FREE_MARGIN + (index % columns) * FREE_CELL_W,
+            y = FREE_MARGIN + (index / columns) * FREE_CELL_H,
+            z = index,
+        )
+    }
+    val taken = existing.mapNotNull { it.placement }
     var scan = 0
-    return widgets.map { w ->
-        if (w.cell != null) return@map w
-        while (occupied(scan % cols, scan / cols)) scan++
-        val cell = GridCell(col = scan % cols, row = scan / cols)
-        scan++
-        taken.add(cell)
-        w.copy(cell = cell)
+    while (occupiesCell(taken, scan % grid, scan / grid)) scan++
+    return Placement(x = (scan % grid).toFloat(), y = (scan / grid).toFloat(), width = 1f, height = 1f)
+}
+
+/** Fills in a position for every widget that carries none, leaving the rest alone. */
+fun seedPlacements(widgets: List<WidgetInstance>, grid: Int): List<WidgetInstance> {
+    if (widgets.none { it.placement == null }) return widgets
+    val settled = widgets.filter { it.placement != null }.toMutableList()
+    return widgets.mapIndexed { index, w ->
+        if (w.placement != null) return@mapIndexed w
+        val seeded = w.copy(placement = seedPlacement(index, grid, settled))
+        settled.add(seeded)
+        seeded
     }
 }
 
-fun LayoutGraph.setGridColumns(path: SlotPath, columns: Int): LayoutGraph =
-    mutate(path) { content ->
-        val coerced = columns.coerceIn(1, GRID_COLUMNS_MAX)
-        if (content.gridColumns == coerced) content
-        else content.copy(gridColumns = coerced)
-    }
+private const val FREE_MARGIN = 16f
+private const val FREE_CELL_W = 220f
+private const val FREE_CELL_H = 160f
 
-// CubeGrid (Android-launcher style): snap [instanceId]'s anchor to [target] keeping
-// its span. No overlap, no compaction -- if the target footprint collides with another
-// widget, snap to the nearest free anchor instead; other widgets never move and empty
-// cells are allowed. Identity no-op when the instance is missing or nothing changes.
-fun LayoutGraph.placeWidgetInCell(path: SlotPath, instanceId: String, target: GridCell, columns: Int): LayoutGraph =
-    mutate(path) { content ->
-        if (content.widgets.none { it.instanceId == instanceId }) content
-        else placeInCubeGrid(content, instanceId, target, columns)
-    }
+// ── Lattice collision ────────────────────────────────────────────────
 
-// CubeGrid resize: keep [instanceId]'s anchor, grow its span toward [colSpan]x[rowSpan]
-// but clamp to the largest that stays free (no overlap, no teleport, other widgets fixed).
-fun LayoutGraph.resizeWidgetInCell(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int): LayoutGraph =
-    mutate(path) { content ->
-        if (content.widgets.none { it.instanceId == instanceId }) content
-        else resizeInCubeGrid(content, instanceId, colSpan, rowSpan, columns)
-    }
+private fun cellsOverlap(x: Float, y: Float, w: Float, h: Float, other: Placement): Boolean =
+    x < other.x + other.spanW() && other.x < x + w &&
+        y < other.y + other.spanH() && other.y < y + h
 
-// Pure CubeGrid move: anchor [movedId] at the clamped [target], or -- if that footprint
-// overlaps another widget -- at the nearest free cell. Other widgets are NEVER moved (no
-// compaction; gaps are allowed). The point is a snap grid layered over a free canvas, not
-// an auto-packer. Null-cell widgets are flow-seeded first. Compose-free + deterministic,
-// so it is unit-testable. Returns the same content when no cell changes.
-fun placeInCubeGrid(content: SlotContent, movedId: String, target: GridCell, columns: Int): SlotContent {
-    val cols = columns.coerceIn(1, GRID_COLUMNS_MAX)
-    val seeded = seededCubeGrid(content.widgets, cols)
-    val cs = target.colSpan.coerceIn(1, cols)
-    val rs = target.rowSpan.coerceAtLeast(1)
-    val others = seeded.filter { it.instanceId != movedId }.mapNotNull { it.cell }
-    val (col, row) = nearestFreeCubeAnchor(target.col.coerceIn(0, cols - cs), target.row.coerceAtLeast(0), cs, rs, cols, others)
-    return applyCubeCell(content, seeded, movedId) { it.copy(col = col, row = row, colSpan = cs, rowSpan = rs) }
+private fun Placement.spanW(): Float = if (width <= 0f) 1f else width
+private fun Placement.spanH(): Float = if (height <= 0f) 1f else height
+
+private fun occupiesCell(taken: List<Placement>, col: Int, row: Int): Boolean =
+    taken.any { cellsOverlap(col.toFloat(), row.toFloat(), 1f, 1f, it) }
+
+/**
+ * Moves [instanceId] to [target] inside a lattice slot, keeping its span.
+ *
+ * No overlap and no compaction: a target that collides snaps to the nearest free
+ * anchor instead, and every other widget stays exactly where it is. Gaps are
+ * allowed, because the model is a snap grid laid over free placement and not a
+ * packer. Identity when nothing moves.
+ */
+fun placeInGrid(content: SlotContent, movedId: String, target: Placement, columns: Int): SlotContent {
+    val cols = columns.coerceIn(1, GRID_MAX)
+    val seeded = seedPlacements(content.widgets, cols)
+    val w = target.spanW().coerceIn(1f, cols.toFloat())
+    val h = target.spanH().coerceAtLeast(1f)
+    val others = seeded.filter { it.instanceId != movedId }.mapNotNull { it.placement }
+    val (col, row) = nearestFreeAnchor(
+        target.x.coerceIn(0f, (cols - w).coerceAtLeast(0f)),
+        target.y.coerceAtLeast(0f),
+        w, h, cols, others,
+    )
+    return applyPlacement(content, seeded, movedId) {
+        it.copy(x = col, y = row, width = w, height = h)
+    }
 }
 
-// Pure CubeGrid resize: clamp the requested span to the largest free rectangle anchored
-// at [movedId]'s current cell. Other widgets are fixed (no overlap, no relocation).
-fun resizeInCubeGrid(content: SlotContent, movedId: String, colSpan: Int, rowSpan: Int, columns: Int): SlotContent {
-    val cols = columns.coerceIn(1, GRID_COLUMNS_MAX)
-    val seeded = seededCubeGrid(content.widgets, cols)
-    val cur = seeded.firstOrNull { it.instanceId == movedId }?.cell ?: GridCell()
-    val others = seeded.filter { it.instanceId != movedId }.mapNotNull { it.cell }
-    val maxCol = (cols - cur.col).coerceAtLeast(1)
-    val (cs, rs) = fitCubeSpan(cur.col, cur.row, colSpan.coerceIn(1, maxCol), rowSpan.coerceAtLeast(1), others)
-    return applyCubeCell(content, seeded, movedId) { it.copy(colSpan = cs, rowSpan = rs) }
+/**
+ * Grows [instanceId] toward [width] by [height] cells from its own anchor,
+ * clamped to the largest span that stays free. Other widgets are fixed, so a
+ * resize never evicts a neighbour.
+ */
+fun resizeInGrid(content: SlotContent, movedId: String, width: Float, height: Float, columns: Int): SlotContent {
+    val cols = columns.coerceIn(1, GRID_MAX)
+    val seeded = seedPlacements(content.widgets, cols)
+    val cur = seeded.firstOrNull { it.instanceId == movedId }?.placement ?: Placement()
+    val others = seeded.filter { it.instanceId != movedId }.mapNotNull { it.placement }
+    val maxW = (cols - cur.x).coerceAtLeast(1f)
+    val (w, h) = fitSpan(cur.x, cur.y, width.coerceIn(1f, maxW), height.coerceAtLeast(1f), others)
+    return applyPlacement(content, seeded, movedId) { it.copy(width = w, height = h) }
 }
 
-private fun cubeOverlap(col: Int, row: Int, colSpan: Int, rowSpan: Int, b: GridCell): Boolean =
-    col < b.col + b.colSpan && b.col < col + colSpan && row < b.row + b.rowSpan && b.row < row + rowSpan
-
-// Nearest free anchor (squared distance to the target, row-major scan) for a
-// colSpan x rowSpan footprint overlapping none of [others]. The empty row below
-// everything always fits, so a free anchor is guaranteed.
-private fun nearestFreeCubeAnchor(col: Int, row: Int, colSpan: Int, rowSpan: Int, cols: Int, others: List<GridCell>): Pair<Int, Int> {
-    fun free(c: Int, r: Int) = others.none { cubeOverlap(c, r, colSpan, rowSpan, it) }
+// Nearest free anchor by squared distance to the target, scanned in reading
+// order. The empty row below everything always fits, so one is guaranteed.
+private fun nearestFreeAnchor(
+    col: Float,
+    row: Float,
+    w: Float,
+    h: Float,
+    cols: Int,
+    others: List<Placement>,
+): Pair<Float, Float> {
+    fun free(c: Float, r: Float) = others.none { cellsOverlap(c, r, w, h, it) }
     if (free(col, row)) return col to row
-    val maxRow = others.maxOfOrNull { it.row + it.rowSpan } ?: 0
-    var best = 0 to maxRow
-    var bestD = Int.MAX_VALUE
-    for (r in 0..maxRow) for (c in 0..(cols - colSpan)) {
-        if (!free(c, r)) continue
+    val maxRow = others.maxOfOrNull { (it.y + it.spanH()).toInt() } ?: 0
+    var best = 0f to maxRow.toFloat()
+    var bestD = Float.MAX_VALUE
+    for (r in 0..maxRow) for (c in 0..(cols - w.toInt())) {
+        if (!free(c.toFloat(), r.toFloat())) continue
         val d = (c - col) * (c - col) + (r - row) * (r - row)
-        if (d < bestD) { bestD = d; best = c to r }
+        if (d < bestD) { bestD = d; best = c.toFloat() to r.toFloat() }
     }
     return best
 }
 
-// Largest span <= requested that stays free at the fixed anchor (shrink the larger
-// dimension first). (1,1) is always free since [others] excludes the widget itself.
-private fun fitCubeSpan(col: Int, row: Int, colSpan: Int, rowSpan: Int, others: List<GridCell>): Pair<Int, Int> {
-    var c = colSpan.coerceAtLeast(1)
-    var r = rowSpan.coerceAtLeast(1)
-    fun free() = others.none { cubeOverlap(col, row, c, r, it) }
-    while ((c > 1 || r > 1) && !free()) { if (c >= r) c-- else r-- }
-    return c to r
+// Largest span at or below the request that stays free at the fixed anchor,
+// shrinking the larger dimension first. One by one is always free, since
+// [others] excludes the widget itself.
+private fun fitSpan(col: Float, row: Float, width: Float, height: Float, others: List<Placement>): Pair<Float, Float> {
+    var w = width.coerceAtLeast(1f)
+    var h = height.coerceAtLeast(1f)
+    fun free() = others.none { cellsOverlap(col, row, w, h, it) }
+    while ((w > 1f || h > 1f) && !free()) { if (w >= h) w-- else h-- }
+    return w to h
 }
 
-// Set one widget's cell via [transform], persisting the seeded cells of the rest.
-private fun applyCubeCell(content: SlotContent, seeded: List<WidgetInstance>, movedId: String, transform: (GridCell) -> GridCell): SlotContent {
-    val cells = seeded.associate { w ->
-        val base = w.cell ?: GridCell()
+// Writes one widget's placement through [transform], persisting the seeds the
+// rest were just handed. Identity when no placement actually changed.
+private fun applyPlacement(
+    content: SlotContent,
+    seeded: List<WidgetInstance>,
+    movedId: String,
+    transform: (Placement) -> Placement,
+): SlotContent {
+    val next = seeded.associate { w ->
+        val base = w.placement ?: Placement()
         w.instanceId to if (w.instanceId == movedId) transform(base) else base
     }
-    val changed = content.widgets.any { cells[it.instanceId] != it.cell }
+    val changed = content.widgets.any { next[it.instanceId] != it.placement }
     return if (!changed) content
-    else content.copy(widgets = content.widgets.map { w -> cells[w.instanceId]?.let { w.copy(cell = it) } ?: w })
+    else content.copy(widgets = content.widgets.map { w -> next[w.instanceId]?.let { w.copy(placement = it) } ?: w })
 }
 
-fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Float): LayoutGraph =
-    updateInstance(path, instanceId) { it.copy(weight = weight.coerceAtLeast(0f)) }
+/** Lattice move addressed by path, for the editor. Identity when the instance is gone. */
+fun LayoutGraph.placeWidgetInGrid(path: SlotPath, instanceId: String, target: Placement, columns: Int): LayoutGraph =
+    mutate(path) { content ->
+        if (content.widgets.none { it.instanceId == instanceId }) content
+        else placeInGrid(content, instanceId, target, columns)
+    }
 
-// Canvas placement transforms (used when the slot is Canvas). Same no-op /
-// missing-instance identity contract as the Phase G transforms above.
-fun LayoutGraph.setCanvasPlacement(path: SlotPath, instanceId: String, placement: CanvasPlacement): LayoutGraph =
-    updateInstance(path, instanceId) { it.copy(canvas = placement) }
+/** Lattice resize addressed by path, for the editor. */
+fun LayoutGraph.resizeWidgetInGrid(path: SlotPath, instanceId: String, width: Float, height: Float, columns: Int): LayoutGraph =
+    mutate(path) { content ->
+        if (content.widgets.none { it.instanceId == instanceId }) content
+        else resizeInGrid(content, instanceId, width, height, columns)
+    }
 
-fun LayoutGraph.setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float): LayoutGraph =
-    updateCanvas(path, instanceId) { it.copy(x = x, y = y) }
-
-fun LayoutGraph.setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float): LayoutGraph =
-    updateCanvas(path, instanceId) { it.copy(width = width.coerceAtLeast(0f), height = height.coerceAtLeast(0f)) }
-
-fun LayoutGraph.setWidgetZ(path: SlotPath, instanceId: String, z: Int): LayoutGraph =
-    updateCanvas(path, instanceId) { it.copy(z = z) }
-
-// Reads the widget's current placement (or the default when null), applies
-// `edit`, and writes it back -- so offset / size / z edits compose without
-// clobbering each other. No-op when the result is unchanged.
-private fun LayoutGraph.updateCanvas(
-    path: SlotPath,
-    instanceId: String,
-    edit: (CanvasPlacement) -> CanvasPlacement,
-): LayoutGraph = updateInstance(path, instanceId) { it.copy(canvas = edit(it.canvas ?: CanvasPlacement())) }
+// ── Traversal ────────────────────────────────────────────────────────
 
 // Walks the path and returns the SlotContent at the leaf, or null if
 // any intermediate surface / slot / parent widget is missing.

@@ -1,9 +1,10 @@
 package hivens.ui.layout
 
+import hivens.widget.model.DefaultLayout
+import hivens.widget.model.LAYOUT_SCHEMA
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
@@ -34,8 +35,14 @@ class LayoutReconcileTest {
     }
 
     @Test
-    fun `CURRENT_SCHEMA is the schema this build migrates up to`() {
-        assertEquals(9, LayoutReconcile.CURRENT_SCHEMA)
+    fun `the schema is one number, and the bundled default carries the same one`() {
+        // A literal here is what let the two drift: the resource said 8 while the
+        // build had moved to 9, and the loader read the stamp and discarded it, so
+        // the mismatch was invisible until a step was added. Both sides now name
+        // the same constant, and loading the bundle is the assertion, because
+        // DefaultLayout refuses a resource stamped with anything else.
+        assertEquals(LAYOUT_SCHEMA, LayoutReconcile.CURRENT_SCHEMA)
+        DefaultLayout.load()
     }
 
 

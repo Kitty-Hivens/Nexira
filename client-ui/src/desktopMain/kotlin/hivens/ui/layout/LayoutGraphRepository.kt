@@ -21,6 +21,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -209,7 +212,17 @@ class LayoutGraphRepository(
             return def
         }
         return try {
-            val envelope = json.decodeFromString<Envelope>(Files.readString(file))
+            // Parsed rather than decoded, because the structural half of the ladder
+            // runs on the raw object. A field this build no longer declares is
+            // dropped by ignoreUnknownKeys at decode, which is before a migration
+            // taking a LayoutGraph could ever see it -- so a shape change has to
+            // happen while the file is still a tree of keys.
+            val root = json.parseToJsonElement(Files.readString(file)).jsonObject
+            val envelope = LoadedEnvelope(
+                schemaVersion = root["schema_version"]?.jsonPrimitive?.int
+                    ?: error("layout envelope carries no schema_version"),
+                graph = root["graph"]?.jsonObject ?: JsonObject(emptyMap()),
+            )
             if (envelope.schemaVersion > SCHEMA_VERSION) {
                 readOnly = true
                 NewerBuildData.record(ReadOnlyStore.Layout)
@@ -235,12 +248,14 @@ class LayoutGraphRepository(
                 _migratedFromSchema = envelope.schemaVersion
             }
             val def = defaultGraph()
+            val structural = JsonMigrations.apply(envelope.schemaVersion, envelope.graph)
+            val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), structural)
             // Migrate + seed missing default surfaces/slots + sweep instanceId
             // uniqueness via the shared reconciler. A migration or merge that
             // mints a colliding id would silently break every findByInstanceId
             // traversal; update() guards live edits, this is the load-time
             // backstop -- serve the bundled default over a corrupted tree.
-            when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, envelope.graph, def)) {
+            when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, decoded, def)) {
                 is LayoutReconcile.Result.Ok -> result.graph
                 is LayoutReconcile.Result.DuplicateId -> {
                     log.error(
@@ -277,6 +292,9 @@ class LayoutGraphRepository(
             log.error("Failed to persist layout graph at {}", file, e)
         }
     }
+
+    /** What a read pulled off disk before the structural ladder runs. */
+    private data class LoadedEnvelope(val schemaVersion: Int, val graph: JsonObject)
 
     @Serializable
     private data class Envelope(

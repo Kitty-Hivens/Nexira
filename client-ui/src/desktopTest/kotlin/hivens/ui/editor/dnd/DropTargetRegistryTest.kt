@@ -4,7 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import hivens.widget.model.NestedSegment
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
+import hivens.widget.model.FlowSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import kotlin.test.Test
@@ -46,7 +46,7 @@ class DropTargetRegistryTest {
         r.registerWidget(slot, "b", index = 1, rect = rect(top = 0f, height = 80f, left = 110f, width = 100f)) // x [110,210], mid 160
         r.registerWidget(slot, "c", index = 2, rect = rect(top = 0f, height = 80f, left = 220f, width = 100f)) // x [220,320]
 
-        val row = SlotOrientation.Row
+        val row = FlowSpec.Row
         assertEquals(0, r.insertionIndexInSlot(slot, Offset(10f, 40f), row))   // left of a's mid
         assertEquals(1, r.insertionIndexInSlot(slot, Offset(120f, 40f), row))  // past a's mid, before b's mid
         assertEquals(3, r.insertionIndexInSlot(slot, Offset(400f, 40f), row))  // past all -> append
@@ -62,7 +62,7 @@ class DropTargetRegistryTest {
         r.registerWidget(slot, "c", index = 2, rect = rect(top = 100f, height = 80f, left = 0f,   width = 100f)) // r1c0
         r.registerWidget(slot, "d", index = 3, rect = rect(top = 100f, height = 80f, left = 110f, width = 100f)) // r1c1
 
-        val grid = SlotOrientation.Grid
+        val grid = FlowSpec.grid(2)
         assertEquals(0, r.insertionIndexInSlot(slot, Offset(50f, -10f), grid)) // above everything
         assertEquals(0, r.insertionIndexInSlot(slot, Offset(10f, 40f), grid))  // row 0, left of a's center
         assertEquals(1, r.insertionIndexInSlot(slot, Offset(120f, 40f), grid)) // row 0, between a and b centers

@@ -3,11 +3,11 @@ package hivens.ui.editor
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.widget.model.CanvasPlacement
-import hivens.widget.model.GridCell
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.GRID_MAX
+import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceSpec
@@ -15,12 +15,13 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
 import hivens.widget.model.moveWidget
-import hivens.widget.model.placeWidgetInCell
+import hivens.widget.model.placeWidgetInGrid
 import hivens.widget.model.removeWidget
 import hivens.widget.model.reorderInSlot
-import hivens.widget.model.resizeWidgetInCell
-import hivens.widget.model.setGridColumns
-import hivens.widget.model.setSlotOrientation
+import hivens.widget.model.resizeWidgetInGrid
+import hivens.widget.model.setFlow
+import hivens.widget.model.setGrid
+import hivens.widget.model.setWidgetAnchor
 import hivens.widget.model.setWidgetOffset
 import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetZ
@@ -116,15 +117,16 @@ class EditModeController(
     // happens at the editor layer because the LayoutGraph layer
     // intentionally rejects undeclared slots (no auto-create), so
     // typo-protection stays at the model boundary.
-    // `canvas` seeds an initial CanvasPlacement so a palette drop onto a
-    // Canvas slot is born at the drop point (and at a concrete size) rather
-    // than flashing at (0,0) and recomposing. Null for flow slots.
+    // `placement` seeds an initial position so a palette drop onto a placement
+    // slot is born at the drop point (and at a concrete size) rather than
+    // flashing at the origin and recomposing. Null for flow slots, which derive
+    // the position from the order instead.
     fun addWidget(
         path: SlotPath,
         kind: WidgetKind,
         slots: List<SlotId>,
         index: Int,
-        canvas: CanvasPlacement? = null,
+        placement: Placement? = null,
         surface: SurfaceSpec? = null,
     ) {
         scope.launch(writeDispatcher) {
@@ -137,7 +139,7 @@ class EditModeController(
                 kind       = kind,
                 instanceId = newInstanceId(),
                 children   = children,
-                canvas     = canvas,
+                placement  = placement,
                 // The widget's own declared plane, so one dropped from the palette
                 // looks like the one the bundled layout places. Editable from the
                 // moment it lands, because it is written onto the instance rather
@@ -178,27 +180,39 @@ class EditModeController(
         }
     }
 
-    // Phase G slot layout. Orientation + grid columns are slot-level;
-    // widget weight is per-instance (set by the drag-dividers in G4).
-    fun setSlotOrientation(path: SlotPath, orientation: SlotOrientation) {
-        scope.launch(writeDispatcher) { repo.update { it.setSlotOrientation(path, orientation) } }
+    // Slot mode. A non-null flow derives each child's position from the order;
+    // null hands that to the children and seeds one onto any that carries none.
+    fun setFlow(path: SlotPath, flow: FlowSpec?) {
+        scope.launch(writeDispatcher) { repo.update { it.setFlow(path, flow) } }
     }
 
-    // Grid column nudge. Reads the current count from the graph INSIDE the
-    // serialized update so rapid +/- clicks compose without a lost-update race; the
-    // model clamps the result to 1..GRID_COLUMNS_MAX.
-    fun nudgeGridColumns(path: SlotPath, delta: Int) {
+    // Nudges the line length of a wrapped flow. Reads the current value from the
+    // graph INSIDE the serialized update so rapid clicks compose without a
+    // lost-update race; the model clamps the result.
+    fun nudgeWrap(path: SlotPath, delta: Int) {
         scope.launch(writeDispatcher) {
             repo.update { g ->
-                val current = g.traverse(path)?.gridColumns ?: SlotContent().gridColumns
-                g.setGridColumns(path, current + delta)
+                val flow = g.traverse(path)?.flow ?: return@update g
+                g.setFlow(path, flow.copy(wrap = (flow.wrap + delta).coerceIn(0, GRID_MAX)))
             }
         }
     }
 
-    // Canvas free-placement (orientation == Canvas): offset + size in dp,
-    // z = paint order. Each composes through the model's updateCanvas, so
-    // offset / size / z edits do not clobber one another mid-drag.
+    // Nudges the lattice a placement slot measures in. 0 is free placement, so
+    // stepping down to it is how a lattice becomes a plain canvas again.
+    fun nudgeGrid(path: SlotPath, delta: Int) {
+        scope.launch(writeDispatcher) {
+            repo.update { g ->
+                val current = g.traverse(path)?.grid ?: SlotContent().grid
+                g.setGrid(path, current + delta)
+            }
+        }
+    }
+
+    // Placement: offset and size in the slot's own unit, plus anchor and paint
+    // order. Each composes through the model's updatePlacement, so the five do
+    // not clobber one another mid-drag. The geometry ones skip the tree-wide
+    // uniqueness sweep: they fire per drag frame and cannot mint an id.
     fun setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float) {
         scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetOffset(path, instanceId, x, y) } }
     }
@@ -211,21 +225,29 @@ class EditModeController(
         scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetZ(path, instanceId, z) } }
     }
 
-    // Cube grid (orientation == CubeGrid): re-anchor a widget to a target cell
-    // (keeping its span) or resize its span (keeping its anchor). placeWidgetInCell
-    // resolves collisions (pushes the overlapped widgets down) and compacts the
-    // grid, so the whole layout reflows in one transform.
-    fun moveWidgetToCell(path: SlotPath, instanceId: String, col: Int, row: Int, columns: Int) {
+    fun setWidgetAnchor(path: SlotPath, instanceId: String, anchor: String) {
+        scope.launch(writeDispatcher) { repo.update { it.setWidgetAnchor(path, instanceId, anchor) } }
+    }
+
+    // Lattice move and resize: re-anchor a widget to a target cell keeping its
+    // span, or grow its span keeping its anchor. Neither moves anybody else. A
+    // target that collides snaps to the nearest free cell and a span that would
+    // overlap is clamped, because this is a snap grid over free placement and
+    // not a packer -- gaps are allowed and stay where the user left them.
+    fun moveWidgetInGrid(path: SlotPath, instanceId: String, col: Int, row: Int, columns: Int) {
         scope.launch(writeDispatcher) {
             repo.update { g ->
-                val cur = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.cell ?: GridCell()
-                g.placeWidgetInCell(path, instanceId, cur.copy(col = col, row = row), columns)
+                val cur = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.placement
+                    ?: Placement()
+                g.placeWidgetInGrid(path, instanceId, cur.copy(x = col.toFloat(), y = row.toFloat()), columns)
             }
         }
     }
 
-    fun resizeWidgetCell(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int) {
-        scope.launch(writeDispatcher) { repo.update { it.resizeWidgetInCell(path, instanceId, colSpan, rowSpan, columns) } }
+    fun resizeWidgetInGrid(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int) {
+        scope.launch(writeDispatcher) {
+            repo.update { it.resizeWidgetInGrid(path, instanceId, colSpan.toFloat(), rowSpan.toFloat(), columns) }
+        }
     }
 
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {

@@ -615,7 +615,7 @@ private fun BarDivider() {
  * Body region: the nested Row of the three original shell regions (left rail,
  * center, right panel). It exists so the root surface can stack the top bar over
  * the body in a Column; the Row itself lives in the appshell.body sub-surface
- * (the orientation comes from that slot, mirroring the appshell.leftrail nesting).
+ * (the arrangement comes from that slot, mirroring the appshell.leftrail nesting).
  * removable=false -- it carries the entire app body.
  */
 @Widget(id = "appshell.region.body", displayName = "widget.appshell.region.body", removable = false)

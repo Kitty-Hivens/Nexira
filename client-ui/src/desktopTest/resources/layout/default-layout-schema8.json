@@ -1,5 +1,5 @@
 {
-  "schema_version": 10,
+  "schema_version": 8,
   "graph": {
     "surfaces": {
       "appshell.overlay": {
@@ -10,19 +10,14 @@
                 "kind": "appshell.activity.pill",
                 "instance_id": "appshell-activity-pill-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
       "appshell.root": {
         "slots": {
           "regions": {
+            "orientation": "Column",
             "widgets": [
               {
                 "kind": "appshell.region.top",
@@ -31,29 +26,16 @@
               {
                 "kind": "appshell.region.body",
                 "instance_id": "appshell-region-body-default",
-                "placement": {
-                  "anchor": "topStart",
-                  "x": 0.0,
-                  "y": 0.0,
-                  "width": 0.0,
-                  "height": 0.0,
-                  "z": 0,
-                  "weight": 1.0
-                }
+                "weight": 1.0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
       "appshell.body": {
         "slots": {
           "content": {
+            "orientation": "Row",
             "widgets": [
               {
                 "kind": "appshell.region.left",
@@ -65,15 +47,7 @@
               {
                 "kind": "appshell.region.center",
                 "instance_id": "appshell-region-center-default",
-                "placement": {
-                  "anchor": "topStart",
-                  "x": 0.0,
-                  "y": 0.0,
-                  "width": 0.0,
-                  "height": 0.0,
-                  "z": 0,
-                  "weight": 1.0
-                }
+                "weight": 1.0
               },
               {
                 "kind": "appshell.region.right",
@@ -82,31 +56,20 @@
                   "widthDp": 265
                 }
               }
-            ],
-            "flow": {
-              "direction": "horizontal",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
       "appshell.topbar": {
         "slots": {
           "left": {
+            "orientation": "Row",
             "widgets": [
               {
                 "kind": "appshell.topbar.breadcrumb",
                 "instance_id": "appshell-topbar-breadcrumb-default"
               }
-            ],
-            "flow": {
-              "direction": "horizontal",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -118,13 +81,7 @@
                 "kind": "home.classic.content",
                 "instance_id": "home-classic-content-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -151,13 +108,7 @@
                 "kind": "home.new.recent",
                 "instance_id": "home-new-recent-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -169,13 +120,7 @@
                 "kind": "library.header",
                 "instance_id": "library-header-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "body": {
             "widgets": [
@@ -183,13 +128,7 @@
                 "kind": "library.body",
                 "instance_id": "library-body-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -246,13 +185,7 @@
                   "target": "About"
                 }
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "bottom": {
             "widgets": [
@@ -270,13 +203,7 @@
                   "target": "Logout"
                 }
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -288,13 +215,7 @@
                 "kind": "appshell.rightrail.compactnews",
                 "instance_id": "appshell-rightrail-compactnews-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "bottom": {
             "widgets": [
@@ -302,13 +223,7 @@
                 "kind": "notifications.history",
                 "instance_id": "appshell-rightrail-history-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -376,13 +291,7 @@
                 "kind": "bg.reset",
                 "instance_id": "bg-reset-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -398,13 +307,7 @@
                 "kind": "about.credits",
                 "instance_id": "about-credits-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "right": {
             "widgets": [
@@ -420,13 +323,7 @@
                 "kind": "about.links.card",
                 "instance_id": "about-links-card-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -446,13 +343,7 @@
                 "kind": "server.details.description",
                 "instance_id": "server-details-description-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "image": {
             "widgets": [
@@ -460,13 +351,7 @@
                 "kind": "server.details.banner",
                 "instance_id": "server-details-banner-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -478,13 +363,7 @@
                 "kind": "profile.nav",
                 "instance_id": "profile-nav-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "skin": {
             "widgets": [
@@ -492,13 +371,7 @@
                 "kind": "profile.skin.section",
                 "instance_id": "profile-skin-section-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "account": {
             "widgets": [
@@ -506,13 +379,7 @@
                 "kind": "profile.account.section",
                 "instance_id": "profile-account-section-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "signin": {
             "widgets": [
@@ -520,13 +387,7 @@
                 "kind": "profile.signin",
                 "instance_id": "profile-signin-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       },
@@ -538,13 +399,7 @@
                 "kind": "theme.picker.grid",
                 "instance_id": "theme-picker-grid-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           },
           "preview": {
             "widgets": [
@@ -552,13 +407,7 @@
                 "kind": "theme.picker.preview",
                 "instance_id": "theme-picker-preview-default"
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            ]
           }
         }
       }

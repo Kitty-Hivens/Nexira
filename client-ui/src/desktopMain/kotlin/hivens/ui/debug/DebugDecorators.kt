@@ -67,7 +67,14 @@ fun debugSlotChromeModifier(state: DebugOverlayState): SlotChromeModifier =
     { path, content ->
         Modifier.composed {
             val key = "s:$path"
-            val label = "${path.leafSlot.value} [${content.orientation.name}]"
+            // The slot's mode as one token: a flow reads as its direction plus its
+            // line length, a placement slot as its unit. Both are what the overlay
+            // is for, which is telling you why a widget sits where it sits.
+            val mode = content.flow?.let { f ->
+                val axis = if (f.horizontal) "row" else "col"
+                if (f.wrap > 0) "$axis/${f.wrap}" else axis
+            } ?: if (content.grid > 0) "grid/${content.grid}" else "free"
+            val label = "${path.leafSlot.value} [$mode]"
             DisposableEffect(key) { onDispose { state.bounds.remove(key) } }
             Modifier.onGloballyPositioned { coords ->
                 if (state.enabled) {

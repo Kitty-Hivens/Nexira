@@ -1301,7 +1301,6 @@ object JapaneseStrings : AppStrings {
     override val editorSlotRow = "横並び"
     override val editorSlotGrid = "グリッド"
     override val editorSlotCanvas = "キャンバス"
-    override val editorSlotCubeGrid = "キューブグリッド"
     override val editorSlotLayoutMenuTitle = "レイアウト"
     override val editorSlotGridColumns = "列数"
     override val editorSlotGridColumnsDecrease = "列を減らす"

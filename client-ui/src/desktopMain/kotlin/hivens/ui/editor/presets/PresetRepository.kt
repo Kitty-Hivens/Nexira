@@ -1,7 +1,13 @@
 package hivens.ui.editor.presets
 
 import hivens.core.io.AtomicFiles
+import hivens.ui.customization.CustomizationSettings
+import hivens.ui.layout.JsonMigrations
+import hivens.ui.layout.LayoutReconcile
+import hivens.widget.model.LayoutGraph
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -49,22 +55,59 @@ class PresetRepository(
         }
     }
 
-    fun load(name: String): PresetEnvelope? {
+    /**
+     * Reads a preset and brings its graph up to the current shape.
+     *
+     * The same floor the layout file is held to applies here, and it used not to:
+     * the refusal to read a pre-surface-schema graph lived in the repository that
+     * owns the layout, while a preset went straight to the merge. Files from
+     * before that schema exist in people's preset directories right now, and
+     * applying one dropped every widget's plane on decode, silently, and then
+     * persisted the result as current. A preset this build cannot read faithfully
+     * is refused instead, and says so.
+     */
+    fun load(name: String): LoadedPreset? {
         val path = resolveExisting(name)
         if (!Files.exists(path)) return null
         return try {
-            json.decodeFromString<PresetEnvelope>(Files.readString(path))
+            val envelope = json.decodeFromString<PresetEnvelope>(Files.readString(path))
+            if (envelope.schemaVersion < LayoutReconcile.SURFACE_SCHEMA) {
+                log.warn(
+                    "Preset '{}' is schema_version {} and describes widget surfaces in a form " +
+                        "with no faithful reading here; not applying it. The file is left as it is.",
+                    name, envelope.schemaVersion,
+                )
+                return null
+            }
+            val structural = JsonMigrations.apply(envelope.schemaVersion, envelope.graph)
+            LoadedPreset(
+                schemaVersion = envelope.schemaVersion,
+                name          = envelope.name,
+                graph         = json.decodeFromJsonElement(LayoutGraph.serializer(), structural),
+                customization = envelope.customization,
+            )
         } catch (e: Exception) {
             log.warn("Failed to load preset {}: {}", name, e.message)
             null
         }
     }
 
-    fun save(envelope: PresetEnvelope) {
+    /**
+     * Writes the current layout and look under [name], stamped with the schema
+     * this build writes, so a later one knows how far to carry it.
+     */
+    fun save(name: String, graph: LayoutGraph, customization: CustomizationSettings) {
+        val envelope = PresetEnvelope(
+            schemaVersion = LayoutReconcile.CURRENT_SCHEMA,
+            name          = name,
+            createdAt     = System.currentTimeMillis(),
+            graph         = json.encodeToJsonElement(LayoutGraph.serializer(), graph).jsonObject,
+            customization = customization,
+        )
         // The hand-rolled tmp-then-rename this replaces published whole files but
         // never flushed them, so a power loss could persist the rename over bytes
         // still in the page cache. AtomicFiles is the same sequence with the fsyncs.
-        AtomicFiles.writeString(pathFor(envelope.name), json.encodeToString(envelope))
+        AtomicFiles.writeString(pathFor(name), json.encodeToString(envelope))
     }
 
     fun delete(name: String): Boolean {
@@ -78,11 +121,19 @@ class PresetRepository(
         return true
     }
 
-    fun import(source: Path): PresetEnvelope? {
+    /**
+     * Copies a preset file somebody was handed into this profile's directory.
+     *
+     * Republished under this build's naming rather than copied byte for byte, so
+     * a name the old scheme could not keep apart lands on its own path. The graph
+     * is NOT migrated here: a file is stored as it arrived and carried forward
+     * when it is applied, which keeps one answer to "when does a preset migrate".
+     */
+    fun import(source: Path): String? {
         return try {
             val envelope = json.decodeFromString<PresetEnvelope>(Files.readString(source))
-            save(envelope)
-            envelope
+            AtomicFiles.writeString(pathFor(envelope.name), json.encodeToString(envelope))
+            envelope.name
         } catch (e: Exception) {
             log.warn("Failed to import preset from {}: {}", source, e.message)
             null

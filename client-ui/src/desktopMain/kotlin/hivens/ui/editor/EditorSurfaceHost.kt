@@ -109,7 +109,7 @@ import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.DefaultLayout
-import hivens.widget.model.SlotOrientation
+import hivens.widget.model.FlowSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.traverse
@@ -314,7 +314,12 @@ fun EditorSurfaceHost(
                 }
                 val path = LocalSlotPath.current
                 val graph = LocalLayoutGraph.current
-                val orientation = graph.traverse(path)?.orientation ?: SlotOrientation.Column
+                // A slot that is not there at all reads as a plain column, which is
+                // what an absent slot has always rendered as. A slot that IS there
+                // and carries no flow is a placement slot, and null is its answer,
+                // so the two nulls must not be collapsed with an elvis.
+                val slotContent = graph.traverse(path)
+                val flow = if (slotContent != null) slotContent.flow else FlowSpec.Column
                 EditableWidgetChrome(
                     path         = path,
                     index        = index,
@@ -323,7 +328,7 @@ fun EditorSurfaceHost(
                     controller   = dragController,
                     editController = controller,
                     registry     = registry,
-                    orientation  = orientation,
+                    flow         = flow,
                     onRemove     = {
                         // Clear the prop target if it points at this widget, else
                         // the palette stays gated off (propTarget != null) and the
@@ -346,9 +351,9 @@ fun EditorSurfaceHost(
                         // pointer is off any slot; treat as cancel.
                         val targetPath = registry.slotForPoint(committedPointer)
                             ?: return@EditableWidgetChrome
-                        val targetOrientation = graph.traverse(targetPath)?.orientation
-                            ?: SlotOrientation.Column
-                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer, targetOrientation)
+                        val targetContent = graph.traverse(targetPath)
+                        val targetFlow = if (targetContent != null) targetContent.flow else FlowSpec.Column
+                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer, targetFlow)
                         if (targetPath == path) {
                             // Same slot -- reorder. -1 when moving down
                             // because removing the source shifts indices.
@@ -574,15 +579,8 @@ fun EditorSurfaceHost(
                     visible       = editing && presetPanelOpen,
                     onDismiss     = { presetPanelOpen = false },
                     onSaveCurrent = { name ->
-                        val envelope = PresetEnvelope(
-                            schemaVersion = LayoutReconcile.CURRENT_SCHEMA,
-                            name          = name,
-                            createdAt     = System.currentTimeMillis(),
-                            graph         = currentGraph,
-                            customization = customization,
-                        )
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            presetRepo.save(envelope)
+                            presetRepo.save(name, currentGraph, customization)
                         }
                     },
                     onLoad = { meta ->
@@ -594,7 +592,9 @@ fun EditorSurfaceHost(
                             // uniqueness pipeline as a normal on-disk load, so a
                             // preset from an older schema (retired kinds) or app
                             // version (missing surfaces/slots) reconciles instead
-                            // of landing in live state verbatim.
+                            // of landing in live state verbatim. The structural
+                            // half already ran inside the repository, before the
+                            // graph was decoded; this is the half that reads one.
                             val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 runCatching {
                                     LayoutReconcile.reconcile(env.schemaVersion, env.graph, DefaultLayout.load())
@@ -715,7 +715,7 @@ fun EditorSurfaceHost(
                 )
             }
 
-            // Selected-slot chrome (Tier 2): handle + orientation menu, full-window
+            // Selected-slot chrome (Tier 2): handle + layout menu, full-window
             // so it is never a layout child of the edited slot.
             if (editing && !previewing) {
                 SlotSelectionOverlay(

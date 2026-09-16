@@ -49,8 +49,8 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
-import hivens.widget.model.SlotOrientation
-import hivens.widget.model.seededCanvasPlacement
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.seedPlacement
 import hivens.widget.model.traverse
 
 // Palette row. Click + drag from the row drops the widget into the
@@ -74,7 +74,7 @@ fun PaletteItem(
     // restarts -- its pointerInput is keyed on the payload, which is the same
     // value for the row's whole life -- so a plain read here would freeze the
     // graph at the first drag from this row. Every drop after that resolved the
-    // target slot's orientation and widget count from a layout that had since
+    // target slot's mode and widget count from a layout that had since
     // moved on: three widgets from one row into a canvas all seeded from the same
     // count and landed on top of each other.
     val graph by rememberUpdatedState(LocalLayoutGraph.current)
@@ -102,14 +102,16 @@ fun PaletteItem(
                 onDragEnd             = { pointer ->
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
                     val target = graph.traverse(targetPath)
-                    if (target?.orientation == SlotOrientation.Canvas) {
-                        // Free placement: drop at the release point (pointer ->
-                        // slot-local dp via the slot's reported window origin).
-                        // Fall back to a staggered seed if the slot has not
-                        // reported bounds. seed carries the default size/z.
-                        val seed = seededCanvasPlacement(target.widgets.size)
+                    if (target != null && target.flow == null) {
+                        // A placement slot needs the widget to arrive somewhere, and
+                        // where depends on what it measures in. A free slot takes the
+                        // release point, converted from the window through the slot's
+                        // reported origin. A lattice takes the first free cell instead:
+                        // the pointer names a dp, and turning that into a cell needs
+                        // geometry this row does not have and the model already knows.
+                        val seed = seedPlacement(target.widgets.size, target.grid, target.widgets)
                         val origin = registry.slotOrigin(targetPath)
-                        val placement = if (origin != null) {
+                        val placement = if (target.grid == 0 && origin != null) {
                             val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, origin.x, origin.y, density)
                             seed.copy(x = xDp.coerceAtLeast(0f), y = yDp.coerceAtLeast(0f))
                         } else {
@@ -117,13 +119,13 @@ fun PaletteItem(
                         }
                         editController.addWidget(
                             targetPath, descriptor.kind, descriptor.slots,
-                            index   = target.widgets.size,
-                            canvas  = placement,
-                            surface = descriptor.defaultSurface,
+                            index     = target.widgets.size,
+                            placement = placement,
+                            surface   = descriptor.defaultSurface,
                         )
                     } else {
-                        val orientation = target?.orientation ?: SlotOrientation.Column
-                        val index = registry.insertionIndexInSlot(targetPath, pointer, orientation)
+                        val flow = target?.flow ?: FlowSpec.Column
+                        val index = registry.insertionIndexInSlot(targetPath, pointer, flow)
                         editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index, surface = descriptor.defaultSurface)
                     }
                 },

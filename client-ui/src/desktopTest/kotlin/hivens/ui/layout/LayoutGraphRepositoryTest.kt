@@ -1,6 +1,6 @@
 package hivens.ui.layout
 
-import hivens.widget.model.CanvasPlacement
+import hivens.widget.model.Placement
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -430,7 +430,11 @@ class LayoutGraphRepositoryTest {
         ))
 
     private fun navKind(kind: String, id: String, surface: SurfaceSpec? = null, weight: Float = 0f) =
-        WidgetInstance(WidgetKind(kind), id, JsonObject(emptyMap()), surface = surface, weight = weight)
+        WidgetInstance(
+            WidgetKind(kind), id, JsonObject(emptyMap()),
+            surface   = surface,
+            placement = Placement(weight = weight).takeUnless { it == Placement() },
+        )
 
     private fun LayoutGraph.leftrailSlot(slot: String) =
         surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId(slot)]!!.widgets

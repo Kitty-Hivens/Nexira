@@ -19,7 +19,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import hivens.widget.model.SlotOrientation
+import hivens.widget.model.FlowSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -180,18 +180,23 @@ class DropTargetRegistry {
     // Insertion index for a pointer inside a known slot. Index is in
     // [0, count] -- count means "append at end". Finds the widget whose
     // main-axis midpoint the pointer is before; inserts at that widget's
-    // position. Main axis = X for Row slots, Y for Column/Grid. If the
-    // pointer is past all widgets, append.
+    // position. Main axis = X for a horizontal flow, Y for a vertical one. If
+    // the pointer is past all widgets, append.
+    //
+    // A placement slot has no insertion point at all: order there is paint
+    // order, not position, so a drop appends and the placement decides where it
+    // lands. Answering anything else would move a widget the user did not touch.
     fun insertionIndexInSlot(
         path: SlotPath,
         pointInWindow: Offset,
-        orientation: SlotOrientation = SlotOrientation.Column,
+        flow: FlowSpec? = FlowSpec.Column,
     ): Int {
         val items = widgets[path]?.values?.sortedBy { it.index } ?: return 0
         if (items.isEmpty()) return 0
-        if (orientation == SlotOrientation.Grid) {
-            // Row-major: insert before the first cell the pointer sits above
-            // (an earlier row) or, within the same row band, left of center.
+        if (flow == null) return items.size
+        if (flow.wrap > 0) {
+            // Reading order: insert before the first cell the pointer sits above
+            // (an earlier line) or, within the same line band, before its middle.
             items.forEach { wb ->
                 val r = wb.rect
                 if (pointInWindow.y < r.top) return wb.index
@@ -199,7 +204,7 @@ class DropTargetRegistry {
             }
             return items.size
         }
-        val horizontal = orientation == SlotOrientation.Row
+        val horizontal = flow.horizontal
         items.forEach { wb ->
             val mid = if (horizontal) wb.rect.left + wb.rect.width / 2f
                       else wb.rect.top + wb.rect.height / 2f

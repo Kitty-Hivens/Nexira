@@ -76,10 +76,10 @@ internal fun canvasResizeSize(
     (startWDp + accumXPx / density).coerceAtLeast(minDp) to
         (startHDp + accumYPx / density).coerceAtLeast(minDp)
 
-// Target cell for a cube-grid MOVE drag: the widget's start cell shifted by the
+// Target cell for a lattice MOVE drag: the widget's start cell shifted by the
 // accumulated pointer delta rounded to whole cells (stride = cell width + gutter).
 // Column clamps inside the grid; row only floors at 0 (the grid grows downward).
-internal fun cubeDragCell(
+internal fun gridDragCell(
     startCol: Int,
     startRow: Int,
     accumXPx: Float,
@@ -96,10 +96,10 @@ internal fun cubeDragCell(
     return col to row
 }
 
-// Target span for a cube-grid RMB-RESIZE drag: the widget's start span grown by the
+// Target span for a lattice RESIZE drag: the widget's start span grown by the
 // accumulated pointer delta rounded to whole cells. Each span floors at 1; the
 // column span is capped at the grid width (a widget can be at most `columns` wide).
-internal fun cubeResizeSpan(
+internal fun gridResizeSpan(
     startColSpan: Int,
     startRowSpan: Int,
     accumXPx: Float,

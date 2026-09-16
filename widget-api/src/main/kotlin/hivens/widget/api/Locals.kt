@@ -142,23 +142,24 @@ val LocalWidgetStateHost: ProvidableCompositionLocal<WidgetStateHost> =
 val LocalSlotMotionMs: ProvidableCompositionLocal<Int> =
     staticCompositionLocalOf { 0 }
 
-// Measured size (dp) of the current Canvas slot's content box, published by
-// SlotRenderer's Canvas branch. The editor's move gesture reads it to clamp a
-// free-placed widget so a grab margin always stays on-canvas (a widget can't
-// be dragged fully out of reach). Zero -- the default, and outside a Canvas
-// slot -- disables clamping. Dynamic (not static): it updates from onSizeChanged
-// on every slot resize, and a static local would recompose the whole canvas
-// subtree on each change rather than just the chrome that reads it.
-val LocalCanvasSlotSizeDp: ProvidableCompositionLocal<Size> =
+// Measured size (dp) of the current placement slot's content box, published by
+// SlotRenderer's placement branch. The editor's move gesture reads it to clamp a
+// placed widget so a grab margin always stays inside (a widget can't be dragged
+// fully out of reach). Zero -- the default, and inside a flow slot -- disables
+// clamping. Dynamic (not static): it updates from onSizeChanged on every slot
+// resize, and a static local would recompose the whole subtree on each change
+// rather than just the chrome that reads it.
+val LocalPlacementSlotSizeDp: ProvidableCompositionLocal<Size> =
     compositionLocalOf { Size.Zero }
 
-// Cube-grid cell geometry published by SlotRenderer's CubeGrid branch (dp): the
+// Lattice cell geometry published by SlotRenderer's placement branch (dp): the
 // editor's move / resize gestures read it to turn a pointer delta into a whole
-// number of cells. Null outside a CubeGrid slot. Dynamic, like the size above --
-// it updates as the slot is measured; only the chrome that reads it recomposes.
-data class CubeGeometry(val cellWidthDp: Float, val gutterDp: Float, val columns: Int)
+// number of cells. Null in a free placement slot, where the unit is already the
+// dp and nothing has to be converted. Dynamic, like the size above -- it updates
+// as the slot is measured; only the chrome that reads it recomposes.
+data class GridGeometry(val cellDp: Float, val gutterDp: Float, val columns: Int)
 
-val LocalCubeGeometry: ProvidableCompositionLocal<CubeGeometry?> =
+val LocalGridGeometry: ProvidableCompositionLocal<GridGeometry?> =
     compositionLocalOf { null }
 
 // Editor-only hook: SlotRenderer's Canvas branch reports its window bounds here

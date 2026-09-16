@@ -1295,7 +1295,6 @@ object EnglishStrings : AppStrings {
     override val editorSlotRow    = "Row"
     override val editorSlotGrid   = "Grid"
     override val editorSlotCanvas = "Canvas"
-    override val editorSlotCubeGrid = "Cube grid"
     override val editorSlotLayoutMenuTitle     = "Layout"
     override val editorSlotGridColumns         = "Columns"
     override val editorSlotGridColumnsDecrease = "Fewer columns"

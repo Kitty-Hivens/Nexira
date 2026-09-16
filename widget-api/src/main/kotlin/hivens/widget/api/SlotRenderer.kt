@@ -4,6 +4,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
@@ -29,15 +31,18 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.widget.model.FlowPlacement
-import hivens.widget.model.GridCell
+import hivens.widget.model.FlowSpec
+import hivens.widget.model.Placement
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.anchorHorizontalBias
+import hivens.widget.model.anchorVerticalBias
 import hivens.widget.model.flowPlacement
+import hivens.widget.model.parseAnchor
 import hivens.widget.model.traverse
 
 // Renders every widget at the addressed slot. Two entry forms:
@@ -52,14 +57,11 @@ import hivens.widget.model.traverse
 //     distinguishes "slot 'body' on container X" from "slot 'body' on
 //     container Y".
 //
-// Phase G: the slot OWNS its intra-slot layout. The renderer reads the
-// slot's SlotOrientation and lays the widgets out itself (Column / Row;
-// Grid renders as Column until G5), so callers no longer wrap the call in
-// a Column. The surface passes `modifier` for inter-slot positioning
-// (weight / fill / padding / scroll) and `spacing` for the gap between
-// widgets (the arrangement the caller's Column used to set). A widget
-// with weight > 0 takes a weighted share of the main axis; weight 0
-// renders through the decorator directly, exactly as before.
+// The slot OWNS its intra-slot layout, and owns it in one of two modes rather
+// than one of five names. A flow derives each child's position from the
+// sequence; a placement slot reads it off the child. The surface passes
+// `modifier` for inter-slot positioning (weight / fill / padding / scroll) and
+// `spacing` for the gap between children, which in a lattice is the gutter.
 //
 // Each widget renders through LocalWidgetDecorator. Default decorator is
 // identity -- zero cost when no editor is mounted. A widget whose kind is
@@ -115,154 +117,95 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         return
     }
 
-    when (content.orientation) {
-        SlotOrientation.Row -> Row(slotChrome(path, content).then(modifier).animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            FlowWidgets(address, content, registry, decorator, unknownDecorator) { Modifier.weight(it) }
+    val flow = content.flow
+    if (flow == null) {
+        PlacementSlot(path, content, address, registry, decorator, unknownDecorator, slotChrome, modifier, spacing)
+    } else {
+        FlowSlot(flow, content, address, registry, decorator, unknownDecorator, slotChrome(path, content), modifier, spacing, motionMs)
+    }
+}
+
+// ── Flow ─────────────────────────────────────────────────────────────
+
+// One body for what used to be three branches. Row and Column differ only in
+// which axis a weighted child takes its share of, and could not share a body
+// only because Modifier.weight is scope-typed -- so the layout passes its own
+// weight in and everything else is written once. Wrapping is the same flow with
+// a line length, which is what the grid always was.
+@Composable
+private fun FlowSlot(
+    flow: FlowSpec,
+    content: SlotContent,
+    address: SlotAddress,
+    registry: WidgetRegistry,
+    decorator: WidgetDecorator,
+    unknownDecorator: UnknownWidgetDecorator,
+    chrome: Modifier,
+    modifier: Modifier,
+    spacing: Dp,
+    motionMs: Int,
+) {
+    val outer = chrome.then(modifier).animatedReflow(motionMs)
+    val lineLength = flow.wrap.coerceAtLeast(0)
+
+    if (lineLength == 0) {
+        if (flow.horizontal) {
+            Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator) { Modifier.weight(it) }
+            }
+        } else {
+            Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
+                FlowWidgets(address, content.widgets, registry, decorator, unknownDecorator) { Modifier.weight(it) }
+            }
         }
-        SlotOrientation.Grid -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            // Non-lazy chunked grid: a Column of equal-width Rows. Reuses the
-            // decorator path so chrome + DnD stay consistent; cells are uniform
-            // (per-widget weight is ignored in Grid) and the last row is padded
-            // with weighted spacers so the columns stay aligned. No dividers.
-            val cols = content.gridColumns.coerceAtLeast(1)
-            content.widgets.chunked(cols).forEachIndexed { rowIndex, rowWidgets ->
+        return
+    }
+
+    // Wrapped: lines of `wrap` children, laid across the flow direction and
+    // stacked along the other one. A uniform line gives every cell an equal
+    // share and pads the short last line with weighted spacers so the columns
+    // stay aligned; a non-uniform one lets each child take its own size.
+    val lines = content.widgets.chunked(lineLength)
+    if (flow.horizontal) {
+        Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
+            lines.forEachIndexed { lineIndex, line ->
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                    rowWidgets.forEachIndexed { colIndex, instance ->
-                        val index = rowIndex * cols + colIndex
-                        key(instance.instanceId) {
-                            val descriptor = registry[instance.kind]
-                            Box(Modifier.weight(1f)) {
-                                if (descriptor != null) {
-                                    val movable = rememberWidgetMovable(descriptor, instance)
-                                    decorator(address, index, descriptor, instance) { movable() }
-                                } else {
-                                    unknownDecorator(address, index, instance)
-                                }
-                            }
-                        }
+                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator) {
+                        Modifier.weight(it)
                     }
-                    repeat(cols - rowWidgets.size) { Spacer(Modifier.weight(1f)) }
+                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
-        SlotOrientation.Canvas -> {
-            // Publish the slot's measured size (dp) so the editor's move gesture
-            // clamps a free-placed widget on-canvas. onSizeChanged keeps it
-            // current without restarting the gesture.
-            val density = LocalDensity.current
-            val reportSlotBounds = LocalSlotBoundsReporter.current
-            var slotSizeDp by remember { mutableStateOf(Size.Zero) }
-            Box(
-                slotChrome(path, content)
-                    .then(modifier)
-                    .onSizeChanged { sz ->
-                        slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
+    } else {
+        Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+            lines.forEachIndexed { lineIndex, line ->
+                Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                    WrappedLine(address, line, lineIndex, lineLength, flow.uniform, registry, decorator, unknownDecorator) {
+                        Modifier.weight(it)
                     }
-                    .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
-            ) {
-                CompositionLocalProvider(LocalCanvasSlotSizeDp provides slotSizeDp) {
-                    // Free canvas: each widget at its absolute dp offset + size,
-                    // painted in z-order then index. Overlap is natural in a Box.
-                    content.widgets.withIndex()
-                        .sortedWith(compareBy({ it.value.canvas?.z ?: 0 }, { it.index }))
-                        .forEach { (index, instance) ->
-                            key(instance.instanceId) {
-                                val cp = instance.canvas
-                                val descriptor = registry[instance.kind]
-                                if (descriptor == null) {
-                                    Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp)) {
-                                        unknownDecorator(address, index, instance)
-                                    }
-                                } else {
-                                    val movable = rememberWidgetMovable(descriptor, instance)
-                                    val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
-                                        Modifier.size(cp.width.dp, cp.height.dp) else Modifier
-                                    Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
-                                        decorator(address, index, descriptor, instance) { movable() }
-                                    }
-                                }
-                            }
-                        }
+                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-        }
-        SlotOrientation.CubeGrid -> {
-            // Cube-cell grid: each widget occupies an addressed cell rectangle
-            // (col/row + span). Cell size derives from the measured slot width and
-            // the column count; cells are square (cellH = cellW); `spacing` is the
-            // gutter. Static placement here -- live move/resize land in later phases.
-            val density = LocalDensity.current
-            val reportSlotBounds = LocalSlotBoundsReporter.current
-            var slotSizeDp by remember { mutableStateOf(Size.Zero) }
-            val cols = content.gridColumns.coerceAtLeast(1)
-            Box(
-                slotChrome(path, content)
-                    .then(modifier)
-                    .onSizeChanged { sz ->
-                        slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
-                    }
-                    .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
-            ) {
-                val cellW: Dp =
-                    if (slotSizeDp.width > 0f) ((slotSizeDp.width.dp - spacing * (cols + 1)) / cols).coerceAtLeast(0.dp)
-                    else 0.dp
-                CompositionLocalProvider(
-                    LocalCanvasSlotSizeDp provides slotSizeDp,
-                    LocalCubeGeometry provides CubeGeometry(cellW.value, spacing.value, cols),
-                ) {
-                    content.widgets.withIndex()
-                        .sortedWith(compareBy({ it.value.cell?.z ?: 0 }, { it.index }))
-                        .forEach { (index, instance) ->
-                            key(instance.instanceId) {
-                                val gc      = instance.cell ?: GridCell()
-                                val colSpan = gc.colSpan.coerceIn(1, cols)
-                                val col     = gc.col.coerceIn(0, cols - colSpan)
-                                val rowSpan = gc.rowSpan.coerceAtLeast(1)
-                                val row     = gc.row.coerceAtLeast(0)
-                                val x = spacing + (cellW + spacing) * col
-                                val y = spacing + (cellW + spacing) * row
-                                val w = cellW * colSpan + spacing * (colSpan - 1)
-                                val h = cellW * rowSpan + spacing * (rowSpan - 1)
-                                val descriptor = registry[instance.kind]
-                                Box(Modifier.offset(x, y).size(w, h)) {
-                                    if (descriptor != null) {
-                                        val movable = rememberWidgetMovable(descriptor, instance)
-                                        decorator(address, index, descriptor, instance) { movable() }
-                                    } else {
-                                        unknownDecorator(address, index, instance)
-                                    }
-                                }
-                            }
-                        }
-                }
-            }
-        }
-        // Column.
-        else -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            FlowWidgets(address, content, registry, decorator, unknownDecorator) { Modifier.weight(it) }
         }
     }
 }
 
-// The Row and Column branches differ in exactly one thing: which axis a weighted
-// widget takes its share of. Modifier.weight is scope-typed, so the two cannot
-// share a body by one calling the other -- the layout passes its own weight in
-// instead, and the rest (placement precedence, the decorator, the unknown-kind
-// fallback) is written once. It was written twice, line for line, and the comment
-// on both copies said they must not drift.
 @Composable
 private fun FlowWidgets(
     address: SlotAddress,
-    content: SlotContent,
+    widgets: List<WidgetInstance>,
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
     weight: (Float) -> Modifier,
 ) {
-    content.widgets.forEachIndexed { index, instance ->
+    widgets.forEachIndexed { index, instance ->
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
-            if (descriptor != null) {
+            if (descriptor == null) {
+                unknownDecorator(address, index, instance)
+            } else {
                 val movable = rememberWidgetMovable(descriptor, instance)
                 // Precedence lives on the model as flowPlacement(), so the rule is
                 // testable without a composition.
@@ -275,27 +218,169 @@ private fun FlowWidgets(
                     }
                     FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
                 }
-            } else {
-                unknownDecorator(address, index, instance)
             }
         }
     }
 }
 
-// Per-widget resize for a flow (Row/Column) slot, applied as a MAXIMUM bound, or
-// null when the widget has no canvas size set. Content that fills (a list, an
-// image) grows to the bound; content that does not (a card, a label, a spacer at
-// its prop height) wraps at its natural size instead of leaving empty space below
-// or beside it -- so dragging the handle past the content no longer inflates the
-// box with phantom padding. A fixed extent only suits the free canvas (which sets
-// Modifier.size directly). Only a resized widget carries a size, so untouched
-// layouts are unaffected.
+// One line of a wrapped flow. `index` has to be the child's position in the
+// whole slot, not in the line, because that is what the drop hit-test and the
+// decorator address it by.
+@Composable
+private fun WrappedLine(
+    address: SlotAddress,
+    line: List<WidgetInstance>,
+    lineIndex: Int,
+    lineLength: Int,
+    uniform: Boolean,
+    registry: WidgetRegistry,
+    decorator: WidgetDecorator,
+    unknownDecorator: UnknownWidgetDecorator,
+    weight: (Float) -> Modifier,
+) {
+    line.forEachIndexed { inLine, instance ->
+        val index = lineIndex * lineLength + inLine
+        key(instance.instanceId) {
+            val descriptor = registry[instance.kind]
+            val cell: Modifier = if (uniform) weight(1f) else Modifier
+            Box(cell) {
+                if (descriptor == null) {
+                    unknownDecorator(address, index, instance)
+                } else {
+                    val movable = rememberWidgetMovable(descriptor, instance)
+                    decorator(address, index, descriptor, instance) { movable() }
+                }
+            }
+        }
+    }
+}
+
+// Per-widget resize for a flow slot, applied as a MAXIMUM bound. Content that
+// fills (a list, an image) grows to the bound; content that does not (a card, a
+// label, a spacer at its prop height) wraps at its natural size instead of
+// leaving empty space below or beside it -- so dragging the handle past the
+// content no longer inflates the box with phantom padding. A fixed extent only
+// suits a placement slot, which sets Modifier.size directly.
 private fun boundedModifier(placement: FlowPlacement.Bounded): Modifier {
     var m: Modifier = Modifier
     if (placement.widthDp > 0f) m = m.widthIn(max = placement.widthDp.dp)
     if (placement.heightDp > 0f) m = m.heightIn(max = placement.heightDp.dp)
     return m
 }
+
+// ── Placement ────────────────────────────────────────────────────────
+
+// Free and lattice placement are one branch, because a lattice is free
+// placement whose unit happens to be a cell rather than a dp. The slot's `grid`
+// says which: 0 measures in dp, N measures in cells of an N-column lattice
+// whose cell size comes from the measured width, so a position survives a
+// window resize instead of being clipped on a narrow one.
+@Composable
+private fun PlacementSlot(
+    path: SlotPath,
+    content: SlotContent,
+    address: SlotAddress,
+    registry: WidgetRegistry,
+    decorator: WidgetDecorator,
+    unknownDecorator: UnknownWidgetDecorator,
+    slotChrome: SlotChromeModifier,
+    modifier: Modifier,
+    spacing: Dp,
+) {
+    val density = LocalDensity.current
+    val reportSlotBounds = LocalSlotBoundsReporter.current
+    var slotSizeDp by remember { mutableStateOf(Size.Zero) }
+    val columns = content.grid
+
+    Box(
+        slotChrome(path, content)
+            .then(modifier)
+            .onSizeChanged { sz ->
+                slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
+            }
+            .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
+    ) {
+        // One cell plus one gutter. Zero outside a lattice, and zero before the
+        // slot has been measured, which is the frame where nothing can be placed
+        // sensibly anyway.
+        val cell: Float = if (columns > 0 && slotSizeDp.width > 0f) {
+            ((slotSizeDp.width - spacing.value * (columns + 1)) / columns).coerceAtLeast(0f)
+        } else {
+            0f
+        }
+
+        CompositionLocalProvider(
+            LocalPlacementSlotSizeDp provides slotSizeDp,
+            LocalGridGeometry provides if (columns > 0) GridGeometry(cell, spacing.value, columns) else null,
+        ) {
+            content.widgets.withIndex()
+                .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
+                .forEach { (index, instance) ->
+                    key(instance.instanceId) {
+                        val p = instance.placement ?: Placement()
+                        val descriptor = registry[instance.kind]
+                        PlacedBox(p, columns, cell, spacing.value) {
+                            if (descriptor == null) {
+                                unknownDecorator(address, index, instance)
+                            } else {
+                                val movable = rememberWidgetMovable(descriptor, instance)
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                        }
+                    }
+                }
+        }
+    }
+}
+
+// Positions one child against its anchor. Compose's own alignment does the bias
+// arithmetic, so the offset is only the nudge away from that corner -- and it
+// runs inward from an end anchor, because "16 from the right" is what somebody
+// parking a widget in a corner means, not "16 further right than the edge".
+@Composable
+private fun BoxScope.PlacedBox(
+    placement: Placement,
+    columns: Int,
+    cell: Float,
+    gutter: Float,
+    content: @Composable () -> Unit,
+) {
+    val lattice = columns > 0
+    val stride = cell + gutter
+    val offX = if (lattice) gutter + placement.x * stride else placement.x
+    val offY = if (lattice) gutter + placement.y * stride else placement.y
+    val width = if (lattice) spanDp(placement.width, stride, gutter) else placement.width
+    val height = if (lattice) spanDp(placement.height, stride, gutter) else placement.height
+
+    val anchor = parseAnchor(placement.anchor)
+    val hBias = anchorHorizontalBias(anchor)
+    val vBias = anchorVerticalBias(anchor)
+    val dx = if (hBias > 0.5f) -offX else offX
+    val dy = if (vBias > 0.5f) -offY else offY
+
+    val sizeMod = if (width > 0f && height > 0f) Modifier.size(width.dp, height.dp) else Modifier
+    Box(Modifier.align(alignmentFor(anchor)).offset(dx.dp, dy.dp).then(sizeMod)) { content() }
+}
+
+// A span of N cells covers N cells and the N-1 gutters between them. A span of
+// 0 means the widget's own size, which a lattice still allows: a strip that
+// wants to be as wide as its text does not stop being placeable.
+private fun spanDp(span: Float, stride: Float, gutter: Float): Float =
+    if (span <= 0f) 0f else span * stride - gutter
+
+private fun alignmentFor(anchor: String): Alignment = when (anchor) {
+    Placement.TOP_START -> Alignment.TopStart
+    Placement.TOP_CENTER -> Alignment.TopCenter
+    Placement.TOP_END -> Alignment.TopEnd
+    Placement.CENTER_START -> Alignment.CenterStart
+    Placement.CENTER -> Alignment.Center
+    Placement.CENTER_END -> Alignment.CenterEnd
+    Placement.BOTTOM_START -> Alignment.BottomStart
+    Placement.BOTTOM_CENTER -> Alignment.BottomCenter
+    else -> Alignment.BottomEnd
+}
+
+// ── Shared ───────────────────────────────────────────────────────────
 
 // Compose forbids try/catch around a @Composable invocation (compiler error),
 // and there is no public per-subtree error boundary, so a single widget's
@@ -317,7 +402,7 @@ private fun Modifier.animatedReflow(motionMs: Int): Modifier =
 @Composable
 private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: WidgetInstance): @Composable () -> Unit {
     val descriptorState = rememberUpdatedState(descriptor)
-    val instanceState   = rememberUpdatedState(instance)
+    val instanceState = rememberUpdatedState(instance)
     return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
 }
 
