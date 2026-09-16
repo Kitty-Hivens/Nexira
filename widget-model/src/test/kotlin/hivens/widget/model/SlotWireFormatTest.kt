@@ -113,3 +113,67 @@ class AnchorDragSignTest {
         assertEquals(anchorDragSignY(Placement.TOP_START), anchorDragSignY("sideways"))
     }
 }
+
+/**
+ * How far a placed widget may travel before the clamp holds it.
+ *
+ * The bias is the whole of it. A clamp written for the top left is correct for
+ * exactly one of the nine anchors, and lets a centred one walk a full slot width
+ * out of reach before it notices, which is what a real layout file recorded:
+ * anchored to the bottom centre, offset 2105, on a slot around two thousand wide.
+ */
+class PlacementClampTest {
+
+    private val slot = 1000f
+    private val widget = 100f
+
+    /** Where the widget's near edge lands for an offset counted from [bias]. */
+    private fun nearEdge(offset: Float, bias: Float): Float {
+        val sign = if (bias > 0.5f) -1f else 1f
+        return bias * (slot - widget) + sign * offset
+    }
+
+    @Test
+    fun `whatever the anchor, what is left inside is never less than the margin`() {
+        // The property, not a number per anchor. Writing the numbers out is how the
+        // first version of this test came to disagree with a clamp that was right:
+        // an end anchor holds at an offset of 976 on a slot of 1000, which reads
+        // like an escape until you work out that it puts the near edge at -76 and
+        // leaves exactly the margin showing.
+        for (bias in listOf(0f, 0.5f, 1f)) {
+            for (raw in listOf(-9999f, -500f, 0f, 300f, 500f, 2105f, 9999f)) {
+                val edge = nearEdge(clampPlacementAxis(raw, slot, widget, bias), bias)
+                assertTrue(
+                    edge >= GRAB_MARGIN_DP - widget - 0.01f && edge <= slot - GRAB_MARGIN_DP + 0.01f,
+                    "bias $bias, offset $raw left the near edge at $edge",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a value already inside is not moved`() {
+        for (bias in listOf(0f, 0.5f, 1f)) {
+            assertEquals(120f, clampPlacementAxis(120f, slot, widget, bias), "bias $bias moved a value that fits")
+        }
+    }
+
+    @Test
+    fun `a centred widget cannot be pushed out of a slot it fits in`() {
+        // The real case: bottom centre, offset 2105, on a slot around two thousand
+        // wide. A clamp written for the top left let it through.
+        val held = clampPlacementAxis(2105f, slotDp = 2129f, widgetDp = 320f, bias = 0.5f)
+        val edge = 0.5f * (2129f - 320f) + held
+        assertTrue(edge + 320f > 0f && edge < 2129f, "the widget ended up entirely outside: near edge $edge")
+    }
+
+    @Test
+    fun `an unmeasured slot clamps nothing rather than pinning to zero`() {
+        assertEquals(400f, clampPlacementAxis(400f, slotDp = 0f, widgetDp = widget, bias = 0f))
+    }
+
+    @Test
+    fun `a slot too small for the margins leaves the value alone`() {
+        assertEquals(400f, clampPlacementAxis(400f, slotDp = 10f, widgetDp = 0f, bias = 0f))
+    }
+}

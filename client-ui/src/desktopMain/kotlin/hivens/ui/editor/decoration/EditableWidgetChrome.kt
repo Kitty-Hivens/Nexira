@@ -59,7 +59,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
-import hivens.ui.editor.canvasDragOffset
+import hivens.ui.editor.placementDragOffset
 import hivens.ui.editor.canvasResizeSize
 import hivens.ui.editor.gridDragCell
 import hivens.ui.editor.gridResizeSpan
@@ -82,6 +82,8 @@ import hivens.widget.model.FlowSpec
 import hivens.widget.model.Placement
 import hivens.widget.model.anchorDragSignX
 import hivens.widget.model.anchorDragSignY
+import hivens.widget.model.anchorHorizontalBias
+import hivens.widget.model.anchorVerticalBias
 import hivens.widget.model.parseAnchor
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
@@ -346,7 +348,7 @@ fun EditableWidgetChrome(
                                     drag(down.id) { change ->
                                         val slot = liveSlotSize.value
                                         val wb = widgetWindowBounds
-                                        val (nx, ny) = canvasDragOffset(
+                                        val (nx, ny) = placementDragOffset(
                                             curX, curY,
                                             change.positionChange().x * signX, change.positionChange().y * signY,
                                             density,
@@ -354,6 +356,8 @@ fun EditableWidgetChrome(
                                             slotHDp   = slot.height,
                                             widgetWDp = (wb?.width ?: 0f) / density,
                                             widgetHDp = (wb?.height ?: 0f) / density,
+                                            hBias     = anchorHorizontalBias(a),
+                                            vBias     = anchorVerticalBias(a),
                                         )
                                         curX = nx
                                         curY = ny

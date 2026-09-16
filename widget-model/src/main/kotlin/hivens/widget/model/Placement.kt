@@ -159,6 +159,40 @@ fun anchorDragSignX(anchor: String): Float = if (anchorHorizontalBias(anchor) > 
 
 fun anchorDragSignY(anchor: String): Float = if (anchorVerticalBias(anchor) > 0.5f) -1f else 1f
 
+/**
+ * One axis of a placed widget's offset, held where at least [marginDp] of it
+ * stays inside the slot.
+ *
+ * The renderer applies this as it draws and the editor applies it as it drags,
+ * from the same function, because the two disagreeing is how a widget ends up
+ * somewhere the pointer cannot reach: the drag stops writing past the edge, and
+ * anything already past it is still drawn where it can be grabbed. The record
+ * itself is left alone, so a slot that grows gives the arrangement back.
+ *
+ * The bias is what makes this more than a coerce. An offset counts from its
+ * anchor, so the same number is a different place depending on the corner, and a
+ * clamp written for the top left lets a centred one travel a whole slot width
+ * before it notices. A degenerate slot, or one too small to hold the margins,
+ * returns the value untouched rather than pinning it to zero.
+ */
+fun clampPlacementAxis(
+    valueDp: Float,
+    slotDp: Float,
+    widgetDp: Float,
+    bias: Float,
+    marginDp: Float = GRAB_MARGIN_DP,
+): Float {
+    if (slotDp <= 0f) return valueDp
+    val base = bias * (slotDp - widgetDp)
+    val lo = marginDp - widgetDp - base
+    val hi = slotDp - marginDp - base
+    if (lo > hi) return valueDp
+    return if (bias > 0.5f) valueDp.coerceIn(-hi, -lo) else valueDp.coerceIn(lo, hi)
+}
+
+/** How much of a placed widget always stays inside its slot. */
+const val GRAB_MARGIN_DP = 24f
+
 /** Vertical share of [parseAnchor]: 0 at the top, 0.5 centred, 1 at the bottom. */
 fun anchorVerticalBias(anchor: String): Float = when (parseAnchor(anchor)) {
     Placement.TOP_START, Placement.TOP_CENTER, Placement.TOP_END -> 0f

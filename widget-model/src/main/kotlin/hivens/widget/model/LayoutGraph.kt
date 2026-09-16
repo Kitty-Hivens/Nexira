@@ -212,8 +212,21 @@ fun LayoutGraph.setWidgetSize(path: SlotPath, instanceId: String, width: Float, 
 fun LayoutGraph.setWidgetZ(path: SlotPath, instanceId: String, z: Int): LayoutGraph =
     updatePlacement(path, instanceId) { it.copy(z = z) }
 
+/**
+ * Attaches the widget to a corner, and starts it there.
+ *
+ * The offset goes back to nothing, because it counted from the old corner and
+ * means somewhere else from the new one: keeping it teleports the widget the
+ * instant a corner is picked, by as much as the distance between the two
+ * corners. "Attach to the bottom right" puts it at the bottom right, and the
+ * drag that follows is how it leaves.
+ */
 fun LayoutGraph.setWidgetAnchor(path: SlotPath, instanceId: String, anchor: String): LayoutGraph =
-    updatePlacement(path, instanceId) { it.copy(anchor = parseAnchor(anchor)) }
+    updatePlacement(path, instanceId) { current ->
+        val next = parseAnchor(anchor)
+        if (next == parseAnchor(current.anchor)) current
+        else current.copy(anchor = next, x = 0f, y = 0f)
+    }
 
 fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Float): LayoutGraph =
     updatePlacement(path, instanceId) { it.copy(weight = weight.coerceAtLeast(0f)) }

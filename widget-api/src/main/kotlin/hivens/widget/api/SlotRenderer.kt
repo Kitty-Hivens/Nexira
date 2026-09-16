@@ -44,6 +44,7 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.anchorHorizontalBias
 import hivens.widget.model.anchorVerticalBias
+import hivens.widget.model.clampPlacementAxis
 import hivens.widget.model.flowPlacement
 import hivens.widget.model.parseAnchor
 import hivens.widget.model.traverse
@@ -317,6 +318,15 @@ private fun PlacementSlot(
             .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
     ) {
         val boundedWidth = maxWidth.value.takeIf { it.isFinite() } ?: 0f
+        val boundedHeight = maxHeight.value.takeIf { it.isFinite() } ?: 0f
+        // The clamp wants the size the slot took, and takes the constraint until
+        // that arrives: measured is only right for a slot that wraps its content,
+        // and waiting a frame for it means the frame a widget first appears on is
+        // the one frame nothing holds it. Which is the frame a screenshot catches.
+        val clampSize = Size(
+            if (measuredDp.width > 0f) measuredDp.width else boundedWidth,
+            if (measuredDp.height > 0f) measuredDp.height else boundedHeight,
+        )
         // One cell, gutters taken off first. Zero outside a lattice, and zero in a
         // slot with no bounded width, where a fraction of the width has nothing to
         // be a fraction of.
@@ -340,7 +350,7 @@ private fun PlacementSlot(
                     key(instance.instanceId) {
                         val p = instance.placement ?: Placement()
                         val descriptor = registry[instance.kind]
-                        PlacedBox(p, columns, cell, spacing.value) {
+                        PlacedBox(p, columns, cell, spacing.value, clampSize) {
                             if (descriptor == null) {
                                 unknownDecorator(address, index, instance)
                             } else {
@@ -364,6 +374,7 @@ private fun BoxScope.PlacedBox(
     columns: Int,
     cell: Float,
     gutter: Float,
+    slotDp: Size,
     content: @Composable () -> Unit,
 ) {
     val lattice = columns > 0
@@ -392,13 +403,42 @@ private fun BoxScope.PlacedBox(
     val dx = if (hBias > 0.5f) -offX else offX
     val dy = if (vBias > 0.5f) -offY else offY
 
+    // Its own measured size, a frame late, which is all a recovery clamp needs:
+    // nobody is dragging on the frame a widget first appears.
+    val density = LocalDensity.current
+    var ownDp by remember { mutableStateOf(Size.Zero) }
+
+    // Held where it can still be grabbed. A free slot stores an offset in dp and
+    // nothing ever refused one, so a widget put past the edge was drawn past the
+    // edge with nothing left to take hold of, and the only way back was the
+    // surface reset or the file. The lattice above clamps for the same reason.
+    // The record is untouched, so a slot that grows gives the arrangement back
+    // exactly as it was written.
+    //
+    // How big it is has to be known first, or the clamp reads a widget as having
+    // no size and demands the offset itself clear the margin, which shoves every
+    // widget near the origin away from it. The declared size answers on the frame
+    // it appears; a widget that names none waits for its own measurement, and
+    // until then nothing is held, because holding by a guess moves things that
+    // were never out of place.
+    val ownW = if (width > 0f) width else ownDp.width
+    val ownH = if (height > 0f) height else ownDp.height
+    val heldX = if (lattice || ownW <= 0f) dx else clampPlacementAxis(dx, slotDp.width, ownW, hBias)
+    val heldY = if (lattice || ownH <= 0f) dy else clampPlacementAxis(dy, slotDp.height, ownH, vBias)
+
     // Each axis on its own: a widget that names a width and not a height is as
     // expressible as one that names both, and requiring the pair silently threw
     // the one away.
     var sizeMod: Modifier = Modifier
     if (width > 0f) sizeMod = sizeMod.width(width.dp)
     if (height > 0f) sizeMod = sizeMod.height(height.dp)
-    Box(Modifier.align(alignmentFor(anchor)).offset(dx.dp, dy.dp).then(sizeMod)) { content() }
+    Box(
+        Modifier
+            .align(alignmentFor(anchor))
+            .offset(heldX.dp, heldY.dp)
+            .onSizeChanged { ownDp = with(density) { Size(it.width.toDp().value, it.height.toDp().value) } }
+            .then(sizeMod),
+    ) { content() }
 }
 
 private fun alignmentFor(anchor: String): Alignment = when (anchor) {

@@ -32,6 +32,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Where the renderer actually puts things, read off the pixels.
@@ -178,6 +179,38 @@ class SlotRendererGeometryTest {
         )
         assertEquals(A, frame.at(30, 190), "the width was not applied, or the height was capped with it")
         assertEquals(PAGE, frame.at(90, 190), "the width was ignored")
+    }
+
+    @Test
+    fun `a widget stored far outside the slot is still drawn where it can be grabbed`() {
+        // The case from a real layout file: anchored to the bottom centre and
+        // dragged until the offset read 2105, which from the centre is a whole
+        // screen past the edge. Nothing refused the number on the way in and
+        // nothing held it on the way out, so the widget was gone and the only way
+        // back was the surface reset.
+        val frame = render(
+            SlotContent(
+                widgets = listOf(
+                    box("a", Placement(anchor = Placement.BOTTOM_CENTER, x = 2105f, y = 812f, width = 40f, height = 40f)),
+                ),
+                flow = null,
+            ),
+        )
+        var painted = 0
+        for (y in 0 until SIDE) for (x in 0 until SIDE) if (frame.at(x, y) == A) painted++
+        assertTrue(painted > 0, "the widget is not on screen at all")
+    }
+
+    @Test
+    fun `a widget dragged past an edge keeps a grab margin inside`() {
+        val frame = render(
+            SlotContent(
+                widgets = listOf(box("a", Placement(x = 5000f, y = 5000f, width = 40f, height = 40f))),
+                flow = null,
+            ),
+        )
+        // Twenty four dp of it stay in, so the far corner of the slot is painted.
+        assertEquals(A, frame.at(SIDE - 5, SIDE - 5), "nothing was left to take hold of")
     }
 
     // ── Flow ──────────────────────────────────────────────────────────

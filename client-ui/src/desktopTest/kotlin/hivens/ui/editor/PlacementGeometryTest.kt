@@ -18,24 +18,26 @@ class PlacementGeometryTest {
     }
 
     @Test
-    fun `canvasDragOffset adds the dp delta to the start on a roomy slot`() {
-        val (x, y) = canvasDragOffset(
+    fun `placementDragOffset adds the dp delta to the start on a roomy slot`() {
+        val (x, y) = placementDragOffset(
             startXDp = 10f, startYDp = 10f,
             accumXPx = 40f, accumYPx = 20f,
             density = 2f,
             slotWDp = 800f, slotHDp = 600f,
             widgetWDp = 100f, widgetHDp = 50f,
+            hBias = 0f, vBias = 0f,
         )
         assertEquals(30f, x, eps)
         assertEquals(20f, y, eps)
     }
 
     @Test
-    fun `clampCanvasOffset keeps a grab margin inside each edge`() {
-        val (x, y) = clampCanvasOffset(
+    fun `clampPlacementOffset keeps a grab margin inside each edge`() {
+        val (x, y) = clampPlacementOffset(
             xDp = 10_000f, yDp = -10_000f,
             slotWDp = 800f, slotHDp = 600f,
             widgetWDp = 100f, widgetHDp = 50f,
+            hBias = 0f, vBias = 0f,
             grabMarginDp = 24f,
         )
         assertEquals(776f, x, eps)   // slotW - margin
@@ -43,16 +45,16 @@ class PlacementGeometryTest {
     }
 
     @Test
-    fun `clampCanvasOffset passes through when the slot is unmeasured`() {
-        val (x, y) = clampCanvasOffset(1234f, -99f, slotWDp = 0f, slotHDp = 0f, widgetWDp = 100f, widgetHDp = 50f, grabMarginDp = 24f)
+    fun `clampPlacementOffset passes through when the slot is unmeasured`() {
+        val (x, y) = clampPlacementOffset(1234f, -99f, slotWDp = 0f, slotHDp = 0f, widgetWDp = 100f, widgetHDp = 50f, hBias = 0f, vBias = 0f, grabMarginDp = 24f)
         assertEquals(1234f, x, eps)
         assertEquals(-99f, y, eps)
     }
 
     @Test
-    fun `clampCanvasOffset passes through when the margins exceed the slot`() {
+    fun `clampPlacementOffset passes through when the margins exceed the slot`() {
         // slot 10dp, widget 5dp, margin 24 -> lo=19 > hi=-14, inverted: no clamp.
-        val (x, y) = clampCanvasOffset(7f, 7f, slotWDp = 10f, slotHDp = 10f, widgetWDp = 5f, widgetHDp = 5f, grabMarginDp = 24f)
+        val (x, y) = clampPlacementOffset(7f, 7f, slotWDp = 10f, slotHDp = 10f, widgetWDp = 5f, widgetHDp = 5f, hBias = 0f, vBias = 0f, grabMarginDp = 24f)
         assertEquals(7f, x, eps)
         assertEquals(7f, y, eps)
     }
