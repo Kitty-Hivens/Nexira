@@ -135,6 +135,51 @@ class SlotRendererGeometryTest {
         assertEquals(PAGE, frame.at(125, 25))
     }
 
+    @Test
+    fun `a widget parked past a narrowed lattice is drawn inside it`() {
+        // The count is a number in a menu and the stored position is deliberately
+        // not rescaled when it moves, so lowering it used to leave a widget at a
+        // column that no longer exists: drawn past the slot, off the window and
+        // out of reach, with no way back but raising the count again.
+        val frame = render(
+            SlotContent(
+                widgets = listOf(box("a", Placement(x = 5f, y = 0f, width = 1f, height = 1f))),
+                flow = null,
+                grid = 2,
+            ),
+        )
+        assertEquals(A, frame.at(150, 25), "the widget was not clamped into the last column")
+        assertEquals(PAGE, frame.at(50, 25), "and it did not fall back to the first")
+    }
+
+    @Test
+    fun `a span wider than the lattice is clamped to it`() {
+        val frame = render(
+            SlotContent(
+                widgets = listOf(box("a", Placement(x = 0f, y = 0f, width = 9f, height = 1f))),
+                flow = null,
+                grid = 2,
+            ),
+        )
+        assertEquals(A, frame.at(50, 25))
+        assertEquals(A, frame.at(150, 25))
+        assertEquals(PAGE, frame.at(50, 150), "the row span was not clamped with it")
+    }
+
+    @Test
+    fun `a widget that names only one axis is sized on that axis alone`() {
+        // Requiring both silently threw the one away, while the record can express
+        // it and the editor can write it.
+        val frame = render(
+            SlotContent(
+                widgets = listOf(box("a", Placement(width = 60f, height = 0f))),
+                flow = null,
+            ),
+        )
+        assertEquals(A, frame.at(30, 190), "the width was not applied, or the height was capped with it")
+        assertEquals(PAGE, frame.at(90, 190), "the width was ignored")
+    }
+
     // ── Flow ──────────────────────────────────────────────────────────
 
     @Test
@@ -245,8 +290,11 @@ class SlotRendererGeometryTest {
                 }
             }
         }
-        val image = scene.render()
-        scene.close()
+        val image = try {
+            scene.render()
+        } finally {
+            scene.close()
+        }
         File(OUT).mkdirs()
         image.encodeToData(EncodedImageFormat.PNG)?.bytes
             ?.let { File(OUT, "slot-${content.hashCode()}.png").writeBytes(it) }

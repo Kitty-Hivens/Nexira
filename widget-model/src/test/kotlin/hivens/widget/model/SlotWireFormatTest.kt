@@ -77,3 +77,39 @@ class SlotWireFormatTest {
         assertNull(widget.placement)
     }
 }
+
+/**
+ * The anchor decides two things that have to be the same decision: which corner
+ * the renderer measures an offset from, and which way a drag moves that number.
+ *
+ * They were two separate expressions once, and only one of them existed: the
+ * renderer ran the offset inward from an end edge and the gesture added to it
+ * regardless, so a widget anchored to a corner walked away from the pointer.
+ */
+class AnchorDragSignTest {
+
+    @Test
+    fun `the drag sign follows the same bias the renderer draws from`() {
+        for (anchor in Placement.ANCHORS) {
+            val expectedX = if (anchorHorizontalBias(anchor) > 0.5f) -1f else 1f
+            val expectedY = if (anchorVerticalBias(anchor) > 0.5f) -1f else 1f
+            assertEquals(expectedX, anchorDragSignX(anchor), "x sign disagrees with the bias for $anchor")
+            assertEquals(expectedY, anchorDragSignY(anchor), "y sign disagrees with the bias for $anchor")
+        }
+    }
+
+    @Test
+    fun `an offset from an end edge grows as the pointer moves away from it`() {
+        assertEquals(-1f, anchorDragSignX(Placement.BOTTOM_END))
+        assertEquals(-1f, anchorDragSignY(Placement.BOTTOM_END))
+        assertEquals(1f, anchorDragSignX(Placement.TOP_START))
+        assertEquals(1f, anchorDragSignY(Placement.TOP_START))
+        assertEquals(1f, anchorDragSignX(Placement.CENTER), "a centred nudge is not an inset")
+    }
+
+    @Test
+    fun `an unrecognised anchor drags the way the default one draws`() {
+        assertEquals(anchorDragSignX(Placement.TOP_START), anchorDragSignX("sideways"))
+        assertEquals(anchorDragSignY(Placement.TOP_START), anchorDragSignY("sideways"))
+    }
+}

@@ -233,13 +233,15 @@ internal fun SlotLayoutMenuContent(
         controller.setFlow(path, null); onClose()
     }
 
-    // The one stepper, pointed at whichever number the current mode has. A
-    // wrapped flow steps its line length; a placement slot steps the lattice it
-    // measures in, and 0 there is free placement, which is how a canvas becomes
-    // a cell grid and back without a fifth name for either.
-    if (flow != null && flow.wrap > 0) {
+    // The one stepper, pointed at whichever number the current mode has. A flow
+    // steps its line length, where 0 is "never wrap"; a placement slot steps the
+    // lattice it measures in, where 0 is free placement. Shown for both and at
+    // every value, because a stepper that disappears at zero is a door that locks
+    // behind you: stepping a grid down to a row used to take the control away
+    // with it, and the only way back was the menu item, which reset the number.
+    if (flow != null) {
         SlotNumberRow(s.editorSlotGridColumns, flow.wrap, s, { controller.nudgeWrap(path, -1) }, { controller.nudgeWrap(path, 1) })
-    } else if (flow == null) {
+    } else {
         SlotNumberRow(s.editorSlotGridColumns, live.grid, s, { controller.nudgeGrid(path, -1) }, { controller.nudgeGrid(path, 1) })
     }
 }

@@ -236,7 +236,7 @@ class EditModeController(
     // not a packer -- gaps are allowed and stay where the user left them.
     fun moveWidgetInGrid(path: SlotPath, instanceId: String, col: Int, row: Int, columns: Int) {
         scope.launch(writeDispatcher) {
-            repo.update { g ->
+            repo.update(validate = false) { g ->
                 val cur = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.placement
                     ?: Placement()
                 g.placeWidgetInGrid(path, instanceId, cur.copy(x = col.toFloat(), y = row.toFloat()), columns)
@@ -246,7 +246,9 @@ class EditModeController(
 
     fun resizeWidgetInGrid(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int) {
         scope.launch(writeDispatcher) {
-            repo.update { it.resizeWidgetInGrid(path, instanceId, colSpan.toFloat(), rowSpan.toFloat(), columns) }
+            // Same reason the four above skip it: this one fires inside a drag loop,
+            // and a tree-wide walk per frame is what the flag was added to avoid.
+            repo.update(validate = false) { it.resizeWidgetInGrid(path, instanceId, colSpan.toFloat(), rowSpan.toFloat(), columns) }
         }
     }
 

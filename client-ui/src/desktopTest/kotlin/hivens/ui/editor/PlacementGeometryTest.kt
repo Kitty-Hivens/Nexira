@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 // Pins the canvas placement + lattice math (offset / clamp / resize / window->local
 // / cell move / span resize) so the gesture code that wraps it stays an untested thin
 // shell.
-class CanvasGeometryTest {
+class PlacementGeometryTest {
 
     private val eps = 0.001f
 

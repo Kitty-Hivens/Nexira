@@ -162,8 +162,8 @@ data class GridGeometry(val cellDp: Float, val gutterDp: Float, val columns: Int
 val LocalGridGeometry: ProvidableCompositionLocal<GridGeometry?> =
     compositionLocalOf { null }
 
-// Editor-only hook: SlotRenderer's Canvas branch reports its window bounds here
-// so a palette drop can land at the release point (converted to slot-local dp).
+// Editor-only hook: SlotRenderer's placement branch reports its window bounds
+// here so a palette drop can land at the release point (converted to slot-local dp).
 // Default no-op; the editor host provides one that registers into the
 // DropTargetRegistry.
 val LocalSlotBoundsReporter: ProvidableCompositionLocal<(SlotPath, Rect) -> Unit> =

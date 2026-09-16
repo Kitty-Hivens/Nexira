@@ -1262,6 +1262,16 @@ interface AppStrings {
     val editorSlotRow: String
     val editorSlotGrid: String
     val editorSlotCanvas: String
+    val editorAnchorTitle: String
+    val editorAnchorTopStart: String
+    val editorAnchorTopCenter: String
+    val editorAnchorTopEnd: String
+    val editorAnchorCenterStart: String
+    val editorAnchorCenter: String
+    val editorAnchorCenterEnd: String
+    val editorAnchorBottomStart: String
+    val editorAnchorBottomCenter: String
+    val editorAnchorBottomEnd: String
     val editorSlotLayoutMenuTitle: String
     val editorSlotGridColumns: String
     val editorSlotGridColumnsDecrease: String

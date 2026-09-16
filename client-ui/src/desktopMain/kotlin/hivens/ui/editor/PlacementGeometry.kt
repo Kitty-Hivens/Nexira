@@ -2,14 +2,15 @@ package hivens.ui.editor
 
 import kotlin.math.roundToInt
 
-// Pure canvas free-placement geometry. Compose-free (plain Floats) so the math
-// is unit-testable without a real pointer or density -- the same discipline as
-// dividerLeftWeight. The gesture code supplies px from Compose and the dp scale
-// from LocalDensity; everything reducible to arithmetic lives here. All sizes
-// are dp unless the name says Px.
+// Pure placement geometry, for both units a slot can measure in: dp on a free
+// slot, whole cells on a lattice. Compose-free (plain Floats) so the math is
+// unit-testable without a real pointer or density. The gesture code supplies px
+// from Compose and the dp scale from LocalDensity; everything reducible to
+// arithmetic lives here. All sizes are dp unless the name says Px or the
+// function says cell.
 
-// Slot-local dp for a palette drop: window pointer minus the canvas slot's
-// window origin, px -> dp.
+// Slot-local dp for a palette drop: window pointer minus the slot's window
+// origin, px -> dp.
 internal fun windowPointToSlotDp(
     pointerXPx: Float,
     pointerYPx: Float,

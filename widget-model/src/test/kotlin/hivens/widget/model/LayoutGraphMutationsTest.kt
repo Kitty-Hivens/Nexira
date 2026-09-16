@@ -116,7 +116,7 @@ class LayoutGraphMutationsTest {
 
     @Test
     fun `setGrid does not rescale what is already placed`() {
-        val placed = seed(w1).setPlacement(rootPath, "i1", Placement(x = 7f, y = 2f))
+        val placed = seed(w1).setWidgetOffset(rootPath, "i1", 7f, 2f)
         val out = placed.setGrid(rootPath, 6)
         assertEquals(
             Placement(x = 7f, y = 2f),
@@ -158,23 +158,43 @@ class LayoutGraphMutationsTest {
     // ── Placement ─────────────────────────────────────────────────────
 
     @Test
-    fun `setPlacement sets it on the matching widget only`() {
-        val p = Placement(x = 10f, y = 20f, width = 100f, height = 50f, z = 3)
-        val out = seed(w1, w2).setPlacement(rootPath, "i2", p)
-        assertEquals(p, out.mainWidgets().first { it.instanceId == "i2" }.placement)
+    fun `a placement is set on the matching widget only`() {
+        val out = seed(w1, w2)
+            .setWidgetOffset(rootPath, "i2", 10f, 20f)
+            .setWidgetSize(rootPath, "i2", 100f, 50f)
+            .setWidgetZ(rootPath, "i2", 3)
+        assertEquals(
+            Placement(x = 10f, y = 20f, width = 100f, height = 50f, z = 3),
+            out.mainWidgets().first { it.instanceId == "i2" }.placement,
+        )
         assertNull(out.mainWidgets().first { it.instanceId == "i1" }.placement)
     }
 
     @Test
-    fun `setPlacement to the same record is identity`() {
-        val placed = seed(w1).setPlacement(rootPath, "i1", Placement(x = 5f))
-        assertSame(placed, placed.setPlacement(rootPath, "i1", Placement(x = 5f)))
+    fun `writing a placement field the value it already has is identity`() {
+        val placed = seed(w1).setWidgetOffset(rootPath, "i1", 5f, 0f)
+        assertSame(placed, placed.setWidgetOffset(rootPath, "i1", 5f, 0f))
     }
 
     @Test
-    fun `setPlacement on unknown instance is identity`() {
+    fun `a placement write on an unknown instance is identity`() {
         val graph = seed(w1)
-        assertSame(graph, graph.setPlacement(rootPath, "ghost", Placement(x = 1f)))
+        assertSame(graph, graph.setWidgetOffset(rootPath, "ghost", 1f, 1f))
+    }
+
+    @Test
+    fun `a widget placed at the origin stays placed`() {
+        // The record equals the default there, and normalising it away would make
+        // the widget read as unseeded: the next flip, move or neighbour's drag
+        // would pick it up and put it somewhere else.
+        val placed = seed(w1).setWidgetOffset(rootPath, "i1", 40f, 40f)
+            .setWidgetOffset(rootPath, "i1", 0f, 0f)
+        assertEquals(Placement(), placed.mainWidgets().single().placement)
+        assertEquals(
+            Placement(),
+            placed.setFlow(rootPath, null).mainWidgets().single().placement,
+            "a slot flipping to placement must not re-seed a widget that is already placed",
+        )
     }
 
     @Test
@@ -230,7 +250,7 @@ class LayoutGraphMutationsTest {
 
     @Test
     fun `setFlow to null preserves an already-placed widget`() {
-        val pre = seed(w1, w2).setPlacement(rootPath, "i1", Placement(x = 500f, y = 500f, z = 9))
+        val pre = seed(w1, w2).setWidgetOffset(rootPath, "i1", 500f, 500f).setWidgetZ(rootPath, "i1", 9)
         val out = pre.setFlow(rootPath, null)
         val placed = out.mainWidgets().associate { it.instanceId to it.placement }
         assertEquals(Placement(x = 500f, y = 500f, z = 9), placed["i1"]) // kept

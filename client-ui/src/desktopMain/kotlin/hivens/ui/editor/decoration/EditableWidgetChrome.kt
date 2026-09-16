@@ -66,6 +66,7 @@ import hivens.ui.editor.gridResizeSpan
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -79,6 +80,9 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.Placement
+import hivens.widget.model.anchorDragSignX
+import hivens.widget.model.anchorDragSignY
+import hivens.widget.model.parseAnchor
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
@@ -89,11 +93,12 @@ import java.awt.Cursor
 // gear (hover -- opens props + the universal backing controls), a resize
 // handle, faint border outline, and a drop indicator.
 //
-// Phase G: the chrome follows the slot's orientation. In a Column slot it
-// wraps in a Column with horizontal drop bars above/below; in a Row slot
-// it wraps in a Row with vertical drop bars left/right. The hover buttons
-// live in a Box-scoped inner section so they use plain BoxScope `.align`
-// regardless of the outer Row/Column.
+// The chrome follows the slot's mode. In a vertical flow it wraps in a Column
+// with horizontal drop bars above and below; in an unwrapped horizontal flow, a
+// Row with vertical bars; in a placement slot, neither, because an insertion
+// index means nothing where position is stored rather than derived. The hover
+// affordances live in a Box-scoped inner section so they use plain BoxScope
+// `.align` whatever the outer wrapper turned out to be.
 //
 // The whole wrapper is also a drop-target bounds-reporter for its own
 // rect -- the registry uses this to compute insertion-index hit-tests
@@ -123,7 +128,8 @@ fun EditableWidgetChrome(
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
         ?.instance?.instanceId == instance.instanceId
 
-    val isRow = flow?.horizontal == true
+    val isRow = flow?.rowLike == true
+    val resizable = flow?.uniformGrid != true
     // A placement slot is one the flow is absent from. Whether it measures in
     // cells or in dp is the lattice geometry's answer, published by the renderer
     // and null when the slot is free.
@@ -295,7 +301,16 @@ fun EditableWidgetChrome(
                                 // The lattice branch goes first, because a lattice
                                 // slot is also a placement slot and the finer answer
                                 // has to win.
+                                // Which way a drag moves the number depends on the
+                                // corner it is measured from: an offset anchored to
+                                // the end edge is an inset, so pulling away from that
+                                // edge has to make it larger, not smaller. Without
+                                // this the widget walked the wrong way on every axis
+                                // whose anchor is not at the start.
                                 isPlaced && gridGeo.value != null -> {
+                                    val a = livePlacement.value?.anchor ?: Placement.TOP_START
+                                    val signX = anchorDragSignX(a)
+                                    val signY = anchorDragSignY(a)
                                     // Lattice move: follow the pointer live, then commit
                                     // to a cell on release. Nobody else moves: a target
                                     // that collides snaps to the nearest free cell.
@@ -309,7 +324,7 @@ fun EditableWidgetChrome(
                                     gridGeo.value?.let { geo ->
                                         val (col, row) = gridDragCell(
                                             start.x.toInt(), start.y.toInt(),
-                                            acc.x, acc.y, density,
+                                            acc.x * signX, acc.y * signY, density,
                                             geo.cellDp, geo.gutterDp, geo.columns,
                                         )
                                         editController.moveWidgetInGrid(path, instance.instanceId, col, row, geo.columns)
@@ -317,6 +332,9 @@ fun EditableWidgetChrome(
                                     latticeDrag = Offset.Zero
                                 }
                                 isPlaced -> {
+                                    val a = livePlacement.value?.anchor ?: Placement.TOP_START
+                                    val signX = anchorDragSignX(a)
+                                    val signY = anchorDragSignY(a)
                                     // Free move: apply each frame's delta to the
                                     // current (already-clamped) position and re-seat,
                                     // so dragging past an edge and back responds at
@@ -330,7 +348,7 @@ fun EditableWidgetChrome(
                                         val wb = widgetWindowBounds
                                         val (nx, ny) = canvasDragOffset(
                                             curX, curY,
-                                            change.positionChange().x, change.positionChange().y,
+                                            change.positionChange().x * signX, change.positionChange().y * signY,
                                             density,
                                             slotWDp   = slot.width,
                                             slotHDp   = slot.height,
@@ -378,13 +396,15 @@ fun EditableWidgetChrome(
                     },
             )
 
-            // SE resize handle (hover-only) -> setWidgetSize. Works on any slot:
-            // on a Canvas slot it sizes the free-placed widget; in a flow slot
-            // SlotRenderer applies the size. Seizes the measured px as the
-            // baseline when the placement size is 0 (intrinsic) so the first
-            // drag does not jump from nothing.
+            // SE resize handle (hover-only). In a placement slot it sizes the widget,
+            // in dp or in whole cells depending on what the slot measures in; in an
+            // unwrapped flow SlotRenderer applies the size as an upper bound. It is
+            // absent from a uniform wrapped flow, which sizes its own cells and would
+            // take the number without ever reading it. Seizes the measured px as the
+            // baseline when the stored size is 0 (intrinsic) so the first drag does
+            // not jump from nothing.
             AnimatedVisibility(
-                visible  = isHovered,
+                visible  = isHovered && resizable,
                 enter    = fadeIn(tween(chromeMotionMs)),
                 exit     = fadeOut(tween(chromeMotionMs)),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
@@ -506,8 +526,9 @@ fun EditableWidgetChrome(
 }
 
 // The widget's right-click context menu body (replaces the old hover affordance
-// buttons): configure, z-order on a Canvas, and remove / force-remove. Reads the
-// graph live for the z bounds; each item closes the menu.
+// buttons): configure, then in a placement slot the corner it hangs from and its
+// layer, then remove or force-remove. Reads the graph live for the z bounds and
+// for the current anchor; each item closes the menu.
 @Composable
 private fun WidgetContextMenuContent(
     isPlaced: Boolean,
@@ -524,6 +545,24 @@ private fun WidgetContextMenuContent(
     val graph = LocalLayoutGraph.current
     NxMenuItem(s.editorConfigure) { onConfigure() }
     if (isPlaced) {
+        // The corner an offset is measured from. It is the whole reason a widget
+        // parked at the bottom right survives a window that grows, and until now
+        // the only way to set it was to edit the layout file by hand.
+        val current = parseAnchor(
+            graph.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.placement?.anchor
+                ?: Placement.TOP_START,
+        )
+        Text(
+            text     = s.editorAnchorTitle,
+            style    = MaterialTheme.typography.labelSmall,
+            color    = NxTheme.colors.textSecondary,
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 2.dp),
+        )
+        Placement.ANCHORS.forEach { anchor ->
+            NxMenuItem(anchorLabel(anchor, s), selected = anchor == current) {
+                editController.setWidgetAnchor(path, instanceId, anchor); onClose()
+            }
+        }
         NxMenuItem(s.editorToFront) {
             val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.placement?.z ?: 0 } ?: 0
             editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()
@@ -535,6 +574,18 @@ private fun WidgetContextMenuContent(
     }
     if (removable) NxMenuItem(s.editorDelete) { onRemove() }
     else NxMenuItem(s.editorForceRemove) { onForceRemove() }
+}
+
+private fun anchorLabel(anchor: String, s: AppStrings): String = when (anchor) {
+    Placement.TOP_START -> s.editorAnchorTopStart
+    Placement.TOP_CENTER -> s.editorAnchorTopCenter
+    Placement.TOP_END -> s.editorAnchorTopEnd
+    Placement.CENTER_START -> s.editorAnchorCenterStart
+    Placement.CENTER -> s.editorAnchorCenter
+    Placement.CENTER_END -> s.editorAnchorCenterEnd
+    Placement.BOTTOM_START -> s.editorAnchorBottomStart
+    Placement.BOTTOM_CENTER -> s.editorAnchorBottomCenter
+    else -> s.editorAnchorBottomEnd
 }
 
 // Drop insertion bar. Horizontal (full width, 2dp tall) for a Column

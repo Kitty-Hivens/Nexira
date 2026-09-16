@@ -36,6 +36,23 @@ data class FlowSpec(
 ) {
     val horizontal: Boolean get() = direction.trim().lowercase() == HORIZONTAL
 
+    /**
+     * A single horizontal line, which is the only flow that lays out like a row.
+     *
+     * A wrapped flow is horizontal too, and treating the two the same is what
+     * made the editor give every cell of a grid the height of the whole slot,
+     * leaving the second line and everything after it with none. Named here
+     * rather than spelled inline at the call site, because getting it wrong was
+     * invisible until something was drawn.
+     */
+    val rowLike: Boolean get() = horizontal && wrap == 0
+
+    /**
+     * Equal cells the flow sizes itself, so a size stored on a child reaches
+     * nothing. What the editor asks before offering a resize handle.
+     */
+    val uniformGrid: Boolean get() = wrap > 0 && uniform
+
     companion object {
         const val VERTICAL = "vertical"
         const val HORIZONTAL = "horizontal"
@@ -109,9 +126,6 @@ data class Placement(
             CENTER_START, CENTER, CENTER_END,
             BOTTOM_START, BOTTOM_CENTER, BOTTOM_END,
         )
-
-        /** The default, which is also what an unrecognised value reads as. */
-        val NONE = Placement()
     }
 }
 
@@ -134,19 +148,20 @@ fun anchorHorizontalBias(anchor: String): Float = when (parseAnchor(anchor)) {
     else -> 1f
 }
 
+/**
+ * Which way a drag has to move the stored offset for this anchor, per axis.
+ *
+ * An offset measured from an end edge is an inset, so pulling away from that edge
+ * makes it larger. The renderer applies the same rule when it draws, from the same
+ * bias, and the two have to agree or a widget walks backwards under the pointer.
+ */
+fun anchorDragSignX(anchor: String): Float = if (anchorHorizontalBias(anchor) > 0.5f) -1f else 1f
+
+fun anchorDragSignY(anchor: String): Float = if (anchorVerticalBias(anchor) > 0.5f) -1f else 1f
+
 /** Vertical share of [parseAnchor]: 0 at the top, 0.5 centred, 1 at the bottom. */
 fun anchorVerticalBias(anchor: String): Float = when (parseAnchor(anchor)) {
     Placement.TOP_START, Placement.TOP_CENTER, Placement.TOP_END -> 0f
     Placement.CENTER_START, Placement.CENTER, Placement.CENTER_END -> 0.5f
     else -> 1f
 }
-
-/**
- * Quantises [value] to whole units when the slot declares a grid.
- *
- * A grid of 0 is free placement and returns the value untouched, so one call
- * site covers both modes and no caller has to branch on the mode to write a
- * position down.
- */
-fun snapToGrid(value: Float, grid: Int): Float =
-    if (grid <= 0) value else kotlin.math.round(value)

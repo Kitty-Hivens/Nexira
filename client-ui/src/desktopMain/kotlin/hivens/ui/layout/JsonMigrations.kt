@@ -5,10 +5,10 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import hivens.widget.model.GRID_MAX
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -69,6 +69,7 @@ internal object JsonMigrations {
     private fun collapseOrientationsIntoPlacement(graph: JsonObject): JsonObject {
         val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
         return buildJsonObject {
+            graph.forEach { (key, value) -> if (key != "surfaces") put(key, value) }
             put("surfaces", JsonObject(surfaces.mapValues { (_, layout) -> migrateSurface(layout) }))
         }
     }
@@ -77,6 +78,7 @@ internal object JsonMigrations {
         val obj = layout.asObjectOrNull() ?: return layout
         val slots = obj["slots"]?.asObjectOrNull() ?: return layout
         return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "slots") put(key, value) }
             put("slots", JsonObject(slots.mapValues { (_, slot) -> migrateSlot(slot) }))
         }
     }
@@ -84,12 +86,27 @@ internal object JsonMigrations {
     private fun migrateSlot(slot: JsonElement): JsonElement {
         val obj = slot.asObjectOrNull() ?: return slot
         val orientation = obj["orientation"]?.asStringOrNull()?.trim().orEmpty()
-        val columns = obj["gridColumns"]?.jsonPrimitive?.intOrNull ?: LEGACY_DEFAULT_COLUMNS
+        // Clamped exactly where the old renderer clamped it. It read the column
+        // count as coerceAtLeast(1), so a zero or a negative in a hand-edited file
+        // drew a one-column grid; carrying the raw number across would turn that
+        // into a free slot measuring in dp, and a cell address of (3, 2) would be
+        // read as three dp by two.
+        val columns = obj.int("gridColumns", LEGACY_DEFAULT_COLUMNS).coerceIn(1, GRID_MAX)
 
-        val widgets = obj["widgets"]?.asArrayOrNull().orEmpty()
+        // A slot whose widgets are not a list is not a slot. Emptying it here would
+        // hand the user a blank pane with no word said, where before the decoder
+        // threw and the repository fell back to the bundled default with a line in
+        // the log. The throw is the honest answer and the caller already catches it.
+        val widgets = obj["widgets"]?.let {
+            it.asArrayOrNull() ?: throw IllegalArgumentException("a slot's widgets must be a list, got ${it::class.simpleName}")
+        } ?: JsonArray(emptyList())
         val migrated = widgets.map { migrateWidget(it, orientation) }
 
         return buildJsonObject {
+            // Anything this step does not own is carried across at every level, not
+            // only on the widget: the step rewrites a shape and does not get to
+            // decide what else a newer build put beside it.
+            obj.forEach { (key, value) -> if (key !in RETIRED_SLOT_KEYS) put(key, value) }
             put("widgets", JsonArray(migrated))
             when (orientation) {
                 "Canvas" -> {
@@ -138,7 +155,7 @@ internal object JsonMigrations {
     }
 
     private fun placementFor(widget: JsonObject, slotOrientation: String): JsonObject? {
-        val weight = widget["weight"]?.jsonPrimitive?.floatOrNull ?: 0f
+        val weight = widget.float("weight")
         val canvas = widget["canvas"]?.asObjectOrNull()
         val cell = widget["cell"]?.asObjectOrNull()
 
@@ -196,6 +213,9 @@ internal object JsonMigrations {
     /** What the old shape kept per widget and the new one folds into `placement`. */
     private val RETIRED_WIDGET_KEYS = setOf("weight", "canvas", "cell", "children")
 
+    /** What the old shape kept per slot and the new one says as a flow and a unit. */
+    private val RETIRED_SLOT_KEYS = setOf("orientation", "gridColumns", "widgets")
+
     /** The old default column count, which a file written before the key existed implies. */
     private const val LEGACY_DEFAULT_COLUMNS = 2
 
@@ -208,9 +228,12 @@ internal object JsonMigrations {
     private fun JsonElement.asStringOrNull(): String? =
         (this as? JsonPrimitive)?.takeIf { it.isString }?.content
 
+    // A number somewhere a number was expected, or the fallback. Guarded against a
+    // nested object rather than left to throw: the accessor beside these already
+    // forgives a wrong shape, and one field of one widget must not take a file down.
     private fun JsonObject.float(key: String, fallback: Float = 0f): Float =
-        this[key]?.jsonPrimitive?.floatOrNull ?: fallback
+        (this[key] as? JsonPrimitive)?.floatOrNull ?: fallback
 
     private fun JsonObject.int(key: String, fallback: Int = 0): Int =
-        this[key]?.jsonPrimitive?.intOrNull ?: fallback
+        (this[key] as? JsonPrimitive)?.intOrNull ?: fallback
 }

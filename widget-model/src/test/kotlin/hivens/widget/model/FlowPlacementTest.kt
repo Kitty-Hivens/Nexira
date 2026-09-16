@@ -66,3 +66,33 @@ class FlowPlacementTest {
         assertEquals(FlowPlacement.Natural, widget(Placement(weight = 0f)).flowPlacement())
     }
 }
+
+/**
+ * The two questions the editor asks a flow before it wraps or decorates a child.
+ *
+ * Both were inline booleans at the call site once, and the first of them was
+ * wrong in a way nothing could see until a grid was drawn in edit mode: every
+ * cell took the height of the whole slot and the lines after the first got none.
+ */
+class FlowShapeTest {
+
+    @Test
+    fun `only an unwrapped horizontal flow lays out like a row`() {
+        assertEquals(true, FlowSpec.Row.rowLike)
+        assertEquals(false, FlowSpec.Column.rowLike)
+        assertEquals(false, FlowSpec.grid(3).rowLike, "a grid is horizontal and is not a row")
+        assertEquals(false, FlowSpec(FlowSpec.VERTICAL, wrap = 3).rowLike)
+    }
+
+    @Test
+    fun `only a uniform wrapped flow sizes its own cells`() {
+        assertEquals(true, FlowSpec.grid(2).uniformGrid)
+        assertEquals(false, FlowSpec.Row.uniformGrid)
+        assertEquals(false, FlowSpec.Column.uniformGrid)
+        assertEquals(
+            false,
+            FlowSpec(FlowSpec.HORIZONTAL, wrap = 2, uniform = false).uniformGrid,
+            "a wrap that is not uniform leaves the size to the child",
+        )
+    }
+}

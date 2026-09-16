@@ -60,9 +60,10 @@ class SurfaceSpecTest {
 
     @Test
     fun `nothing on the wire is an enum`() {
-        // An enum constant renamed upstream breaks every file that named it; a string
-        // is a parser change. LenientEnumSerializer exists in this module because that
-        // lesson was already paid for once.
+        // An enum constant renamed upstream breaks every file that named it, while a
+        // string is a parser change. The module used to keep a lenient enum codec
+        // beside this claim, for the one field that broke the rule; the field is
+        // gone and so is the codec, and the claim is now the whole of it.
         val encoded = json.encodeToString(SurfaceSpec(shape = SurfaceShape(kind = "pill")))
         assertTrue(""""kind":"pill"""" in encoded, encoded)
     }

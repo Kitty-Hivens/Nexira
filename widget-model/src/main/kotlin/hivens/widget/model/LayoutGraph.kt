@@ -201,10 +201,6 @@ fun LayoutGraph.setGrid(path: SlotPath, grid: Int): LayoutGraph =
 
 // ── Placement ────────────────────────────────────────────────────────
 
-/** Replaces one widget's whole placement record. */
-fun LayoutGraph.setPlacement(path: SlotPath, instanceId: String, placement: Placement): LayoutGraph =
-    updateInstance(path, instanceId) { it.copy(placement = placement) }
-
 fun LayoutGraph.setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float): LayoutGraph =
     updatePlacement(path, instanceId) { it.copy(x = x, y = y) }
 
@@ -232,14 +228,16 @@ private fun LayoutGraph.updatePlacement(
     instanceId: String,
     edit: (Placement) -> Placement,
 ): LayoutGraph = updateInstance(path, instanceId) { widget ->
-    val next = edit(widget.placement ?: Placement())
-    // An all-default record normalises back to nothing, the same way an
-    // all-default surface does. Two things need it: setting a field to the value
-    // it already had on a widget that carries no placement has to stay a no-op,
-    // or the identity contract every transform rests on breaks; and "unplaced"
-    // has to remain expressible, because that is what a slot flipping into
-    // placement mode looks for when it decides whom to seed.
-    widget.copy(placement = next.takeUnless { it == Placement() })
+    val had = widget.placement
+    val next = edit(had ?: Placement())
+    // Nothing becomes nothing, but something never becomes nothing. Writing a
+    // field its own value on an unplaced widget has to stay a no-op, or the
+    // identity contract every transform rests on breaks. Going the other way and
+    // normalising a placed widget back to null would erase the difference between
+    // "at the origin" and "nowhere": a widget dragged to (0, 0) would read as
+    // unseeded, and the next flip, move or neighbour's drag would pick it up and
+    // put it somewhere else.
+    widget.copy(placement = if (had == null && next == Placement()) null else next)
 }
 
 // ── Seeding ──────────────────────────────────────────────────────────

@@ -460,7 +460,7 @@ fun EditorSurfaceHost(
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
             Motion.panelSlide.durationMs
         } else 0,
-        // Canvas slots report their window bounds so palette drops land at the
+        // Placement slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
         LocalSlotBoundsReporter provides if (state is EditModeState.On && !previewing) {
             { p, r -> registry.registerSlot(p, r) }

@@ -186,21 +186,29 @@ class DropTargetRegistry {
     // A placement slot has no insertion point at all: order there is paint
     // order, not position, so a drop appends and the placement decides where it
     // lands. Answering anything else would move a widget the user did not touch.
+    // No default for [flow]: it decides between "insert here" and "append", and a
+    // forgotten argument would move a widget the user never touched.
     fun insertionIndexInSlot(
         path: SlotPath,
         pointInWindow: Offset,
-        flow: FlowSpec? = FlowSpec.Column,
+        flow: FlowSpec?,
     ): Int {
         val items = widgets[path]?.values?.sortedBy { it.index } ?: return 0
         if (items.isEmpty()) return 0
         if (flow == null) return items.size
         if (flow.wrap > 0) {
-            // Reading order: insert before the first cell the pointer sits above
-            // (an earlier line) or, within the same line band, before its middle.
+            // Reading order along the flow's own axis: before the first cell that
+            // sits on a later line, or, within the same line, before its middle.
+            // A vertical wrap stacks its lines side by side, so the two axes swap.
+            val acrossLines = if (flow.horizontal) pointInWindow.y else pointInWindow.x
+            val alongLine = if (flow.horizontal) pointInWindow.x else pointInWindow.y
             items.forEach { wb ->
                 val r = wb.rect
-                if (pointInWindow.y < r.top) return wb.index
-                if (pointInWindow.y <= r.bottom && pointInWindow.x < r.left + r.width / 2f) return wb.index
+                val lineStart = if (flow.horizontal) r.top else r.left
+                val lineEnd = if (flow.horizontal) r.bottom else r.right
+                val middle = if (flow.horizontal) r.left + r.width / 2f else r.top + r.height / 2f
+                if (acrossLines < lineStart) return wb.index
+                if (acrossLines <= lineEnd && alongLine < middle) return wb.index
             }
             return items.size
         }

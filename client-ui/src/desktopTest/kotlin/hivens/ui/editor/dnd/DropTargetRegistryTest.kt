@@ -31,11 +31,11 @@ class DropTargetRegistryTest {
         r.registerWidget(slot, "c", index = 2, rect = rect(top = 120f))   // [120, 170]
 
         // Above midpoint of widget 0 -> index 0
-        assertEquals(0, r.insertionIndexInSlot(slot, Offset(50f, 10f)))
+        assertEquals(0, r.insertionIndexInSlot(slot, Offset(50f, 10f), FlowSpec.Column))
         // Below midpoint of widget 0, above midpoint of widget 1 -> 1
-        assertEquals(1, r.insertionIndexInSlot(slot, Offset(50f, 70f)))
+        assertEquals(1, r.insertionIndexInSlot(slot, Offset(50f, 70f), FlowSpec.Column))
         // Below all -> append at 3
-        assertEquals(3, r.insertionIndexInSlot(slot, Offset(50f, 200f)))
+        assertEquals(3, r.insertionIndexInSlot(slot, Offset(50f, 200f), FlowSpec.Column))
     }
 
     @Test
@@ -73,7 +73,7 @@ class DropTargetRegistryTest {
     @Test
     fun `insertionIndexInSlot returns zero for unknown slot`() {
         val r = DropTargetRegistry()
-        assertEquals(0, r.insertionIndexInSlot(slot, Offset(0f, 0f)))
+        assertEquals(0, r.insertionIndexInSlot(slot, Offset(0f, 0f), FlowSpec.Column))
     }
 
     @Test

@@ -71,6 +71,15 @@ class PresetRepository(
         if (!Files.exists(path)) return null
         return try {
             val envelope = json.decodeFromString<PresetEnvelope>(Files.readString(path))
+            if (envelope.schemaVersion > LayoutReconcile.CURRENT_SCHEMA) {
+                log.warn(
+                    "Preset '{}' is schema_version {} > supported {} -- written by a newer build. " +
+                        "Not applying it: what this build cannot name would be dropped on decode and " +
+                        "then written back as current.",
+                    name, envelope.schemaVersion, LayoutReconcile.CURRENT_SCHEMA,
+                )
+                return null
+            }
             if (envelope.schemaVersion < LayoutReconcile.SURFACE_SCHEMA) {
                 log.warn(
                     "Preset '{}' is schema_version {} and describes widget surfaces in a form " +

@@ -11,23 +11,30 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.FlowSpec
+import hivens.widget.model.GRID_MAX
 import hivens.widget.model.Placement
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
@@ -283,36 +290,49 @@ private fun PlacementSlot(
     modifier: Modifier,
     spacing: Dp,
 ) {
+    val density = LocalDensity.current
     val reportSlotBounds = LocalSlotBoundsReporter.current
-    val columns = content.grid
+    val columns = content.grid.coerceIn(0, GRID_MAX)
 
-    // BoxWithConstraints rather than a size read back through state. A lattice
-    // turns a cell address into dp against the measured width, and a width that
-    // only arrives after the first layout means the first frame draws every
-    // widget at the origin at full size: the cell is zero, the stride is zero,
-    // and a span of zero is "take your own size". In the running app that is one
-    // wrong frame; anywhere a single frame is the whole answer, it is the answer.
+    // Two measurements, for two jobs, and they are not the same number.
+    //
+    // The cell comes from the constraints, during composition. A lattice turns a
+    // cell address into dp against the width, and a width that only arrives after
+    // the first layout means the first frame draws every widget at the origin at
+    // full size. In the running app that is one wrong frame; anywhere a single
+    // frame is the whole answer, it is the answer.
+    //
+    // The clamp that keeps a dragged widget reachable needs the size the slot
+    // actually took, which is not the constraint's maximum in a slot that wraps
+    // its content, and which is infinite on an unbounded axis. It is allowed to
+    // arrive a frame late, because nobody is dragging on the frame a slot first
+    // appears, and publishing a zero would switch the clamp off entirely.
+    var measuredDp by remember { mutableStateOf(Size.Zero) }
     BoxWithConstraints(
         slotChrome(path, content)
             .then(modifier)
+            .onSizeChanged { sz ->
+                measuredDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
+            }
             .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
     ) {
-        val slotSizeDp = Size(
-            maxWidth.value.takeIf { it.isFinite() } ?: 0f,
-            maxHeight.value.takeIf { it.isFinite() } ?: 0f,
-        )
-        // One cell, gutters taken off first. Zero outside a lattice, and zero in
-        // a slot with no bounded width, where a fraction of the width means
-        // nothing to divide.
-        val cell: Float = if (columns > 0 && slotSizeDp.width > 0f) {
-            ((slotSizeDp.width - spacing.value * (columns + 1)) / columns).coerceAtLeast(0f)
+        val boundedWidth = maxWidth.value.takeIf { it.isFinite() } ?: 0f
+        // One cell, gutters taken off first. Zero outside a lattice, and zero in a
+        // slot with no bounded width, where a fraction of the width has nothing to
+        // be a fraction of.
+        val cell: Float = if (columns > 0 && boundedWidth > 0f) {
+            ((boundedWidth - spacing.value * (columns + 1)) / columns).coerceAtLeast(0f)
         } else {
             0f
         }
 
         CompositionLocalProvider(
-            LocalPlacementSlotSizeDp provides slotSizeDp,
-            LocalGridGeometry provides if (columns > 0) GridGeometry(cell, spacing.value, columns) else null,
+            LocalPlacementSlotSizeDp provides measuredDp,
+            // Published only when there is a cell to convert against. A geometry
+            // carrying a zero cell reads as a lattice to the editor and then
+            // answers every pointer delta with "no movement", which is a gesture
+            // that is present and does nothing.
+            LocalGridGeometry provides if (columns > 0 && cell > 0f) GridGeometry(cell, spacing.value, columns) else null,
         ) {
             content.widgets.withIndex()
                 .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
@@ -348,10 +368,23 @@ private fun BoxScope.PlacedBox(
 ) {
     val lattice = columns > 0
     val stride = cell + gutter
-    val offX = if (lattice) gutter + placement.x * stride else placement.x
-    val offY = if (lattice) gutter + placement.y * stride else placement.y
-    val width = if (lattice) spanDp(placement.width, stride, gutter) else placement.width
-    val height = if (lattice) spanDp(placement.height, stride, gutter) else placement.height
+
+    // A lattice clamps what it is given, the way the cube grid it replaces did.
+    // Nothing keeps a stored position inside a lattice that has since been made
+    // narrower: the count is a number in a menu, and reducing it used to leave a
+    // widget parked at a column that no longer exists, drawn past the slot, out
+    // of the window and out of reach, with no way back but to raise the count
+    // again. The record is left alone and the drawing is clamped, so lowering the
+    // count is reversible.
+    val spanW = if (lattice) placement.width.coerceIn(1f, columns.toFloat()) else placement.width
+    val spanH = if (lattice) placement.height.coerceAtLeast(1f) else placement.height
+    val col = if (lattice) placement.x.coerceIn(0f, (columns - spanW).coerceAtLeast(0f)) else placement.x
+    val row = if (lattice) placement.y.coerceAtLeast(0f) else placement.y
+
+    val offX = if (lattice) gutter + col * stride else col
+    val offY = if (lattice) gutter + row * stride else row
+    val width = if (lattice) spanW * stride - gutter else placement.width
+    val height = if (lattice) spanH * stride - gutter else placement.height
 
     val anchor = parseAnchor(placement.anchor)
     val hBias = anchorHorizontalBias(anchor)
@@ -359,15 +392,14 @@ private fun BoxScope.PlacedBox(
     val dx = if (hBias > 0.5f) -offX else offX
     val dy = if (vBias > 0.5f) -offY else offY
 
-    val sizeMod = if (width > 0f && height > 0f) Modifier.size(width.dp, height.dp) else Modifier
+    // Each axis on its own: a widget that names a width and not a height is as
+    // expressible as one that names both, and requiring the pair silently threw
+    // the one away.
+    var sizeMod: Modifier = Modifier
+    if (width > 0f) sizeMod = sizeMod.width(width.dp)
+    if (height > 0f) sizeMod = sizeMod.height(height.dp)
     Box(Modifier.align(alignmentFor(anchor)).offset(dx.dp, dy.dp).then(sizeMod)) { content() }
 }
-
-// A span of N cells covers N cells and the N-1 gutters between them. A span of
-// 0 means the widget's own size, which a lattice still allows: a strip that
-// wants to be as wide as its text does not stop being placeable.
-private fun spanDp(span: Float, stride: Float, gutter: Float): Float =
-    if (span <= 0f) 0f else span * stride - gutter
 
 private fun alignmentFor(anchor: String): Alignment = when (anchor) {
     Placement.TOP_START -> Alignment.TopStart

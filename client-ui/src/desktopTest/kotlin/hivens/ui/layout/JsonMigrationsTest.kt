@@ -4,11 +4,16 @@ import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
+import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -193,29 +198,158 @@ class JsonMigrationsTest {
 
     // ── The real file ─────────────────────────────────────────────────
 
-    @Test
-    fun `the bundled default as it shipped at schema 8 migrates into the one that ships now`() {
-        // The strongest check available: the previous release's actual resource,
-        // carried through this step, has to come out as the file the build now
-        // carries. It is the difference between a migration that parses and a
-        // migration that means the same thing.
-        val old = javaClass.getResourceAsStream("/layout/default-layout-schema8.json")!!
-            .bufferedReader(Charsets.UTF_8).use { it.readText() }
-        val envelope = json.parseToJsonElement(old).jsonObject
-        val migrated = JsonMigrations.apply(8, envelope["graph"]!!.jsonObject)
-        val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), migrated)
+    /** The previous release's resource, exactly as it shipped. */
+    private fun shippedAtSchema8(): JsonObject =
+        json.parseToJsonElement(
+            javaClass.getResourceAsStream("/layout/default-layout-schema8.json")!!
+                .bufferedReader(Charsets.UTF_8).use { it.readText() },
+        ).jsonObject
 
-        assertEquals(DefaultLayout.load(), decoded, "the shipped bundle and the migrated one must be the same graph")
+    private fun migratedBundle(): LayoutGraph =
+        json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(8, shippedAtSchema8()["graph"]!!.jsonObject),
+        )
+
+    @Test
+    fun `the migrated bundle and the one that ships are the same graph`() {
+        // What this proves and what it does not. The resource the build carries was
+        // rewritten into the new shape by a separate pass, so this says the two
+        // agree, not that either is right: a mistake made in both would pass here
+        // unnoticed. It earns its place by catching the other thing, a bundle
+        // hand-edited out of step with the step that is supposed to produce it.
+        // Correctness is the test below, which derives what it expects from the old
+        // file itself.
+        assertEquals(DefaultLayout.load(), migratedBundle(), "the shipped bundle drifted from what the step produces")
     }
 
     @Test
-    fun `the two rows in the shipped bundle survive as horizontal flows`() {
-        // Named because it is the case a decode-side migration would have lost in
-        // silence, and the only two of twenty-three slots where it would show.
-        val bundle = DefaultLayout.load()
-        val horizontal = bundle.surfaces.values
-            .flatMap { it.slots.values }
-            .count { it.flow?.horizontal == true }
-        assertEquals(2, horizontal)
+    fun `every surface, slot, widget and id in the old bundle survives`() {
+        assertSurvives(shippedAtSchema8(), 8)
+    }
+
+    @Test
+    fun `a file carrying every old shape survives all of them`() {
+        // The bundle exercises three of the five: twenty slots leaning on the
+        // field's own default, one Column and two Rows, no gridColumns, no canvas,
+        // no cell, no nesting. Every branch that is actually the substance of this
+        // step is untouched by it, so the same invariants run over a file that has
+        // one of each, including two a hand edit can produce.
+        assertSurvives(fixture("legacy-sampler-schema9.json"), 9)
+    }
+
+    @Test
+    fun `a hand-edited column count of zero lands where the old renderer put it`() {
+        val migrated = json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(9, fixture("legacy-sampler-schema9.json")["graph"]!!.jsonObject),
+        )
+        val slots = migrated.surfaces[SurfaceId("sampler")]!!.slots
+
+        // The old renderer read the count as coerceAtLeast(1), so a zero drew a
+        // one-column grid. Carried across raw it would have become a flow that
+        // never wraps, which is a row.
+        val gridZero = slots[SlotId("gridZero")]!!
+        assertEquals(1, gridZero.flow?.wrap, "a grid of zero columns is a grid of one")
+        assertEquals(true, gridZero.flow?.uniform)
+
+        // And on the lattice side a zero would have meant free placement in dp, so
+        // a cell address of (3, 2) would have been read as three dp by two.
+        val cubeZero = slots[SlotId("cubeZero")]!!
+        assertNull(cubeZero.flow)
+        assertEquals(1, cubeZero.grid, "a lattice of zero columns is a lattice of one")
+        assertEquals(3f, cubeZero.widgets.single().placement?.x, "the cell address is still cells")
+    }
+
+    @Test
+    fun `a nested container's canvas child keeps its placement`() {
+        val migrated = json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(9, fixture("legacy-sampler-schema9.json")["graph"]!!.jsonObject),
+        )
+        val body = migrated.surfaces[SurfaceId("sampler")]!!.slots[SlotId("nested")]!!
+            .widgets.single().children[SlotId("body")]!!
+        assertNull(body.flow, "the nested canvas came back a flow")
+        val p = assertNotNull(body.widgets.single().placement)
+        assertEquals(5f, p.x)
+        assertEquals(70f, p.width)
+        assertEquals(3, p.z)
+    }
+
+    private fun fixture(name: String): JsonObject =
+        json.parseToJsonElement(
+            javaClass.getResourceAsStream("/layout/$name")!!
+                .bufferedReader(Charsets.UTF_8).use { it.readText() },
+        ).jsonObject
+
+    /**
+     * Nothing named in [envelope] is lost, and every mode comes out as its
+     * successor. Expectations are counted off the old bytes at run time, so
+     * nothing here can agree with a mistake made on the other side.
+     *
+     * Both walks recurse into containers. They did not, and the two sides only
+     * matched because the bundle has no container in it: the first one to arrive
+     * would have failed this for a reason that was never about the migration.
+     */
+    private fun assertSurvives(envelope: JsonObject, from: Int) {
+        val oldSurfaces = envelope["graph"]!!.jsonObject["surfaces"]!!.jsonObject
+        val migrated = json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(from, envelope["graph"]!!.jsonObject),
+        )
+
+        assertEquals(oldSurfaces.keys, migrated.surfaces.keys.map { it.value }.toSet(), "a surface went missing")
+
+        val oldIds = mutableListOf<String>()
+        val oldWeights = mutableMapOf<String, Float>()
+        var oldHorizontal = 0
+        var oldPlacement = 0
+
+        fun walkOld(slot: JsonObject) {
+            when (slot["orientation"]?.jsonPrimitive?.contentOrNull) {
+                "Row", "Grid" -> oldHorizontal++
+                "Canvas", "CubeGrid" -> oldPlacement++
+            }
+            slot["widgets"]?.jsonArray?.forEach { w ->
+                val obj = w.jsonObject
+                val id = obj["instance_id"]!!.jsonPrimitive.content
+                oldIds += id
+                obj["weight"]?.jsonPrimitive?.floatOrNull?.takeIf { it > 0f }?.let { oldWeights[id] = it }
+                obj["children"]?.jsonObject?.values?.forEach { walkOld(it.jsonObject) }
+            }
+        }
+        oldSurfaces.values.forEach { layout ->
+            layout.jsonObject["slots"]!!.jsonObject.values.forEach { walkOld(it.jsonObject) }
+        }
+
+        val newIds = mutableListOf<String>()
+        val newWeights = mutableMapOf<String, Float>()
+        var newHorizontal = 0
+        var newPlacement = 0
+
+        fun walkNew(slot: SlotContent) {
+            when {
+                slot.flow == null -> newPlacement++
+                slot.flow?.horizontal == true -> newHorizontal++
+            }
+            slot.widgets.forEach { w ->
+                newIds += w.instanceId
+                w.placement?.weight?.takeIf { it > 0f }?.let { newWeights[w.instanceId] = it }
+                w.children.values.forEach { walkNew(it) }
+            }
+        }
+        migrated.surfaces.values.forEach { layout -> layout.slots.values.forEach { walkNew(it) } }
+
+        oldSurfaces.forEach { (surfaceId, layout) ->
+            assertEquals(
+                layout.jsonObject["slots"]!!.jsonObject.keys,
+                migrated.surfaces[SurfaceId(surfaceId)]!!.slots.keys.map { it.value }.toSet(),
+                "a slot went missing from $surfaceId",
+            )
+        }
+        assertEquals(oldIds.sorted(), newIds.sorted(), "a widget went missing or was duplicated")
+        assertEquals(oldHorizontal, newHorizontal, "a row or a grid did not stay horizontal")
+        assertEquals(oldPlacement, newPlacement, "a canvas or a lattice changed mode")
+        assertEquals(oldWeights, newWeights, "a weight was lost, gained or moved to another widget")
     }
 }
