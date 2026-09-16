@@ -1,8 +1,12 @@
 package hivens.ui.widgets.sample.players
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -26,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -123,6 +128,9 @@ fun RecordPlayerWidget(instance: WidgetInstance) {
     val openTracks = rememberAudioFilesPicker(scope) { player.open(it) }
     val waveform = rememberWaveform(state.file)
 
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+
     RecordPlayerCard(
         state       = state,
         track       = track,
@@ -140,6 +148,8 @@ fun RecordPlayerWidget(instance: WidgetInstance) {
         onSkipNext  = { player.skipToNext() },
         onSkipPrev  = { player.skipToPrevious() },
         onSeek      = { player.seek(it) },
+        chrome      = hovered,
+        modifier    = Modifier.hoverable(hover),
     )
 }
 
@@ -162,6 +172,7 @@ internal fun RecordPlayerCard(
     onSkipNext: () -> Unit,
     onSkipPrev: () -> Unit,
     onSeek: (Long) -> Unit = {},
+    chrome: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -169,6 +180,17 @@ internal fun RecordPlayerCard(
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     var menuOpen by remember { mutableStateOf(false) }
+
+    // The disc is the object and the controls are what a pointer asks for. Left
+    // standing, the transport sits on the artwork the whole time and the shape
+    // stops being a record and becomes a button with a picture behind it. Held up
+    // while the menu is open so a click into the panel does not take it away on
+    // the way there, and always up with nothing loaded, where it is the only thing
+    // saying the widget does anything at all.
+    val reveal by animateFloatAsState(
+        targetValue = if (chrome || menuOpen || idle) 1f else 0f,
+        label = "record-chrome",
+    )
 
     val name = playerTitle(state, track, s)
     val artist = track?.artist
@@ -210,6 +232,7 @@ internal fun RecordPlayerCard(
                         Modifier
                             .size(side * BUTTON_SHARE)
                             .clip(CircleShape)
+                            .alpha(reveal)
                             .background(Color.Black.copy(alpha = TRANSPORT_SCRIM)),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -227,7 +250,7 @@ internal fun RecordPlayerCard(
                 }
             }
 
-            Box(Modifier.align(Alignment.TopEnd)) {
+            Box(Modifier.align(Alignment.TopEnd).alpha(reveal)) {
                 NxIconButton(
                     icon               = NxIcon.MoreVert,
                     contentDescription = s.packCardMore,
