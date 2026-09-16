@@ -103,11 +103,34 @@ class WindowMaximizer(private val state: WindowState) {
         window = null
     }
 
+    /**
+     * Recomputes the flag, and says what it decided from.
+     *
+     * The numbers go in the line because this flag is the only timestamped signal
+     * the launcher produces when the window's geometry moves under it, and it used
+     * to record the conclusion and throw the evidence away. A tear across the lower
+     * part of the window after a resume left exactly one line in the log saying the
+     * window had stopped being maximized, with nothing to say whether the frame had
+     * really shrunk, whether the work area had grown, or whether the two had simply
+     * stopped agreeing. The full dump beside this carries all of it and is behind a
+     * debug property, which is the wrong side of the fence for something that
+     * happens on a laptop lid and not on demand.
+     *
+     * It costs a line per change, and a change is rare: a handful in an hour of
+     * ordinary use, since it only fires when the answer actually moves.
+     */
     private fun refresh(w: ComposeWindow) {
         val now = isMax(w.extendedState) || fillsWorkArea(w)
         if (now != maximized) {
             maximized = now
-            log.info("window state <- WM reports maximized={}", maximized)
+            val b = w.bounds
+            val wa = screenWorkArea(w.graphicsConfiguration)
+            log.info(
+                "window state <- WM reports maximized={} (ext={} bounds={}x{} at {},{} work={}x{} at {},{})",
+                maximized, decode(w.extendedState),
+                b.width, b.height, b.x, b.y,
+                wa.width, wa.height, wa.x, wa.y,
+            )
         }
     }
 
