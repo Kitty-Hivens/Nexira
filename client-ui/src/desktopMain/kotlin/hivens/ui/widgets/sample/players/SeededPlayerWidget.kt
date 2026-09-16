@@ -184,7 +184,14 @@ internal fun SeededPlayerCard(
         // Measured before it is composed, for the same reason the cover player is:
         // a widget's width is the slot's call and not the designer's, and a row of
         // fixed measurements holds at the width it was drawn at and breaks below it.
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // With nothing loaded the whole plane opens the picker. The cover square
+        // was the only way in, and the ladder drops it first, so a narrow empty
+        // player answered nowhere but the overflow.
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .then(if (state is PlaybackState.Idle) Modifier.clickable(onClick = onPick) else Modifier),
+        ) {
             val art = maxWidth >= 240.dp
             val album = showAlbum && maxWidth >= 300.dp
             val skips = queueSize > 1 && maxWidth >= 260.dp

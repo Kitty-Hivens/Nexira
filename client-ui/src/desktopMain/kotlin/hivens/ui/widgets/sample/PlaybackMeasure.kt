@@ -21,23 +21,20 @@ internal fun progressFraction(state: PlaybackState): Float = when (state) {
 private fun safeFraction(position: Long, duration: Long): Float =
     if (duration <= 0L) 0f else (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
 
-/** "1:04 / 3:58", or empty while the duration is unknown. */
-internal fun timelineLabel(state: PlaybackState): String {
-    val (pos, dur) = when (state) {
-        is PlaybackState.Playing -> state.positionMs to state.durationMs
-        is PlaybackState.Paused  -> state.positionMs to state.durationMs
-        is PlaybackState.Ready   -> 0L to state.durationMs
-        else                     -> return ""
-    }
-    if (dur <= 0L) return ""
-    return "${formatMs(pos)} / ${formatMs(dur)}"
-}
-
-/** Where the track is now, or empty when nothing is loaded. */
+/**
+ * Where the track is now, or empty when nothing is loaded.
+ *
+ * Ready carries a real position like the other two and is read like them. It used
+ * to be answered with a hard zero, on the assumption that a loaded-but-unplayed
+ * track is always at its start, and that is not true: a track opened and scrubbed
+ * before anybody pressed play is Ready somewhere in the middle, as is one scrubbed
+ * into after it finished. The clock printed 0:00 while the bar beside it, which
+ * reads the same field through [progressFraction], sat where the scrub had put it.
+ */
 internal fun elapsedLabel(state: PlaybackState): String = when (state) {
     is PlaybackState.Playing -> formatMs(state.positionMs)
     is PlaybackState.Paused  -> formatMs(state.positionMs)
-    is PlaybackState.Ready   -> formatMs(0L)
+    is PlaybackState.Ready   -> formatMs(state.positionMs)
     else                     -> ""
 }
 

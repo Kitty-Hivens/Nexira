@@ -3,7 +3,6 @@ package hivens.ui.widgets.sample.players
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -29,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -166,7 +164,14 @@ internal fun CoverPlayerCard(
       // drawn at and breaks below it, which is issue #662 on the older card. So
       // the parts drop in order of how much they carry: the second timecode
       // first, then the first, then the art.
-      BoxWithConstraints(Modifier.fillMaxWidth()) {
+      // With nothing loaded the whole plane opens the picker. The cover square
+      // was the only way in, and it is the first thing the ladder drops, so below
+      // 240dp an empty player had no answer but the overflow.
+      BoxWithConstraints(
+          Modifier
+              .fillMaxWidth()
+              .then(if (state is PlaybackState.Idle) Modifier.clickable(onClick = onPick) else Modifier),
+      ) {
         // The ladder, with the skips IN it rather than beside it. Adding two more
         // controls to the row without moving these numbers is what clipped the
         // total timecode at 320dp: the parts still dropped in order, but each
@@ -180,8 +185,12 @@ internal fun CoverPlayerCard(
         val medium = maxWidth >= 240.dp
         val skips = queueSize > 1 && maxWidth >= 260.dp
         val skipRoom = if (skips) SKIP_ROOM else 0.dp
-        val showTotal = maxWidth >= 260.dp + skipRoom
-        val wide = maxWidth >= 340.dp + skipRoom
+        // The elapsed outlives the total, which is the way round every other kind
+        // has it and the way round the sentence above describes. It was inverted:
+        // the LENGTH of the track survived and the position in it went first, so a
+        // narrow card answered how long the track is and not where it had got to.
+        val showElapsed = maxWidth >= 260.dp + skipRoom
+        val showTotal = maxWidth >= 340.dp + skipRoom
         val coverSide = if (maxWidth >= 300.dp) 104.dp else 72.dp
         Box(Modifier.fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().padding(if (medium) 14.dp else 10.dp)) {
@@ -249,9 +258,14 @@ internal fun CoverPlayerCard(
                             Spacer(Modifier.width(2.dp))
                             SkipKey(NxIcon.SkipNext, s.audioSkipNext, loaded, onSkipNext)
                         }
-                        if (wide) {
+                        // The label decides as well as the ladder: Timecode draws
+                        // nothing for an empty string, so gating on the width alone
+                        // left a gap of pure spacer on an idle card wide enough to
+                        // have asked for a clock.
+                        val elapsed = elapsedLabel(state)
+                        if (showElapsed && elapsed.isNotEmpty()) {
                             Spacer(Modifier.width(12.dp))
-                            Timecode(elapsedLabel(state))
+                            Timecode(elapsed)
                         }
                         Spacer(Modifier.width(8.dp))
                         PlaybackScrubber(
@@ -260,9 +274,10 @@ internal fun CoverPlayerCard(
                             onSeekFraction = { onSeek((it * duration).toLong()) },
                             modifier       = Modifier.weight(1f),
                         )
-                        if (showTotal) {
+                        val total = totalLabel(state)
+                        if (showTotal && total.isNotEmpty()) {
                             Spacer(Modifier.width(8.dp))
-                            Timecode(totalLabel(state))
+                            Timecode(total)
                         }
                     }
                 }
@@ -432,7 +447,13 @@ private fun TransportKey(playing: Boolean, enabled: Boolean, onClick: () -> Unit
         Symbol(
             icon               = if (playing) NxIcon.Pause else NxIcon.PlayArrow,
             contentDescription = if (playing) s.audioPause else s.audioPlay,
-            tint               = if (enabled) Color.White else NxTheme.colors.textSecondary.copy(alpha = 0.4f),
+            // The palette's own answer for what reads on the accent, not white.
+            // The dark theme's primary is a light purple and its onPrimary is
+            // BLACK: white on it measures 2.65 to 1, under even the large-graphic
+            // floor, where the token gives 7.93. The light theme's onPrimary is
+            // white anyway, so this changes nothing there and fixes the other.
+            tint               = if (enabled) NxTheme.colors.onPrimary
+                                 else NxTheme.colors.textSecondary.copy(alpha = 0.4f),
             fill               = 1f,
             weight             = 500,
             modifier           = Modifier.size(20.dp),

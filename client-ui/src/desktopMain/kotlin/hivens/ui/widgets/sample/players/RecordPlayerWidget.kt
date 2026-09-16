@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -342,7 +343,7 @@ internal fun RecordPlayerCard(
 
 /** The disc at the middle: the artwork, or a tonal stand-in where there is none. */
 @Composable
-private fun Label(artwork: androidx.compose.ui.graphics.ImageBitmap?, side: androidx.compose.ui.unit.Dp, accent: Color) {
+private fun Label(artwork: ImageBitmap?, side: Dp, accent: Color) {
     if (artwork != null) {
         Image(
             bitmap             = artwork,

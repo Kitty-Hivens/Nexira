@@ -35,7 +35,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -45,6 +44,7 @@ import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
@@ -350,8 +350,8 @@ private fun Transport(
     state: PlaybackState,
     loaded: Boolean,
     tint: Color,
-    side: androidx.compose.ui.unit.Dp,
-    s: hivens.ui.i18n.AppStrings,
+    side: Dp,
+    s: AppStrings,
     onPlayPause: () -> Unit,
 ) = NxIconButton(
     icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
