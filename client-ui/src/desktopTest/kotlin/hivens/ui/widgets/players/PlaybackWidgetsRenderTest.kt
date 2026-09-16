@@ -122,6 +122,8 @@ class PlaybackWidgetsRenderTest {
             state       = playing(0.35f),
             track       = track,
             volume      = 0.7f,
+            queueSize   = 1,
+            onPick      = {},
             onPlayPause = {},
             onVolume    = {},
         )
@@ -162,6 +164,8 @@ class PlaybackWidgetsRenderTest {
                     state       = playing(fraction),
                     track       = track,
                     volume      = volume,
+                    queueSize   = 1,
+                    onPick      = {},
                     onPlayPause = {},
                     onVolume    = {},
                 )

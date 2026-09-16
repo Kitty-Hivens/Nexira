@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -46,6 +47,13 @@ import hivens.ui.theme.NxTheme
  * therefore owns the arithmetic; a scrubber that took milliseconds would have to
  * be told the length twice, once to draw and once to report.
  *
+ * [accent] is the colour of the played part. It defaults to the palette's accent,
+ * which is what a card wants, and exists because the mini control draws a volume
+ * track a few points away from this one: two bars of the same colour side by side
+ * are one control the reader has to work out, and the measure is the one that has
+ * to win that. On every backing it can land on, the handle's own colour still
+ * reads against it.
+ *
  * A drag that is cancelled still releases the pressed state, or the handle
  * sticks enlarged after the pointer leaves the window mid-gesture.
  *
@@ -63,6 +71,7 @@ internal fun PlaybackScrubber(
     enabled: Boolean,
     onSeekFraction: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    accent: Color = NxTheme.colors.primary,
 ) {
     val seek by rememberUpdatedState(onSeekFraction)
     val interaction = remember { MutableInteractionSource() }
@@ -125,7 +134,7 @@ internal fun PlaybackScrubber(
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
                 .background(
-                    if (enabled) NxTheme.colors.primary
+                    if (enabled) accent
                     else NxTheme.colors.textSecondary.copy(alpha = 0.35f),
                 ),
         )

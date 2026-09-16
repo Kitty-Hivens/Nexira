@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,32 +46,42 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
-import hivens.ui.audio.fileTitle
-import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.nx.NxProgressBar
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
+import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.useService
 import hivens.widget.model.InjectService
 import hivens.widget.model.Widget
+import org.koin.compose.koinInject
 
-// Mini transport for the cross-widget music service. Reads
-// MusicPlayerService from the registry; if no provider is currently
-// mounted (the user removed the player widget, or hasn't dropped
-// one yet) shows a muted disabled state instead of disappearing or
-// crashing. Demonstrates the bidirectional read+write loop end to
-// end: sliding the volume here moves it on the main player, tapping
-// pause here flips the main player's transport, both backed by the
-// same AudioPlayer Koin singleton.
+/**
+ * The transport as one strip, for a surface that wants the controls without the
+ * object.
+ *
+ * The smallest of the player kinds and the only one that prefers somebody else's
+ * playback to its own. It reads [MusicPlayerService] out of the widget service
+ * registry, which is what lets a surface carry a full player and this strip and
+ * have them be two views of one playback rather than two players arguing over a
+ * device. It is also the launcher's only consumer of that registry, so the
+ * declaration below is the one worked example of the inject side.
+ *
+ * Where no provider is mounted it drives the process player directly instead of
+ * refusing. It used to draw a sunken plane saying to add a music player, which was
+ * honest while the widget it deferred to existed and became nonsense when that
+ * widget was retired: a music player telling somebody to go and find a music
+ * player. Every provider wraps the same singleton anyway, so the two paths differ
+ * in which object is asked and in nothing a listener can hear.
+ */
 @Widget(
     id          = "home.new.playback.mini",
     displayName = "widget.home.new.playback.mini",
@@ -78,29 +90,34 @@ import hivens.widget.model.Widget
 @InjectService(MusicPlayerService::class)
 @Composable
 fun PlaybackMiniControlWidget() {
-    val service: MusicPlayerService? = useService()
-
-    if (service == null) {
-        DisabledPlaceholder()
-        return
-    }
+    val provided: MusicPlayerService? = useService()
+    val player: AudioPlayer = koinInject()
+    val service = provided ?: remember(player) { MusicPlayerServiceImpl(player) }
 
     val state by service.state.collectAsState()
     val volume by service.volume.collectAsState()
     val track by service.track.collectAsState()
+    val queue by service.queue.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    val openTracks = rememberAudioFilesPicker(scope) { service.open(it) }
 
     PlaybackMiniControl(
         state       = state,
         track       = track,
         volume      = volume,
+        queueSize   = queue.size,
+        onPick      = openTracks,
         onPlayPause = { if (state is PlaybackState.Playing) service.pause() else service.play() },
         onVolume    = { service.setVolume(it) },
+        onSkipNext  = { service.skipToNext() },
+        onSkipPrev  = { service.skipToPrevious() },
+        onSeek      = { service.seek(it) },
     )
 }
 
 /**
- * The strip itself, over plain data -- split from the widget for the same reason
- * every player card is: it can then be rendered off-screen without the service
+ * The strip itself, over plain data, so it renders off-screen without the service
  * registry, a Koin graph or an audio device.
  */
 @Composable
@@ -108,96 +125,107 @@ internal fun PlaybackMiniControl(
     state: PlaybackState,
     track: TrackInfo?,
     volume: Float,
+    queueSize: Int,
+    onPick: () -> Unit,
     onPlayPause: () -> Unit,
     onVolume: (Float) -> Unit,
+    onSkipNext: () -> Unit = {},
+    onSkipPrev: () -> Unit = {},
+    onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
+    val idle = state is PlaybackState.Idle
+    val loaded = !idle && state !is PlaybackState.Error
+    val duration = durationMsOf(state)
 
     NxSurface(NxSurfaceLevel.Floating, modifier.fillMaxWidth()) {
-        Column(
-            modifier            = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Symbol(icon = NxIcon.MusicNote,
-                    contentDescription = null,
-                    tint               = NxTheme.colors.primary,
-                    modifier           = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                // Off the file's tags, so the face is picked per string; see
-                // familyForText.
-                val shortTitle = currentTitleShort(state, track, s)
-                Text(
-                    text       = shortTitle,
-                    style      = MaterialTheme.typography.bodyMedium,
-                    color      = NxTheme.colors.textPrimary,
-                    fontWeight = FontWeight.Medium,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis,
-                    fontFamily = familyForText(shortTitle),
-                    modifier   = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(10.dp))
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // One threshold per element, none of them consulting another, which is
+            // the rule the cards pay for. Widest first: the volume track, then the
+            // skips. The name and the measure never go, because between them they
+            // are the whole widget.
+            val showVolume = maxWidth >= 300.dp
+            val showSkips = queueSize > 1 && maxWidth >= 240.dp
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .openWhenEmpty(idle, s.audioPickTrack, onPick)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Symbol(
+                        icon               = NxIcon.MusicNote,
+                        contentDescription = null,
+                        tint               = NxTheme.colors.primary,
+                        modifier           = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    // Off the file's tags, so the face is picked per string; see
+                    // familyForText.
+                    val name = playerTitle(state, track, s)
+                    Text(
+                        text       = name,
+                        style      = MaterialTheme.typography.bodyMedium,
+                        color      = NxTheme.colors.textPrimary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis,
+                        fontFamily = familyForText(name),
+                        modifier   = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(10.dp))
 
-                val isPlaying = state is PlaybackState.Playing
-                // Idle (no file ever loaded) intentionally disables play here:
-                // the file-picker lives on the main MusicPlayer widget. The
-                // mini-control drives existing playback, it does not bootstrap
-                // it. Open the main widget once, pick a track, then the mini
-                // can transport it from anywhere on the surface.
-                val canTransport = state is PlaybackState.Playing || state is PlaybackState.Paused || state is PlaybackState.Ready
-                TransportButton(
-                    icon        = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
-                    enabled     = canTransport,
-                    onClick     = onPlayPause,
-                    description = if (isPlaying) s.audioPause else s.audioPlay,
-                )
-                Spacer(Modifier.width(10.dp))
-                MiniVolumeBar(
-                    value         = volume,
-                    onValueChange = onVolume,
-                    modifier      = Modifier.width(110.dp),
+                    if (showSkips) {
+                        MiniGlyph(NxIcon.SkipPrevious, s.audioSkipPrevious, loaded, onSkipPrev)
+                        Spacer(Modifier.width(2.dp))
+                    }
+                    val isPlaying = state is PlaybackState.Playing
+                    TransportButton(
+                        icon        = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
+                        enabled     = loaded,
+                        onClick     = onPlayPause,
+                        description = if (isPlaying) s.audioPause else s.audioPlay,
+                    )
+                    if (showSkips) {
+                        Spacer(Modifier.width(2.dp))
+                        MiniGlyph(NxIcon.SkipNext, s.audioSkipNext, loaded, onSkipNext)
+                    }
+                    if (showVolume) {
+                        Spacer(Modifier.width(10.dp))
+                        MiniVolumeBar(
+                            value         = volume,
+                            onValueChange = onVolume,
+                            modifier      = Modifier.width(110.dp),
+                        )
+                    }
+                }
+
+                // Where the track is, under the row rather than inside it, and it
+                // answers a press like every other measure here. It used to be the
+                // library's progress drawing with no gesture on it, which is the
+                // complaint the cards were rebuilt over: a measure you can see and
+                // cannot move.
+                val seekFraction: ((Float) -> Unit)? =
+                    if (loaded && duration > 0L) {
+                        { at -> onSeek((at * duration).toLong()) }
+                    } else {
+                        null
+                    }
+                PlaybackScrubber(
+                    fraction       = progressFraction(state),
+                    enabled        = seekFraction != null,
+                    onSeekFraction = { seekFraction?.invoke(it) },
+                    modifier       = Modifier.fillMaxWidth(),
+                    // The progress accent rather than the plain one, because the
+                    // volume track sits ten points above this and the two must not
+                    // read as one control. That distinction was the whole reason
+                    // this line used to be the library's progress drawing, and it
+                    // survives the drawing being replaced by something seekable.
+                    accent         = NxTheme.colors.progressAccent,
                 )
             }
-
-            // Where the track is, under the row rather than inside it. Without a
-            // measure of its own the widget's only bar was the volume, which idles
-            // at full and read as a track played to the end -- and the two are told
-            // apart by more than position: this one is the library's progress
-            // primitive, in the progress accent, with no handle to grab.
-            NxProgressBar(progress = progressFraction(state), height = 3.dp)
-        }
-    }
-}
-
-/** Nothing provides playback here. A sunken plane, so an inert slot reads as one. */
-@Composable
-private fun DisabledPlaceholder() {
-    val s = LocalStrings.current
-    NxSurface(NxSurfaceLevel.Sunken, Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier          = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Symbol(icon = NxIcon.VolumeOff,
-                contentDescription = null,
-                tint               = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
-                modifier           = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text  = s.audioNoPlayerHere,
-                style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text  = s.audioAddMusicPlayer,
-                style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
-            )
         }
     }
 }
@@ -219,9 +247,36 @@ private fun TransportButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Symbol(icon = icon,
+        Symbol(
+            icon               = icon,
             contentDescription = description,
             tint               = tint,
+            modifier           = Modifier.size(16.dp),
+        )
+    }
+}
+
+/**
+ * A skip, drawn bare beside the one filled key.
+ *
+ * Unplated for the reason the cover player's are: three filled discs in a row make
+ * a reader look for the difference between them instead of at the one that matters.
+ */
+@Composable
+private fun MiniGlyph(icon: IconKey, name: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(26.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Symbol(
+            icon               = icon,
+            contentDescription = name,
+            tint               = NxTheme.colors.textPrimary.copy(alpha = if (enabled) 0.7f else 0.3f),
+            fill               = 1f,
+            weight             = 500,
             modifier           = Modifier.size(16.dp),
         )
     }
@@ -307,19 +362,4 @@ private fun MiniVolumeBar(
             )
         }
     }
-}
-
-/**
- * The track's own title, falling back to the file's name until the tags land.
- *
- * The same name in every state, for the reason spelled out beside the players'
- * own copy: a fallback that keeps the extension where [TrackInfo] drops it makes
- * one track show under two names.
- */
-private fun currentTitleShort(state: PlaybackState, track: TrackInfo?, s: AppStrings): String = when (state) {
-    PlaybackState.Idle       -> s.audioNoFile
-    is PlaybackState.Ready   -> track?.title ?: fileTitle(state.file)
-    is PlaybackState.Playing -> track?.title ?: fileTitle(state.file)
-    is PlaybackState.Paused  -> track?.title ?: fileTitle(state.file)
-    is PlaybackState.Error   -> track?.title ?: fileTitle(state.file)
 }
