@@ -51,11 +51,11 @@ class MediaSessionBridge(
     private var session: MediaSession? = null
     private var job: Job? = null
 
-    /** The last state published, so the next one is a copy with what moved changed. */
-    private var published: SessionState? = null
-
-    /** What the position read when it was last published, for spotting a jump. */
+    /** What the position read on the previous poll, for spotting a jump. */
     private var lastPositionMs = 0L
+
+    /** Names each cover apart, so a new one is a new URL. */
+    private var artSerial = 0
 
     fun start() {
         if (job != null) return
@@ -83,14 +83,28 @@ class MediaSessionBridge(
             opened.onCommand { command -> scope.launch { handle(command) } }
             log.info("Media session published as {}", IDENTITY)
 
-            var artFor: String? = null
+            // Which file the cover on the wire belongs to, and whether it has been
+            // written from that file's own tags yet.
+            var artFor: Path? = null
+            var artRead = false
             var artUrl: String? = null
             while (isActive) {
                 val state = player.state.value
                 val track = player.track.value
-                val key = track?.let { "${state.file}|${it.title}" }
-                if (key != null && key != artFor) {
-                    artFor = key
+                val file = state.file
+                if (file != artFor) {
+                    // A new file drops the previous cover at once. The player clears
+                    // its metadata on load and fills it again a moment later from the
+                    // decode thread, so keying this on the track instead left the old
+                    // picture standing through that gap: the new title beside the
+                    // previous track's art, which is the partial update SessionState
+                    // is explicit about.
+                    artFor = file
+                    artRead = false
+                    artUrl = null
+                }
+                if (file != null && !artRead && track != null) {
+                    artRead = true
                     artUrl = withContext(Dispatchers.IO) { writeArt(track.artwork) }
                 }
                 publish(state, track, artUrl)
@@ -100,14 +114,28 @@ class MediaSessionBridge(
     }
 
     /**
-     * Sends the state on when something other than the position moved, and
-     * announces the position on its own when it jumped.
+     * Hands the whole state over on every poll, and announces the position
+     * separately when it jumped.
      *
-     * Both halves matter. A whole state five times a second is a D-Bus message
-     * five times a second for a number the desktop can read whenever it likes,
-     * and MPRIS has a property for exactly that reason. A seek nobody asked us
-     * for is the one case the desktop cannot work out for itself, because its
-     * widget is extrapolating from the last position it was told.
+     * Every poll, with no comparison of our own, and that is the load-bearing
+     * part. MPRIS leaves the position out of its property-change notifications
+     * deliberately, because a number that moves continuously would be a bus
+     * message per tick and a redraw in every widget listening; what a reader
+     * does instead is poll the property, and what that property answers is the
+     * last state published here. So withholding a publish because only the
+     * position moved is not an optimisation, it is the scrubber freezing in
+     * every widget on the bus while the audio plays on.
+     *
+     * Cheap, because the comparison already exists one layer down: the session
+     * diffs the state against what it last announced and emits nothing where
+     * nothing changed. Doing it here as well duplicated that work and got the
+     * one property it excludes wrong.
+     *
+     * The jump is the other half, and it cannot be inferred. A position that
+     * advanced and a position that was seeked look identical to anything
+     * comparing two snapshots, and a reader extrapolating between polls has no
+     * way to tell them apart, so the player has to say. A track change is one of
+     * these: the position drops to zero without anybody having seeked.
      */
     private fun publish(state: PlaybackState, track: TrackInfo?, artUrl: String?) {
         val s = session ?: return
@@ -121,8 +149,17 @@ class MediaSessionBridge(
             },
             metadata = metadataOf(state, track, artUrl),
             positionMicros = positionMs * 1_000L,
+            // The player's own loudness, which is a separate slider from the
+            // stream's in the system mixer. Left at its default this published a
+            // constant full volume, so a widget's slider sat at the top whatever
+            // the player was set to, and a drag on it snapped straight back.
+            volume = player.volume.value.toDouble(),
             canPlay = state !is PlaybackState.Idle,
-            canPause = state is PlaybackState.Playing,
+            // Whether this player can be paused at all, not whether it is playing
+            // right now. The distinction is the protocol's: these properties
+            // describe what the player is able to do, and tying one to the
+            // transport made it flip on every press.
+            canPause = state !is PlaybackState.Idle,
             canGoNext = player.queue.value.size > 1,
             canGoPrevious = player.queue.value.size > 1,
             canSeek = durationOf(state) > 0L,
@@ -133,18 +170,10 @@ class MediaSessionBridge(
             },
         )
 
-        val previous = published
-        // Compared without the position, which moves on its own and is not news.
-        if (previous == null || previous.copy(positionMicros = 0) != next.copy(positionMicros = 0)) {
-            runCatching { s.publish(next) }.onFailure { log.warn("Could not publish the session state", it) }
-            published = next
-            lastPositionMs = positionMs
-            return
-        }
+        runCatching { s.publish(next) }.onFailure { log.warn("Could not publish the session state", it) }
         if (jumped(positionMs)) {
             runCatching { s.seeked(positionMs * 1_000L) }
                 .onFailure { log.warn("Could not announce a seek", it) }
-            published = next
         }
         lastPositionMs = positionMs
     }
@@ -171,20 +200,34 @@ class MediaSessionBridge(
             album = track?.album,
             durationMicros = duration.takeIf { it > 0L }?.times(1_000L),
             artUrl = artUrl,
-            // The path is what identifies a track here, and a queue can hold the
-            // same file twice, so the index goes with it. A desktop compares this
-            // against what it believed was playing before acting on a seek.
-            trackId = state.file?.let { "${player.queueIndex.value}:$it" },
+            trackId = trackIdOf(state.file),
         )
     }
+
+    /**
+     * What names the loaded track on the wire.
+     *
+     * The path identifies it, and a queue can hold the same file twice, so the
+     * index goes with it. One function rather than two literals because the id is
+     * minted here and compared here: a desktop sends it back with a seek to say
+     * which track it believed was playing, and an identity that is built one way
+     * and checked another would fail every comparison.
+     */
+    private fun trackIdOf(file: Path?): String? = file?.let { "${player.queueIndex.value}:$it" }
 
     /**
      * Writes [artwork] where the desktop can read it, and answers its URL.
      *
      * A file rather than the bytes themselves, because MPRIS carries a URL and
-     * not a picture. One file, overwritten per track: a cache keyed by track
-     * would grow without a bound for a gain nobody can see, since the only reader
-     * is a widget showing the one thing playing now.
+     * not a picture. A NEW name each time, which is the whole point: one file
+     * overwritten in place keeps the same URL, and a widget that already loaded
+     * that URL has no reason to read it again, so every track after the first
+     * showed the first track's cover. The name is what tells the desktop the
+     * picture changed.
+     *
+     * The one before last is deleted as the next is written, so the directory
+     * holds two: the one being pointed at and the one a widget may still be
+     * reading while it catches up.
      *
      * The picture is re-encoded from the decoded bitmap rather than kept from the
      * file, which costs a PNG of at most 512 points a side, once a track. Holding
@@ -195,12 +238,13 @@ class MediaSessionBridge(
         if (artwork == null) return null
         return runCatching {
             Files.createDirectories(artDir)
-            val file = artDir.resolve(ART_FILE)
             val bytes = Image.makeFromBitmap(artwork.asSkiaBitmap())
                 .encodeToData(EncodedImageFormat.PNG)
                 ?.bytes
                 ?: return null
+            val file = artDir.resolve("cover-${artSerial++}.png")
             Files.write(file, bytes)
+            Files.deleteIfExists(artDir.resolve("cover-${artSerial - 3}.png"))
             file.toUri().toString()
         }.onFailure { log.warn("Could not write the cover for the media session", it) }.getOrNull()
     }
@@ -218,7 +262,23 @@ class MediaSessionBridge(
                 val now = positionOf(player.state.value)
                 player.seek(now + command.offsetMicros / 1_000L)
             }
-            is SessionCommand.SetPosition -> player.seek(command.positionMicros / 1_000L)
+            is SessionCommand.SetPosition -> {
+                // The track the sender believed was playing, which is the whole
+                // reason the command carries one. A widget still showing the
+                // previous track when somebody clicked its scrubber would
+                // otherwise seek whatever replaced it, and a track change is
+                // exactly when a click is most likely to be one poll behind.
+                //
+                // No id is not a mismatch. A reader that sends none is making no
+                // claim about which track this is, and refusing it would drop
+                // every seek from a widget that does not track identities.
+                val current = trackIdOf(player.state.value.file)
+                if (command.trackId == null || command.trackId == current) {
+                    player.seek(command.positionMicros / 1_000L)
+                } else {
+                    log.debug("Dropping a stale seek for {} while {} is loaded", command.trackId, current)
+                }
+            }
             is SessionCommand.SetLoop -> player.setRepeat(
                 when (command.loop) {
                     LoopMode.NONE -> RepeatMode.Off
@@ -244,19 +304,22 @@ class MediaSessionBridge(
         job = null
         runCatching { session?.close() }
         session = null
-        published = null
     }
 
     private companion object {
         const val APPLICATION = "Nexira"
         const val IDENTITY = "Nexira"
         const val DESKTOP_ENTRY = "nexira"
-        const val ART_FILE = "now-playing.png"
 
         /**
-         * How often the player is read. Slower than the transport's own five a
-         * second, because nothing here draws: what this produces is a bus message
-         * when something changed, and the position the desktop reads on demand.
+         * How often the player is read, which is also how stale the position a
+         * desktop reads can be.
+         *
+         * Slower than the transport's own five a second, because nothing here
+         * draws and a bus message only leaves when something other than the
+         * position changed. Half a second is under what a reader's own redraw
+         * would resolve, and it is the anchor such a reader extrapolates from
+         * between its polls rather than the rate it redraws at.
          */
         const val POLL_MS = 500L
 
