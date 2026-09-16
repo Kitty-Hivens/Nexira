@@ -82,8 +82,34 @@ class SystemAudioOutput : AutoCloseable {
             log.warn("No system audio backend; falling back to the player's own line", e)
             null
         }
-        backend?.let { log.info("System audio output ready: {}", it.javaClass.simpleName) }
+        backend?.let {
+            log.info("System audio output ready: {}", it.javaClass.simpleName)
+            releaseOnShutdown()
+        }
         backend
+    }
+
+    /**
+     * Gives the connection back when the process goes, which nothing else does.
+     *
+     * Registered at the moment a backend exists rather than at construction, which
+     * is the whole reason it is here and not in a hook class of its own: this is
+     * opened on the first track, so a launcher nobody played anything in should
+     * install nothing.
+     *
+     * Closing the backend releases every sink made from it, so a write parked
+     * against a device that has stopped answering is freed rather than left for
+     * the process to take down with it.
+     *
+     * The lambdas are built now and not at shutdown, the same reason the layout
+     * flush gives: a lambda's class loads when its first instance is made, and a
+     * hook that first reaches for its own generated classes while the process is
+     * exiting cannot run at all if the image behind it has been replaced.
+     */
+    private fun releaseOnShutdown() {
+        val body: () -> Unit = { close() }
+        val task = Runnable { runCatching(body) }
+        runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-audio-output")) }
     }
 
     override fun close() {

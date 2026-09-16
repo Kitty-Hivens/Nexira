@@ -88,6 +88,7 @@ class MediaSessionBridge(
             }
             session = opened
             opened.onCommand { command -> scope.launch { handle(command) } }
+            releaseOnShutdown()
             log.info("Media session published as {}", IDENTITY)
 
             val publisher = SessionPublisher(opened) { message, cause -> log.warn(message, cause) }
@@ -189,6 +190,30 @@ class MediaSessionBridge(
             SessionCommand.Quit,
             -> Unit
         }
+    }
+
+    /**
+     * Takes the session off the bus when the process goes, which nothing else
+     * does.
+     *
+     * Registered once a session exists rather than at construction, so a desktop
+     * that published nothing installs no hook. The session's own contract asks for
+     * this in as many words: a player left published after it has stopped
+     * answering is worse than no player. Exiting does release the bus name by
+     * dropping the connection, so what this buys is the release happening because
+     * the launcher said so rather than because its socket closed, which is the
+     * difference between a quit and a crash from the desktop's side.
+     *
+     * The lambdas are built here and not at shutdown, the same reason the layout
+     * flush gives: a lambda's class loads when its first instance is made, and a
+     * hook that first touches its own generated classes while the process is
+     * exiting cannot run at all if the image it was compiled from has been
+     * replaced underneath it.
+     */
+    private fun releaseOnShutdown() {
+        val body: () -> Unit = { close() }
+        val task = Runnable { runCatching(body) }
+        runCatching { Runtime.getRuntime().addShutdownHook(Thread(task, "nexira-media-session")) }
     }
 
     override fun close() {
