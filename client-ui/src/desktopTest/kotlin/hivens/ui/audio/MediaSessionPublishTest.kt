@@ -93,7 +93,7 @@ class MediaSessionPublishTest {
     fun `ordinary playing announces no seek`() {
         val session = RecordingSession()
         val publisher = SessionPublisher(session)
-        for (at in 0L..5_000L step SESSION_POLL_MS) publisher.publish(snapshot(playing(first, at)), artUrl = null)
+        for (at in 0L..5_000L step SESSION_TICK_MS) publisher.publish(snapshot(playing(first, at)), artUrl = null)
         assertTrue(session.seeks.isEmpty(), "advancing by one poll at a time is not a jump: ${session.seeks}")
     }
 
@@ -126,7 +126,7 @@ class MediaSessionPublishTest {
         val session = RecordingSession()
         val publisher = SessionPublisher(session)
         publisher.publish(snapshot(playing(first, 0L)), artUrl = null)
-        publisher.publish(snapshot(playing(first, SESSION_POLL_MS + SESSION_JUMP_MARGIN_MS)), artUrl = null)
+        publisher.publish(snapshot(playing(first, SESSION_TICK_MS + SESSION_JUMP_MARGIN_MS)), artUrl = null)
         assertTrue(session.seeks.isEmpty(), "a poll one margin late is still playing: ${session.seeks}")
     }
 
@@ -267,7 +267,7 @@ class MediaSessionPublishTest {
 
         val track = TrackInfo(title = "First", artwork = ImageBitmap(1, 1))
         repeat(20) { poll ->
-            trail.urlFor(snapshot(playing(first, poll * SESSION_POLL_MS), track = track), ::write)
+            trail.urlFor(snapshot(playing(first, poll * SESSION_TICK_MS), track = track), ::write)
         }
         assertEquals(1, writes, "a cover re-encoded every poll is a megapixel of work twice a second")
     }

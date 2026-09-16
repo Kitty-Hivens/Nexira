@@ -11,10 +11,12 @@ import dev.hivens.libsound.TrackMetadata
 import dev.hivens.libsound.PlaybackState as SessionPlayback
 import dev.hivens.libsound.session.MediaSessions
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.EncodedImageFormat
@@ -22,7 +24,6 @@ import org.jetbrains.skia.Image
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Publishes what the launcher is playing to the desktop, and takes its media
@@ -42,10 +43,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * ## What is here and what is beside it
  *
  * This class owns the two things a test cannot have: a connection to the bus and
- * a timer. Everything it decides lives in [SessionPublisher], [CoverTrail] and
- * [sessionStateOf], which take plain data and can be driven through a whole run
- * of a track without either. That split is not tidiness. Five things this bridge
- * published were stale or wrong at once and every one of them was found by
+ * a live player. Everything it decides lives in [SessionPublisher], [CoverTrail]
+ * and [sessionStateOf], which take plain data and can be driven through a whole
+ * run of a track without either. That split is not tidiness. Five things this
+ * bridge published were stale or wrong at once and every one of them was found by
  * reading rather than by using the launcher, because there was nothing that
  * could fail.
  */
@@ -93,29 +94,72 @@ class MediaSessionBridge(
 
             val publisher = SessionPublisher(opened) { message, cause -> log.warn(message, cause) }
             val covers = CoverTrail()
-            while (isActive) {
-                val snapshot = snapshot()
-                // Off the poll's own thread: a several-megapixel cover is a decode
-                // and an encode, and the loop is what keeps the desktop's position
-                // moving.
+            snapshots().collect { snapshot ->
+                // Inline, and the collector waits for it. This whole coroutine
+                // already runs on the IO dispatcher, so naming it again moves
+                // nothing: what the call buys is the right pool for a decode and an
+                // encode, not a hop off this one. It costs a publish held back for
+                // the length of one PNG, once per track, and the alternative is a
+                // second coroutine whose ordering against this one would have to be
+                // reasoned about for a picture that changes once a song.
                 val artUrl = covers.urlFor(snapshot) { artwork ->
                     withContext(Dispatchers.IO) { writeArt(artwork) }
                 }
                 publisher.publish(snapshot, artUrl)
-                delay(SESSION_POLL_MS.milliseconds)
             }
         }
     }
 
-    /** Everything the session is built from, read in one go so the parts cannot disagree. */
-    private fun snapshot() = PlayerSnapshot(
-        state = player.state.value,
-        track = player.track.value,
-        volume = player.volume.value,
-        queueSize = player.queue.value.size,
-        queueIndex = player.queueIndex.value,
-        repeat = player.repeat.value,
-    )
+    /**
+     * Everything the session is built from, as one stream.
+     *
+     * Driven by the player rather than by a timer here, and that is the whole of
+     * the difference. A timer is a delay added to EVERY change and not only to the
+     * position: a pause pressed in the launcher waited for the next tick before it
+     * reached the bus, so a media widget went on saying the track was playing for
+     * up to half a second after it had stopped. Read from the player's own flows,
+     * a change leaves as fast as the player produces it.
+     *
+     * The position comes along for free and arrives fresher than it did. The
+     * player's state carries it and therefore emits at the player's own poll while
+     * a track runs, which is a little over twice the rate the timer ran at. While
+     * nothing is playing nothing emits, which is correct rather than idle: a
+     * position that is not moving is not stale.
+     *
+     * Combined rather than collected from the state alone, because a state flow
+     * drops a value equal to the one before it. A paused player publishes no state
+     * at all, so a volume moved or a repeat mode cycled while paused would have
+     * reached nobody.
+     */
+    // sample is the one preview member used here. It has carried this signature
+    // since coroutines 1.0 and the alternative is hand-rolling a throttle, which is
+    // exactly the sort of small timing primitive this session has already shown is
+    // easy to get subtly wrong.
+    @OptIn(FlowPreview::class)
+    internal fun snapshots(): Flow<PlayerSnapshot> {
+        // The loudness is the one input here that a hand moves directly. Every
+        // other field is written by the player's own poll, but a slider reports on
+        // every pointer frame and the player publishes each one, so a drag across
+        // the track is sixty values a second. The timer this replaced was the only
+        // thing holding that down, and without a limit of its own the drag became
+        // sixty property-change signals a second on the session bus, each one
+        // waking every media widget on the desktop.
+        //
+        // Sampled rather than dropped: the value that matters is where the hand
+        // stopped, and that one arrives within a tick. The first snapshot waits the
+        // same tick, which nothing observes, since it happens as the bus name is
+        // claimed.
+        val volume = player.volume.sample(VOLUME_SAMPLE_MS)
+        val transport = combine(player.state, player.track, volume) { state, track, level ->
+            Triple(state, track, level)
+        }
+        val queue = combine(player.queue, player.queueIndex, player.repeat) { entries, index, repeat ->
+            Triple(entries.size, index, repeat)
+        }
+        return combine(transport, queue) { (state, track, volume), (size, index, repeat) ->
+            PlayerSnapshot(state, track, volume, size, index, repeat)
+        }
+    }
 
     /**
      * Writes [artwork] where the desktop can read it, and answers its URL.
@@ -231,16 +275,25 @@ class MediaSessionBridge(
 }
 
 /**
- * How often the player is read, which is also how stale the position a desktop
- * reads can be.
+ * How far apart two snapshots are while a track runs.
  *
- * Slower than the transport's own five a second, because nothing here draws and a
- * bus message only leaves when something other than the position changed. Half a
- * second is under what a reader's own redraw would resolve, and it is the anchor
- * such a reader extrapolates from between its polls rather than the rate it
- * redraws at.
+ * Nothing schedules on it. It exists so a jump has something to be measured
+ * against: a position that moved further than one of these plus the margin below
+ * did not get there by playing.
+ *
+ * Taken from the player rather than restated, because it IS the player's poll now
+ * that the stream is driven by one: a copy of the number here would go quietly
+ * wrong the day the other one moved, and every ordinary tick would read as a seek.
  */
-internal const val SESSION_POLL_MS = 500L
+internal val SESSION_TICK_MS = AudioPlayer.POLL_INTERVAL_MS
+
+/**
+ * How often a moving loudness reaches the bus.
+ *
+ * A slider reports on every pointer frame and the player passes each one straight
+ * through, so this is what stands between a drag and a property-change storm.
+ */
+private const val VOLUME_SAMPLE_MS = 100L
 
 /**
  * How far past one poll's worth of playing the position may move before it counts
@@ -299,7 +352,7 @@ internal fun acceptsSeek(sent: String?, current: String?): Boolean = sent == nul
 /**
  * Whether the position moved further than playing could have moved it.
  *
- * Backwards at all, or forwards by more than one interval plus
+ * Backwards at all, or forwards by more than one tick plus
  * [SESSION_JUMP_MARGIN_MS].
  *
  * A null [previousMs] is the first poll, and it is never a jump. There is nothing
@@ -312,7 +365,7 @@ internal fun acceptsSeek(sent: String?, current: String?): Boolean = sent == nul
 internal fun jumped(positionMs: Long, previousMs: Long?): Boolean {
     if (previousMs == null) return false
     val delta = positionMs - previousMs
-    return delta < 0L || delta > SESSION_POLL_MS + SESSION_JUMP_MARGIN_MS
+    return delta < 0L || delta > SESSION_TICK_MS + SESSION_JUMP_MARGIN_MS
 }
 
 /**

@@ -266,6 +266,18 @@ class AudioPlayer(
         val file = _queue.value.getOrNull(index) ?: return
         closeCurrent()
         _queueIndex.value = index
+        // The identity moves as ONE step, and before the engine is opened rather
+        // than after. A reader takes the index and the state together, and between
+        // the two assignments this used to describe the new entry of the queue with
+        // the previous entry's file: a track nothing had ever played, named by an
+        // id nothing would name again, with the old cover still beside it. The gap
+        // was the whole of an FFmpeg open, so anything watching the player rather
+        // than sampling it twice a second caught it every time.
+        _state.value = if (autoplay) {
+            PlaybackState.Playing(file, positionMs = 0L, durationMs = 0L)
+        } else {
+            PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
+        }
         rememberQueue()
         started = autoplay
         // Metadata belongs to the file, so this is the only place it is dropped: a
@@ -284,11 +296,6 @@ class AudioPlayer(
             // first audible buffer, so opening a track makes no sound.
             p.setVolume(0f)
             p.pause()
-        }
-        _state.value = if (autoplay) {
-            PlaybackState.Playing(file, positionMs = 0L, durationMs = 0L)
-        } else {
-            PlaybackState.Ready(file, positionMs = 0L, durationMs = 0L)
         }
         startPolling()
     }
@@ -438,13 +445,29 @@ class AudioPlayer(
                 val p = player ?: break
                 val file = loadedFile ?: break
                 val st = p.state
-                _state.value = mapPlaybackState(
-                    file    = file,
-                    st      = st,
-                    started = started,
-                    posMs   = p.positionNanos() / 1_000_000L,
-                    durMs   = (p.durationNanos ?: 0L) / 1_000_000L,
-                )
+                val ended = st == VideoPlayer.State.Ended
+                val looping = ended && _repeat.value == RepeatMode.One
+                val next = if (ended && !looping) {
+                    nextQueueIndex(_queue.value.size, _queueIndex.value, _repeat.value)
+                } else {
+                    null
+                }
+                // A track about to be followed by another is not paused, and the
+                // difference is not cosmetic: Ended maps to Ready, Ready is what
+                // every desktop protocol reads as paused, and publishing it turned
+                // the transport in a media widget into a play button and back on
+                // every track boundary and every turn of a one-track loop. The gap
+                // between the last sample of one file and the first of the next
+                // belongs to neither of them, so nothing is said about it.
+                if (!(started && (looping || next != null))) {
+                    _state.value = mapPlaybackState(
+                        file    = file,
+                        st      = st,
+                        started = started,
+                        posMs   = p.positionNanos() / 1_000_000L,
+                        durMs   = (p.durationNanos ?: 0L) / 1_000_000L,
+                    )
+                }
                 // Once per file: null is cleared only by open(), and a file with
                 // no tags still resolves to a title, so this cannot re-fire.
                 if (_track.value == null && st != VideoPlayer.State.Opening) readMetadata(p, file)
@@ -457,18 +480,17 @@ class AudioPlayer(
                     log.error("Audio playback failed for {}", file, st.cause)
                     break
                 }
-                if (st == VideoPlayer.State.Ended) {
+                if (ended) {
                     // Repeating ONE track is a seek, not a reopen: the engine is
                     // still alive at this point and rewinding it keeps the decode
                     // thread and the audio device, so the loop is seamless and the
                     // mode can change while the track plays.
-                    if (_repeat.value == RepeatMode.One) {
+                    if (looping) {
                         p.seek(0L)
                         p.resume()
                         delay(POLL_INTERVAL_MS.milliseconds)
                         continue
                     }
-                    val next = nextQueueIndex(_queue.value.size, _queueIndex.value, _repeat.value)
                     // A finished track holds a decode thread and the audio device
                     // open for nothing either way. Drop them WITHOUT closeCurrent(),
                     // which would join the very job this runs on.
@@ -511,10 +533,19 @@ class AudioPlayer(
         started = false
     }
 
-    private companion object {
+    internal companion object {
+        /**
+         * How often the engine is read, and therefore how often this player says
+         * anything about itself.
+         *
+         * Not private, because it is no longer only this class's business: the
+         * media session is driven by these flows rather than by a clock of its own,
+         * so the rate a jump is measured against is this number. A copy of it over
+         * there would go quietly wrong the day this one moved.
+         */
         const val POLL_INTERVAL_MS = 200L
-        const val VOLUME_WRITE_DELAY_MS = 500L
-        const val QUEUE_WRITE_DELAY_MS = 800L
+        private const val VOLUME_WRITE_DELAY_MS = 500L
+        private const val QUEUE_WRITE_DELAY_MS = 800L
     }
 }
 
