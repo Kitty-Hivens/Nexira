@@ -1,7 +1,6 @@
 package hivens.ui.widgets.sample.players
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -188,7 +187,7 @@ internal fun WavePlayerCard(
                         // With nothing loaded the plane opens the picker: there is no
                         // artwork here to click, and an empty player that answers
                         // nowhere is a dead end.
-                        .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier)
+                        .openWhenEmpty(idle, s.audioPickTrack, onPick)
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

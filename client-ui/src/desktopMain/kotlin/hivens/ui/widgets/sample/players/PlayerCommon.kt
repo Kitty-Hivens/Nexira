@@ -4,10 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.remember
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import hivens.ui.audio.AudioError
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
@@ -151,6 +155,43 @@ private fun repeatIcon(mode: RepeatMode): IconKey = when (mode) {
     // The queue's own glyph rather than a third arrow: what changes between One and
     // Queue is the size of the thing being looped, not the looping.
     RepeatMode.Queue -> NxIcon.QueueMusic
+}
+
+/**
+ * While nothing is loaded, the whole plane opens a file.
+ *
+ * Every kind here offers this, because an empty player that answers nowhere is a
+ * dead end: several of them drop their artwork square as they narrow, and that
+ * square was the only way in.
+ *
+ * A press and a published action rather than `clickable`, and the difference is
+ * accessibility rather than taste. `clickable` merges the semantics of everything
+ * beneath it, so an empty card collapsed into one node and its overflow button and
+ * its artwork square stopped being reachable on their own. Declaring the action
+ * without the merge leaves both standing, and a reader still finds the one thing
+ * the empty card is for. It also draws no indication, which a whole card rippling
+ * under the pointer was never asking for.
+ *
+ * Unconsumed only. A press one of those children took is not also an open, and
+ * with the weaker test a click on the overflow of an empty card put its panel and
+ * a file dialog on screen together.
+ */
+internal fun Modifier.openWhenEmpty(
+    idle: Boolean,
+    label: String,
+    onPick: () -> Unit,
+): Modifier {
+    if (!idle) return this
+    return this
+        .pointerInput(onPick) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitFirstDown(requireUnconsumed = true)
+                    onPick()
+                }
+            }
+        }
+        .semantics { onClick(label = label) { onPick(); true } }
 }
 
 /**

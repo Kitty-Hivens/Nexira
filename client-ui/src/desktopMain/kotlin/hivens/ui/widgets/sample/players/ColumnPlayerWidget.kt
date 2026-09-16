@@ -2,7 +2,6 @@ package hivens.ui.widgets.sample.players
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -210,7 +209,7 @@ internal fun ColumnPlayerCard(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier)
+                    .openWhenEmpty(idle, s.audioPickTrack, onPick)
                     .padding(12.dp),
             ) {
                 if (showCover) {

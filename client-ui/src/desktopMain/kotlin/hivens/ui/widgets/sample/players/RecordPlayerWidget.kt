@@ -3,7 +3,6 @@ package hivens.ui.widgets.sample.players
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -212,7 +211,7 @@ internal fun RecordPlayerCard(
                         }
                         // The disc is the only affordance this shape has, so with
                         // nothing loaded it has to be the one that opens a file.
-                        .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier),
+                        .openWhenEmpty(idle, s.audioPickTrack, onPick),
                     contentAlignment = Alignment.Center,
                 ) {
                     val side = minOf(maxWidth, maxHeight)

@@ -3,7 +3,6 @@ package hivens.ui.widgets.sample.players
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -214,7 +213,7 @@ internal fun TilePlayerCard(
             .playerObject(maxSide)
             .aspectRatio(1f)
             .clip(MaterialTheme.shapes.medium)
-            .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier),
+            .openWhenEmpty(idle, s.audioPickTrack, onPick),
     ) {
         val side = minOf(maxWidth, maxHeight)
         // One threshold, and it is about the words rather than the controls: a

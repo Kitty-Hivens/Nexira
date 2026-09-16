@@ -170,7 +170,7 @@ internal fun CoverPlayerCard(
       BoxWithConstraints(
           Modifier
               .fillMaxWidth()
-              .then(if (state is PlaybackState.Idle) Modifier.clickable(onClick = onPick) else Modifier),
+              .openWhenEmpty(state is PlaybackState.Idle, s.audioPickTrack, onPick),
       ) {
         // The ladder, with the skips IN it rather than beside it. Adding two more
         // controls to the row without moving these numbers is what clipped the

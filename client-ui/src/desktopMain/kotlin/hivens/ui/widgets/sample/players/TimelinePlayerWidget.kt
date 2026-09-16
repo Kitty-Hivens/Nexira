@@ -190,15 +190,9 @@ internal fun TimelinePlayerCard(
             Box(
                 Modifier
                     .fillMaxSize()
+                    .openWhenEmpty(idle, s.audioPickTrack, onPick)
                     .pointerInput(idle, loaded, duration) {
-                        if (idle) {
-                            awaitEachGesture {
-                                awaitFirstDown(requireUnconsumed = false)
-                                onPick()
-                            }
-                            return@pointerInput
-                        }
-                        if (!loaded || duration <= 0L) return@pointerInput
+                        if (idle || !loaded || duration <= 0L) return@pointerInput
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             val width = size.width.coerceAtLeast(1).toFloat()

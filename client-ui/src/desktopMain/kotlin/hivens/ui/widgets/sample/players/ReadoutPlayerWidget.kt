@@ -1,7 +1,6 @@
 package hivens.ui.widgets.sample.players
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -178,7 +177,7 @@ internal fun ReadoutPlayerCard(
                         // With nothing loaded the whole plane opens the picker. There
                         // is no cover square here to click, and a player that says
                         // "pick a track" and answers nowhere is a dead end.
-                        .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier)
+                        .openWhenEmpty(idle, s.audioPickTrack, onPick)
                         .padding(14.dp),
                 ) {
                     val name = playerTitle(state, track, s)

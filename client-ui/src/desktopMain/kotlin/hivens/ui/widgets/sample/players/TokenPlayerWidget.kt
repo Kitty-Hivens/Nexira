@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -215,7 +214,7 @@ internal fun TokenPlayerCard(
                     .seekByAngle(MIDDLE_SHARE) { at ->
                         if (loaded && duration > 0L) onSeek((at * duration).toLong())
                     }
-                    .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier),
+                    .openWhenEmpty(idle, s.audioPickTrack, onPick),
                 contentAlignment = Alignment.Center,
             ) {
                 val side = minOf(maxWidth, maxHeight)

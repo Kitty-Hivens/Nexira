@@ -190,7 +190,7 @@ internal fun SeededPlayerCard(
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .then(if (state is PlaybackState.Idle) Modifier.clickable(onClick = onPick) else Modifier),
+                .openWhenEmpty(state is PlaybackState.Idle, s.audioPickTrack, onPick),
         ) {
             val art = maxWidth >= 240.dp
             val album = showAlbum && maxWidth >= 300.dp

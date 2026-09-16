@@ -2,7 +2,6 @@ package hivens.ui.widgets.sample.players
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -173,7 +172,7 @@ internal fun GroundPlayerCard(
             .clip(MaterialTheme.shapes.medium)
             // With nothing loaded the whole plane opens the picker: the ground is
             // the only affordance this shape has, so it has to be the one.
-            .then(if (idle) Modifier.clickable(onClick = onPick) else Modifier),
+            .openWhenEmpty(idle, s.audioPickTrack, onPick),
     ) {
         Ground(track?.artwork, palette.surfaceContainer, palette.primary, palette.tertiary)
         // Three stops, and only the middle one is on the knob.
