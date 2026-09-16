@@ -2,6 +2,7 @@ package hivens.ui.audio
 
 import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.diag.SkinemaGate
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +63,30 @@ class AudioPlayer(
      * losing that must never cost the sound itself.
      */
     private val output: SystemAudioOutput? = null,
+    /**
+     * Where an open file comes from.
+     *
+     * Defaulted, so nothing that builds a player has to know this exists, and a
+     * parameter rather than a hard call so the orchestration around it can be
+     * driven without FFmpeg on the path. What lives above this seam is every
+     * decision the launcher makes about playback: what a queue does at its end,
+     * what a repeat mode means, what a scrub into a finished track reopens into,
+     * and whether a track running into the next one is ever called paused.
+     */
+    private val engines: PlaybackEngines = SkinemaEngines,
+    /**
+     * The one lane every engine touch and the poll loop run on.
+     *
+     * Single by construction, which is what confines the mutable fields below to
+     * one thread: no locking, no torn reads, and no UI freeze when a close blocks
+     * while it joins a decode thread. `limitedParallelism(1)` gives that queue
+     * without owning a dedicated thread.
+     *
+     * A parameter for the same reason the engine is one. All of the behaviour here
+     * is coroutines, so a test that cannot advance them can only wait and hope, and
+     * a scheduler it drives is single-lane in the same way this is.
+     */
+    private val engine: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
 ) {
     private val log = LoggerFactory.getLogger(AudioPlayer::class.java)
 
@@ -107,10 +132,6 @@ class AudioPlayer(
      */
     val track: StateFlow<TrackInfo?> = _track.asStateFlow()
 
-    // Serializes engine ops + the poll loop onto one IO thread. limitedParallelism(1)
-    // gives a confinement queue without owning a dedicated thread.
-    private val engine = Dispatchers.IO.limitedParallelism(1)
-
     private val _queue = MutableStateFlow<List<Path>>(emptyList())
 
     /**
@@ -129,7 +150,7 @@ class AudioPlayer(
     // Confined to [engine] -- only ever touched inside a launch(engine) { } below.
     // The queue flows are written from there too; they are flows rather than plain
     // fields only because the UI reads them.
-    private var player: VideoPlayer? = null
+    private var player: PlaybackEngine? = null
     private var pollJob: Job? = null
     // Skinema represents both "opened, never played" and "played then paused"
     // as State.Paused; this carries the distinction the UI needs (Ready vs
@@ -320,7 +341,7 @@ class AudioPlayer(
      * Constructs the engine for [file], reporting a refusal or a failed open on
      * [state]. Confined to [engine] like every other player touch.
      */
-    private fun openPlayer(file: Path): VideoPlayer? {
+    private fun openPlayer(file: Path): PlaybackEngine? {
         if (!SkinemaGate.enabled) {
             log.warn("Audio open refused: the skinema module is disabled")
             _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
@@ -336,7 +357,7 @@ class AudioPlayer(
         // a registration and it is ours until the engine takes it.
         val sink = output?.sink()
         return try {
-            VideoPlayer(path = file, loop = false, audio = true, sink = sink)
+            engines.open(file, sink)
         } catch (e: Exception) {
             runCatching { sink?.close() }
             openFailed(file, e)
@@ -352,7 +373,7 @@ class AudioPlayer(
         }
     }
 
-    private fun openFailed(file: Path, cause: Throwable): VideoPlayer? {
+    private fun openFailed(file: Path, cause: Throwable): PlaybackEngine? {
         log.error("Failed to open audio file {}", file, cause)
         _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
         return null
@@ -516,7 +537,7 @@ class AudioPlayer(
      * [engine] -- a several-megapixel cover would otherwise sit in front of
      * every transport command queued behind it.
      */
-    private suspend fun readMetadata(p: VideoPlayer, file: Path) {
+    private suspend fun readMetadata(p: PlaybackEngine, file: Path) {
         val artwork = p.coverArt?.let { withContext(Dispatchers.Default) { decodeArtwork(it) } }
         _track.value = trackInfoFrom(p.tags, file, artwork)
     }
