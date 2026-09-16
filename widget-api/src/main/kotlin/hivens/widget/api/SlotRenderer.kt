@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,20 +15,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.movableContentOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.widget.model.FlowPlacement
@@ -287,22 +283,27 @@ private fun PlacementSlot(
     modifier: Modifier,
     spacing: Dp,
 ) {
-    val density = LocalDensity.current
     val reportSlotBounds = LocalSlotBoundsReporter.current
-    var slotSizeDp by remember { mutableStateOf(Size.Zero) }
     val columns = content.grid
 
-    Box(
+    // BoxWithConstraints rather than a size read back through state. A lattice
+    // turns a cell address into dp against the measured width, and a width that
+    // only arrives after the first layout means the first frame draws every
+    // widget at the origin at full size: the cell is zero, the stride is zero,
+    // and a span of zero is "take your own size". In the running app that is one
+    // wrong frame; anywhere a single frame is the whole answer, it is the answer.
+    BoxWithConstraints(
         slotChrome(path, content)
             .then(modifier)
-            .onSizeChanged { sz ->
-                slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
-            }
             .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
     ) {
-        // One cell plus one gutter. Zero outside a lattice, and zero before the
-        // slot has been measured, which is the frame where nothing can be placed
-        // sensibly anyway.
+        val slotSizeDp = Size(
+            maxWidth.value.takeIf { it.isFinite() } ?: 0f,
+            maxHeight.value.takeIf { it.isFinite() } ?: 0f,
+        )
+        // One cell, gutters taken off first. Zero outside a lattice, and zero in
+        // a slot with no bounded width, where a fraction of the width means
+        // nothing to divide.
         val cell: Float = if (columns > 0 && slotSizeDp.width > 0f) {
             ((slotSizeDp.width - spacing.value * (columns + 1)) / columns).coerceAtLeast(0f)
         } else {
