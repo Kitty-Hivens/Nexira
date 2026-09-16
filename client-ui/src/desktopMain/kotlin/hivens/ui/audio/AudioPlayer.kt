@@ -319,9 +319,19 @@ class AudioPlayer(
             _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
             return null
         }
+        // Named rather than passed inline, so an engine that does not take it
+        // leaves it to somebody. Skinema closes the sink it was handed and can
+        // only do that once it has one, and the one thing that reliably throws
+        // out of this constructor is a natives bundle that will not load, which
+        // does not get better on the next press: each press opened a stream on
+        // the sound server and dropped it unreferenced. Not yet a stream on the
+        // graph, since a sink connects on its first open, but it is an arena and
+        // a registration and it is ours until the engine takes it.
+        val sink = output?.sink()
         return try {
-            VideoPlayer(path = file, loop = false, audio = true, sink = output?.sink())
+            VideoPlayer(path = file, loop = false, audio = true, sink = sink)
         } catch (e: Exception) {
+            runCatching { sink?.close() }
             openFailed(file, e)
         } catch (e: LinkageError) {
             // A natives bundle that is missing, or from another FFmpeg line,
@@ -330,6 +340,7 @@ class AudioPlayer(
             // press of Play as a crash instead of a track that will not open.
             // Narrower than Throwable on purpose: an OutOfMemoryError here is
             // not a file that failed to open.
+            runCatching { sink?.close() }
             openFailed(file, e)
         }
     }
@@ -350,9 +361,17 @@ class AudioPlayer(
      * Skinema counts in nanoseconds, so the millisecond the UI works in is
      * converted here rather than at every call site. A track that ran to its end
      * was released by the poll loop, and it is still the track that is loaded, so
-     * a seek into it re-opens the file exactly as [play] does -- the alternative
-     * is a scrubber that silently does nothing once the track finishes, which
-     * from the user's side is the same as a broken control.
+     * a seek into it re-opens the file -- the alternative is a scrubber that
+     * silently does nothing once the track finishes, which from the user's side is
+     * the same as a broken control.
+     *
+     * A re-opened engine is silenced AND paused, which is the pair [loadAt] uses
+     * for an open nobody asked to hear. Skinema begins playing as soon as it is
+     * constructed, so silencing alone left the track running inaudibly with its
+     * position climbing, and the poll loop reported that as playing: a transport
+     * offering a pause button over no sound. The engine is only ever absent here
+     * after a release or a stop, and neither leaves anything started, so this is
+     * the whole of the re-open case rather than one branch of it.
      *
      * The position is clamped into the container's own duration where one is
      * known: a drag to the very end of a bar is a request for the end of the
@@ -363,7 +382,8 @@ class AudioPlayer(
             val file = loadedFile ?: return@launch
             val p = player ?: openPlayer(file)?.also {
                 player = it
-                it.setVolume(if (started) _volume.value else 0f)
+                it.setVolume(0f)
+                it.pause()
                 startPolling()
             } ?: return@launch
             val durationNanos = p.durationNanos
@@ -514,8 +534,15 @@ internal fun mapPlaybackState(
     durMs: Long,
 ): PlaybackState = when (st) {
     VideoPlayer.State.Opening -> PlaybackState.Ready(file, positionMs = 0L, durationMs = durMs)
-    VideoPlayer.State.Playing -> PlaybackState.Playing(file, posMs, durMs)
-    VideoPlayer.State.Seeking -> PlaybackState.Playing(file, posMs, durMs)
+    // Started is asked of the sounding states as well, not only of Paused. An
+    // engine opened for a file nobody pressed play on is silenced and paused, but
+    // Skinema begins playing the moment it is constructed and takes the pause on
+    // its own thread, so a poll landing inside that window finds it playing. Left
+    // unasked, the transport showed a pause button over silence for a tick of
+    // every open and every scrub into a track that had finished.
+    VideoPlayer.State.Playing, VideoPlayer.State.Seeking ->
+        if (started) PlaybackState.Playing(file, posMs, durMs)
+        else PlaybackState.Ready(file, posMs, durMs)
     VideoPlayer.State.Paused ->
         if (started) PlaybackState.Paused(file, posMs, durMs)
         else PlaybackState.Ready(file, posMs, durMs)
