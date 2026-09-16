@@ -97,8 +97,13 @@ class SystemAudioOutput : AutoCloseable {
         const val APPLICATION = "Nexira"
         const val APPLICATION_ID = "dev.hivens.nexira"
 
-        /** A freedesktop icon name, which is what a mixer row draws beside the name. */
-        const val ICON = "audio-x-generic"
+        /**
+         * The icon a mixer row draws beside the name, by the name the desktop
+         * knows it under: the same one the desktop entry names and the one the
+         * packaging installs into hicolor. A generic freedesktop name was what
+         * made the row a note glyph like any other player's.
+         */
+        const val ICON = "nexira"
     }
 }
 
