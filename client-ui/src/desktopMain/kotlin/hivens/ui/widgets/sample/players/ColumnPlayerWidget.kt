@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -86,10 +86,11 @@ import org.koin.compose.koinInject
  * top to bottom is no harder than left to right once nothing else competes for
  * the same direction.
  *
- * There is no drag on the strip here. A vertical gesture inside a rail belongs to
- * the rail, which scrolls, and a widget that steals it makes the rail feel broken
- * to reach past. Seeking is the one thing this kind gives up, and the transport
- * under it is the compensation: full sized, because a rail has the room for it.
+ * The strip takes a press and a drag, like every other measure here. The worry was
+ * that a vertical gesture inside a rail is one the rail wants for scrolling, but a
+ * rail scrolls on the wheel and a drag beginning on a child belongs to the child:
+ * what the caution would have bought is a measure people can see and cannot move.
+ * The transport under it is full sized either way, because a rail has the room.
  */
 @Serializable
 data class ColumnPlayerProps(
@@ -177,7 +178,21 @@ internal fun ColumnPlayerCard(
     val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
+    val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
+
+    // Built from the duration rather than read out of the state inside the
+    // gesture. The state is a new value on every poll, so a lambda closing over it
+    // is a new lambda five times a second, and the pointer handler keyed on that
+    // lambda was torn down and rebuilt just as often: a press landing in the gap
+    // was lost outright and a drag never survived one. Every sibling kind already
+    // did it this way.
+    val seekFraction: ((Float) -> Unit)? =
+        if (loaded && duration > 0L) {
+            { at -> onSeek((at * duration).toLong()) }
+        } else {
+            null
+        }
 
     NxSurface(
         level    = NxSurfaceLevel.Floating,
@@ -208,11 +223,7 @@ internal fun ColumnPlayerCard(
                         fraction  = progressFraction(state),
                         played    = palette.primary,
                         remaining = palette.textSecondary.copy(alpha = 0.26f),
-                        onSeekFraction = if (loaded && durationMsOf(state) > 0L) {
-                            { at -> onSeek((at * durationMsOf(state)).toLong()) }
-                        } else {
-                            null
-                        },
+                        onSeekFraction = seekFraction,
                         modifier  = Modifier.width(stripWidth).fillMaxHeight(),
                     )
                     Spacer(Modifier.width(10.dp))
@@ -302,12 +313,33 @@ internal fun ColumnPlayerCard(
                 }
             }
 
-            Box(Modifier.align(Alignment.TopEnd).padding(2.dp)) {
-                NxIconButton(
-                    icon               = NxIcon.MoreVert,
-                    contentDescription = s.packCardMore,
-                    onClick            = { menuOpen = true },
-                )
+            // Far enough in that the disc behind it clears the card's own corner.
+            // At two points the circle was cut by the curve and read as a shape
+            // that had not fitted rather than as a button.
+            Box(Modifier.align(Alignment.TopEnd).padding(6.dp)) {
+                // Over the artwork the glyph needs a ground of its own. Drawn in the
+                // palette's own ink it took whatever the cover's top corner happened
+                // to be, and on the light theme a dark corner swallowed it outright.
+                // The disc is only there when there is a picture under it: on the
+                // bare plane the palette's ink is exactly right and a black wash
+                // would be an ornament.
+                Box(
+                    Modifier
+                        .then(
+                            if (showCover) {
+                                Modifier.clip(CircleShape).background(Color.Black.copy(alpha = OVERFLOW_SCRIM))
+                            } else {
+                                Modifier
+                            },
+                        ),
+                ) {
+                    NxIconButton(
+                        icon               = NxIcon.MoreVert,
+                        contentDescription = s.packCardMore,
+                        onClick            = { menuOpen = true },
+                        tint               = if (showCover) Color.White else palette.textPrimary,
+                    )
+                }
                 NxPopoverPanel(
                     expanded         = menuOpen,
                     onDismissRequest = { menuOpen = false },
@@ -367,7 +399,7 @@ internal fun ColumnPlayerCard(
  * card in a narrow one.
  */
 @Composable
-private fun Cover(artwork: ImageBitmap?, accent: androidx.compose.ui.graphics.Color) {
+private fun Cover(artwork: ImageBitmap?, accent: Color) {
     val shape = MaterialTheme.shapes.small
     if (artwork != null) {
         Image(
@@ -393,6 +425,9 @@ private fun Cover(artwork: ImageBitmap?, accent: androidx.compose.ui.graphics.Co
  * how long the title happens to be is a measure that changes scale per track.
  */
 private val BODY_HEIGHT = 96.dp
+
+/** How far the disc behind the overflow darkens the cover under it. */
+private const val OVERFLOW_SCRIM = 0.38f
 
 /** What a clock reads with nothing loaded. */
 private const val EMPTY_CLOCK = "--:--"

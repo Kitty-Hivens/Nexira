@@ -230,10 +230,14 @@ private const val FLOOR_SHARE = 0.08f
  * Twelve o'clock is the start and it runs clockwise, matching what the ring
  * draws, so the position follows the finger rather than the arithmetic.
  *
- * Presses nearer the middle than [innerFraction] are left alone. The middle of
- * every ring-shaped player holds its transport, and a shape whose whole face is
- * one gesture would either swallow the press meant for the button or seek to
- * wherever the button happens to sit.
+ * A press has to LAND on the ring, and only a press. Nearer the middle than
+ * [innerFraction] is the transport's own ground, and past the outer edge is
+ * outside the object altogether, since both shapes that use this are round and are
+ * laid out in a square: without the second test a click on nothing, in the corner
+ * beside a token, moved the track.
+ *
+ * Neither test is applied once a gesture is under way. The whole point of a rotary
+ * control is that it follows the angle for as long as the button is held.
  */
 internal fun Modifier.seekByAngle(
     innerFraction: Float,
@@ -242,16 +246,20 @@ internal fun Modifier.seekByAngle(
     if (onSeekFraction == null) return this
     return pointerInput(onSeekFraction, innerFraction) {
         val centre = Offset(size.width / 2f, size.height / 2f)
-        val inner = size.width.coerceAtMost(size.height) / 2f * innerFraction
+        val radius = size.width.coerceAtMost(size.height) / 2f
+        val inner = radius * innerFraction
+
+        /** Whether a point is on the band the ring occupies. Asked of a press only. */
+        fun onBand(at: Offset): Boolean {
+            val reach = hypot(at.x - centre.x, at.y - centre.y)
+            return reach >= inner && reach <= radius
+        }
 
         fun report(at: Offset) {
-            val dx = at.x - centre.x
-            val dy = at.y - centre.y
-            if (hypot(dx, dy) < inner) return
             // atan2 answers from three o'clock and counts anticlockwise on a
             // screen's y-down axes, so a quarter turn puts zero at the top and the
             // sweep runs the way the arc is drawn.
-            val turns = (atan2(dy, dx) / (2.0 * PI) + 0.25).toFloat()
+            val turns = (atan2(at.y - centre.y, at.x - centre.x) / (2.0 * PI) + 0.25).toFloat()
             onSeekFraction(((turns % 1f) + 1f) % 1f)
         }
 
@@ -261,6 +269,14 @@ internal fun Modifier.seekByAngle(
                 // the ring are children drawn over this, and a press one of them
                 // took is not also a seek.
                 val down = awaitFirstDown(requireUnconsumed = true)
+                // The band decides whether a gesture STARTS, and nothing after
+                // that. A rotary control follows the angle for as long as the
+                // button is held, and a hand sweeping round a small disc leaves the
+                // band constantly: asked on every move, the position froze wherever
+                // the pointer crossed an edge, with nothing on screen to say the
+                // drag had been dropped. Once a press has landed on the ring, every
+                // angle it reaches afterwards is meant.
+                if (!onBand(down.position)) continue
                 report(down.position)
                 do {
                     val event = awaitPointerEvent()
@@ -280,7 +296,7 @@ internal fun Modifier.seekByAngle(
  * here at all: a press is the first report and every move after it is another,
  * which is the same thing a tap would have been and cannot be stolen.
  */
-private fun Modifier.seekAlong(
+internal fun Modifier.seekAlong(
     vertical: Boolean,
     onSeekFraction: ((Float) -> Unit)?,
 ): Modifier {

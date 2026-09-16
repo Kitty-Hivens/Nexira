@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +48,14 @@ import hivens.ui.theme.NxTheme
  *
  * A drag that is cancelled still releases the pressed state, or the handle
  * sticks enlarged after the pointer leaves the window mid-gesture.
+ *
+ * [onSeekFraction] is read through a holder rather than captured. The gesture
+ * coroutine is keyed on [enabled] alone, it starts on the first event it ever sees
+ * and then lives inside its own loop for good, so whatever it captured at that
+ * moment is what it keeps. The callers close a duration into that callback, and
+ * stepping from one loaded track to the next never touches [enabled]: the scrubber
+ * went on converting fractions with the PREVIOUS track's length, so a click at the
+ * middle of a three-minute track after a ten-minute one asked for five minutes in.
  */
 @Composable
 internal fun PlaybackScrubber(
@@ -55,6 +64,7 @@ internal fun PlaybackScrubber(
     onSeekFraction: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val seek by rememberUpdatedState(onSeekFraction)
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var pressing by remember { mutableStateOf(false) }
@@ -90,9 +100,9 @@ internal fun PlaybackScrubber(
                     pressing = true
                     try {
                         val w = size.width.coerceAtLeast(1).toFloat()
-                        onSeekFraction((down.position.x / w).coerceIn(0f, 1f))
+                        seek((down.position.x / w).coerceIn(0f, 1f))
                         drag(down.id) { change ->
-                            onSeekFraction((change.position.x / w).coerceIn(0f, 1f))
+                            seek((change.position.x / w).coerceIn(0f, 1f))
                             change.consume()
                         }
                     } finally {

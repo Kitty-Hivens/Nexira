@@ -57,6 +57,7 @@ import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
+import hivens.ui.widgets.sample.durationMsOf
 import hivens.ui.widgets.sample.progressFraction
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
@@ -80,11 +81,15 @@ import org.koin.compose.koinInject
  * that turns into a player.
  *
  * The dim under the chrome is flat rather than a gradient, which is the opposite
- * of what the caption gets, and deliberately: the controls sit in the MIDDLE of
- * the square, where a bottom gradient leaves them on whatever the cover happens
- * to be. The caption is at the foot, so a gradient is exactly right there, and it
- * is drawn whether the chrome is up or not, because the title sits on the picture
- * either way.
+ * of what the foot gets, and deliberately: the controls sit in the MIDDLE of the
+ * square, where a bottom gradient leaves them on whatever the cover happens to be.
+ * The foot carries the name and the measure, so a gradient is exactly right there,
+ * and it is drawn whether the chrome is up and whether a caption is asked for,
+ * because the measure sits on the picture in every one of those cases.
+ *
+ * The measure at the foot takes a press and a drag like every other one here. The
+ * box around it reaches well above the three points it draws, since a line that
+ * thin is a target nobody can hit.
  *
  * With no artwork the ground is generated from the palette rather than filled
  * with a note glyph on grey. The empty case of a shape whose whole subject is a
@@ -145,6 +150,7 @@ fun TilePlayerWidget(instance: WidgetInstance) {
         onRepeat    = { player.setRepeat(it) },
         onSkipNext  = { player.skipToNext() },
         onSkipPrev  = { player.skipToPrevious() },
+        onSeek      = { player.seek(it) },
         modifier    = Modifier.hoverable(hover),
     )
 }
@@ -174,13 +180,26 @@ internal fun TilePlayerCard(
     onRepeat: (RepeatMode) -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrev: () -> Unit,
+    onSeek: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
     val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
+    val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
+
+    // Null while there is nothing to seek in, which is what leaves the line inert
+    // rather than reporting a position in a track of unknown length. Built from
+    // the duration rather than from the state, so it is remembered across a poll
+    // instead of tearing down the gesture twice a second.
+    val seekFraction: ((Float) -> Unit)? =
+        if (loaded && duration > 0L) {
+            { at -> onSeek((at * duration).toLong()) }
+        } else {
+            null
+        }
 
     // Faded rather than switched. The chrome appearing on a frame boundary reads
     // as a flicker when the pointer crosses a wall of these, and the menu holds it
@@ -252,14 +271,18 @@ internal fun TilePlayerCard(
             }
         }
 
+        // For the foot of the tile, and present whether the chrome is up or not,
+        // because the title and the measure both sit on the picture either way. It
+        // used to be drawn inside the caption's own branch, so a tile too small for
+        // a caption, or one told not to draw one, put its measure straight onto the
+        // artwork and lost it against half the covers there are.
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.72f)),
+            ),
+        )
+
         if (caption) {
-            // For the caption alone, and present whether the chrome is up or not,
-            // because the title sits on the picture either way.
-            Box(
-                Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.72f)),
-                ),
-            )
             Column(Modifier.align(Alignment.BottomStart).padding(12.dp).padding(bottom = 4.dp)) {
                 val name = playerTitle(state, track, s)
                 Text(
@@ -288,15 +311,34 @@ internal fun TilePlayerCard(
         // Inset by the shape's own corner so neither end of the line is eaten by
         // the curve, which is what a full-bleed rule at the foot of a rounded tile
         // looks like it is.
-        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.26f)))
-            Box(
-                Modifier
-                    .fillMaxWidth(progressFraction(state).coerceIn(0f, 1f))
-                    .height(3.dp)
-                    .clip(CircleShape)
-                    .background(palette.primary),
-            )
+        //
+        // Taller than it draws, and that is the point: three points of line is a
+        // target nobody can hit. The gutters go on the OUTSIDE of the gesture so
+        // the span a press is measured against is exactly the span the line
+        // occupies, and the line keeps its old distance from the foot by sitting
+        // at the bottom of a box that reaches up to meet the pointer.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .height((side * SEEK_REACH_SHARE).coerceIn(SEEK_REACH_MIN, SEEK_REACH_MAX))
+                .seekAlong(vertical = false, onSeekFraction = seekFraction),
+            contentAlignment = Alignment.BottomStart,
+        ) {
+            Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Box(
+                    Modifier.fillMaxWidth().height(3.dp).clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.26f)),
+                )
+                Box(
+                    Modifier
+                        .fillMaxWidth(progressFraction(state).coerceIn(0f, 1f))
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(palette.primary),
+                )
+            }
         }
 
         Box(Modifier.align(Alignment.TopEnd).alpha(reveal)) {
@@ -355,6 +397,23 @@ internal fun TilePlayerCard(
         }
     }
 }
+
+/**
+ * How far up from the foot a press still counts as the measure, as a share of the
+ * tile between a floor and a ceiling.
+ *
+ * The line itself is three points and stays where it is whatever this says. This
+ * is the box around it, which is what a pointer actually has to land in, and it is
+ * taken from the tile's own size like every other threshold here: a fixed reach
+ * was a fifth of a large tile and nearly half of one placed at the smallest size
+ * the props allow.
+ */
+private const val SEEK_REACH_SHARE = 0.16f
+
+/** Enough to hold the line and the eleven points of clearance under it. */
+private val SEEK_REACH_MIN = 13.dp
+
+private val SEEK_REACH_MAX = 22.dp
 
 /** The artwork, or a field generated from the palette where there is none. */
 @Composable
