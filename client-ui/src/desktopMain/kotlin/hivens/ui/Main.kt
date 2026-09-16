@@ -43,6 +43,7 @@ import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.MediaSessionBridge
+import hivens.ui.audio.AudioOutput
 import hivens.ui.audio.SystemAudioOutput
 import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.editor.EditModeController
@@ -243,7 +244,11 @@ val uiModule = module {
             },
             initialQueue  = saved.audioQueue.mapNotNull { runCatching { Path.of(it) }.getOrNull() },
             initialIndex  = saved.audioQueueIndex,
-            output        = get(),
+            // Optional, and read as optional. The doc on this parameter says losing
+            // the named output must never cost the sound itself, and a get() that
+            // throws is exactly that cost, paid by everything else in the process
+            // as well.
+            output        = getOrNull(),
             persistQueue  = { files, index ->
                 settings.saveSettings(
                     settings.getSettings().copy(
@@ -260,7 +265,10 @@ val uiModule = module {
     // top of it. A machine it cannot reach falls back to the line skinema opens
     // for itself, so this is an improvement to how the sound is labelled and never
     // a condition on it playing.
-    single(createdAtStart = false) { SystemAudioOutput() }
+    // Bound by the interface the player asks for, not by the class that implements
+    // it. Registered under the concrete type, the lookup for AudioOutput found
+    // nothing and took the whole launcher down before its first frame.
+    single<AudioOutput>(createdAtStart = false) { SystemAudioOutput() }
 
     // What the desktop sees of the player: MPRIS on Linux, the platform's own
     // elsewhere. createdAtStart because nothing composes it -- a media session is

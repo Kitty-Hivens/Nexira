@@ -50,6 +50,7 @@ import java.awt.Desktop
 import java.nio.file.Path
 import kotlin.concurrent.thread
 import kotlin.math.floor
+import kotlin.math.round
 import kotlin.math.min
 
 // Pixel-game boot readout: thick block frame with stepped corners, the fill
@@ -194,8 +195,13 @@ fun ThresholdOverlay(
 
         Canvas(Modifier.fillMaxSize()) {
             val u = UNIT.toPx()
+            // Snapped to whole device pixels. Centring put the left edge on a half
+            // pixel on any window whose width is odd, and a band of a pixel-art
+            // frame drawn across a fraction is antialiased into two soft ones: the
+            // frame reads as crooked, which for the one element in the launcher
+            // that is deliberately pixel art is the only thing anyone will see.
             val frameRect = Rect(
-                Offset((size.width - barWidth.toPx()) / 2f, barTop.toPx()),
+                Offset(round((size.width - barWidth.toPx()) / 2f), round(barTop.toPx())),
                 Size(barWidth.toPx(), barHeight.toPx()),
             )
 
@@ -216,9 +222,13 @@ fun ThresholdOverlay(
                 }
             }
 
-            // Readout: frame + segments follow the shared exit fade.
+            // Readout: frame + segments follow the shared exit fade. A failed boot
+            // draws neither. The bar answers "how far along", and there is no
+            // answer to that under a message saying it did not get there: an empty
+            // frame below the error is a control that cannot mean anything, and it
+            // is the first thing the eye goes to.
             val frameAlpha = entryAlpha.value * exitFade.value
-            if (frameAlpha > 0f) {
+            if (frameAlpha > 0f && failed == null) {
                 drawPixelFrame(frameRect, u, pal.frame.copy(alpha = 0.92f * frameAlpha))
                 // Fill: discrete segments on the pixel grid, each 3 units wide
                 // with a unit gap -- the bar loads chunk by chunk, never as a
@@ -229,9 +239,7 @@ fun ThresholdOverlay(
                 )
                 val segStride = 4 * u
                 val segCount = floor((inner.width + u) / segStride).toInt().coerceAtLeast(1)
-                val fillFraction = if (failed != null) 0f else bar
-                val lit = floor(fillFraction * segCount).toInt().coerceIn(0, segCount)
-                val alpha = if (failed != null) 0.25f * frameAlpha else frameAlpha
+                val lit = floor(bar * segCount).toInt().coerceIn(0, segCount)
                 for (i in 0 until lit) {
                     drawPixelSegment(
                         Rect(
@@ -239,7 +247,7 @@ fun ThresholdOverlay(
                             Size(3 * u, inner.height),
                         ),
                         step = u / 2f,
-                        color = pal.fill.copy(alpha = alpha),
+                        color = pal.fill.copy(alpha = frameAlpha),
                     )
                 }
             }
