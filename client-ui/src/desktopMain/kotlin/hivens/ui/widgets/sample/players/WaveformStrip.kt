@@ -1,10 +1,7 @@
 package hivens.ui.widgets.sample.players
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -75,20 +72,7 @@ internal fun WaveformStrip(
     val slotPx = with(density) { (barWidth + gap).toPx() }.coerceAtLeast(1f)
     val barPx = with(density) { barWidth.toPx() }.coerceAtLeast(1f)
 
-    val seekable = onSeekFraction != null
-    val gestures = if (!seekable) Modifier else Modifier.pointerInput(onSeekFraction) {
-        val width = size.width.toFloat()
-        detectTapGestures { onSeekFraction!!((it.x / width).coerceIn(0f, 1f)) }
-    }.then(
-        Modifier.pointerInput(onSeekFraction) {
-            val width = size.width.toFloat()
-            detectHorizontalDragGestures { change, _ ->
-                onSeekFraction!!((change.position.x / width).coerceIn(0f, 1f))
-            }
-        },
-    )
-
-    Canvas(modifier.then(gestures)) {
+    Canvas(modifier.seekAlong(vertical = false, onSeekFraction = onSeekFraction)) {
         val count = (size.width / slotPx).toInt().coerceAtLeast(1)
         // Resampling per draw rather than per recomposition: the count depends on
         // the measured width, which is not known until here, and the reduction is
@@ -137,19 +121,7 @@ internal fun WaveformColumn(
     val slotPx = with(density) { (barHeight + gap).toPx() }.coerceAtLeast(1f)
     val barPx = with(density) { barHeight.toPx() }.coerceAtLeast(1f)
 
-    val gestures = if (onSeekFraction == null) Modifier else Modifier.pointerInput(onSeekFraction) {
-        val height = size.height.toFloat()
-        detectTapGestures { onSeekFraction((it.y / height).coerceIn(0f, 1f)) }
-    }.then(
-        Modifier.pointerInput(onSeekFraction) {
-            val height = size.height.toFloat()
-            detectVerticalDragGestures { change, _ ->
-                onSeekFraction((change.position.y / height).coerceIn(0f, 1f))
-            }
-        },
-    )
-
-    Canvas(modifier.then(gestures)) {
+    Canvas(modifier.seekAlong(vertical = true, onSeekFraction = onSeekFraction)) {
         val count = (size.height / slotPx).toInt().coerceAtLeast(1)
         val bars = waveform.bars(count)
         val floor = size.width * FLOOR_SHARE
@@ -288,6 +260,39 @@ internal fun Modifier.seekByAngle(
                 // Unconsumed only: the transport in the middle and the overflow on
                 // the ring are children drawn over this, and a press one of them
                 // took is not also a seek.
+                val down = awaitFirstDown(requireUnconsumed = true)
+                report(down.position)
+                do {
+                    val event = awaitPointerEvent()
+                    event.changes.firstOrNull()?.let { report(it.position) }
+                } while (event.changes.any { it.pressed })
+            }
+        }
+    }
+}
+
+/**
+ * Seeking along a strip: the press lands, and the drag carries on from it.
+ *
+ * One gesture rather than a tap detector beside a drag detector. Two of them on
+ * the same element race for the press, and the drag wins often enough that a
+ * plain click on the strip did nothing perhaps half the time. There is no tap
+ * here at all: a press is the first report and every move after it is another,
+ * which is the same thing a tap would have been and cannot be stolen.
+ */
+private fun Modifier.seekAlong(
+    vertical: Boolean,
+    onSeekFraction: ((Float) -> Unit)?,
+): Modifier {
+    if (onSeekFraction == null) return this
+    return pointerInput(onSeekFraction, vertical) {
+        fun report(at: Offset) {
+            val span = (if (vertical) size.height else size.width).toFloat()
+            if (span <= 0f) return
+            onSeekFraction(((if (vertical) at.y else at.x) / span).coerceIn(0f, 1f))
+        }
+        awaitPointerEventScope {
+            while (true) {
                 val down = awaitFirstDown(requireUnconsumed = true)
                 report(down.position)
                 do {
