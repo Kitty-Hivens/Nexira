@@ -38,6 +38,16 @@ import kotlin.time.Duration.Companion.milliseconds
  * null; the launcher plays exactly as before and the desktop simply shows
  * nothing. That is why every path here is null-tolerant rather than guarded by a
  * capability check at the call site.
+ *
+ * ## What is here and what is beside it
+ *
+ * This class owns the two things a test cannot have: a connection to the bus and
+ * a timer. Everything it decides lives in [SessionPublisher], [CoverTrail] and
+ * [sessionStateOf], which take plain data and can be driven through a whole run
+ * of a track without either. That split is not tidiness. Five things this bridge
+ * published were stale or wrong at once and every one of them was found by
+ * reading rather than by using the launcher, because there was nothing that
+ * could fail.
  */
 class MediaSessionBridge(
     private val player: AudioPlayer,
@@ -50,9 +60,6 @@ class MediaSessionBridge(
 
     private var session: MediaSession? = null
     private var job: Job? = null
-
-    /** What the position read on the previous poll, for spotting a jump. */
-    private var lastPositionMs = 0L
 
     /** Names each cover apart, so a new one is a new URL. */
     private var artSerial = 0
@@ -83,137 +90,31 @@ class MediaSessionBridge(
             opened.onCommand { command -> scope.launch { handle(command) } }
             log.info("Media session published as {}", IDENTITY)
 
-            // Which file the cover on the wire belongs to, and whether it has been
-            // written from that file's own tags yet.
-            var artFor: Path? = null
-            var artRead = false
-            var artUrl: String? = null
+            val publisher = SessionPublisher(opened) { message, cause -> log.warn(message, cause) }
+            val covers = CoverTrail()
             while (isActive) {
-                val state = player.state.value
-                val track = player.track.value
-                val file = state.file
-                if (file != artFor) {
-                    // A new file drops the previous cover at once. The player clears
-                    // its metadata on load and fills it again a moment later from the
-                    // decode thread, so keying this on the track instead left the old
-                    // picture standing through that gap: the new title beside the
-                    // previous track's art, which is the partial update SessionState
-                    // is explicit about.
-                    artFor = file
-                    artRead = false
-                    artUrl = null
+                val snapshot = snapshot()
+                // Off the poll's own thread: a several-megapixel cover is a decode
+                // and an encode, and the loop is what keeps the desktop's position
+                // moving.
+                val artUrl = covers.urlFor(snapshot) { artwork ->
+                    withContext(Dispatchers.IO) { writeArt(artwork) }
                 }
-                if (file != null && !artRead && track != null) {
-                    artRead = true
-                    artUrl = withContext(Dispatchers.IO) { writeArt(track.artwork) }
-                }
-                publish(state, track, artUrl)
-                delay(POLL_MS.milliseconds)
+                publisher.publish(snapshot, artUrl)
+                delay(SESSION_POLL_MS.milliseconds)
             }
         }
     }
 
-    /**
-     * Hands the whole state over on every poll, and announces the position
-     * separately when it jumped.
-     *
-     * Every poll, with no comparison of our own, and that is the load-bearing
-     * part. MPRIS leaves the position out of its property-change notifications
-     * deliberately, because a number that moves continuously would be a bus
-     * message per tick and a redraw in every widget listening; what a reader
-     * does instead is poll the property, and what that property answers is the
-     * last state published here. So withholding a publish because only the
-     * position moved is not an optimisation, it is the scrubber freezing in
-     * every widget on the bus while the audio plays on.
-     *
-     * Cheap, because the comparison already exists one layer down: the session
-     * diffs the state against what it last announced and emits nothing where
-     * nothing changed. Doing it here as well duplicated that work and got the
-     * one property it excludes wrong.
-     *
-     * The jump is the other half, and it cannot be inferred. A position that
-     * advanced and a position that was seeked look identical to anything
-     * comparing two snapshots, and a reader extrapolating between polls has no
-     * way to tell them apart, so the player has to say. A track change is one of
-     * these: the position drops to zero without anybody having seeked.
-     */
-    private fun publish(state: PlaybackState, track: TrackInfo?, artUrl: String?) {
-        val s = session ?: return
-        val positionMs = positionOf(state)
-        val next = SessionState(
-            playback = when (state) {
-                is PlaybackState.Playing -> SessionPlayback.PLAYING
-                is PlaybackState.Paused -> SessionPlayback.PAUSED
-                is PlaybackState.Ready -> SessionPlayback.PAUSED
-                is PlaybackState.Idle, is PlaybackState.Error -> SessionPlayback.STOPPED
-            },
-            metadata = metadataOf(state, track, artUrl),
-            positionMicros = positionMs * 1_000L,
-            // The player's own loudness, which is a separate slider from the
-            // stream's in the system mixer. Left at its default this published a
-            // constant full volume, so a widget's slider sat at the top whatever
-            // the player was set to, and a drag on it snapped straight back.
-            volume = player.volume.value.toDouble(),
-            canPlay = state !is PlaybackState.Idle,
-            // Whether this player can be paused at all, not whether it is playing
-            // right now. The distinction is the protocol's: these properties
-            // describe what the player is able to do, and tying one to the
-            // transport made it flip on every press.
-            canPause = state !is PlaybackState.Idle,
-            canGoNext = player.queue.value.size > 1,
-            canGoPrevious = player.queue.value.size > 1,
-            canSeek = durationOf(state) > 0L,
-            loop = when (player.repeat.value) {
-                RepeatMode.Off -> LoopMode.NONE
-                RepeatMode.One -> LoopMode.TRACK
-                RepeatMode.Queue -> LoopMode.PLAYLIST
-            },
-        )
-
-        runCatching { s.publish(next) }.onFailure { log.warn("Could not publish the session state", it) }
-        if (jumped(positionMs)) {
-            runCatching { s.seeked(positionMs * 1_000L) }
-                .onFailure { log.warn("Could not announce a seek", it) }
-        }
-        lastPositionMs = positionMs
-    }
-
-    /**
-     * Whether the position moved by more than one poll's worth of playing.
-     *
-     * Backwards at all, or forwards by more than the interval plus a margin. The
-     * margin is what keeps an ordinary tick from being read as a seek: a poll
-     * that ran late, or a clock that advanced across a track boundary, moves the
-     * number by more than the nominal interval without anybody having sought.
-     */
-    private fun jumped(positionMs: Long): Boolean {
-        val delta = positionMs - lastPositionMs
-        return delta < 0L || delta > POLL_MS + JUMP_MARGIN_MS
-    }
-
-    private fun metadataOf(state: PlaybackState, track: TrackInfo?, artUrl: String?): TrackMetadata {
-        if (state is PlaybackState.Idle) return TrackMetadata.EMPTY
-        val duration = durationOf(state)
-        return TrackMetadata(
-            title = track?.title ?: state.file?.fileName?.toString(),
-            artists = listOfNotNull(track?.artist),
-            album = track?.album,
-            durationMicros = duration.takeIf { it > 0L }?.times(1_000L),
-            artUrl = artUrl,
-            trackId = trackIdOf(state.file),
-        )
-    }
-
-    /**
-     * What names the loaded track on the wire.
-     *
-     * The path identifies it, and a queue can hold the same file twice, so the
-     * index goes with it. One function rather than two literals because the id is
-     * minted here and compared here: a desktop sends it back with a seek to say
-     * which track it believed was playing, and an identity that is built one way
-     * and checked another would fail every comparison.
-     */
-    private fun trackIdOf(file: Path?): String? = file?.let { "${player.queueIndex.value}:$it" }
+    /** Everything the session is built from, read in one go so the parts cannot disagree. */
+    private fun snapshot() = PlayerSnapshot(
+        state = player.state.value,
+        track = player.track.value,
+        volume = player.volume.value,
+        queueSize = player.queue.value.size,
+        queueIndex = player.queueIndex.value,
+        repeat = player.repeat.value,
+    )
 
     /**
      * Writes [artwork] where the desktop can read it, and answers its URL.
@@ -263,17 +164,8 @@ class MediaSessionBridge(
                 player.seek(now + command.offsetMicros / 1_000L)
             }
             is SessionCommand.SetPosition -> {
-                // The track the sender believed was playing, which is the whole
-                // reason the command carries one. A widget still showing the
-                // previous track when somebody clicked its scrubber would
-                // otherwise seek whatever replaced it, and a track change is
-                // exactly when a click is most likely to be one poll behind.
-                //
-                // No id is not a mismatch. A reader that sends none is making no
-                // claim about which track this is, and refusing it would drop
-                // every seek from a widget that does not track identities.
-                val current = trackIdOf(player.state.value.file)
-                if (command.trackId == null || command.trackId == current) {
+                val current = trackIdOf(player.state.value.file, player.queueIndex.value)
+                if (acceptsSeek(command.trackId, current)) {
                     player.seek(command.positionMicros / 1_000L)
                 } else {
                     log.debug("Dropping a stale seek for {} while {} is loaded", command.trackId, current)
@@ -310,31 +202,245 @@ class MediaSessionBridge(
         const val APPLICATION = "Nexira"
         const val IDENTITY = "Nexira"
         const val DESKTOP_ENTRY = "nexira"
-
-        /**
-         * How often the player is read, which is also how stale the position a
-         * desktop reads can be.
-         *
-         * Slower than the transport's own five a second, because nothing here
-         * draws and a bus message only leaves when something other than the
-         * position changed. Half a second is under what a reader's own redraw
-         * would resolve, and it is the anchor such a reader extrapolates from
-         * between its polls rather than the rate it redraws at.
-         */
-        const val POLL_MS = 500L
-
-        const val JUMP_MARGIN_MS = 750L
     }
 }
 
-private fun positionOf(state: PlaybackState): Long = when (state) {
+/**
+ * How often the player is read, which is also how stale the position a desktop
+ * reads can be.
+ *
+ * Slower than the transport's own five a second, because nothing here draws and a
+ * bus message only leaves when something other than the position changed. Half a
+ * second is under what a reader's own redraw would resolve, and it is the anchor
+ * such a reader extrapolates from between its polls rather than the rate it
+ * redraws at.
+ */
+internal const val SESSION_POLL_MS = 500L
+
+/**
+ * How far past one poll's worth of playing the position may move before it counts
+ * as a jump.
+ *
+ * What keeps an ordinary tick from being read as a seek: a poll that ran late, or
+ * a clock that advanced across a track boundary, moves the number by more than the
+ * nominal interval without anybody having sought.
+ */
+internal const val SESSION_JUMP_MARGIN_MS = 750L
+
+/**
+ * Everything the session is built from, as of one poll.
+ *
+ * Read off the player in one go rather than field by field where each is needed,
+ * so a track that changes half way through building a state cannot leave the new
+ * title beside the old duration. Plain data, which is what lets the whole of the
+ * publishing be driven through a run of a track without a player or a bus.
+ */
+internal data class PlayerSnapshot(
+    val state: PlaybackState,
+    val track: TrackInfo?,
+    val volume: Float,
+    val queueSize: Int,
+    val queueIndex: Int,
+    val repeat: RepeatMode,
+) {
+    val file: Path? get() = state.file
+}
+
+/**
+ * What names the loaded track on the wire.
+ *
+ * The path identifies it, and a queue can hold the same file twice, so the index
+ * goes with it. One function rather than two literals because the id is minted
+ * here and compared here: a desktop sends it back with a seek to say which track
+ * it believed was playing, and an identity built one way and checked another
+ * would fail every comparison.
+ */
+internal fun trackIdOf(file: Path?, queueIndex: Int): String? = file?.let { "$queueIndex:$it" }
+
+/**
+ * Whether a seek naming [sent] should be acted on while [current] is loaded.
+ *
+ * The command carries the track its sender believed was playing, and that is the
+ * whole reason it carries one: a widget still showing the previous track when
+ * somebody clicked its scrubber would otherwise seek whatever replaced it, and a
+ * track change is exactly when a click is most likely to be one poll behind.
+ *
+ * No id is not a mismatch. A reader that sends none is making no claim about which
+ * track this is, and refusing it would drop every seek from a widget that does not
+ * carry identities.
+ */
+internal fun acceptsSeek(sent: String?, current: String?): Boolean = sent == null || sent == current
+
+/**
+ * Whether the position moved further than playing could have moved it.
+ *
+ * Backwards at all, or forwards by more than one interval plus
+ * [SESSION_JUMP_MARGIN_MS].
+ *
+ * A null [previousMs] is the first poll, and it is never a jump. There is nothing
+ * for the position to be inconsistent with yet, and the state published alongside
+ * carries it anyway, so announcing one would tell the desktop somebody sought when
+ * the player had only just started answering. Treating the absent previous value
+ * as a zero said exactly that for any first poll that was not at the very start of
+ * a track.
+ */
+internal fun jumped(positionMs: Long, previousMs: Long?): Boolean {
+    if (previousMs == null) return false
+    val delta = positionMs - previousMs
+    return delta < 0L || delta > SESSION_POLL_MS + SESSION_JUMP_MARGIN_MS
+}
+
+/**
+ * The whole outward state, from one snapshot and whatever cover is on disk.
+ *
+ * Pure, and separated from the bridge for the reason the bridge's own
+ * documentation gives: this is where five defects sat at once, and none of them
+ * could have been caught by anything short of reading it.
+ */
+internal fun sessionStateOf(snapshot: PlayerSnapshot, artUrl: String?): SessionState {
+    val state = snapshot.state
+    return SessionState(
+        playback = when (state) {
+            is PlaybackState.Playing -> SessionPlayback.PLAYING
+            is PlaybackState.Paused -> SessionPlayback.PAUSED
+            is PlaybackState.Ready -> SessionPlayback.PAUSED
+            is PlaybackState.Idle, is PlaybackState.Error -> SessionPlayback.STOPPED
+        },
+        metadata = metadataOf(snapshot, artUrl),
+        positionMicros = positionOf(state) * 1_000L,
+        // The player's own loudness, which is a separate slider from the stream's
+        // in the system mixer. Left at its default this published a constant full
+        // volume, so a widget's slider sat at the top whatever the player was set
+        // to, and a drag on it snapped back.
+        volume = snapshot.volume.toDouble(),
+        canPlay = state !is PlaybackState.Idle,
+        // Whether this player can be paused at all, not whether it is playing right
+        // now. The distinction is the protocol's: these properties describe what
+        // the player is able to do, and tying one to the transport made it flip on
+        // every press.
+        canPause = state !is PlaybackState.Idle,
+        canGoNext = snapshot.queueSize > 1,
+        canGoPrevious = snapshot.queueSize > 1,
+        canSeek = durationOf(state) > 0L,
+        loop = when (snapshot.repeat) {
+            RepeatMode.Off -> LoopMode.NONE
+            RepeatMode.One -> LoopMode.TRACK
+            RepeatMode.Queue -> LoopMode.PLAYLIST
+        },
+    )
+}
+
+private fun metadataOf(snapshot: PlayerSnapshot, artUrl: String?): TrackMetadata {
+    val state = snapshot.state
+    if (state is PlaybackState.Idle) return TrackMetadata.EMPTY
+    val duration = durationOf(state)
+    return TrackMetadata(
+        title = snapshot.track?.title ?: state.file?.fileName?.toString(),
+        artists = listOfNotNull(snapshot.track?.artist),
+        album = snapshot.track?.album,
+        durationMicros = duration.takeIf { it > 0L }?.times(1_000L),
+        artUrl = artUrl,
+        trackId = trackIdOf(state.file, snapshot.queueIndex),
+    )
+}
+
+/**
+ * Turns a run of snapshots into what the session is told.
+ *
+ * ## Every poll, with no comparison of its own
+ *
+ * That is the load-bearing part and it reads backwards. MPRIS leaves the position
+ * out of its property-change notifications deliberately, because a number that
+ * moves continuously would be a bus message per tick and a redraw in every widget
+ * listening; what a reader does instead is poll the property, and what that
+ * property answers is the last state the player published. So withholding a
+ * publish because only the position moved is not an optimisation, it is the
+ * scrubber freezing in every widget on the bus while the audio plays on.
+ *
+ * It is cheap because the comparison already exists one layer down: the session
+ * diffs the state against what it last announced and emits nothing where nothing
+ * changed. Doing it here as well duplicated that work and got the one property it
+ * excludes wrong.
+ *
+ * ## The jump is the other half
+ *
+ * A position that advanced and a position that was seeked look identical to
+ * anything comparing two snapshots, and a reader extrapolating between polls has
+ * no way to tell them apart, so the player has to say. A track change is one of
+ * these: the position drops to zero without anybody having sought.
+ */
+internal class SessionPublisher(
+    private val session: MediaSession,
+    /** Where a refusal from the bus goes. Separate so a test can hold one without a logger. */
+    private val onFailure: (String, Throwable) -> Unit = { _, _ -> },
+) {
+
+    /**
+     * What the position read on the previous turn, or null before there has been
+     * one. Null rather than zero: a zero is a real position and would make the
+     * first poll of a track already under way look like a seek.
+     */
+    private var lastPositionMs: Long? = null
+
+    fun publish(snapshot: PlayerSnapshot, artUrl: String?) {
+        runCatching { session.publish(sessionStateOf(snapshot, artUrl)) }
+            .onFailure { onFailure("Could not publish the session state", it) }
+        val positionMs = positionOf(snapshot.state)
+        if (jumped(positionMs, lastPositionMs)) {
+            runCatching { session.seeked(positionMs * 1_000L) }
+                .onFailure { onFailure("Could not announce a seek", it) }
+        }
+        lastPositionMs = positionMs
+    }
+}
+
+/**
+ * Which cover URL belongs on the wire, across a run of polls.
+ *
+ * A track change arrives in two steps rather than one: the player clears its
+ * metadata when it loads a file and fills it again from the decode thread a moment
+ * later. Keyed on the track, that gap left the previous picture standing beside
+ * the new title, which is the partial update the session state is explicit about.
+ * So the file is what resets it and the metadata is what fills it.
+ */
+internal class CoverTrail {
+
+    /** The file the current URL belongs to, or null when nothing is loaded. */
+    private var forFile: Path? = null
+
+    /** Whether the file's own tags have been looked at, which happens once per file. */
+    private var read = false
+
+    private var url: String? = null
+
+    /**
+     * [write] is called at most once per file, and only once that file's metadata
+     * has arrived. A file whose tags carry no picture answers null and is not
+     * asked again.
+     */
+    suspend fun urlFor(snapshot: PlayerSnapshot, write: suspend (ImageBitmap?) -> String?): String? {
+        val file = snapshot.file
+        if (file != forFile) {
+            forFile = file
+            read = false
+            url = null
+        }
+        if (file != null && !read && snapshot.track != null) {
+            read = true
+            url = write(snapshot.track.artwork)
+        }
+        return url
+    }
+}
+
+internal fun positionOf(state: PlaybackState): Long = when (state) {
     is PlaybackState.Playing -> state.positionMs
     is PlaybackState.Paused -> state.positionMs
     is PlaybackState.Ready -> state.positionMs
     is PlaybackState.Idle, is PlaybackState.Error -> 0L
 }
 
-private fun durationOf(state: PlaybackState): Long = when (state) {
+internal fun durationOf(state: PlaybackState): Long = when (state) {
     is PlaybackState.Playing -> state.durationMs
     is PlaybackState.Paused -> state.durationMs
     is PlaybackState.Ready -> state.durationMs
