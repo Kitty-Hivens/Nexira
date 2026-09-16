@@ -12,6 +12,7 @@ import hivens.ui.audio.AudioError
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
+import hivens.ui.audio.fileTitle
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
@@ -23,7 +24,6 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import java.nio.file.Path
 import java.nio.file.Paths
-import kotlin.io.path.name
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -82,16 +82,22 @@ internal fun rememberAudioFilesPicker(
 }
 
 /**
- * The track's own title, the file name until the tags land, and the invitation
+ * The track's own title, the file's name until the tags land, and the invitation
  * to load something when nothing is loaded at all. An empty player that says
  * nothing reads as broken rather than as empty.
+ *
+ * The same name in every state, the failed one included. The fallback drops the
+ * extension because that is what [TrackInfo] itself falls back to, and a file
+ * named one way before its tags are read and another way after has renamed itself
+ * under the reader. On a track that failed, that reads as a different file rather
+ * than as the same one in trouble.
  */
 internal fun playerTitle(state: PlaybackState, track: TrackInfo?, s: AppStrings): String = when (state) {
     is PlaybackState.Idle    -> s.audioPickTrack
-    is PlaybackState.Ready   -> track?.title ?: state.file.name
-    is PlaybackState.Playing -> track?.title ?: state.file.name
-    is PlaybackState.Paused  -> track?.title ?: state.file.name
-    is PlaybackState.Error   -> state.file.name
+    is PlaybackState.Ready   -> track?.title ?: fileTitle(state.file)
+    is PlaybackState.Playing -> track?.title ?: fileTitle(state.file)
+    is PlaybackState.Paused  -> track?.title ?: fileTitle(state.file)
+    is PlaybackState.Error   -> track?.title ?: fileTitle(state.file)
 }
 
 /**

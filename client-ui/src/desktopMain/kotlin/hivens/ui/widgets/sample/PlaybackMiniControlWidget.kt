@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
+import hivens.ui.audio.fileTitle
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
@@ -60,7 +61,6 @@ import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
 import hivens.widget.model.InjectService
 import hivens.widget.model.Widget
-import kotlin.io.path.name
 
 // Mini transport for the cross-widget music service. Reads
 // MusicPlayerService from the registry; if no provider is currently
@@ -100,7 +100,7 @@ fun PlaybackMiniControlWidget() {
 
 /**
  * The strip itself, over plain data -- split from the widget for the same reason
- * as [MusicPlayerCard]: it can then be rendered off-screen without the service
+ * every player card is: it can then be rendered off-screen without the service
  * registry, a Koin graph or an audio device.
  */
 @Composable
@@ -309,11 +309,17 @@ private fun MiniVolumeBar(
     }
 }
 
-/** The track's own title, falling back to the file name until metadata lands. */
+/**
+ * The track's own title, falling back to the file's name until the tags land.
+ *
+ * The same name in every state, for the reason spelled out beside the players'
+ * own copy: a fallback that keeps the extension where [TrackInfo] drops it makes
+ * one track show under two names.
+ */
 private fun currentTitleShort(state: PlaybackState, track: TrackInfo?, s: AppStrings): String = when (state) {
     PlaybackState.Idle       -> s.audioNoFile
-    is PlaybackState.Ready   -> track?.title ?: state.file.name
-    is PlaybackState.Playing -> track?.title ?: state.file.name
-    is PlaybackState.Paused  -> track?.title ?: state.file.name
-    is PlaybackState.Error   -> state.file.name
+    is PlaybackState.Ready   -> track?.title ?: fileTitle(state.file)
+    is PlaybackState.Playing -> track?.title ?: fileTitle(state.file)
+    is PlaybackState.Paused  -> track?.title ?: fileTitle(state.file)
+    is PlaybackState.Error   -> track?.title ?: fileTitle(state.file)
 }

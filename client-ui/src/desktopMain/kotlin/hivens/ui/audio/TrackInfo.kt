@@ -55,8 +55,15 @@ internal fun trackInfoFrom(tags: Map<String, String>, file: Path, artwork: Image
     )
 }
 
-/** The file name without its extension, or the whole name when it has none. */
-private fun fileTitle(file: Path): String =
+/**
+ * The file name without its extension, or the whole name when it has none.
+ *
+ * Shared rather than private because it is the name a file shows under, and a
+ * renderer standing in for absent tags has to reach for the same one: two
+ * fallbacks that differ by an extension make a track rename itself the moment
+ * the tags arrive or the playback fails.
+ */
+internal fun fileTitle(file: Path): String =
     file.nameWithoutExtension.takeIf { it.isNotBlank() } ?: file.name
 
 /**
