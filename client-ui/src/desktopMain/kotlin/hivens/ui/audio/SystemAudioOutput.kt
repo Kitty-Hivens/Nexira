@@ -11,6 +11,19 @@ import dev.hivens.skinema.audio.PcmSink
 import org.slf4j.LoggerFactory
 
 /**
+ * Where a track's sound leaves.
+ *
+ * One member, because one is all the player asks for. An interface rather than the
+ * class below it for the reason the engine is one: the player closes a stream that
+ * an engine refused to take, and that is a path worth being able to drive without
+ * a sound server on the machine.
+ */
+public fun interface AudioOutput {
+    /** A stream for one track, or null to let the decoder open its own line. */
+    public fun sink(): PcmSink?
+}
+
+/**
  * Where the launcher's sound leaves, when the system will have it by name.
  *
  * Without this skinema opens a line for itself through JavaSound, and what the
@@ -32,7 +45,7 @@ import org.slf4j.LoggerFactory
  * feature, identity in the mixer is the improvement, and losing the second must
  * never cost the first.
  */
-class SystemAudioOutput : AutoCloseable {
+class SystemAudioOutput : AudioOutput, AutoCloseable {
 
     private val log = LoggerFactory.getLogger(SystemAudioOutput::class.java)
 
@@ -47,7 +60,7 @@ class SystemAudioOutput : AutoCloseable {
      * a connection to the sound server, and a launcher that never plays anything
      * has no business holding one.
      */
-    fun sink(): PcmSink? {
+    override fun sink(): PcmSink? {
         val open = backendOrNull() ?: return null
         return try {
             SkinemaAdapter(

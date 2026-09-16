@@ -62,7 +62,7 @@ class AudioPlayer(
      * stream the mixer shows as Nexira rather than as an anonymous JVM, and
      * losing that must never cost the sound itself.
      */
-    private val output: SystemAudioOutput? = null,
+    private val output: AudioOutput? = null,
     /**
      * Where an open file comes from.
      *

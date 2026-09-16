@@ -58,6 +58,25 @@ class AudioPlayerOrchestrationTest {
         override fun close() { closed = true }
     }
 
+    /**
+     * A stream that records whether anybody gave it back.
+     *
+     * Every member is a plain call on skinema's own seam, which is an interface in a
+     * pure module: nothing here needs a sound server, and the launcher's envelope
+     * pass already implements the same one in production.
+     */
+    private class FakeSink : PcmSink {
+        var closed = false
+        override fun open(sampleRate: Int) = Unit
+        override fun write(data: ByteArray, offset: Int, length: Int) = Unit
+        override fun stop() = Unit
+        override fun start() = Unit
+        override fun flush() = Unit
+        override fun framePosition(): Long = 0L
+        override fun setVolume(volume: Float) = Unit
+        override fun close() { closed = true }
+    }
+
     /** Hands out fakes and remembers every one, so a released engine can be checked. */
     private class FakeEngines : PlaybackEngines {
         val opened = mutableListOf<FakeEngine>()
@@ -373,6 +392,50 @@ class AudioPlayerOrchestrationTest {
         runCurrent()
 
         assertEquals(PlaybackState.Error(files[0], AudioError.OpenFailed), player.state.value)
+    }
+
+    @Test
+    fun `a refused open gives back the stream it was handed`() = runTest {
+        // The stream is built before the engine and passed into it, so an engine
+        // that throws leaves it unreferenced and unclosed. What reliably throws
+        // there is a natives bundle that will not load, and that does not get
+        // better on the next press: every press would open another stream on the
+        // sound server and drop it.
+        val sink = FakeSink()
+        val engines = FakeEngines()
+        engines.refuse = { UnsatisfiedLinkError("no libavcodec") }
+        val player = AudioPlayer(
+            scope = backgroundScope,
+            engines = engines,
+            output = { sink },
+            engine = StandardTestDispatcher(testScheduler),
+        )
+
+        player.open(tracks(1))
+        runCurrent()
+
+        assertTrue(sink.closed, "a stream nothing took is the player's to give back")
+    }
+
+    @Test
+    fun `an engine that takes the stream keeps it`() = runTest {
+        // The other half, and the reason the close is on the failure path alone:
+        // skinema closes the sink it was handed, so closing it here as well would
+        // pull the device out from under a track that is playing.
+        val sink = FakeSink()
+        val engines = FakeEngines()
+        val player = AudioPlayer(
+            scope = backgroundScope,
+            engines = engines,
+            output = { sink },
+            engine = StandardTestDispatcher(testScheduler),
+        )
+
+        player.open(tracks(1))
+        runCurrent()
+
+        assertEquals(listOf<PcmSink?>(sink), engines.sinks, "the stream reached the engine")
+        assertTrue(!sink.closed, "and is the engine's to close from here")
     }
 
     // -- what the queue remembers ------------------------------------------------
