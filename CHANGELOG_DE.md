@@ -10,6 +10,18 @@ nicht gelesen werden, um eine Version zu verstehen.
 
 ## [Unreleased]
 
+Der Musikplayer besteht jetzt aus zehn verschiedenen Playern, und Sie wählen den, der zu seinem Platz passt. Eine Karte mit dem Cover als Hauptsache, eine, die die Farbe der gerade laufenden Platte annimmt, eine schlichte Anzeige für einen Ordner mit losen Dateien ohne Cover, eine Kachel, auf der nichts als das Cover steht, bis der Zeiger darauf liegt, eine Schallplatte, ein Token in der Größe einer einzelnen Zelle und mehrere, die um die Form des Stücks selbst herum gebaut sind. Der bisherige Player wird durch die Cover-Karte ersetzt und behält seinen Platz auf dem Bildschirm.
+
+Vier davon zeichnen das Stück. Der Launcher liest die Datei einmal und ermittelt ihre Form, sodass Sie die Umrisse genau dieser Musik sehen und nicht einen Balken, der sich füllt, und der bereits gespielte Teil ist eingefärbt. Das dauert etwa eine Sekunde pro Datei, einmalig, im Hintergrund, und eine Datei, die sich nicht vermessen lässt, bleibt einfach flach und hinterlässt kein Loch.
+
+Sie können mehrere Dateien auf einmal laden, und sie werden zu einer Warteschlange. Vor und zurück springen, einen Titel oder die ganze Warteschlange wiederholen, einen Eintrag entfernen, den Sie nicht wollten. Die Warteschlange und Ihre Stelle darin sind nach einem Neustart noch da, und es wird nichts geöffnet, bevor Sie auf Wiedergabe drücken.
+
+Ihr Desktop weiß jetzt, was läuft. Medientasten funktionieren, das Medien-Widget zeigt Titel, Interpret und Cover, und seine Knöpfe steuern den Launcher. In der Lautstärkeanzeige des Systems erscheint der Ton als Nexira mit einem eigenen Symbol statt als namenloser Java-Prozess, sodass Sie ihn einzeln leiser stellen, auf eine andere Ausgabe legen oder eine Effektregel darauf richten können.
+
+Jede Fortschrittsanzeige reagiert auf einen Druck und folgt einem Ziehen, wo immer sie steht: ein Balken, die Form des Stücks, dieselbe Form hochkant, der Ring um eine Schallplatte oder der ganze Körper einer Karte.
+
+Und eine lange Liste von Kleinigkeiten. Ein Klick auf eine Anzeige trifft jedes Mal statt etwa in der Hälfte der Fälle. Das Ziehen um die Schallplatte folgt weiter der Hand, statt stehen zu bleiben, sobald sie über den Rand gerät. Ein Titelwechsel lässt die Suchleiste nicht mehr mit der Länge des vorherigen Titels rechnen, sodass ein Klick auf die Mitte eines kurzen Stücks nicht mehr an dessen Ende springt. Uhr und Balken stimmen überein. Ein Titel ohne Tags behält einen Namen und benennt sich beim Laden nicht mehr um. Der Wiedergabeknopf auf der Cover-Karte ist im dunklen Erscheinungsbild lesbar. Ein leerer Player öffnet eine Datei überall, wo Sie ihn anklicken, auch bei Breiten, in denen sein Cover-Quadrat nicht gezeichnet wird.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.

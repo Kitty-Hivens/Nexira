@@ -18,6 +18,18 @@ verbatim and a hand-wrapped line becomes a staircase of breaks.
 
 ## [Unreleased]
 
+The music player is now ten different players, and you pick the one that suits the place you put it. A card led by the cover, one that takes on the colour of the record it is playing, a plain readout for a folder of loose files with no artwork in them, a tile that is nothing but the cover until you point at it, a disc, a token the size of a single cell, and several built around the shape of the track itself. The player you already had is replaced by the cover-led card and keeps its place on your screen.
+
+Four of them draw the track. The launcher reads the file once and works out its shape, so what you see is the outline of that actual piece of music rather than a bar filling up, and the part already played is inked. It takes about a second per file, once, in the background, and a file it cannot measure simply stays flat instead of leaving a hole.
+
+You can load several files at a time and they become a queue. Skip forward and back, repeat one track or the whole queue, drop an entry you did not want. The queue and your place in it are still there after a restart, and nothing is opened until you press play.
+
+Your desktop now knows what is playing. Media keys work, the media widget shows the track, the artist and the cover, and its buttons drive the launcher. In the system volume panel the sound appears as Nexira with its own icon instead of an unnamed Java process, so you can turn it down on its own, send it to another output or point an effects rule at it.
+
+Every measure answers a press and follows a drag, wherever it appears: a bar, the shape of the track, the same shape stood on end, the ring around a disc, or the whole body of a card.
+
+And a long list of smaller things. A click on a measure lands every time instead of roughly half the time. Dragging around the disc keeps following your hand instead of stopping when it strays past the edge. Changing tracks no longer leaves the scrubber working from the previous track's length, so a click halfway along a short track stops jumping to the end of it. The clock and the bar agree with each other. A track with no tags keeps one name instead of renaming itself while it loads. The play button on the cover card is legible on the dark theme. An empty player opens a file wherever you click it, including at widths where its artwork square is not drawn.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.
