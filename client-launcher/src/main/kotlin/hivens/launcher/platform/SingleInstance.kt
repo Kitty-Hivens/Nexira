@@ -20,8 +20,15 @@ import java.nio.file.StandardOpenOption
  *   - a shutdown hook flushes the lock cleanly and logs release; without it,
  *     the JVM still cleans up on exit but we lose the audit trail when
  *     diagnosing "two instances running" complaints.
- *   - the lock file carries the holder's PID so a stuck process can be
- *     identified by inspection (`cat ~/.local/share/nexira/.lock`).
+ *   - the holder's PID is written beside the lock so a stuck process can be
+ *     identified by inspection (`cat ~/.local/share/nexira/.lock.pid`). It is a
+ *     separate file and `.lock` itself stays empty, for the reason [writePid]
+ *     gives.
+ *
+ * Whether an instance is RUNNING is the lock and never the PID beside it: the
+ * file outlives a process that died without releasing, so it answers who last
+ * held it rather than who holds it. `flock -n ~/.local/share/nexira/.lock true`
+ * succeeds exactly when nobody does.
  *
  * Failure mode is **fail-open**: if lock acquisition itself crashes for
  * an unexpected reason (FS oddities, permissions), we log the warning
