@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample.players
+package hivens.ui.widgets.players
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,29 +29,31 @@ import kotlin.math.sin
 import kotlin.test.Test
 
 /**
- * Concept K on screen.
+ * Concept E on screen, which is the only way to see whether it IS concept E.
  *
- * Two things carry this shape and both can fail quietly. The ground has to be a
- * colour field rather than a recognisable picture, which is a question about how
- * far the blur goes and cannot be answered by reading the code; and the white
- * text has to survive whatever the cover happens to be, which is a question
- * about the darkening. Both are photographed here, including at the ends of the
- * dim range, because a card that is legible only on the sample artwork is a card
- * that looks finished and is not.
- *
- * A real cover is passed where one is configured, through the same property the
- * other probes read, since the stand-in is deliberately flat and a flat picture
- * blurs to nothing and proves nothing.
+ * The identity of this shape is that the envelope carries both jobs at once, the
+ * picture and the position. A sheet where the envelope never arrived draws a flat
+ * row of stubs and still looks like a perfectly reasonable player, which is
+ * exactly how a broken measure would pass review. So the sheets are drawn with a
+ * real envelope, without one, and at the ends of the width ladder, and the
+ * resting state is photographed on purpose rather than avoided.
  */
-class GroundPlayerRenderProbe {
+class WavePlayerRenderProbe {
 
-    private val cover by lazy { ProbeSample.cover() }
-
+    /**
+     * A synthetic envelope with a quiet lead-in, a loud body and a fade, so the
+     * played and unplayed inks are both visible and the outline is not a
+     * featureless block.
+     */
     private val sample: Waveform = Waveform(
         FloatArray(512) { i ->
             val t = i / 512f
-            val body = abs(sin(t * 22f)) * 0.5f + 0.4f
-            if (t < 0.03f) 0.02f else body
+            val body = abs(sin(t * 18f)) * 0.55f + 0.35f
+            when {
+                t < 0.04f -> 0.02f
+                t > 0.94f -> body * (1f - (t - 0.94f) / 0.06f)
+                else -> body
+            }
         },
     )
 
@@ -59,11 +61,11 @@ class GroundPlayerRenderProbe {
         file = Paths.get("/music/audio.mp3"), positionMs = pos, durationMs = 295_000L,
     )
 
-    private val track get() = TrackInfo(
+    private val track = TrackInfo(
         title = "Sacrifice",
         artist = "Taka feat. めらみぽっぷ",
         album = "追憶のサクラメント",
-        artwork = cover,
+        artwork = null,
     )
 
     @OptIn(ExperimentalComposeUiApi::class)
@@ -83,47 +85,45 @@ class GroundPlayerRenderProbe {
         scene.close()
         File("build/render").mkdirs()
         img.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {
-            File("build/render/player-ground-$name.png").writeBytes(it)
+            File("build/render/player-wave-$name.png").writeBytes(it)
         }
     }
 
     private @androidx.compose.runtime.Composable fun card(
         state: PlaybackState,
-        info: TrackInfo?,
-        dim: Float = 0.6f,
+        waveform: Waveform?,
         queueSize: Int = 4,
-    ) = GroundPlayerCard(
-        state = state, track = info, waveform = sample, volume = 0.7f,
-        repeat = RepeatMode.Off, queueSize = queueSize, dim = dim,
+        showTimes: Boolean = true,
+    ) = WavePlayerCard(
+        state = state, track = if (state is PlaybackState.Idle) null else track,
+        waveform = waveform, volume = 0.7f, repeat = RepeatMode.Off,
+        queueSize = queueSize, showTimes = showTimes,
         onPick = {}, onPlayPause = {}, onStop = {}, onVolume = {},
         onRepeat = {}, onSkipNext = {}, onSkipPrev = {}, onSeek = {},
     )
 
-    /** The card in both palettes, and the darkening at the ends of its range. */
+    /** The card in both palettes, measured and not yet measured. */
     @Test
     fun probe() {
         for (dark in listOf(true, false)) {
-            sheet("card-${if (dark) "dark" else "light"}", 400, 440, dark) {
+            sheet("card-${if (dark) "dark" else "light"}", 400, 430, dark) {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
-                    // The concept's own value, then none, then the far end. If the
-                    // first and the second look alike the darkening is not reaching
-                    // the ground at all.
-                    listOf(0.6f, 0f, 1f).forEach { dim ->
-                        Box(Modifier.width(340.dp)) { card(playing(107_000L), track, dim) }
-                    }
+                    // Measured, then the resting state, then a track whose envelope
+                    // is all silence. The second and the third must not look alike:
+                    // one is waiting and one is an answer.
+                    Box(Modifier.width(340.dp)) { card(playing(107_000L), sample) }
+                    Box(Modifier.width(340.dp)) { card(playing(107_000L), null) }
+                    Box(Modifier.width(340.dp)) { card(playing(107_000L), Waveform(FloatArray(512))) }
                 }
             }
         }
     }
 
-    /** No artwork, nothing loaded, and a file that would not open. */
+    /** Empty, and a file that would not open. */
     @Test
     fun states() {
-        sheet("states", 400, 440, dark = true) {
+        sheet("states", 400, 240, dark = true) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
-                Box(Modifier.width(340.dp)) {
-                    card(playing(12_000L), TrackInfo("audio", null, null, null))
-                }
                 Box(Modifier.width(340.dp)) { card(PlaybackState.Idle, null, queueSize = 0) }
                 Box(Modifier.width(340.dp)) {
                     card(
@@ -136,14 +136,18 @@ class GroundPlayerRenderProbe {
         }
     }
 
-    /** The width sweep. One threshold here, the skips at 280. */
+    /**
+     * The width sweep. The concept was drawn once at 340dp and a slot is not
+     * obliged to give it that. The two thresholds are the times at 260 and the
+     * skips at 300, so the ladder has to read as one element leaving at a time.
+     */
     @Test
     fun widths() {
-        val widths = listOf(400, 340, 300, 280, 260, 220, 180)
+        val widths = listOf(400, 340, 300, 280, 260, 240, 200, 160)
         sheet("widths", 440, 1000, dark = true) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
                 widths.forEach { w ->
-                    Box(Modifier.width(w.dp)) { card(playing(107_000L), track) }
+                    Box(Modifier.width(w.dp)) { card(playing(107_000L), sample) }
                 }
             }
         }

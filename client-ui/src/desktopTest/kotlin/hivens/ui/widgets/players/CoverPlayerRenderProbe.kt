@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample.players
+package hivens.ui.widgets.players
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement

@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample.players
+package hivens.ui.widgets.players
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -55,8 +55,6 @@ import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.seedFromImage
-import hivens.ui.widgets.sample.durationMsOf
-import hivens.ui.widgets.sample.progressFraction
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService

@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample
+package hivens.ui.widgets.players
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState

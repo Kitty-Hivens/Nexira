@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample.players
+package hivens.ui.widgets.players
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -56,8 +56,6 @@ import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
-import hivens.ui.widgets.sample.durationMsOf
-import hivens.ui.widgets.sample.progressFraction
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService

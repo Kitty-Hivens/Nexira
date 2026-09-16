@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample
+package hivens.ui.widgets.players
 
 import hivens.ui.audio.PlaybackState
 

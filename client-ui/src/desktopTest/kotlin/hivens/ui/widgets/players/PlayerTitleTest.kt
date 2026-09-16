@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample.players
+package hivens.ui.widgets.players
 
 import hivens.ui.audio.AudioError
 import hivens.ui.audio.PlaybackState

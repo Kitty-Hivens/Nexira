@@ -1,4 +1,4 @@
-package hivens.ui.widgets.sample
+package hivens.ui.widgets.players
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
-import hivens.ui.widgets.sample.players.ReadoutPlayerCard
+import hivens.ui.widgets.players.ReadoutPlayerCard
 import hivens.ui.i18n.EnglishStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
