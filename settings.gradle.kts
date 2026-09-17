@@ -121,7 +121,6 @@ include(":widget-processor")
 // on the kernel and nothing else in-tree -- no client-ui, no nx-ui, no NxTheme.
 // Kept in the build so it keeps compiling against the API it demonstrates.
 include(":examples:widget-pixelplayer")
-include(":examples:widget-osu-storyboard")
 // Runtime discovery of widget modules: scans a directory for jars, checks the
 // ABI they declare, and hands back registries. Separate from :widget-api so a
 // module author compiles against the kernel without pulling in its loader.
