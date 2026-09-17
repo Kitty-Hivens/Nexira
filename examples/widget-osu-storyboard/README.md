@@ -89,3 +89,28 @@ Separate from the API, and honest about it:
 
 Drops the jar into `~/.local/share/nexira/widgets`, which is the entire install procedure.
 Then place the widget on any surface and set its `folder` prop to a beatmap directory.
+
+## Three widgets, and why there are three
+
+The first one was a player, and a player is not an event. The module now carries three,
+which is the argument rather than a feature list:
+
+| id | what it is | what it proved |
+|---|---|---|
+| `osusb.storyboard` | replays the authored timeline | the kernel can carry heavy declarative motion |
+| `osusb.altravita` | composes the art into a live surface | the kernel can carry authored motion and pointer response |
+| `osusb.rhythm` | a playable round off the real beatmap | the kernel can carry a clock, input and a result |
+
+The rhythm round reads the six difficulties beside the art (235 to 980 notes, AR 4 to 9.5)
+and runs one: notes approach on the beatmap's own timing, the pointer answers them, and the
+judgement windows come from the map's own OD. It keeps a combo, an accuracy and a best run.
+
+And it is still not a performance, which is the real finding. A performance would take the
+screen, play the track it is timed to, dim everything else, and give it all back at the
+end. The kernel offers a widget none of that: it cannot seize a surface, cannot go
+fullscreen, cannot play the audio the beatmap is written against, cannot quiet the rest of
+the application, and is never told when it is over. So the round is silent, confined to its
+slot, and ends by simply running out of notes.
+
+That is the honest answer to "can a module stage an event": it can build every part that
+happens inside its own rectangle, and none of the parts that make it an event.
