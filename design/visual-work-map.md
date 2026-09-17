@@ -14,12 +14,14 @@ Every item names a file and a line so it can be picked up without re-deriving it
 
 ## 1. Components that claim more than they do
 
-- **The editor's cube-slot resize does not exist.** `EditableWidgetChrome.kt:441`
-  says "a right-drag in a cube slot resizes by cells". The secondary-button
-  handler at `:267-276` only opens the context menu, and `cubeResizeSpan`
-  (`CanvasGeometry.kt:102-117`) has no production call site -- only
-  `CanvasGeometryTest`. Either build the gesture or delete the helper and the
-  comment.
+- DONE. **The editor's lattice resize does not exist.** The comment promised a
+  right-drag that resized by cells, the secondary button only opened the context
+  menu, and the helper behind it had no production call site, only a test. The
+  slot-orientation collapse gave it one: the resize handle quantises through
+  `gridResizeSpan` and the move gesture through `gridDragCell`, both in
+  `PlacementGeometry.kt`, which is what `CanvasGeometry.kt` became. Kept because
+  the shape of the defect is worth recognising: a helper with tests and no
+  callers, described by a comment as though it were wired.
 - **The edit-mode vignette draws no tint.** `EditorSurfaceHost.kt:489-491`
   describes "a soft inner primary tint"; `:977-981` draws a 1.5dp square-cornered
   border at 35% and nothing else.
@@ -77,7 +79,7 @@ is what stops them coming back.
   (`TopBarBreadcrumbWidget.kt:40`). Removed from the theme picker; still present
   in `ServerSettingsScreen.kt:98` and `ServerDetailsSurface.kt:118`, where they
   are place-based and acceptable.
-- DONE (the comment now says the gesture does not exist). `cubeResizeSpan` -- see section 1.
+- DONE (the gesture was built, not deleted). `gridResizeSpan` -- see section 1.
 - Two zip readers in one tree: `ZipUtils` on commons-compress,
   `MrpackInstaller` on `java.util.zip`. The latter cannot take a channel, so it
   has to move if partial archive reads ever land.
@@ -96,8 +98,10 @@ is what stops them coming back.
 - **Nothing highlights on drag-over.** Empty slots take no drag state
   (`EmptySlotPlaceholder.kt:49-53`) and breathe on a 1600ms loop whether or not
   they are the target; slot chrome strokes only when already selected
-  (`SlotLayoutChrome.kt:94-106`); canvas and cube slots get no indicator at all
-  (`EditableWidgetChrome.kt:427`).
+  (`SlotLayoutChrome.kt`), and a placement slot gets no indicator at all,
+  whether its unit is the dp or a lattice cell (`EditableWidgetChrome.kt`).
+  Still open after the slot-orientation collapse, which changed the vocabulary
+  and not the behaviour.
 - PARTLY DONE (the offset is fixed; the 80dp height still under-reports a tall
   canvas, which needs the renderer to report the slot itself). **An empty canvas slot's drop target is only its top 80dp**, and offset 6dp
   low because the padding is applied before `onGloballyPositioned`
@@ -224,9 +228,15 @@ own height. The card stops showing which pack it is.
 Two more, both of which use less space the more they are given: the recent-packs
 row on the new Home is five tiles of a fixed 180dp, so 940dp of a 2178dp row,
 and the tile count is a stored prop rather than anything derived from the
-measured width. And the free canvas positions widgets by absolute offset with no
-clamp at render, so an arrangement made at 2560 is clipped at 1920 and one made
-at 1920 leaves 640dp of dead margin at 2560. That has shipped.
+measured width.
+
+Free placement used to be the third: it positioned widgets by absolute offset from
+the top left with no clamp at render, so an arrangement made at 2560 was clipped at
+1920 and one made at 1920 left 640dp of dead margin at 2560, and that shipped. The
+schema 10 collapse closed both halves. An offset now counts from one of nine anchors,
+so a widget parked at an edge stays there when the window grows, and the renderer
+clamps what it draws while never touching the record, so a narrower window hides
+nothing permanently and a wider one gives the arrangement back.
 
 **The correction worth keeping.** Line length is not the problem on these
 surfaces -- there is almost no body copy, and what exists is either capped or

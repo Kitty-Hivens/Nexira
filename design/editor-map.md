@@ -274,8 +274,8 @@ Two lessons from writing those, both worth keeping:
 | | |
 |---|---|
 | widget kinds compiled in | 67 (66 under `ui/widgets`, 1 in `ui/activity`), plus 1 in `examples/` |
-| kinds reading a surface context | 25 of 66 |
-| portable kinds | 41 of 66. It was 15 of 58 in August |
+| kinds pinned to one surface | 42 of 67, counted through the helpers as well as the widget bodies |
+| portable kinds | 25 of 67. An earlier count said 41, and it was wrong: it read each widget file for a context local and missed the 15 background widgets, which reach `LocalBgSettingsContext` through `BgSlider` and `BgPicker` rather than naming it |
 | surfaces | 14, all in the bundled default: 8 centre, 6 shell |
 | kinds placed on a fresh install | 47 of 67. 20 exist only in the palette |
 | destinations assembled from widgets | 7 of 14 |
@@ -326,8 +326,12 @@ fields where a closed vocabulary is hiding behind free text.
   height.
 
 **The prerequisite everything Android-shaped waits on:** 3 of 67 widgets respond to the size
-they are given, plus 10 players doing it by hand through `BoxWithConstraints` outside
-`AdaptiveWidget`. A perfect cell grid would place boxes whose contents do not change. The
+they are given through the `AdaptiveWidget` contract (the clock, the notes pad, the
+checklist), plus 11 of the 12 players doing it by hand with their own `BoxWithConstraints`,
+which steps a discrete control ladder by width and never touches type size. `AdaptiveWidget`
+computes a scale only when both axes are bounded, so inside a flow slot it is exactly 1 and
+the mechanism may as well not be there.
+A perfect cell grid would place boxes whose contents do not change. The
 footprint contract should be locked on the clock first (3x3 default, then 4x5, content
 adapts), which is a decision recorded in May and never acted on.
 
