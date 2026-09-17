@@ -30,7 +30,7 @@ a name addresses a mount point, an id addresses containment. `mutate` and `mutat
 being two functions follows from that and is correct.
 
 A surface **can** be a component of the widget system without being a widget: the system
-owns it, enumerates it, and could let a pack contribute one.
+owns it, enumerates it, and could let a widget module contribute one.
 
 ### How something opens is a property of the opening
 
@@ -123,7 +123,7 @@ contracts, string-keyed channels rather than the neighbour's types, a third arti
 shared contract, discovery. Which means it carries the cost profile too. Microservices pay
 off at organisational scale, buying the ability to deploy without talking to each other.
 The trigger is therefore not the size of the code, it is **a contributor who cannot be
-reached at the moment of the edit**. That has fired exactly once, for widget packs, and
+reached at the moment of the edit**. That has fired exactly once, for widget modules, and
 the boundary is already drawn there.
 
 If it is ever wanted, the cheap path is to repeat the pattern that already works, one
@@ -180,7 +180,7 @@ how they got there. So animation is three separate places and they must not be c
 
 1. **inside a widget** -- the widget's own business, through the `Motion` roles. Works today.
 2. **of the structure** -- a widget added, removed, reflowed. Today `LocalSlotMotionMs`, which
-   only the editor provides. Becomes real when a pack can add a widget at runtime.
+   only the editor provides. Becomes real when a module can add a widget at runtime.
 3. **of the unfolding** -- a screen change, a modal opening, a lane sliding in. This one
    belongs with the opening mode, as another field beside it.
 
@@ -294,7 +294,8 @@ Two lessons from writing those, both worth keeping:
 1. **The prune gate.** `AppShell` prunes widgets whose kind left the registry, gated on a
    schema bump. Its own comment calls it a trap armed the moment the registry has a second
    source. The loader shipped, so the second source exists now. A release that bumps the
-   schema while a pack fails to load deletes that pack's widgets permanently, silently, and
+   schema while a widget module fails to load deletes that module's widgets permanently,
+   silently, and
    it looks exactly like the feature working.
 2. **The mount guard.** Cheap, and the safety net for everything after it.
 3. **Seeding on cross-slot move.** Partly done: `moveWidget` seeds a placement now. The

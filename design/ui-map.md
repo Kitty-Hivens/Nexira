@@ -281,7 +281,9 @@ compiled-in registry and the discovery seam for a jar. `CompositeWidgetRegistry`
 sources with first-source-wins and records every shadowed id. The built-in registry is
 always first, which is what makes the six non-removable kinds unshadowable.
 
-**A widget pack is a plain jar** dropped into the data directory. Parent-first classloader
+**A widget module is a plain jar** dropped into the data directory. It is never called a
+pack: `Pack` is the modpack, the product's central noun, and the loader says `module`
+everywhere (`WidgetModuleLoader`, `LoadedWidgetModule`, `Nexira-Module-Id`). Parent-first classloader
 per module, so Compose and `widget-api` resolve to the launcher's copies (a second
 compose-runtime would hand the wrong `Composer` type across the boundary). The API version
 must match exactly. No sandbox, and the code says so rather than pretending otherwise.
@@ -311,7 +313,7 @@ size. `AdaptiveWidget` computes a scale only when both axes are bounded, so **in
 slot it is exactly 1** and the mechanism is inert. Every slot in the shipped layout is a
 flow slot.
 
-**The ceiling on "a widget can make a screen" is concrete.** A pack can contribute kinds and
+**The ceiling on "a widget can make a screen" is concrete.** A module can contribute kinds and
 nothing else. It cannot register a data source or a command, because those registries are
 populated by hand in `Main.kt` with no discovery hook. It cannot add a surface, because
 `SlotRenderer` is invoked from a screen composable naming an existing id, and the set of
@@ -321,7 +323,7 @@ fourteen is fixed by the build.
 registry, gated on a schema bump just having happened, sparing only kinds present in the
 bundled default. Its own comment says the gate must be made conditional on registry
 completeness before a second source ships. The loader shipped. Nothing has been added. What
-protects users today is only that no pack ships by default.
+protects users today is only that no widget module ships by default.
 
 ---
 
