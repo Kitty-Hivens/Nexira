@@ -37,11 +37,13 @@ fun NxChoiceChip(
     val bg = if (selected) NxTheme.colors.primary.copy(alpha = 0.18f * alpha)
              else NxTheme.colors.surface.copy(alpha = alpha)
     val interaction = remember { MutableInteractionSource() }
-    Text(
+    NxSteadyText(
         text       = label,
         style      = MaterialTheme.typography.labelSmall,
         color      = fg,
-        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        // Bold says "picked", and the chip used to widen as it said so: the row
+        // of chips shifted under the cursor that had just picked one.
+        weight     = if (selected) FontWeight.Bold else FontWeight.Normal,
         maxLines   = 1,
         overflow   = TextOverflow.Ellipsis,
         modifier   = modifier

@@ -170,6 +170,51 @@ internal class ContentTabState(
     var browsing by mutableStateOf(false)
         private set
 
+    // -- updates --------------------------------------------------------------
+
+    /**
+     * What Modrinth says is newer, per installed file. Empty until a check runs,
+     * which is not the same as "everything is current" -- [checked] separates the
+     * two, so the toolbar can stay quiet instead of claiming a folder is up to
+     * date before anyone has asked.
+     */
+    var updates by mutableStateOf<Map<ContentRef, ModUpdate>>(emptyMap())
+        private set
+    var checkingUpdates by mutableStateOf(false)
+        private set
+    var checked by mutableStateOf(false)
+        private set
+
+    /** The batch this instance has in flight, or the outcome of its last one. */
+    var updateRun by mutableStateOf<InstanceContentUpdater.Run?>(null)
+        private set
+
+    /** The row whose version list is open, and what has been loaded for it. */
+    var versionsOf by mutableStateOf<InstalledContent?>(null)
+        private set
+    var versionList by mutableStateOf<List<ModrinthVersion>?>(null)
+        private set
+    var versionsFailed by mutableStateOf(false)
+        private set
+    var switchingTo by mutableStateOf<String?>(null)
+        private set
+
+    /**
+     * Updates for rows that are still on disk under the name they were found by.
+     *
+     * An applied update renames the file, so its entry here would otherwise keep
+     * offering a version that is already installed until the next check came back.
+     */
+    val liveUpdates: Map<ContentRef, ModUpdate> by derivedStateOf {
+        val present = items.orEmpty().mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
+        updates.filterKeys { it in present }
+    }
+
+    /** Rows the player may actually have replaced, which is what "update all" means here. */
+    val updatable: List<InstalledContent> by derivedStateOf {
+        items.orEmpty().filter { rulesFor(it).canDelete }
+    }
+
     /**
      * Icons for every scanned item, off-screen rows included, so scrolling is
      * instant and a row swaps once (placeholder to final) instead of cascading

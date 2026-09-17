@@ -6,6 +6,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
@@ -13,6 +15,7 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -57,6 +61,8 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.placementDragOffset
@@ -562,11 +568,7 @@ private fun WidgetContextMenuContent(
             color    = NxTheme.colors.textSecondary,
             modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 2.dp),
         )
-        Placement.ANCHORS.forEach { anchor ->
-            NxMenuItem(anchorLabel(anchor, s), selected = anchor == current) {
-                editController.setWidgetAnchor(path, instanceId, anchor); onClose()
-            }
-        }
+        AnchorGrid(current) { editController.setWidgetAnchor(path, instanceId, it); onClose() }
         NxMenuItem(s.editorToFront) {
             val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.placement?.z ?: 0 } ?: 0
             editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()
@@ -578,6 +580,48 @@ private fun WidgetContextMenuContent(
     }
     if (removable) NxMenuItem(s.editorDelete) { onRemove() }
     else NxMenuItem(s.editorForceRemove) { onForceRemove() }
+}
+
+/**
+ * The nine corners, as nine corners.
+ *
+ * They were nine rows, which put thirteen items in one context menu and pushed it
+ * off the bottom of the screen. A grid is also the shape of the thing being
+ * chosen: the cell you press is where the widget goes, so the position carries
+ * the meaning and the names are left to carry it for a screen reader.
+ */
+@Composable
+private fun AnchorGrid(current: String, onPick: (String) -> Unit) {
+    val s = LocalStrings.current
+    Column(
+        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Placement.ANCHORS.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                row.forEach { anchor ->
+                    val selected = anchor == current
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(
+                                if (selected) NxTheme.colors.primary.copy(alpha = 0.22f)
+                                else NxTheme.colors.surfaceVariant.copy(alpha = 0.5f),
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (selected) NxTheme.colors.primary
+                                else NxTheme.colors.outline.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(6.dp),
+                            )
+                            .clickable { onPick(anchor) }
+                            .semantics { contentDescription = anchorLabel(anchor, s) },
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun anchorLabel(anchor: String, s: AppStrings): String = when (anchor) {

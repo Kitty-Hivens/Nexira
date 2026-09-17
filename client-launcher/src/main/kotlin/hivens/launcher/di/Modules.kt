@@ -86,7 +86,9 @@ import hivens.core.data.PackOrigin
 import hivens.core.update.PackUpdater
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.instance.ContentScanCache
+import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.news.CuratedNewsFeed
@@ -508,6 +510,10 @@ val mirrorModule = module {
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
     single { ModrinthClient(get(named("direct")), get(), caches = get()) }
+    // Per-file updates for an instance's own folders: checks Modrinth by hash and
+    // swaps jars in place. App-scoped, so a batch of forty survives leaving the tab
+    // that started it.
+    single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get()) }
     single { SmrtSyncService(get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by

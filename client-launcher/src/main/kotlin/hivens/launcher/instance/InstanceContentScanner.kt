@@ -21,6 +21,21 @@ import kotlin.io.path.name
 
 enum class ContentKind { Mod, ResourcePack, ShaderPack }
 
+/** Suffix an item carries on disk while it is turned off. */
+const val DISABLED_SUFFIX = ".disabled"
+
+/**
+ * The instance-relative folder a kind lives in. One answer, here: the scanner,
+ * the manager, the updater and the Content tab each used to carry their own
+ * copy of this `when`, which is three chances for a new kind to land in the
+ * wrong folder.
+ */
+fun ContentKind.folderName(): String = when (this) {
+    ContentKind.Mod          -> "mods"
+    ContentKind.ResourcePack -> "resourcepacks"
+    ContentKind.ShaderPack   -> "shaderpacks"
+}
+
 /**
  * One installed content item, read from the instance's own folders -- NOT from a
  * pack manifest. [fileName] is the on-disk name with any `.disabled` suffix
@@ -55,6 +70,11 @@ class InstalledContent(
         (((kind.hashCode() * 31 + fileName.hashCode()) * 31) + enabled.hashCode()) * 31 + (version?.hashCode() ?: 0)
 }
 
+/** Where this item actually sits under [instanceDir], disabled suffix and all. */
+fun InstalledContent.pathIn(instanceDir: Path): Path =
+    instanceDir.resolve(kind.folderName())
+        .resolve(if (enabled) fileName else fileName + DISABLED_SUFFIX)
+
 /**
  * Reads what is ACTUALLY installed under an instance, origin-agnostic: the
  * `mods/`, `resourcepacks/` and `shaderpacks/` folders, parsing each archive's
@@ -85,17 +105,11 @@ class InstanceContentScanner(
         // mod). Edits overwrite in place (same key), so only deletions leave orphans.
         cache?.let { c ->
             val current = items.mapTo(HashSet()) {
-                instanceDir.resolve(folderFor(it.kind)).resolve(it.fileName).normalize().toString()
+                instanceDir.resolve(it.kind.folderName()).resolve(it.fileName).normalize().toString()
             }
             c.retain(instanceDir.normalize().toString() + File.separator, current)
         }
         items
-    }
-
-    private fun folderFor(kind: ContentKind): String = when (kind) {
-        ContentKind.Mod -> "mods"
-        ContentKind.ResourcePack -> "resourcepacks"
-        ContentKind.ShaderPack -> "shaderpacks"
     }
 
     private fun scanArchives(dir: Path, kind: ContentKind): List<InstalledContent> {
@@ -114,14 +128,14 @@ class InstanceContentScanner(
     }
 
     private fun isArchive(name: String): Boolean {
-        val base = name.removeSuffix(DISABLED)
+        val base = name.removeSuffix(DISABLED_SUFFIX)
         return base.endsWith(".jar") || base.endsWith(".zip")
     }
 
     private fun read(file: Path, kind: ContentKind): InstalledContent {
         val rawName = file.name
-        val enabled = !rawName.endsWith(DISABLED)
-        val fileName = rawName.removeSuffix(DISABLED)
+        val enabled = !rawName.endsWith(DISABLED_SUFFIX)
+        val fileName = rawName.removeSuffix(DISABLED_SUFFIX)
         val size = Files.size(file)
         val mtime = Files.getLastModifiedTime(file).toMillis()
         // Key on the canonical (enabled) path so an optional-toggle rename keeps the
@@ -332,8 +346,6 @@ class InstanceContentScanner(
         Meta(name, version, description, icon, homepageUrl, license, authors, dependencies)
 
     private companion object {
-        const val DISABLED = ".disabled"
-
         /** `key = "value"` / `key = 'value'`, each quote style closed by its own kind. */
         fun tomlString(prefix: String) = Regex("""$prefix\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 

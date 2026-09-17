@@ -73,6 +73,7 @@ import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.nx.NxButtonStyle
@@ -158,7 +159,7 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     }
 
     Column(
-        modifier            = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier            = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Toolbar(
@@ -465,13 +466,16 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelLarge,
-            color      = if (selected) Color.White else NxTheme.colors.textSecondary,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-            maxLines   = 1,
-            overflow   = TextOverflow.Ellipsis,
+        // The selected chip is bold and a bold chip is wider, which moved the rest
+        // of the row sideways on every click; the box is measured at the weight the
+        // label can grow to, so only the ink changes.
+        NxSteadyText(
+            text     = label,
+            style    = MaterialTheme.typography.labelLarge,
+            color    = if (selected) Color.White else NxTheme.colors.textSecondary,
+            weight   = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -623,7 +627,7 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
     LaunchedEffect(state, state.submitted, retryTick) { state.runSearch(state.submitted) }
 
     Column(
-        modifier            = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier            = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

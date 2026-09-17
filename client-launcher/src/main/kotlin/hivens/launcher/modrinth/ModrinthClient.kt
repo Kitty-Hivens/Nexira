@@ -6,12 +6,17 @@ import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
+import hivens.core.api.dto.modrinth.ModrinthUpdateQuery
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -96,6 +101,44 @@ class ModrinthClient(
         return getJson("$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit")
     }
 
+    /**
+     * For each file hash, the newest version Modrinth has that fits [loaders] and
+     * [gameVersions] within [versionTypes] -- `POST /v2/version_files/update_many`.
+     *
+     * The server answers with the newest MATCHING version, which is not the same
+     * question as "is there something newer than what you have": a file already on
+     * the newest build gets itself back. Callers compare the returned file's hash
+     * against the one they asked about rather than treating every answer as an
+     * update.
+     *
+     * Chunked, because the request body carries every hash and a large instance
+     * has hundreds. Uncached on purpose: a stale "no update" is the one answer
+     * nobody can act on, and the check runs on an explicit open or click.
+     */
+    suspend fun latestForHashes(
+        hashes: List<String>,
+        loaders: List<String>,
+        gameVersions: List<String>,
+        versionTypes: List<String>,
+    ): Map<String, List<ModrinthVersion>> {
+        if (hashes.isEmpty()) return emptyMap()
+        val out = mutableMapOf<String, List<ModrinthVersion>>()
+        for (chunk in hashes.distinct().chunked(UPDATE_QUERY_CHUNK)) {
+            val body = ModrinthUpdateQuery(
+                algorithm    = "sha1",
+                hashes       = chunk,
+                loaders      = loaders,
+                gameVersions = gameVersions,
+                versionTypes = versionTypes,
+            )
+            out += postJson<ModrinthUpdateQuery, Map<String, List<ModrinthVersion>>>(
+                "$API_BASE/v2/version_files/update_many",
+                body,
+            )
+        }
+        return out
+    }
+
     /** Newest version of [projectId] fitting the instance's MC + loader, else the newest overall. */
     suspend fun bestModVersion(projectId: String, mcVersion: String, loader: String): ModrinthVersion? {
         val versions = listVersions(projectId)
@@ -116,6 +159,24 @@ class ModrinthClient(
     suspend fun downloadTo(url: String, target: Path): Unit = withContext(Dispatchers.IO) {
         if (Files.exists(target)) return@withContext
         transfers.fetch(Transfer(url = url, dest = target, userAgent = USER_AGENT, skip = SkipIfPresent.Presence))
+    }
+
+    private suspend inline fun <reified B, reified T> postJson(url: String, body: B): T {
+        val resp: HttpResponse = httpProvider.current.post(url) {
+            headers.append("User-Agent", USER_AGENT)
+            headers.append("Accept", "application/json")
+            contentType(ContentType.Application.Json)
+            // Encoded here rather than handed over as an object: this client is
+            // shared with the mirror's, whose content negotiation is configured
+            // elsewhere, and the body's shape is part of the request contract.
+            setBody(json.encodeToString(body))
+            timeout { requestTimeoutMillis = METADATA_TIMEOUT_MS }
+        }
+        if (!resp.status.isSuccess()) {
+            val text = runCatching { resp.bodyAsText() }.getOrDefault("")
+            throw IOException("POST $url failed: ${resp.status} body=$text")
+        }
+        return json.decodeFromString(resp.bodyAsText())
     }
 
     private suspend inline fun <reified T> getJson(url: String): T {
@@ -145,6 +206,13 @@ class ModrinthClient(
     private const val METADATA_TIMEOUT_MS = 20_000L
         const val API_BASE = "https://api.modrinth.com"
         private const val USER_AGENT = "Nexira-modrinth-client"
+
+        /**
+         * Hashes per update query. Modrinth accepts far more, but the body is
+         * echoed in full on a failure and a chunked run reports progress that
+         * moves; a folder of two hundred mods is two requests either way.
+         */
+        private const val UPDATE_QUERY_CHUNK = 100
 
         // Same tolerance as the mirror client: ignore unknown fields so a
         // Modrinth payload that grows new keys does not break the decode.

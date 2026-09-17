@@ -75,6 +75,7 @@ import hivens.ui.nx.NxCalloutTone
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxRow
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.PlayButton
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
@@ -212,11 +213,20 @@ fun PackDetailScreen(
         // tree, a selected file and every scroll position in it were gone by the
         // time the reader came back one click later.
         val tabRetention = rememberSaveableStateHolder()
-        Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
+        // One inset for every tab body, decided here instead of four times over.
+        // Each pane used to bring its own, and the three that disagreed with the
+        // Logs pane put a different amount of air under the same tab strip --
+        // switching tabs nudged the content up and down for no reason anyone
+        // reading the screen could see.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+        ) {
             tabRetention.SaveableStateProvider(tabIndex) {
             when (tabIndex) {
                 0 -> ContentTabPane(instance = pack)
-                1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
+                1 -> FileBrowserPane(rootDir = instanceDir)
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)
             }
@@ -295,8 +305,9 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
     Surface(
         // Floated card, same treatment as the hero above: full-bleed square
         // edges read as a foreign element next to the rounded cards the rest
-        // of the screen is built from.
-        modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        // of the screen is built from. The inset around it belongs to the tab
+        // host, which gives every pane the same one.
+        modifier = Modifier.fillMaxSize(),
         shape    = MaterialTheme.shapes.medium,
         // Glass tint, not solid: a solid fill broke the app's translucent
         // aesthetic and left a hard seam against the right panel. The
@@ -578,12 +589,15 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Symbol(icon, contentDescription = null, tint = tint, size = 16.dp)
-                Text(
-                    text       = label,
-                    style      = MaterialTheme.typography.labelLarge,
-                    color      = tint,
-                    maxLines   = 1,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                // Steady, not a plain Text: the active tab is bold, bold is wider,
+                // and the strip used to re-lay itself out on every click -- the tab
+                // the user pressed moved, and so did the three beside it.
+                NxSteadyText(
+                    text     = label,
+                    style    = MaterialTheme.typography.labelLarge,
+                    color    = tint,
+                    maxLines = 1,
+                    weight   = if (active) FontWeight.Bold else FontWeight.Normal,
                 )
             }
         }
