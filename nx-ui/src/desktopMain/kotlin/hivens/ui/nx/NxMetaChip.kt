@@ -32,6 +32,8 @@ fun NxMetaChip(
     modifier: Modifier = Modifier,
     tone: NxMetaChipTone = NxMetaChipTone.Surface,
     dot: Color? = null,
+    /** A drawn mark in the dot's place: a loader's own logo rather than a swatch. */
+    leading: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = NxTheme.colors
@@ -55,6 +57,7 @@ fun NxMetaChip(
             else -> null
         },
         dot        = dot,
+        leading    = leading,
         onClick    = onClick,
     )
 }

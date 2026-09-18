@@ -42,6 +42,14 @@ internal fun NxPill(
     modifier: Modifier = Modifier,
     fontWeight: FontWeight? = null,
     dot: Color? = null,
+    /**
+     * A mark drawn where [dot] would be, and in its place.
+     *
+     * A coloured square is one kind of mark and a glyph is another: a loader chip
+     * wants its own logo rather than a swatch standing in for it. The slot takes
+     * precedence because a caller passing both means the drawn one.
+     */
+    leading: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(pillCorner)
@@ -56,7 +64,10 @@ internal fun NxPill(
         horizontalArrangement = Arrangement.spacedBy(pillGap),
     ) {
         // The dot takes the shell's corner, so it stays the same shape as what holds it.
-        if (dot != null) Box(Modifier.size(dotSize).clip(shape).background(dot))
+        when {
+            leading != null -> leading()
+            dot != null -> Box(Modifier.size(dotSize).clip(shape).background(dot))
+        }
         Text(
             text       = text,
             style      = MaterialTheme.typography.labelSmall,
