@@ -109,7 +109,7 @@ libvault          = "0.2.1"
 # exact version `compose` above resolves). It also moves the FFmpeg pin to the
 # n9.0 line, which renames every soname the loader asks for, so it pairs only
 # with the natives below.
-skinema           = "0.8.0"
+skinema           = "0.8.2"
 
 # The natives are versioned as the FFmpeg build they carry plus a repack
 # revision, not as the library: skinema names the natives version it pairs with
