@@ -53,7 +53,7 @@ object LayoutReconcile {
     fun reconcile(schemaVersion: Int, graph: LayoutGraph, default: LayoutGraph): Result {
         val migrated = Migrations.apply(schemaVersion, graph)
         firstDuplicateInstanceId(migrated)?.let { return Result.DuplicateId(it, "migration") }
-        val merged = mergeMissingSlots(mergeMissingSurfaces(migrated, default), default)
+        val merged = mergeMissingFamilies(mergeMissingSurfaces(migrated, default), default)
         firstDuplicateInstanceId(merged)?.let { return Result.DuplicateId(it, "merge") }
         return Result.Ok(merged)
     }
@@ -83,28 +83,49 @@ object LayoutReconcile {
         return user.copy(surfaces = user.surfaces + missing)
     }
 
-    // Adds slots the bundled default declares on a surface the user already
-    // has. [mergeMissingSurfaces] only adds whole NEW surfaces; a slot ADDED
-    // to an existing surface in a later release would otherwise stay
-    // invisible (SlotRenderer finds nothing at the new id -- a blank pane
-    // with no in-product way back). Slots are structural (the editor has no
-    // create/delete-slot op), so a slot present in the default but absent
-    // from the user graph is always an upstream addition, never a user
-    // deletion -- which makes this purely additive and safe. Slot REMOVALS
-    // are left in place; a stale slot is inert and a true reclaim needs an
-    // explicit migration step.
-    private fun mergeMissingSlots(user: LayoutGraph, def: LayoutGraph): LayoutGraph {
+    // Adds families, and slots within a family, that the bundled default declares
+    // on a surface the user already has. [mergeMissingSurfaces] only adds whole
+    // NEW surfaces; a family or a slot ADDED to an existing surface in a later
+    // release would otherwise stay invisible (SlotRenderer finds nothing at the
+    // new id -- a blank pane with no in-product way back). Both are structural
+    // (the editor has no create/delete op for either), so one present in the
+    // default and absent from the user graph is always an upstream addition and
+    // never a user deletion, which makes this purely additive and safe.
+    // REMOVALS are left in place; a stale family or slot is inert and a true
+    // reclaim needs an explicit migration step.
+    private fun mergeMissingFamilies(user: LayoutGraph, def: LayoutGraph): LayoutGraph {
         var changed = false
         val merged = user.surfaces.mapValues { (surfaceId, layout) ->
             val defLayout = def.surfaces[surfaceId] ?: return@mapValues layout
-            val missing   = defLayout.slots.filterKeys { it !in layout.slots }
-            if (missing.isEmpty()) return@mapValues layout
-            changed = true
-            log.info(
-                "Layout graph: seeding {} new slot(s) into surface '{}' from bundled default: {}",
-                missing.size, surfaceId.value, missing.keys.map { it.value },
-            )
-            layout.copy(slots = layout.slots + missing)
+
+            val newFamilies = defLayout.families.filterKeys { it !in layout.families }
+            if (newFamilies.isNotEmpty()) {
+                changed = true
+                log.info(
+                    "Layout graph: seeding {} new family/families into surface '{}' from bundled default: {}",
+                    newFamilies.size, surfaceId.value, newFamilies.keys.map { it.value },
+                )
+            }
+
+            // No early return here, deliberately: the label would be the inner
+            // mapValues and read as if it left the surface loop.
+            val grown = layout.families.mapValues { (familyId, family) ->
+                val missing = defLayout.family(familyId)?.slots
+                    ?.filterKeys { it !in family.slots }
+                    .orEmpty()
+                if (missing.isEmpty()) {
+                    family
+                } else {
+                    changed = true
+                    log.info(
+                        "Layout graph: seeding {} new slot(s) into '{}' family '{}' from bundled default: {}",
+                        missing.size, surfaceId.value, familyId.value, missing.keys.map { it.value },
+                    )
+                    family.copy(slots = family.slots + missing)
+                }
+            }
+
+            layout.copy(families = grown + newFamilies)
         }
         return if (changed) user.copy(surfaces = merged) else user
     }

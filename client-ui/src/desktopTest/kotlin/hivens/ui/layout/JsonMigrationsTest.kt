@@ -1,6 +1,7 @@
 package hivens.ui.layout
 
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.FamilyId
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
@@ -44,7 +45,7 @@ class JsonMigrationsTest {
     private fun decode(graph: String, from: Int = 9): LayoutGraph =
         json.decodeFromJsonElement(LayoutGraph.serializer(), migrate(graph, from))
 
-    private fun slotOf(g: LayoutGraph) = g.surfaces[SurfaceId("s")]!!.slots[SlotId("main")]!!
+    private fun slotOf(g: LayoutGraph) = g.surfaces[SurfaceId("s")]!!.slotsOf(FamilyId.GENERAL)[SlotId("main")]!!
 
     private fun graphOf(slot: String) = """{"surfaces":{"s":{"slots":{"main":$slot}}}}"""
 
@@ -160,7 +161,8 @@ class JsonMigrationsTest {
     fun `a key this step does not own is copied across untouched`() {
         val w = widget(""""surface":{"fill":"raised"},"somethingNewer":7""")
         val migrated = migrate(graphOf("""{"orientation":"Column","widgets":[$w]}"""))
-        val out = migrated["surfaces"]!!.jsonObject["s"]!!.jsonObject["slots"]!!
+        val out = migrated["surfaces"]!!.jsonObject["s"]!!.jsonObject["families"]!!
+            .jsonObject["general"]!!.jsonObject["slots"]!!
             .jsonObject["main"]!!.jsonObject["widgets"]!!
         assertEquals(true, out.toString().contains("somethingNewer"), "the step rewrites a shape, not the whole record")
         val decoded = slotOf(decode(graphOf("""{"orientation":"Column","widgets":[$w]}""")))
@@ -212,15 +214,84 @@ class JsonMigrationsTest {
         )
 
     @Test
-    fun `the migrated bundle and the one that ships are the same graph`() {
-        // What this proves and what it does not. The resource the build carries was
-        // rewritten into the new shape by a separate pass, so this says the two
-        // agree, not that either is right: a mistake made in both would pass here
-        // unnoticed. It earns its place by catching the other thing, a bundle
-        // hand-edited out of step with the step that is supposed to produce it.
-        // Correctness is the test below, which derives what it expects from the old
-        // file itself.
-        assertEquals(DefaultLayout.load(), migratedBundle(), "the shipped bundle drifted from what the step produces")
+    fun `the shipped bundle has the shape the step produces`() {
+        // What this proves and what it does not.
+        //
+        // It used to compare the two graphs whole, which only held while the bundle
+        // and the captured fixture described the same set of widgets. They do not
+        // and cannot: the fixture is the previous release's resource, frozen, and
+        // every widget added since is in one and not the other. Held to equality the
+        // test fails on the next feature rather than on a mistake, and the only way
+        // to keep it green is to re-capture the fixture -- which throws away the one
+        // thing the fixture is for.
+        //
+        // So what is compared is the SHAPE: the surfaces, the families inside them,
+        // the slots inside those, and each slot's arrangement. That is what the step
+        // rewrites, and a bundle hand-edited into a shape the step does not produce
+        // is what this is here to catch. Whether the contents survive the crossing
+        // is the test below, which derives what it expects from the old bytes.
+        val shipped = DefaultLayout.load()
+        val produced = migratedBundle()
+        assertEquals(produced.surfaces.keys, shipped.surfaces.keys, "a surface appeared or vanished")
+        produced.surfaces.forEach { (sid, oldLayout) ->
+            val now = shipped.surfaces[sid]!!
+            oldLayout.families.forEach { (fid, family) ->
+                val nowFamily = assertNotNull(now.family(fid), "family $sid/${fid.value} is not in the shipped bundle")
+                assertEquals(
+                    family.slots.keys, nowFamily.slots.keys,
+                    "the shipped bundle's slots for $sid/${fid.value} are not the ones the step produces",
+                )
+                family.slots.forEach { (slotId, content) ->
+                    val nowContent = nowFamily.slots[slotId]!!
+                    assertEquals(content.flow, nowContent.flow, "$sid/${fid.value}/${slotId.value} changed arrangement")
+                    assertEquals(content.grid, nowContent.grid, "$sid/${fid.value}/${slotId.value} changed its unit")
+                }
+            }
+        }
+    }
+
+    // ── Families ──────────────────────────────────────────────────────
+
+    @Test
+    fun `a file written before families comes back as the general one`() {
+        val migrated = migrate(graphOf("""{"orientation":"Row","widgets":[]}"""), from = 9)
+        val families = migrated["surfaces"]!!.jsonObject["s"]!!.jsonObject["families"]!!.jsonObject
+        assertEquals(setOf("general"), families.keys)
+        assertNotNull(families["general"]!!.jsonObject["slots"]!!.jsonObject["main"])
+        assertNull(migrated["surfaces"]!!.jsonObject["s"]!!.jsonObject["slots"], "the flat slot map must not be left behind")
+    }
+
+    @Test
+    fun `a surface that already names its families is not wrapped a second time`() {
+        // A hand-edited file, or one this build wrote and then re-read under a lower
+        // stamp. Wrapping twice would bury the reader's whole arrangement one level
+        // deeper, under a family nothing renders.
+        val already = """{"surfaces":{"s":{"families":{"general":{"slots":{"main":{"widgets":[],"flow":null,"grid":0}}}}}}}"""
+        val migrated = JsonMigrations.apply(10, json.parseToJsonElement(already).jsonObject)
+        val families = migrated["surfaces"]!!.jsonObject["s"]!!.jsonObject["families"]!!.jsonObject
+        assertEquals(setOf("general"), families.keys)
+        assertNotNull(families["general"]!!.jsonObject["slots"]!!.jsonObject["main"])
+    }
+
+    @Test
+    fun `a nested container keeps addressing its children by slot, not by family`() {
+        // A family belongs to a surface, which is the thing code navigates and
+        // swaps. A widget nested inside one is already inside whichever family is
+        // showing it, so wrapping its children would invent a level nothing reads.
+        val child = """{"orientation":"Column","widgets":[]}"""
+        val container = """{"kind":"c","instance_id":"outer","children":{"body":$child}}"""
+        val slot = slotOf(decode(graphOf("""{"orientation":"Column","widgets":[$container]}""")))
+        assertNotNull(slot.widgets.single().children[SlotId("body")])
+    }
+
+    @Test
+    fun `a surface carrying no slots at all still comes back with a general family`() {
+        // The editor writes an empty surface when the reader clears one out, and the
+        // decoder would otherwise read the result as a surface with no families,
+        // which no path renders and the reconciler cannot seed into.
+        val migrated = JsonMigrations.apply(10, json.parseToJsonElement("""{"surfaces":{"s":{}}}""").jsonObject)
+        val families = migrated["surfaces"]!!.jsonObject["s"]!!.jsonObject["families"]!!.jsonObject
+        assertEquals(setOf("general"), families.keys)
     }
 
     @Test
@@ -244,7 +315,7 @@ class JsonMigrationsTest {
             LayoutGraph.serializer(),
             JsonMigrations.apply(9, fixture("legacy-sampler-schema9.json")["graph"]!!.jsonObject),
         )
-        val slots = migrated.surfaces[SurfaceId("sampler")]!!.slots
+        val slots = migrated.surfaces[SurfaceId("sampler")]!!.slotsOf(FamilyId.GENERAL)
 
         // The old renderer read the count as coerceAtLeast(1), so a zero drew a
         // one-column grid. Carried across raw it would have become a flow that
@@ -267,7 +338,7 @@ class JsonMigrationsTest {
             LayoutGraph.serializer(),
             JsonMigrations.apply(9, fixture("legacy-sampler-schema9.json")["graph"]!!.jsonObject),
         )
-        val body = migrated.surfaces[SurfaceId("sampler")]!!.slots[SlotId("nested")]!!
+        val body = migrated.surfaces[SurfaceId("sampler")]!!.slotsOf(FamilyId.GENERAL)[SlotId("nested")]!!
             .widgets.single().children[SlotId("body")]!!
         assertNull(body.flow, "the nested canvas came back a flow")
         val p = assertNotNull(body.widgets.single().placement)
@@ -338,12 +409,12 @@ class JsonMigrationsTest {
                 w.children.values.forEach { walkNew(it) }
             }
         }
-        migrated.surfaces.values.forEach { layout -> layout.slots.values.forEach { walkNew(it) } }
+        migrated.surfaces.values.forEach { layout -> layout.slotsOf(FamilyId.GENERAL).values.forEach { walkNew(it) } }
 
         oldSurfaces.forEach { (surfaceId, layout) ->
             assertEquals(
                 layout.jsonObject["slots"]!!.jsonObject.keys,
-                migrated.surfaces[SurfaceId(surfaceId)]!!.slots.keys.map { it.value }.toSet(),
+                migrated.surfaces[SurfaceId(surfaceId)]!!.slotsOf(FamilyId.GENERAL).keys.map { it.value }.toSet(),
                 "a slot went missing from $surfaceId",
             )
         }

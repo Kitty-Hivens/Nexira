@@ -53,7 +53,8 @@ import hivens.widget.model.traverse
 //
 //   * Top-level: SlotRenderer(surface, slot) -- used by surface
 //     composables (NewHomeScreen, LibraryScreen, AppLayout rails, ...).
-//     Initialises LocalSlotPath at the surface root.
+//     Initialises LocalSlotPath at the surface root, inside whichever
+//     family that surface is currently showing.
 //
 //   * Nested: SlotRenderer(parent, slot) -- used by container widgets
 //     inside their @Composable body. Extends LocalSlotPath with the
@@ -80,7 +81,11 @@ fun SlotRenderer(
     modifier: Modifier = Modifier,
     spacing: Dp = 0.dp,
 ) {
-    val path = SlotPath(surface, slot)
+    // The family is resolved here rather than taken from an argument so a surface
+    // that switches families does not have to thread the id through every slot it
+    // declares, and so a slot declared before families existed keeps meaning the
+    // general one without saying so.
+    val path = SlotPath(surface, slot, family = activeFamilyOf(surface))
     CompositionLocalProvider(LocalSlotPath provides path) {
         RenderSlotContent(path, modifier, spacing)
     }

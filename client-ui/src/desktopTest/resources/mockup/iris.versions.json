@@ -1,1 +1,374 @@
-[{"id": "KduFYu4t", "version_number": "1.8.14-beta.1+1.21.1-neoforge", "version_type": "beta", "date_published": "2026-06-13T15:57:14.116693Z", "changelog": "Updates to Sodium 0.8, and fixes a few old bugs.", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2540723, "primary": true}]}, {"id": "bAo1Qhte", "version_number": "1.8.14-beta.1+1.21.1-fabric", "version_type": "beta", "date_published": "2026-06-13T15:56:42.633700Z", "changelog": "Updates to Sodium 0.8, and fixes a few old bugs.", "game_versions": ["1.21.1"], "loaders": ["fabric"], "files": [{"size": 2791343, "primary": true}]}, {"id": "t3ruzodq", "version_number": "1.8.12+1.21.1-neoforge", "version_type": "release", "date_published": "2025-06-17T15:51:56.477905Z", "changelog": "This fixes support for Pixelmon.", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2438548, "primary": true}]}, {"id": "zsoi0dso", "version_number": "1.8.8+1.21.1-fabric", "version_type": "release", "date_published": "2025-02-20T15:04:02.182924Z", "changelog": "Fixes a crash with some packs", "game_versions": ["1.21", "1.21.1"], "loaders": ["fabric", "quilt"], "files": [{"size": 2690177, "primary": true}]}, {"id": "oXIoDcGE", "version_number": "1.8.8+1.21.1-neoforge", "version_type": "release", "date_published": "2025-02-20T15:02:38.431569Z", "changelog": "Fixes a crash with some packs", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2437216, "primary": true}]}, {"id": "RJ6B9OeB", "version_number": "1.8.7+1.21.1-neoforge", "version_type": "release", "date_published": "2025-02-20T02:13:19.690121Z", "changelog": "This updates to the latest Sodium, fixing many texture bugs.", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2437207, "primary": true}]}, {"id": "A99vfwJc", "version_number": "1.8.7+1.21.1-fabric", "version_type": "release", "date_published": "2025-02-20T02:12:38.262442Z", "changelog": "This updates to the latest Sodium, fixing many texture bugs.", "game_versions": ["1.21", "1.21.1"], "loaders": ["fabric"], "files": [{"size": 2690171, "primary": true}]}, {"id": "pgeobnib", "version_number": "1.8.6+1.21.1-neoforge", "version_type": "release", "date_published": "2025-01-24T00:30:36.655806Z", "changelog": "This adds the optional \"shader bypass\" ability", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2434588, "primary": true}]}, {"id": "QS9F364b", "version_number": "1.8.1+1.21.1-neoforge", "version_type": "release", "date_published": "2024-12-02T23:17:39.616820Z", "changelog": "Update to Sodium 0.6.1.", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2421994, "primary": true}]}, {"id": "IzngD3Cy", "version_number": "1.8.1+1.21.1-fabric", "version_type": "release", "date_published": "2024-12-02T23:16:42.985387Z", "changelog": "Update to Sodium 0.6.1.", "game_versions": ["1.21", "1.21.1"], "loaders": ["fabric", "quilt"], "files": [{"size": 2677842, "primary": true}]}, {"id": "S793sibh", "version_number": "1.8.0+1.21.1-neoforge", "version_type": "release", "date_published": "2024-11-17T05:56:29.658537Z", "changelog": "## One of the biggest releases ever, Iris 1.8 and Sodium 0.6 are now out of beta. \n\nWith new functionality like translucency sorting, support for NeoForge and the Fabric Rendering API, and better mod compatibility, this 1.21.x release has all you could wish for. Shaders now have better mod support and slightly better performance, with improved visuals thanks to updates in Sodium.", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2419528, "primary": true}]}, {"id": "MA2sKKaG", "version_number": "1.8.0+1.21.1-fabric", "version_type": "release", "date_published": "2024-11-17T05:55:36.290304Z", "changelog": "## One of the biggest releases ever, Iris 1.8 and Sodium 0.6 are now out of beta. \n\nWith new functionality like translucency sorting, support for NeoForge and the Fabric Rendering API, and better mod compatibility, this 1.21.x release has all you could wish for. Shaders now have better mod support and slightly better performance, with improved visuals thanks to updates in Sodium.", "game_versions": ["1.21", "1.21.1"], "loaders": ["fabric", "quilt"], "files": [{"size": 2675365, "primary": true}]}, {"id": "W51fNmnQ", "version_number": "1.8.0-beta.8+1.21.1-neoforge", "version_type": "beta", "date_published": "2024-11-08T02:30:01.012230Z", "changelog": "This is a hotfix to fix issues with shadows.", "game_versions": ["1.21.1"], "loaders": ["neoforge"], "files": [{"size": 2418061, "primary": true}]}, {"id": "NqWJ1KIA", "version_number": "1.8.0-beta.8+1.21.1-fabric", "version_type": "beta", "date_published": "2024-11-08T02:28:55.466328Z", "changelog": "This is a hotfix to fix critical issues with shadows.", "game_versions": ["1.21.1"], "loaders": ["fabric", "quilt"], "files": [{"size": 2674980, "primary": true}]}]
+[
+  {
+    "id": "KduFYu4t",
+    "version_number": "1.8.14-beta.1+1.21.1-neoforge",
+    "version_type": "beta",
+    "date_published": "2026-06-13T15:57:14.116693Z",
+    "changelog": "Updates to Sodium 0.8, and fixes a few old bugs.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2540723,
+        "primary": true,
+        "filename": "iris-1.8.14-beta.1+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/KduFYu4t/iris-1.8.14-beta.1+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "daa5a679c6b5ff7c5225d62a619ac9369e04f047"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.14-beta.1+1.21.1-neoforge"
+  },
+  {
+    "id": "bAo1Qhte",
+    "version_number": "1.8.14-beta.1+1.21.1-fabric",
+    "version_type": "beta",
+    "date_published": "2026-06-13T15:56:42.633700Z",
+    "changelog": "Updates to Sodium 0.8, and fixes a few old bugs.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "fabric"
+    ],
+    "files": [
+      {
+        "size": 2791343,
+        "primary": true,
+        "filename": "iris-1.8.14-beta.1+1.21.1-fabric.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/bAo1Qhte/iris-1.8.14-beta.1+1.21.1-fabric.jar",
+        "hashes": {
+          "sha1": "7c7f4b4f09f82a2b15a252ef7ad1f2edc5d643bd"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.14-beta.1+1.21.1-fabric"
+  },
+  {
+    "id": "t3ruzodq",
+    "version_number": "1.8.12+1.21.1-neoforge",
+    "version_type": "release",
+    "date_published": "2025-06-17T15:51:56.477905Z",
+    "changelog": "This fixes support for Pixelmon.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2438548,
+        "primary": true,
+        "filename": "iris-1.8.12+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/t3ruzodq/iris-1.8.12+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "d076d6f094a67c58769ad28e521ec1bad2f03cec"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.12+1.21.1-neoforge"
+  },
+  {
+    "id": "zsoi0dso",
+    "version_number": "1.8.8+1.21.1-fabric",
+    "version_type": "release",
+    "date_published": "2025-02-20T15:04:02.182924Z",
+    "changelog": "Fixes a crash with some packs",
+    "game_versions": [
+      "1.21",
+      "1.21.1"
+    ],
+    "loaders": [
+      "fabric",
+      "quilt"
+    ],
+    "files": [
+      {
+        "size": 2690177,
+        "primary": true,
+        "filename": "iris-1.8.8+1.21.1-fabric.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/zsoi0dso/iris-1.8.8+1.21.1-fabric.jar",
+        "hashes": {
+          "sha1": "f45586aed8e4c4a34b5f2222ed6473589c321a21"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.8+1.21.1-fabric"
+  },
+  {
+    "id": "oXIoDcGE",
+    "version_number": "1.8.8+1.21.1-neoforge",
+    "version_type": "release",
+    "date_published": "2025-02-20T15:02:38.431569Z",
+    "changelog": "Fixes a crash with some packs",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2437216,
+        "primary": true,
+        "filename": "iris-1.8.8+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/oXIoDcGE/iris-1.8.8+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "d1fa41debb1d219755f60faaf1c039566a330573"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.8+1.21.1-neoforge"
+  },
+  {
+    "id": "RJ6B9OeB",
+    "version_number": "1.8.7+1.21.1-neoforge",
+    "version_type": "release",
+    "date_published": "2025-02-20T02:13:19.690121Z",
+    "changelog": "This updates to the latest Sodium, fixing many texture bugs.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2437207,
+        "primary": true,
+        "filename": "iris-1.8.7+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/RJ6B9OeB/iris-1.8.7+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "885df56a72b984d183fb8e613eb45b8f69e7a353"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.7+1.21.1-neoforge"
+  },
+  {
+    "id": "A99vfwJc",
+    "version_number": "1.8.7+1.21.1-fabric",
+    "version_type": "release",
+    "date_published": "2025-02-20T02:12:38.262442Z",
+    "changelog": "This updates to the latest Sodium, fixing many texture bugs.",
+    "game_versions": [
+      "1.21",
+      "1.21.1"
+    ],
+    "loaders": [
+      "fabric"
+    ],
+    "files": [
+      {
+        "size": 2690171,
+        "primary": true,
+        "filename": "iris-1.8.7+1.21.1-fabric.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/A99vfwJc/iris-1.8.7+1.21.1-fabric.jar",
+        "hashes": {
+          "sha1": "74c6711544992f7f17da519e975df2c257fb8e3a"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.7+1.21.1-fabric"
+  },
+  {
+    "id": "pgeobnib",
+    "version_number": "1.8.6+1.21.1-neoforge",
+    "version_type": "release",
+    "date_published": "2025-01-24T00:30:36.655806Z",
+    "changelog": "This adds the optional \"shader bypass\" ability",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2434588,
+        "primary": true,
+        "filename": "iris-1.8.6+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/pgeobnib/iris-1.8.6+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "2b5e9cceb59eb5c0a2d2df245c595cf0ef1310c5"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.6+1.21.1-neoforge"
+  },
+  {
+    "id": "QS9F364b",
+    "version_number": "1.8.1+1.21.1-neoforge",
+    "version_type": "release",
+    "date_published": "2024-12-02T23:17:39.616820Z",
+    "changelog": "Update to Sodium 0.6.1.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2421994,
+        "primary": true,
+        "filename": "iris-1.8.1+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/QS9F364b/iris-1.8.1+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "c07a3cea1b4dbb5fdbcbfc1a1faa7fa6fab1b789"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.1+1.21.1-neoforge"
+  },
+  {
+    "id": "IzngD3Cy",
+    "version_number": "1.8.1+1.21.1-fabric",
+    "version_type": "release",
+    "date_published": "2024-12-02T23:16:42.985387Z",
+    "changelog": "Update to Sodium 0.6.1.",
+    "game_versions": [
+      "1.21",
+      "1.21.1"
+    ],
+    "loaders": [
+      "fabric",
+      "quilt"
+    ],
+    "files": [
+      {
+        "size": 2677842,
+        "primary": true,
+        "filename": "iris-1.8.1+1.21.1-fabric.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/IzngD3Cy/iris-1.8.1+1.21.1-fabric.jar",
+        "hashes": {
+          "sha1": "897387b50b7b156bcd03c833769f7a7a323f45dc"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.1+1.21.1-fabric"
+  },
+  {
+    "id": "S793sibh",
+    "version_number": "1.8.0+1.21.1-neoforge",
+    "version_type": "release",
+    "date_published": "2024-11-17T05:56:29.658537Z",
+    "changelog": "## One of the biggest releases ever, Iris 1.8 and Sodium 0.6 are now out of beta. \n\nWith new functionality like translucency sorting, support for NeoForge and the Fabric Rendering API, and better mod compatibility, this 1.21.x release has all you could wish for. Shaders now have better mod support and slightly better performance, with improved visuals thanks to updates in Sodium.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2419528,
+        "primary": true,
+        "filename": "iris-1.8.0+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/S793sibh/iris-1.8.0+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "833349ece2bdf74aa6f697635d2ac44090d485ea"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.0+1.21.1-neoforge"
+  },
+  {
+    "id": "MA2sKKaG",
+    "version_number": "1.8.0+1.21.1-fabric",
+    "version_type": "release",
+    "date_published": "2024-11-17T05:55:36.290304Z",
+    "changelog": "## One of the biggest releases ever, Iris 1.8 and Sodium 0.6 are now out of beta. \n\nWith new functionality like translucency sorting, support for NeoForge and the Fabric Rendering API, and better mod compatibility, this 1.21.x release has all you could wish for. Shaders now have better mod support and slightly better performance, with improved visuals thanks to updates in Sodium.",
+    "game_versions": [
+      "1.21",
+      "1.21.1"
+    ],
+    "loaders": [
+      "fabric",
+      "quilt"
+    ],
+    "files": [
+      {
+        "size": 2675365,
+        "primary": true,
+        "filename": "iris-1.8.0+1.21.1-fabric.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/MA2sKKaG/iris-1.8.0+1.21.1-fabric.jar",
+        "hashes": {
+          "sha1": "129f54554835e4af950a9c750d6cf24e70bfb8ff"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.0+1.21.1-fabric"
+  },
+  {
+    "id": "W51fNmnQ",
+    "version_number": "1.8.0-beta.8+1.21.1-neoforge",
+    "version_type": "beta",
+    "date_published": "2024-11-08T02:30:01.012230Z",
+    "changelog": "This is a hotfix to fix issues with shadows.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "neoforge"
+    ],
+    "files": [
+      {
+        "size": 2418061,
+        "primary": true,
+        "filename": "iris-1.8.0-beta.8+1.21.1-neoforge.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/W51fNmnQ/iris-1.8.0-beta.8+1.21.1-neoforge.jar",
+        "hashes": {
+          "sha1": "de8a6972193ba35e927bcb370bf6522dba75a73a"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.0-beta.8+1.21.1-neoforge"
+  },
+  {
+    "id": "NqWJ1KIA",
+    "version_number": "1.8.0-beta.8+1.21.1-fabric",
+    "version_type": "beta",
+    "date_published": "2024-11-08T02:28:55.466328Z",
+    "changelog": "This is a hotfix to fix critical issues with shadows.",
+    "game_versions": [
+      "1.21.1"
+    ],
+    "loaders": [
+      "fabric",
+      "quilt"
+    ],
+    "files": [
+      {
+        "size": 2674980,
+        "primary": true,
+        "filename": "iris-1.8.0-beta.8+1.21.1-fabric.jar",
+        "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/NqWJ1KIA/iris-1.8.0-beta.8+1.21.1-fabric.jar",
+        "hashes": {
+          "sha1": "5b9ed871c72a3bb3846866d09f03af80ff34d5a8"
+        }
+      }
+    ],
+    "project_id": "YL57xq9U",
+    "name": "1.8.0-beta.8+1.21.1-fabric"
+  }
+]

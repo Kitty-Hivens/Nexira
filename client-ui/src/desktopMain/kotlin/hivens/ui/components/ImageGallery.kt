@@ -62,6 +62,7 @@ import coil3.request.ImageRequest
 import coil3.size.Size
 import hivens.ui.icons.IconKey
 import hivens.core.api.catalogue.CatalogueGalleryItem
+import hivens.core.api.dto.modrinth.ModrinthGalleryImage
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
@@ -127,6 +128,34 @@ fun galleryMedia(items: List<CatalogueGalleryItem>): List<GalleryMedia> =
             )
         }
     }
+
+/**
+ * A catalogue project's gallery as [GalleryMedia].
+ *
+ * The same furniture a pack's gallery uses, because it is the same thing: a strip
+ * of shots with captions, a lightbox behind it. A second gallery written for mods
+ * would be a second set of cell sizes, a second lightbox and a second answer to
+ * what happens when an author uploaded no captions.
+ *
+ * Featured shots come first. Modrinth returns them in upload order with a flag,
+ * and the flag is the author saying which one to look at.
+ *
+ * Every entry is an image: the catalogue's gallery uploads are stills, so unlike
+ * the mirror's there is no video case to classify.
+ */
+fun modrinthGalleryMedia(images: List<ModrinthGalleryImage>): List<GalleryMedia> =
+    images
+        .sortedByDescending { it.featured }
+        .map {
+            GalleryMedia.Image(
+                thumb = it.url,
+                // The thumbnail is ~350px and upscales to mush at full-window size,
+                // so the lightbox gets the original where there is one.
+                full = it.rawUrl?.takeIf { raw -> raw.isNotBlank() } ?: it.url,
+                title = it.title,
+                description = it.description,
+            )
+        }
 
 /**
  * The narrowest a screenshot cell is allowed to get before the grid drops a

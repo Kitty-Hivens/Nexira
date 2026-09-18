@@ -132,7 +132,14 @@ class InstanceContentScanner(
         return base.endsWith(".jar") || base.endsWith(".zip")
     }
 
-    private fun read(file: Path, kind: ContentKind): InstalledContent {
+    /**
+     * One archive's own metadata, without walking the folder it sits in.
+     *
+     * The project page needs exactly this for the single file it was opened on,
+     * and scanning an instance carrying two hundred mods to find one of them is
+     * work nobody asked for. Same parser, same answer, one file.
+     */
+    fun read(file: Path, kind: ContentKind): InstalledContent {
         val rawName = file.name
         val enabled = !rawName.endsWith(DISABLED_SUFFIX)
         val fileName = rawName.removeSuffix(DISABLED_SUFFIX)

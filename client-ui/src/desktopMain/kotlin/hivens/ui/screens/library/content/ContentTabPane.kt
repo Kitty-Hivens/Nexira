@@ -94,8 +94,9 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
-import hivens.ui.screens.versions.PickerIntent
-import hivens.ui.screens.versions.PickerVersion
+import hivens.ui.screens.mod.ModTarget
+import hivens.ui.screens.versions.pickerIntentFor
+import hivens.ui.screens.versions.pickerVersionsOf
 import hivens.ui.screens.versions.VersionPickerWindow
 import hivens.ui.utils.rememberFileDialogSettings
 import java.nio.file.Path
@@ -123,6 +124,11 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun ContentTabPane(
     instance: PackInstance,
     state: ContentTabState,
+    /**
+     * Opens the project page. A page and not a dialog, because its metadata
+     * blocks live in the shell's right rail and a dialog has no rail beside it.
+     */
+    onOpenProject: (ModTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -180,6 +186,8 @@ internal fun ContentTabPane(
             modsDir   = state.instanceDir.resolve("mods"),
             modifier  = modifier,
             onBack    = state::stopBrowsing,
+            instanceId = instance.id,
+            onOpenProject = onOpenProject,
         )
         return
     }
@@ -257,7 +265,9 @@ internal fun ContentTabPane(
                                 rules          = rules,
                                 onToggle       = { enabled -> state.toggle(c, enabled) },
                                 onDelete       = if (rules.canDelete) ({ state.requestDelete(c) }) else null,
-                                onDetails      = { state.detailsOf = c },
+                                onDetails      = {
+                                    onOpenProject(ModTarget.Installed(instance.id, c.kind, c.fileName))
+                                },
                                 resolveProject = { state.resolveProject(c) },
                                 update         = state.liveUpdates[ContentRef(c.kind, c.fileName)],
                                 onUpdate       = { state.update(c) },
@@ -306,14 +316,6 @@ internal fun ContentTabPane(
             confirmLabel = s.editorDelete,
             onConfirm    = state::confirmDelete,
             onDismiss    = state::cancelDelete,
-        )
-    }
-
-    state.detailsOf?.let { target ->
-        ContentDetailsDialog(
-            content        = target,
-            resolveProject = { state.resolveProject(target) },
-            onDismiss      = { state.detailsOf = null },
         )
     }
 
@@ -382,50 +384,19 @@ internal fun ModVersionsWindow(
     // that do not fit answered "is there one for me" by making it unaskable: an
     // absence read the same whether the project never shipped one or shipped one
     // for another loader. The window folds them away by default and says how many.
-    val shown = remember(versions, mcVersion, loaders) {
-        versions.orEmpty().filter { it.files.isNotEmpty() }.sortedByDescending { it.datePublished }
+    val all = versions.orEmpty()
+    val rows = remember(all, mcVersion, loaders, installedId, s) {
+        pickerVersionsOf(all, mcVersion, loaders, installedId, s)
     }
-    fun fits(v: ModrinthVersion): Boolean =
-        (mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
-            (loaders.isEmpty() || loaders.any { it in v.loaders })
-    // The newest build that RUNS here. The newest overall may be for another
-    // loader entirely, and badging that one "latest" points at a dead end.
-    val newestId = shown.firstOrNull { fits(it) }?.id
-    val installedAt = shown.firstOrNull { it.id == installedId }?.datePublished
+    val installedAt = all.firstOrNull { it.id == installedId }?.datePublished
 
     VersionPickerWindow(
         title       = s.contentVersionsTitle,
         packName    = content.displayName,
         packIcon    = icon,
-        versions    = shown.map { v ->
-            PickerVersion(
-                id          = v.id,
-                label       = v.versionNumber,
-                channel     = VersionChannel.of(v.versionType, v.versionNumber),
-                publishedAt = v.datePublished,
-                changelog   = v.changelog,
-                runtimeLine = listOf(v.gameVersions.joinToString(", "), v.loaders.joinToString(", "))
-                    .filter { it.isNotBlank() }
-                    .joinToString("  |  ")
-                    .takeIf { it.isNotBlank() },
-                sizeLabel   = v.files.firstOrNull { f -> f.primary }?.size?.let { humanSize(it, s) }
-                    ?: v.files.firstOrNull()?.size?.let { humanSize(it, s) },
-                installed   = v.id == installedId,
-                latest      = v.id == newestId,
-                compatible  = fits(v),
-            )
-        },
-        intentFor   = { picked ->
-            val at = shown.firstOrNull { it.id == picked.id }?.datePublished
-            when {
-                picked.installed                        -> PickerIntent.Switch
-                installedAt == null || at == null       -> PickerIntent.Switch
-                at > installedAt                        -> PickerIntent.Upgrade
-                at < installedAt                        -> PickerIntent.Rollback
-                else                                    -> PickerIntent.Switch
-            }
-        },
-        onConfirm   = { picked -> shown.firstOrNull { it.id == picked.id }?.let(onPick) },
+        versions    = rows,
+        intentFor   = { picked -> pickerIntentFor(picked, all, installedAt) },
+        onConfirm   = { picked -> all.firstOrNull { it.id == picked.id }?.let(onPick) },
         onDismiss   = onDismiss,
         busyVersionId = busyVersionId,
         // The window opens on the click and the listing is a request behind it.
@@ -436,7 +407,7 @@ internal fun ModVersionsWindow(
         warning     = when {
             unknown -> s.contentVersionsUnknown
             failed  -> s.contentVersionsLoadFailed
-            versions != null && shown.isEmpty() -> s.contentVersionsUnknown
+            versions != null && rows.isEmpty() -> s.contentVersionsUnknown
             else -> null
         },
     )
@@ -897,7 +868,16 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
  * `mods/`. Reachable only from an editable (detached) instance.
  */
 @Composable
-private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifier: Modifier, onBack: () -> Unit) {
+private fun ModBrowser(
+    mcVersion: String,
+    loader: String,
+    modsDir: Path,
+    modifier: Modifier,
+    onBack: () -> Unit,
+    /** Which pack a result opened from here would be installed into. */
+    instanceId: String,
+    onOpenProject: (ModTarget) -> Unit,
+) {
     val s = LocalStrings.current
     val state = rememberModBrowserState(mcVersion, loader, modsDir)
     val scope = rememberCoroutineScope()
@@ -954,6 +934,10 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
                                 working   = hit.projectId in state.working,
                                 failed    = hit.projectId in state.failed,
                                 onInstall = { scope.launch { state.installMod(hit) } },
+                                // A result was a row that led nowhere: the only
+                                // thing a reader could do with it was install it
+                                // sight unseen. It opens the page now.
+                                onOpen    = { onOpenProject(ModTarget.Catalogue(hit.projectId, instanceId)) },
                             )
                         }
                     }
@@ -965,11 +949,20 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
 }
 
 @Composable
-internal fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Boolean, failed: Boolean, onInstall: () -> Unit) {
+internal fun ModResultRow(
+    hit: ModrinthSearchHit,
+    installed: Boolean,
+    working: Boolean,
+    failed: Boolean,
+    onInstall: () -> Unit,
+    onOpen: (() -> Unit)? = null,
+) {
     val s = LocalStrings.current
     val shape = RoundedCornerShape(7.dp)
     Row(
-        modifier              = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(NxTheme.colors.surface.copy(alpha = 0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
+        modifier              = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
+            .background(NxTheme.colors.surface.copy(alpha = 0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {

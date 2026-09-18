@@ -176,7 +176,6 @@ internal class ContentTabState(
         private set
     var pendingBulkDelete by mutableStateOf<List<InstalledContent>>(emptyList())
         private set
-    var detailsOf by mutableStateOf<InstalledContent?>(null)
     var browsing by mutableStateOf(false)
         private set
 

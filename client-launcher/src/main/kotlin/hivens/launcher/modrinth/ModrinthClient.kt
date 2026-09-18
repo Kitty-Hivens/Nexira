@@ -5,6 +5,8 @@ import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.api.dto.modrinth.ModrinthDisclosures
+import hivens.core.api.dto.modrinth.ModrinthGameVersion
+import hivens.core.api.dto.modrinth.ModrinthTeamMember
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthHashQuery
@@ -96,6 +98,27 @@ class ModrinthClient(
         val facets = URLEncoder.encode("""[["project_type:modpack"]]""", StandardCharsets.UTF_8)
         return getJson("$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit")
     }
+
+    /**
+     * Who is credited on a project.
+     *
+     * A separate call because the project record carries no authors. Returned in
+     * the catalogue's own order, which puts nobody first in particular, so the
+     * caller sorts.
+     */
+    suspend fun members(projectId: String): List<ModrinthTeamMember> =
+        getJson("$API_BASE/v2/project/$projectId/members")
+
+    /**
+     * Every Minecraft version the catalogue knows, newest first.
+     *
+     * A tag list rather than project data: it is the same for every project and
+     * changes when Mojang ships, so the page asks once and folds every project's
+     * support against it. Without it a range cannot be computed at all, because
+     * nothing else says which versions are adjacent.
+     */
+    suspend fun gameVersions(): List<ModrinthGameVersion> =
+        getJson("$API_BASE/v2/tag/game_version")
 
     /** All versions of a project, newest-first (Modrinth's default order). */
     suspend fun listVersions(projectId: String): List<ModrinthVersion> =

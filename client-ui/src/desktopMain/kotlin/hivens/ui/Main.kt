@@ -70,7 +70,9 @@ import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
+import hivens.ui.screens.mod.OpenProjectState
 import hivens.widget.api.CompositeWidgetRegistry
+import hivens.widget.api.SurfaceFamilies
 import hivens.widget.loader.WidgetModuleLoader
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
@@ -174,6 +176,7 @@ val uiModule = module {
             register(Sources.AutoSync, flowSource(get<AutoSyncService>().snapshot))
             register(Sources.Notifications, flowSource(get<NotificationArchiveStore>().log))
             register(Sources.DoNotDisturb, flowSource(get<NotificationCenter>().doNotDisturb))
+            register(Sources.OpenProject, flowSource(get<OpenProjectState>().open))
         }
     }
 
@@ -223,6 +226,17 @@ val uiModule = module {
     single { WidgetStateStore(get<Path>().resolve("widget-state.json"), get(), get()) }
     single(createdAtStart = true) { WidgetStateGc(repo = get(), store = get(), scope = get()) }
     single(createdAtStart = true) { WidgetStateFlushHook(get()) }
+
+    // What the mod page is looking at, which the right rail's project-view family
+    // reads. A singleton because the page that writes it and the rail that reads
+    // it are different surfaces with no composition in common.
+    single { OpenProjectState() }
+
+    // Which family each surface is showing. A singleton rather than shell state
+    // because switching one is something the app DOES -- a navigation, a pack
+    // opening, a future plugin -- and not all of that runs inside a composition.
+    // Deliberately not persisted: it describes the moment, not the arrangement.
+    single { SurfaceFamilies() }
 
     // Editor mutation facade. Holds no state itself; fires LayoutGraph
     // updates into the shared CoroutineScope so callers stay

@@ -1,568 +1,668 @@
 {
-  "schema_version": 10,
+  "schema_version": 11,
   "graph": {
     "surfaces": {
       "appshell.overlay": {
-        "slots": {
-          "bottom": {
-            "widgets": [
-              {
-                "kind": "appshell.activity.pill",
-                "instance_id": "appshell-activity-pill-default"
+        "families": {
+          "general": {
+            "slots": {
+              "bottom": {
+                "widgets": [
+                  {
+                    "kind": "appshell.activity.pill",
+                    "instance_id": "appshell-activity-pill-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "appshell.root": {
-        "slots": {
-          "regions": {
-            "widgets": [
-              {
-                "kind": "appshell.region.top",
-                "instance_id": "appshell-region-top-default"
-              },
-              {
-                "kind": "appshell.region.body",
-                "instance_id": "appshell-region-body-default",
-                "placement": {
-                  "anchor": "topStart",
-                  "x": 0.0,
-                  "y": 0.0,
-                  "width": 0.0,
-                  "height": 0.0,
-                  "z": 0,
-                  "weight": 1.0
-                }
+        "families": {
+          "general": {
+            "slots": {
+              "regions": {
+                "widgets": [
+                  {
+                    "kind": "appshell.region.top",
+                    "instance_id": "appshell-region-top-default"
+                  },
+                  {
+                    "kind": "appshell.region.body",
+                    "instance_id": "appshell-region-body-default",
+                    "placement": {
+                      "anchor": "topStart",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "width": 0.0,
+                      "height": 0.0,
+                      "z": 0,
+                      "weight": 1.0
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "appshell.body": {
-        "slots": {
-          "content": {
-            "widgets": [
-              {
-                "kind": "appshell.region.left",
-                "instance_id": "appshell-region-left-default",
-                "props": {
-                  "widthDp": 65
-                }
-              },
-              {
-                "kind": "appshell.region.center",
-                "instance_id": "appshell-region-center-default",
-                "placement": {
-                  "anchor": "topStart",
-                  "x": 0.0,
-                  "y": 0.0,
-                  "width": 0.0,
-                  "height": 0.0,
-                  "z": 0,
-                  "weight": 1.0
-                }
-              },
-              {
-                "kind": "appshell.region.right",
-                "instance_id": "appshell-region-right-default",
-                "props": {
-                  "widthDp": 265
-                }
+        "families": {
+          "general": {
+            "slots": {
+              "content": {
+                "widgets": [
+                  {
+                    "kind": "appshell.region.left",
+                    "instance_id": "appshell-region-left-default",
+                    "props": {
+                      "widthDp": 65
+                    }
+                  },
+                  {
+                    "kind": "appshell.region.center",
+                    "instance_id": "appshell-region-center-default",
+                    "placement": {
+                      "anchor": "topStart",
+                      "x": 0.0,
+                      "y": 0.0,
+                      "width": 0.0,
+                      "height": 0.0,
+                      "z": 0,
+                      "weight": 1.0
+                    }
+                  },
+                  {
+                    "kind": "appshell.region.right",
+                    "instance_id": "appshell-region-right-default",
+                    "props": {
+                      "widthDp": 265
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "horizontal",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "appshell.topbar": {
-        "slots": {
-          "left": {
-            "widgets": [
-              {
-                "kind": "appshell.topbar.breadcrumb",
-                "instance_id": "appshell-topbar-breadcrumb-default"
+        "families": {
+          "general": {
+            "slots": {
+              "left": {
+                "widgets": [
+                  {
+                    "kind": "appshell.topbar.breadcrumb",
+                    "instance_id": "appshell-topbar-breadcrumb-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "horizontal",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "horizontal",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "home.classic": {
-        "slots": {
-          "main": {
-            "widgets": [
-              {
-                "kind": "home.classic.content",
-                "instance_id": "home-classic-content-default"
+        "families": {
+          "general": {
+            "slots": {
+              "main": {
+                "widgets": [
+                  {
+                    "kind": "home.classic.content",
+                    "instance_id": "home-classic-content-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "home.new": {
-        "slots": {
-          "main": {
-            "widgets": [
-              {
-                "kind": "home.new.welcome",
-                "instance_id": "home-new-welcome-default",
-                "props": {
-                  "showSubtitle": false
-                }
-              },
-              {
-                "kind": "home.new.spacer",
-                "instance_id": "home-new-spacer-default"
-              },
-              {
-                "kind": "home.new.hero",
-                "instance_id": "home-new-hero-default"
-              },
-              {
-                "kind": "home.new.recent",
-                "instance_id": "home-new-recent-default"
+        "families": {
+          "general": {
+            "slots": {
+              "main": {
+                "widgets": [
+                  {
+                    "kind": "home.new.welcome",
+                    "instance_id": "home-new-welcome-default",
+                    "props": {
+                      "showSubtitle": false
+                    }
+                  },
+                  {
+                    "kind": "home.new.spacer",
+                    "instance_id": "home-new-spacer-default"
+                  },
+                  {
+                    "kind": "home.new.hero",
+                    "instance_id": "home-new-hero-default"
+                  },
+                  {
+                    "kind": "home.new.recent",
+                    "instance_id": "home-new-recent-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "library": {
-        "slots": {
-          "header": {
-            "widgets": [
-              {
-                "kind": "library.header",
-                "instance_id": "library-header-default"
+        "families": {
+          "general": {
+            "slots": {
+              "header": {
+                "widgets": [
+                  {
+                    "kind": "library.header",
+                    "instance_id": "library-header-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "body": {
+                "widgets": [
+                  {
+                    "kind": "library.body",
+                    "instance_id": "library-body-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "body": {
-            "widgets": [
-              {
-                "kind": "library.body",
-                "instance_id": "library-body-default"
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "appshell.leftrail": {
-        "slots": {
-          "top": {
-            "widgets": [
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-home",
-                "props": {
-                  "target": "Home"
-                }
+        "families": {
+          "general": {
+            "slots": {
+              "top": {
+                "widgets": [
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-home",
+                    "props": {
+                      "target": "Home"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-library",
+                    "props": {
+                      "target": "Library"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-browse",
+                    "props": {
+                      "target": "Browse"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-profile",
+                    "props": {
+                      "target": "Profile"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-wardrobe",
+                    "props": {
+                      "target": "Wardrobe"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-settings",
+                    "props": {
+                      "target": "Settings"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-about",
+                    "props": {
+                      "target": "About"
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               },
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-library",
-                "props": {
-                  "target": "Library"
-                }
-              },
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-browse",
-                "props": {
-                  "target": "Browse"
-                }
-              },
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-profile",
-                "props": {
-                  "target": "Profile"
-                }
-              },
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-wardrobe",
-                "props": {
-                  "target": "Wardrobe"
-                }
-              },
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-settings",
-                "props": {
-                  "target": "Settings"
-                }
-              },
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-about",
-                "props": {
-                  "target": "About"
-                }
+              "bottom": {
+                "widgets": [
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-console",
+                    "props": {
+                      "target": "Console"
+                    }
+                  },
+                  {
+                    "kind": "nav.entry",
+                    "instance_id": "appshell-leftrail-nav-logout",
+                    "props": {
+                      "target": "Logout"
+                    }
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "bottom": {
-            "widgets": [
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-console",
-                "props": {
-                  "target": "Console"
-                }
-              },
-              {
-                "kind": "nav.entry",
-                "instance_id": "appshell-leftrail-nav-logout",
-                "props": {
-                  "target": "Logout"
-                }
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "appshell.rightrail": {
-        "slots": {
-          "news": {
-            "widgets": [
-              {
-                "kind": "appshell.rightrail.compactnews",
-                "instance_id": "appshell-rightrail-compactnews-default"
+        "families": {
+          "general": {
+            "slots": {
+              "news": {
+                "widgets": [
+                  {
+                    "kind": "appshell.rightrail.compactnews",
+                    "instance_id": "appshell-rightrail-compactnews-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "bottom": {
+                "widgets": [
+                  {
+                    "kind": "notifications.history",
+                    "instance_id": "appshell-rightrail-history-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           },
-          "bottom": {
-            "widgets": [
-              {
-                "kind": "notifications.history",
-                "instance_id": "appshell-rightrail-history-default"
+          "projectView": {
+            "slots": {
+              "modData": {
+                "widgets": [
+                  {
+                    "kind": "mod.compatibility",
+                    "instance_id": "mod-compatibility-default"
+                  },
+                  {
+                    "kind": "mod.links",
+                    "instance_id": "mod-links-default"
+                  },
+                  {
+                    "kind": "mod.tags",
+                    "instance_id": "mod-tags-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "authorData": {
+                "widgets": [
+                  {
+                    "kind": "mod.creators",
+                    "instance_id": "mod-creators-default"
+                  },
+                  {
+                    "kind": "mod.details",
+                    "instance_id": "mod-details-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "bg.settings": {
-        "slots": {
-          "controls": {
-            "widgets": [
-              {
-                "kind": "bg.enable.toggle",
-                "instance_id": "bg-enable-toggle-default"
-              },
-              {
-                "kind": "bg.image.picker",
-                "instance_id": "bg-image-picker-default"
-              },
-              {
-                "kind": "bg.scale.mode",
-                "instance_id": "bg-scale-mode-default"
-              },
-              {
-                "kind": "bg.position.x",
-                "instance_id": "bg-position-x-default"
-              },
-              {
-                "kind": "bg.position.y",
-                "instance_id": "bg-position-y-default"
-              },
-              {
-                "kind": "bg.fx.blur",
-                "instance_id": "bg-fx-blur-default"
-              },
-              {
-                "kind": "bg.fx.darken",
-                "instance_id": "bg-fx-darken-default"
-              },
-              {
-                "kind": "bg.fx.opacity",
-                "instance_id": "bg-fx-opacity-default"
-              },
-              {
-                "kind": "bg.fx.saturation",
-                "instance_id": "bg-fx-saturation-default"
-              },
-              {
-                "kind": "bg.fx.parallax",
-                "instance_id": "bg-fx-parallax-default"
-              },
-              {
-                "kind": "bg.fx.vignette",
-                "instance_id": "bg-fx-vignette-default"
-              },
-              {
-                "kind": "bg.fx.animspeed",
-                "instance_id": "bg-fx-animspeed-default"
-              },
-              {
-                "kind": "bg.loop.mode",
-                "instance_id": "bg-loop-mode-default"
-              },
-              {
-                "kind": "bg.audio",
-                "instance_id": "bg-audio-default"
-              },
-              {
-                "kind": "bg.tint",
-                "instance_id": "bg-tint-default"
-              },
-              {
-                "kind": "bg.reset",
-                "instance_id": "bg-reset-default"
+        "families": {
+          "general": {
+            "slots": {
+              "controls": {
+                "widgets": [
+                  {
+                    "kind": "bg.enable.toggle",
+                    "instance_id": "bg-enable-toggle-default"
+                  },
+                  {
+                    "kind": "bg.image.picker",
+                    "instance_id": "bg-image-picker-default"
+                  },
+                  {
+                    "kind": "bg.scale.mode",
+                    "instance_id": "bg-scale-mode-default"
+                  },
+                  {
+                    "kind": "bg.position.x",
+                    "instance_id": "bg-position-x-default"
+                  },
+                  {
+                    "kind": "bg.position.y",
+                    "instance_id": "bg-position-y-default"
+                  },
+                  {
+                    "kind": "bg.fx.blur",
+                    "instance_id": "bg-fx-blur-default"
+                  },
+                  {
+                    "kind": "bg.fx.darken",
+                    "instance_id": "bg-fx-darken-default"
+                  },
+                  {
+                    "kind": "bg.fx.opacity",
+                    "instance_id": "bg-fx-opacity-default"
+                  },
+                  {
+                    "kind": "bg.fx.saturation",
+                    "instance_id": "bg-fx-saturation-default"
+                  },
+                  {
+                    "kind": "bg.fx.parallax",
+                    "instance_id": "bg-fx-parallax-default"
+                  },
+                  {
+                    "kind": "bg.fx.vignette",
+                    "instance_id": "bg-fx-vignette-default"
+                  },
+                  {
+                    "kind": "bg.fx.animspeed",
+                    "instance_id": "bg-fx-animspeed-default"
+                  },
+                  {
+                    "kind": "bg.loop.mode",
+                    "instance_id": "bg-loop-mode-default"
+                  },
+                  {
+                    "kind": "bg.audio",
+                    "instance_id": "bg-audio-default"
+                  },
+                  {
+                    "kind": "bg.tint",
+                    "instance_id": "bg-tint-default"
+                  },
+                  {
+                    "kind": "bg.reset",
+                    "instance_id": "bg-reset-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "about": {
-        "slots": {
-          "left": {
-            "widgets": [
-              {
-                "kind": "about.logo",
-                "instance_id": "about-logo-default"
+        "families": {
+          "general": {
+            "slots": {
+              "left": {
+                "widgets": [
+                  {
+                    "kind": "about.logo",
+                    "instance_id": "about-logo-default"
+                  },
+                  {
+                    "kind": "about.credits",
+                    "instance_id": "about-credits-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               },
-              {
-                "kind": "about.credits",
-                "instance_id": "about-credits-default"
+              "right": {
+                "widgets": [
+                  {
+                    "kind": "about.update.panel",
+                    "instance_id": "about-update-panel-default"
+                  },
+                  {
+                    "kind": "about.system.card",
+                    "instance_id": "about-system-card-default"
+                  },
+                  {
+                    "kind": "about.links.card",
+                    "instance_id": "about-links-card-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "right": {
-            "widgets": [
-              {
-                "kind": "about.update.panel",
-                "instance_id": "about-update-panel-default"
-              },
-              {
-                "kind": "about.system.card",
-                "instance_id": "about-system-card-default"
-              },
-              {
-                "kind": "about.links.card",
-                "instance_id": "about-links-card-default"
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "server.details": {
-        "slots": {
-          "text": {
-            "widgets": [
-              {
-                "kind": "server.details.title",
-                "instance_id": "server-details-title-default"
+        "families": {
+          "general": {
+            "slots": {
+              "text": {
+                "widgets": [
+                  {
+                    "kind": "server.details.title",
+                    "instance_id": "server-details-title-default"
+                  },
+                  {
+                    "kind": "server.details.tagbar",
+                    "instance_id": "server-details-tagbar-default"
+                  },
+                  {
+                    "kind": "server.details.description",
+                    "instance_id": "server-details-description-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               },
-              {
-                "kind": "server.details.tagbar",
-                "instance_id": "server-details-tagbar-default"
-              },
-              {
-                "kind": "server.details.description",
-                "instance_id": "server-details-description-default"
+              "image": {
+                "widgets": [
+                  {
+                    "kind": "server.details.banner",
+                    "instance_id": "server-details-banner-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "image": {
-            "widgets": [
-              {
-                "kind": "server.details.banner",
-                "instance_id": "server-details-banner-default"
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "profile": {
-        "slots": {
-          "nav": {
-            "widgets": [
-              {
-                "kind": "profile.nav",
-                "instance_id": "profile-nav-default"
+        "families": {
+          "general": {
+            "slots": {
+              "nav": {
+                "widgets": [
+                  {
+                    "kind": "profile.nav",
+                    "instance_id": "profile-nav-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "skin": {
+                "widgets": [
+                  {
+                    "kind": "profile.skin.section",
+                    "instance_id": "profile-skin-section-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "account": {
+                "widgets": [
+                  {
+                    "kind": "profile.account.section",
+                    "instance_id": "profile-account-section-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "signin": {
+                "widgets": [
+                  {
+                    "kind": "profile.signin",
+                    "instance_id": "profile-signin-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "skin": {
-            "widgets": [
-              {
-                "kind": "profile.skin.section",
-                "instance_id": "profile-skin-section-default"
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "account": {
-            "widgets": [
-              {
-                "kind": "profile.account.section",
-                "instance_id": "profile-account-section-default"
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "signin": {
-            "widgets": [
-              {
-                "kind": "profile.signin",
-                "instance_id": "profile-signin-default"
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       },
       "theme.picker": {
-        "slots": {
-          "grid": {
-            "widgets": [
-              {
-                "kind": "theme.picker.grid",
-                "instance_id": "theme-picker-grid-default"
+        "families": {
+          "general": {
+            "slots": {
+              "grid": {
+                "widgets": [
+                  {
+                    "kind": "theme.picker.grid",
+                    "instance_id": "theme-picker-grid-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "preview": {
+                "widgets": [
+                  {
+                    "kind": "theme.picker.preview",
+                    "instance_id": "theme-picker-preview-default"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
               }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
-          },
-          "preview": {
-            "widgets": [
-              {
-                "kind": "theme.picker.preview",
-                "instance_id": "theme-picker-preview-default"
-              }
-            ],
-            "flow": {
-              "direction": "vertical",
-              "wrap": 0,
-              "uniform": false
-            },
-            "grid": 0
+            }
           }
         }
       }

@@ -1,13 +1,14 @@
 package hivens.ui.layout
 
-import hivens.widget.model.Placement
+import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
+import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
-import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceShape
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
@@ -88,11 +89,13 @@ class LayoutGraphRepositoryTest {
         repo.update { graph ->
             graph.copy(
                 surfaces = graph.surfaces.mapValues { (_, layout) ->
-                    layout.copy(
-                        slots = layout.slots.mapValues { (_, content) ->
-                            content.copy(widgets = content.widgets + widget)
-                        }
-                    )
+                    layout.mapFamilies { family ->
+                        family.copy(
+                            slots = family.slots.mapValues { (_, content) ->
+                                content.copy(widgets = content.widgets + widget)
+                            }
+                        )
+                    }
                 }
             )
         }
@@ -102,7 +105,7 @@ class LayoutGraphRepositoryTest {
         val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
         val widgets = reloaded.value()
             .surfaces[SurfaceId("home.classic")]!!
-            .slots[SlotId("main")]!!
+            .slotsOf(FamilyId.GENERAL)[SlotId("main")]!!
             .widgets
         assertEquals(listOf(widget), widgets)
     }
@@ -344,7 +347,7 @@ class LayoutGraphRepositoryTest {
         repo.flush()
 
         val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
-        val w = reloaded.value().surfaces[SurfaceId("cx")]!!.slots[SlotId("o")]!!.widgets.first()
+        val w = reloaded.value().surfaces[SurfaceId("cx")]!!.slotsOf(FamilyId.GENERAL)[SlotId("o")]!!.widgets.first()
         assertEquals(SurfaceSpec(opacity = 0.45f, shape = SurfaceShape(corners = SurfaceCorners(all = 10f))), w.surface)
     }
 
@@ -369,7 +372,7 @@ class LayoutGraphRepositoryTest {
         val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
         val containerLoaded = reloaded.value()
             .surfaces[SurfaceId("with-container")]!!
-            .slots[SlotId("main")]!!
+            .slotsOf(FamilyId.GENERAL)[SlotId("main")]!!
             .widgets.first()
         val childLoaded = containerLoaded.children[SlotId("body")]!!.widgets.first()
         assertEquals("c1", childLoaded.instanceId)
@@ -408,7 +411,7 @@ class LayoutGraphRepositoryTest {
             )),
         ))
         val loaded = loadFrom(LayoutReconcile.SURFACE_SCHEMA, theirs, default = theirs)
-        val w = loaded.surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.single()
+        val w = loaded.surfaces[SurfaceId("home.new")]!!.slotsOf(FamilyId.GENERAL)[SlotId("main")]!!.widgets.single()
         assertEquals("theirs", w.instanceId)
         assertEquals(0.4f, w.surface?.opacity)
     }
@@ -437,7 +440,7 @@ class LayoutGraphRepositoryTest {
         )
 
     private fun LayoutGraph.leftrailSlot(slot: String) =
-        surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId(slot)]!!.widgets
+        surfaces[SurfaceId("appshell.leftrail")]!!.slotsOf(FamilyId.GENERAL)[SlotId(slot)]!!.widgets
 
     private fun WidgetInstance.target() = props["target"]?.jsonPrimitive?.content
 
@@ -466,11 +469,13 @@ class LayoutGraphRepositoryTest {
                 surfaces = graph.surfaces
                     .mapValues { (sid, layout) ->
                         if (sid == SurfaceId("home.classic")) {
-                            layout.copy(
-                                slots = layout.slots.mapValues { (_, content) ->
-                                    content.copy(widgets = content.widgets + extra)
-                                }
-                            )
+                            layout.mapFamilies { family ->
+                                family.copy(
+                                    slots = family.slots.mapValues { (_, content) ->
+                                        content.copy(widgets = content.widgets + extra)
+                                    }
+                                )
+                            }
                         } else layout
                     } + (SurfaceId("scratch") to SurfaceLayout()),
             )
@@ -570,7 +575,7 @@ class LayoutGraphRepositoryTest {
         val nextDefault = LayoutGraph(
             surfaces = mapOf(
                 SurfaceId("profile") to SurfaceLayout(
-                    slots = priorDefault.surfaces[SurfaceId("profile")]!!.slots +
+                    slots = priorDefault.surfaces[SurfaceId("profile")]!!.slotsOf(FamilyId.GENERAL) +
                         (SlotId("signin") to SlotContent(listOf(signin))),
                 ),
             ),
@@ -578,15 +583,15 @@ class LayoutGraphRepositoryTest {
         val loaded = LayoutGraphRepository(file, json, scope) { nextDefault }.value()
         val profile = loaded.surfaces[SurfaceId("profile")]!!
 
-        assertTrue(SlotId("signin") in profile.slots, "new bundled-default slot must auto-seed into the existing surface")
+        assertTrue(SlotId("signin") in profile.slotsOf(FamilyId.GENERAL), "new bundled-default slot must auto-seed into the existing surface")
         assertEquals(
             listOf(signin),
-            profile.slots[SlotId("signin")]!!.widgets,
+            profile.slotsOf(FamilyId.GENERAL)[SlotId("signin")]!!.widgets,
             "seeded slot must match the bundled default",
         )
         // The user's pre-existing slots in the same surface are untouched.
-        assertEquals("nav-1",  profile.slots[SlotId("nav")]!!.widgets.single().instanceId)
-        assertEquals("acct-1", profile.slots[SlotId("account")]!!.widgets.single().instanceId)
+        assertEquals("nav-1",  profile.slotsOf(FamilyId.GENERAL)[SlotId("nav")]!!.widgets.single().instanceId)
+        assertEquals("acct-1", profile.slotsOf(FamilyId.GENERAL)[SlotId("account")]!!.widgets.single().instanceId)
     }
 
     @Test
@@ -611,7 +616,7 @@ class LayoutGraphRepositoryTest {
         val loaded = LayoutGraphRepository(file, json, scope) { nextDefault }.value()
         assertEquals(
             "user-edited-nav",
-            loaded.surfaces[SurfaceId("profile")]!!.slots[SlotId("nav")]!!.widgets.single().instanceId,
+            loaded.surfaces[SurfaceId("profile")]!!.slotsOf(FamilyId.GENERAL)[SlotId("nav")]!!.widgets.single().instanceId,
             "an existing slot keeps the user's content; only MISSING slots seed",
         )
     }

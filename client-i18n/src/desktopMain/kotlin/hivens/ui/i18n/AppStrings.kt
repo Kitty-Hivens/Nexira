@@ -877,6 +877,101 @@ interface AppStrings {
     val contentVersionsLoadFailed: String
     val contentDetailAuthors: String
     val contentDetailSize: String
+    // ── The project page (#367) ──────────────────────────────────────────────
+    // The page carries the header, the tabs and the body; the blocks below it
+    // names live in the right rail's project-view family. A page drawn for a jar
+    // the catalogue has never indexed keeps every one of these and answers the
+    // ones it can, so several have an explicit "not known" reading rather than
+    // being left out.
+
+    val modPageTabDescription: String
+    val modPageTabVersions: String
+    val modPageTabChangelog: String
+    val modPageTabGallery: String
+    /** The project has a page and the author left it blank. */
+    val modPageBodyEmpty: String
+    /** There is a description, on a page this file is not linked to. */
+    val modPageBodyUnknown: String
+    val modPageStatDownloads: String
+    val modPageStatFollowers: String
+    /** Marks a file that came from disk rather than from a catalogue. */
+    val modPageLocalFile: String
+    val modPageFindInCatalogue: String
+    /**
+     * The address the archive itself declares, which is the author's own site and
+     * not the catalogue entry. Both are "open a page" and naming them the same way
+     * put two identical labels a centimetre apart pointing at different places.
+     */
+    val modPageHomepage: String
+    /**
+     * Opening the catalogue entry in a browser.
+     *
+     * Lives in the overflow, not on a button. The reference has no such action at
+     * all, because there you are already on that page; here it is worth having and
+     * is still not what a reader came to the page to do.
+     */
+    val modPageOpenInCatalogue: String
+    val modPageCopyLink: String
+
+    /** The page's primary action, which names the pack it is going into. */
+    fun modPageInstallInto(pack: String): String
+    fun modPageInstalledIn(pack: String): String
+    val modPageInstalling: String
+    val modPageInstallFailed: String
+    val modPageInstallRetry: String
+    /** Required dependencies the pack's game version and loader have no build for. */
+    fun modPageInstallMissing(count: Int): String
+    /** Installing one NAMED build, which is what the versions tab is for. */
+    fun modPageInstallBuild(version: String): String
+    fun modPageInstalledVersion(version: String): String
+
+    val modRailCompatibility: String
+    val modRailGame: String
+    val modRailPlatforms: String
+    val modRailEnvironment: String
+    val modRailLinks: String
+    val modRailTags: String
+    val modRailCreators: String
+    val modRailDetails: String
+    /** Stands where a fact would be for a file nothing can answer it for. */
+    val modRailUnknownValue: String
+
+    val modEnvClientOnly: String
+    val modEnvServerOnly: String
+    val modEnvBoth: String
+    val modEnvEither: String
+
+    val modLinkIssues: String
+    val modLinkSource: String
+    val modLinkWiki: String
+    val modLinkDiscord: String
+    val modLinkDonate: String
+
+    val modLicenseUnknown: String
+    val modLicenseAllRights: String
+    fun modPublishedOn(date: String): String
+    fun modUpdatedOn(date: String): String
+    val modPublishedUnknown: String
+    val modUpdatedUnknown: String
+
+    // What an author declares about their own project. Reported, never accused:
+    // these are facts the reader weighs, so they are written plainly and only the
+    // one that can physically hurt someone is allowed a colour.
+    val modDisclosureTelemetryOptIn: String
+    val modDisclosureTelemetryOptOut: String
+    val modDisclosureTelemetryAlways: String
+    val modDisclosureTelemetry: String
+    val modDisclosureAds: String
+    val modDisclosurePaid: String
+    val modDisclosureAiContent: String
+    val modDisclosureAiFunctionality: String
+    val modDisclosureSystem: String
+    val modDisclosureEpilepsy: String
+
+    /** Compact counts. The catalogue reports millions and a rail column is 300dp. */
+    fun compactMillions(value: String): String
+    fun compactThousands(value: String): String
+
     val contentTabFetchErrorTitle: String
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String

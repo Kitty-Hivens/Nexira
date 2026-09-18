@@ -45,7 +45,48 @@ internal object JsonMigrations {
 
     private fun step(toVersion: Int): (JsonObject) -> JsonObject = when (toVersion) {
         10 -> ::collapseOrientationsIntoPlacement
+        11 -> ::wrapSlotsInGeneralFamily
         else -> { it -> it }
+    }
+
+    /**
+     * A surface's slots become one family's slots, named `general`.
+     *
+     * Everything a file written before families describes is what the surface
+     * shows when nothing has asked for anything else, which is exactly what the
+     * general family is. So the step is a wrap and not a translation: the slot map
+     * moves down one level under a name it already had implicitly, and no widget,
+     * position or arrangement is touched.
+     *
+     * Only the top level moves. A container widget's `children` still keys slots
+     * directly, because a family is a property of a SURFACE -- the thing code
+     * navigates and swaps -- and a widget nested inside one is already inside
+     * whichever family is showing it.
+     */
+    private fun wrapSlotsInGeneralFamily(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        return buildJsonObject {
+            graph.forEach { (key, value) -> if (key != "surfaces") put(key, value) }
+            put("surfaces", JsonObject(surfaces.mapValues { (_, layout) -> wrapSurface(layout) }))
+        }
+    }
+
+    private fun wrapSurface(layout: JsonElement): JsonElement {
+        val obj = layout.asObjectOrNull() ?: return layout
+        // Already wrapped: a hand-edited file, or one this build wrote and then
+        // re-read through a lower stamp. Wrapping twice would bury the reader's
+        // arrangement under a family nothing renders.
+        if (obj["families"] != null) return layout
+        val slots = obj["slots"] ?: JsonObject(emptyMap())
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "slots") put(key, value) }
+            put(
+                "families",
+                buildJsonObject {
+                    put("general", buildJsonObject { put("slots", slots) })
+                },
+            )
+        }
     }
 
     /**

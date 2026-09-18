@@ -82,6 +82,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
+import hivens.ui.screens.mod.ModTarget
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.settings.PackSettingsWindow
 import hivens.ui.screens.library.FileBrowserPane
@@ -126,6 +127,8 @@ fun PackDetailScreen(
     initialShowSettings: Boolean = false,
     initialSettingsSection: PackSettingsCategory? = null,
     onOpenVersions: (fromSettings: Boolean) -> Unit = {},
+    /** Opens the project page for one of this instance's files, or for a search result. */
+    onOpenProject: (ModTarget) -> Unit = {},
 ) {
     PuppetScreen("PackDetail.$instanceId")
     PuppetClick("packDetail.back") { onBack() }
@@ -235,7 +238,7 @@ fun PackDetailScreen(
         ) {
             tabRetention.SaveableStateProvider(tabIndex) {
             when (tabIndex) {
-                0 -> ContentTabPane(instance = pack, state = contentState)
+                0 -> ContentTabPane(instance = pack, state = contentState, onOpenProject = onOpenProject)
                 1 -> FileBrowserPane(rootDir = instanceDir)
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)

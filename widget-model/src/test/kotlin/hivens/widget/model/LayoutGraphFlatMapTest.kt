@@ -14,7 +14,7 @@ class LayoutGraphFlatMapTest {
         ),
     )
 
-    private fun LayoutGraph.slotA() = surfaces[SurfaceId("s")]!!.slots[SlotId("a")]!!.widgets
+    private fun LayoutGraph.slotA() = surfaces[SurfaceId("s")]!!.slotsOf(FamilyId.GENERAL)[SlotId("a")]!!.widgets
 
     @Test
     fun `identity transform returns an equal graph`() {
@@ -61,7 +61,7 @@ class LayoutGraphFlatMapTest {
         val out = g.flatMapInstances {
             if (it.kind.value == "hit") listOf(it.copy(kind = WidgetKind("changed"))) else listOf(it)
         }
-        assertEquals("changed", out.surfaces[SurfaceId("s1")]!!.slots[SlotId("a")]!!.widgets.first().kind.value)
-        assertEquals("miss", out.surfaces[SurfaceId("s2")]!!.slots[SlotId("b")]!!.widgets.first().kind.value)
+        assertEquals("changed", out.surfaces[SurfaceId("s1")]!!.slotsOf(FamilyId.GENERAL)[SlotId("a")]!!.widgets.first().kind.value)
+        assertEquals("miss", out.surfaces[SurfaceId("s2")]!!.slotsOf(FamilyId.GENERAL)[SlotId("b")]!!.widgets.first().kind.value)
     }
 }

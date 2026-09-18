@@ -22,7 +22,7 @@ private const val DEFAULT_LAYOUT_RESOURCE = "/widget/default-layout.json"
  * read the number and threw it away, so nothing anywhere noticed. A stamp
  * nobody checks is a comment.
  */
-const val LAYOUT_SCHEMA: Int = 10
+const val LAYOUT_SCHEMA: Int = 11
 
 object DefaultLayout {
     fun load(json: Json = LENIENT): LayoutGraph {

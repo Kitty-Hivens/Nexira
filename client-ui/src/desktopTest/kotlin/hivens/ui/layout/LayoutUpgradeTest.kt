@@ -4,6 +4,7 @@ import hivens.ui.bootstrap.RecoveryIo
 import hivens.core.data.NewerBuildData
 import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
+import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -122,7 +123,7 @@ class LayoutUpgradeTest {
         return repo().value()
     }
 
-    private fun slot(g: LayoutGraph, id: String) = g.surfaces[SurfaceId("home.new")]!!.slots[SlotId(id)]!!
+    private fun slot(g: LayoutGraph, id: String) = g.surfaces[SurfaceId("home.new")]!!.slotsOf(FamilyId.GENERAL)[SlotId(id)]!!
 
     @Test
     fun `a row stays a row and its weighted widget keeps its share`() {
@@ -179,7 +180,7 @@ class LayoutUpgradeTest {
     @Test
     fun `nothing is lost and no id is minted`() {
         val loaded = loadSaved()
-        val ids = loaded.surfaces.values.flatMap { it.slots.values }.flatMap { s -> s.widgets.map { it.instanceId } }
+        val ids = loaded.surfaces.values.flatMap { it.slotsOf(FamilyId.GENERAL).values }.flatMap { s -> s.widgets.map { it.instanceId } }
         assertEquals(setOf("weighted", "bounded", "placed", "celled", "plain"), ids.toSet())
         assertEquals(ids.size, ids.toSet().size, "the uniqueness sweep would have refused a duplicate")
     }

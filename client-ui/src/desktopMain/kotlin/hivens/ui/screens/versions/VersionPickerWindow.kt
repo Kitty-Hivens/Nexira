@@ -159,27 +159,9 @@ fun VersionPickerWindow(
      */
     loading: Boolean = false,
 ) {
-    val s = LocalStrings.current
     val colors = NxTheme.colors
     val busy = busyVersionId != null
-
-    var query by remember { mutableStateOf("") }
-    var showIncompatible by remember(versions) { mutableStateOf(false) }
-    var selectedId by remember(versions) {
-        mutableStateOf(versions.firstOrNull { it.installed }?.id ?: versions.firstOrNull { it.compatible }?.id)
-    }
-    val hiddenCount = remember(versions) { versions.count { !it.compatible } }
-    val shown = remember(versions, query, showIncompatible) {
-        versions
-            .filter { showIncompatible || it.compatible || it.installed }
-            .filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
-    }
-    // A query that hides the selection would leave the detail pane describing a
-    // row the reader can no longer see; follow the filter instead.
-    LaunchedEffect(shown) {
-        if (shown.none { it.id == selectedId }) selectedId = shown.firstOrNull()?.id
-    }
-    val selected = versions.firstOrNull { it.id == selectedId }
+    var selected by remember(versions) { mutableStateOf<PickerVersion?>(null) }
 
     // In-composition overlay rather than a Popup: the window belongs to the app's
     // own surface stack, so it inherits the theme, sizes against the app window,
@@ -223,32 +205,83 @@ fun VersionPickerWindow(
             Column(Modifier.fillMaxSize()) {
                 Header(title, packName, packIcon, onDismiss)
                 HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
-                Row(Modifier.weight(1f).fillMaxWidth()) {
-                    VersionRail(
-                        versions = shown,
-                        loading = loading,
-                        query = query,
-                        onQuery = { query = it },
-                        selectedId = selectedId,
-                        onSelect = { selectedId = it },
-                        hiddenCount = hiddenCount,
-                        showIncompatible = showIncompatible,
-                        onToggleIncompatible = { showIncompatible = !showIncompatible },
-                    )
-                    Box(Modifier.width(1.dp).fillMaxHeight().background(colors.outline.copy(alpha = 0.25f)))
-                    DetailPane(selected, Modifier.weight(1f).fillMaxHeight())
-                }
+                VersionBrowser(
+                    versions = versions,
+                    loading = loading,
+                    onSelectionChange = { selected = it },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                val picked = selected
                 Footer(
                     warning = warning,
-                    selected = selected,
-                    intent = selected?.let(intentFor),
+                    selected = picked,
+                    intent = picked?.let(intentFor),
                     busy = busy,
-                    busyThis = selected != null && selected.id == busyVersionId,
-                    onConfirm = { selected?.let(onConfirm) },
+                    busyThis = picked != null && picked.id == busyVersionId,
+                    onConfirm = { picked?.let(onConfirm) },
                     onDismiss = onDismiss,
                 )
             }
         }
+    }
+}
+
+/**
+ * The list of builds and the notes beside it, without the window around them.
+ *
+ * Extracted because the same thing is wanted in two places and one of them is not
+ * a modal: a project page shows its versions as a tab, and a tab cannot be a card
+ * with a scrim behind it. What a reader does here is identical either way -- find
+ * the build, read why -- so it is one piece of furniture with two hosts rather
+ * than two lists that drift.
+ *
+ * The filtering and the selection live here, because they are how the list is
+ * read and not what the host does with the answer. The host learns which build is
+ * selected through [onSelectionChange] and puts its own action wherever its shape
+ * allows: a footer in the window, [detailAction] under the notes in a tab.
+ */
+@Composable
+fun VersionBrowser(
+    versions: List<PickerVersion>,
+    loading: Boolean,
+    onSelectionChange: (PickerVersion?) -> Unit,
+    modifier: Modifier = Modifier,
+    detailAction: (@Composable (PickerVersion) -> Unit)? = null,
+) {
+    val colors = NxTheme.colors
+    var query by remember { mutableStateOf("") }
+    var showIncompatible by remember(versions) { mutableStateOf(false) }
+    var selectedId by remember(versions) {
+        mutableStateOf(versions.firstOrNull { it.installed }?.id ?: versions.firstOrNull { it.compatible }?.id)
+    }
+    val hiddenCount = remember(versions) { versions.count { !it.compatible } }
+    val shown = remember(versions, query, showIncompatible) {
+        versions
+            .filter { showIncompatible || it.compatible || it.installed }
+            .filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
+    }
+    // A query that hides the selection would leave the detail pane describing a
+    // row the reader can no longer see; follow the filter instead.
+    LaunchedEffect(shown) {
+        if (shown.none { it.id == selectedId }) selectedId = shown.firstOrNull()?.id
+    }
+    val selected = versions.firstOrNull { it.id == selectedId }
+    LaunchedEffect(selected) { onSelectionChange(selected) }
+
+    Row(modifier) {
+        VersionRail(
+            versions = shown,
+            loading = loading,
+            query = query,
+            onQuery = { query = it },
+            selectedId = selectedId,
+            onSelect = { selectedId = it },
+            hiddenCount = hiddenCount,
+            showIncompatible = showIncompatible,
+            onToggleIncompatible = { showIncompatible = !showIncompatible },
+        )
+        Box(Modifier.width(1.dp).fillMaxHeight().background(colors.outline.copy(alpha = 0.25f)))
+        DetailPane(selected, Modifier.weight(1f).fillMaxHeight(), detailAction)
     }
 }
 
@@ -448,7 +481,11 @@ private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-private fun DetailPane(v: PickerVersion?, modifier: Modifier = Modifier) {
+private fun DetailPane(
+    v: PickerVersion?,
+    modifier: Modifier = Modifier,
+    action: (@Composable (PickerVersion) -> Unit)? = null,
+) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     if (v == null) {
@@ -520,6 +557,12 @@ private fun DetailPane(v: PickerVersion?, modifier: Modifier = Modifier) {
                     Text(s.versionPickerNoChangelog, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
                 }
             }
+        }
+        // A host with no footer of its own puts its action here, under the notes
+        // it belongs to, rather than somewhere the reader has to look away to.
+        if (action != null) {
+            HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
+            Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) { action(v) }
         }
     }
 }

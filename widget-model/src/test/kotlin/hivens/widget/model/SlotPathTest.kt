@@ -72,6 +72,21 @@ class SlotPathTest {
     @Test
     fun `toString format is path-readable for diagnostics`() {
         val deep = SlotPath(surface, main).child("c1", body)
-        assertEquals("home.new:main > c1:body", deep.toString())
+        assertEquals("home.new/general:main > c1:body", deep.toString())
+    }
+
+    @Test
+    fun `the family is part of the address and survives a descent`() {
+        val project = FamilyId("projectView")
+        val deep = SlotPath(surface, main, family = project).child("c1", body)
+        assertEquals(project, deep.family)
+        assertEquals("home.new/projectView:main > c1:body", deep.toString())
+    }
+
+    @Test
+    fun `two paths that differ only in family are different paths`() {
+        val general = SlotPath(surface, main)
+        val project = SlotPath(surface, main, family = FamilyId("projectView"))
+        kotlin.test.assertNotEquals(general, project)
     }
 }

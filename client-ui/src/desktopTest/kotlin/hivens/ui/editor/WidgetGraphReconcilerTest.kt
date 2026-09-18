@@ -3,6 +3,7 @@ package hivens.ui.editor
 import androidx.compose.runtime.Composable
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -39,7 +40,7 @@ class WidgetGraphReconcilerTest {
         ))
 
     private fun LayoutGraph.slotWidgets() =
-        surfaces[SurfaceId("s")]!!.slots[SlotId("main")]!!.widgets
+        surfaces[SurfaceId("s")]!!.slotsOf(FamilyId.GENERAL)[SlotId("main")]!!.widgets
 
     private fun LayoutGraph.firstWidget() = slotWidgets().first()
 

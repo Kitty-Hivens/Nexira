@@ -97,6 +97,7 @@ import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
+import hivens.widget.api.LocalFamilyOverrides
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotChromeModifier
@@ -110,6 +111,7 @@ import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FlowSpec
+import hivens.widget.model.FamilyId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.traverse
@@ -171,6 +173,16 @@ fun EditorSurfaceHost(
     var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
+    // Which of the selected surface's families is being arranged. Null follows the
+    // app, which is what a surface with one family always does. A family the app
+    // only enters in some state -- a rail that only shows its project view while a
+    // project is open -- would otherwise be arrangeable only by first getting the
+    // app into that state, which makes the reader hunt for their own layout.
+    var selectedFamily by remember(selectedSurface) { mutableStateOf<FamilyId?>(null) }
+    val availableFamilies: List<FamilyId> = remember(selectedSurface, graphForSurfaces) {
+        selectedSurface?.let { graphForSurfaces.surfaces[it]?.families?.keys?.toList() }.orEmpty()
+    }
+
     // Prop editor target. Cleared on surface change (keyed remember), on
     // dismiss, and on leaving edit mode; while set, the palette hides so
     // the two right-edge panels do not overlap.
@@ -447,6 +459,15 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Remembered, not built inline: the Local is a dynamic one, and a fresh map
+    // each recompose would invalidate every slot that reads it -- which is all of
+    // them -- for a value that changes only when the editor picks a family.
+    val familyOverrides: Map<SurfaceId, FamilyId> = remember(editing, selectedSurface, selectedFamily) {
+        val sid = selectedSurface
+        val fid = selectedFamily
+        if (editing && sid != null && fid != null) mapOf(sid to fid) else emptyMap()
+    }
+
     CompositionLocalProvider(
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
@@ -455,6 +476,9 @@ fun EditorSurfaceHost(
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotChromeModifier provides slotChromeFactory,
+        // Shows the family being arranged in place of the one the app would.
+        // Empty while not editing, so nothing the editor picked survives the exit.
+        LocalFamilyOverrides provides familyOverrides,
         // Edit-mode reflow duration: slot add / remove / resize animates while
         // editing, and nothing elsewhere.
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
@@ -703,6 +727,9 @@ fun EditorSurfaceHost(
                     surfaces              = availableSurfaces,
                     selectedSurface       = selectedSurface,
                     onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false; clearSlotSelection() },
+                    families              = availableFamilies,
+                    selectedFamily        = selectedFamily,
+                    onFamilyPicked        = { selectedFamily = it; clearSlotSelection() },
                     surfaceHasSettings    = surfaceHasSettings(selectedSurface),
                     onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
                     paletteOpen           = paletteOpen,
@@ -744,6 +771,9 @@ private fun EditModePill(
     surfaces: List<SurfaceId>,
     selectedSurface: SurfaceId?,
     onSurfacePicked: (SurfaceId) -> Unit,
+    families: List<FamilyId>,
+    selectedFamily: FamilyId?,
+    onFamilyPicked: (FamilyId?) -> Unit,
     surfaceHasSettings: Boolean,
     onOpenSurfaceSettings: () -> Unit,
     paletteOpen: Boolean,
@@ -767,8 +797,10 @@ private fun EditModePill(
             // the surface-settings gear added) overflows around the 960dp min
             // window, where the "Esc -- exit" hint got squeezed into a vertical
             // staircase. Threshold on the measured width, not the coarse
-            // WidthClass, so it tracks the real chip count.
-            val compact = maxWidth < 1100.dp
+            // WidthClass, so it tracks the real chip count -- and the family
+            // chips are words rather than icons, so a surface that shows them
+            // needs the rest to give up their labels sooner.
+            val compact = maxWidth < if (families.size > 1) 1250.dp else 1100.dp
             Surface(
                 color   = NxTheme.colors.surface.copy(alpha = 0.94f),
                 shape   = RoundedCornerShape(20.dp),
@@ -795,6 +827,26 @@ private fun EditModePill(
                             onClick  = { onSurfacePicked(sid) },
                         )
                         Spacer(Modifier.width(4.dp))
+                    }
+
+                    // Family picker. Only for a surface that has more than one:
+                    // a single-family surface has nothing to choose, and a chip
+                    // that cannot change anything is noise in a pill already
+                    // tight enough to go icon-only.
+                    if (families.size > 1) {
+                        Spacer(Modifier.width(2.dp))
+                        families.forEach { fid ->
+                            FamilyChip(
+                                family  = fid,
+                                active  = fid == selectedFamily,
+                                compact = compact,
+                                // Picking the pinned one again hands the surface back
+                                // to the app, so the editor is never left holding a
+                                // family the reader has stopped looking at.
+                                onClick = { onFamilyPicked(if (fid == selectedFamily) null else fid) },
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
                     }
 
                     Spacer(Modifier.width(6.dp))
@@ -911,6 +963,26 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, o
                 )
             }
         }
+    }
+}
+
+// A family of the selected surface. Text only: a family is named by what it is
+// for, and there is no icon vocabulary for "the rail while a project is open"
+// that would not be a worse label than the word.
+@Composable
+private fun FamilyChip(family: FamilyId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
+    val bg = if (active) NxTheme.colors.primary.copy(alpha = 0.18f) else Color.Transparent
+    val fg = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
+    Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
+        Text(
+            text       = family.value,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = fg,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+            modifier   = Modifier
+                .clickable { onClick() }
+                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 6.dp),
+        )
     }
 }
 

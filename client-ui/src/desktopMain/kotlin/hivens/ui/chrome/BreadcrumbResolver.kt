@@ -11,6 +11,8 @@ import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.screens.mod.ModTarget
+import hivens.ui.screens.mod.OpenProjectState
 import hivens.ui.screens.ServerResolution
 import hivens.ui.screens.rememberServerResolution
 import org.koin.compose.koinInject
@@ -37,6 +39,21 @@ fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
     is Screen.ServerDetails       -> null
     is Screen.PackDetail          -> null
     is Screen.CataloguePackDetail -> null
+    is Screen.ModDetail           -> null
+}
+
+/**
+ * What a project page is called before anything has been fetched, and if nothing
+ * ever is.
+ *
+ * A file answers with its own name minus the extension, which is what the reader
+ * clicked and is recognisable even when the catalogue has never heard of it. A
+ * catalogue entry answers with its id, which is usually the slug and reads as a
+ * name.
+ */
+private fun modFallbackLabel(target: ModTarget): String = when (target) {
+    is ModTarget.Catalogue -> target.projectId
+    is ModTarget.Installed -> target.fileName.substringBeforeLast('.')
 }
 
 /**
@@ -65,8 +82,25 @@ fun rememberCrumbLabel(screen: Screen): String {
         is Screen.ServerSettings      -> serverCrumb(screen.serverId)
         is Screen.ServerDetails       -> serverCrumb(screen.serverId)
         is Screen.CataloguePackDetail -> catalogueCrumb(screen.origin, screen.packId, s.crumbLoading)
+        is Screen.ModDetail           -> modCrumb(screen.target)
         else -> staticCrumbLabel(screen, s).orEmpty() // unreachable: statics returned above
     }
+}
+
+/**
+ * A project page's title, taken from what the page itself published rather than
+ * fetched a second time.
+ *
+ * Guarded on the target, because the trail can hold an entry that is not the
+ * screen on top: an unguarded read would label every project crumb with whatever
+ * page is open now. Falls back to the route's own name, which is what the reader
+ * clicked either way.
+ */
+@Composable
+private fun modCrumb(target: ModTarget): String {
+    val state: OpenProjectState = koinInject()
+    val open by state.open.collectAsState()
+    return open?.takeIf { it.targetKey == target.key }?.title ?: modFallbackLabel(target)
 }
 
 /**

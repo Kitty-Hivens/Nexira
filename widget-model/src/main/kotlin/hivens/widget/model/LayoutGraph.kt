@@ -53,8 +53,65 @@ data class SlotContent(
 /** Upper bound for [SlotContent.grid] and for [FlowSpec.wrap]; the steppers clamp to it. */
 const val GRID_MAX = 48
 
+/**
+ * One family's slots, and the plane the surface wears while that family is live.
+ *
+ * [surface] is here and not on [SurfaceLayout] because the family answers for how
+ * the surface LOOKS as well as what it holds: a rail carrying a project's data is
+ * allowed to sit on a different plane from the same rail carrying messages, and
+ * making the reader re-style the rail every time they switch would be asking them
+ * to maintain one setting in two places. Null means the surface keeps whatever
+ * its host paints.
+ */
 @Serializable
-data class SurfaceLayout(val slots: Map<SlotId, SlotContent> = emptyMap())
+data class FamilyLayout(
+    val slots: Map<SlotId, SlotContent> = emptyMap(),
+    val surface: SurfaceSpec? = null,
+)
+
+/**
+ * Every family a surface has, live one included, all at once.
+ *
+ * Nothing here says which family is showing: that is runtime state, set by the
+ * code that navigated, and it deliberately never reaches the file. If switching
+ * families rewrote the graph, opening a project would overwrite the arrangement
+ * the reader built for the general view, and leaving it would overwrite the
+ * other. Both sets are the reader's work and both survive.
+ *
+ * There is no `slots` on this type on purpose. Almost every caller means
+ * [FamilyId.GENERAL] and would have been right, but the four that walk the graph
+ * whole -- instance id uniqueness, the migration rewriter, the reset sweep --
+ * would have been silently wrong, and a shorthand that is right by default is
+ * exactly the kind that nobody re-reads. Name the family, or ask for all of them.
+ */
+@Serializable
+data class SurfaceLayout(
+    val families: Map<FamilyId, FamilyLayout> = emptyMap(),
+) {
+    /** The named family, or null when this surface has never had one. */
+    fun family(id: FamilyId): FamilyLayout? = families[id]
+
+    /** The named family's slots, empty when the surface does not carry it. */
+    fun slotsOf(id: FamilyId): Map<SlotId, SlotContent> = families[id]?.slots.orEmpty()
+
+    /** Every slot in every family, for the sweeps that must not miss one. */
+    fun allSlots(): Sequence<SlotContent> =
+        families.values.asSequence().flatMap { it.slots.values.asSequence() }
+
+    /** Rewrites every family through [edit], dropping none. */
+    fun mapFamilies(edit: (FamilyLayout) -> FamilyLayout): SurfaceLayout =
+        copy(families = families.mapValues { (_, f) -> edit(f) })
+}
+
+/**
+ * A surface whose only family is [FamilyId.GENERAL].
+ *
+ * Kept as a function with the type's name so the many callers that predate
+ * families -- the bundled default, the reconciler's seeds, the tests -- keep
+ * saying what they always meant, which is a surface with one set of slots.
+ */
+fun SurfaceLayout(slots: Map<SlotId, SlotContent>): SurfaceLayout =
+    SurfaceLayout(families = mapOf(FamilyId.GENERAL to FamilyLayout(slots)))
 
 @Serializable
 data class LayoutGraph(val surfaces: Map<SurfaceId, SurfaceLayout> = emptyMap()) {
@@ -414,7 +471,7 @@ fun LayoutGraph.resizeWidgetInGrid(path: SlotPath, instanceId: String, width: Fl
 // Walks the path and returns the SlotContent at the leaf, or null if
 // any intermediate surface / slot / parent widget is missing.
 fun LayoutGraph.traverse(path: SlotPath): SlotContent? {
-    var content = surfaces[path.surface]?.slots?.get(path.rootSlot) ?: return null
+    var content = surfaces[path.surface]?.family(path.family)?.slots?.get(path.rootSlot) ?: return null
     for (segment in path.nested) {
         val container = content.widgets.firstOrNull { it.instanceId == segment.parentInstanceId } ?: return null
         content = container.children[segment.slot] ?: return null
@@ -425,9 +482,13 @@ fun LayoutGraph.traverse(path: SlotPath): SlotContent? {
 // Walks every WidgetInstance in the graph (including nested children)
 // in pre-order. Used by the launcher's tree-wide instanceId uniqueness
 // check.
+//
+// Every family, not just the live one: an instanceId has to be unique across the
+// whole file, or switching families would surface a duplicate that nothing
+// checked when it was created.
 fun LayoutGraph.walkInstances(): Sequence<WidgetInstance> = sequence {
     for ((_, layout) in surfaces) {
-        for ((_, content) in layout.slots) {
+        for (content in layout.allSlots()) {
             yieldAll(content.walkInstances())
         }
     }
@@ -454,7 +515,9 @@ fun LayoutGraph.flatMapInstances(
     transform: (WidgetInstance) -> List<WidgetInstance>,
 ): LayoutGraph = copy(
     surfaces = surfaces.mapValues { (_, layout) ->
-        layout.copy(slots = layout.slots.mapValues { (_, content) -> content.flatMapInstances(transform) })
+        layout.mapFamilies { family ->
+            family.copy(slots = family.slots.mapValues { (_, content) -> content.flatMapInstances(transform) })
+        }
     },
 )
 
@@ -466,9 +529,9 @@ private fun SlotContent.flatMapInstances(
     },
 )
 
-// All instanceIds under one surface, tree-wide (including nested children).
+// All instanceIds under one surface, tree-wide: every family, every nested child.
 fun SurfaceLayout.instanceIds(): Set<String> =
-    slots.values.flatMap { content -> content.walkInstances().map { it.instanceId } }.toSet()
+    allSlots().flatMap { content -> content.walkInstances().map { it.instanceId } }.toSet()
 
 // Removes every widget whose instanceId is in `ids`, tree-wide. resetSurface
 // uses this to clear ids that leaked onto OTHER surfaces (via a cross-surface
@@ -476,7 +539,9 @@ fun SurfaceLayout.instanceIds(): Set<String> =
 // ids collide with the leaked copies and the tree-wide uniqueness check
 // rejects the whole reset, trapping the user.
 fun SurfaceLayout.removeInstanceIds(ids: Set<String>): SurfaceLayout =
-    copy(slots = slots.mapValues { (_, content) -> content.removeInstanceIds(ids) })
+    mapFamilies { family ->
+        family.copy(slots = family.slots.mapValues { (_, content) -> content.removeInstanceIds(ids) })
+    }
 
 private fun SlotContent.removeInstanceIds(ids: Set<String>): SlotContent =
     copy(
@@ -501,6 +566,48 @@ fun LayoutGraph.resetSurface(surface: SurfaceId, defaultLayout: SurfaceLayout?):
     return copy(surfaces = cleaned + (surface to defaultLayout))
 }
 
+// ── Families ─────────────────────────────────────────────────────────
+
+/**
+ * Makes sure [surface] carries [family], adding an empty one if it does not.
+ *
+ * A family a surface has never shown has no slots on disk, because nothing has
+ * been arranged in it yet. The first render has to find something to hang
+ * content on, so the reconciler seeds it here rather than having every read
+ * treat "absent" and "empty" as the same thing. Identity when the family is
+ * already there, empty or not.
+ */
+fun LayoutGraph.ensureFamily(surface: SurfaceId, family: FamilyId): LayoutGraph {
+    val layout = surfaces[surface] ?: SurfaceLayout()
+    if (family in layout.families) return this
+    return copy(
+        surfaces = surfaces + (surface to layout.copy(families = layout.families + (family to FamilyLayout()))),
+    )
+}
+
+/**
+ * Sets (or clears, with null) the plane the surface wears under [family].
+ *
+ * An all-default surface normalizes to null, matching the per-widget rule, so a
+ * family the reader never styled stays absent from the file instead of writing
+ * out a record of every default.
+ */
+fun LayoutGraph.updateFamilySurface(
+    surface: SurfaceId,
+    family: FamilyId,
+    spec: SurfaceSpec?,
+): LayoutGraph {
+    val layout = surfaces[surface] ?: return this
+    val current = layout.family(family) ?: return this
+    val normalized = spec?.takeUnless { it == SurfaceSpec() }
+    if (current.surface == normalized) return this
+    return copy(
+        surfaces = surfaces + (
+            surface to layout.copy(families = layout.families + (family to current.copy(surface = normalized)))
+        ),
+    )
+}
+
 // ── Internal traversal + rebuild ──────────────────────────────────────
 
 // Applies `mutator` to the SlotContent at `path`. If the mutator
@@ -512,7 +619,8 @@ private fun LayoutGraph.mutate(
     mutator: (SlotContent) -> SlotContent,
 ): LayoutGraph {
     val rootLayout = surfaces[path.surface] ?: return this
-    val rootContent = rootLayout.slots[path.rootSlot] ?: return this
+    val rootFamily = rootLayout.family(path.family) ?: return this
+    val rootContent = rootFamily.slots[path.rootSlot] ?: return this
 
     val newRootContent: SlotContent = if (path.nested.isEmpty()) {
         mutator(rootContent)
@@ -527,8 +635,11 @@ private fun LayoutGraph.mutate(
     }
 
     if (newRootContent === rootContent) return this
-    val newSlots = rootLayout.slots.toMutableMap().apply { put(path.rootSlot, newRootContent) }
-    val newSurfaces = surfaces.toMutableMap().apply { put(path.surface, rootLayout.copy(slots = newSlots)) }
+    val newSlots = rootFamily.slots.toMutableMap().apply { put(path.rootSlot, newRootContent) }
+    val newFamilies = rootLayout.families.toMutableMap()
+        .apply { put(path.family, rootFamily.copy(slots = newSlots)) }
+    val newSurfaces = surfaces.toMutableMap()
+        .apply { put(path.surface, rootLayout.copy(families = newFamilies)) }
     return copy(surfaces = newSurfaces)
 }
 

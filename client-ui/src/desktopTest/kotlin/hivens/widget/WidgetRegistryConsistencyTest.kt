@@ -17,8 +17,10 @@ class WidgetRegistryConsistencyTest {
     @Test
     fun `every default-layout widget kind exists in the generated registry`() {
         val graph = DefaultLayout.load()
+        // Every family, not just the general one: a kind that only the project-view
+        // rail names is just as capable of being renamed out from under the layout.
         val referenced = graph.surfaces.values
-            .flatMap { it.slots.values }
+            .flatMap { it.allSlots().toList() }
             .flatMap { it.widgets }
             .map { it.kind }
             .toSet()
@@ -108,6 +110,7 @@ class WidgetRegistryConsistencyTest {
             "bg.fx.vignette",
             "bg.fx.animspeed",
             "bg.loop.mode",
+            "bg.audio",
             "bg.tint",
             "bg.reset",
             "profile.nav",
@@ -125,6 +128,13 @@ class WidgetRegistryConsistencyTest {
             // per-instance persisted state widgets
             "notes.scratch",
             "checklist",
+            // The project page's metadata blocks, which live in the right rail's
+            // project-view family rather than in the page.
+            "mod.compatibility",
+            "mod.links",
+            "mod.tags",
+            "mod.creators",
+            "mod.details",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")

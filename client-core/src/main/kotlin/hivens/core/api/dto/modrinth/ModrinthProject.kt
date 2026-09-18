@@ -26,6 +26,11 @@ data class ModrinthProject(
     /** Long-form CommonMark project body. */
     val body: String = "",
     val categories: List<String> = emptyList(),
+    /**
+     * Tags beyond the primary ones. The catalogue's own page shows both together
+     * in one block, so a reader never has to know which list a tag came from.
+     */
+    @SerialName("additional_categories") val additionalCategories: List<String> = emptyList(),
     val license: ModrinthLicense? = null,
     @SerialName("icon_url") val iconUrl: String? = null,
     val gallery: List<ModrinthGalleryImage> = emptyList(),

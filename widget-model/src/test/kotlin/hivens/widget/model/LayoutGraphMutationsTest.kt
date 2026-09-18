@@ -24,7 +24,7 @@ class LayoutGraphMutationsTest {
     )
 
     private fun LayoutGraph.mainWidgets(): List<WidgetInstance> =
-        surfaces[home]?.slots?.get(main)?.widgets ?: emptyList()
+        surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.widgets ?: emptyList()
 
     private val rootPath: SlotPath = SlotPath(home, main)
 
@@ -89,7 +89,7 @@ class LayoutGraphMutationsTest {
     @Test
     fun `setFlow changes the slot's arrangement`() {
         val out = seed(w1).setFlow(rootPath, FlowSpec.Row)
-        assertEquals(FlowSpec.Row, out.surfaces[home]?.slots?.get(main)?.flow)
+        assertEquals(FlowSpec.Row, out.surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.flow)
     }
 
     @Test
@@ -101,7 +101,7 @@ class LayoutGraphMutationsTest {
     @Test
     fun `a grid is a horizontal flow that wraps into equal cells`() {
         val out = seed(w1).setFlow(rootPath, FlowSpec.grid(3))
-        val flow = out.surfaces[home]?.slots?.get(main)?.flow!!
+        val flow = out.surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.flow!!
         assertEquals(true, flow.horizontal)
         assertEquals(3, flow.wrap)
         assertEquals(true, flow.uniform)
@@ -109,9 +109,9 @@ class LayoutGraphMutationsTest {
 
     @Test
     fun `setGrid updates and clamps to the 0 to MAX range`() {
-        assertEquals(3, seed(w1).setGrid(rootPath, 3).surfaces[home]?.slots?.get(main)?.grid)
-        assertEquals(0, seed(w1).setGrid(rootPath, -4).surfaces[home]?.slots?.get(main)?.grid)
-        assertEquals(GRID_MAX, seed(w1).setGrid(rootPath, 999).surfaces[home]?.slots?.get(main)?.grid)
+        assertEquals(3, seed(w1).setGrid(rootPath, 3).surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.grid)
+        assertEquals(0, seed(w1).setGrid(rootPath, -4).surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.grid)
+        assertEquals(GRID_MAX, seed(w1).setGrid(rootPath, 999).surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.grid)
     }
 
     @Test
@@ -245,7 +245,7 @@ class LayoutGraphMutationsTest {
         assertEquals(Placement(x = 236f, y = 16f, z = 1), placed["i2"])
         assertEquals(Placement(x = 456f, y = 16f, z = 2), placed["i3"])
         assertEquals(Placement(x = 16f, y = 176f, z = 3), placed["i4"]) // wraps to the next row
-        assertNull(out.surfaces[home]?.slots?.get(main)?.flow)
+        assertNull(out.surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.flow)
     }
 
     @Test
@@ -260,7 +260,7 @@ class LayoutGraphMutationsTest {
     @Test
     fun `setFlow to another flow only flips, no seeding`() {
         val out = seed(w1, w2).setFlow(rootPath, FlowSpec.Row)
-        assertEquals(FlowSpec.Row, out.surfaces[home]?.slots?.get(main)?.flow)
+        assertEquals(FlowSpec.Row, out.surfaces[home]?.slotsOf(FamilyId.GENERAL)?.get(main)?.flow)
         assertNull(out.mainWidgets().first { it.instanceId == "i1" }.placement)
         assertNull(out.mainWidgets().first { it.instanceId == "i2" }.placement)
     }
@@ -409,8 +409,8 @@ class LayoutGraphMutationsTest {
             instanceId = "i1",
             toIndex    = 0,
         )
-        val top    = out.surfaces[home]!!.slots[SlotId("top")]!!.widgets
-        val bottom = out.surfaces[home]!!.slots[SlotId("bottom")]!!.widgets
+        val top    = out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[SlotId("top")]!!.widgets
+        val bottom = out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[SlotId("bottom")]!!.widgets
         assertEquals(listOf(w2),     top)
         assertEquals(listOf(w1, w3), bottom)
     }
@@ -461,7 +461,7 @@ class LayoutGraphMutationsTest {
     @Test
     fun `insertWidget at depth 1 grows the container's body slot`() {
         val out = seedNested().insertWidget(nestedBody, w3, 1)
-        val containerNow = out.surfaces[home]!!.slots[main]!!.widgets[0]
+        val containerNow = out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[main]!!.widgets[0]
         val bodyWidgets = containerNow.children[SlotId("body")]!!.widgets
         assertEquals(listOf(w1, w3, w2), bodyWidgets)
     }
@@ -469,14 +469,14 @@ class LayoutGraphMutationsTest {
     @Test
     fun `removeWidget at depth 1 strips a child without touching siblings`() {
         val out = seedNested().removeWidget(nestedBody, "i2")
-        val containerNow = out.surfaces[home]!!.slots[main]!!.widgets[0]
+        val containerNow = out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[main]!!.widgets[0]
         assertEquals(listOf(w1), containerNow.children[SlotId("body")]!!.widgets)
     }
 
     @Test
     fun `reorderInSlot at depth 1 reorders within the container`() {
         val out = seedNested().reorderInSlot(nestedBody, fromIndex = 0, toIndex = 1)
-        val containerNow = out.surfaces[home]!!.slots[main]!!.widgets[0]
+        val containerNow = out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[main]!!.widgets[0]
         assertEquals(listOf(w2, w1), containerNow.children[SlotId("body")]!!.widgets)
     }
 
@@ -488,7 +488,7 @@ class LayoutGraphMutationsTest {
             instanceId = "i1",
             toIndex    = 0,
         )
-        val rootWidgets = out.surfaces[home]!!.slots[main]!!.widgets
+        val rootWidgets = out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[main]!!.widgets
         assertEquals(2, rootWidgets.size)
         assertEquals("i1", rootWidgets[0].instanceId)
         // Container still present, body now has just w2.
@@ -506,7 +506,7 @@ class LayoutGraphMutationsTest {
             instanceId = "i3",
             toIndex    = 1,
         )
-        val rootWidgets = out.surfaces[home]!!.slots[main]!!.widgets
+        val rootWidgets = out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[main]!!.widgets
         assertEquals(1, rootWidgets.size, "w3 leaves root slot")
         val bodyNow = rootWidgets[0].children[SlotId("body")]!!.widgets
         assertEquals(listOf(w1, w3, w2), bodyNow, "w3 landed at index 1 inside container")
@@ -569,9 +569,9 @@ class LayoutGraphMutationsTest {
             ),
         )
         val out = layout.removeInstanceIds(setOf("i1"))
-        assertEquals(listOf("i2"), out.slots[SlotId("top")]!!.widgets.map { it.instanceId })
+        assertEquals(listOf("i2"), out.slotsOf(FamilyId.GENERAL)[SlotId("top")]!!.widgets.map { it.instanceId })
         // i1 nested inside the container's body slot is stripped too.
-        val body = out.slots[SlotId("bot")]!!.widgets[0].children[SlotId("body")]!!.widgets
+        val body = out.slotsOf(FamilyId.GENERAL)[SlotId("bot")]!!.widgets[0].children[SlotId("body")]!!.widgets
         assertEquals(listOf("i2"), body.map { it.instanceId })
     }
 
@@ -589,8 +589,8 @@ class LayoutGraphMutationsTest {
             ),
         )
         val out = graph.resetSurface(home, defaultHome)
-        assertEquals(listOf("i1"), out.surfaces[home]!!.slots[main]!!.widgets.map { it.instanceId })
-        assertEquals(emptyList<String>(), out.surfaces[SurfaceId("library")]!!.slots[SlotId("body")]!!.widgets.map { it.instanceId })
+        assertEquals(listOf("i1"), out.surfaces[home]!!.slotsOf(FamilyId.GENERAL)[main]!!.widgets.map { it.instanceId })
+        assertEquals(emptyList<String>(), out.surfaces[SurfaceId("library")]!!.slotsOf(FamilyId.GENERAL)[SlotId("body")]!!.widgets.map { it.instanceId })
         // The pre-fix bug would have produced two "i1" tree-wide -> uniqueness must hold.
         val ids = out.walkInstances().map { it.instanceId }.toList()
         assertEquals(ids.toSet().size, ids.size, "no duplicate instanceIds after reset")

@@ -2,6 +2,7 @@ package hivens.ui.widgets
 
 import hivens.launcher.AutoSyncService
 import hivens.ui.notifications.PersistedNotification
+import hivens.ui.screens.mod.OpenProject
 import hivens.widget.model.SourceKey
 
 /**
@@ -17,4 +18,8 @@ object Sources {
     // "Do not disturb" live state -- the notification-history widget reflects it
     // on its mute toggle; NotificationStack reads the same flow to gate popups.
     val DoNotDisturb = SourceKey<Boolean>("notifications.dnd")
+    // The project whose page is open, or null anywhere else in the app. Read by
+    // the right rail's project-view family, which is shown on that page and has
+    // nothing to say off it.
+    val OpenProject = SourceKey<OpenProject?>("mod.open")
 }

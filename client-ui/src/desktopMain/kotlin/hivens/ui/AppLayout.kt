@@ -48,6 +48,7 @@ import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalShellContext
 import hivens.ui.widgets.shell.ShellContext
 import hivens.ui.widgets.themepicker.ThemePickerSurface
+import hivens.ui.screens.mod.ModDetailScreen
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -270,6 +271,7 @@ fun AppLayout(
                                 }
                                 onScreenChange(Screen.PackVersions(screen.instanceId))
                             },
+                            onOpenProject          = { onScreenChange(Screen.ModDetail(it)) },
                         )
 
                     is Screen.PackVersions ->
@@ -277,6 +279,9 @@ fun AppLayout(
                             instanceId = screen.instanceId,
                             onBack     = onBack,
                         )
+
+                    is Screen.ModDetail ->
+                        ModDetailScreen(target = screen.target, onBack = onBack)
                 }
             }
         }

@@ -130,7 +130,10 @@ import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetServiceRegistry
+import hivens.ui.screens.mod.ModTarget
+import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetStateHost
+import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetServiceRegistry
@@ -241,6 +244,20 @@ sealed class Screen {
     data class CataloguePackDetail(val origin: PackOrigin, val packId: String) : Screen()
 
     /**
+     * The project page (#367), rendered natively rather than linked out.
+     *
+     * A SCREEN and not a panel, because its metadata blocks live in
+     * `appshell.rightrail` -- a shell surface present on every screen -- and a
+     * page carrying its own right-hand column would stand a third column beside
+     * the news. Opening one therefore navigates; it cannot open in place, because
+     * in place the blocks have nowhere to appear.
+     *
+     * Carries a [ModTarget] rather than a project id so a jar the catalogue has
+     * never indexed gets the same page as one it has.
+     */
+    data class ModDetail(val target: ModTarget) : Screen()
+
+    /**
      * Identity for state that outlives a visit, stable across the fields a screen
      * stamps onto its own back-stack entry.
      *
@@ -254,6 +271,7 @@ sealed class Screen {
         is PackDetail          -> "PackDetail:$instanceId"
         is PackVersions        -> "PackVersions:$instanceId"
         is CataloguePackDetail -> "CataloguePackDetail:$origin:$packId"
+        is ModDetail           -> "ModDetail:${target.key}"
         is ServerSettings      -> "ServerSettings:$serverId"
         is ServerDetails       -> "ServerDetails:$serverId"
         else                   -> this::class.simpleName.orEmpty()
@@ -932,6 +950,9 @@ fun FrameWindowScope.AppShellContent(
             // fresh identity each recompose would invalidate the whole content
             // subtree rather than just the widgets that have a surface.
             val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
+            // Which family each surface shows. From Koin, not remembered here, so a
+            // switch can come from outside the composition.
+            val surfaceFamilies: SurfaceFamilies = koinInject()
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 LocalLayoutGraph                         provides layoutGraph,
@@ -940,6 +961,7 @@ fun FrameWindowScope.AppShellContent(
                 LocalWidgetDataRegistry                  provides widgetDataRegistry,
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,
                 LocalWidgetStateHost                     provides widgetStateStore,
+                LocalSurfaceFamilies                     provides surfaceFamilies,
                 // Dev UI-debug seams: report-only bounds instrumentation, mounted
                 // ONLY while a non-release build has the overlay on AND a facet needs
                 // it -- else identity, so a dev build with the overlay off runs the
