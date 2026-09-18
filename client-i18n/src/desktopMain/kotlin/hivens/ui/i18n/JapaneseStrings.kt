@@ -1459,6 +1459,9 @@ object JapaneseStrings : AppStrings {
     override fun readOnlyDataBody(stores: String) =
         "新しいビルドのランチャーが書き込んでいます: $stores。読み取り専用で開いているため、このセッションでは書き戻せません。" +
             "変更はランチャーを閉じると失われます。編集するには更新してください。"
+    override fun readOnlyDataBodyOldFormat(stores: String) =
+        "このビルドが正確に読めない形式で保存されています: $stores。ファイルはそのまま残し、読み取り専用で開いています。" +
+            "今の変更は終了時に失われます。古いビルドなら読み込めます。"
     override val readOnlyDataLibrary = "パックのライブラリ"
     override val readOnlyDataLayout = "レイアウト"
     override val readOnlyDataTheme    = "テーマ"

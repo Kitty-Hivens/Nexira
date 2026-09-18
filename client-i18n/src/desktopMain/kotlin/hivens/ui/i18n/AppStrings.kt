@@ -1434,6 +1434,8 @@ interface AppStrings {
     // --- Data written by a newer build (read-only for this session) ---
     val readOnlyDataTitle: String
     fun readOnlyDataBody(stores: String): String
+    /** The other direction: too old to read faithfully, so going back helps and updating does not. */
+    fun readOnlyDataBodyOldFormat(stores: String): String
     val readOnlyDataLibrary: String
     val readOnlyDataLayout: String
     val readOnlyDataTheme: String

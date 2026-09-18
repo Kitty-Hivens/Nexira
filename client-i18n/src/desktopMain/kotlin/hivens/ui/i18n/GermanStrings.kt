@@ -1455,6 +1455,9 @@ object GermanStrings : AppStrings {
     override fun readOnlyDataBody(stores: String) =
         "Von einem neueren Build des Launchers geschrieben: $stores. Schreibgeschützt geöffnet — diese Sitzung kann " +
             "nichts zurückschreiben, alle Änderungen gehen beim Beenden verloren. Aktualisieren Sie, um wieder zu bearbeiten."
+    override fun readOnlyDataBodyOldFormat(stores: String) =
+        "In einer Form geschrieben, die dieser Build nicht getreu lesen kann: $stores. Unverändert belassen " +
+            "und schreibgeschützt geöffnet, Änderungen gehen beim Beenden verloren. Ein älterer Build liest sie noch."
     override val readOnlyDataLibrary  = "die Pack-Sammlung"
     override val readOnlyDataLayout   = "das Layout"
     override val readOnlyDataTheme    = "das Design"

@@ -24,6 +24,7 @@ import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.RefreshableAuthProvider
 import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
@@ -642,24 +643,33 @@ fun FrameWindowScope.AppShellContent(
         // must not age out before the work is done. Keyed, so a shell reload after
         // a crash updates the same entry instead of stacking another.
         LaunchedEffect(Unit) {
-            val stores = NewerBuildData.affected()
-            if (stores.isEmpty()) return@LaunchedEffect
-            val named = stores.joinToString(", ") { store ->
-                when (store) {
-                    ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
-                    ReadOnlyStore.Layout      -> s.readOnlyDataLayout
-                    ReadOnlyStore.Theme       -> s.readOnlyDataTheme
+            val affected = NewerBuildData.affectedWithReason()
+            if (affected.isEmpty()) return@LaunchedEffect
+            // One notice per reason, because the two say opposite things about
+            // what to do: a newer file is fixed by updating, and an older one is
+            // fixed by going back. A single sentence covering both would be wrong
+            // for whichever half the reader has.
+            affected.entries.groupBy({ it.value }, { it.key }).forEach { (reason, stores) ->
+                val named = stores.joinToString(", ") { store ->
+                    when (store) {
+                        ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
+                        ReadOnlyStore.Layout      -> s.readOnlyDataLayout
+                        ReadOnlyStore.Theme       -> s.readOnlyDataTheme
+                    }
                 }
+                notificationCenter.push(
+                    sourceKey = "storage-read-only-${reason.name.lowercase()}",
+                    sender    = Branding.TITLE,
+                    iconUrl   = null,
+                    severity  = Severity.Warn,
+                    kind      = Kind.Sticky,
+                    title     = s.readOnlyDataTitle,
+                    body      = when (reason) {
+                        ReadOnlyReason.NewerBuild       -> s.readOnlyDataBody(named)
+                        ReadOnlyReason.UnreadableFormat -> s.readOnlyDataBodyOldFormat(named)
+                    },
+                )
             }
-            notificationCenter.push(
-                sourceKey = "storage-read-only",
-                sender    = Branding.TITLE,
-                iconUrl   = null,
-                severity  = Severity.Warn,
-                kind      = Kind.Sticky,
-                title     = s.readOnlyDataTitle,
-                body      = s.readOnlyDataBody(named),
-            )
         }
 
         val dataDirectory: java.nio.file.Path = koinInject()

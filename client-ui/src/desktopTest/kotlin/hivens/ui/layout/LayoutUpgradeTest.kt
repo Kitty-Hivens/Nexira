@@ -1,6 +1,9 @@
 package hivens.ui.layout
 
 import hivens.ui.bootstrap.RecoveryIo
+import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyReason
+import hivens.core.data.ReadOnlyStore
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -209,5 +212,28 @@ class LayoutUpgradeTest {
         val loaded = repo().value()
         assertEquals(bundled, loaded, "a graph with no faithful reading must not be half-read")
         assertEquals(ancient, Files.readString(file), "the file was overwritten instead of left")
+    }
+
+    @Test
+    fun `an edit does not persist the default over a file from before the surface schema`() = runBlocking {
+        // "Left alone" held on load and not afterwards: the branch served the
+        // bundled default without closing the store, so the first edit of the
+        // session wrote that default over the file it had declined to read, and
+        // the notice never fired because nothing had been recorded.
+        NewerBuildData.reset()
+        val ancient = savedAtSchema9.replace("\"schema_version\": 9", "\"schema_version\": 7")
+        Files.writeString(file, ancient)
+
+        val repo = repo()
+        repo.update { g -> g.copy(surfaces = g.surfaces + (SurfaceId("extra") to SurfaceLayout())) }
+        repo.flush()
+
+        assertEquals(ancient, Files.readString(file), "an edit overwrote a file this build refused to read")
+        assertEquals(
+            mapOf(ReadOnlyStore.Layout to ReadOnlyReason.UnreadableFormat),
+            NewerBuildData.affectedWithReason(),
+            "nothing was recorded, so the session could not tell the user its edits are not being kept",
+        )
+        NewerBuildData.reset()
     }
 }

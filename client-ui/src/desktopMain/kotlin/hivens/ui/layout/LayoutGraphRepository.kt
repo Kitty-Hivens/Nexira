@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import hivens.core.data.NewerBuildData
+import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
 import hivens.core.io.AtomicFiles
 import hivens.ui.bootstrap.RecoveryIo
@@ -233,9 +234,16 @@ class LayoutGraphRepository(
                 )
             }
             if (envelope.schemaVersion in 1 until LayoutReconcile.SURFACE_SCHEMA) {
-                // Deliberately not migrated: see LayoutReconcile.SURFACE_SCHEMA. The
-                // file is left on disk untouched and simply not read, so a build that
-                // still understands it can be gone back to.
+                // Deliberately not migrated: see LayoutReconcile.SURFACE_SCHEMA.
+                //
+                // "Left on disk untouched" was the intent and not the behaviour: the
+                // branch returned the bundled default without closing the store, so
+                // the first edit of the session persisted that default over the file
+                // it had just declined to read, and the notice never fired because
+                // nothing had been recorded. Read-only is what makes the sentence
+                // above true.
+                readOnly = true
+                NewerBuildData.record(ReadOnlyStore.Layout, ReadOnlyReason.UnreadableFormat)
                 log.warn(
                     "Layout graph at {} is schema_version {} and describes widget surfaces in a form " +
                         "with no faithful reading here; starting from the bundled default. " +
