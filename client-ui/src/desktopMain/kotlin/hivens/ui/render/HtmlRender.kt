@@ -782,16 +782,45 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
     }
 }
 
-private fun buildInline(nodes: List<Node>, ctx: InlineCtx, onLink: (String) -> Unit): AnnotatedString =
-    buildAnnotatedString { nodes.forEach { appendInline(it, ctx, onLink) } }
+/**
+ * Where the run is, for the one whitespace rule that needs to know.
+ *
+ * HTML drops whitespace at the start of a line: a source that writes a hard break
+ * as a backslash and a newline leaves that newline in the markup, and a browser
+ * renders nothing for it. Jsoup's `text()` collapses a run of whitespace to one
+ * space but does not remove it, so without this every line after a break began
+ * with a space and sat a few pixels right of the one above it. Two lines of prose
+ * under a heading is where it shows, and it showed on every description written
+ * that way.
+ */
+private class InlineFlow(var atLineStart: Boolean = true)
 
-private fun AnnotatedString.Builder.appendInline(node: Node, ctx: InlineCtx, onLink: (String) -> Unit) {
+private fun buildInline(nodes: List<Node>, ctx: InlineCtx, onLink: (String) -> Unit): AnnotatedString {
+    val flow = InlineFlow()
+    return buildAnnotatedString { nodes.forEach { appendInline(it, ctx, flow, onLink) } }
+}
+
+private fun AnnotatedString.Builder.appendInline(
+    node: Node,
+    ctx: InlineCtx,
+    flow: InlineFlow,
+    onLink: (String) -> Unit,
+) {
     when (node) {
-        is TextNode -> append(node.text())
+        is TextNode -> {
+            val text = if (flow.atLineStart) node.text().trimStart() else node.text()
+            if (text.isNotEmpty()) {
+                append(text)
+                flow.atLineStart = false
+            }
+        }
         is Element -> {
-            fun kids() = node.childNodes().forEach { appendInline(it, ctx, onLink) }
+            fun kids() = node.childNodes().forEach { appendInline(it, ctx, flow, onLink) }
             when (node.tagName().lowercase()) {
-                "br" -> append("\n")
+                "br" -> {
+                    append("\n")
+                    flow.atLineStart = true
+                }
                 "b", "strong" -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { kids() }
                 "i", "em" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { kids() }
                 "u", "ins" -> withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { kids() }
@@ -820,7 +849,12 @@ private fun AnnotatedString.Builder.appendInline(node: Node, ctx: InlineCtx, onL
                     if (c == null) kids() else withStyle(SpanStyle(color = c)) { kids() }
                 }
                 // Inline image -> its alt text (v1; block-level images render as AsyncImage).
-                "img" -> node.attr("alt").takeIf { it.isNotBlank() }?.let { append(it) }
+                // An inline image falls back to its alt text, which is ink on the
+                // line like any other, so the line has started.
+                "img" -> node.attr("alt").takeIf { it.isNotBlank() }?.let {
+                    append(it)
+                    flow.atLineStart = false
+                }
                 // Unknown inline element -> its content, never the raw tag.
                 else -> kids()
             }
