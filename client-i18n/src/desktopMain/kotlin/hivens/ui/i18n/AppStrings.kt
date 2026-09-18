@@ -1436,6 +1436,7 @@ interface AppStrings {
     fun readOnlyDataBody(stores: String): String
     val readOnlyDataLibrary: String
     val readOnlyDataLayout: String
+    val readOnlyDataTheme: String
     val videoFetchingTool: String
     val videoResolvingPage: String
     val videoDownloading: String

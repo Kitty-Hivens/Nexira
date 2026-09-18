@@ -58,4 +58,54 @@ class ThemeManagerTest {
         val manager = ThemeManager(tempDir()) { _, _ -> }
         assertEquals(ThemePresets.CELESTIA_DARK, manager.loadTheme())
     }
+
+    @Test
+    fun `a theme written before a role existed keeps everything it did say`() {
+        // The regression this guards: the record had no field defaults, so the
+        // release that added a role made every file on disk undecodable. The
+        // loader fell back to a preset and the next save wrote that preset over
+        // the user's colours, with one swallowed exception as the only trace.
+        val dir = tempDir()
+        Files.writeString(
+            dir.resolve("themes.json"),
+            """{"name":"Mine","primary":"#112233","secondary":"#445566"}""",
+        )
+
+        val loaded = ThemeManager(dir) { _, _ -> }.loadTheme()
+
+        assertEquals("Mine", loaded.name, "a file that predates a role is still that user's theme")
+        assertEquals("#112233", loaded.primary)
+        assertEquals("#445566", loaded.secondary)
+        assertEquals(ThemePresets.CELESTIA_DARK.error, loaded.error, "a role it never mentioned takes the default")
+    }
+
+    @Test
+    fun `a theme from a newer build is read, and not written back over`() {
+        val dir = tempDir()
+        val file = dir.resolve("themes.json")
+        Files.writeString(
+            file,
+            """{"schema_version":99,"name":"From the future","primary":"#ABCDEF"}""",
+        )
+        val published = mutableListOf<Pair<Path, String>>()
+        val manager = ThemeManager(dir) { f, c -> published += f to c }
+
+        val loaded = manager.loadTheme()
+        assertEquals("From the future", loaded.name, "read it as far as this build can")
+        assertTrue(manager.readOnly, "a newer stamp opens the file read-only")
+
+        manager.saveTheme(ThemePresets.MATRIX)
+        assertTrue(published.isEmpty(), "writing back would drop whatever the newer build understood and this does not")
+    }
+
+    @Test
+    fun `a saved theme carries the stamp that makes the guard possible`() {
+        val published = mutableListOf<String>()
+        ThemeManager(tempDir()) { _, c -> published += c }.saveTheme(ThemePresets.VAPORWAVE)
+
+        assertTrue(
+            published.single().contains("\"${ThemeManager.SCHEMA_KEY}\""),
+            "an unstamped file is indistinguishable from one written before stamping began",
+        )
+    }
 }

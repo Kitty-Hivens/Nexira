@@ -3,7 +3,7 @@ package hivens.core.data
 import java.util.Collections
 
 /** A store this build reads but will not write back. */
-enum class ReadOnlyStore { PackLibrary, Layout }
+enum class ReadOnlyStore { PackLibrary, Layout, Theme }
 
 /**
  * Stores that were written by a NEWER build than this one and are therefore open

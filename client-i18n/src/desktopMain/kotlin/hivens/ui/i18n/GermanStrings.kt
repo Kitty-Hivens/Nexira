@@ -1457,6 +1457,7 @@ object GermanStrings : AppStrings {
             "nichts zurückschreiben, alle Änderungen gehen beim Beenden verloren. Aktualisieren Sie, um wieder zu bearbeiten."
     override val readOnlyDataLibrary  = "die Pack-Sammlung"
     override val readOnlyDataLayout   = "das Layout"
+    override val readOnlyDataTheme    = "das Design"
     override val videoFetchingTool    = "Downloader wird geholt"
     override val videoResolvingPage   = "Seite wird gelesen"
     override val videoDownloading     = "Wird heruntergeladen"

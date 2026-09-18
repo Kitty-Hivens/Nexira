@@ -1461,6 +1461,7 @@ object JapaneseStrings : AppStrings {
             "変更はランチャーを閉じると失われます。編集するには更新してください。"
     override val readOnlyDataLibrary = "パックのライブラリ"
     override val readOnlyDataLayout = "レイアウト"
+    override val readOnlyDataTheme    = "テーマ"
     override val videoFetchingTool = "ダウンローダーを取得中"
     override val videoResolvingPage = "ページを読み取り中"
     override val videoDownloading = "ダウンロード中"

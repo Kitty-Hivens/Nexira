@@ -1471,6 +1471,7 @@ object RussianStrings : AppStrings {
             "данные обратно, и всё изменённое пропадёт при выходе. Обновитесь, чтобы снова редактировать."
     override val readOnlyDataLibrary  = "библиотека сборок"
     override val readOnlyDataLayout   = "раскладка"
+    override val readOnlyDataTheme    = "тема"
     override val videoFetchingTool    = "Скачиваем загрузчик"
     override val videoResolvingPage   = "Читаем страницу"
     override val videoDownloading     = "Скачивание"

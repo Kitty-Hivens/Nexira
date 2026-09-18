@@ -3,25 +3,40 @@ package hivens.ui.theme
 import androidx.compose.ui.graphics.Color
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * Custom theme
+ * A saved theme.
+ *
+ * Every field carries a default, and that is load-bearing rather than tidy. A
+ * theme is authored by the user and stored whole, so a role added in a later
+ * release would make every file already on disk fail to decode: the loader would
+ * fall back to a preset, and the next save would write that preset over work
+ * nobody agreed to lose. With defaults, an older file is simply a file that does
+ * not mention the new role yet.
+ *
+ * The defaults are Celestia Dark's, so a role the file predates arrives at
+ * something deliberate instead of white.
  */
 @Serializable
 data class CustomTheme(
-    val name: String,
-    val primary: String,
-    val secondary: String,
+    val name: String = "Celestia Dark",
+    val primary: String = "#BB86FC",
+    val secondary: String = "#03DAC6",
     // Used only in ThemePickerScreen preview, not applied to the actual theme.
     // Dark/Light toggle controls background and text colors at runtime.
-    val background: String,
-    val surface: String,
-    val accent: String,
-    val success: String,
-    val error: String
+    val background: String = "#121212",
+    val surface: String = "#1E1E1E",
+    val accent: String = "#BB86FC",
+    val success: String = "#4CAF50",
+    val error: String = "#CF6679",
 ) {
     companion object {
         fun parseHexColor(hex: String): Color {
@@ -183,27 +198,68 @@ class ThemeManager(
 ) {
     private val logger = LoggerFactory.getLogger(ThemeManager::class.java)
     private val themesFile = configPath.resolve("themes.json")
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+
+    /**
+     * True when the file was stamped by a build newer than this one.
+     *
+     * The layout store already refuses to write such a file back, for the reason
+     * that applies here unchanged: this build cannot represent what it did not
+     * understand, so writing would discard it. This module cannot reach the
+     * launcher's notice registry, so it reports the fact and the app root records
+     * it, the same way [publish] is handed in rather than performed here.
+     */
+    @Volatile
+    var readOnly: Boolean = false
+        private set
 
     fun loadTheme(): CustomTheme {
+        if (!Files.exists(themesFile)) return ThemePresets.CELESTIA_DARK
         return try {
-            if (Files.exists(themesFile)) {
-                json.decodeFromString<CustomTheme>(Files.readString(themesFile))
-            } else {
-                ThemePresets.CELESTIA_DARK
+            val text = Files.readString(themesFile)
+            // Read the stamp off the raw object: a file written before stamping
+            // began has none, and absent means the first version rather than an
+            // error.
+            val stamp = runCatching {
+                json.parseToJsonElement(text).jsonObject[SCHEMA_KEY]?.jsonPrimitive?.intOrNull
+            }.getOrNull() ?: 1
+            if (stamp > SCHEMA_VERSION) {
+                readOnly = true
+                logger.warn(
+                    "Theme at {} is {} {} > supported {} -- written by a newer build. Loading read-only; " +
+                        "this session will not write it back.",
+                    themesFile, SCHEMA_KEY, stamp, SCHEMA_VERSION,
+                )
             }
+            json.decodeFromString<CustomTheme>(text)
         } catch (e: Exception) {
-            logger.error("Failed to load theme", e)
+            // Every field has a default, so reaching here means the file is not a
+            // theme at all rather than merely an older one. Say which, because the
+            // old message said nothing and the fallback looks identical to the
+            // user having chosen the preset.
+            logger.warn("Theme at {} could not be read ({}); falling back to the default preset", themesFile, e.toString())
             ThemePresets.CELESTIA_DARK
         }
     }
 
     fun saveTheme(theme: CustomTheme) {
+        if (readOnly) {
+            logger.warn("Not writing {} -- it belongs to a newer build and this session is read-only", themesFile)
+            return
+        }
         try {
-            publish(themesFile, json.encodeToString(theme))
+            val body = json.encodeToJsonElement(CustomTheme.serializer(), theme).jsonObject
+            val stamped = JsonObject(body + (SCHEMA_KEY to JsonPrimitive(SCHEMA_VERSION)))
+            publish(themesFile, json.encodeToString(JsonObject.serializer(), stamped))
             logger.info("Theme saved: ${theme.name}")
         } catch (e: Exception) {
             logger.error("Failed to save theme", e)
         }
+    }
+
+    companion object {
+        /** Bumped when a change to [CustomTheme] cannot be read by an older build. */
+        const val SCHEMA_VERSION = 1
+        internal const val SCHEMA_KEY = "schema_version"
     }
 }

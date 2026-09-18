@@ -648,6 +648,7 @@ fun FrameWindowScope.AppShellContent(
                 when (store) {
                     ReadOnlyStore.PackLibrary -> s.readOnlyDataLibrary
                     ReadOnlyStore.Layout      -> s.readOnlyDataLayout
+                    ReadOnlyStore.Theme       -> s.readOnlyDataTheme
                 }
             }
             notificationCenter.push(
@@ -666,13 +667,29 @@ fun FrameWindowScope.AppShellContent(
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
-        var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
+        var customTheme   by remember {
+            val loaded = themeManager.loadTheme()
+            // The manager decides read-only on its own, in a module that cannot see
+            // the notice registry, so the fact is carried across here. This runs
+            // during composition and the notice above is a LaunchedEffect, which
+            // runs after it, so the ordering holds.
+            if (themeManager.readOnly) NewerBuildData.record(ReadOnlyStore.Theme)
+            mutableStateOf(loaded)
+        }
 
         // Customization extension: persisted overrides for accent, density,
         // whether surfaces blur, and the nav rail's selection. Provided via
         // [LocalCustomization] so NxTheme and the surfaces can read them
         // without prop-drilling.
-        val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
+        // coerceInputValues is the half that was missing, and it is the half that
+        // matters: every field of the record already has a default, so an unknown
+        // KEY was survivable, while an unknown VALUE was not. A release adding one
+        // variant to the rail's selection enum made an older build fail the whole
+        // record, fall back to defaults, and write those defaults back on the next
+        // toggle. Coercion turns that into one field taking its default.
+        val customizationJson    = remember {
+            Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
+        }
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }
 

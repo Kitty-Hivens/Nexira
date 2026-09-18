@@ -1455,6 +1455,7 @@ object EnglishStrings : AppStrings {
             "so anything you change is lost when the launcher closes. Update to edit it again."
     override val readOnlyDataLibrary  = "the pack library"
     override val readOnlyDataLayout   = "the layout"
+    override val readOnlyDataTheme    = "the theme"
     override val videoFetchingTool    = "Fetching the downloader"
     override val videoResolvingPage   = "Reading the page"
     override val videoDownloading     = "Downloading"

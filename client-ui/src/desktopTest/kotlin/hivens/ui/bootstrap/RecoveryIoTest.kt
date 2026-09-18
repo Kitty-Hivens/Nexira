@@ -101,6 +101,21 @@ class RecoveryIoTest {
     }
 
     @Test
+    fun `resetCustomization clears every appearance file, customization included`() {
+        // The accent in customization.json re-seeds the whole generated palette
+        // and the rail fields can leave navigation with no visible selection, so
+        // a reset that skips this file cannot undo the states it exists for. It
+        // did skip it: the list named three owners and there were four.
+        val files = listOf("themes.json", "background.json", "console.json", "customization.json")
+            .map { dataDir / it }
+        files.forEach { Files.writeString(it, "{}") }
+
+        RecoveryIo.resetCustomization(dataDir)
+
+        files.forEach { assertFalse(Files.exists(it), "${it.fileName} is appearance and should be cleared") }
+    }
+
+    @Test
     fun `resetWidgetState deletes the widget content and nothing else`() {
         val themes = dataDir / "themes.json"
         val widgetState = dataDir / "widget-state.json"
