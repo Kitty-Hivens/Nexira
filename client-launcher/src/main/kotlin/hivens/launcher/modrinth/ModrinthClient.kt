@@ -4,6 +4,7 @@ import hivens.core.api.HttpClientProvider
 import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
+import hivens.core.api.dto.modrinth.ModrinthDisclosures
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthHashQuery
@@ -50,6 +51,20 @@ class ModrinthClient(
         val url = "$API_BASE/v2/project/$projectId"
         return caches.project.get(url) { getJson(url) }
     }
+
+    /**
+     * What the author declares this project does -- `GET /v3/project/{id}/disclosures`.
+     *
+     * The only v3 call in this client. There is no v2 equivalent: disclosures
+     * arrived with v3 and the older route does not carry them, so the page reads
+     * one endpoint off the other line rather than doing without.
+     *
+     * An empty list and a failed request must not look the same, which is why
+     * this throws rather than swallowing: "the author declared nothing" is an
+     * answer a reader can act on, and "we could not ask" is not.
+     */
+    suspend fun disclosures(projectId: String): ModrinthDisclosures =
+        getJson("$API_BASE/v3/project/$projectId/disclosures")
 
     /**
      * Resolve a specific version. The wire carries `project_id` + `version_id`

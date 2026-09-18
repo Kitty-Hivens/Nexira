@@ -6,8 +6,13 @@ import kotlinx.serialization.Serializable
 /**
  * Subset of Modrinth `/v2/project/{id}`. The Content-tab icon resolver reads
  * only [iconUrl]; the catalogue detail render adds [description] (tagline),
- * [body] (long markdown), [gallery] and [categories]. Tolerant decoder
- * (`ignoreUnknownKeys`) ignores the rest of the rich payload.
+ * [body] (long markdown), [gallery] and [categories]; the project page reads
+ * the rest. Tolerant decoder (`ignoreUnknownKeys`) ignores what is left.
+ *
+ * [clientSide] and [serverSide] are `required` / `optional` / `unsupported` /
+ * `unknown`, and they are read as a PAIR: neither half means anything alone,
+ * since "client: required" is a client-only mod and a client-and-server mod
+ * alike depending on what the other half says.
  */
 @Serializable
 data class ModrinthProject(
@@ -24,6 +29,29 @@ data class ModrinthProject(
     val license: ModrinthLicense? = null,
     @SerialName("icon_url") val iconUrl: String? = null,
     val gallery: List<ModrinthGalleryImage> = emptyList(),
+    val downloads: Long = 0,
+    val followers: Long = 0,
+    /** Loader ids the project publishes for, or `minecraft` / `iris` for the other kinds. */
+    val loaders: List<String> = emptyList(),
+    @SerialName("game_versions") val gameVersions: List<String> = emptyList(),
+    @SerialName("client_side") val clientSide: String = "unknown",
+    @SerialName("server_side") val serverSide: String = "unknown",
+    @SerialName("issues_url") val issuesUrl: String? = null,
+    @SerialName("source_url") val sourceUrl: String? = null,
+    @SerialName("wiki_url") val wikiUrl: String? = null,
+    @SerialName("discord_url") val discordUrl: String? = null,
+    @SerialName("donation_urls") val donationUrls: List<ModrinthDonation> = emptyList(),
+    /** When the project first appeared, which is not when its newest build did. */
+    val published: String? = null,
+    val updated: String? = null,
+)
+
+/** One "support the author" link. [id] names the platform (`patreon`, `ko-fi`, `github`). */
+@Serializable
+data class ModrinthDonation(
+    val id: String = "",
+    val platform: String = "",
+    val url: String = "",
 )
 
 @Serializable
