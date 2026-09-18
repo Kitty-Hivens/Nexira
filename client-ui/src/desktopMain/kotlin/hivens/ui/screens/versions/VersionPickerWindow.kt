@@ -1,5 +1,6 @@
 package hivens.ui.screens.versions
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -14,15 +15,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -50,16 +51,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.update.VersionChannel
-import hivens.ui.components.ChannelChip
-import hivens.ui.components.channelColor
 import hivens.ui.components.ReleaseNotes
+import hivens.ui.components.channelColor
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
-import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
@@ -81,11 +80,11 @@ data class PickerVersion(
     val channel: VersionChannel,
     val publishedAt: String? = null,
     val changelog: String? = null,
-    /** Second line of the detail pane, e.g. "Minecraft 1.12.2 . Forge". */
+    /** Second line of the row, e.g. "Minecraft 1.12.2 . Forge". */
     val runtimeLine: String? = null,
     /**
      * Download size, when the source publishes one per version. The mirror
-     * describes a build rather than a file, so it passes null and the line is
+     * describes a build rather than a file, so it passes null and the fact is
      * simply absent.
      */
     val sizeLabel: String? = null,
@@ -98,16 +97,24 @@ enum class PickerIntent { Install, Upgrade, Rollback, Switch }
 
 /**
  * The version picker, shared by the catalogue's install flow and an installed
- * instance's version change. One surface, two hosts: the two used to be a rich
- * screen and a stunted list of download buttons, and the stunted one was what a
- * new user met first.
+ * instance's version change.
  *
- * Composed as four zones rather than one slab, because that division IS the
- * drawing: a header that names the action, a list panel that carries state
- * (channel, current, date), a detail panel that answers "what changes", and a
- * footer that holds the single labelled action. A row is one line and the row
- * itself is the target, so the eye lands on the version rather than on a column
- * of identical buttons.
+ * ONE list, and the row carries everything it is. The window used to be a
+ * master-detail split across most of the app: a column of numbers on the left, a
+ * pane describing the chosen one on the right, and a footer holding the single
+ * action. That shape is right when the detail is substantial, and here it is not
+ * -- notes on a real project run to one sentence, so the pane held a line of text
+ * above seven hundred pixels of nothing, and the list beside it held eight rows
+ * above four hundred more. A sentence that short belongs on the row it describes.
+ *
+ * So the row is the unit: channel, number, badges, date and size, the first line
+ * of its notes underneath, and the action arriving in place of the date once the
+ * row is chosen. Notes longer than that line unfold under the row rather than
+ * moving to a pane, which is the only thing the pane was carrying that a row
+ * could not.
+ *
+ * The card is sized to what it holds, with a ceiling. Sizing it to the window
+ * instead is what put eight builds inside a hall.
  */
 @Composable
 fun VersionPickerWindow(
@@ -132,23 +139,24 @@ fun VersionPickerWindow(
      */
     loading: Boolean = false,
 ) {
+    val s = LocalStrings.current
     val colors = NxTheme.colors
     val busy = busyVersionId != null
 
     var query by remember { mutableStateOf("") }
-    var selectedId by remember(versions) {
-        mutableStateOf(versions.firstOrNull { it.installed }?.id ?: versions.firstOrNull()?.id)
-    }
+    // Nothing is chosen on open. The installed build is MARKED rather than
+    // selected: pre-selecting it armed an action for the one row whose action
+    // does nothing, and the reader came here to move somewhere else.
+    var selectedId by remember(versions) { mutableStateOf<String?>(null) }
     val shown = remember(versions, query) {
         if (query.isBlank()) versions
         else versions.filter { it.label.contains(query, ignoreCase = true) }
     }
-    // A query that hides the selection would leave the detail pane describing a
-    // row the user can no longer see; follow the filter instead.
+    // A query that hides the chosen row would leave an action armed for something
+    // off screen.
     LaunchedEffect(shown) {
-        if (shown.none { it.id == selectedId }) selectedId = shown.firstOrNull()?.id
+        if (shown.none { it.id == selectedId }) selectedId = null
     }
-    val selected = versions.firstOrNull { it.id == selectedId }
 
     // In-composition overlay rather than a Popup: the window belongs to the app's
     // own surface stack, so it inherits the theme, sizes against the app window,
@@ -177,69 +185,91 @@ fun VersionPickerWindow(
             level = NxSurfaceLevel.Raised,
             blurDp = 0f,
             opacity = 1f,
-            // Fraction of the app window with no dp ceiling: a bigger screen gets a
-            // bigger window, not the same island floating in more emptiness.
             modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .fillMaxHeight(0.90f)
+                // Margin first, then the ceiling, then take what is left. A
+                // fraction cannot do this job in either order: `fillMaxWidth`
+                // fixes the width, so a ceiling after it has nothing to clamp,
+                // and a ceiling before it makes the fraction a fraction of the
+                // ceiling. The padding is what keeps the card off the edges on a
+                // window too narrow to reach the ceiling at all.
+                .padding(horizontal = 16.dp)
+                .widthIn(max = CARD_WIDTH)
+                .fillMaxWidth()
                 .clip(MaterialTheme.shapes.medium)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
         ) {
-            Column(Modifier.fillMaxSize()) {
-                Header(title, packName, packIcon, onDismiss)
+            Column(Modifier.fillMaxWidth()) {
+                Header(title, packName, packIcon, versions.size, onDismiss)
                 HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
-                Row(Modifier.weight(1f).fillMaxWidth()) {
-                    // Proportional, not a fixed 300dp rail: the list has to grow
-                    // with the window or it turns into a slot in a field of notes.
-                    ListPanel(
-                        versions = shown,
-                        loading = loading,
-                        total = versions.size,
-                        query = query,
-                        onQuery = { query = it },
-                        selectedId = selectedId,
-                        onSelect = { selectedId = it },
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                if (warning != null) WarningLine(warning)
+                // Search earns its place once the list is long enough that the
+                // only way to a year-old build is scrolling.
+                if (versions.size > SEARCH_THRESHOLD) {
+                    NxField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = s.versionPickerSearch,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     )
-                    DetailPanel(selected, Modifier.weight(2f).fillMaxHeight())
                 }
-                Footer(
-                    warning = warning,
-                    selected = selected,
-                    intent = selected?.let(intentFor),
-                    busy = busy,
-                    busyThis = selected != null && selected.id == busyVersionId,
-                    onConfirm = { selected?.let(onConfirm) },
-                    onDismiss = onDismiss,
-                )
+                when {
+                    loading -> CenteredProgress(Modifier.fillMaxWidth().heightIn(min = 160.dp))
+                    shown.isEmpty() -> Box(
+                        Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(s.versionPickerEmpty, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                    }
+                    else -> VersionList(
+                        versions = shown,
+                        selectedId = selectedId,
+                        busyVersionId = busyVersionId,
+                        busy = busy,
+                        intentFor = intentFor,
+                        onSelect = { selectedId = if (selectedId == it) null else it },
+                        onConfirm = onConfirm,
+                    )
+                }
+                Spacer(Modifier.size(8.dp))
             }
         }
     }
 }
 
+/** How wide the card is allowed to get. A list of numbers does not want a hall. */
+private val CARD_WIDTH = 680.dp
+
+/** How tall the list may run before it scrolls inside the card. */
+private val LIST_MAX_HEIGHT = 460.dp
+
+private const val SEARCH_THRESHOLD = 8
+
 // --- Zones -----------------------------------------------------------------
 
 @Composable
-private fun Header(title: String, packName: String, icon: Any?, onDismiss: () -> Unit) {
+private fun Header(title: String, packName: String, icon: Any?, count: Int, onDismiss: () -> Unit) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         PackAvatar(icon, packName)
         Column(Modifier.weight(1f)) {
             Text(
-                text = title,
+                text = packName,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            // The count belongs here rather than under the list: it is a fact
+            // about what you are looking at, and a caption at the bottom of a
+            // scrolling column is a fact nobody scrolls to.
             Text(
-                text = packName,
+                text = s.versionPickerCount(count),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.textSecondary,
                 maxLines = 1,
@@ -251,8 +281,216 @@ private fun Header(title: String, packName: String, icon: Any?, onDismiss: () ->
 }
 
 @Composable
+private fun WarningLine(text: String) {
+    val colors = NxTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Symbol(NxIcon.Warning, contentDescription = null, tint = colors.warnAccent, size = 16.dp)
+        Text(text, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+    }
+}
+
+@Composable
+private fun VersionList(
+    versions: List<PickerVersion>,
+    selectedId: String?,
+    busyVersionId: String?,
+    busy: Boolean,
+    intentFor: (PickerVersion) -> PickerIntent,
+    onSelect: (String) -> Unit,
+    onConfirm: (PickerVersion) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val hover = remember { MutableInteractionSource() }
+    val hovered by hover.collectIsHoveredAsState()
+    Box(Modifier.fillMaxWidth().heightIn(max = LIST_MAX_HEIGHT).hoverable(hover)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            items(versions, key = { it.id }) { v ->
+                VersionRow(
+                    v = v,
+                    selected = v.id == selectedId,
+                    busyThis = v.id == busyVersionId,
+                    busy = busy,
+                    intent = intentFor(v),
+                    onSelect = { onSelect(v.id) },
+                    onConfirm = { onConfirm(v) },
+                )
+                PuppetClick("versionPicker.select.${v.id}") { onSelect(v.id) }
+            }
+        }
+        NxVerticalScrollbar(
+            adapter = rememberScrollbarAdapter(listState),
+            revealed = hovered || listState.isScrollInProgress,
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp),
+        )
+    }
+}
+
+/**
+ * One build, and everything true about it.
+ *
+ * The number reads first, the leading dot carries the channel so a beta is
+ * legible before a word of it is read, and the date and size ride together at
+ * the trailing edge: they are one fact about the build, and split into two
+ * columns they left the eye to cross the row to join them up.
+ *
+ * Choosing the row is what arms the action, and the action lands in the date's
+ * slot rather than beside it. A row already carrying a number, two badges, a
+ * date and a size has no width left for a button, and adding one clipped both.
+ */
+@Composable
+private fun VersionRow(
+    v: PickerVersion,
+    selected: Boolean,
+    busyThis: Boolean,
+    busy: Boolean,
+    intent: PickerIntent,
+    onSelect: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val colors = NxTheme.colors
+    val note = remember(v.changelog, v.label) { firstLineOfNotes(v.changelog, v.label) }
+    val hasMore = remember(v.changelog, note) { hasNotesBeyond(v.changelog, note) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .background(if (selected) colors.primary.copy(alpha = 0.12f) else Color.Transparent)
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(channelColor(v.channel)))
+            Text(
+                text = v.label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected || v.installed) FontWeight.SemiBold else FontWeight.Normal,
+                color = colors.textPrimary,
+                maxLines = 1,
+                // Middle, not tail: what separates one `SNAPSHOT-0.0.0-...` from
+                // the next is the date at its END, and a tail ellipsis turns the
+                // whole snapshot chain into identical rows.
+                overflow = TextOverflow.MiddleEllipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            when {
+                v.installed -> NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
+                v.latest -> NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
+            }
+            Spacer(Modifier.weight(1f))
+            when {
+                busyThis -> CircularProgressIndicator(
+                    color = colors.primary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp),
+                )
+                // The build already on disk is not somewhere to go. The row says
+                // so and offers nothing, rather than offering a download that
+                // changes nothing and a minute of wondering whether it worked.
+                selected && !v.installed && !busy -> {
+                    PuppetClick("versionPicker.confirm") { onConfirm() }
+                    NxButton(
+                        label = actionLabel(s, intent, v),
+                        onClick = onConfirm,
+                        icon = NxIcon.Download,
+                        compact = true,
+                    )
+                }
+                else -> Text(
+                    text = metaLine(v),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                )
+            }
+        }
+        if (note != null) {
+            Text(
+                text = note,
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 17.dp),
+            )
+        }
+        // Everything past the first line unfolds here. This is the one thing the
+        // detail pane carried that a row cannot, so it is the one thing that
+        // survived it.
+        AnimatedVisibility(visible = selected && hasMore) {
+            Column(Modifier.padding(start = 17.dp, top = 4.dp, end = 4.dp)) {
+                v.runtimeLine?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                }
+                v.changelog?.let { ReleaseNotes(it, Modifier.fillMaxWidth().padding(top = 6.dp)) }
+            }
+        }
+    }
+}
+
+/** The date and the size as one trailing fact, skipping whichever is absent. */
+private fun metaLine(v: PickerVersion): String =
+    listOfNotNull(formatBuildTimestamp(v.publishedAt)?.substringBefore(' '), v.sizeLabel)
+        .joinToString("  ·  ")
+
+private fun actionLabel(s: hivens.ui.i18n.AppStrings, intent: PickerIntent, v: PickerVersion): String =
+    when (intent) {
+        PickerIntent.Install -> s.versionPickerInstall(v.label)
+        PickerIntent.Upgrade -> s.versionPickerUpgrade(v.label)
+        PickerIntent.Rollback -> s.versionPickerRollback(v.label)
+        PickerIntent.Switch -> s.versionPickerSwitch(v.label)
+    }
+
+/**
+ * The first line of a changelog, as prose rather than as source.
+ *
+ * A changelog is markdown and its first line is as often a heading as a
+ * sentence, so an unstripped preview prints its hashes. Stripped by hand rather
+ * than rendered: this is one line of context on a row, and a markdown parse per
+ * row of a long list is work done for text nobody reads in full there.
+ */
+internal fun firstLineOfNotes(raw: String?, label: String = ""): String? {
+    fun clean(line: String) = line
+        .removePrefix(">").trimStart()
+        .trimStart('#', '*', '-', '+').trimStart()
+        .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
+        .replace(Regex("`([^`]+)`"), "$1")
+        .replace(Regex("\\[(.+?)]\\([^)]*\\)"), "$1")
+        .trim()
+    // Most changelogs open with their own version number as a heading, which
+    // strips down to the number the row already prints two millimetres above it.
+    // Skip past anything that only repeats the label and take the first line
+    // that actually says something.
+    return raw?.lineSequence()
+        ?.map { clean(it) }
+        ?.firstOrNull { it.isNotEmpty() && !it.equals(label, ignoreCase = true) }
+}
+
+/** Whether the notes hold anything the row's one line did not already show. */
+internal fun hasNotesBeyond(raw: String?, firstLine: String?): Boolean {
+    val lines = raw?.lineSequence()?.filter { it.isNotBlank() }?.toList().orEmpty()
+    if (lines.isEmpty()) return false
+    if (firstLine == null) return true
+    // A heading plus one sentence is not "more": the sentence IS the preview, and
+    // unfolding it would show the reader the line they just read.
+    return lines.size > 2 || lines.sumOf { it.trim().length } > firstLine.length + 24
+}
+
+@Composable
 private fun PackAvatar(icon: Any?, name: String) {
-    val box = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
+    val box = Modifier.size(34.dp).clip(RoundedCornerShape(9.dp))
     val tint = NxTheme.colors.decorativeColor(name)
     SubcomposeAsyncImage(
         model = icon,
@@ -272,252 +510,3 @@ private fun PackAvatar(icon: Any?, name: String) {
         },
     )
 }
-
-@Composable
-private fun ListPanel(
-    versions: List<PickerVersion>,
-    loading: Boolean,
-    total: Int,
-    query: String,
-    onQuery: (String) -> Unit,
-    selectedId: String?,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val s = LocalStrings.current
-    val colors = NxTheme.colors
-    // Its own sunken plane: the list and the detail must read as two places, not
-    // as one field with a gap down the middle.
-    NxSurface(level = NxSurfaceLevel.Sunken, blurDp = 0f, modifier = modifier) {
-        Column(Modifier.fillMaxSize()) {
-            // Search earns its place at 39 builds; without it the only way to a
-            // year-old version is scrolling.
-            if (total > SEARCH_THRESHOLD) {
-                NxField(
-                    value = query,
-                    onValueChange = onQuery,
-                    placeholder = s.versionPickerSearch,
-                    modifier = Modifier.fillMaxWidth().padding(10.dp),
-                )
-            }
-            val listState = rememberLazyListState()
-            // The bar is the only cue for how deep the list runs, so it has to show
-            // on hover too -- scroll-only means it appears once you already guessed.
-            val hover = remember { MutableInteractionSource() }
-            val hovered by hover.collectIsHoveredAsState()
-            Box(Modifier.weight(1f).hoverable(hover)) {
-                if (loading) CenteredProgress(Modifier.fillMaxSize())
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    items(versions, key = { it.id }) { v ->
-                        VersionRow(v, selected = v.id == selectedId, onClick = { onSelect(v.id) })
-                        PuppetClick("versionPicker.select.${v.id}") { onSelect(v.id) }
-                    }
-                }
-                NxVerticalScrollbar(
-                    adapter = rememberScrollbarAdapter(listState),
-                    revealed = hovered || listState.isScrollInProgress,
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                )
-            }
-            Text(
-                text = s.versionPickerCount(total),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.textSecondary,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-    }
-}
-
-/**
- * One line, and the line is the target. The leading dot carries the channel, so
- * a beta is legible before reading a word; the trailing chip carries state. The
- * action is NOT here: repeating it per row is what turned the old picker into a
- * column of identical buttons.
- */
-@Composable
-private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit) {
-    val s = LocalStrings.current
-    val colors = NxTheme.colors
-    val shape = MaterialTheme.shapes.small
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(if (selected) colors.primary.copy(alpha = 0.16f) else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            Modifier.size(7.dp).clip(RoundedCornerShape(2.dp)).background(channelColor(v.channel)),
-        )
-        Text(
-            text = v.label,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (selected || v.installed) FontWeight.SemiBold else FontWeight.Normal,
-            color = colors.textPrimary,
-            maxLines = 1,
-            // Middle, not tail: what separates one `SNAPSHOT-0.0.0-...` from the
-            // next is the date at its END, and a tail ellipsis turns the whole
-            // snapshot chain into identical rows.
-            overflow = TextOverflow.MiddleEllipsis,
-            // The single flexible child. A trailing weighted spacer would split the
-            // free space with it, so the label lost half the row to blank whenever
-            // a badge was present and ellipsised a version that fit.
-            modifier = Modifier.weight(1f),
-        )
-        // The date is what separates one row from the next once a project has
-        // twenty versions of the same shape. Dropped when a badge takes the
-        // space, since the badge is the stronger answer to "which one".
-        val stamp = formatBuildTimestamp(v.publishedAt)
-        if (stamp != null && !v.installed && !v.latest) {
-            Text(
-                text  = stamp,
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.textSecondary.copy(alpha = 0.7f),
-                maxLines = 1,
-            )
-        }
-        when {
-            v.installed -> NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
-            v.latest -> NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
-        }
-    }
-}
-
-@Composable
-private fun DetailPanel(v: PickerVersion?, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
-    val colors = NxTheme.colors
-    if (v == null) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            Text(s.versionPickerEmpty, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-        }
-        return
-    }
-    Column(modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = v.label,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                // Same anatomy as a list row: the value owns the flexible space,
-                // the badges and the date sit against the right edge.
-                modifier = Modifier.weight(1f),
-            )
-            ChannelChip(v.channel)
-            formatBuildTimestamp(v.publishedAt)?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-            }
-        }
-        // Runtime once, here, instead of repeated on every row of the list.
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            v.runtimeLine?.let {
-                Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
-            }
-            v.sizeLabel?.let {
-                Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary.copy(alpha = 0.7f))
-            }
-        }
-        HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
-        val notes = v.changelog?.takeIf { it.isNotBlank() }
-        if (notes != null) {
-            Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                ReleaseNotes(notes)
-            }
-        } else {
-            // Most mirror builds ship no notes, so this is the pane's ordinary
-            // state rather than an exception. Pinned to the top edge it reads as a
-            // caption for a paragraph that failed to load.
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(s.versionPickerNoChangelog, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun Footer(
-    warning: String?,
-    selected: PickerVersion?,
-    intent: PickerIntent?,
-    busy: Boolean,
-    busyThis: Boolean,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val s = LocalStrings.current
-    val colors = NxTheme.colors
-    HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
-    NxSurface(level = NxSurfaceLevel.Sunken, blurDp = 0f, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (warning != null) {
-                Symbol(NxIcon.Warning, contentDescription = null, tint = colors.warnAccent, size = 16.dp)
-                Text(
-                    text = warning,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary,
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
-            NxButton(
-                label = s.createPackCancel,
-                onClick = onDismiss,
-                style = NxButtonStyle.Tertiary,
-                enabled = !busy,
-                compact = true,
-            )
-            if (busyThis) {
-                CircularProgressIndicator(
-                    color = colors.primary,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            // ONE action, and its label states the outcome including direction.
-            val label = when {
-                selected?.installed == true -> s.packVersionCurrentTag
-                else -> when (intent) {
-                PickerIntent.Install -> s.versionPickerInstall(selected?.label.orEmpty())
-                PickerIntent.Upgrade -> s.versionPickerUpgrade(selected?.label.orEmpty())
-                PickerIntent.Rollback -> s.versionPickerRollback(selected?.label.orEmpty())
-                PickerIntent.Switch, null -> s.versionPickerSwitch(selected?.label.orEmpty())
-                }
-            }
-            // The build already on disk is not somewhere to go. The row says
-            // "current" and the action offered to fetch it again, which is a
-            // download that changes nothing and a minute of wondering whether it
-            // worked.
-            val actionable = selected != null && !selected.installed && !busy
-            PuppetClick("versionPicker.confirm", enabled = actionable) { onConfirm() }
-            NxButton(
-                label = label,
-                onClick = onConfirm,
-                // No glyph on the build already installed: "current" beside a
-                // download arrow describes an action nobody is being offered.
-                icon = NxIcon.Download.takeIf { actionable },
-                enabled = actionable,
-                compact = true,
-            )
-        }
-    }
-}
-
-private const val SEARCH_THRESHOLD = 8
-
-

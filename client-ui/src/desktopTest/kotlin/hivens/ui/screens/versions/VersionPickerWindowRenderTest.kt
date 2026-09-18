@@ -17,18 +17,24 @@ import java.nio.file.Path
 import javax.imageio.ImageIO
 import kotlin.math.abs
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
  * Off-screen render of the version picker, which doubles as the guard on its
- * sizing rule: the window is a fraction of whatever it is dropped into, with no
- * dp ceiling, so a bigger host must produce a bigger window rather than the same
- * island in more empty space.
+ * sizing rule.
+ *
+ * That rule was inverted deliberately, and this test says so. It used to be a
+ * fraction of the host with no ceiling, on the reasoning that a bigger screen
+ * should get a bigger window rather than the same island in more emptiness. What
+ * that produced was eight builds inside a hall: the content does not grow with
+ * the display, so the window growing with it only bought more nothing. The card
+ * now takes the width it needs up to a ceiling and stops.
  *
  * The card is measured, not eyeballed. The scene paints a vivid backdrop, the
- * overlay scrims it, and the opaque card is the one horizontal run through the
- * middle that differs from the scrim -- so the assertion reads the drawn result
- * rather than the modifier that was supposed to produce it.
+ * overlay scrims it, and the opaque card is the one region that differs from the
+ * scrim, so the assertion reads the drawn result rather than the modifier that
+ * was supposed to produce it.
  */
 class VersionPickerWindowRenderTest {
 
@@ -39,6 +45,7 @@ class VersionPickerWindowRenderTest {
             channel = VersionChannel.Beta,
             publishedAt = "2026-07-25T23:47:00Z",
             runtimeLine = "Minecraft 1.12.2  Forge",
+            sizeLabel = "2,4 МБ",
             latest = true,
         ),
         PickerVersion(
@@ -48,6 +55,7 @@ class VersionPickerWindowRenderTest {
             publishedAt = "2026-07-18T10:00:00Z",
             changelog = "# 0.1.7\n\nПочинена генерация чанков.",
             runtimeLine = "Minecraft 1.12.2  Forge",
+            sizeLabel = "2,3 МБ",
             installed = true,
         ),
     ) + (0..40).map { i ->
@@ -59,7 +67,7 @@ class VersionPickerWindowRenderTest {
         )
     }
 
-    /** Renders the picker over a pink field and returns the card's horizontal extent in px. */
+    /** Renders the picker over a pink field and returns the card's width in px. */
     private fun renderAndMeasureCard(width: Int, height: Int, name: String): Int {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
@@ -91,28 +99,28 @@ class VersionPickerWindowRenderTest {
         }
         Files.write(out, png.bytes)
 
-        val image = ImageIO.read(ByteArrayInputStream(png.bytes))
-        return cardWidthAtMidHeight(image)
+        return cardWidth(ImageIO.read(ByteArrayInputStream(png.bytes)))
     }
 
     /**
-     * Width of the contiguous non-scrim run across the vertical middle. The far
-     * left column is scrim by construction (the card is centred and never fills
-     * the host), so it serves as the reference sample.
+     * Width of the card's bounding box. The card no longer fills the height, so a
+     * single sampled row can land in the scrim above or below it; the widest run
+     * anywhere in the image is the card.
      */
-    private fun cardWidthAtMidHeight(image: BufferedImage): Int {
-        val y = image.height / 2
-        val scrim = image.getRGB(1, y)
-        var first = -1
-        var last = -1
-        for (x in 0 until image.width) {
-            if (!similar(image.getRGB(x, y), scrim)) {
-                if (first < 0) first = x
-                last = x
+    private fun cardWidth(image: BufferedImage): Int {
+        val scrim = image.getRGB(1, 1)
+        var left = Int.MAX_VALUE
+        var right = -1
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                if (!similar(image.getRGB(x, y), scrim)) {
+                    if (x < left) left = x
+                    if (x > right) right = x
+                }
             }
         }
-        assertTrue(first >= 0, "no card found over the scrim")
-        return last - first + 1
+        assertTrue(right >= 0, "no card found over the scrim")
+        return right - left + 1
     }
 
     private fun similar(a: Int, b: Int): Boolean {
@@ -123,14 +131,23 @@ class VersionPickerWindowRenderTest {
     }
 
     @Test
-    fun `card takes the host's width fraction and grows with the host`() {
+    fun `the card stops at its ceiling instead of following the display`() {
         val fhd = renderAndMeasureCard(1920, 1080, "version-picker-fhd.png")
         val twoK = renderAndMeasureCard(2560, 1440, "version-picker-2k.png")
 
-        // 88% of the host, within a corner-rounding pixel or two at the sampled row.
-        assertTrue(abs(fhd - 1690) <= 8, "FHD card width $fhd, expected ~1690 (0.88 of 1920)")
-        assertTrue(abs(twoK - 2253) <= 8, "2K card width $twoK, expected ~2253 (0.88 of 2560)")
-        // The point of the rule: a bigger host is a bigger window, not more margin.
-        assertTrue(twoK > fhd + 400, "card did not grow with the host: $fhd -> $twoK")
+        // 680dp at density 1, within a corner-rounding pixel or two.
+        assertTrue(abs(fhd - 680) <= 6, "FHD card width $fhd, expected the 680 ceiling")
+        // The point of the rule as it now stands: a third more display buys the
+        // reader nothing here, because the list is the same length either way.
+        assertEquals(fhd, twoK, "the card followed the display past its ceiling")
+    }
+
+    @Test
+    fun `on a narrow window the card yields rather than overflowing`() {
+        val narrow = renderAndMeasureCard(600, 900, "version-picker-narrow.png")
+
+        // 94 percent of 600, so the card still clears the scrim on both sides.
+        assertTrue(abs(narrow - 564) <= 8, "narrow card width $narrow, expected about 564")
+        assertTrue(narrow < 600, "the card must not reach the window edges")
     }
 }
