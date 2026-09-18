@@ -2,6 +2,7 @@ package hivens.launcher.instance
 
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.util.sha1Of
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,11 +52,23 @@ class InstanceContentUpdater(
     data class Target(val update: ModUpdate, val enabled: Boolean)
 
     /**
+     * What a check found, and whether it got to ask everything it meant to.
+     *
+     * The two are separate answers and the screen needs both: a request that
+     * failed leaves [updates] holding whatever DID come back, which is worth
+     * showing, while [complete] is what stops "we could not ask" being drawn as
+     * "there is nothing new".
+     */
+    data class CheckOutcome(val updates: Map<ContentRef, ModUpdate>, val complete: Boolean)
+
+    /**
      * How a batch is going. [current] is the file being worked on, for a line
      * that moves; [failed] names what did not land, and survives [finished] so
      * the screen can say so after the fact.
      */
     data class Run(
+        /** The instance this batch belongs to, by name, for a surface that reports it. */
+        val title: String,
         val total: Int,
         val done: Int,
         val current: String?,
@@ -69,6 +82,8 @@ class InstanceContentUpdater(
     val runs: StateFlow<Map<String, Run>> = _runs
 
     private val jobs = ConcurrentHashMap<String, Job>()
+
+    private val cached = ConcurrentHashMap<String, Checked>()
 
     /** Runs are keyed by instance folder: one batch per instance, and it outlives any screen. */
     fun keyOf(instanceDir: Path): String = instanceDir.normalize().toString()
@@ -90,8 +105,18 @@ class InstanceContentUpdater(
         mcVersion: String,
         loader: String,
         channel: ModUpdateChannel = ModUpdateChannel.Release,
-    ): Map<ContentRef, ModUpdate> = withContext(Dispatchers.IO) {
-        if (mcVersion.isBlank() || items.isEmpty()) return@withContext emptyMap()
+        force: Boolean = false,
+    ): CheckOutcome = withContext(Dispatchers.IO) {
+        if (mcVersion.isBlank() || items.isEmpty()) return@withContext CheckOutcome(emptyMap(), true)
+
+        // Leaving the tab and coming back is one click, and without this it was
+        // also a full round of requests. Short-lived on purpose: the answer goes
+        // stale the moment an author publishes, and the refresh beside the button
+        // is there for exactly that.
+        val key = keyOf(instanceDir)
+        if (!force) {
+            cached[key]?.takeIf { it.fresh(items) }?.let { return@withContext CheckOutcome(it.updates, true) }
+        }
 
         // One hash per file, and a file that cannot be read is skipped rather
         // than failing the check for everything beside it.
@@ -104,23 +129,54 @@ class InstanceContentUpdater(
         // them are owed the same answer.
         val byHash = hashed.groupBy({ it.second }, { it.first })
 
+        // What is installed, as Modrinth knows it: the publish date each answer
+        // has to beat, and the channel each file is actually on. Without this a
+        // machine running a beta is told, every single check, that a release
+        // from a year earlier is an update.
+        var complete = true
+        val current = try {
+            modrinth.versionsForHashes(hashed.map { it.second })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("resolving installed versions failed: {}", e.message)
+            complete = false
+            emptyMap()
+        }
+
         val found = mutableMapOf<ContentRef, ModUpdate>()
-        for ((kind, group) in hashed.groupBy { it.first.kind }) {
+        // A request that did not come back leaves this run incomplete, and an
+        // incomplete run must not be remembered: cached, "we could not ask" would
+        // be served as "there is nothing" for the next ten minutes.
+        for ((group, hashes) in hashed.groupBy(
+            { (item, hash) -> item.kind to effectiveChannel(channel, current[hash]?.versionType) },
+            { it.second },
+        )) {
+            val (kind, askChannel) = group
             val loaders = loadersFor(kind, loader)
             if (loaders.isEmpty()) continue
-            var remaining = group.map { it.second }.distinct()
-            for (types in channel.rungs) {
+            var remaining = hashes.distinct()
+            for (types in askChannel.rungs) {
                 if (remaining.isEmpty()) break
-                val answers = runCatching {
+                val answers = try {
                     modrinth.latestForHashes(remaining, loaders, listOf(mcVersion), types)
-                }.getOrElse {
-                    log.warn("update check for {} failed on channel {}: {}", kind, types, it.message)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    log.warn("update check for {} failed on channel {}: {}", kind, types, e.message)
+                    complete = false
                     break
                 }
                 for ((hash, versions) in answers) {
                     for (installed in byHash[hash].orEmpty()) {
                         val ref = ContentRef(installed.kind, installed.fileName)
-                        updateFrom(ref, hash, installed.version, versions)?.let { found[ref] = it }
+                        updateFrom(
+                            ref                  = ref,
+                            installedSha1        = hash,
+                            installedVersion     = installed.version,
+                            candidates           = versions,
+                            installedPublishedAt = current[hash]?.datePublished,
+                        )?.let { found[ref] = it }
                     }
                 }
                 // A file that got an answer on this rung has been answered,
@@ -129,7 +185,24 @@ class InstanceContentUpdater(
                 remaining = remaining - answers.keys
             }
         }
-        found
+        // Only a complete answer is worth remembering; a partial one is handed
+        // back for what it has and asked again next time.
+        if (complete) {
+            cached[key] = Checked(found, items.map { ContentRef(it.kind, it.fileName) }.toSet(), System.nanoTime())
+        }
+        CheckOutcome(found, complete)
+    }
+
+    /**
+     * A check, and what it was a check OF. The file set is part of the key: a mod
+     * added or deleted since means the cached answer is about a different folder,
+     * and a folder someone just dropped a jar into is precisely when the answer
+     * matters.
+     */
+    private class Checked(val updates: Map<ContentRef, ModUpdate>, val of: Set<ContentRef>, val at: Long) {
+        fun fresh(items: List<InstalledContent>): Boolean =
+            System.nanoTime() - at < CHECK_TTL_NANOS &&
+                of == items.mapTo(mutableSetOf()) { ContentRef(it.kind, it.fileName) }
     }
 
     /**
@@ -142,6 +215,7 @@ class InstanceContentUpdater(
      */
     fun start(
         instanceDir: Path,
+        title: String,
         targets: List<Target>,
         onChanged: suspend () -> Unit = {},
     ): Boolean {
@@ -149,8 +223,12 @@ class InstanceContentUpdater(
         val key = keyOf(instanceDir)
         jobs[key]?.let { if (it.isActive) return false }
 
-        _runs.update { it + (key to Run(total = targets.size, done = 0, current = null, failed = emptyList(), finished = false)) }
+        _runs.update { it + (key to Run(title = title, total = targets.size, done = 0, current = null, failed = emptyList(), finished = false)) }
         val job = scope.launch {
+            // A download interrupted by the app closing leaves its scratch file
+            // behind. The scanner ignores those, so nobody would ever see them
+            // and nothing else would ever remove them.
+            sweepScratch(instanceDir, targets.map { it.update.ref.kind }.distinct())
             val gate = Semaphore(DOWNLOAD_CONCURRENCY)
             coroutineScope {
                 targets.map { target ->
@@ -197,7 +275,7 @@ class InstanceContentUpdater(
         val dir = instanceDir.resolve(update.ref.kind.folderName())
         withContext(Dispatchers.IO) { Files.createDirectories(dir) }
         val scratch = withContext(Dispatchers.IO) {
-            Files.createTempFile(dir, ".nexira-update-", ".part").also {
+            Files.createTempFile(dir, SCRATCH_PREFIX, SCRATCH_SUFFIX).also {
                 // The transfer skips a target that already exists, and
                 // createTempFile has just made one.
                 Files.deleteIfExists(it)
@@ -226,6 +304,20 @@ class InstanceContentUpdater(
         }
     }
 
+    /** Remove scratch files an interrupted batch left in the folders being touched. */
+    private suspend fun sweepScratch(instanceDir: Path, kinds: List<ContentKind>) = withContext(Dispatchers.IO) {
+        for (kind in kinds) {
+            val dir = instanceDir.resolve(kind.folderName())
+            runCatching {
+                if (!Files.isDirectory(dir)) return@runCatching
+                Files.list(dir).use { stream ->
+                    stream.filter { it.fileName.toString().startsWith(SCRATCH_PREFIX) }
+                        .forEach { runCatching { Files.deleteIfExists(it) } }
+                }
+            }
+        }
+    }
+
     private fun mark(key: String, edit: (Run) -> Run) {
         _runs.update { runs -> runs[key]?.let { runs + (key to edit(it)) } ?: runs }
     }
@@ -237,5 +329,21 @@ class InstanceContentUpdater(
          * thing the player is looking at -- not about the server.
          */
         const val DOWNLOAD_CONCURRENCY = 4
+
+        /**
+         * Scratch naming. The prefix is what the sweep recognises; both halves
+         * keep the file out of what the scanner reads as content, so a download
+         * in flight never appears in the list as a broken mod.
+         */
+        const val SCRATCH_PREFIX = ".nexira-update-"
+        const val SCRATCH_SUFFIX = ".part"
+
+        /**
+         * How long a check answers for. Ten minutes, the same figure Modrinth's
+         * own client settled on: long enough that walking between tabs costs
+         * nothing, short enough that it cannot be the reason a fix published
+         * this morning is invisible this afternoon.
+         */
+        val CHECK_TTL_NANOS = 10L * 60 * 1_000_000_000
     }
 }

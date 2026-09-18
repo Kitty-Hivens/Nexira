@@ -1,5 +1,6 @@
 package hivens.launcher.instance
 
+import hivens.core.api.dto.modrinth.ModrinthDependency
 import hivens.core.api.dto.modrinth.ModrinthVersion
 
 /**
@@ -45,7 +46,7 @@ data class ModUpdate(
  * Whether [candidates] hold an actual update for a file whose sha1 is
  * [installedSha1], and which one.
  *
- * Two rules, both load-bearing:
+ * Three rules, all load-bearing:
  *
  *  - The newest by publish date wins, ranked here rather than trusted from the
  *    response: the order is not part of the API contract.
@@ -54,6 +55,13 @@ data class ModUpdate(
  *    anything already current that is the file that was asked about -- taking
  *    every answer at face value would offer to re-download the whole folder and
  *    call it an update.
+ *  - An answer published BEFORE the installed file is not an update either, and
+ *    this is the rule that is easy to miss. Ask the release channel about a
+ *    machine running a beta and the honest answer is a release from a year ago:
+ *    a different hash, and older. Without [installedPublishedAt] that rollback
+ *    is offered as an upgrade, once per check, for every mod on a prerelease
+ *    build. Null means the file is unknown to Modrinth and there is no date to
+ *    compare against, so the hash alone decides.
  *
  * A version with no files at all is skipped rather than crashing the check: one
  * malformed project must not cost the other ninety-nine their answer.
@@ -63,6 +71,7 @@ fun updateFrom(
     installedSha1: String,
     installedVersion: String?,
     candidates: List<ModrinthVersion>,
+    installedPublishedAt: String? = null,
 ): ModUpdate? {
     val newest = candidates
         .filter { it.files.isNotEmpty() }
@@ -70,6 +79,8 @@ fun updateFrom(
         ?: return null
     val file = newest.primaryFile()
     if (file.hashes.sha1.equals(installedSha1, ignoreCase = true)) return null
+    // ISO-8601 in UTC, so lexicographic order is chronological order.
+    if (installedPublishedAt != null && newest.datePublished <= installedPublishedAt) return null
     return ModUpdate(
         ref              = ref,
         installedVersion = installedVersion,
@@ -83,6 +94,23 @@ fun updateFrom(
         sizeBytes        = file.size,
     )
 }
+
+/**
+ * The channel a check should ask about for a file, given what the instance
+ * prefers and what the file actually IS.
+ *
+ * A player on a beta gets asked about betas. The preference is a floor, not a
+ * ceiling: someone who installed a prerelease build by hand has already said
+ * which channel they are on for that mod, and holding them to the stabler
+ * setting means either silence or, worse, an offer to move them backwards onto
+ * the newest release.
+ */
+fun effectiveChannel(preferred: ModUpdateChannel, installedType: String?): ModUpdateChannel =
+    when (installedType?.lowercase()) {
+        "alpha" -> ModUpdateChannel.Alpha
+        "beta"  -> if (preferred == ModUpdateChannel.Alpha) preferred else ModUpdateChannel.Beta
+        else    -> preferred
+    }
 
 /**
  * The same swap an update describes, for a version somebody picked by hand.
@@ -108,6 +136,28 @@ fun ModrinthVersion.swapFor(ref: ContentRef, installedVersion: String?): ModUpda
         sha1             = file.hashes.sha1,
         sizeBytes        = file.size,
     )
+}
+
+/**
+ * The dependencies of [version] that actually have to be fetched.
+ *
+ * Required only: `optional` is the author suggesting a companion mod, and
+ * acting on a suggestion grows somebody's folder with things they did not pick.
+ * `embedded` is already inside the jar, and `incompatible` is the opposite of a
+ * thing to install.
+ *
+ * [present] is the set of project ids the instance already carries. A
+ * dependency already there is dropped whatever version it is on: replacing a
+ * working build because a newer one exists is the behaviour that took Sodium
+ * out from under Iris.
+ */
+fun requiredDependencies(
+    version: ModrinthVersion,
+    present: Set<String>,
+): List<ModrinthDependency> = version.dependencies.filter { dep ->
+    dep.dependencyType == "required" &&
+        (dep.projectId != null || dep.versionId != null) &&
+        dep.projectId !in present
 }
 
 /**

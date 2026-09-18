@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
+import hivens.launcher.instance.ModInstaller
 import hivens.launcher.modrinth.ModrinthClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +31,8 @@ private val log = LoggerFactory.getLogger("ModBrowser")
 @Stable
 internal class ModBrowserState(
     private val search: suspend (String) -> List<ModrinthSearchHit>,
-    private val install: suspend (ModrinthSearchHit) -> Boolean,
+    private val install: suspend (ModrinthSearchHit) -> ModInstaller.Outcome,
+    private val presentProjects: suspend () -> Set<String>,
 ) {
     var query by mutableStateOf("")
 
@@ -46,6 +48,16 @@ internal class ModBrowserState(
     var results by mutableStateOf<List<ModrinthSearchHit>?>(null)
         private set
 
+    /**
+     * Projects the instance already carries, whether this browser put them there
+     * or not.
+     *
+     * Seeded from the folder rather than accumulated from clicks. Growing it only
+     * from installs made here meant a pack of ninety mods opened the browser and
+     * offered to install every one of them again, and a dependency dragged in
+     * behind the mod that was clicked stayed on Install until the tab was
+     * reopened -- the browser was reporting its own session, not the instance.
+     */
     var installed by mutableStateOf(emptySet<String>())
         private set
 
@@ -64,6 +76,22 @@ internal class ModBrowserState(
     var searchFailed by mutableStateOf(false)
         private set
 
+    /**
+     * Ask the folder what it holds. Runs alongside the first search rather than
+     * before it: both are one request, and holding the results back until this
+     * lands would trade a row that corrects itself for a screen that stays empty.
+     */
+    suspend fun loadInstalled() {
+        installed = installed + runCatching { presentProjects() }
+            .onFailure {
+                if (it is CancellationException) throw it
+                // A row reading Install for something already installed is a
+                // wasted click; a browser that refuses to open is worse.
+                log.warn("reading installed projects failed", it)
+            }
+            .getOrDefault(emptySet())
+    }
+
     suspend fun runSearch(settled: String) {
         results = null
         searchFailed = false
@@ -80,46 +108,56 @@ internal class ModBrowserState(
      * Installs one result. Marks the project installed only when the download
      * actually landed -- the previous version reported success unconditionally,
      * which is the same thing as not checking.
+     *
+     * What the install reports back is the whole set the instance now holds, so
+     * the dependencies it pulled in behind this one stop offering themselves.
      */
     suspend fun installMod(hit: ModrinthSearchHit) {
         val id = hit.projectId
         working = working + id
         failed = failed - id
-        val ok = try {
+        val outcome = try {
             install(hit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             log.warn("Installing {} from Modrinth failed", id, e)
-            false
+            ModInstaller.Outcome()
         } finally {
             working = working - id
         }
-        if (ok) installed = installed + id else failed = failed + id
+        if (outcome.ok) installed = installed + outcome.present + id else failed = failed + id
     }
 }
 
 @Composable
 internal fun rememberModBrowserState(mcVersion: String, loader: String, modsDir: Path): ModBrowserState {
     val modrinth: ModrinthClient = koinInject()
-    return remember(modrinth, mcVersion, loader, modsDir) {
+    val installer: ModInstaller = koinInject()
+    // The installer works on the instance, the browser was handed its mods
+    // folder; one is the parent of the other and this is where that is known.
+    val instanceDir = modsDir.parent
+    return remember(modrinth, installer, mcVersion, loader, modsDir) {
         ModBrowserState(
             search = { q -> withContext(Dispatchers.IO) { modrinth.searchMods(q, mcVersion, loader).hits } },
             install = { hit ->
                 withContext(Dispatchers.IO) {
                     val version = modrinth.bestModVersion(hit.projectId, mcVersion, loader)
-                    val file = version?.primaryFile()
-                    if (file == null) {
-                        // No file for this MC/loader pair is a real answer, not an
+                    if (version == null) {
+                        // No build for this MC/loader pair is a real answer, not an
                         // error: the project exists but does not support this pack.
                         log.info("Modrinth project {} has no build for {} / {}", hit.projectId, mcVersion, loader)
-                        false
+                        ModInstaller.Outcome()
                     } else {
-                        modrinth.downloadTo(file.url, modsDir.resolve(file.filename))
-                        true
+                        val outcome = installer.install(instanceDir, version, mcVersion, loader)
+                        if (outcome.missing.isNotEmpty()) {
+                            log.warn("{} installed without required {}", hit.title, outcome.missing)
+                        }
+                        outcome
                     }
                 }
             },
+            presentProjects = { withContext(Dispatchers.IO) { installer.presentProjects(instanceDir) } },
         )
     }
 }

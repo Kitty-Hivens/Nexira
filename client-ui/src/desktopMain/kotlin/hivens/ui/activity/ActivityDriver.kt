@@ -10,6 +10,7 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.AutoSyncService
 import hivens.launcher.InstallPhase
 import hivens.launcher.InstallSnapshot
+import hivens.launcher.instance.InstanceContentUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -35,6 +36,8 @@ class ActivityDriver(
     private val installs: StateFlow<Map<String, InstallSnapshot>>,
     private val updates: StateFlow<Map<String, PackUpdateStatus>>,
     private val sync: StateFlow<AutoSyncService.Snapshot>,
+    /** Per-file updates inside an instance's own folders, keyed by instance dir. */
+    private val contentUpdates: StateFlow<Map<String, InstanceContentUpdater.Run>>,
     private val repository: IPackRepository,
     private val appScope: CoroutineScope,
 ) {
@@ -56,6 +59,7 @@ class ActivityDriver(
         appScope.launch { installs.collect { it.values.forEach(::onInstall) } }
         appScope.launch { updates.collect(::onUpdates) }
         appScope.launch { sync.collect(::onSync) }
+        appScope.launch { contentUpdates.collect { runs -> runs.forEach { (key, run) -> onContentUpdate(key, run) } } }
     }
 
     /** Report only what changed. Returns false when the registry already has this. */
@@ -124,6 +128,35 @@ class ActivityDriver(
                 phase = phase,
             )
         }
+    }
+
+    /**
+     * A batch of per-file updates inside one instance.
+     *
+     * Reported here rather than drawn by the tab that started it: the batch
+     * outlives that tab, and a band across the content list is chrome in the
+     * middle of the thing being changed. The pill is where the launcher already
+     * says what it is doing, and it survives navigating away.
+     *
+     * The count IS the measure -- files done out of files planned -- so a run
+     * needs no separate progress model. A batch that lost some files reports
+     * Failed even though most of them landed, because "forty of fifty two" is
+     * not a success anyone should have to read twice.
+     */
+    private fun onContentUpdate(key: String, run: InstanceContentUpdater.Run) {
+        val phase = when {
+            !run.finished        -> ActivityPhase.Running(run.done.toLong(), run.total.toLong(), run.current)
+            run.failed.isEmpty() -> ActivityPhase.Succeeded
+            else                 -> ActivityPhase.Failed(run.failed.joinToString(", "))
+        }
+        val activityKey = "content:$key"
+        if (!changed(activityKey, phase)) return
+        registry.report(
+            key   = activityKey,
+            kind  = ActivityKind.Update,
+            title = run.title,
+            phase = phase,
+        )
     }
 
     /**

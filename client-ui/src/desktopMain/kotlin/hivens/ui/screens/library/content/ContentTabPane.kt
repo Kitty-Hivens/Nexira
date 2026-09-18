@@ -53,9 +53,15 @@ import coil3.compose.AsyncImage
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
 import hivens.core.data.PackInstance
+import hivens.core.api.dto.modrinth.ModrinthVersion
+import hivens.core.update.VersionChannel
 import hivens.launcher.instance.ContentKind
+import hivens.launcher.instance.ContentRef
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.instance.ModUpdate
+import hivens.launcher.instance.loadersFor
 import androidx.compose.runtime.DisposableEffect
 import hivens.ui.activity.Selection
 import hivens.ui.activity.dragSelect
@@ -63,11 +69,14 @@ import hivens.ui.activity.SelectionAction
 import hivens.ui.activity.SelectionActionKind
 import hivens.ui.activity.SelectionItem
 import hivens.ui.activity.SelectionRegistry
+import hivens.ui.components.ConfirmDialog
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxIconButton
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
@@ -85,6 +94,9 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
+import hivens.ui.screens.versions.PickerIntent
+import hivens.ui.screens.versions.PickerVersion
+import hivens.ui.screens.versions.VersionPickerWindow
 import hivens.ui.utils.rememberFileDialogSettings
 import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
@@ -108,16 +120,30 @@ import kotlin.time.Duration.Companion.milliseconds
  * [ContentTabState]; this renders that state and forwards intents.
  */
 @Composable
-fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
+internal fun ContentTabPane(
+    instance: PackInstance,
+    state: ContentTabState,
+    modifier: Modifier = Modifier,
+) {
     val s = LocalStrings.current
-    val state = rememberContentTabState(instance)
     val selections: SelectionRegistry = koinInject()
+    val scope = rememberCoroutineScope()
     val addDialogSettings = rememberFileDialogSettings(s.contentAddFiles)
 
     LaunchedEffect(state) { state.load() }
     // Separate from load(): this one runs for as long as the tab is on screen,
     // picking up anything added to the folders from outside the launcher.
     LaunchedEffect(state) { state.watchContentFolders() }
+    // A batch of updates belongs to the app, not to this tab, so the tab
+    // subscribes to it rather than owning it: come back mid-run and the line is
+    // where the run actually is.
+    LaunchedEffect(state) { state.watchUpdateRun() }
+    // Asked once, when the scan first lands. Detecting this up front is what
+    // lets the toolbar offer the update instead of making someone click
+    // something to find out whether there is anything to click.
+    LaunchedEffect(state, state.items) {
+        if (state.items != null && !state.checked && !state.checkingUpdates) state.checkUpdates()
+    }
 
     // The selection lives on the activity surface, so this view publishes it and
     // takes it back down on the way out. Leaving the tab with rows still ticked
@@ -182,7 +208,21 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
             canFindProjects = state.canAddContent,
             onAddFiles     = { state.addFiles(addDialogSettings) },
             onFindProjects = state::startBrowsing,
+            // Updating is offered wherever replacing a file is: on a tracked pack
+            // the pack decides what its mods are, and a swap behind its back is
+            // undone by the next sync.
+            updateCount    = state.liveUpdates.size,
+            offersUpdates  = state.updatable.isNotEmpty(),
+            checkFailed    = state.checkFailed,
+            run            = state.updateRun,
+            onUpdateAll    = state::requestUpdateAll,
+            onCheck        = { scope.launch { state.checkUpdates(force = true) } },
         )
+
+        // The outcome of a batch is NOT drawn here. It goes to the activity pill,
+        // which is where the launcher accounts for work it is doing -- a band
+        // across the list would push the content down to report on itself, and
+        // the batch outlives this tab anyway.
 
         val visible = state.visible
         when {
@@ -219,6 +259,11 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                                 onDelete       = if (rules.canDelete) ({ state.requestDelete(c) }) else null,
                                 onDetails      = { state.detailsOf = c },
                                 resolveProject = { state.resolveProject(c) },
+                                update         = state.liveUpdates[ContentRef(c.kind, c.fileName)],
+                                onUpdate       = { state.update(c) },
+                                // Switching versions is the same write as an update,
+                                // so it is offered on the same rows.
+                                onVersions     = if (rules.canDelete) ({ state.openVersions(c) }) else null,
                             )
                         }
                     }
@@ -230,6 +275,18 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+
+    // Replacing fifty files is worth one question. It is not destructive enough
+    // for the red gate, so it takes the ordinary one with its own verb.
+    if (state.pendingUpdateAll > 0) {
+        ConfirmDialog(
+            title        = s.contentUpdateConfirmTitle,
+            body         = s.contentUpdateConfirmBody(state.pendingUpdateAll),
+            confirmLabel = s.contentUpdateConfirmAction,
+            onConfirm    = state::updateAll,
+            onDismiss    = state::cancelUpdateAll,
+        )
     }
 
     if (state.pendingBulkDelete.isNotEmpty()) {
@@ -259,10 +316,131 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
             onDismiss      = { state.detailsOf = null },
         )
     }
+
+}
+
+/**
+ * The Content tab's version picker, hosted by the SCREEN rather than by the tab.
+ *
+ * It sizes itself against what contains it, and what contained it was the tab
+ * body -- so the window came out inset by the tab's own padding, clipped on the
+ * right, and scaled to a panel instead of to the app. A modal belongs to the
+ * surface it covers, which is the screen; the same reason the pack's settings
+ * window is hosted there and not inside whichever section opened it.
+ */
+@Composable
+internal fun ContentVersionsOverlay(instance: PackInstance, state: ContentTabState) {
+    val target = state.versionsOf ?: return
+    ModVersionsWindow(
+        content       = target,
+        versions      = state.versionList,
+        failed        = state.versionsFailed,
+        unknown       = state.versionsUnknown,
+        installedId   = state.installedVersionId(target),
+        icon          = state.iconFor(target)?.model(),
+        busyVersionId = state.switchingTo,
+        mcVersion     = instance.cachedManifest?.minecraftVersion.orEmpty(),
+        loader        = instance.cachedManifest?.loaderName
+            ?.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
+            ?.lowercase().orEmpty(),
+        onPick        = { v -> state.switchTo(target, v) },
+        onDismiss     = state::closeVersions,
+    )
+}
+
+/**
+ * Every build Modrinth has of one installed file, in the picker the pack's own
+ * version switch uses.
+ *
+ * The same window on purpose: picking a build of a mod and picking a build of a
+ * pack are the same decision at a different scale, and the pack's picker already
+ * answers what a person asks at that moment -- which one am I on, what is the
+ * newest, what changed, and is this a step forward or back.
+ *
+ * Versions that cannot run here are left out rather than shown and refused, with
+ * the installed one always kept: a file can be installed under a version that no
+ * longer lists this game version, and hiding the row the reader is standing on
+ * makes the list unreadable.
+ */
+@Composable
+internal fun ModVersionsWindow(
+    content: InstalledContent,
+    versions: List<ModrinthVersion>?,
+    failed: Boolean,
+    unknown: Boolean,
+    installedId: String?,
+    icon: Any?,
+    busyVersionId: String?,
+    mcVersion: String,
+    loader: String,
+    onPick: (ModrinthVersion) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val loaders = loadersFor(content.kind, loader)
+    val shown = remember(versions, installedId, mcVersion, loaders) {
+        versions.orEmpty()
+            .filter { it.files.isNotEmpty() }
+            .filter { v ->
+                v.id == installedId ||
+                    ((mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
+                        (loaders.isEmpty() || loaders.any { it in v.loaders }))
+            }
+            .sortedByDescending { it.datePublished }
+    }
+    val newestId = shown.firstOrNull()?.id
+    val installedAt = shown.firstOrNull { it.id == installedId }?.datePublished
+
+    VersionPickerWindow(
+        title       = s.contentVersionsTitle,
+        packName    = content.displayName,
+        packIcon    = icon,
+        versions    = shown.map { v ->
+            PickerVersion(
+                id          = v.id,
+                label       = v.versionNumber,
+                channel     = VersionChannel.of(v.versionType, v.versionNumber),
+                publishedAt = v.datePublished,
+                changelog   = v.changelog,
+                runtimeLine = listOf(v.gameVersions.joinToString(", "), v.loaders.joinToString(", "))
+                    .filter { it.isNotBlank() }
+                    .joinToString("  |  ")
+                    .takeIf { it.isNotBlank() },
+                sizeLabel   = v.files.firstOrNull { f -> f.primary }?.size?.let { humanSize(it, s) }
+                    ?: v.files.firstOrNull()?.size?.let { humanSize(it, s) },
+                installed   = v.id == installedId,
+                latest      = v.id == newestId,
+            )
+        },
+        intentFor   = { picked ->
+            val at = shown.firstOrNull { it.id == picked.id }?.datePublished
+            when {
+                picked.installed                        -> PickerIntent.Switch
+                installedAt == null || at == null       -> PickerIntent.Switch
+                at > installedAt                        -> PickerIntent.Upgrade
+                at < installedAt                        -> PickerIntent.Rollback
+                else                                    -> PickerIntent.Switch
+            }
+        },
+        onConfirm   = { picked -> shown.firstOrNull { it.id == picked.id }?.let(onPick) },
+        onDismiss   = onDismiss,
+        busyVersionId = busyVersionId,
+        // The window opens on the click and the listing is a request behind it.
+        loading     = versions == null && !unknown && !failed,
+        // The list is empty for two different reasons and they need different
+        // words: Modrinth has never seen this file, or it has and the fetch
+        // failed. Neither is "this mod has no versions".
+        warning     = when {
+            unknown -> s.contentVersionsUnknown
+            failed  -> s.contentVersionsLoadFailed
+            versions != null && shown.isEmpty() -> s.contentVersionsUnknown
+            else -> null
+        },
+    )
 }
 
 @Composable
-private fun Toolbar(
+internal fun Toolbar(
     query: String,
     onQuery: (String) -> Unit,
     filter: ContentFilter,
@@ -277,6 +455,12 @@ private fun Toolbar(
     canFindProjects: Boolean,
     onAddFiles: () -> Unit,
     onFindProjects: () -> Unit,
+    updateCount: Int,
+    offersUpdates: Boolean,
+    checkFailed: Boolean,
+    run: InstanceContentUpdater.Run?,
+    onUpdateAll: () -> Unit,
+    onCheck: () -> Unit,
 ) {
     val s = LocalStrings.current
     var filtersOpen by remember { mutableStateOf(false) }
@@ -308,6 +492,15 @@ private fun Toolbar(
                 shownCount     = shownCount,
                 scannedCount   = scannedCount,
             )
+            if (offersUpdates) {
+                UpdateControls(
+                    count       = updateCount,
+                    checkFailed = checkFailed,
+                    run         = run,
+                    onUpdateAll = onUpdateAll,
+                    onCheck     = onCheck,
+                )
+            }
             if (canFindProjects) {
                 NxButton(label = s.contentFindProjects, onClick = onFindProjects, style = NxButtonStyle.Secondary, icon = NxIcon.Search, compact = true)
             }
@@ -315,6 +508,63 @@ private fun Toolbar(
                 NxButton(label = s.contentAddFiles, onClick = onAddFiles, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
             }
         }
+    }
+}
+
+/**
+ * The toolbar's update control: one button, and only when there is something to
+ * press it for.
+ *
+ * A folder with nothing to update, and a check still running, both draw NOTHING.
+ * The previous version narrated itself -- "checking", "everything is up to
+ * date" -- which put a line of prose in a row of controls to report the absence
+ * of work. A control that is not there says the same thing and takes no room.
+ *
+ * Two states do draw. Updates found: the download action, counted. A batch in
+ * flight: the same slot, inert, carrying the count as it goes, because a minute
+ * of downloads with no sign of progress reads as nothing happening.
+ *
+ * A check that FAILED is the exception, and it is a glyph rather than a
+ * sentence: silence there would be indistinguishable from "nothing new", which
+ * is the one wrong thing this can say. It is also the retry -- the only way back
+ * from a check that did not run.
+ */
+@Composable
+private fun UpdateControls(
+    count: Int,
+    checkFailed: Boolean,
+    run: InstanceContentUpdater.Run?,
+    onUpdateAll: () -> Unit,
+    onCheck: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val active = run?.takeIf { !it.finished }
+    when {
+        active != null -> Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            modifier              = Modifier.padding(horizontal = 6.dp),
+        ) {
+            CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+            Text(
+                text     = s.contentUpdateRunning(active.done, active.total),
+                style    = MaterialTheme.typography.labelLarge,
+                color    = NxTheme.colors.textSecondary,
+                maxLines = 1,
+            )
+        }
+        count > 0 -> NxButton(
+            label   = s.contentUpdateAll(count),
+            onClick = onUpdateAll,
+            icon    = NxIcon.Download,
+            compact = true,
+        )
+        checkFailed -> NxIconButton(
+            icon               = NxIcon.Warning,
+            contentDescription = s.contentUpdateCheckFailed,
+            onClick            = onCheck,
+            tint               = NxTheme.colors.warnAccent,
+        )
     }
 }
 
@@ -486,7 +736,7 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
  * [onDelete] is null unless the row is user-owned.
  */
 @Composable
-private fun ContentRow(
+internal fun ContentRow(
     content: InstalledContent,
     iconState: ContentIconState?,
     rules: ContentRowRules,
@@ -502,6 +752,9 @@ private fun ContentRow(
     onDelete: (() -> Unit)?,
     onDetails: () -> Unit,
     resolveProject: suspend () -> ModrinthProject?,
+    update: ModUpdate?,
+    onUpdate: () -> Unit,
+    onVersions: (() -> Unit)?,
 ) {
     val s = LocalStrings.current
     val uriHandler = LocalUriHandler.current
@@ -547,6 +800,30 @@ private fun ContentRow(
                 Text(v, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary.copy(alpha = dim), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+        // The chip both reports the newer build and is the way to take it: the
+        // row already says what is installed, so the one thing worth a control
+        // here is the one thing the reader would do about it.
+        if (update != null) {
+            NxMetaChip(
+                text    = s.contentUpdateTo(update.versionNumber),
+                tone    = NxMetaChipTone.Success,
+                onClick = onUpdate,
+            )
+        }
+        // Beside the switch rather than buried in the overflow: picking a build
+        // is a thing done TO this row, and the overflow is where actions go to
+        // be found only by someone already looking for them.
+        if (onVersions != null) {
+            NxIconButton(
+                // Swap, not a clock: History reads as "put back what was here
+                // before", and this picks WHICH build to run -- forward, back or
+                // sideways onto a beta.
+                icon               = NxIcon.SwapHoriz,
+                contentDescription = s.contentActionVersions,
+                onClick            = onVersions,
+                tint               = NxTheme.colors.textSecondary,
+            )
+        }
         if (rules.showToggle) {
             NxSwitch(
                 checked         = rules.effectiveEnabled,
@@ -558,6 +835,9 @@ private fun ContentRow(
         // caller passed them (a mod with a known URL / a user-owned row).
         NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
             NxMenuItem(label = s.contentActionDetails, icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
+            if (update != null) {
+                NxMenuItem(label = s.contentUpdateTo(update.versionNumber), icon = NxIcon.Download, onClick = { dismiss(); onUpdate() })
+            }
             // "Open page" is kind-agnostic: the embedded homepage if the archive
             // declared one, else the canonical Modrinth page (mod / resourcepack /
             // shader all resolve by file hash). Resolved while the menu is open, so
@@ -619,6 +899,10 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
     val state = rememberModBrowserState(mcVersion, loader, modsDir)
     val scope = rememberCoroutineScope()
 
+    // What the instance already holds, asked once when the browser opens. Without
+    // it every result offers an install, including the ninety already in the
+    // folder.
+    LaunchedEffect(state) { state.loadInstalled() }
     // Debounce typing, then search on the settled query. The timer is a
     // composition concern; both halves of the query live on the holder, so a
     // rebuilt one cannot leave them disagreeing.
@@ -678,7 +962,7 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
 }
 
 @Composable
-private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Boolean, failed: Boolean, onInstall: () -> Unit) {
+internal fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Boolean, failed: Boolean, onInstall: () -> Unit) {
     val s = LocalStrings.current
     val shape = RoundedCornerShape(7.dp)
     Row(
@@ -720,7 +1004,7 @@ private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Bo
  * file hash -- a non-Modrinth / private jar simply keeps a null link.
  */
 @Composable
-private fun ContentDetailsDialog(
+internal fun ContentDetailsDialog(
     content: InstalledContent,
     resolveProject: suspend () -> ModrinthProject?,
     onDismiss: () -> Unit,

@@ -69,7 +69,11 @@ class LocalPackCreator(
             instanceDirName = instanceDirName,
             createdAtEpoch = Instant.now().epochSecond,
             runtime = InstanceRuntime(),
-            notes = "Created locally.",
+            // No note. A note is for something the player has to know and cannot
+            // see -- an import that left files unresolved. That this pack was
+            // built here is already on the page as the Local badge, and saying it
+            // again in a banner is a permanent notice carrying no information.
+            notes = "",
             cachedManifest = CachedManifestSnapshot(
                 minecraftVersion = mc,
                 loaderName = loaderId ?: "vanilla",

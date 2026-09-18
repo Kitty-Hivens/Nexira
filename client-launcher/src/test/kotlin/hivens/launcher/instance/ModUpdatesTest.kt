@@ -1,5 +1,6 @@
 package hivens.launcher.instance
 
+import hivens.core.api.dto.modrinth.ModrinthDependency
 import hivens.core.api.dto.modrinth.ModrinthFile
 import hivens.core.api.dto.modrinth.ModrinthHashes
 import hivens.core.api.dto.modrinth.ModrinthVersion
@@ -106,6 +107,60 @@ class ModUpdatesTest {
         assertNull(updateFrom(ref, "aaaa", "1.0", emptyList()))
     }
 
+    // ── an older answer is not an update ─────────────────────────────────────
+
+    @Test
+    fun `a release older than the installed beta is not an update`() {
+        // Exactly the Iris case: 1.8.14-beta.1 installed, and the release channel
+        // answers with 1.8.12 from a year earlier. Different hash, older build.
+        val older = version("1.8.12", "2025-06-17", sha1 = "bbbb")
+        assertNull(
+            updateFrom(ref, "aaaa", "1.8.14-beta.1", listOf(older), installedPublishedAt = "2026-06-13"),
+            "asking the release channel about a beta must not offer a rollback as an upgrade",
+        )
+    }
+
+    @Test
+    fun `a build published the same instant is not an update either`() {
+        val same = version("1.1", "2026-02-01", sha1 = "bbbb")
+        assertNull(updateFrom(ref, "aaaa", "1.1", listOf(same), installedPublishedAt = "2026-02-01"))
+    }
+
+    @Test
+    fun `a genuinely newer build still comes through`() {
+        val newer = version("1.2", "2026-03-01", sha1 = "cccc")
+        val update = updateFrom(ref, "aaaa", "1.1", listOf(newer), installedPublishedAt = "2026-02-01")!!
+        assertEquals("1.2", update.versionNumber)
+    }
+
+    @Test
+    fun `a file Modrinth cannot date falls back to the hash`() {
+        val other = version("1.2", "2026-03-01", sha1 = "cccc")
+        val update = updateFrom(ref, "aaaa", "1.1", listOf(other), installedPublishedAt = null)!!
+        assertEquals("1.2", update.versionNumber, "no date to compare means the hash decides, as before")
+    }
+
+    // ── the channel follows what is installed ────────────────────────────────
+
+    @Test
+    fun `a beta on disk is asked about betas`() {
+        assertEquals(ModUpdateChannel.Beta, effectiveChannel(ModUpdateChannel.Release, "beta"))
+        assertEquals(ModUpdateChannel.Alpha, effectiveChannel(ModUpdateChannel.Release, "alpha"))
+    }
+
+    @Test
+    fun `a release on disk keeps the instance preference`() {
+        assertEquals(ModUpdateChannel.Release, effectiveChannel(ModUpdateChannel.Release, "release"))
+        assertEquals(ModUpdateChannel.Release, effectiveChannel(ModUpdateChannel.Release, null))
+        assertEquals(ModUpdateChannel.Beta, effectiveChannel(ModUpdateChannel.Beta, "release"))
+    }
+
+    @Test
+    fun `the preference is a floor, never lowered by what is installed`() {
+        assertEquals(ModUpdateChannel.Alpha, effectiveChannel(ModUpdateChannel.Alpha, "beta"))
+        assertEquals(ModUpdateChannel.Alpha, effectiveChannel(ModUpdateChannel.Alpha, "release"))
+    }
+
     // ── which loaders each folder is asked about ─────────────────────────────
 
     @Test
@@ -119,6 +174,54 @@ class ModUpdatesTest {
     fun `a vanilla instance has no loader to ask a mod about`() {
         assertTrue(loadersFor(ContentKind.Mod, "").isEmpty())
         assertEquals(listOf("minecraft"), loadersFor(ContentKind.ResourcePack, ""), "a resource pack is published for the game, not for a loader")
+    }
+
+    // ── what an install has to drag along ────────────────────────────────────
+
+    private fun dep(project: String?, type: String = "required", versionId: String? = null) =
+        ModrinthDependency(projectId = project, versionId = versionId, dependencyType = type)
+
+    private fun withDeps(vararg deps: ModrinthDependency) =
+        version("1.0", "2026-01-01", sha1 = "aaaa").copy(dependencies = deps.toList())
+
+    @Test
+    fun `required dependencies are what gets fetched`() {
+        val v = withDeps(dep("curios"), dep("patchouli"))
+        val needed = requiredDependencies(v, present = emptySet())
+        assertEquals(listOf("curios", "patchouli"), needed.map { it.projectId })
+    }
+
+    @Test
+    fun `optional, embedded and incompatible are left alone`() {
+        val v = withDeps(
+            dep("curios"),
+            dep("jei", type = "optional"),
+            dep("fabric_api", type = "embedded"),
+            dep("embeddium", type = "incompatible"),
+        )
+        assertEquals(listOf("curios"), requiredDependencies(v, emptySet()).map { it.projectId },
+            "a suggestion is not an instruction, and an embedded jar is already inside")
+    }
+
+    @Test
+    fun `a dependency already installed is not fetched again`() {
+        val v = withDeps(dep("curios"), dep("patchouli"))
+        val needed = requiredDependencies(v, present = setOf("curios"))
+        assertEquals(listOf("patchouli"), needed.map { it.projectId },
+            "whatever version is already there stays: replacing it is how Sodium went out from under Iris")
+    }
+
+    @Test
+    fun `a pinned dependency survives with its version id`() {
+        val v = withDeps(dep("sodium", versionId = "Pb3OXVqC"))
+        val needed = requiredDependencies(v, emptySet())
+        assertEquals("Pb3OXVqC", needed.single().versionId, "the author pinned a build; the installer must honour it")
+    }
+
+    @Test
+    fun `a dependency naming nothing at all is dropped`() {
+        val v = withDeps(dep(null))
+        assertTrue(requiredDependencies(v, emptySet()).isEmpty())
     }
 
     // ── the channel ladder ───────────────────────────────────────────────────

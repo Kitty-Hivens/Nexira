@@ -5,12 +5,14 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.SessionData
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Path
@@ -61,6 +63,7 @@ class PackDetailStateTest {
         onLaunch: (SessionData, PackInstance) -> Unit = { _, _ -> },
         onAbort: () -> Unit = {},
         onOpenFolder: (Path) -> Unit = {},
+        writeScope: CoroutineScope = CoroutineScope(UnconfinedTestDispatcher()),
     ) = PackDetailState(
         instanceId = "inst-1",
         repo = repo,
@@ -68,6 +71,7 @@ class PackDetailStateTest {
         launch = onLaunch,
         abort = onAbort,
         openInFileManager = onOpenFolder,
+        writeScope = writeScope,
     )
 
     /** Starts the screen's collection on the test's own scope and lets it settle. */
@@ -75,6 +79,29 @@ class PackDetailStateTest {
         backgroundScope.launch { state.observe() }
         runCurrent()
         return state
+    }
+
+    @Test
+    fun `dismissing the provenance note clears it on the record`() = runTest {
+        val repo = FakeRepo(listOf(pack().copy(notes = "Imported from Prism.")))
+        val state = observing(state(repo, writeScope = backgroundScope))
+
+        state.dismissNotes()
+        runCurrent()
+
+        assertEquals("", repo.observe().value.single().notes, "a note taken down must not come back next launch")
+    }
+
+    @Test
+    fun `dismissing a pack with no note writes nothing`() = runTest {
+        val repo = FakeRepo(listOf(pack()))
+        val state = observing(state(repo, writeScope = backgroundScope))
+        val before = repo.observe().value
+
+        state.dismissNotes()
+        runCurrent()
+
+        assertTrue(before === repo.observe().value, "no note, no write")
     }
 
     @Test

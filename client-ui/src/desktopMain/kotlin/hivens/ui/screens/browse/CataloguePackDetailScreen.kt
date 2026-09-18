@@ -265,7 +265,7 @@ fun CataloguePackDetailScreen(
         VersionPickerWindow(
             title = s.versionPickerInstallTitle,
             packName = d.title,
-            packIconUrl = d.iconUrl,
+            packIcon = d.iconUrl,
             versions = rows,
             intentFor = { PickerIntent.Install },
             busyVersionId = installing?.versionId,

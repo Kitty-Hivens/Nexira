@@ -8,10 +8,10 @@ import hivens.core.time.Clock
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.launcher.AutoSyncService
+import hivens.launcher.instance.InstanceContentUpdater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -114,11 +114,54 @@ class ActivityDriverStaleTest {
         )
     }
 
-    private fun TestScope.driver(reg: ActivityRegistry, hub: FakeHub) = ActivityDriver(
+    @Test
+    fun `a content batch narrates its count and settles on the outcome`() = runTest {
+        val reg = ActivityRegistry(scope = this, clock = Clock { 0L }, terminalHoldMs = 60_000)
+        val runs = MutableStateFlow<Map<String, InstanceContentUpdater.Run>>(emptyMap())
+        driver(reg, FakeHub(), runs).start()
+
+        runs.value = mapOf("dir" to run(total = 4, done = 1, current = "sodium.jar"))
+        runCurrent()
+        assertEquals(
+            ActivityPhase.Running(1, 4, "sodium.jar"),
+            reg.activities.value.single { it.key == "content:dir" }.phase,
+            "the files-of-files count is the whole progress model",
+        )
+
+        runs.value = mapOf("dir" to run(total = 4, done = 4, finished = true, failed = listOf("iris.jar")))
+        runCurrent()
+        assertEquals(
+            ActivityPhase.Failed("iris.jar"),
+            reg.activities.value.single { it.key == "content:dir" }.phase,
+            "a batch that lost a file did not succeed",
+        )
+    }
+
+    private fun run(
+        total: Int,
+        done: Int,
+        current: String? = null,
+        failed: List<String> = emptyList(),
+        finished: Boolean = false,
+    ) = InstanceContentUpdater.Run(
+        title = "Pack",
+        total = total,
+        done = done,
+        current = current,
+        failed = failed,
+        finished = finished,
+    )
+
+    private fun TestScope.driver(
+        reg: ActivityRegistry,
+        hub: FakeHub,
+        content: StateFlow<Map<String, InstanceContentUpdater.Run>> = MutableStateFlow(emptyMap()),
+    ) = ActivityDriver(
         registry = reg,
         installs = MutableStateFlow(emptyMap()),
         updates = hub.statuses,
         sync = MutableStateFlow(AutoSyncService.Snapshot(emptyMap(), AutoSyncService.OverallState.Idle)),
+        contentUpdates = content,
         repository = FakeRepo(),
         appScope = backgroundScope,
     )

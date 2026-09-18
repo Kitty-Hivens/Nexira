@@ -69,7 +69,7 @@ class VersionPickerWindowRenderTest {
                     VersionPickerWindow(
                         title = "Установка сборки",
                         packName = "Industrial",
-                        packIconUrl = null,
+                        packIcon = null,
                         versions = versions,
                         intentFor = { PickerIntent.Install },
                         onConfirm = {},

@@ -14,6 +14,8 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.platform.SystemActions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
@@ -53,6 +55,8 @@ internal class PackDetailState(
     private val launch: (SessionData, PackInstance) -> Unit,
     private val abort: () -> Unit,
     private val openInFileManager: (Path) -> Unit,
+    /** App scope: the record write must outlive the screen that asked for it. */
+    private val writeScope: CoroutineScope,
 ) {
     var resolution by mutableStateOf(resolve(repo.observe().value))
         private set
@@ -92,6 +96,21 @@ internal class PackDetailState(
 
     fun abortLaunch() = abort()
 
+    /**
+     * Take the provenance notice down for good.
+     *
+     * The note is a one-time message about how this instance came to be -- an
+     * import that could not fetch every file, a pack built here -- and once it
+     * has been read it is a permanent band across the top of the page reporting
+     * something that happened once. Cleared on the record rather than hidden in
+     * the screen, so it stays gone after a restart.
+     */
+    fun dismissNotes() {
+        val target = pack ?: return
+        if (target.notes.isBlank()) return
+        writeScope.launch { repo.put(target.copy(notes = "")) }
+    }
+
     fun openFolder() {
         instanceDir?.let(openInFileManager)
     }
@@ -103,7 +122,8 @@ internal fun rememberPackDetailState(instanceId: String): PackDetailState {
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
-    return remember(instanceId, repo, paths, controller, launchDriver) {
+    val writeScope: CoroutineScope = koinInject()
+    return remember(instanceId, repo, paths, controller, launchDriver, writeScope) {
         PackDetailState(
             instanceId = instanceId,
             repo       = repo,
@@ -119,6 +139,7 @@ internal fun rememberPackDetailState(instanceId: String): PackDetailState {
             },
             abort      = controller::abort,
             openInFileManager = { dir -> SystemActions.openFolder(dir.toString()) },
+            writeScope = writeScope,
         )
     }
 }

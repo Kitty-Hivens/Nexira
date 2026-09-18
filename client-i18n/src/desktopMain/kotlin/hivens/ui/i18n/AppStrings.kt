@@ -850,6 +850,26 @@ interface AppStrings {
     fun selectionBlockedByPack(count: Int): String
     val contentActionDetails: String
     val contentActionOpenPage: String
+
+    // Updates for installed content: the check, the batch, and the version picker
+    // a row opens. Counts are interpolated by the locale, which is also where the
+    // plural agreement lives.
+    val contentUpdateCheck: String
+    fun contentUpdateAll(count: Int): String
+    fun contentUpdateRunning(done: Int, total: Int): String
+    val contentUpdateUpToDate: String
+    /** The check itself did not run. Never the same message as "nothing new". */
+    val contentUpdateCheckFailed: String
+    /** The gate before a batch replaces files. The body receives the count. */
+    val contentUpdateConfirmTitle: String
+    fun contentUpdateConfirmBody(count: Int): String
+    val contentUpdateConfirmAction: String
+    /** Row action and its tooltip: the version this file would move to. */
+    fun contentUpdateTo(version: String): String
+    val contentActionVersions: String
+    val contentVersionsTitle: String
+    val contentVersionsUnknown: String
+    val contentVersionsLoadFailed: String
     val contentDetailAuthors: String
     val contentDetailSize: String
     val contentTabFetchErrorTitle: String

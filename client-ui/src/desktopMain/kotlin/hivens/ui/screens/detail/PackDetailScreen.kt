@@ -86,6 +86,8 @@ import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.settings.PackSettingsWindow
 import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.content.ContentTabPane
+import hivens.ui.screens.library.content.ContentVersionsOverlay
+import hivens.ui.screens.library.content.rememberContentTabState
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.NxTheme
@@ -153,6 +155,10 @@ fun PackDetailScreen(
     val s = LocalStrings.current
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
+    // Owned here rather than inside the tab, because one thing it holds -- the
+    // version picker -- is a modal over the whole screen, and a modal drawn
+    // inside a tab body is sized and clipped by that body.
+    val contentState = rememberContentTabState(pack)
     val authedSession = (appState as? AppState.Authenticated)?.session
     val launchIndication by indications.launchIndication(pack.id).collectAsState()
 
@@ -201,9 +207,13 @@ fun PackDetailScreen(
         // never shown, so a half-populated import read as an empty success.
         if (pack.notes.isNotBlank()) {
             NxCalloutBanner(
-                body     = pack.notes,
-                tone     = NxCalloutTone.Info,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                body      = pack.notes,
+                tone      = NxCalloutTone.Info,
+                modifier  = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                // It reports how this instance came to be, which is read once and
+                // then is a band across the page forever. Closing it clears the
+                // note on the record, so it does not come back next launch.
+                onDismiss = state::dismissNotes,
             )
         }
 
@@ -225,7 +235,7 @@ fun PackDetailScreen(
         ) {
             tabRetention.SaveableStateProvider(tabIndex) {
             when (tabIndex) {
-                0 -> ContentTabPane(instance = pack)
+                0 -> ContentTabPane(instance = pack, state = contentState)
                 1 -> FileBrowserPane(rootDir = instanceDir)
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)
@@ -233,6 +243,9 @@ fun PackDetailScreen(
             }
         }
     }
+
+    // Above the tabs and beside the settings window: both cover the screen.
+    ContentVersionsOverlay(instance = pack, state = contentState)
 
     if (showSettings) {
         PackSettingsWindow(

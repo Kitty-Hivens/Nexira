@@ -49,14 +49,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
-import com.mikepenz.markdown.m3.Markdown
 import hivens.core.update.VersionChannel
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.channelColor
+import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxField
@@ -82,6 +83,12 @@ data class PickerVersion(
     val changelog: String? = null,
     /** Second line of the detail pane, e.g. "Minecraft 1.12.2 . Forge". */
     val runtimeLine: String? = null,
+    /**
+     * Download size, when the source publishes one per version. The mirror
+     * describes a build rather than a file, so it passes null and the line is
+     * simply absent.
+     */
+    val sizeLabel: String? = null,
     val installed: Boolean = false,
     val latest: Boolean = false,
 )
@@ -106,13 +113,24 @@ enum class PickerIntent { Install, Upgrade, Rollback, Switch }
 fun VersionPickerWindow(
     title: String,
     packName: String,
-    packIconUrl: String?,
+    /**
+     * Anything the image loader accepts: a URL for a catalogue pack, the icon
+     * bytes a mod jar carries. It used to be typed as a URL, so every mod whose
+     * icon came out of its own archive fell through to the initials tile.
+     */
+    packIcon: Any?,
     versions: List<PickerVersion>,
     intentFor: (PickerVersion) -> PickerIntent,
     onConfirm: (PickerVersion) -> Unit,
     onDismiss: () -> Unit,
     busyVersionId: String? = null,
     warning: String? = null,
+    /**
+     * The list is still being fetched. A host whose versions are already in hand
+     * leaves this alone; one that opens the window and then asks the network
+     * would otherwise show an empty list, which reads as "this has no versions".
+     */
+    loading: Boolean = false,
 ) {
     val colors = NxTheme.colors
     val busy = busyVersionId != null
@@ -168,13 +186,14 @@ fun VersionPickerWindow(
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
-                Header(title, packName, packIconUrl, onDismiss)
+                Header(title, packName, packIcon, onDismiss)
                 HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
                 Row(Modifier.weight(1f).fillMaxWidth()) {
                     // Proportional, not a fixed 300dp rail: the list has to grow
                     // with the window or it turns into a slot in a field of notes.
                     ListPanel(
                         versions = shown,
+                        loading = loading,
                         total = versions.size,
                         query = query,
                         onQuery = { query = it },
@@ -201,7 +220,7 @@ fun VersionPickerWindow(
 // --- Zones -----------------------------------------------------------------
 
 @Composable
-private fun Header(title: String, packName: String, iconUrl: String?, onDismiss: () -> Unit) {
+private fun Header(title: String, packName: String, icon: Any?, onDismiss: () -> Unit) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     Row(
@@ -209,7 +228,7 @@ private fun Header(title: String, packName: String, iconUrl: String?, onDismiss:
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PackAvatar(iconUrl, packName)
+        PackAvatar(icon, packName)
         Column(Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -232,11 +251,11 @@ private fun Header(title: String, packName: String, iconUrl: String?, onDismiss:
 }
 
 @Composable
-private fun PackAvatar(iconUrl: String?, name: String) {
+private fun PackAvatar(icon: Any?, name: String) {
     val box = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp))
     val tint = NxTheme.colors.decorativeColor(name)
     SubcomposeAsyncImage(
-        model = iconUrl,
+        model = icon,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = box,
@@ -257,6 +276,7 @@ private fun PackAvatar(iconUrl: String?, name: String) {
 @Composable
 private fun ListPanel(
     versions: List<PickerVersion>,
+    loading: Boolean,
     total: Int,
     query: String,
     onQuery: (String) -> Unit,
@@ -286,6 +306,7 @@ private fun ListPanel(
             val hover = remember { MutableInteractionSource() }
             val hovered by hover.collectIsHoveredAsState()
             Box(Modifier.weight(1f).hoverable(hover)) {
+                if (loading) CenteredProgress(Modifier.fillMaxSize())
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
@@ -351,6 +372,18 @@ private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit)
             // a badge was present and ellipsised a version that fit.
             modifier = Modifier.weight(1f),
         )
+        // The date is what separates one row from the next once a project has
+        // twenty versions of the same shape. Dropped when a badge takes the
+        // space, since the badge is the stronger answer to "which one".
+        val stamp = formatBuildTimestamp(v.publishedAt)
+        if (stamp != null && !v.installed && !v.latest) {
+            Text(
+                text  = stamp,
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textSecondary.copy(alpha = 0.7f),
+                maxLines = 1,
+            )
+        }
         when {
             v.installed -> NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
             v.latest -> NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
@@ -387,14 +420,19 @@ private fun DetailPanel(v: PickerVersion?, modifier: Modifier = Modifier) {
             }
         }
         // Runtime once, here, instead of repeated on every row of the list.
-        v.runtimeLine?.let {
-            Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            v.runtimeLine?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
+            }
+            v.sizeLabel?.let {
+                Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary.copy(alpha = 0.7f))
+            }
         }
         HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
         val notes = v.changelog?.takeIf { it.isNotBlank() }
         if (notes != null) {
             Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Markdown(content = notes)
+                ReleaseNotes(notes)
             }
         } else {
             // Most mirror builds ship no notes, so this is the pane's ordinary
@@ -452,18 +490,28 @@ private fun Footer(
                 )
             }
             // ONE action, and its label states the outcome including direction.
-            val label = when (intent) {
+            val label = when {
+                selected?.installed == true -> s.packVersionCurrentTag
+                else -> when (intent) {
                 PickerIntent.Install -> s.versionPickerInstall(selected?.label.orEmpty())
                 PickerIntent.Upgrade -> s.versionPickerUpgrade(selected?.label.orEmpty())
                 PickerIntent.Rollback -> s.versionPickerRollback(selected?.label.orEmpty())
                 PickerIntent.Switch, null -> s.versionPickerSwitch(selected?.label.orEmpty())
+                }
             }
-            PuppetClick("versionPicker.confirm", enabled = selected != null && !busy) { onConfirm() }
+            // The build already on disk is not somewhere to go. The row says
+            // "current" and the action offered to fetch it again, which is a
+            // download that changes nothing and a minute of wondering whether it
+            // worked.
+            val actionable = selected != null && !selected.installed && !busy
+            PuppetClick("versionPicker.confirm", enabled = actionable) { onConfirm() }
             NxButton(
                 label = label,
                 onClick = onConfirm,
-                icon = NxIcon.Download,
-                enabled = selected != null && !busy,
+                // No glyph on the build already installed: "current" beside a
+                // download arrow describes an action nobody is being offered.
+                icon = NxIcon.Download.takeIf { actionable },
+                enabled = actionable,
                 compact = true,
             )
         }

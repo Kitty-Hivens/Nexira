@@ -6,6 +6,7 @@ import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchResponse
+import hivens.core.api.dto.modrinth.ModrinthHashQuery
 import hivens.core.api.dto.modrinth.ModrinthUpdateQuery
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
@@ -102,6 +103,27 @@ class ModrinthClient(
     }
 
     /**
+     * The versions these file hashes ARE -- `POST /v2/version_files`.
+     *
+     * The update endpoint answers what is newest in a channel, which is not the
+     * same as what is newer than the file asking. Without knowing when the
+     * installed file was published, a beta from this June looks "outdated"
+     * against a release from last June, and the launcher offers the rollback as
+     * an update. This is where that date comes from, for every file at once.
+     */
+    suspend fun versionsForHashes(hashes: List<String>): Map<String, ModrinthVersion> {
+        if (hashes.isEmpty()) return emptyMap()
+        val out = mutableMapOf<String, ModrinthVersion>()
+        for (chunk in hashes.distinct().chunked(UPDATE_QUERY_CHUNK)) {
+            out += postJson<ModrinthHashQuery, Map<String, ModrinthVersion>>(
+                "$API_BASE/v2/version_files",
+                ModrinthHashQuery(algorithm = "sha1", hashes = chunk),
+            )
+        }
+        return out
+    }
+
+    /**
      * For each file hash, the newest version Modrinth has that fits [loaders] and
      * [gameVersions] within [versionTypes] -- `POST /v2/version_files/update_many`.
      *
@@ -114,6 +136,10 @@ class ModrinthClient(
      * Chunked, because the request body carries every hash and a large instance
      * has hundreds. Uncached on purpose: a stale "no update" is the one answer
      * nobody can act on, and the check runs on an explicit open or click.
+     *
+     * The value is an ARRAY per hash, and the sibling route `version_files/update`
+     * answers the same question with a single object per hash. Verified against
+     * the live API rather than read off the docs, which describe neither shape.
      */
     suspend fun latestForHashes(
         hashes: List<String>,

@@ -61,6 +61,7 @@ import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
 import hivens.launcher.AutoSyncService
+import hivens.launcher.instance.InstanceContentUpdater
 import hivens.update.UpdateService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
@@ -401,6 +402,7 @@ val uiModule = module {
             installs   = get<PackInstallService>().installs,
             updates    = get<PackUpdateStatusHub>().statuses,
             sync       = get<AutoSyncService>().snapshot,
+            contentUpdates = get<InstanceContentUpdater>().runs,
             repository = get(),
             appScope   = get(),
         ).also { it.start() }

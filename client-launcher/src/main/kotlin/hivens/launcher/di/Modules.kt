@@ -89,6 +89,7 @@ import hivens.launcher.instance.ContentScanCache
 import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.instance.ModInstaller
 import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.news.CuratedNewsFeed
@@ -514,6 +515,10 @@ val mirrorModule = module {
     // swaps jars in place. App-scoped, so a batch of forty survives leaving the tab
     // that started it.
     single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get()) }
+    // Installing a mod means installing what it cannot run without: the browser
+    // used to fetch the one jar that was clicked and leave the player to meet the
+    // missing dependency on the loading screen.
+    single { ModInstaller(modrinth = get(), scanner = get()) }
     single { SmrtSyncService(get(), get()) }
 
     // Pack-catalogue read side: one provider per browsable source, indexed by

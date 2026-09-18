@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.interfaces.IMirrorPackClient
@@ -19,11 +20,17 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.smrt.ModIconResolver
 import hivens.launcher.instance.ContentKind
+import hivens.launcher.instance.ContentRef
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentManager
 import hivens.launcher.instance.ContentFolderWatch
 import hivens.launcher.instance.InstanceContentScanner
+import hivens.launcher.instance.InstanceContentUpdater
+import hivens.launcher.instance.ModUpdate
 import hivens.launcher.instance.PackPlacedContent
+import hivens.launcher.instance.folderName
+import hivens.launcher.instance.pathIn
+import hivens.launcher.instance.swapFor
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.platform.PlatformPaths
@@ -31,9 +38,11 @@ import hivens.ui.utils.pickFiles
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -102,6 +111,7 @@ internal class ContentTabState(
     private val controller: LauncherController,
     private val iconResolver: ModIconResolver,
     private val modrinth: ModrinthClient,
+    private val updater: InstanceContentUpdater,
     private val watch: ContentFolderWatch,
     private val scope: CoroutineScope,
     /**
@@ -185,6 +195,13 @@ internal class ContentTabState(
     var checked by mutableStateOf(false)
         private set
 
+    /**
+     * The last check could not be completed. Distinct from finding nothing: one
+     * says the folder is current, the other says nobody managed to ask.
+     */
+    var checkFailed by mutableStateOf(false)
+        private set
+
     /** The batch this instance has in flight, or the outcome of its last one. */
     var updateRun by mutableStateOf<InstanceContentUpdater.Run?>(null)
         private set
@@ -193,6 +210,12 @@ internal class ContentTabState(
     var versionsOf by mutableStateOf<InstalledContent?>(null)
         private set
     var versionList by mutableStateOf<List<ModrinthVersion>?>(null)
+        private set
+    /**
+     * Two different empty lists, and they need different words: Modrinth has no
+     * record of this file at all, or it has and the fetch did not come back.
+     */
+    var versionsUnknown by mutableStateOf(false)
         private set
     var versionsFailed by mutableStateOf(false)
         private set
@@ -226,6 +249,11 @@ internal class ContentTabState(
     // mods, resource packs and shaders are all Modrinth project types). Powers
     // the open-page action and fills details a sparse archive leaves blank.
     private val projectCache = mutableStateMapOf<String, ModrinthProject?>()
+
+    // The Modrinth version a file IS, resolved by the same hash lookup the project
+    // resolution already pays for. The version picker needs it to mark which row of
+    // the list the instance is actually sitting on.
+    private val versionCache = mutableStateMapOf<String, ModrinthVersion>()
 
     private var manifest by mutableStateOf<SmrtPackManifest?>(null)
 
@@ -594,6 +622,183 @@ internal class ContentTabState(
         scope.launch { rescan() }
     }
 
+    // -- updates --------------------------------------------------------------
+
+    /**
+     * Ask Modrinth what is newer for the files this instance may replace.
+     *
+     * Runs once when the tab opens and again on demand. Only the editable rows
+     * are asked about: a mod the pack owns cannot be swapped from here, and
+     * offering an update that the next pack sync would undo is worse than not
+     * offering one.
+     */
+    suspend fun checkUpdates(force: Boolean = false) {
+        val targets = updatable
+        val mcVersion = instance.cachedManifest?.minecraftVersion.orEmpty()
+        // Nothing to ask about, or nothing to ask WITH. An instance whose manifest
+        // has not been read yet has no game version to match against, and saying
+        // "everything is up to date" off the back of a question never asked is the
+        // one answer here that would be a lie.
+        if (targets.isEmpty()) {
+            checked = true
+            return
+        }
+        if (mcVersion.isBlank()) return
+        checkingUpdates = true
+        try {
+            val outcome = updater.check(
+                instanceDir = instanceDir,
+                items       = targets,
+                mcVersion   = mcVersion,
+                loader      = loaderId(),
+                force       = force,
+            )
+            // Whatever came back is worth keeping even when the round was not
+            // complete; what the round could not answer is reported separately
+            // rather than drawn as an answer.
+            withContext(Dispatchers.Main) {
+                updates = outcome.updates
+                checkFailed = !outcome.complete
+                checked = true
+            }
+        } catch (e: CancellationException) {
+            // Leaving the tab cancels this. It is not a failed check, and telling
+            // the reader it was would be a notice about their own navigation.
+            throw e
+        } catch (e: Exception) {
+            // The previous answer stands: a check that could not run is not
+            // evidence that the updates it found last time have gone away.
+            withContext(Dispatchers.Main) { checkFailed = true }
+        } finally {
+            withContext(NonCancellable + Dispatchers.Main) { checkingUpdates = false }
+        }
+    }
+
+    /**
+     * Follow the batch this instance has running, if any.
+     *
+     * The run belongs to the app, not to the tab, so coming back to a tab left
+     * mid-update finds the line where it actually is. A finished run stays until
+     * the screen takes it down, which is what lets it report what failed.
+     */
+    suspend fun watchUpdateRun() {
+        updater.runs.collect { all -> updateRun = all[updater.keyOf(instanceDir)] }
+    }
+
+    /**
+     * How many updates the confirm gate is currently asking about, or 0 when it
+     * is not open. The count is the question -- "update 52 projects?" -- so it is
+     * what gets held rather than a bare boolean.
+     */
+    var pendingUpdateAll by mutableStateOf(0)
+        private set
+
+    fun requestUpdateAll() {
+        pendingUpdateAll = liveUpdates.size
+    }
+
+    fun cancelUpdateAll() {
+        pendingUpdateAll = 0
+    }
+
+    /** Install every update found, in one batch. */
+    fun updateAll() {
+        pendingUpdateAll = 0
+        startUpdates(liveUpdates.values.toList())
+    }
+
+    /** Install the one update found for [content]. */
+    fun update(content: InstalledContent) {
+        liveUpdates[ContentRef(content.kind, content.fileName)]?.let { startUpdates(listOf(it)) }
+    }
+
+    private fun startUpdates(chosen: List<ModUpdate>) {
+        if (chosen.isEmpty()) return
+        val enabledBy = items.orEmpty().associate { ContentRef(it.kind, it.fileName) to rulesFor(it).effectiveEnabled }
+        val targets = chosen.map { InstanceContentUpdater.Target(it, enabledBy[it.ref] ?: true) }
+        updater.start(instanceDir, instance.displayName, targets) {
+            rescan()
+            // The batch is done with the folder; re-asking is one request and it
+            // is the only thing that can tell a swap that kept its file name from
+            // an update still waiting.
+            if (updater.runs.value[updater.keyOf(instanceDir)]?.finished == true) checkUpdates(force = true)
+        }
+    }
+
+    // -- versions -------------------------------------------------------------
+
+    /**
+     * Open the version list for a row: every build Modrinth has of that project,
+     * so a player can move to one that is not simply the newest -- back off a
+     * broken release, or forward onto a beta on purpose.
+     */
+    fun openVersions(content: InstalledContent) {
+        versionsOf = content
+        versionList = null
+        versionsFailed = false
+        versionsUnknown = false
+        scope.launch {
+            try {
+                val project = resolveProject(content)
+                if (project == null) {
+                    versionsUnknown = true
+                    return@launch
+                }
+                versionList = withContext(Dispatchers.IO) { modrinth.listVersions(project.id) }
+            } catch (e: CancellationException) {
+                // The window was closed, or the tab left. Neither is a failure to
+                // report back into a window that is no longer there.
+                throw e
+            } catch (e: Exception) {
+                versionsFailed = true
+            }
+        }
+    }
+
+    fun closeVersions() {
+        versionsOf = null
+        versionList = null
+        versionsFailed = false
+        versionsUnknown = false
+    }
+
+    /** The version id the open row is currently on, once its hash has been resolved. */
+    fun installedVersionId(content: InstalledContent): String? =
+        versionCache[content.selectionKey()]?.id
+
+    /**
+     * Put [version] where the row's file is. Same path as an update: fetch,
+     * check against the published hash, swap, keeping the on/off state.
+     */
+    fun switchTo(content: InstalledContent, version: ModrinthVersion) {
+        val ref = ContentRef(content.kind, content.fileName)
+        val swap = version.swapFor(ref, content.version) ?: return
+        switchingTo = version.id
+        val started = updater.start(
+            instanceDir,
+            instance.displayName,
+            listOf(InstanceContentUpdater.Target(swap, rulesFor(content).effectiveEnabled)),
+        ) {
+            rescan()
+            if (updater.runs.value[updater.keyOf(instanceDir)]?.finished == true) {
+                // The batch runs on the app scope; what it changes on screen is
+                // written where the screen reads it from.
+                withContext(Dispatchers.Main) {
+                    switchingTo = null
+                    closeVersions()
+                }
+                checkUpdates(force = true)
+            }
+        }
+        if (!started) switchingTo = null
+    }
+
+    private fun loaderId(): String =
+        instance.cachedManifest?.loaderName
+            ?.takeIf { it.isNotBlank() && !it.equals("vanilla", ignoreCase = true) }
+            ?.lowercase()
+            .orEmpty()
+
     // -- modrinth -------------------------------------------------------------
 
     /**
@@ -608,6 +813,7 @@ internal class ContentTabState(
         val project = withContext(Dispatchers.IO) {
             val sha1 = runCatching { sha1Of(file) }.getOrNull() ?: return@withContext null
             val version = runCatching { modrinth.versionByHash(sha1) }.getOrNull() ?: return@withContext null
+            withContext(Dispatchers.Main) { versionCache[key] = version }
             runCatching { modrinth.resolveProject(version.projectId) }.getOrNull()
         }
         projectCache[key] = project
@@ -620,9 +826,7 @@ internal class ContentTabState(
     private fun entryFor(content: InstalledContent): SmrtModEntry? =
         if (isMirror && content.kind == ContentKind.Mod) manifestMods[content.fileName] else null
 
-    private fun fileOf(content: InstalledContent): Path =
-        instanceDir.resolve(content.kind.folder())
-            .resolve(if (content.enabled) content.fileName else content.fileName + DISABLED_SUFFIX)
+    private fun fileOf(content: InstalledContent): Path = content.pathIn(instanceDir)
 
     private companion object {
         const val ICON_PREFETCH_CONCURRENCY = 8
@@ -637,6 +841,7 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
     val controller: LauncherController = koinInject()
     val iconResolver: ModIconResolver = koinInject()
     val modrinth: ModrinthClient = koinInject()
+    val updater: InstanceContentUpdater = koinInject()
     val scope = rememberCoroutineScope()
     val writeScope: CoroutineScope = koinInject()
     val state = remember(instance.id) {
@@ -649,6 +854,7 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
             controller   = controller,
             iconResolver = iconResolver,
             modrinth     = modrinth,
+            updater      = updater,
             watch        = ContentFolderWatch(),
             scope        = scope,
             writeScope   = writeScope,
@@ -785,19 +991,11 @@ internal fun placedKeysFrom(paths: Set<String>?): Set<String>? =
 /** Which of this tab's folders a manifest asset lands in, or null when it lands elsewhere. */
 internal fun kindOfDest(dest: String): ContentKind? =
     when (dest.substringBefore('/')) {
-        ContentKind.Mod.folder()          -> ContentKind.Mod
-        ContentKind.ResourcePack.folder() -> ContentKind.ResourcePack
-        ContentKind.ShaderPack.folder()   -> ContentKind.ShaderPack
+        ContentKind.Mod.folderName()          -> ContentKind.Mod
+        ContentKind.ResourcePack.folderName() -> ContentKind.ResourcePack
+        ContentKind.ShaderPack.folderName()   -> ContentKind.ShaderPack
         else                              -> null
     }
-
-internal fun ContentKind.folder(): String = when (this) {
-    ContentKind.Mod -> "mods"
-    ContentKind.ResourcePack -> "resourcepacks"
-    ContentKind.ShaderPack -> "shaderpacks"
-}
-
-internal const val DISABLED_SUFFIX = ".disabled"
 
 internal fun sha1Of(file: Path): String {
     val md = MessageDigest.getInstance("SHA-1")

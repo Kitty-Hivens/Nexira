@@ -30,6 +30,11 @@ enum class NxCalloutTone { Info, Warning, Error }
  * accent, an optional [title] and [body], and a [content] slot for actions
  * (buttons, prompts) that stacks under the text. Replaces the warning-banner
  * recipe that was copy-pasted across the login and server-detail surfaces.
+ *
+ * [onDismiss] adds a close on the trailing edge, for a banner that reports
+ * something that HAPPENED rather than a standing condition: an outcome the
+ * reader has taken in has no reason to keep occupying the screen, and a
+ * standing one must not be dismissable into thinking it went away.
  */
 @Composable
 fun NxCalloutBanner(
@@ -38,6 +43,7 @@ fun NxCalloutBanner(
     modifier: Modifier = Modifier,
     tone: NxCalloutTone = NxCalloutTone.Info,
     icon: IconKey? = null,
+    onDismiss: (() -> Unit)? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val colors = NxTheme.colors
@@ -73,6 +79,15 @@ fun NxCalloutBanner(
                 Text(body, style = MaterialTheme.typography.bodySmall, color = colors.textPrimary.copy(alpha = 0.85f))
             }
             content?.invoke(this)
+        }
+        if (onDismiss != null) {
+            NxIconButton(
+                icon               = NxIcon.Close,
+                contentDescription = null,
+                onClick            = onDismiss,
+                tint               = colors.textSecondary,
+                iconSize           = 16.dp,
+            )
         }
     }
 }
