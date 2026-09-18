@@ -55,6 +55,7 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceSpec
+import hivens.widget.model.propsWith
 import hivens.widget.model.parseFill
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
@@ -211,7 +212,22 @@ private fun PropPanelBody(
                         annotations = anns,
                         current     = cur,
                         onChange    = { newValue ->
-                            controller.updateProps(path, instanceId, JsonObject(effective + (name to newValue)))
+                            // What differs from the declaration, not the whole
+                            // effective object.
+                            //
+                            // Writing everything froze every other field at the
+                            // default of the day, so a later release that moved
+                            // one could no longer move this instance, and the
+                            // frozen value read exactly like a choice the user
+                            // had made. A field put back to its default drops
+                            // out of the record again and follows the
+                            // declaration, which is the same rule read by
+                            // [effective] one screen up.
+                            controller.updateProps(
+                                path,
+                                instanceId,
+                                propsWith(descriptor.defaultPropsJson, instance.props, name, newValue),
+                            )
                         },
                     )
                 }

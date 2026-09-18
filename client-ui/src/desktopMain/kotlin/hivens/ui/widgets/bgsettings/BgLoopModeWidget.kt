@@ -24,7 +24,7 @@ fun BgLoopModeWidget() {
             NxChoiceChip(
                 label    = label,
                 selected = settings.loopMode == mode,
-                onToggle = { ctx.update { copy(loopMode = mode) } },
+                onToggle = { ctx.update { withLoopMode(mode) } },
             )
         }
     }

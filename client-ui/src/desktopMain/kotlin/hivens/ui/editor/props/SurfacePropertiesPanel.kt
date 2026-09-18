@@ -209,7 +209,7 @@ private fun NavSelectionControl(
                             else NxTheme.colors.outline.copy(alpha = 0.25f),
                             shape = MaterialTheme.shapes.small,
                         )
-                        .clickable { onChange(customization.copy(navSelectionStyle = variant)) }
+                        .clickable { onChange(customization.withNavSelectionStyle(variant)) }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
                     Text(
@@ -220,7 +220,7 @@ private fun NavSelectionControl(
                     )
                 }
                 PuppetClick("settings.navSelection.${variant.name}") {
-                    onChange(customization.copy(navSelectionStyle = variant))
+                    onChange(customization.withNavSelectionStyle(variant))
                 }
             }
         }

@@ -14,6 +14,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,7 +127,15 @@ private fun NumberRow(
     decimals: Boolean,
     onChange: (Double) -> Unit,
 ) {
-    var text by remember(value) { mutableStateOf(value) }
+    // Re-seeding from the record while the field has focus overwrites what is
+    // being typed. The write is debounced, so the value that comes back lands
+    // between keystrokes and the caret jumps to the end of a number nobody
+    // finished. The record wins only when this field is not the one being
+    // edited, which is the arrangement the pack settings window arrived at for
+    // the same reason.
+    var focused by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf(value) }
+    LaunchedEffect(value, focused) { if (!focused) text = value }
     Row(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -158,7 +168,7 @@ private fun NumberRow(
                 singleLine    = true,
                 textStyle     = TextStyle(color = NxTheme.colors.textPrimary, fontSize = 13.sp),
                 cursorBrush   = SolidColor(NxTheme.colors.primary),
-                modifier      = Modifier.fillMaxWidth(),
+                modifier      = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
             )
         }
     }
@@ -233,7 +243,15 @@ private fun ColorRow(label: String, hex: String, onChange: (String) -> Unit) {
 /** A free-text row. Also the fill control: one field carrying a value or a name. */
 @Composable
 internal fun StringRow(label: String, value: String, onChange: (String) -> Unit) {
-    var text by remember(value) { mutableStateOf(value) }
+    // Re-seeding from the record while the field has focus overwrites what is
+    // being typed. The write is debounced, so the value that comes back lands
+    // between keystrokes and the caret jumps to the end of a number nobody
+    // finished. The record wins only when this field is not the one being
+    // edited, which is the arrangement the pack settings window arrived at for
+    // the same reason.
+    var focused by remember { mutableStateOf(false) }
+    var text by remember { mutableStateOf(value) }
+    LaunchedEffect(value, focused) { if (!focused) text = value }
     Row(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -262,7 +280,7 @@ internal fun StringRow(label: String, value: String, onChange: (String) -> Unit)
                 singleLine    = true,
                 textStyle     = TextStyle(color = NxTheme.colors.textPrimary, fontSize = 13.sp),
                 cursorBrush   = SolidColor(NxTheme.colors.primary),
-                modifier      = Modifier.fillMaxWidth(),
+                modifier      = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
             )
         }
     }

@@ -1,5 +1,6 @@
 package hivens.ui.customization
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -47,7 +48,8 @@ data class CustomizationSettings(
      * behind the icon; the other variants change only the selection
      * decoration, never the rail's geometry or spacing.
      */
-    val navSelectionStyle: NavSelectionStyle = NavSelectionStyle.Pill,
+    @SerialName("navSelectionStyle")
+    val navSelectionStyleWire: String = NavSelectionStyle.Pill.name,
     /**
      * Optional hex color for the nav selection decoration and the active
      * icon. Null keeps the theme accent (primary), so it tracks the palette
@@ -67,7 +69,29 @@ data class CustomizationSettings(
      * fit for the minimal LeftBar / Dot / None selections.
      */
     val navHoverHighlight: Boolean = true,
-)
+) {
+    /**
+     * The selection this build understands, or the default when the file names
+     * one it does not.
+     *
+     * Stored as a string rather than the enum for the reason the layout format
+     * already gives about itself: a constant a newer build added has to either
+     * throw here or be guessed at, and both cost the user the choice they made.
+     * Throwing reset the whole record and the first toggle wrote the reset back;
+     * coercing kept the record and replaced the field. A string is carried
+     * through verbatim, so the value survives a launch of a build that predates
+     * it.
+     */
+    val navSelectionStyle: NavSelectionStyle get() = parseNavSelectionStyle(navSelectionStyleWire)
+
+    fun withNavSelectionStyle(style: NavSelectionStyle): CustomizationSettings =
+        copy(navSelectionStyleWire = style.name)
+}
+
+/** Case and surrounding space are forgiven: this file is editable by hand. */
+fun parseNavSelectionStyle(value: String): NavSelectionStyle =
+    NavSelectionStyle.entries.firstOrNull { it.name.equals(value.trim(), ignoreCase = true) }
+        ?: NavSelectionStyle.Pill
 
 /**
  * Decoration drawn behind / around the active left-rail icon. Shape-only --
