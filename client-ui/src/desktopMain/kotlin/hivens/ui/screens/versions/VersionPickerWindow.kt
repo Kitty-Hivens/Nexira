@@ -46,6 +46,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -315,7 +316,24 @@ private fun VersionRail(
     val s = LocalStrings.current
     // Its own plane. The list and the notes have to read as two places, not as
     // one field with a rule down the middle.
-    NxSurface(level = NxSurfaceLevel.Sunken, blurDp = 0f, modifier = Modifier.width(RAIL_WIDTH).fillMaxHeight()) {
+    // No hairline of its own. Every surface draws one by default, which is right
+    // for a plane floating on a page and wrong for one sitting flush inside
+    // another: the rail meets the card on three sides, so its edge doubled the
+    // card's, and the two crossed the header and footer rules at the corners. The
+    // tone step is the separation here, which is what the ladder is for -- the
+    // hairline is the SECOND signal, and a second signal inside a card is noise.
+    NxSurface(
+        // Base, not Sunken. The field inside is a Sunken surface, and a Sunken
+        // field on a Sunken rail has no tone step between them at all, so the
+        // field held itself up on its hairline alone and read as a frame laid on
+        // the plane rather than a well cut into it. One rung up gives the card,
+        // the rail and the field three tones in order.
+        level = NxSurfaceLevel.Base,
+        blurDp = 0f,
+        borderWidthDp = 0f,
+        shape = RectangleShape,
+        modifier = Modifier.width(RAIL_WIDTH).fillMaxHeight(),
+    ) {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize()) {
                 if (versions.size > SEARCH_THRESHOLD || query.isNotBlank()) {
@@ -361,8 +379,8 @@ private fun VersionRail(
                             // had a list row showing through it.
                             Brush.verticalGradient(
                                 0f to Color.Transparent,
-                                0.7f to NxTheme.colors.surfaceContainerLow,
-                                1f to NxTheme.colors.surfaceContainerLow,
+                                0.7f to NxTheme.colors.surface,
+                                1f to NxTheme.colors.surface,
                             ),
                         ),
                     contentAlignment = Alignment.BottomCenter,
