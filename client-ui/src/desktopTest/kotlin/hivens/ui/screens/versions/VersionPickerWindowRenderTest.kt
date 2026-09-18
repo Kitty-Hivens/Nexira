@@ -64,6 +64,10 @@ class VersionPickerWindowRenderTest {
             label = "SNAPSHOT-0.0.0-2026.06.%02d".format(i % 28 + 1),
             channel = VersionChannel.Alpha,
             runtimeLine = "Minecraft 1.12.2  Forge",
+            sizeLabel = "2,2 МБ",
+            publishedAt = "2026-06-%02dT10:00:00Z".format(i % 28 + 1),
+            changelog = if (i % 3 == 0) "Мелкие правки генерации и пара исправлений в рендере." else null,
+            compatible = i % 4 != 0,
         )
     }
 
@@ -135,8 +139,8 @@ class VersionPickerWindowRenderTest {
         val fhd = renderAndMeasureCard(1920, 1080, "version-picker-fhd.png")
         val twoK = renderAndMeasureCard(2560, 1440, "version-picker-2k.png")
 
-        // 680dp at density 1, within a corner-rounding pixel or two.
-        assertTrue(abs(fhd - 680) <= 6, "FHD card width $fhd, expected the 680 ceiling")
+        // 928dp at density 1, within a corner-rounding pixel or two.
+        assertTrue(abs(fhd - 928) <= 6, "FHD card width $fhd, expected the 928 ceiling")
         // The point of the rule as it now stands: a third more display buys the
         // reader nothing here, because the list is the same length either way.
         assertEquals(fhd, twoK, "the card followed the display past its ceiling")
@@ -146,8 +150,8 @@ class VersionPickerWindowRenderTest {
     fun `on a narrow window the card yields rather than overflowing`() {
         val narrow = renderAndMeasureCard(600, 900, "version-picker-narrow.png")
 
-        // 94 percent of 600, so the card still clears the scrim on both sides.
-        assertTrue(abs(narrow - 564) <= 8, "narrow card width $narrow, expected about 564")
+        // The window minus its margins, since 600 is far under the ceiling.
+        assertTrue(abs(narrow - 504) <= 8, "narrow card width $narrow, expected about 504")
         assertTrue(narrow < 600, "the card must not reach the window edges")
     }
 }

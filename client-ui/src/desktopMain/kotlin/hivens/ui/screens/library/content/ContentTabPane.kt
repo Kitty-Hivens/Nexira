@@ -378,17 +378,19 @@ internal fun ModVersionsWindow(
 ) {
     val s = LocalStrings.current
     val loaders = loadersFor(content.kind, loader)
-    val shown = remember(versions, installedId, mcVersion, loaders) {
-        versions.orEmpty()
-            .filter { it.files.isNotEmpty() }
-            .filter { v ->
-                v.id == installedId ||
-                    ((mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
-                        (loaders.isEmpty() || loaders.any { it in v.loaders }))
-            }
-            .sortedByDescending { it.datePublished }
+    // Everything with a file, marked rather than filtered. Dropping the builds
+    // that do not fit answered "is there one for me" by making it unaskable: an
+    // absence read the same whether the project never shipped one or shipped one
+    // for another loader. The window folds them away by default and says how many.
+    val shown = remember(versions, mcVersion, loaders) {
+        versions.orEmpty().filter { it.files.isNotEmpty() }.sortedByDescending { it.datePublished }
     }
-    val newestId = shown.firstOrNull()?.id
+    fun fits(v: ModrinthVersion): Boolean =
+        (mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
+            (loaders.isEmpty() || loaders.any { it in v.loaders })
+    // The newest build that RUNS here. The newest overall may be for another
+    // loader entirely, and badging that one "latest" points at a dead end.
+    val newestId = shown.firstOrNull { fits(it) }?.id
     val installedAt = shown.firstOrNull { it.id == installedId }?.datePublished
 
     VersionPickerWindow(
@@ -410,6 +412,7 @@ internal fun ModVersionsWindow(
                     ?: v.files.firstOrNull()?.size?.let { humanSize(it, s) },
                 installed   = v.id == installedId,
                 latest      = v.id == newestId,
+                compatible  = fits(v),
             )
         },
         intentFor   = { picked ->

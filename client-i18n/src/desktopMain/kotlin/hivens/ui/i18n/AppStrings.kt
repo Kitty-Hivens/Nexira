@@ -965,6 +965,12 @@ interface AppStrings {
     fun versionPickerCount(n: Int): String
     val versionPickerEmpty: String
     val versionPickerNoChangelog: String
+
+    /** Marks a build that does not run on this instance's game version or loader. */
+    val versionPickerIncompatible: String
+    /** Reveals builds that were folded away because they do not fit here. */
+    fun versionPickerShowIncompatible(count: Int): String
+    val versionPickerHideIncompatible: String
     val versionPickerWarning: String
     fun versionPickerInstall(version: String): String
     fun versionPickerUpgrade(version: String): String
