@@ -14,7 +14,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.update.UpdateService
@@ -269,8 +268,8 @@ fun UpdateDialog(
                         .background(NxTheme.colors.background.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
                         .padding(12.dp)
                 ) {
-                    Markdown(
-                        content  = bodyContent,
+                    ReleaseNotes(
+                        markdown = bodyContent,
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     )
                 }

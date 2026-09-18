@@ -46,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtBuildDiff
 import hivens.core.update.PackBuild
 import hivens.core.api.dto.smrt.SmrtModEntry
@@ -73,6 +72,7 @@ import hivens.launcher.PackOperationPhase
 import hivens.launcher.PackOperationService
 import hivens.ui.components.ChannelChip
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTime
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.AppStrings
@@ -554,7 +554,7 @@ private fun BuildDetailPane(
         // The curator's "why" next to the structural diff's "what".
         build.changelog?.takeIf { it.isNotBlank() }?.let { notes ->
             NxSection(s.packVersionsNotes) {
-                Markdown(content = notes)
+                ReleaseNotes(notes)
             }
         }
 
