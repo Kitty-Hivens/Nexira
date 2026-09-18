@@ -1,5 +1,6 @@
 package hivens.ui.audio
 
+import dev.hivens.skinema.audio.PcmFormat
 import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.player.VideoPlayer
 import kotlinx.coroutines.launch
@@ -67,7 +68,7 @@ class AudioPlayerOrchestrationTest {
      */
     private class FakeSink : PcmSink {
         var closed = false
-        override fun open(sampleRate: Int) = Unit
+        override fun open(format: PcmFormat) = Unit
         override fun write(data: ByteArray, offset: Int, length: Int) = Unit
         override fun stop() = Unit
         override fun start() = Unit

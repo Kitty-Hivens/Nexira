@@ -7,7 +7,9 @@ import dev.hivens.libsound.MediaRole
 import dev.hivens.libsound.PcmEncoding
 import dev.hivens.libsound.SinkConfig
 import dev.hivens.libsound.audio.AudioBackends
+import dev.hivens.skinema.audio.PcmFormat
 import dev.hivens.skinema.audio.PcmSink
+import dev.hivens.skinema.audio.PcmEncoding as SkinemaEncoding
 import org.slf4j.LoggerFactory
 
 /**
@@ -154,15 +156,15 @@ class SystemAudioOutput : AudioOutput, AutoCloseable {
  * played, because that number is the clock a player's whole timeline rides on.
  * So this carries no state and corrects nothing.
  *
- * The one thing it states is the shape. skinema's seam is S16LE interleaved
- * stereo and says so in its own documentation, so the format is built here rather
- * than negotiated: every libsound backend must accept that shape, which makes the
- * open the one call in the chain that cannot fail for want of a format.
+ * The shape is no longer assumed. skinema used to hand over a sample rate and
+ * nothing else, so this built S16LE interleaved stereo from documentation and
+ * hoped; 0.8.2 passes the whole format, and the two encodings name the same five
+ * members, so the mapping is total and the guess is gone.
  */
 private class SkinemaAdapter(private val sink: AudioSink) : PcmSink {
 
-    override fun open(sampleRate: Int) {
-        sink.open(AudioFormat(sampleRate, CHANNELS, PcmEncoding.S16LE))
+    override fun open(format: PcmFormat) {
+        sink.open(AudioFormat(format.sampleRate, format.channels, encodingOf(format.encoding)))
     }
 
     override fun write(data: ByteArray, offset: Int, length: Int) = sink.write(data, offset, length)
@@ -172,6 +174,19 @@ private class SkinemaAdapter(private val sink: AudioSink) : PcmSink {
     override fun start() = sink.start()
 
     override fun flush() = sink.flush()
+
+    /**
+     * The two enums are the same five members under two package names, so this
+     * is exhaustive on purpose: a new encoding on either side should stop the
+     * compiler rather than fall through to a silent default that plays noise.
+     */
+    private fun encodingOf(encoding: SkinemaEncoding): PcmEncoding = when (encoding) {
+        SkinemaEncoding.U8    -> PcmEncoding.U8
+        SkinemaEncoding.S16LE -> PcmEncoding.S16LE
+        SkinemaEncoding.S32LE -> PcmEncoding.S32LE
+        SkinemaEncoding.F32LE -> PcmEncoding.F32LE
+        SkinemaEncoding.F64LE -> PcmEncoding.F64LE
+    }
 
     override fun framePosition(): Long = sink.framePosition()
 

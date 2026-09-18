@@ -1,5 +1,6 @@
 package hivens.ui.audio
 
+import dev.hivens.skinema.audio.PcmFormat
 import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.diag.SkinemaGate
@@ -140,17 +141,26 @@ internal class EnvelopeSink : PcmSink {
 
     private var fold: PeakFold? = null
 
-    override fun open(sampleRate: Int) {
+    /**
+     * Read from the format the stream declares rather than assumed. The constant
+     * it replaces was two channels times two bytes, which is right for S16
+     * stereo and quietly wrong for anything else -- and a frame count divided by
+     * the wrong stride is a clock that drifts rather than an error that shows.
+     */
+    private var bytesPerFrame = DEFAULT_BYTES_PER_FRAME
+
+    override fun open(format: PcmFormat) {
         // Reopening replaces the stream and restarts the clock at zero, so what
         // was gathered for the previous one goes with it rather than being
         // spliced onto what follows.
         played.set(0)
-        fold = PeakFold(WINDOW_FRAMES * CHANNELS)
+        bytesPerFrame = format.bytesPerFrame
+        fold = PeakFold(WINDOW_FRAMES * format.channels)
     }
 
     override fun write(data: ByteArray, offset: Int, length: Int) {
         fold?.accept(data, offset, length)
-        played.addAndGet((length / BYTES_PER_FRAME).toLong())
+        played.addAndGet((length / bytesPerFrame).toLong())
     }
 
     // Everything accepted has been played, because this sink is the device. The
@@ -277,7 +287,8 @@ private const val WINDOW_FRAMES = 1024
 /** What the seam carries, fixed rather than negotiated at this version. */
 private const val CHANNELS = 2
 
-private const val BYTES_PER_FRAME = CHANNELS * 2
+/** Only a starting value: the stream states its own stride on open. */
+private const val DEFAULT_BYTES_PER_FRAME = CHANNELS * 2
 
 private const val INITIAL_WINDOWS = 1024
 

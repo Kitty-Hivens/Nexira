@@ -1,5 +1,6 @@
 package hivens.ui.audio
 
+import dev.hivens.skinema.audio.PcmFormat
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -135,16 +136,30 @@ class WaveformTest {
         assertFailsWith<IllegalArgumentException> { resampleTo(floatArrayOf(1f), 0) }
     }
 
+    /**
+     * The shape the envelope pass has always assumed, now stated rather than
+     * implied: skinema hands the sink a whole format since 0.8.2, and these
+     * tests pin the stride arithmetic, so the format they pass has to be the one
+     * that arithmetic was written for.
+     */
+    private fun stereo16(sampleRate: Int) = PcmFormat(
+        sampleRate = sampleRate,
+        channels = 2,
+        layout = "stereo",
+        encoding = dev.hivens.skinema.audio.PcmEncoding.S16LE,
+        significantBits = 16,
+    )
+
     // ---- the sink -------------------------------------------------------
 
     @Test
     fun `reopening drops what the previous stream gathered`() {
         val sink = EnvelopeSink()
-        sink.open(44_100)
+        sink.open(stereo16(44_100))
         sink.write(s16(32767, 32767), 0, 4)
         assertTrue(sink.framePosition() > 0)
 
-        sink.open(44_100)
+        sink.open(stereo16(44_100))
         assertEquals(0L, sink.framePosition(), "a reopen restarts the clock at zero")
         assertEquals(0, sink.peaks().size, "and does not splice the old stream onto the new one")
     }
@@ -152,7 +167,7 @@ class WaveformTest {
     @Test
     fun `the frame position counts frames rather than bytes`() {
         val sink = EnvelopeSink()
-        sink.open(44_100)
+        sink.open(stereo16(44_100))
         // Four stereo frames: sixteen bytes at two channels of two bytes.
         sink.write(s16(0, 0, 0, 0, 0, 0, 0, 0), 0, 16)
         assertEquals(4L, sink.framePosition())
