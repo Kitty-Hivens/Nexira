@@ -369,6 +369,10 @@
                 "instance_id": "bg-loop-mode-default"
               },
               {
+                "kind": "bg.audio",
+                "instance_id": "bg-audio-default"
+              },
+              {
                 "kind": "bg.tint",
                 "instance_id": "bg-tint-default"
               },

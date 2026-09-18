@@ -757,6 +757,11 @@ interface AppStrings {
     val backgroundLoopForever: String
     val backgroundLoopOnce: String
 
+    // --- Background audio ---
+    val backgroundAudio: String
+    val backgroundAudioDesc: String
+    val backgroundAudioVolume: String
+
     // --- Customization extension ---
     val customizationAccentClear: String
     val customizationSectionVisual: String

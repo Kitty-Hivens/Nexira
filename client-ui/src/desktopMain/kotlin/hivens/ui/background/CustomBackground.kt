@@ -149,8 +149,19 @@ private fun AnimatedParallaxImage(
     // Material-You seed: static from the decoded bitmap (off-thread); video from its
     // first decoded frame (via the player's onSeed). Either feeds the palette seed.
     var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
-    val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased)
-        rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, settings.hardwareDecode, onSeed = { videoSeed = it }) else null
+    val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased) {
+        rememberSkinemaFrame(
+            file            = file,
+            speedMultiplier = settings.animationSpeedMultiplier,
+            loopMode        = settings.loopMode,
+            hardwareDecode  = settings.hardwareDecode,
+            audio           = settings.audio,
+            audioVolume     = settings.audioVolume,
+            onSeed          = { videoSeed = it },
+        )
+    } else {
+        null
+    }
     // Seed + brightness in ONE pixel read (a large wallpaper is tens of MB; two reads
     // OOM'd). Video only exposes its seed, so brightness falls back to the seed's luma.
     val staticTone by produceState<WallpaperTone?>(null, staticBitmap) {

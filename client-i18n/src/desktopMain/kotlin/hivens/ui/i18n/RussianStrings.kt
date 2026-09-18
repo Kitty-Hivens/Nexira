@@ -686,6 +686,10 @@ object RussianStrings : AppStrings {
     override val backgroundLoopForever   = "Бесконечно"
     override val backgroundLoopOnce      = "Один раз"
 
+    override val backgroundAudio         = "Звук"
+    override val backgroundAudioDesc     = "Проигрывать звуковую дорожку самих обоев. Скорость анимации меняет и её темп."
+    override val backgroundAudioVolume   = "Громкость"
+
     override val customizationAccentClear     = "Сбросить акцент"
     override val customizationSectionVisual   = "Визуал"
     override val customizationSectionColors   = "Переопределение цветов"
@@ -1171,6 +1175,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.showTitle" to "Показывать заголовок",
         "widget.appshell.rightrail.compactnews.imageSource" to "Источник картинки",
         "widget.appshell.rightrail.compactnews.channel" to "Канал",
+        "widget.bg.audio" to "Звук обоев",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
         "widget.bg.fx.blur" to "Размытие",

@@ -696,6 +696,10 @@ object JapaneseStrings : AppStrings {
     override val backgroundLoopForever = "ずっと"
     override val backgroundLoopOnce = "一度だけ"
 
+    override val backgroundAudio = "サウンド"
+    override val backgroundAudioDesc = "壁紙自身の音声トラックを再生します。アニメーション速度は音のテンポも変えます。"
+    override val backgroundAudioVolume = "音量"
+
     override val customizationAccentClear = "上書きを解除"
     override val customizationSectionVisual = "見た目"
     override val customizationSectionColors = "色の上書き"
@@ -1160,6 +1164,7 @@ object JapaneseStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.showTitle" to "見出しを表示",
         "widget.appshell.rightrail.compactnews.imageSource" to "画像の取得元",
         "widget.appshell.rightrail.compactnews.channel" to "チャンネル",
+        "widget.bg.audio" to "壁紙のサウンド",
         "widget.bg.enable.toggle" to "背景のオンオフ",
         "widget.bg.fx.animspeed" to "アニメーション速度",
         "widget.bg.fx.blur" to "ぼかし",

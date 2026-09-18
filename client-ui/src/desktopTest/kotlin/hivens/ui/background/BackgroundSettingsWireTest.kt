@@ -61,6 +61,17 @@ class BackgroundSettingsWireTest {
     }
 
     @Test
+    fun `a wallpaper is silent until somebody says otherwise`() {
+        // The whole of the decision, pinned: a file written before the wallpaper
+        // could sound reads as one that does not, and a fresh record agrees. A
+        // default that drifted to true would give every video wallpaper a voice
+        // on the launch after an update, with nothing on screen having asked.
+        val old = json.decodeFromString<BackgroundSettings>("""{"enabled":true,"imagePath":"/tmp/a.mp4"}""")
+        assertEquals(false, old.audio)
+        assertEquals(false, BackgroundSettings().audio)
+    }
+
+    @Test
     fun `case and stray space are forgiven, because a person edits this file`() {
         assertEquals(ScaleMode.STRETCH, parseScaleMode(" stretch "))
         assertEquals(BackgroundLoopMode.LoopForever, parseLoopMode("loopforever"))

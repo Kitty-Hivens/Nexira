@@ -686,6 +686,10 @@ object EnglishStrings : AppStrings {
     override val backgroundLoopForever   = "Forever"
     override val backgroundLoopOnce      = "Play once"
 
+    override val backgroundAudio         = "Sound"
+    override val backgroundAudioDesc     = "Play the wallpaper's own audio track. Animation speed shifts its tempo too."
+    override val backgroundAudioVolume   = "Volume"
+
     override val customizationAccentClear     = "Clear override"
     override val customizationSectionVisual   = "Visual"
     override val customizationSectionColors   = "Color overrides"
@@ -1155,6 +1159,7 @@ object EnglishStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.showTitle" to "Show title",
         "widget.appshell.rightrail.compactnews.imageSource" to "Image source",
         "widget.appshell.rightrail.compactnews.channel" to "Channel",
+        "widget.bg.audio" to "Wallpaper sound",
         "widget.bg.enable.toggle" to "Background on/off",
         "widget.bg.fx.animspeed" to "Animation speed",
         "widget.bg.fx.blur" to "Blur",

@@ -685,6 +685,10 @@ object GermanStrings : AppStrings {
     override val backgroundLoopForever   = "Endlos"
     override val backgroundLoopOnce      = "Einmal"
 
+    override val backgroundAudio         = "Ton"
+    override val backgroundAudioDesc     = "Die eigene Tonspur des Hintergrunds abspielen. Die Animationsgeschwindigkeit ändert auch ihr Tempo."
+    override val backgroundAudioVolume   = "Lautstärke"
+
     override val customizationAccentClear     = "Überschreibung löschen"
     override val customizationSectionVisual   = "Visuell"
     override val customizationSectionColors   = "FARBÜBERSCHREIBUNGEN"
@@ -1157,6 +1161,7 @@ object GermanStrings : AppStrings {
         "widget.appshell.rightrail.compactnews.showTitle" to "Titel anzeigen",
         "widget.appshell.rightrail.compactnews.imageSource" to "Bildquelle",
         "widget.appshell.rightrail.compactnews.channel" to "Kanal",
+        "widget.bg.audio" to "Hintergrundton",
         "widget.bg.enable.toggle" to "Hintergrund an/aus",
         "widget.bg.fx.animspeed" to "Animationstempo",
         "widget.bg.fx.blur" to "Unschärfe",

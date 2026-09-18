@@ -46,6 +46,28 @@ data class BackgroundSettings(
      * (an escape hatch for a driver that opens but glitches mid-stream).
      */
     val hardwareDecode: Boolean = true,
+    /**
+     * Decode and play the wallpaper's own audio track.
+     *
+     * Off, and that is a decision rather than a starting value. A wallpaper is a
+     * picture, and one that begins making noise because the file picked happened
+     * to carry a soundtrack is not what anybody asked for. Switched on, the
+     * background opens the file's audio stream and the launcher has a second
+     * voice beside the music player.
+     *
+     * [animationSpeedMultiplier] reaches the same player as a playback rate, so a
+     * speed other than 1 shifts this sound's tempo along with the picture. One
+     * setting keeps one meaning: a branch that quietly stopped applying the speed
+     * once the sound was on would be a second rule with nothing on screen to say
+     * so.
+     */
+    val audio: Boolean = false,
+    /**
+     * Linear 0..1 for the wallpaper's own sound and nothing else. The music
+     * player carries its own level, so turning the wall down leaves a track where
+     * it was.
+     */
+    val audioVolume: Float = 1.0f,
 ) {
     /** The scale this build understands, or the default when the file names one it does not. */
     val scaleMode: ScaleMode get() = parseScaleMode(scaleModeWire)
