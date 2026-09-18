@@ -262,6 +262,27 @@ private sealed interface Frag
 private class InlineRun(val nodes: List<Node>) : Frag
 private class BlockEl(val el: Element) : Frag
 
+/**
+ * How many bare `<br>` a run consists of, or zero when it holds anything else.
+ *
+ * Only a run that is NOTHING but breaks and whitespace counts: a `<br>` inside a
+ * sentence is a line break and is already handled where the text is built.
+ */
+private fun breakRun(nodes: List<Node>): Int {
+    var count = 0
+    for (n in nodes) {
+        when {
+            n is TextNode && n.text().isBlank() -> {}
+            n is Element && n.tagName().equals("br", true) -> count++
+            else -> return 0
+        }
+    }
+    return count
+}
+
+/** Vertical air one spacer `<br>` buys, which is a line of prose and no more. */
+private val BREAK_HEIGHT = 10.dp
+
 /** Split a parent's children into block elements and runs of inline nodes (pure -- no composition). */
 private fun group(parent: Element): List<Frag> {
     val out = ArrayList<Frag>()
@@ -306,7 +327,15 @@ private fun ColumnScope.blocks(
                 // came out as its alt text.
                 val imgs = imageRunOfNodes(frag.nodes)
                 val ann = if (imgs == null) buildInline(frag.nodes, ctx, onLink) else null
+                val spacers = if (imgs == null) breakRun(frag.nodes) else 0
                 if (imgs != null) ImageRunBlock(imgs, onLink, center = center)
+                // A run of bare `<br>` between two blocks is how a description
+                // spaces itself out -- Essential's uses thirty-nine of them, four
+                // at a time. They carry no text, so the blank-text guard below
+                // dropped every one of them and the page came out with its
+                // pictures stacked flush against each other. The author asked for
+                // air; this is the air.
+                else if (spacers > 0) Spacer(Modifier.height(BREAK_HEIGHT * spacers))
                 else if (ann != null && ann.text.isNotBlank()) Text(
                     ann,
                     style    = TextStyle(
