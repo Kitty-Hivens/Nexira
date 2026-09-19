@@ -5,26 +5,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxSlider
-import hivens.ui.theme.NxTheme
 
+/**
+ * The library's section header, so a heading on this surface is set like a heading
+ * anywhere else.
+ *
+ * This was a private copy at labelSmall with a letter-spacing of its own, which put
+ * the headings of the appearance studio at a different size from every other block
+ * of settings in the launcher. The copy predates [NxSectionHeader] having fifteen
+ * readers, and there is nothing here it was expressing that the shared one does not.
+ */
 @Composable
 internal fun SectionTitle(text: String) {
-    Text(
-        text          = text,
-        style         = MaterialTheme.typography.labelSmall,
-        fontWeight    = FontWeight.Bold,
-        color         = NxTheme.colors.primary,
-        letterSpacing = 1.sp,
-    )
+    NxSectionHeader(text)
 }
 
 // Enum picker: an accent section title over a wrapping row of NxChoiceChips.

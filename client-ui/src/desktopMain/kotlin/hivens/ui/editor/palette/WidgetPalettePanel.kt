@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -57,6 +58,9 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.editor.props.PANEL_SHADOW_DP
 import hivens.widget.api.LocalWidgetRegistry
 
 // Floating widget palette. Right-edge pinned. Slides in/out with the
@@ -102,7 +106,14 @@ fun WidgetPalettePanel(
         exit     = fadeOut(spring()) + slideOutHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
         modifier = modifier,
     ) {
-        Column(
+        NxSurface(
+            level    = NxSurfaceLevel.Floating,
+            shape    = MaterialTheme.shapes.large,
+            // Solid, no glass: the panel floats over the right rail, and stacked
+            // translucent layers composited into muddy glass.
+            opacity  = 1f,
+            blurDp   = 0f,
+            shadowDp = PANEL_SHADOW_DP,
             modifier = Modifier
                 .graphicsLayer {
                     translationX = paletteOffset.value.x
@@ -132,13 +143,9 @@ fun WidgetPalettePanel(
                     }
                 }
                 .fillMaxHeight()
-                .padding(top = 64.dp, bottom = 96.dp, end = 16.dp, start = 0.dp)
-                .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
-                .clip(MaterialTheme.shapes.large)
-                // Solid surface, no glass: the panel floats over the right rail,
-                // and stacked translucent layers composited into muddy glass.
-                .background(NxTheme.colors.surface),
+                .padding(top = 64.dp, bottom = 96.dp, end = 16.dp, start = 0.dp),
         ) {
+        Column(Modifier.fillMaxSize()) {
             // Header
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
@@ -239,6 +246,7 @@ fun WidgetPalettePanel(
                     }
                 }
             }
+        }
         }
     }
 }

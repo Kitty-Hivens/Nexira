@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,7 +56,12 @@ fun NxColorField(
     var text by remember(hex) { mutableStateOf(hex.orEmpty()) }
     val parsed = text.takeIf { it.isNotBlank() }?.let(::parseHexOrNull)
     Row(
-        modifier              = modifier,
+        // Fills what it is given and lets the field take the rest, rather than
+        // holding the field at a constant. A fixed width inside a row is the same
+        // thing a hand-rolled row is one level up: it lines up with nothing, and in
+        // a 172dp control column it left twenty dangling where every neighbour
+        // reached the edge.
+        modifier              = modifier.fillMaxWidth(),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.s10),
     ) {
@@ -71,7 +76,7 @@ fun NxColorField(
             value         = text,
             onValueChange = { v -> text = v; onValueChange(v.ifBlank { null }) },
             placeholder   = placeholder,
-            modifier      = Modifier.width(120.dp),
+            modifier      = Modifier.weight(1f),
         )
         if (onClear != null && clearLabel != null) {
             Text(

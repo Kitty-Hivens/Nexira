@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.surface.bodyFloor
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
@@ -150,17 +153,21 @@ private fun PropPanelBody(
         JsonObject(descriptor.defaultPropsJson + instance.props)
     }
 
-    Column(
+    NxSurface(
+        level    = NxSurfaceLevel.Floating,
+        shape    = MaterialTheme.shapes.large,
+        // Solid, no glass: a settings panel must stay readable and not composite
+        // with the layers it floats over. Named rather than left to the default,
+        // which thins on dark.
+        opacity  = 1f,
+        blurDp   = 0f,
+        shadowDp = PANEL_SHADOW_DP,
         modifier = Modifier
             .width(320.dp)
             .fillMaxHeight()
-            .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-            .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
-            .clip(MaterialTheme.shapes.large)
-            // Solid surface, no glass: a settings panel must stay readable and
-            // not composite with the layers it floats over.
-            .background(NxTheme.colors.surface),
+            .padding(top = 64.dp, bottom = 96.dp, end = 16.dp),
     ) {
+    Column(Modifier.fillMaxSize()) {
         Row(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -284,7 +291,16 @@ private fun PropPanelBody(
             Text(s.editorResetToDefault, style = MaterialTheme.typography.labelMedium)
         }
     }
+    }
 }
+
+/**
+ * How far the editor's docked panels stand off the page.
+ *
+ * One number across the three of them, because they are one kind of thing and
+ * were three hand-rolled planes that happened to agree.
+ */
+internal const val PANEL_SHADOW_DP = 18f
 
 /**
  * Whether the body a spec resolves to is dark, which is what decides the opacity a

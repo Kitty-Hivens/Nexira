@@ -26,12 +26,30 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.sliderKeyboardAdjust
+import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSliderTrack
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Spacing
 import hivens.ui.widgets.toWidgetColorOrNull
+
+/**
+ * How much of a 320dp panel its labels are allowed to take.
+ *
+ * One number, because a column of unlike controls only reads as a column while
+ * every row measures its label the same way. It used to be 150 on a slider and 140
+ * on a field, with a switch on neither, so the panel had three left edges and the
+ * eye had to find each control before it could compare any two.
+ *
+ * 120 rather than the 140 it replaces: the panel has 292dp between its gutters, and
+ * half of that spent on a label left a slider 74dp of track, which is a control too
+ * short to aim at.
+ */
+internal val panelLabelWidth: Dp = 120.dp
 
 @Composable
 internal fun LabeledSlider(
@@ -43,31 +61,32 @@ internal fun LabeledSlider(
     keyStep: Float = (range.endInclusive - range.start) / 100f,
     onValueChange: (Float) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text     = label,
-            style    = MaterialTheme.typography.bodySmall,
-            color    = NxTheme.colors.textSecondary,
-            modifier = Modifier.width(150.dp),
-        )
-        // The library's own track, so a property row and a settings row draw the
-        // same control. The modifier owns hover-focus and the arrow keys; the track
-        // owns the pointer.
-        NxSliderTrack(
-            value         = value,
-            range         = range,
-            onValueChange = onValueChange,
-            compact       = true,
-            modifier      = Modifier.weight(1f).sliderKeyboardAdjust(value, range, keyStep, onValueChange),
-        )
-        Text(
-            text     = format.format(value * displayMultiplier),
-            style    = MaterialTheme.typography.labelSmall,
-            color    = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
-            modifier = Modifier.width(54.dp),
-        )
+    // The library's row, so a property row and a settings row are one shape. The
+    // track and the readout are what this adds to it. The label column, the type and
+    // the band are the row's to decide, and they are decided once.
+    NxRow(title = label, compact = true, labelWidth = panelLabelWidth) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NxSliderTrack(
+                value         = value,
+                range         = range,
+                onValueChange = onValueChange,
+                compact       = true,
+                modifier      = Modifier.weight(1f).sliderKeyboardAdjust(value, range, keyStep, onValueChange),
+            )
+            Text(
+                text      = format.format(value * displayMultiplier),
+                style     = MaterialTheme.typography.labelSmall,
+                color     = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
+                textAlign = TextAlign.End,
+                maxLines  = 1,
+                modifier  = Modifier.width(READOUT_WIDTH).padding(start = Spacing.s6),
+            )
+        }
     }
 }
+
+/** Enough for "100%" and for a two-decimal fraction, which are the two widest readouts. */
+private val READOUT_WIDTH = 42.dp
 
 @Composable
 internal fun HexField(

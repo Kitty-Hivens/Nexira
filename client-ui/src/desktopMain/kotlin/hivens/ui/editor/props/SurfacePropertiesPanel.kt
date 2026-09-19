@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,7 +58,10 @@ import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
+import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSwitch
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.editor.rememberDockOffset
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
@@ -89,18 +93,21 @@ fun SurfacePropertiesPanel(
             // Draggable dock: the header drags this offset (session-scoped), like the
         // widget palette, so the panel can be pulled off the right edge.
         val offset = rememberDockOffset()
-        Column(
+        NxSurface(
+            level    = NxSurfaceLevel.Floating,
+            shape    = MaterialTheme.shapes.large,
+            // Solid, no glass: a settings panel must stay readable and not composite
+            // with the layers it floats over.
+            opacity  = 1f,
+            blurDp   = 0f,
+            shadowDp = PANEL_SHADOW_DP,
             modifier = Modifier
                 .graphicsLayer { translationX = offset.value.x; translationY = offset.value.y }
                 .width(320.dp)
                 .fillMaxHeight()
-                .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
-                .shadow(elevation = 18.dp, shape = MaterialTheme.shapes.large)
-                .clip(MaterialTheme.shapes.large)
-                // Solid surface, no glass: a settings panel must stay readable and
-                // not composite with the layers it floats over.
-                .background(NxTheme.colors.surface),
+                .padding(top = 64.dp, bottom = 96.dp, end = 16.dp),
         ) {
+        Column(Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -156,6 +163,7 @@ fun SurfacePropertiesPanel(
             ) {
                 NavSelectionControl(customization = customization, onChange = onCustomizationChanged)
             }
+        }
         }
     }
 }
@@ -291,25 +299,17 @@ private fun navSelectionStyleLabel(variant: NavSelectionStyle, s: AppStrings): S
         NavSelectionStyle.None    -> s.navStyleNone
     }
 
-// Smaller than a full settings-screen switch row (bodyLarge): the 320dp
-// surface panel cramps long toggle names, so the label drops to bodySmall and
-// takes the row's remaining width with the Switch pinned at the end.
+// The library's row in its panel form: smaller than a settings-screen row, because
+// a 320dp panel cramps long toggle names. This was the third hand-rolled answer to
+// "a label with a control beside it" in one feature. The row it replaces differed
+// from the other two only in which of them it happened to be written after.
+//
+// No pinned label column, unlike the prop panel: this block is a list of toggles
+// rather than a form of unlike controls, and a switch against the far edge is what
+// a list of them reads as.
 @Composable
 private fun CompactSwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-    ) {
-        Text(
-            text     = title,
-            style    = MaterialTheme.typography.bodySmall,
-            color    = NxTheme.colors.textPrimary,
-            modifier = Modifier.weight(1f),
-        )
-        NxSwitch(
-            checked         = checked,
-            onCheckedChange = onCheckedChange,
-        )
+    NxRow(title = title, compact = true) {
+        NxSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
