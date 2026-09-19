@@ -2,6 +2,7 @@ package hivens.ui.background
 
 import androidx.compose.runtime.Composable
 import hivens.ui.diag.SkinemaGate
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.getValue
@@ -19,8 +20,12 @@ import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.compose.rememberPlayerState
 import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.player.VideoPlayer
+import dev.hivens.skinema.player.WhenUnwatched
 import dev.hivens.skinema.skiko.VideoFrameImage
 import hivens.ui.audio.AudioOutput
+import hivens.ui.audio.PlaybackRouter
+import hivens.ui.audio.RepeatMode
+import hivens.ui.audio.WallpaperSession
 import hivens.ui.theme.seedFromRgba
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,19 +94,6 @@ internal class VideoFramePainter(
 }
 
 /**
- * A Skinema player over one wallpaper file, plus the Skia image its frames land
- * in. Both hold resources the JVM will not reclaim on its own -- a decode thread
- * and a pacer thread, native FFmpeg state, one raster image, and a stream on the
- * sound server when the wallpaper is one that sounds -- and all of them are
- * released together in [release].
- *
- * A [RememberObserver] rather than a `DisposableEffect`, because the decode
- * thread starts inside the constructor, i.e. during composition: a composition
- * that is abandoned before it applies never runs its effects, and the player
- * created for it would then be running with nothing left holding a reference to
- * close it. [onAbandoned] is the only callback that covers that.
- */
-/**
  * Where the wallpaper had got to, carried across a re-open.
  *
  * Whether the picture sounds, how it loops and how it decodes are all constructor
@@ -123,12 +115,26 @@ private class BackgroundResume {
     var positionNanos: Long = 0L
 }
 
+/**
+ * A Skinema player over one wallpaper file, plus the Skia image its frames land
+ * in. Both hold resources the JVM will not reclaim on its own -- a decode thread
+ * and a pacer thread, native FFmpeg state, one raster image, and a stream on the
+ * sound server when the wallpaper is one that sounds -- and all of them are
+ * released together in [release].
+ *
+ * A [RememberObserver] rather than a `DisposableEffect`, because the decode
+ * thread starts inside the constructor, i.e. during composition: a composition
+ * that is abandoned before it applies never runs its effects, and the player
+ * created for it would then be running with nothing left holding a reference to
+ * close it. [onAbandoned] is the only callback that covers that.
+ */
 private class BackgroundVideo(
     file: File,
     loop: Boolean,
     audio: Boolean,
     output: AudioOutput?,
     hardware: HwAccel,
+    unwatched: WhenUnwatched,
     private val closeScope: CoroutineScope,
 ) : RememberObserver {
 
@@ -139,7 +145,7 @@ private class BackgroundVideo(
      * wallpaper down with the window. The caller draws nothing instead, which
      * is what it already does for a file that fails to decode.
      */
-    val player: VideoPlayer? = openBackgroundPlayer(file, loop, audio, output, hardware)
+    val player: VideoPlayer? = openBackgroundPlayer(file, loop, audio, output, hardware, unwatched)
 
     private val frames = VideoFrameImage()
 
@@ -202,10 +208,11 @@ private fun openBackgroundPlayer(
     audio: Boolean,
     output: AudioOutput?,
     hardware: HwAccel,
+    unwatched: WhenUnwatched,
 ): VideoPlayer? {
     val sink: PcmSink? = if (audio) output?.sink() else null
     return try {
-        VideoPlayer(path = file.toPath(), loop = loop, audio = audio, sink = sink, hardware = hardware)
+        VideoPlayer(path = file.toPath(), loop = loop, audio = audio, sink = sink, hardware = hardware, unwatched = unwatched)
     } catch (e: LinkageError) {
         runCatching { sink?.close() }
         log.error("Background media natives unavailable for {}", file.absolutePath, e)
@@ -233,6 +240,8 @@ internal fun rememberSkinemaFrame(
     hardwareDecode: Boolean,
     audio: Boolean,
     audioVolume: Float,
+    link: Boolean,
+    onAudioVolume: (Float) -> Unit,
     onSeed: (Int) -> Unit = {},
 ): VideoFramePainter? {
     // Skinema disabled by boot recovery -> no animated background (same draw-
@@ -258,7 +267,7 @@ internal fun rememberSkinemaFrame(
     // do, and skinema's own note on the property names the cost -- a consumer
     // offering a repeat button had to choose between the button and the position.
     val closeScope = koinInject<CoroutineScope>()
-    val video = remember(file, hardwareDecode, audio) {
+    val video = remember(file, hardwareDecode, audio, link) {
         BackgroundVideo(
             file = file,
             // The background loops unless the user pinned it to a single pass.
@@ -268,6 +277,13 @@ internal fun rememberSkinemaFrame(
             // 4K on the CPU is brutal; AUTO offloads to the GPU and falls back
             // to software per file when no device opens.
             hardware = if (hardwareDecode) HwAccel.AUTO else HwAccel.OFF,
+            // Freeze stops the clock while nobody takes the picture, which is
+            // right for decoration: a minimised window should cost nothing. It is
+            // wrong for a track, because minimising would then stop the music. It
+            // also removes an ambiguity the link creates, where a gap in the frame
+            // pump reads as Paused and is indistinguishable from the real thing now
+            // that a real pause freezes the picture too.
+            unwatched = if (link) WhenUnwatched.KeepTime else WhenUnwatched.Freeze,
             closeScope = closeScope,
         )
     }
@@ -281,6 +297,36 @@ internal fun rememberSkinemaFrame(
     // The animation-speed slider maps to playback rate; Skinema clamps to
     // [0.5, 4]x internally.
     LaunchedEffect(player, speedMultiplier) { player.setRate(speedMultiplier) }
+
+    // The wall as something that plays, and whether it is what the players are
+    // pointed at. Attached whenever it sounds, so a linked wall has a session
+    // waiting the instant the link is flipped rather than one frame later;
+    // ownership is the narrower question and is asked separately.
+    val session = koinInject<WallpaperSession>()
+    val router = koinInject<PlaybackRouter>()
+    DisposableEffect(video, audio) {
+        if (audio) {
+            session.attach(
+                player = player,
+                file = file.toPath(),
+                volume = audioVolume,
+                repeat = repeatOf(loopMode),
+                persistVolume = onAudioVolume,
+            )
+        }
+        onDispose { if (audio) session.detach() }
+    }
+    // Ownership, and nothing else, so the session can be attached and silent at the
+    // same time. The wall only owns what it can be heard doing.
+    DisposableEffect(router, audio, link) {
+        router.setWallpaperOwns(audio && link)
+        onDispose { router.setWallpaperOwns(false) }
+    }
+    // The settings moved, not the transport, so these report rather than write
+    // back: the appearance panel already persists, and echoing it would write the
+    // same value a second time through a debounce that is still in flight.
+    LaunchedEffect(session, audioVolume) { session.reportVolume(audioVolume) }
+    LaunchedEffect(session, loopMode) { session.reportRepeat(repeatOf(loopMode)) }
 
     // A property write rather than a new player, which is what the property exists
     // for. Read on the decode thread at the end of a lap, so a change lands at the
@@ -344,3 +390,14 @@ internal fun rememberSkinemaFrame(
         )
     }
 }
+
+/**
+ * The wallpaper's loop, as the transport names it.
+ *
+ * A wallpaper turns the lap or it does not, which is one bit, while a repeat mode
+ * has three states because a music queue has an end to wrap. There is no queue
+ * here, so [RepeatMode.Queue] has nothing to go round and never appears: a lap that
+ * repeats IS the one-entry case that mode already collapses into.
+ */
+private fun repeatOf(mode: BackgroundLoopMode): RepeatMode =
+    if (mode == BackgroundLoopMode.PlayOnce) RepeatMode.Off else RepeatMode.One

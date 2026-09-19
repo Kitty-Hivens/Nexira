@@ -65,6 +65,15 @@ fun CustomBackground(
     modifier: Modifier = Modifier,
     mousePosProvider: () -> Offset = { Offset(0.5f, 0.5f) },
     onTone: (WallpaperTone) -> Unit = {},
+    /**
+     * Where a level set from a player widget goes, while the wallpaper is what the
+     * transport is pointed at.
+     *
+     * Narrow rather than the whole settings writer: the painter has no business
+     * writing an arbitrary setting, and the one field it can honestly own is the
+     * loudness of the thing it is playing.
+     */
+    onAudioVolume: (Float) -> Unit = {},
 ) {
     if (!settings.hasUsableImage()) {
         LaunchedEffect(Unit) { onTone(WallpaperTone(null, null)) }
@@ -78,6 +87,7 @@ fun CustomBackground(
             settings         = settings,
             mousePosProvider = mousePosProvider,
             onTone           = onTone,
+            onAudioVolume    = onAudioVolume,
         )
 
         // Darkening overlay
@@ -129,6 +139,7 @@ private fun AnimatedParallaxImage(
     settings: BackgroundSettings,
     mousePosProvider: () -> Offset,
     onTone: (WallpaperTone) -> Unit,
+    onAudioVolume: (Float) -> Unit,
 ) {
     // Scale mode and alignment (Backdrop.kt) decide where every pixel of the
     // wallpaper lands.
@@ -157,6 +168,8 @@ private fun AnimatedParallaxImage(
             hardwareDecode  = settings.hardwareDecode,
             audio           = settings.audio,
             audioVolume     = settings.audioVolume,
+            link            = settings.linkToPlayers,
+            onAudioVolume   = onAudioVolume,
             onSeed          = { videoSeed = it },
         )
     } else {

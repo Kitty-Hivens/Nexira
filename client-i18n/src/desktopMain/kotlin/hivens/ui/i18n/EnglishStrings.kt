@@ -628,6 +628,9 @@ object EnglishStrings : AppStrings {
     override val backgroundAudio         = "Sound"
     override val backgroundAudioDesc     = "Play the wallpaper's own audio track. Animation speed shifts its tempo too."
     override val backgroundAudioVolume   = "Volume"
+    override val backgroundAudioStill   = "A still wallpaper carries no sound and no playhead."
+    override val backgroundLink   = "Drive it from the players"
+    override val backgroundLinkDesc   = "Player widgets and the media keys address the wallpaper. Pausing stops the picture as well."
 
     override val customizationAccentClear     = "Clear override"
     override val customizationSectionVisual   = "Visual"

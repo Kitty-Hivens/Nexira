@@ -627,6 +627,9 @@ object RussianStrings : AppStrings {
     override val backgroundAudio         = "Звук"
     override val backgroundAudioDesc     = "Проигрывать звуковую дорожку самих обоев. Скорость анимации меняет и её темп."
     override val backgroundAudioVolume   = "Громкость"
+    override val backgroundAudioStill   = "У неподвижных обоев нет ни звука, ни позиции."
+    override val backgroundLink   = "Управлять из плееров"
+    override val backgroundLinkDesc   = "Виджеты плеера и медиаклавиши обращаются к обоям. Пауза останавливает и картинку."
 
     override val customizationAccentClear     = "Сбросить акцент"
     override val customizationSectionVisual   = "Визуал"

@@ -68,6 +68,23 @@ data class BackgroundSettings(
      * it was.
      */
     val audioVolume: Float = 1.0f,
+    /**
+     * Hand the clip on the wall to the player widgets, so the transport, the
+     * position and the media keys address it.
+     *
+     * Requires [audio], and the control says so rather than accepting the click:
+     * a wall the transport drives but nobody hears is a scrubber over a
+     * decoration. It also requires a wallpaper that moves at all, since a still
+     * has no playhead, no duration and no position, and there is nothing for a
+     * session to be.
+     *
+     * Off, like [audio], and for a second reason on top of the first. Switched
+     * on, the wallpaper stops being decoration and becomes a track, which changes
+     * what a pause means: it stops the picture as well as the sound, because
+     * keeping the animation running over stopped audio is the incoherent half.
+     * Nobody should meet that without having asked for it.
+     */
+    val linkToPlayers: Boolean = false,
 ) {
     /** The scale this build understands, or the default when the file names one it does not. */
     val scaleMode: ScaleMode get() = parseScaleMode(scaleModeWire)

@@ -705,6 +705,9 @@ interface AppStrings {
     val backgroundAudio: String
     val backgroundAudioDesc: String
     val backgroundAudioVolume: String
+    val backgroundAudioStill: String
+    val backgroundLink: String
+    val backgroundLinkDesc: String
 
     // --- Customization extension ---
     val customizationAccentClear: String

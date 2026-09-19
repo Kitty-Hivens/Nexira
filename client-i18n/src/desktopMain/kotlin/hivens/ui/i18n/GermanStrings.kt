@@ -627,6 +627,9 @@ object GermanStrings : AppStrings {
     override val backgroundAudio         = "Ton"
     override val backgroundAudioDesc     = "Die eigene Tonspur des Hintergrunds abspielen. Die Animationsgeschwindigkeit ändert auch ihr Tempo."
     override val backgroundAudioVolume   = "Lautstärke"
+    override val backgroundAudioStill   = "Ein unbewegtes Hintergrundbild hat weder Ton noch Abspielposition."
+    override val backgroundLink   = "Über die Player steuern"
+    override val backgroundLinkDesc   = "Player-Widgets und die Medientasten sprechen den Hintergrund an. Pause hält auch das Bild an."
 
     override val customizationAccentClear     = "Überschreibung löschen"
     override val customizationSectionVisual   = "Visuell"

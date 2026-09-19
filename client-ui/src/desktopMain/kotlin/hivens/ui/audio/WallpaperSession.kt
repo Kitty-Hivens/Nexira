@@ -44,13 +44,6 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class WallpaperSession(
     private val scope: CoroutineScope,
-    /**
-     * Where a level the transport set goes, so it survives the session. The
-     * wallpaper's loudness is a background setting rather than this object's, and a
-     * slider moved in a player widget has to reach the same record the slider in
-     * the appearance panel writes.
-     */
-    private val persistVolume: (Float) -> Unit = {},
 ) : MusicPlayerService {
 
     private val log = LoggerFactory.getLogger(WallpaperSession::class.java)
@@ -78,6 +71,18 @@ class WallpaperSession(
     private var pollJob: Job? = null
 
     /**
+     * Where a level the transport set goes, so it survives the session.
+     *
+     * Handed over with the player rather than taken at construction, because the
+     * wallpaper's loudness is a background setting and only the composable that
+     * renders the background can write one. A hook that lived here permanently
+     * would be mutable global state set from a composition, which is the shape
+     * this avoids by living exactly as long as the attachment does.
+     */
+    @Volatile
+    private var persistVolume: (Float) -> Unit = {}
+
+    /**
      * Takes the player the background has just opened.
      *
      * Called again for the same wallpaper whenever a setting rebuilds it, which the
@@ -85,9 +90,16 @@ class WallpaperSession(
      * rather than refusing is the whole contract: what arrives is always the live
      * one, and what it replaces is already being closed by its owner.
      */
-    fun attach(player: VideoPlayer, file: Path, volume: Float, repeat: RepeatMode) {
+    fun attach(
+        player: VideoPlayer,
+        file: Path,
+        volume: Float,
+        repeat: RepeatMode,
+        persistVolume: (Float) -> Unit,
+    ) {
         pollJob?.cancel()
         this.player = player
+        this.persistVolume = persistVolume
         _volume.value = volume.coerceIn(0f, 1f)
         _repeat.value = repeat
         _queue.value = listOf(file)
@@ -105,6 +117,7 @@ class WallpaperSession(
         pollJob?.cancel()
         pollJob = null
         player = null
+        persistVolume = {}
         _state.value = PlaybackState.Idle
         _track.value = null
         _queue.value = emptyList()

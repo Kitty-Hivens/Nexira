@@ -43,6 +43,8 @@ import hivens.ui.platform.ImageIoIconProcessor
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
+import hivens.ui.audio.PlaybackRouter
+import hivens.ui.audio.WallpaperSession
 import hivens.ui.audio.MediaSessionBridge
 import hivens.ui.audio.AudioOutput
 import hivens.ui.audio.SystemAudioOutput
@@ -320,7 +322,13 @@ val uiModule = module {
     // App-static instead, like the data sources and the commands beside it. The
     // widgets read the contract rather than the engine, which is what lets the
     // thing behind it change without any of them knowing.
-    single<MusicPlayerService> { MusicPlayerServiceImpl(get()) }
+    single { WallpaperSession(get()) }
+    single { PlaybackRouter(get(), MusicPlayerServiceImpl(get()), get()) }
+    // Bound to the same instance rather than built twice: the background asks for
+    // the router by its own type to say who owns the session, and everything else
+    // asks for the contract. Two instances would mean the switch and the readers
+    // disagreeing about who is playing.
+    single<MusicPlayerService> { get<PlaybackRouter>() }
 
     // Where the sound leaves. One connection to the sound server for the process,
     // opened on the first track rather than at startup, and a stream per track on

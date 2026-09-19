@@ -25,8 +25,7 @@ import kotlin.test.assertNull
  */
 class WallpaperSessionTest {
 
-    private fun session(scope: TestScope, onVolume: (Float) -> Unit = {}) =
-        WallpaperSession(scope, persistVolume = onVolume)
+    private fun session(scope: TestScope) = WallpaperSession(scope)
 
     @Test
     fun `with nothing attached it is idle and holds no queue`() = runTest {
@@ -57,22 +56,21 @@ class WallpaperSessionTest {
     }
 
     @Test
-    fun `a level set on the transport is clamped and handed on to be persisted`() = runTest {
-        val written = mutableListOf<Float>()
-        val s = session(this) { written += it }
+    fun `a level set with nothing attached is clamped and reaches no record`() = runTest {
+        val s = session(this)
 
-        s.setVolume(0.4f)
+        // The hook arrives with the player, so a detached session has none. The
+        // clamp is this object's either way, and the flow has to stay inside the
+        // range whatever a caller passes.
         s.setVolume(1.7f)
+        assertEquals(1f, s.volume.value)
         s.setVolume(-0.2f)
-
-        assertEquals(listOf(0.4f, 1f, 0f), written, "the record has to receive what the flow reports")
         assertEquals(0f, s.volume.value)
     }
 
     @Test
     fun `a level the settings moved is reported without being written back`() = runTest {
-        val written = mutableListOf<Float>()
-        val s = session(this) { written += it }
+        val s = session(this)
 
         // The appearance panel's own slider already persists. Echoing it here would
         // write the same value a second time and, through the debounce above it,
@@ -80,7 +78,6 @@ class WallpaperSessionTest {
         s.reportVolume(0.25f)
 
         assertEquals(0.25f, s.volume.value)
-        assertEquals(emptyList(), written)
     }
 
     @Test

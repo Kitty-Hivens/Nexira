@@ -1373,6 +1373,11 @@ fun AppRoot(
           settings         = backgroundSettings,
           mousePosProvider = { mousePos.value },
           onTone           = { tone = it },
+          // The one setting a player widget can move while the wallpaper is what
+          // its transport is pointed at. Through the same state the appearance
+          // panel writes, so the two sliders are one value and the debounce below
+          // persists it once.
+          onAudioVolume    = { backgroundSettings = backgroundSettings.copy(audioVolume = it) },
       )
 
       af.WrapContent(

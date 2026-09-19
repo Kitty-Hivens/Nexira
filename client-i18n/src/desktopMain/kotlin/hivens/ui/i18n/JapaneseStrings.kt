@@ -640,6 +640,9 @@ object JapaneseStrings : AppStrings {
     override val backgroundAudio = "サウンド"
     override val backgroundAudioDesc = "壁紙自身の音声トラックを再生します。アニメーション速度は音のテンポも変えます。"
     override val backgroundAudioVolume = "音量"
+    override val backgroundAudioStill = "静止した壁紙には音声も再生位置もありません。"
+    override val backgroundLink = "プレイヤーから操作する"
+    override val backgroundLinkDesc = "プレイヤーウィジェットとメディアキーが壁紙を操作します。一時停止で映像も止まります。"
 
     override val customizationAccentClear = "上書きを解除"
     override val customizationSectionVisual = "見た目"
