@@ -1153,7 +1153,7 @@ object EnglishStrings : AppStrings {
     override val retiredChoiceKeep = "Leave it"
     override val retiredChoiceAdopt = "Keep as a pack"
     override val retiredChoiceDelete = "Delete"
-    override val retiredNoVersion = "This folder does not say which Minecraft it is for, so it cannot become a pack. Fill the version in if you know it."
+    override val retiredNoVersion = "no Minecraft version in the folder"
     override val retiredDetected = "Read from the folder. Correct it if it is wrong."
     override val retiredLoaderVanilla = "none"
     override val retiredApply = "Carry out"

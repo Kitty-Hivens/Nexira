@@ -1168,7 +1168,7 @@ object RussianStrings : AppStrings {
     override val retiredChoiceKeep = "Не трогать"
     override val retiredChoiceAdopt = "Оставить сборкой"
     override val retiredChoiceDelete = "Удалить"
-    override val retiredNoVersion = "В папке не сказано, под какой Minecraft она, поэтому сборкой стать не может. Впиши версию, если знаешь её."
+    override val retiredNoVersion = "версия Minecraft не определена"
     override val retiredDetected = "Прочитано из папки. Поправь, если неверно."
     override val retiredLoaderVanilla = "нет"
     override val retiredApply = "Выполнить"

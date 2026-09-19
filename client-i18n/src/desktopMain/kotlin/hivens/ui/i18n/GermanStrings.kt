@@ -1155,7 +1155,7 @@ object GermanStrings : AppStrings {
     override val retiredChoiceKeep = "So lassen"
     override val retiredChoiceAdopt = "Als Pack behalten"
     override val retiredChoiceDelete = "Löschen"
-    override val retiredNoVersion = "Der Ordner sagt nicht, für welches Minecraft er ist, also kann er kein Pack werden. Trag die Version ein, wenn du sie kennst."
+    override val retiredNoVersion = "keine Minecraft-Version im Ordner"
     override val retiredDetected = "Aus dem Ordner gelesen. Korrigiere es, wenn es falsch ist."
     override val retiredLoaderVanilla = "keiner"
     override val retiredApply = "Ausführen"

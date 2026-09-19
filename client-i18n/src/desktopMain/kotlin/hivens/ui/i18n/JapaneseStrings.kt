@@ -1160,7 +1160,7 @@ object JapaneseStrings : AppStrings {
     override val retiredChoiceKeep = "そのまま"
     override val retiredChoiceAdopt = "パックとして残す"
     override val retiredChoiceDelete = "削除"
-    override val retiredNoVersion = "このフォルダーは対象の Minecraft を示していないため、パックにできません。分かる場合はバージョンを入力してください。"
+    override val retiredNoVersion = "Minecraft のバージョンが不明です"
     override val retiredDetected = "フォルダーから読み取った値です。違う場合は直してください。"
     override val retiredLoaderVanilla = "なし"
     override val retiredApply = "実行"

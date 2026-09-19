@@ -1361,7 +1361,12 @@ interface AppStrings {
     val retiredChoiceKeep: String
     val retiredChoiceAdopt: String
     val retiredChoiceDelete: String
-    /** On a client whose tree names no Minecraft version, so nothing can be provisioned for it. */
+    /**
+    * On a folder whose tree names no Minecraft version.
+    *
+    * Short, because it sits inline among the other facts and the disabled
+    * "keep as a pack" chip beside it already says what follows from it.
+    */
     val retiredNoVersion: String
     /** Over the version and loader fields: what the tree said, which the reader may correct. */
     val retiredDetected: String
