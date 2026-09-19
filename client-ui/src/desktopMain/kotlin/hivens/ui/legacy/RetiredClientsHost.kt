@@ -26,7 +26,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +46,7 @@ import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -74,7 +74,11 @@ fun RetiredClientsHost() {
     val adopter: RetiredClientAdopter = koinInject()
     val sweeper: RetiredDataSweeper = koinInject()
     val state = remember { RetiredClientsState(scanner, adopter, sweeper) }
-    val scope = rememberCoroutineScope()
+    // The process scope, not the composition's. This provisions a runtime, moves
+    // gigabytes and then deletes trees; a shell restart after a crash must not
+    // cut that in half. The install and update services take the same scope for
+    // the same reason.
+    val scope: CoroutineScope = koinInject()
 
     LaunchedEffect(Unit) { state.load() }
 
@@ -85,6 +89,7 @@ fun RetiredClientsHost() {
             finished = state.finished,
             running = state.running,
             reclaimedBytes = state.reclaimedBytes,
+            ready = state.ready,
             onClose = { gate.dismiss() },
             onApply = { scope.launch { state.run() } },
         )
@@ -105,6 +110,7 @@ internal fun RetiredClientsBody(
     finished: Boolean,
     running: Boolean,
     reclaimedBytes: Long,
+    ready: Boolean,
     onClose: () -> Unit,
     onApply: () -> Unit,
 ) {
@@ -113,7 +119,7 @@ internal fun RetiredClientsBody(
             when {
                 loading -> Loading()
                 finished -> Done(rows, reclaimedBytes, onClose)
-                else -> Chooser(rows, running, onClose, onApply)
+                else -> Chooser(rows, running, ready, onClose, onApply)
             }
         }
     }
@@ -159,6 +165,7 @@ private fun OutcomeLine(row: RetiredRow) {
             s.retiredAdopted to NxTheme.colors.success
         }
         RetiredOutcome.Deleted -> s.retiredDeleted to NxTheme.colors.textSecondary
+        RetiredOutcome.PartlyDeleted -> s.retiredPartlyDeleted to NxTheme.colors.warnAccent
         is RetiredOutcome.Failed ->
             (if (outcome.reason == "remove") s.retiredRemoveFailed else s.retiredFailed) to NxTheme.colors.error
         // Left alone, which is an outcome and not an instruction -- naming the
@@ -180,7 +187,13 @@ private fun OutcomeLine(row: RetiredRow) {
 }
 
 @Composable
-private fun Chooser(rows: List<RetiredRow>, running: Boolean, onClose: () -> Unit, onApply: () -> Unit) {
+private fun Chooser(
+    rows: List<RetiredRow>,
+    running: Boolean,
+    ready: Boolean,
+    onClose: () -> Unit,
+    onApply: () -> Unit,
+) {
     val s = LocalStrings.current
     val totalBytes = rows.sumOf { it.client.sizeBytes }
     val anyChosen = rows.any { it.choice != RetiredChoice.Keep }
@@ -203,7 +216,7 @@ private fun Chooser(rows: List<RetiredRow>, running: Boolean, onClose: () -> Uni
             modifier = Modifier.padding(end = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(rows, key = { it.client.name }) { row -> ClientRow(row) }
+            items(rows, key = { it.client.name }) { row -> ClientRow(row, running) }
         }
         NxVerticalScrollbar(
             adapter = rememberScrollbarAdapter(listState),
@@ -220,6 +233,24 @@ private fun Chooser(rows: List<RetiredRow>, running: Boolean, onClose: () -> Uni
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Symbol(NxIcon.Warning, contentDescription = null, tint = NxTheme.colors.warnAccent, size = 16.dp)
             Text(s.retiredWarning, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.warnAccent)
+        }
+    }
+
+    // Why the button is dead, beside the button. The row that holds the pass back
+    // carries the same sentence, but the list scrolls and the button does not --
+    // so on a long list the explanation sat below the fold while the control it
+    // explained sat in plain sight, greyed out and saying nothing.
+    val blocking = rows.filter { it.choice == RetiredChoice.Adopt && !it.adoptable }
+    if (blocking.isNotEmpty()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Symbol(NxIcon.Warning, contentDescription = null, tint = NxTheme.colors.warnAccent, size = 16.dp)
+            Text(
+                text = s.retiredBlockedBy(blocking.joinToString(", ") { it.client.name }),
+                style = MaterialTheme.typography.bodySmall,
+                color = NxTheme.colors.warnAccent,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 
@@ -244,13 +275,15 @@ private fun Chooser(rows: List<RetiredRow>, running: Boolean, onClose: () -> Uni
             style = NxButtonStyle.Primary,
             // Nothing chosen is a real answer -- the reader looked and left -- so
             // the button is simply not live rather than the dialog refusing to close.
-            enabled = anyChosen && !running,
+            // Not ready means a folder is set to become a pack and has no version
+            // on it. The row says which one, so the button only has to wait.
+            enabled = anyChosen && ready && !running,
         )
     }
 }
 
 @Composable
-private fun ClientRow(row: RetiredRow) {
+private fun ClientRow(row: RetiredRow, running: Boolean) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     NxCard(modifier = Modifier.fillMaxWidth(), level = NxSurfaceLevel.Base) {
@@ -280,16 +313,21 @@ private fun ClientRow(row: RetiredRow) {
                 // a choice rather than one to press, and a selected "leave it" chip
                 // was the loudest thing on the row -- the default outshouting the
                 // destructive option it sits next to.
+                // Always live, even with no version read off the folder. The
+                // field that fixes that only appears once this is pressed, so
+                // gating it here made the one row that needs typing the one row
+                // nobody could type into.
                 NxChoiceChip(
                     label = s.retiredChoiceAdopt,
                     selected = row.choice == RetiredChoice.Adopt,
-                    enabled = row.adoptable,
+                    enabled = !running,
                 ) {
                     row.choice = if (row.choice == RetiredChoice.Adopt) RetiredChoice.Keep else RetiredChoice.Adopt
                 }
                 NxChoiceChip(
                     label = s.retiredChoiceDelete,
                     selected = row.choice == RetiredChoice.Delete,
+                    enabled = !running,
                 ) {
                     row.choice = if (row.choice == RetiredChoice.Delete) RetiredChoice.Keep else RetiredChoice.Delete
                 }
@@ -309,10 +347,14 @@ private fun ClientRow(row: RetiredRow) {
                         placeholder = s.retiredLoaderVanilla,
                         modifier = Modifier.width(120.dp),
                     )
+                    // Which sentence depends on whether the fields hold enough to
+                    // act on: an empty version is the one thing holding the pass
+                    // back, and it is said here rather than left to a button that
+                    // does nothing when pressed.
                     Text(
-                        text = s.retiredDetected,
+                        text = if (row.adoptable) s.retiredDetected else s.retiredNeedsVersion,
                         style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary,
+                        color = if (row.adoptable) colors.textSecondary else colors.warnAccent,
                         modifier = Modifier.weight(1f),
                     )
                 }

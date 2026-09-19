@@ -45,7 +45,7 @@ class RetiredClientsRenderProbe {
     )
 
     @Composable
-    private fun Sheet(rows: List<RetiredRow>, finished: Boolean, reclaimed: Long) {
+    private fun Sheet(rows: List<RetiredRow>, finished: Boolean, reclaimed: Long, ready: Boolean = true) {
         Box(
             Modifier.fillMaxSize().background(NxTheme.colors.background).padding(24.dp),
             contentAlignment = Alignment.TopCenter,
@@ -56,6 +56,7 @@ class RetiredClientsRenderProbe {
                 finished = finished,
                 running = false,
                 reclaimedBytes = reclaimed,
+                ready = ready,
                 onClose = {},
                 onApply = {},
             )
@@ -72,7 +73,7 @@ class RetiredClientsRenderProbe {
         }
         try {
             var t = 0L
-            repeat(4) { t += 16_000_000L; scene.render(t) }
+            repeat(40) { t += 16_000_000L; scene.render(t) }
             val png = scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
             Files.write(out, png.bytes)
         } finally {
@@ -97,6 +98,23 @@ class RetiredClientsRenderProbe {
         draw("chooser-narrow", 700, 900, dark = true) { Sheet(rows, finished = false, reclaimed = 0L) }
     }
 
+    /**
+     * The folder whose version nobody read, set to become a pack anyway.
+     *
+     * This row used to be unreachable: the chip was dead without a version and
+     * the field that supplies one only appears under a live chip. It is drawn on
+     * its own because it is the only row that can hold the pass back.
+     */
+    @Test
+    fun `the row that still needs a version typed`() {
+        val rows = fixtures.map { RetiredRow(it) }
+        rows.last().choice = RetiredChoice.Adopt
+        rows[0].choice = RetiredChoice.Adopt
+        draw("needs-version-dark", 1000, 900, dark = true) {
+            Sheet(rows, finished = false, reclaimed = 0L, ready = false)
+        }
+    }
+
     @Test
     fun `the outcome after a pass`() {
         val rows = fixtures.map { RetiredRow(it) }
@@ -104,6 +122,7 @@ class RetiredClientsRenderProbe {
         rows[1].outcome = RetiredOutcome.Deleted
         rows[2].outcome = RetiredOutcome.Adopted("Industrial", sourceKept = true)
         rows[3].outcome = RetiredOutcome.Failed("remove")
+        rows[4].outcome = RetiredOutcome.PartlyDeleted
         draw("done-dark", 1000, 700, dark = true) { Sheet(rows, finished = true, reclaimed = 3_100_000_000L) }
     }
 }

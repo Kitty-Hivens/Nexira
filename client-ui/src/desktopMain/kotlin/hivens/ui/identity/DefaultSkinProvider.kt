@@ -74,8 +74,24 @@ class DefaultSkinProvider(
                 )
             }
         }
-        return emptyList()
+        return cachedLegacy()
     }
+
+    /**
+     * The pair already extracted from a client that is no longer on disk.
+     *
+     * Read last, so a modern jar appearing later still upgrades the row to nine.
+     * Read at all because a pre-1.19.4 client only ever carries two, and the
+     * reason the leftover-clients sweep extracts before it deletes is that the
+     * jar stops existing. A cache that only counted as a hit at nine threw that
+     * rescue away on exactly the installs it was written for: the two PNGs sat
+     * there and nothing ever read them again.
+     */
+    private fun cachedLegacy(): List<DefaultSkin> =
+        listOf("Steve" to false, "Alex" to true).mapNotNull { (name, slim) ->
+            val f = cacheDir.resolve("${name.lowercase()}.png")
+            if (f.exists()) DefaultSkin(name, slim, f) else null
+        }
 
     private fun cachedModern(): List<DefaultSkin>? {
         val hit = modern.mapNotNull { (name, slim) ->

@@ -1384,6 +1384,9 @@ interface AppStrings {
     val retiredRemoveFailed: String
     fun retiredDone(reclaimed: String): String
     val retiredDoneNothing: String
+    val retiredNeedsVersion: String
+    fun retiredBlockedBy(folders: String): String
+    val retiredPartlyDeleted: String
 
     val editorCancel: String
     val editorDelete: String

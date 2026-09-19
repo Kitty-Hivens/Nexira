@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.time.Instant
+import java.util.Comparator
 import java.util.UUID
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -68,7 +68,19 @@ class RetiredClientAdopter(
      * file means the instance is incomplete, and removing the source then would
      * turn a recoverable gap into a permanent one.
      */
-    data class Adopted(val instance: PackInstance, val linked: Int, val failed: Int) {
+    data class Adopted(
+        val instance: PackInstance,
+        val linked: Int,
+        val failed: Int,
+        /**
+         * Bytes that are now a shared inode rather than a second copy.
+         *
+         * Removing the source frees none of these, which is the whole point of
+         * hardlinking -- so a caller that reports reclaimed space has to subtract
+         * them or it tells the player it recovered gigabytes it did not.
+         */
+        val sharedBytes: Long = 0L,
+    ) {
         /** True when every file made it, so the source tree carries nothing unique. */
         val complete: Boolean get() = failed == 0
     }
@@ -93,15 +105,30 @@ class RetiredClientAdopter(
             ?: throw IOException("Cannot adopt '${client.name}' without a Minecraft version.")
         val loaderId = loader?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it != "vanilla" }
         val instanceId = UUID.randomUUID().toString()
-        val instanceDirName = sanitize("${client.name}-$instanceId")
+        // The id is appended after the cap rather than sanitized with the name:
+        // inside it, a long folder name pushes the UUID out and two adoptions
+        // reduce to one directory, where the second lands in the first's tree and
+        // the sweep then removes a source whose content went nowhere.
+        val instanceDirName = sanitize(client.name).take(NAME_BUDGET) + "-" + instanceId
         val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
         onReserveDir(clientDir)
         Files.createDirectories(clientDir)
         log.info("adopt: '{}' ({} on {}) -> {}", client.name, loaderId ?: "vanilla", mc, clientDir)
 
-        val transfer = linkContent(client.dir, clientDir, progress)
-        seedSharedAssets(client.dir)
-        ensureRuntime(mc, loaderId, progress)
+        val transfer = try {
+            linkContent(client.dir, clientDir, progress).also {
+                seedSharedAssets(client.dir)
+                ensureRuntime(mc, loaderId, progress)
+            }
+        } catch (e: Throwable) {
+            // The directory was reserved and is now half-filled with hardlinks to
+            // a source that is still there. Nothing lists it, nothing will ever
+            // finish it, and a second attempt reserves another one under a new id
+            // -- so it goes back before the failure is passed on. The links are
+            // shared inodes, so removing them takes nothing from the source.
+            discard(clientDir)
+            throw e
+        }
 
         val instance = PackInstance(
             id = instanceId,
@@ -133,10 +160,23 @@ class RetiredClientAdopter(
                 client.name, transfer.failed,
             )
         }
-        Adopted(instance, transfer.linked, transfer.failed)
+        Adopted(instance, transfer.linked, transfer.failed, transfer.sharedBytes)
     }
 
-    private data class Transfer(val linked: Int, val failed: Int)
+    /** Removes a reservation that will never be finished. */
+    private fun discard(dir: Path) {
+        runCatching {
+            if (!Files.exists(dir)) return
+            Files.walk(dir).use { tree ->
+                tree.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+            }
+        }.onFailure { log.warn("adopt: could not remove the unfinished {}", dir, it) }
+    }
+
+    private data class Transfer(val linked: Int, val failed: Int, val sharedBytes: Long)
+
+    /** What became of one file, which decides whether its bytes are shared. */
+    private enum class Placement { Linked, Copied, Failed }
 
     /**
      * Hardlinks the client's own content, leaving behind everything the launcher
@@ -155,13 +195,26 @@ class RetiredClientAdopter(
     ): Transfer {
         var linked = 0
         var failed = 0
+        var shared = 0L
+        val srcReal = runCatching { src.toRealPath() }.getOrDefault(src)
         fun place(from: Path, to: Path, label: String) {
-            if (link(from, to)) linked++ else failed++
+            when (link(from, to)) {
+                Placement.Linked -> {
+                    linked++
+                    shared += sizeOf(from)
+                }
+                Placement.Copied -> linked++
+                Placement.Failed -> failed++
+            }
             progress(linked, 0, label)
         }
         Files.newDirectoryStream(src).use { top ->
             for (child in top) {
                 if (isRuntimeArtefact(child.name)) continue
+                if (Files.isSymbolicLink(child)) {
+                    if (!carryLink(child, dest.resolve(child.name), srcReal)) failed++
+                    continue
+                }
                 if (child.isRegularFile()) {
                     place(child, dest.resolve(child.name), child.name)
                     continue
@@ -172,6 +225,17 @@ class RetiredClientAdopter(
                         val rel = src.relativize(path).toString()
                         val target = dest.resolve(rel)
                         when {
+                            // A link is answered before the two predicates under
+                            // it, because the walk does not follow links and both
+                            // of those do. Asking a link whether it is a directory
+                            // gets an answer about what it points at, and the walk
+                            // never descends into it -- so the branch below would
+                            // make an empty folder, count nothing as failed, and
+                            // let the caller delete a tree it had not carried.
+                            Files.isSymbolicLink(path) -> {
+                                Files.createDirectories(target.parent)
+                                if (!carryLink(path, target, srcReal)) failed++
+                            }
                             path.isDirectory() -> Files.createDirectories(target)
                             path.isRegularFile() -> {
                                 Files.createDirectories(target.parent)
@@ -182,7 +246,34 @@ class RetiredClientAdopter(
                 }
             }
         }
-        return Transfer(linked, failed)
+        return Transfer(linked, failed, shared)
+    }
+
+    /**
+     * A link the player put there, carried across as a link.
+     *
+     * Worlds on a second disk are kept this way, and those bytes are not in the
+     * client tree at all: pointing the new link at the same real file leaves the
+     * content exactly where it was, and the source folder can still be let go.
+     *
+     * A link INTO the tree is refused instead. What it points at is what the sweep
+     * is about to remove, so recreating it would hand the instance a path that
+     * stops existing minutes later. Refusing counts as a file that did not make
+     * it, which is what keeps the source and tells the reader to look.
+     */
+    private fun carryLink(link: Path, dest: Path, srcReal: Path): Boolean {
+        val real = runCatching { link.toRealPath() }.getOrNull()
+        if (real == null) {
+            log.warn("adopt: link {} resolves to nothing, so the source must be kept", link)
+            return false
+        }
+        if (real.startsWith(srcReal)) {
+            log.warn("adopt: link {} points inside the tree the sweep would remove", link)
+            return false
+        }
+        return runCatching { Files.createSymbolicLink(dest, real) }
+            .onFailure { log.warn("adopt: could not recreate link {}", dest, it) }
+            .isSuccess
     }
 
     /**
@@ -206,7 +297,7 @@ class RetiredClientAdopter(
                     val target = assetsDir.resolve(assets.relativize(path).toString())
                     if (Files.exists(target)) continue
                     Files.createDirectories(target.parent)
-                    if (link(path, target)) linked++
+                    if (link(path, target) != Placement.Failed) linked++
                 }
             }
         }.onFailure { log.warn("adopt: could not seed shared assets from {}", assets, it) }
@@ -218,28 +309,43 @@ class RetiredClientAdopter(
      * Answers whether the file is now at [dest], because the caller decides
      * whether the source can be let go on exactly that.
      */
-    private fun link(src: Path, dest: Path): Boolean =
+    private fun link(src: Path, dest: Path): Placement =
         try {
             Files.createLink(dest, src)
-            true
-        } catch (_: java.nio.file.FileAlreadyExistsException) {
-            // Already placed by an earlier pass over the same tree.
-            true
+            Placement.Linked
         } catch (_: UnsupportedOperationException) {
             copy(src, dest)
-        } catch (_: java.nio.file.FileSystemException) {
-            // Cross-device (EXDEV), or a filesystem with no hardlinks at all.
-            copy(src, dest)
+        } catch (e: java.nio.file.FileSystemException) {
+            // A file already at the target is NOT this adoption having placed it.
+            // The walk yields every path once, so anything there came from outside
+            // -- a previous run that stopped halfway, or another folder that
+            // reduced to the same directory. Reading that as success is how a
+            // source gets deleted for content nothing carried.
+            if (e is java.nio.file.FileAlreadyExistsException) {
+                log.warn("adopt: {} already exists and is not this adoption's doing", dest)
+                Placement.Failed
+            } else {
+                // Cross-device (EXDEV), or a filesystem with no hardlinks at all.
+                copy(src, dest)
+            }
         }
 
-    private fun copy(src: Path, dest: Path): Boolean =
-        runCatching { Files.copy(src, dest, StandardCopyOption.REPLACE_EXISTING) }
+    private fun copy(src: Path, dest: Path): Placement =
+        runCatching { Files.copy(src, dest) }
             .onFailure { log.warn("adopt: could not place {}", dest, it) }
-            .isSuccess
+            .fold({ Placement.Copied }, { Placement.Failed })
+
+    private fun sizeOf(path: Path): Long = runCatching { Files.size(path) }.getOrDefault(0L)
 
     private fun sanitize(raw: String): String = raw.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96)
 
     internal companion object {
+        /**
+         * How much of the folder name the instance directory keeps, leaving room
+         * for the separator and the 36-character id that makes it unique.
+         */
+        private const val NAME_BUDGET = 59
+
         /**
          * Top-level names that are the retired path's own runtime rather than the
          * player's content, matched case-insensitively.

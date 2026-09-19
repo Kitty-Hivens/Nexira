@@ -6,6 +6,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Comparator
@@ -37,7 +38,20 @@ class RetiredDataSweeper(
 ) {
     private val log = LoggerFactory.getLogger(RetiredDataSweeper::class.java)
 
-    data class Swept(val clients: List<String>, val bytes: Long, val leftoversRemoved: Boolean)
+    data class Swept(
+        val clients: List<String>,
+        val bytes: Long,
+        val leftoversRemoved: Boolean,
+        /**
+         * Trees that lost some of their content and kept the rest. Separate from
+         * [clients] because "could not be removed" and "is half gone" send the
+         * reader to two different places.
+         */
+        val partial: List<String> = emptyList(),
+    )
+
+    /** How much of a tree went. */
+    private enum class Removal { Gone, Partial, Untouched }
 
     /**
      * Deletes the named clients and, if that empties `clients/`, the bookkeeping
@@ -46,24 +60,45 @@ class RetiredDataSweeper(
      * A client that fails to delete is reported rather than thrown on: a locked
      * file in one tree must not leave the other six behind with nothing said.
      */
-    suspend fun sweep(clients: List<RetiredClient>): Swept = withContext(io) {
+    suspend fun sweep(
+        clients: List<RetiredClient>,
+        /**
+         * Bytes of a tree that are already a shared inode with an instance, which
+         * removing the tree therefore does not free. An adopted source is almost
+         * entirely this, and counting it as reclaimed would have the surface
+         * announce gigabytes the disk never got back.
+         */
+        sharedBytesOf: (RetiredClient) -> Long = { 0L },
+    ): Swept = withContext(io) {
         if (clients.isEmpty()) return@withContext Swept(emptyList(), 0L, false)
         beforeFirstDelete()
 
         val gone = mutableListOf<String>()
+        val partial = mutableListOf<String>()
         var bytes = 0L
         for (client in clients) {
             currentCoroutineContext().ensureActive()
-            if (deleteTree(client.dir)) {
-                gone += client.name
-                bytes += client.sizeBytes
+            when (deleteTree(client.dir)) {
+                Removal.Gone -> {
+                    gone += client.name
+                    bytes += (client.sizeBytes - sharedBytesOf(client)).coerceAtLeast(0L)
+                }
+                Removal.Partial -> partial += client.name
+                Removal.Untouched -> Unit
             }
         }
 
-        val leftovers = clientsDir().let { !it.isDirectory() || it.listOrEmpty().isEmpty() }
+        // Empty is one answer and unreadable is another. Treating the second as
+        // the first would remove the whole directory, including the folders the
+        // reader had just chosen to keep.
+        val remaining = clientsDir().entriesOrNull()
+        val leftovers = remaining != null && remaining.isEmpty()
         if (leftovers) removeLeftovers()
-        log.info("sweep: removed {} client(s), {} bytes, leftovers={}", gone.size, bytes, leftovers)
-        Swept(gone, bytes, leftovers)
+        log.info(
+            "sweep: removed {} client(s), {} partial, {} bytes, leftovers={}",
+            gone.size, partial.size, bytes, leftovers,
+        )
+        Swept(gone, bytes, leftovers, partial)
     }
 
     /**
@@ -80,25 +115,56 @@ class RetiredDataSweeper(
         )
         for (path in targets) {
             if (!path.exists()) continue
-            if (deleteTree(path)) log.info("sweep: removed {}", path.fileName)
+            if (deleteTree(path) == Removal.Gone) log.info("sweep: removed {}", path.fileName)
         }
     }
 
-    private fun deleteTree(path: Path): Boolean = runCatching {
-        if (!path.exists()) return true
-        Files.walk(path).use { tree ->
-            tree.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+    /**
+     * Removes a tree, and answers how much of it went.
+     *
+     * One locked file used to abort the whole walk and read back as "untouched",
+     * which is the opposite of what the reader is looking at: the other several
+     * thousand files are already gone. Each entry is therefore its own attempt,
+     * and what survives decides the answer.
+     */
+    private fun deleteTree(path: Path): Removal {
+        if (!path.exists()) return Removal.Gone
+        var removed = 0
+        try {
+            Files.walk(path).use { tree ->
+                tree.sorted(Comparator.reverseOrder()).forEach { entry ->
+                    try {
+                        if (Files.deleteIfExists(entry)) removed++
+                    } catch (e: IOException) {
+                        log.warn("sweep: could not remove {}", entry, e)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            log.warn("sweep: could not read {} while removing it", path, e)
         }
-        !path.exists()
-    }.getOrElse {
-        log.warn("sweep: could not remove {}", path, it)
-        false
+        return when {
+            !path.exists() -> Removal.Gone
+            removed > 0 -> Removal.Partial
+            else -> Removal.Untouched
+        }
     }
 
     private fun clientsDir(): Path = dataDir.resolve("clients")
 
-    private fun Path.listOrEmpty(): List<Path> =
-        runCatching { Files.newDirectoryStream(this).use { it.toList() } }.getOrDefault(emptyList())
+    /**
+     * What the directory holds, or null when that cannot be read.
+     *
+     * Null rather than an empty list, because the caller removes the directory on
+     * an empty answer. A listing that failed and said "empty" is how a permission
+     * error turns into the deletion of everything the reader kept.
+     */
+    private fun Path.entriesOrNull(): List<Path>? {
+        if (!exists() || !isDirectory()) return emptyList()
+        return runCatching { Files.newDirectoryStream(this).use { it.toList() } }
+            .onFailure { log.warn("sweep: could not list {}, leaving the leftovers alone", this, it) }
+            .getOrNull()
+    }
 
     private companion object {
         /**

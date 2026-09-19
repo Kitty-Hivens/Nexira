@@ -40,13 +40,26 @@ class RetiredRow(val client: RetiredClient) {
     /** Filled once the row is done with, successfully or not. */
     var outcome by mutableStateOf<RetiredOutcome?>(null)
 
-    /** Adoption needs a version; without one the only honest choice is to keep or delete. */
+    /**
+     * Whether this row could be adopted as it stands.
+     *
+     * Not a gate on CHOOSING adoption. The version field only appears once the
+     * row is set to adopt, so refusing the choice without a version left the one
+     * folder that needs typing as the one folder nobody could type into.
+     */
     val adoptable: Boolean get() = mcVersion.isNotBlank()
 }
 
 sealed interface RetiredOutcome {
     data class Adopted(val packName: String, val sourceKept: Boolean) : RetiredOutcome
     data object Deleted : RetiredOutcome
+
+    /**
+     * Some of the tree went and some did not. Its own outcome because the two
+     * readings send a person to different places: nothing happened means try
+     * again, half of it happened means go and look at what is left.
+     */
+    data object PartlyDeleted : RetiredOutcome
     data class Failed(val reason: String) : RetiredOutcome
 }
 
@@ -87,6 +100,13 @@ class RetiredClientsState(
     /** Nothing chosen means the reader looked and left, which the surface must allow. */
     val anyChosen: Boolean get() = rows.any { it.choice != RetiredChoice.Keep }
 
+    /**
+     * Whether the pass can run. A row set to adopt with no version is the one
+     * thing that blocks it, and the surface says so on that row rather than
+     * leaving a dead button with no explanation.
+     */
+    val ready: Boolean get() = rows.none { it.choice == RetiredChoice.Adopt && !it.adoptable }
+
     suspend fun load() {
         loading = true
         rows.clear()
@@ -96,11 +116,16 @@ class RetiredClientsState(
         loading = false
     }
 
-    /** Sets every row that can take it to [choice]; the ones that cannot are left alone. */
+    /**
+     * Sets every row to [choice].
+     *
+     * Including the rows that cannot be adopted yet: the version is typed on a row
+     * that is already set to adopt, so skipping them here would put them out of
+     * reach of the only control that fixes them. [ready] is what holds the pass
+     * back until they are filled in.
+     */
     fun chooseAll(choice: RetiredChoice) {
-        rows.forEach { row ->
-            if (choice != RetiredChoice.Adopt || row.adoptable) row.choice = choice
-        }
+        rows.forEach { row -> row.choice = choice }
     }
 
     /**
@@ -115,6 +140,10 @@ class RetiredClientsState(
         running = true
         try {
             val toSweep = mutableListOf<RetiredClient>()
+            // Bytes an adopted source now shares with its instance. Removing the
+            // source frees none of them, so they come off what the surface
+            // reports as reclaimed.
+            val shared = mutableMapOf<String, Long>()
 
             for (row in rows.filter { it.choice == RetiredChoice.Adopt }) {
                 row.busy = true
@@ -122,7 +151,10 @@ class RetiredClientsState(
                     val adopted = adopter.adopt(row.client, row.mcVersion, row.loader.ifBlank { null })
                     row.outcome = RetiredOutcome.Adopted(adopted.instance.displayName, sourceKept = !adopted.complete)
                     // The source is redundant only when every file made it across.
-                    if (adopted.complete) toSweep += row.client
+                    if (adopted.complete) {
+                        toSweep += row.client
+                        shared[row.client.dir.toString()] = adopted.sharedBytes
+                    }
                     ActionRing.record(
                         "Leftover client '${row.client.name}' adopted as a local pack" +
                             if (adopted.complete) "" else " (source kept: ${adopted.failed} file(s) did not transfer)",
@@ -142,14 +174,15 @@ class RetiredClientsState(
             toSweep += deleting.map { it.client }
 
             if (toSweep.isNotEmpty()) {
-                val swept = sweeper.sweep(toSweep)
+                val swept = sweeper.sweep(toSweep) { shared[it.dir.toString()] ?: 0L }
                 reclaimedBytes = swept.bytes
                 val gone = swept.clients.toSet()
+                val half = swept.partial.toSet()
                 deleting.forEach { row ->
-                    row.outcome = if (row.client.name in gone) {
-                        RetiredOutcome.Deleted
-                    } else {
-                        RetiredOutcome.Failed(FAILED_TO_REMOVE)
+                    row.outcome = when (row.client.name) {
+                        in gone -> RetiredOutcome.Deleted
+                        in half -> RetiredOutcome.PartlyDeleted
+                        else -> RetiredOutcome.Failed(FAILED_TO_REMOVE)
                     }
                 }
                 ActionRing.record("Leftover clients: removed ${swept.clients.size}, reclaimed ${swept.bytes} bytes")

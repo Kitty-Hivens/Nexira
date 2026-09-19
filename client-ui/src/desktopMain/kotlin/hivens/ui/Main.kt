@@ -121,8 +121,9 @@ val uiModule = module {
     // one hook belongs to a client-ui type: the default skins are read out of a
     // client jar, and on an upgraded install the retired tree is the only place
     // one lives until a pack is installed. Listing them extracts and caches the
-    // nine PNGs for good, so the sweep does it once before the first deletion --
-    // otherwise somebody who cleared the folders first would find the wardrobe's
+    // PNGs for good -- nine off a modern client, the Steve and Alex pair off a
+    // 1.12.2 one -- so the sweep does it once before the first deletion.
+    // Otherwise somebody who cleared the folders first would find the wardrobe's
     // defaults gone for a reason they could not act on.
     single { RetiredClientsGate() }
     single {

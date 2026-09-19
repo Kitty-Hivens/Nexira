@@ -236,8 +236,16 @@ class RetiredClientsStateTest {
         assertEquals(true, treeWasThere, "the hook must see what it is meant to rescue")
     }
 
+    /**
+     * A folder whose tree names no version can still be SET to adopt, and the
+     * pass is what waits.
+     *
+     * The version is typed on a row that is already set to adopt, so refusing the
+     * choice put the one folder that needs typing out of reach of the only field
+     * that fixes it. The gate belongs on running, not on choosing.
+     */
     @Test
-    fun `a client with no version cannot be chosen for adoption`() = runTest {
+    fun `a client with no version blocks the pass rather than the choice`() = runTest {
         val dir = clients / "Mystery"
         (dir / "mods").createDirectories()
         (dir / "mods" / "Something.jar").writeText("x")
@@ -247,7 +255,34 @@ class RetiredClientsStateTest {
         assertFalse(s.rows.single().adoptable)
 
         s.chooseAll(RetiredChoice.Adopt)
-        assertEquals(RetiredChoice.Keep, s.rows.single().choice, "a bulk choice skips what cannot take it")
+        assertEquals(RetiredChoice.Adopt, s.rows.single().choice, "the row has to be reachable to be fixed")
+        assertFalse(s.ready, "and the pass waits until a version is on it")
+
+        s.rows.single().mcVersion = "1.12.2"
+        assertTrue(s.ready)
+    }
+
+    /**
+     * What the surface reports as reclaimed, against what the disk actually got.
+     *
+     * An adopted source is hardlinked into its instance, so removing it frees the
+     * runtime that was left behind and nothing else. Counting the whole folder
+     * would have the surface announce gigabytes that never came back.
+     */
+    @Test
+    fun `adopted bytes are not counted as reclaimed`() = runTest {
+        client("Industrial")
+        val s = state()
+        s.load()
+        s.rows.single().choice = RetiredChoice.Adopt
+        val folder = s.rows.single().client.sizeBytes
+        s.run()
+
+        assertTrue(folder > 0, "the fixture has to weigh something for this to mean anything")
+        assertTrue(
+            s.reclaimedBytes < folder,
+            "content that is now a shared inode is not space the disk got back",
+        )
     }
 
     @Test
