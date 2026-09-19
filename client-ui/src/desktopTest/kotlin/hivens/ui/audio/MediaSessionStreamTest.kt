@@ -1,10 +1,12 @@
 package hivens.ui.audio
 
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Path
+import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -19,6 +21,10 @@ import kotlin.test.assertTrue
  * the player passes each one through, and a property-change signal per frame is a
  * storm on a bus every media widget on the desktop is listening to.
  */
+// runCurrent and advanceTimeBy are the scheduler's own controls and are still
+// experimental. Driving the clock by hand is the whole instrument here, so the
+// opt-in is the honest answer rather than a warning to live with.
+@OptIn(ExperimentalCoroutinesApi::class)
 class MediaSessionStreamTest {
 
     private val artDir: Path = Path.of("/tmp/nexira-test-covers-unused")
@@ -26,7 +32,7 @@ class MediaSessionStreamTest {
     @Test
     fun `a volume drag does not become one snapshot per pointer frame`() = runTest {
         val player = AudioPlayer(scope = backgroundScope)
-        val bridge = MediaSessionBridge(player, backgroundScope, artDir)
+        val bridge = MediaSessionBridge(MusicPlayerServiceImpl(player), backgroundScope, artDir)
 
         val seen = mutableListOf<Float>()
         val collector = backgroundScope.launch { bridge.snapshots().collect { seen += it.volume } }
@@ -53,7 +59,7 @@ class MediaSessionStreamTest {
         // state: a paused player emits no state, so a slider moved while paused
         // would otherwise reach the desktop only on the next play.
         val player = AudioPlayer(scope = backgroundScope)
-        val bridge = MediaSessionBridge(player, backgroundScope, artDir)
+        val bridge = MediaSessionBridge(MusicPlayerServiceImpl(player), backgroundScope, artDir)
 
         val seen = mutableListOf<Float>()
         val collector = backgroundScope.launch { bridge.snapshots().collect { seen += it.volume } }

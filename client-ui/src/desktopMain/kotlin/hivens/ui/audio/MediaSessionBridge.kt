@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image
+import hivens.ui.widgets.services.MusicPlayerService
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -51,7 +52,12 @@ import java.nio.file.Path
  * could fail.
  */
 class MediaSessionBridge(
-    private val player: AudioPlayer,
+    /**
+     * The contract rather than the engine, so what the desktop sees follows
+     * whoever owns the session rather than one object that happens to be the
+     * owner today. Every member this bridge reads or drives is on it.
+     */
+    private val player: MusicPlayerService,
     private val scope: CoroutineScope,
     /** Where a cover is written so the desktop can read it back by URL. */
     private val artDir: Path,

@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
@@ -45,11 +44,8 @@ import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
-import hivens.ui.widgets.services.MusicPlayerServiceImpl
-import hivens.widget.api.provideService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
-import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
@@ -88,20 +84,16 @@ data class ReadoutPlayerProps(
     propsClass = ReadoutPlayerProps::class,
     drawsOwnSurface = true,
 )
-@ProvidesService(MusicPlayerService::class)
 @Composable
 fun ReadoutPlayerWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ReadoutPlayerProps>()
-    val player: AudioPlayer = koinInject()
+    val player: MusicPlayerService = koinInject()
     val state by player.state.collectAsState()
     val volume by player.volume.collectAsState()
     val repeat by player.repeat.collectAsState()
     val queue by player.queue.collectAsState()
     val track by player.track.collectAsState()
     val scope = rememberCoroutineScope()
-
-    val musicService = remember(player) { MusicPlayerServiceImpl(player) }
-    provideService(MusicPlayerService::class, instance.instanceId, musicService)
 
     val openTracks = rememberAudioFilesPicker(scope) { player.open(it) }
 

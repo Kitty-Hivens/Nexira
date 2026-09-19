@@ -46,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.LocalStrings
@@ -58,9 +57,6 @@ import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
-import hivens.ui.widgets.services.MusicPlayerServiceImpl
-import hivens.widget.api.useService
-import hivens.widget.model.InjectService
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
 
@@ -68,31 +64,24 @@ import org.koin.compose.koinInject
  * The transport as one strip, for a surface that wants the controls without the
  * object.
  *
- * The smallest of the player kinds and the only one that prefers somebody else's
- * playback to its own. It reads [MusicPlayerService] out of the widget service
- * registry, which is what lets a surface carry a full player and this strip and
- * have them be two views of one playback rather than two players arguing over a
- * device. It is also the launcher's only consumer of that registry, so the
- * declaration below is the one worked example of the inject side.
+ * The smallest of the player kinds, and it reads the same [MusicPlayerService] the
+ * others do, so a surface carrying a full player and this strip has two views of
+ * one playback rather than two players arguing over a device.
  *
- * Where no provider is mounted it drives the process player directly instead of
- * refusing. It used to draw a sunken plane saying to add a music player, which was
- * honest while the widget it deferred to existed and became nonsense when that
- * widget was retired: a music player telling somebody to go and find a music
- * player. Every provider wraps the same singleton anyway, so the two paths differ
- * in which object is asked and in nothing a listener can hear.
+ * It used to take that contract out of the widget service registry and fall back
+ * to the process player when nothing was mounted. Both halves reached the same
+ * object: every provider wrapped the singleton, and so did the fallback, so the
+ * round trip decided which wrapper was asked and nothing a listener could hear.
+ * The contract is app-provided now and the question does not arise.
  */
 @Widget(
     id          = "home.new.playback.mini",
     displayName = "widget.home.new.playback.mini",
     drawsOwnSurface = true,
 )
-@InjectService(MusicPlayerService::class)
 @Composable
 fun PlaybackMiniControlWidget() {
-    val provided: MusicPlayerService? = useService()
-    val player: AudioPlayer = koinInject()
-    val service = provided ?: remember(player) { MusicPlayerServiceImpl(player) }
+    val service: MusicPlayerService = koinInject()
 
     val state by service.state.collectAsState()
     val volume by service.volume.collectAsState()

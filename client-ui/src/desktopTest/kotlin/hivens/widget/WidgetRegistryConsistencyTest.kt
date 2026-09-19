@@ -177,14 +177,32 @@ class WidgetRegistryConsistencyTest {
         }
     }
 
+    /**
+     * Nothing declares a service contract, and that is the state rather than a
+     * regression.
+     *
+     * The registry's one real contract was the music player: ten widgets provided
+     * it, one read it, and that reader fell back to the same engine every provider
+     * wrapped. It is app-provided through the container now, so no widget reads it
+     * out of the registry and none provides it, which leaves the check above with
+     * nothing to check.
+     *
+     * That vacuity is what this says out loud, and it is a tripwire rather than a
+     * headstone. It fails the moment a declaration appears, because the pair is
+     * live again at that point and somebody has to decide whether the registry is
+     * where the new contract belongs or whether it follows the player into the
+     * container.
+     */
     @Test
-    fun `the service annotations reach the registry at all`() {
-        // The pair that exists today. If this ever goes empty the processor has
-        // stopped reading the annotations, and the check above passes vacuously.
-        val descriptors = GeneratedWidgetRegistry.all().values
-        assertTrue(
-            descriptors.any { it.provides.isNotEmpty() } && descriptors.any { it.injects.isNotEmpty() },
-            "no widget declares a service contract -- either the annotations are gone or KSP is not reading them",
+    fun `no widget declares a service contract, so the check above is vacuous`() {
+        val declaring = GeneratedWidgetRegistry.all().values
+            .filter { it.provides.isNotEmpty() || it.injects.isNotEmpty() }
+            .map { it.kind.value }
+        assertEquals(
+            emptyList(),
+            declaring,
+            "a widget declares a service contract again, so the unmet-contract check above is live once " +
+                "more. Decide whether the registry is the right home for it before relying on that check.",
         )
     }
 

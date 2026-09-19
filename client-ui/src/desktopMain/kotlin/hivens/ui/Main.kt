@@ -70,6 +70,8 @@ import hivens.update.UpdateService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.state.WidgetStateFlushHook
+import hivens.ui.widgets.services.MusicPlayerService
+import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
@@ -304,6 +306,21 @@ val uiModule = module {
             },
         )
     }
+
+    // What a widget asks about playback, and the one place the answer comes from.
+    //
+    // It used to be provided by every player widget into the widget service
+    // registry and read by one consumer, which had a fallback to this same engine
+    // for when none was mounted. Every path already ended at one object, so the
+    // round trip decided which wrapper was asked and nothing else: ten
+    // registrations, one reader, and a churn the drag ghost could steal from,
+    // since a ghost and its source share an instance id and the ghost's dispose
+    // unregistered what the source had provided.
+    //
+    // App-static instead, like the data sources and the commands beside it. The
+    // widgets read the contract rather than the engine, which is what lets the
+    // thing behind it change without any of them knowing.
+    single<MusicPlayerService> { MusicPlayerServiceImpl(get()) }
 
     // Where the sound leaves. One connection to the sound server for the process,
     // opened on the first track rather than at startup, and a stream per track on
