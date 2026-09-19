@@ -3,6 +3,7 @@ package hivens.ui.widgets.shell
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.chrome.rememberCrumbLabel
 import hivens.ui.i18n.LocalStrings
@@ -45,6 +47,14 @@ fun TopBarBreadcrumbWidget() {
                 label = rememberCrumbLabel(screen),
                 isLast = isLast,
                 onClick = { if (!isLast) ctx.onPopTo(screen) },
+                // Where you ARE takes the remaining room and the places you came
+                // through give way first. A trail four deep ending in a build
+                // number -- Library, the pack, the project, 1.8.14-beta.1+1.21.1-neoforge
+                // -- ran past the bar, and a Row measures its unweighted children
+                // first, so the one segment that got cut was the one naming where
+                // the reader had arrived.
+                modifier = if (isLast) Modifier.weight(1f, fill = false)
+                else Modifier.widthIn(max = CRUMB_MAX),
             )
             if (!isLast) {
                 Symbol(
@@ -86,14 +96,21 @@ private fun NavArrow(
 }
 
 @Composable
-private fun CrumbSegment(label: String, isLast: Boolean, onClick: () -> Unit) {
+private fun CrumbSegment(label: String, isLast: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelLarge,
         color = if (isLast) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary,
         fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Normal,
         maxLines = 1,
-        modifier = (if (isLast) Modifier else Modifier.clickable(onClick = onClick))
+        // Said with an ellipsis rather than cut. maxLines alone leaves the default
+        // clip, which ends a name on half a glyph.
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .then(if (isLast) Modifier else Modifier.clickable(onClick = onClick))
             .padding(horizontal = 4.dp, vertical = 4.dp),
     )
 }
+
+/** How wide a place the reader has already left may be before it gives way. */
+private val CRUMB_MAX = 160.dp

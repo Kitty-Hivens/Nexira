@@ -142,7 +142,7 @@ internal fun rememberModBrowserState(mcVersion: String, loader: String, modsDir:
             search = { q -> withContext(Dispatchers.IO) { modrinth.searchMods(q, mcVersion, loader).hits } },
             install = { hit ->
                 withContext(Dispatchers.IO) {
-                    val version = modrinth.bestModVersion(hit.projectId, mcVersion, loader)
+                    val version = modrinth.newestMatchingVersion(hit.projectId, mcVersion, loader)
                     if (version == null) {
                         // No build for this MC/loader pair is a real answer, not an
                         // error: the project exists but does not support this pack.

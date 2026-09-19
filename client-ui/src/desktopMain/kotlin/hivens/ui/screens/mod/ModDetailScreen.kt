@@ -1,7 +1,18 @@
 package hivens.ui.screens.mod
 
 import androidx.compose.foundation.background
+import hivens.ui.theme.Motion
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +37,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,12 +69,11 @@ import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.components.ImageGallery
 import hivens.ui.components.modrinthGalleryMedia
 import hivens.ui.render.MarkdownHtml
-import hivens.ui.screens.versions.VersionBrowser
-import hivens.ui.screens.versions.pickerVersionsOf
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
@@ -76,6 +88,11 @@ import java.nio.file.Path
 /**
  * The project page: a header, the tabs, and the body.
  *
+ * No way back of its own. The shell already carries one, twice: the top bar's
+ * arrow and the breadcrumb that ends on this page. A third, wedged between the
+ * window edge and the project's own mark, was one more thing to read before the
+ * page starts and pushed the mark off the margin every other page keeps.
+ *
  * Nothing else, on purpose. The compatibility, links and details blocks live in
  * `appshell.rightrail`, which is a shell surface and therefore already beside
  * this page on every screen -- a page carrying its own right-hand column would
@@ -85,7 +102,12 @@ import java.nio.file.Path
 @Composable
 fun ModDetailScreen(
     target: ModTarget,
-    onBack: () -> Unit,
+    /**
+     * Opens one build's own page. Carries the build's number as well as its id,
+     * because the breadcrumb needs a name on the first frame and the row that was
+     * clicked already has one.
+     */
+    onOpenVersion: (versionId: String, versionNumber: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val modrinth: ModrinthClient = koinInject()
@@ -94,12 +116,20 @@ fun ModDetailScreen(
     val openProject: OpenProjectState = koinInject()
     val dataDir: Path = koinInject()
     val families = LocalSurfaceFamilies.current
+    val s = LocalStrings.current
 
     val state = remember(target) {
-        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject)
+        ModDetailState(target, modrinth, repo, dataDir, scanner, openProject, strings = s)
     }
     var reloadTick by remember(state) { mutableStateOf(0) }
-    var tab by remember(state) { mutableStateOf(ModPageTab.Description) }
+    // Saveable, not remembered. The only way to a build's page is the Versions
+    // tab, and the shell keeps a screen's saveable state across a visit -- so
+    // without this, Back from a build always landed on Description, which is not
+    // the tab anybody left from.
+    var tab by rememberSaveable(
+        state,
+        stateSaver = Saver(save = { it.name }, restore = { ModPageTab.valueOf(it) }),
+    ) { mutableStateOf(ModPageTab.Description) }
     val gallery = remember(state.project) { modrinthGalleryMedia(state.project?.gallery.orEmpty()) }
     // A tab with nothing behind it is not drawn, which is what the reference does:
     // a project with no shots has no gallery to open, and a tab that leads to an
@@ -122,7 +152,7 @@ fun ModDetailScreen(
     }
 
     Column(modifier.fillMaxSize()) {
-        Header(state, onBack)
+        Header(state)
         // The tabs are page chrome, above the card and outside its scroll. They
         // used to be the first thing inside it, so opening a long description and
         // reading two screens down left no way back to Versions without scrolling
@@ -153,8 +183,13 @@ fun ModDetailScreen(
                 ) {
                     Body(state) { reloadTick++ }
                 }
-                ModPageTab.Versions -> VersionsPane(state, Modifier.fillMaxSize())
-                ModPageTab.Changelog -> ChangelogPane(state, Modifier.fillMaxSize())
+                ModPageTab.Versions -> VersionsPane(
+                    state = state,
+                    onOpenVersion = { v -> onOpenVersion(v.id, v.versionNumber.ifBlank { v.name }) },
+                    onReload = { reloadTick++ },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ModPageTab.Changelog -> ChangelogPane(state, onReload = { reloadTick++ }, modifier = Modifier.fillMaxSize())
                 ModPageTab.Gallery -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 ) {
@@ -170,70 +205,10 @@ fun ModDetailScreen(
 /** Which pane the page is showing. */
 internal enum class ModPageTab { Description, Versions, Changelog, Gallery }
 
-/**
- * Every build the catalogue has, in the same list the version modal uses.
- *
- * The same furniture on purpose: picking a build of a mod is one decision and it
- * should not look like two different screens depending on where the reader
- * started. What differs is where the action sits, which is under the notes here
- * because a tab has no footer of its own.
- */
-@Composable
-internal fun VersionsPane(state: ModDetailState, modifier: Modifier = Modifier) {
-    val s = LocalStrings.current
-    val scope = rememberCoroutineScope()
-    // Asked when the tab is opened, not when the page is. Keyed on the project so
-    // a second visit to a different mod asks again.
-    LaunchedEffect(state) { state.loadVersions() }
-
-    val all = state.versions
-    val rows = remember(all, state.packMcVersion, state.packLoaders, s) {
-        pickerVersionsOf(all.orEmpty(), state.packMcVersion, state.packLoaders, installedId = null, s = s)
-    }
-
-    if (state.versionsFailed) {
-        RetryStateBlock(
-            title = s.contentTabFetchErrorTitle,
-            message = s.contentVersionsLoadFailed,
-            retryLabel = s.contentTabRetry,
-            onRetry = { scope.launch { state.versions = null; state.loadVersions() } },
-            modifier = modifier.padding(20.dp),
-            titleStyle = MaterialTheme.typography.titleMedium,
-        )
-        return
-    }
-
-    VersionBrowser(
-        versions = rows,
-        loading = all == null,
-        onSelectionChange = {},
-        modifier = modifier,
-        detailAction = { picked ->
-            // No action where there is no pack to act on. A page opened from
-            // nowhere in particular can still be read; it just cannot install.
-            if (state.install != InstallAction.None) {
-                NxButton(
-                    label = when {
-                        state.installing -> s.modPageInstalling
-                        state.installFailed -> s.modPageInstallRetry
-                        else -> s.modPageInstallBuild(picked.label)
-                    },
-                    onClick = {
-                        all?.firstOrNull { it.id == picked.id }
-                            ?.let { v -> scope.launch { state.installVersion(v) } }
-                    },
-                    icon = if (state.installFailed) NxIcon.Refresh else NxIcon.Download,
-                    enabled = !state.installing,
-                )
-            }
-        },
-    )
-}
-
 @Composable
 internal fun Body(state: ModDetailState, onRetry: () -> Unit) {
     val s = LocalStrings.current
-    val uriHandler = LocalUriHandler.current
+    val follow = rememberLinkFollower()
     when {
         state.loading -> Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
@@ -255,7 +230,8 @@ internal fun Body(state: ModDetailState, onRetry: () -> Unit) {
         state.body != null -> MarkdownHtml(
             markdown = state.body.orEmpty(),
             modifier = Modifier.fillMaxWidth(),
-            onLink = { uriHandler.openUri(it) },
+            // A description that links to another mod opens that mod HERE.
+            onLink = follow,
         )
         // Two different silences. The catalogue has an entry and the author left
         // it blank, or there is no entry at all and the description lives
@@ -274,7 +250,7 @@ private fun Unknown(text: String) = Text(
 )
 
 @Composable
-internal fun Header(state: ModDetailState, onBack: () -> Unit) {
+internal fun Header(state: ModDetailState) {
     val scope = rememberCoroutineScope()
     val s = LocalStrings.current
     val uriHandler = LocalUriHandler.current
@@ -294,13 +270,6 @@ internal fun Header(state: ModDetailState, onBack: () -> Unit) {
         // sitting on the same line as anything.
         verticalAlignment = Alignment.Top,
     ) {
-        Box(
-            Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onBack).padding(6.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Symbol(NxIcon.ArrowBack, contentDescription = null, tint = NxTheme.colors.textPrimary, size = 20.dp)
-        }
-
         ProjectIcon(project?.iconUrl, state.title)
 
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -372,7 +341,15 @@ internal fun Header(state: ModDetailState, onBack: () -> Unit) {
                 // somewhere else, but it is not what a reader came here to do, so it
                 // goes in the overflow the way every other secondary route does.
                 //
-                InstallButton(state, scope)
+                // Whether an install is possible at all is known from the route.
+                // WHAT goes in the slot needs the pack read off disk, and until it
+                // lands [InstallAction.None] draws nothing, so this reserves the
+                // fact rather than the width: the button still appears a moment in.
+                // Reserving the width would mean knowing the label, and the label
+                // names the pack.
+                if (state.installPossible) {
+                    Box(contentAlignment = Alignment.Center) { InstallButton(state, scope) }
+                }
                 val pageUrl = project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
                 val homepage = installed?.homepageUrl?.takeIf { it.isNotBlank() }
                 if (pageUrl != null || homepage != null) {
@@ -401,6 +378,23 @@ internal fun Header(state: ModDetailState, onBack: () -> Unit) {
                     s.modPageInstalledVersion(it),
                     style = MaterialTheme.typography.labelSmall,
                     color = NxTheme.colors.textSecondary,
+                )
+            }
+            // Why nothing happened, under the button that was pressed, naming the
+            // two things that decided it. Without this the click did nothing and
+            // said nothing, which reads as the launcher having ignored it.
+            if (state.installNoBuild) {
+                // Names the axes that are actually KNOWN. Filling a blank one with
+                // the unknown placeholder produced "no build for Unknown / Unknown",
+                // which is a sentence about our own ignorance rather than about
+                // the pack.
+                val target = listOf(state.packMcVersion, state.packLoaders.firstOrNull().orEmpty())
+                    .filter { it.isNotBlank() }
+                    .joinToString(" / ")
+                Text(
+                    if (target.isBlank()) s.modPageNoBuildAny else s.modPageNoBuildFor(target),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxTheme.colors.warnAccent,
                 )
             }
             // Said under the button, where the click was. A mod that landed without
@@ -502,10 +496,9 @@ private fun Stat(icon: IconKey, value: String, label: String) {
 /**
  * The page's tabs.
  *
- * Only the description is reachable so far: versions and the gallery are the next
- * two panes and are drawn disabled rather than left out, because a tab row that
- * grows later moves everything under it, and a reader who can see where the other
- * two will be is not surprised when they arrive.
+ * Description, versions and the changelog are always there, because every project
+ * has all three even when one of them is empty. The gallery is the exception and
+ * appears only where there are shots.
  */
 @Composable
 internal fun Tabs(
@@ -515,34 +508,84 @@ internal fun Tabs(
     hasGallery: Boolean = false,
 ) {
     val s = LocalStrings.current
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        // The gallery appears only where there are shots, the way the reference
-        // does it. A tab that opens an empty pane is a click that tells a reader
-        // nothing its absence would not have told them.
-        val tabs = buildList {
-            add(ModPageTab.Description to s.modPageTabDescription)
-            add(ModPageTab.Versions to s.modPageTabVersions)
-            add(ModPageTab.Changelog to s.modPageTabChangelog)
-            if (hasGallery) add(ModPageTab.Gallery to s.modPageTabGallery)
+    val density = LocalDensity.current
+    // The gallery appears only where there are shots, the way the reference does
+    // it. A tab that opens an empty pane is a click that tells a reader nothing
+    // its absence would not have told them.
+    val tabs = buildList {
+        add(ModPageTab.Description to s.modPageTabDescription)
+        add(ModPageTab.Versions to s.modPageTabVersions)
+        add(ModPageTab.Changelog to s.modPageTabChangelog)
+        if (hasGallery) add(ModPageTab.Gallery to s.modPageTabGallery)
+    }
+
+    // Where each tab's mark belongs, measured rather than computed: the labels are
+    // five different words in five languages and the row is the only thing that
+    // knows how wide each came out.
+    val marks = remember { mutableStateMapOf<ModPageTab, Dp>() }
+    val target = marks[active]
+    val travel = remember { Animatable(0.dp, Dp.VectorConverter) }
+    var placed by remember { mutableStateOf(false) }
+    val spec = Motion.track.of<Dp>()
+    LaunchedEffect(target, spec) {
+        val to = target ?: return@LaunchedEffect
+        if (!placed) {
+            // The first position is where the mark ALREADY is. Animating to it
+            // would slide the underline in from the left edge on arrival, as if
+            // the reader had just moved it there.
+            travel.snapTo(to)
+            placed = true
+        } else {
+            travel.animateTo(to, spec)
         }
-        tabs.forEach { (id, label) ->
-            val selected = id == active
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onSelect(id) },
-            ) {
-                Text(
-                    label,
+    }
+
+    Column(modifier) {
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            tabs.forEach { (id, label) ->
+                // Measured at its heaviest, drawn at its current weight. A bold face
+                // is wider, so selecting a tab used to widen its label and slide
+                // every tab after it sideways, out from under the cursor that had
+                // just clicked.
+                NxSteadyText(
+                    text = label,
+                    weight = if (id == active) FontWeight.Bold else FontWeight.Normal,
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (selected) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (id == active) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary,
+                    // No indication. A tab already says where you are with its weight
+                    // and its rule, and a hover plate behind the word is a second
+                    // answer to a question the row has already answered.
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onSelect(id) }
+                        .onGloballyPositioned { c ->
+                            val centre = c.positionInParent().x + c.size.width / 2f
+                            marks[id] = with(density) { (centre - MARK_WIDTH.toPx() / 2f).toDp() }
+                        },
                 )
-                Spacer(Modifier.size(6.dp))
+            }
+        }
+        Spacer(Modifier.size(6.dp))
+        // ONE mark that travels, not one per tab that blinks on and off. The
+        // underline is the same object wherever it is, so it moves the way the
+        // reader's attention does -- and because every click retargets an
+        // animation already in flight, a run of fast clicks is followed rather
+        // than queued: the mark is always heading for the tab last asked for,
+        // from wherever it had got to.
+        Box(Modifier.fillMaxWidth().height(MARK_HEIGHT)) {
+            if (placed) {
                 Box(
-                    Modifier.size(width = 26.dp, height = 2.dp)
-                        .background(if (selected) NxTheme.colors.primary else Color.Transparent),
+                    Modifier.offset(x = travel.value)
+                        .size(width = MARK_WIDTH, height = MARK_HEIGHT)
+                        .background(NxTheme.colors.primary),
                 )
             }
         }
     }
 }
+
+/** The underline: a mark under the word rather than a rule the width of it. */
+private val MARK_WIDTH = 26.dp
+private val MARK_HEIGHT = 2.dp

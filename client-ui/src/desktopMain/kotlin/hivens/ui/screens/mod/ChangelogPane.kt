@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,7 +42,9 @@ import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxVerticalScrollbar
+import hivens.ui.nx.RetryStateBlock
 import hivens.ui.theme.NxTheme
+import kotlinx.coroutines.launch
 
 /**
  * Every build's notes in one column, newest first.
@@ -54,13 +57,61 @@ import hivens.ui.theme.NxTheme
  * that is one motion or it is not worth doing.
  */
 @Composable
-internal fun ChangelogPane(state: ModDetailState, modifier: Modifier = Modifier) {
+internal fun ChangelogPane(
+    state: ModDetailState,
+    /** Asks the screen to load the project again; see [VersionsPane]. */
+    onReload: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val s = LocalStrings.current
-    LaunchedEffect(state) { state.loadVersions() }
+    val scope = rememberCoroutineScope()
+    // Same key as the versions tab, for the same reason: the project arrives after
+    // the tab mounts, and asking before it does used to leave a spinner forever.
+    LaunchedEffect(state, state.project) { state.loadVersions() }
 
     val all = state.versions
     val entries = remember(all) { changelogEntries(all.orEmpty()) }
 
+    // The same three refusals the versions tab makes, because both panes read the
+    // same fetch. Without them a listing that failed left [all] null forever and
+    // this drew a spinner that never stopped, which is the one state a reader
+    // cannot tell from work still in progress.
+    if (state.failed) {
+        RetryStateBlock(
+            title = s.contentTabFetchErrorTitle,
+            message = s.contentTabFetchErrorGeneric,
+            retryLabel = s.contentTabRetry,
+            onRetry = onReload,
+            modifier = modifier.padding(20.dp),
+            titleStyle = MaterialTheme.typography.titleMedium,
+        )
+        return
+    }
+    if (state.versionsFailed) {
+        RetryStateBlock(
+            title = s.modPageVersionsFailed,
+            message = s.modPageVersionsFailedBody,
+            retryLabel = s.contentTabRetry,
+            onRetry = { scope.launch { state.versions = null; state.loadVersions() } },
+            modifier = modifier.padding(20.dp),
+            titleStyle = MaterialTheme.typography.titleMedium,
+        )
+        return
+    }
+    if (state.loading || state.versionsLoading) {
+        CenteredProgress(modifier.fillMaxSize())
+        return
+    }
+    if (!state.knownToCatalogue) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                s.modPageVersionsNoEntry,
+                style = MaterialTheme.typography.bodySmall,
+                color = NxTheme.colors.textSecondary,
+            )
+        }
+        return
+    }
     if (all == null) {
         CenteredProgress(modifier.fillMaxSize())
         return
@@ -163,7 +214,17 @@ private fun ChangelogRow(entry: ChangelogEntry) {
                 )
                 ChannelChip(entry.channel)
                 formatBuildTimestamp(v.datePublished)?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
+                    // One line. This Row has no weighted child, so the date is
+                    // measured against whatever the name and the channel chip left,
+                    // and a Text that is allowed to wrap grows the row a line
+                    // instead of giving way.
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             // The notes once per distinct text. A repeated build keeps its header,

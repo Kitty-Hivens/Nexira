@@ -81,8 +81,12 @@ data class OpenProject(
     val serverSide: String? = null,
     val licenseId: String? = null,
     val licenseName: String? = null,
+    /** How long ago, as the rail reads it. */
     val publishedAt: String? = null,
     val updatedAt: String? = null,
+    /** The exact moment, for the tooltip behind each of the two above. */
+    val publishedExact: String? = null,
+    val updatedExact: String? = null,
     val links: List<ProjectLink> = emptyList(),
     val disclosures: List<ModrinthDisclosure> = emptyList(),
     /**
@@ -120,6 +124,19 @@ class OpenProjectState {
 
     fun publish(project: OpenProject?) {
         _open.value = project
+    }
+
+    /**
+     * Takes the rail down only if it is still describing [targetKey].
+     *
+     * A page clears on the way out, and the shell animates between pages, so the
+     * one LEAVING is disposed after the one arriving has already published. An
+     * unconditional clear then wiped the rail a frame after the new page filled
+     * it: an empty panel beside a loaded project, and a breadcrumb that fell back
+     * to the raw catalogue id because the title it reads had just been erased.
+     */
+    fun clearIf(targetKey: String) {
+        if (_open.value?.targetKey == targetKey) _open.value = null
     }
 }
 

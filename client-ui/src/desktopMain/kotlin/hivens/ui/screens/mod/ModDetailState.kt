@@ -9,6 +9,8 @@ import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.ui.components.formatBuildTimestamp
+import hivens.ui.i18n.AppStrings
+import hivens.ui.components.relativeAge
 import hivens.launcher.instance.DISABLED_SUFFIX
 import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.ContentKind
@@ -44,6 +46,12 @@ class ModDetailState(
     private val dataDir: Path,
     private val scanner: InstanceContentScanner,
     private val open: OpenProjectState,
+    /**
+     * The reader's language, for the two facts the rail receives already written:
+     * how long ago a build was published and when it was updated. The rail draws
+     * what it is handed, so whoever hands it has to speak.
+     */
+    private val strings: AppStrings,
     // Composed from the two the state already holds, so a caller that has those
     // has this. Koin binds the same pair.
     private val installer: ModInstaller = ModInstaller(modrinth, scanner),
@@ -100,6 +108,18 @@ class ModDetailState(
         private set
 
     /**
+     * The project exists and has nothing that runs on this pack.
+     *
+     * Kept apart from [installFailed], which means the attempt broke. This one is
+     * an ANSWER: there is no such build, retrying will find no such build, and the
+     * only thing left to do is open the versions tab and choose deliberately. The
+     * two used to be one flag, so a project that simply does not support the pack
+     * offered a Retry that could never succeed.
+     */
+    var installNoBuild by mutableStateOf(false)
+        private set
+
+    /**
      * Every build the catalogue has, or null until the versions tab asks.
      *
      * Not fetched with the page. A reader who came to read the description never
@@ -110,6 +130,19 @@ class ModDetailState(
 
     /** The listing itself did not run. Never the same as a project with no builds. */
     var versionsFailed by mutableStateOf(false)
+        internal set
+
+    /**
+     * True while the build list is in flight.
+     *
+     * Kept apart from "versions is null", which was the only signal and meant three
+     * different things at once: the fetch is running, the fetch never started
+     * because the page had not resolved its project yet, and there is no project to
+     * ask about. The pane drew a spinner for all three, so a local jar span forever
+     * and a catalogue mod span or not depending on whether the reader reached the
+     * tab before the page finished loading.
+     */
+    var versionsLoading by mutableStateOf(false)
         internal set
 
     /** The archive on disk, for a page opened on an installed file. */
@@ -148,15 +181,23 @@ class ModDetailState(
                 is ModTarget.Catalogue -> loadCatalogue(t.projectId)
                 is ModTarget.Installed -> loadInstalled(t)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             // A page that failed to load and a project that declares nothing must
             // not look the same, so the failure is kept rather than folded into an
             // empty result.
             log.warn("Project page: could not resolve {}", target.key, e)
             failed = true
+        } finally {
+            // Restored even when the caller walked away mid-flight. A retry
+            // launched from one of the panes runs on the PANE's scope, so
+            // switching tabs while it was in flight left this true with nothing
+            // left to clear it: all three panes then drew a spinner, with no
+            // retry and no effect whose key had changed to run again.
+            loading = false
         }
         publish()
-        loading = false
     }
 
     /**
@@ -167,7 +208,7 @@ class ModDetailState(
      * a value, not a navigation.
      */
     fun clear() {
-        open.publish(null)
+        open.clearIf(target.key)
     }
 
     private suspend fun loadCatalogue(projectId: String) {
@@ -226,7 +267,32 @@ class ModDetailState(
     /** Where the page can put things, and what runs there. */
     internal class Destination(val name: String, val dir: Path, val mc: String, val loader: String)
 
-    private var destination: Destination? = null
+    /**
+     * Internal rather than private for the same reason the loaded fields are: a
+     * render sheet has to be able to stand up a page that knows which pack it is
+     * aimed at, or the compatibility marking can only be looked at by running the
+     * app against a real instance.
+     */
+    internal var destination: Destination? = null
+
+    /**
+     * The catalogue's version list, for folding a build's game versions into
+     * ranges the way the project's own block does. Empty until something asks.
+     */
+    var gameVersionTags by mutableStateOf<List<ModrinthGameVersion>>(emptyList())
+        internal set
+
+    /**
+     * Asks for the folding order without asking for the build list.
+     *
+     * A single build's page folds its game versions the same way the table does
+     * and has no use for the other four hundred builds, so it takes this instead
+     * of [loadVersions] -- which would fetch the largest response the catalogue
+     * has to serve a page that shows one row of chips.
+     */
+    suspend fun loadGameVersionTags() {
+        if (gameVersionTags.isEmpty()) gameVersionTags = versionTags()
+    }
 
     /** The pack's runtime, for marking which builds can actually run. */
     val packMcVersion: String get() = destination?.mc.orEmpty()
@@ -241,19 +307,44 @@ class ModDetailState(
      * reader who came for the description never pays for it.
      */
     suspend fun loadVersions() {
+        // No project means nothing to ask: either the page is still resolving one,
+        // in which case the caller runs this again when it arrives, or the
+        // catalogue has never seen this file and there is no list to get.
         val projectId = project?.id ?: return
-        if (versions != null) return
+        if (versions != null || versionsLoading) return
+        versionsLoading = true
         versionsFailed = false
-        val fetched = withContext(Dispatchers.IO) {
-            runCatching { modrinth.listVersions(projectId) }
-                .onFailure {
-                    if (it is CancellationException) throw it
-                    log.warn("Project page: listing versions of {} failed", projectId, it)
-                }
-                .getOrNull()
+        try {
+            val fetched = withContext(Dispatchers.IO) {
+                runCatching { modrinth.listVersions(projectId) }
+                    .onFailure {
+                        if (it is CancellationException) throw it
+                        log.warn("Project page: listing versions of {} failed", projectId, it)
+                    }
+                    .getOrNull()
+            }
+            if (fetched == null) versionsFailed = true else versions = fetched
+            // The table folds each build's game versions, and folding needs the
+            // catalogue's release order.
+            if (gameVersionTags.isEmpty()) gameVersionTags = versionTags()
+        } finally {
+            versionsLoading = false
         }
-        if (fetched == null) versionsFailed = true else versions = fetched
     }
+
+    /**
+     * Whether an install could ever be offered here, answerable before anything
+     * loads.
+     *
+     * The route carries the pack; only what is already in that pack needs reading.
+     * Keeping the two apart is what lets the header reserve the action's place from
+     * the first frame instead of growing one under the reader's hands.
+     */
+    val installPossible: Boolean
+        get() = (target as? ModTarget.Catalogue)?.intoInstanceId != null
+
+    /** Whether the catalogue has an entry at all, once the page has finished looking. */
+    val knownToCatalogue: Boolean get() = project != null
 
     /**
      * Installs one named build rather than the newest that fits.
@@ -268,6 +359,7 @@ class ModDetailState(
         val pack = resolveDestination() ?: return
         installing = true
         installFailed = false
+        installNoBuild = false
         installMissing = emptyList()
         try {
             val outcome = withContext(Dispatchers.IO) {
@@ -304,17 +396,23 @@ class ModDetailState(
 
         installing = true
         installFailed = false
+        installNoBuild = false
         installMissing = emptyList()
         try {
             val pack = resolveDestination() ?: return
+            val version = withContext(Dispatchers.IO) {
+                modrinth.newestMatchingVersion(projectId, pack.mc, pack.loader)
+            }
+            if (version == null) {
+                // Refused rather than substituted. The pick is the launcher's, so
+                // it does not get to quietly choose a build for another loader; the
+                // reader can still take one by name from the versions tab.
+                log.info("Project {} has no build for {} / {}", projectId, pack.mc, pack.loader)
+                installNoBuild = true
+                return
+            }
             val outcome = withContext(Dispatchers.IO) {
-                val version = modrinth.bestModVersion(projectId, pack.mc, pack.loader)
-                if (version == null) {
-                    log.info("Project {} has no build for {} / {}", projectId, pack.mc, pack.loader)
-                    ModInstaller.Outcome()
-                } else {
-                    installer.install(pack.dir, version, pack.mc, pack.loader)
-                }
+                installer.install(pack.dir, version, pack.mc, pack.loader)
             }
             if (outcome.ok) {
                 install = InstallAction.Present(pack.name)
@@ -339,10 +437,12 @@ class ModDetailState(
 
         if (file != null) {
             installed = withContext(Dispatchers.IO) { runCatching { scanner.read(file, t.kind) }.getOrNull() }
+            // The catalogue half is allowed to fail loudly, and [load] turns that
+            // into the page's retry. Caught here it produced the worst reading the
+            // page has: a file drawn as one the catalogue has never seen, with a
+            // versions tab saying so, because a request had timed out.
             val found = withContext(Dispatchers.IO) {
-                val sha1 = runCatching { sha1Of(file) }.getOrNull() ?: return@withContext null
-                val version = runCatching { modrinth.versionByHash(sha1) }.getOrNull() ?: return@withContext null
-                runCatching { modrinth.resolveProject(version.projectId) }.getOrNull()
+                modrinth.versionByHash(sha1Of(file))?.let { modrinth.resolveProject(it.projectId) }
             }
             project = found
             if (found != null) {
@@ -417,7 +517,14 @@ class ModDetailState(
         // A jar names the version it was built against at best, and the range it
         // also runs on is not in the archive at all. An empty list is the honest
         // answer and the rail draws the question mark.
-        val folded = if (p == null) emptyList() else foldGameVersions(p.gameVersions, versionTags())
+        // The catalogue's answer when there is one, and the archive's own when there
+        // is not. A jar names the loader it needs and usually the game version it
+        // was built against, and saying "unknown" over the top of that is throwing
+        // away a fact the file had already handed us.
+        val folded = when {
+            p != null -> foldGameVersions(p.gameVersions, versionTags())
+            else -> local?.gameVersions.orEmpty().filter { it.isNotBlank() }
+        }
         open.publish(
             OpenProject(
                 targetKey = target.key,
@@ -425,7 +532,7 @@ class ModDetailState(
                 slug = p?.slug ?: (target as? ModTarget.Installed)?.fileName.orEmpty(),
                 source = source,
                 gameVersionLabels = folded,
-                loaders = p?.loaders ?: emptyList(),
+                loaders = p?.loaders ?: local?.loaders.orEmpty(),
                 categories = p?.let { it.categories + it.additionalCategories } ?: emptyList(),
                 clientSide = p?.clientSide,
                 serverSide = p?.serverSide,
@@ -433,8 +540,15 @@ class ModDetailState(
                 licenseName = p?.license?.name,
                 // Formatted here, because the rail renders what it is given and a
                 // raw ISO stamp is not something a reader was ever meant to see.
-                publishedAt = formatBuildTimestamp(p?.published),
-                updatedAt = formatBuildTimestamp(p?.updated),
+                // Both halves: how long ago for reading, the exact moment for the
+                // tooltip behind it.
+                // Blank is not a date. relativeAge answers "" for a stamp that is not
+                // there, and handing that through printed "Published" with nothing
+                // after it rather than saying the date is not known.
+                publishedAt = relativeAge(p?.published, strings).takeIf { it.isNotBlank() },
+                publishedExact = formatBuildTimestamp(p?.published),
+                updatedAt = relativeAge(p?.updated, strings).takeIf { it.isNotBlank() },
+                updatedExact = formatBuildTimestamp(p?.updated),
                 links = p?.let(::linksOf) ?: emptyList(),
                 creators = creators,
                 disclosures = disclosures,

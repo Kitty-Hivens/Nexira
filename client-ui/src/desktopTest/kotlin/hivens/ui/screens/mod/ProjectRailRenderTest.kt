@@ -69,7 +69,7 @@ class ProjectRailRenderTest {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private fun resource(name: String): String =
-        checkNotNull(javaClass.classLoader.getResourceAsStream("mockup/$name")) { "missing fixture $name" }
+        checkNotNull(javaClass.classLoader.getResourceAsStream("catalogue/$name")) { "missing fixture $name" }
             .bufferedReader().use { it.readText() }
 
     private fun project(slug: String) = json.decodeFromString<ModrinthProject>(resource("$slug.project.json"))
@@ -159,12 +159,12 @@ class ProjectRailRenderTest {
         }
     }
 
-    private fun sheet(slugs: List<String>, name: String) {
+    private fun sheet(slugs: List<String>, name: String, dark: Boolean = true) {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val projects = slugs.map(::open)
         val scene = ImageComposeScene(300 * slugs.size + 40 * (slugs.size + 1), 1200, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(useDarkTheme = dark) {
                 Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
@@ -189,6 +189,19 @@ class ProjectRailRenderTest {
     @Test
     fun `the rail, three projects side by side`() =
         sheet(listOf("sodium", "essential", "cloth-config"), "project-rail.png")
+
+    /**
+     * The same rail on the light style.
+     *
+     * The blocks are built out of style tokens and the chips inside them carry a
+     * hairline drawn from the outline token, which had only ever been looked at
+     * over a dark plane. A rule that reads on one background and vanishes on the
+     * other is the whole failure mode of an outline, and nothing but a picture
+     * catches it.
+     */
+    @Test
+    fun `the rail holds up on the light style`() =
+        sheet(listOf("sodium", "cloth-config"), "project-rail-light.png", dark = false)
 
     /**
      * Cloth Config's fifty-eight versions, which is the case the folding exists

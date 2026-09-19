@@ -91,6 +91,7 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.puppet.PuppetClick
@@ -452,14 +453,20 @@ private fun BuildRow(
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text       = build.versionNumber,
-                style      = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color      = colors.textPrimary,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-                modifier   = Modifier.weight(1f, fill = false),
+            // Measured bold, drawn at its current weight. Selecting a build bolded
+            // its number, and a heavier face is wider, so the channel chip and the
+            // tags beside it jumped right on every click down the list.
+            NxSteadyText(
+                text     = build.versionNumber,
+                style    = MaterialTheme.typography.bodyMedium,
+                // Left edge, not centre: this is a column of build numbers, and a
+                // centred label inside a bold-wide box indents every unselected row.
+                align    = Alignment.CenterStart,
+                weight   = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color    = colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
             ChannelChip(build.channel)
             if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
@@ -804,13 +811,15 @@ private class DiffLabels(
 
 @Composable
 private fun ModDiffIcon(entry: SmrtModEntry, icons: ModIconResolver) {
-    val url by produceState<String?>(entry.display?.iconUrl, entry.filename) {
+    // Seeded with what the process already knows, so a warm resolver draws the
+    // icon in this frame rather than a letter in this one and the icon in the next.
+    val url by produceState<String?>(icons.cached(entry), entry.filename) {
         // The rows are emitted positionally, so one composition serves a different
         // entry when the compared versions change -- and produceState does not
         // re-apply its initial value on a key change. Without this reset the state
         // still held the previous mod's resolved icon, and the guard below then
         // skipped resolving, leaving that icon next to this mod's name for good.
-        value = entry.display?.iconUrl
+        value = icons.cached(entry)
         if (value == null) value = runCatching { icons.resolve(entry) }.getOrNull()
     }
     val box = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp))

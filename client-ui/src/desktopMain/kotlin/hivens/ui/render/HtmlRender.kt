@@ -23,12 +23,14 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -72,7 +74,10 @@ import coil3.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import coil3.size.Size as CoilSize
+import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.components.isPlayableVideoUrl
+import androidx.compose.ui.text.style.TextOverflow
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
@@ -254,6 +259,7 @@ private const val MAX_BLOCK_DEPTH = 32
 
 private val BLOCK_TAGS = setOf(
     "p", "div", "section", "article", "header", "footer", "main", "aside", "figure", "center",
+    "iframe",
     "h1", "h2", "h3", "h4", "h5", "h6",
     "ul", "ol", "li", "blockquote", "pre", "hr", "table", "thead", "tbody", "tr", "details", "summary",
 )
@@ -475,6 +481,7 @@ private fun ColumnScope.block(
             modifier = Modifier.padding(vertical = 6.dp),
         )
         "img" -> ImageBlock(el)
+        "iframe" -> EmbedBlock(el, onLink)
         "table" -> TableBlock(el, ctx, onLink, depth)
         "details" -> DetailsBlock(el, ctx, onLink, depth)
         // div / section / li / summary / details / unknown container -> flow children (propagating center).
@@ -627,19 +634,119 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, 
  * stays a row only if no member of it can set the height of the rest.
  */
 @Composable
-private fun SizedImage(src: String, alt: String?, maxHeight: Dp?, modifier: Modifier = Modifier) {
+private fun SizedImage(
+    src: String,
+    alt: String?,
+    maxHeight: Dp?,
+    maxWidth: Dp? = null,
+    modifier: Modifier = Modifier,
+) {
+    // Trimmed first. A description is hand-written HTML and authors leave a space
+    // inside the quotes; `URI()` throws on one, the gate below then read the
+    // address as unfetchable, and a perfectly good banner was dropped with
+    // nothing anywhere saying why.
+    val url = src.trim()
     // Same gate the links get, for the same reason: a description is written by a
     // third party, and an image source is a fetch the page performs on its own.
     // A `file:` source would make remote text drive a local read.
-    if (!isFetchableUrl(src)) return
+    if (!isFetchableUrl(url)) return
     AsyncImage(
-        model              = src,
+        model              = url,
         contentDescription = alt,
         contentScale       = ContentScale.Fit,
         modifier           = modifier
+            .then(if (maxWidth != null) Modifier.widthIn(max = maxWidth) else Modifier)
             .then(if (maxHeight != null) Modifier.heightIn(max = maxHeight) else Modifier)
             .clip(MaterialTheme.shapes.small),
     )
+}
+
+/**
+ * An embedded video, as far as a native window can honour one.
+ *
+ * A description is HTML and authors put a YouTube player at the top of it. There
+ * is no web view here to run one in, and the previous answer was to drop the
+ * element entirely -- so the page opened on a paragraph about a mod whose whole
+ * pitch was the trailer above it.
+ *
+ * Drawn as the still and a play mark, which is what a player looks like before
+ * anybody presses it, and the press goes out to a browser. That still is fetched
+ * from Google, so opening a mod page reaches Google whenever the description
+ * embeds a video -- a deliberate choice, taken because the alternative was a page
+ * visibly poorer than the one it is a native answer to. Everything else on the
+ * page already fetches from wherever the author pointed it.
+ */
+@Composable
+private fun EmbedBlock(el: Element, onLink: (String) -> Unit) {
+    val src = el.attr("src").trim().ifBlank { el.attr("data-src").trim() }
+    val id = youtubeId(src) ?: return
+    val watch = "https://www.youtube.com/watch?v=$id"
+    Box(
+        modifier = Modifier
+            .padding(vertical = 8.dp)
+            .fillMaxWidth()
+            // The shape of the thing rather than the size of the frame: an author
+            // writing width="560" height="315" is describing 16:9, and the column
+            // decides how much of it there is room for.
+            .aspectRatio(16f / 9f)
+            .clip(MaterialTheme.shapes.small)
+            .background(Color.Black)
+            .clickable { onLink(watch) },
+        contentAlignment = Alignment.Center,
+    ) {
+        // The sharp frame where the upload has one, the one every video has where
+        // it does not. maxres is absent on older and lower-resolution uploads, and
+        // a missing still would leave a black rectangle with a button on it.
+        SubcomposeAsyncImage(
+            model = "$THUMB_BASE/$id/maxresdefault.jpg",
+            contentDescription = el.attr("title").trim().ifBlank { null },
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+            error = {
+                AsyncImage(
+                    model = "$THUMB_BASE/$id/hqdefault.jpg",
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+        )
+        // Ours, not theirs: a neutral plate and a white triangle is the universal
+        // mark for this, and wearing another product's badge would be claiming to
+        // BE their player rather than to link to it.
+        Box(
+            Modifier.size(width = 64.dp, height = 46.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(Color.Black.copy(alpha = 0.62f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, size = 30.dp)
+        }
+    }
+}
+
+/** Where a video's still frames live. */
+private const val THUMB_BASE = "https://i.ytimg.com/vi"
+
+/**
+ * The video an embed stands for, or null when the source is not one we can name.
+ *
+ * An unknown frame is left undrawn rather than turned into a link nobody can
+ * judge: a description is third-party HTML, and an iframe is where an advert
+ * would be.
+ */
+private fun youtubeId(src: String): String? {
+    if (!isBrowsableUrl(src)) return null
+    val host = runCatching { URI(src).host }.getOrNull()?.removePrefix("www.")?.lowercase() ?: return null
+    val id = when (host) {
+        "youtube.com", "youtube-nocookie.com" ->
+            src.substringAfter("/embed/", "").substringBefore('?').substringBefore('/')
+                .ifBlank { Regex("[?&]v=([^&]+)").find(src)?.groupValues?.getOrNull(1).orEmpty() }
+        "youtu.be" -> URI(src).path.orEmpty().trim('/').substringBefore('/')
+        else -> return null
+    }
+    // A video id is opaque but bounded; anything else came from a URL we misread.
+    return id.takeIf { it.isNotBlank() && it.length <= 24 && it.all { c -> c.isLetterOrDigit() || c == '-' || c == '_' } }
 }
 
 /** A row of badges stays a row; a tall one in it would set the height of the rest. */
@@ -649,9 +756,33 @@ private val BADGE_MAX_HEIGHT = 220.dp
 private fun ImageBlock(el: Element) {
     val src = el.attr("src").ifBlank { el.attr("data-src") }
     if (src.isBlank()) return
-    // HTML width/height are CSS px, not dp -- honouring them as dp overflowed the
-    // column (a width="660" banner blew past the content), so they are ignored.
-    SizedImage(src, el.attr("alt").ifBlank { null }, maxHeight = null)
+    // A declared size is a CEILING here, never a demand. Ignoring it altogether
+    // was the previous answer and it drew a 250-wide Patreon badge at its natural
+    // 1100, which is the same defect the other way round: an author who says 250
+    // is saying "no larger than", and clamping to the column means honouring that
+    // can no longer overflow the way a fixed width did.
+    SizedImage(
+        src = src,
+        alt = el.attr("alt").ifBlank { null },
+        maxHeight = declaredPx(el, "height"),
+        maxWidth = declaredPx(el, "width"),
+    )
+}
+
+/**
+ * A size the author declared, in CSS pixels, from the attribute or the style.
+ *
+ * Read as dp, which is only true at one scale, and that is fine for a ceiling:
+ * too generous on a dense display is a picture at its natural size, which is
+ * what the page did everywhere before.
+ */
+private fun declaredPx(el: Element, axis: String): Dp? {
+    val fromAttr = el.attr(axis).trim()
+    val fromStyle = Regex("(?:^|;)\\s*$axis\\s*:\\s*([0-9.]+)\\s*px", RegexOption.IGNORE_CASE)
+        .find(el.attr("style"))?.groupValues?.getOrNull(1)
+    val raw = (fromStyle ?: fromAttr).removeSuffix("px").trim()
+    val value = raw.toFloatOrNull() ?: return null
+    return value.takeIf { it > 0f }?.dp
 }
 
 /** A still image and its optional wrapping link. */

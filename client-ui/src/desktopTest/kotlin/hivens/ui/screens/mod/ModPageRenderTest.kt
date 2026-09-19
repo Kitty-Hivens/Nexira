@@ -28,10 +28,13 @@ import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.net.TransferEngine
+import hivens.launcher.instance.ContentKind
+import hivens.launcher.instance.InstalledContent
 import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.ui.components.ImageGallery
 import hivens.ui.components.formatBuildTimestamp
+import hivens.ui.i18n.RussianStrings
 import hivens.ui.components.modrinthGalleryMedia
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
@@ -77,7 +80,7 @@ class ModPageRenderTest {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private fun resource(name: String): String =
-        checkNotNull(javaClass.classLoader.getResourceAsStream("mockup/$name")) { "missing fixture $name" }
+        checkNotNull(javaClass.classLoader.getResourceAsStream("catalogue/$name")) { "missing fixture $name" }
             .bufferedReader().use { it.readText() }
 
     private fun project(slug: String) = json.decodeFromString<ModrinthProject>(resource("$slug.project.json"))
@@ -109,6 +112,7 @@ class ModPageRenderTest {
             dataDir = Path.of("."),
             scanner = InstanceContentScanner(),
             open = OpenProjectState(),
+            strings = RussianStrings,
         )
         s.project = p
         s.disclosures = disclosures(slug)
@@ -118,6 +122,46 @@ class ModPageRenderTest {
         // action exists for. Set here rather than resolved, because resolving it
         // reads a folder that a sheet has no business having.
         s.install = InstallAction.Install("Industrial")
+        return s
+    }
+
+    /**
+     * The page as a jar the catalogue has never heard of.
+     *
+     * Every fact the catalogue would have supplied is absent, which is the only
+     * state where the rail has to say so rather than show a value. Drawn through
+     * the real widgets, because what is on trial is exactly the words they choose
+     * for a fact nobody can answer.
+     */
+    private fun openLocal(): OpenProject = OpenProject(
+        targetKey = "installed:cloth-config-0.6.13.jar",
+        title = "Cloth Config API",
+        slug = "cloth-config-0.6.13.jar",
+        source = ProjectSource.Local,
+        gameVersionLabels = emptyList(),
+        loaders = listOf("fabric"),
+        licenseId = "LGPL-3.0-only",
+        authors = listOf("shedaniel"),
+        sizeBytes = 1_142_000,
+    )
+
+    private fun localState(): ModDetailState {
+        val s = state("cloth-config")
+        s.project = null
+        s.installed = InstalledContent(
+            kind = ContentKind.Mod,
+            fileName = "cloth-config-0.6.13.jar",
+            displayName = "Cloth Config API",
+            version = "0.6.13",
+            description = "Configuration Library for Minecraft Mods",
+            enabled = true,
+            iconBytes = null,
+            sizeBytes = 1_142_000,
+            license = "LGPL-3.0-only",
+            authors = listOf("shedaniel"),
+            loaders = listOf("fabric"),
+        )
+        s.install = InstallAction.None
         return s
     }
 
@@ -152,9 +196,9 @@ class ModPageRenderTest {
     }
 
     @Composable
-    private fun Screen(slug: String) {
-        val pageState = state(slug)
-        val railProject = open(slug)
+    private fun Screen(slug: String, local: Boolean = false) {
+        val pageState = if (local) localState() else state(slug)
+        val railProject = if (local) openLocal() else open(slug)
         val rail = SurfaceId("appshell.rightrail")
         val registry = WidgetDataRegistry().apply {
             register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(railProject)))
@@ -174,7 +218,7 @@ class ModPageRenderTest {
                 Box(Modifier.width(56.dp).fillMaxHeight().background(NxTheme.colors.surface.copy(alpha = 0.35f)))
 
                 Column(Modifier.weight(1f).fillMaxHeight()) {
-                    Header(pageState, onBack = {})
+                    Header(pageState)
                     Tabs(
                         active = ModPageTab.Description,
                         onSelect = {},
@@ -214,11 +258,11 @@ class ModPageRenderTest {
         }
     }
 
-    private fun sheet(slug: String, name: String) {
+    private fun sheet(slug: String, name: String, local: Boolean = false) {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1500, 1000, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) { Screen(slug) }
+            NxTheme(useDarkTheme = true) { Screen(slug, local) }
         }
         val png = try {
             var t = 0L
@@ -243,13 +287,27 @@ class ModPageRenderTest {
     /**
      * The versions tab, on a project with a real build list.
      *
-     * The same furniture the version modal uses, in a pane: what has to look right
-     * is that a reader picking a build of a mod sees one thing whether they got
-     * here from the page or from an installed row.
+     * A table, which is what the reference shows and what a reader scanning a
+     * project needs: a row per build with its facts in columns. The modal's
+     * list-beside-notes answers a different question and was the wrong shape here.
      */
     @Test
-    fun `the versions tab`() {
-        val out = Path.of("build/render", "modpage-versions.png")
+    fun `the versions tab`() = versionsSheet(1160, "modpage-versions.png")
+
+    /**
+     * The same table in the width the narrowest window actually leaves it.
+     *
+     * The columns are fixed and together they need about 912dp, while the window
+     * floors at 960 before either rail is taken off it -- so at the bottom of the
+     * range the right-hand end of the table has nowhere to be. What this sheet has
+     * to show is that it is reachable rather than gone, and that the headings
+     * still sit over their own columns.
+     */
+    @Test
+    fun `the versions tab in a narrow panel`() = versionsSheet(620, "modpage-versions-narrow.png")
+
+    private fun versionsSheet(width: Int, name: String) {
+        val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val pageState = state("sodium")
         // A captured build list. Its file records were trimmed to a size when the
@@ -258,12 +316,22 @@ class ModPageRenderTest {
         // rather than captured -- nothing here downloads, and a hash that looked
         // real would be the lie.
         pageState.versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json"))
+        pageState.gameVersionTags = gameVersions
+        pageState.install = InstallAction.Install("Industrial")
+        // Aimed at a NeoForge 1.21.1 pack, so the fabric builds in the fixture are
+        // the ones the pack cannot run and the sheet shows both markings at once.
+        pageState.destination = ModDetailState.Destination(
+            name = "Industrial",
+            dir = Path.of("."),
+            mc = "1.21.1",
+            loader = "neoforge",
+        )
 
-        val scene = ImageComposeScene(1160, 700, density = Density(1f)) {
+        val scene = ImageComposeScene(width, 700, density = Density(1f)) {
             NxTheme(useDarkTheme = true) {
                 Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(14.dp)) {
                     NxSurface(level = NxSurfaceLevel.Raised, modifier = Modifier.fillMaxSize()) {
-                        VersionsPane(pageState, Modifier.fillMaxSize())
+                        VersionsPane(pageState, onOpenVersion = {}, onReload = {}, modifier = Modifier.fillMaxSize())
                     }
                 }
             }
@@ -276,7 +344,7 @@ class ModPageRenderTest {
             scene.close()
         }
         Files.write(out, png.bytes)
-        assertTrue(png.bytes.size > 20_000, "the versions tab drew almost nothing (${png.bytes.size} bytes)")
+        assertTrue(png.bytes.size > 20_000, "$name drew almost nothing (${png.bytes.size} bytes)")
     }
 
     /**
@@ -297,7 +365,7 @@ class ModPageRenderTest {
             NxTheme(useDarkTheme = true) {
                 Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(14.dp)) {
                     NxSurface(level = NxSurfaceLevel.Raised, modifier = Modifier.fillMaxSize()) {
-                        ChangelogPane(pageState, Modifier.fillMaxSize())
+                        ChangelogPane(pageState, onReload = {}, modifier = Modifier.fillMaxSize())
                     }
                 }
             }
@@ -354,4 +422,12 @@ class ModPageRenderTest {
     @Test fun `essential, which declares three things`() = sheet("essential", "modpage-essential.png")
 
     @Test fun `cloth config, a four-line body`() = sheet("cloth-config", "modpage-cloth.png")
+
+    /**
+     * A jar the catalogue does not know, which is where every "unknown" on the
+     * page is actually seen. A mock-up used to draw this sheet and hard-coded a
+     * bare question mark into it, so the one view whose whole point was the
+     * missing facts was showing a placeholder no widget would ever print.
+     */
+    @Test fun `a local jar, where the facts run out`() = sheet("cloth-config", "modpage-local.png", local = true)
 }

@@ -52,6 +52,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
@@ -436,11 +437,14 @@ private fun SourceTab(label: String, selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelLarge,
-            color      = if (selected) Color.White else NxTheme.colors.textSecondary,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        // Measured bold, drawn at the weight it currently wears. A heavier face is
+        // wider, so selecting a source used to widen its tab and slide every tab
+        // after it out from under the cursor that had just pressed one.
+        NxSteadyText(
+            text   = label,
+            style  = MaterialTheme.typography.labelLarge,
+            color  = if (selected) Color.White else NxTheme.colors.textSecondary,
+            weight = if (selected) FontWeight.Bold else FontWeight.Normal,
         )
     }
 }

@@ -113,6 +113,12 @@ internal class ContentTabState(
     private val modrinth: ModrinthClient,
     private val updater: InstanceContentUpdater,
     private val watch: ContentFolderWatch,
+    /**
+     * Answers that outlive this tab. Read straight into [iconCache] when a scan
+     * lands, so a return visit paints the icons it already knew on the first
+     * frame instead of re-hashing every jar in the folder to find them again.
+     */
+    private val icons: ContentIconStore,
     private val scope: CoroutineScope,
     /**
      * Where a change to the files on disk runs.
@@ -175,8 +181,6 @@ internal class ContentTabState(
     var pendingDelete by mutableStateOf<InstalledContent?>(null)
         private set
     var pendingBulkDelete by mutableStateOf<List<InstalledContent>>(emptyList())
-        private set
-    var browsing by mutableStateOf(false)
         private set
 
     // -- updates --------------------------------------------------------------
@@ -342,6 +346,9 @@ internal class ContentTabState(
     // leave a previous prefetch racing the new one over the same keys.
     private var iconJob: Job? = null
 
+    /** The open row's version lookup, for the same reason [iconJob] exists. */
+    private var versionsJob: Job? = null
+
     /**
      * The installed list and its icons, alongside the pack manifest on a mirror
      * pack. Alongside rather than after: the manifest is a network fetch and only
@@ -416,8 +423,20 @@ internal class ContentTabState(
      * Embedded icon first (free), then Modrinth by file hash, then a probe of the
      * jar, then nothing and the row draws a letter. Bounded concurrency keeps a
      * big pack from stampeding the network and the disk at once.
+     *
+     * Only answers reach the cache. Every rescan cancels the prefetch in flight,
+     * and a file that has just been installed is precisely the one being resolved
+     * when the next rescan lands, so a cancellation written down as "no icon"
+     * would single out the mod the person had just chosen.
      */
     private fun prefetchIcons(list: List<InstalledContent>) {
+        // What the process already knows, taken synchronously and before anything
+        // is drawn. Only what is left over is worth a coroutine.
+        list.forEach { c ->
+            val key = c.selectionKey()
+            if (iconCache.containsKey(key)) return@forEach
+            icons.get(storeKey(c))?.let { iconCache[key] = it }
+        }
         iconJob?.cancel()
         iconJob = scope.launch {
             val gate = Semaphore(ICON_PREFETCH_CONCURRENCY)
@@ -429,15 +448,29 @@ internal class ContentTabState(
                         val resolved = gate.withPermit {
                             val file = fileOf(c)
                             val embedded = c.iconBytes
-                            runCatching {
-                                when {
-                                    embedded != null -> ContentIconState.Bytes(embedded)
-                                    else -> iconResolver.resolveByFile(file)?.let { ContentIconState.Url(it) }
-                                        ?: scanner.probeJarIcon(file)?.let { ContentIconState.Bytes(it) }
+                            // The archive's own art, which is local and final.
+                            val probed = { scanner.probeJarIcon(file)?.let { ContentIconState.Bytes(it) } }
+                            when {
+                                embedded != null -> ContentIconState.Bytes(embedded)
+                                else -> try {
+                                    iconResolver.resolveByFile(file)?.let { ContentIconState.Url(it) }
+                                        ?: probed()
                                         ?: ContentIconState.None
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    // The catalogue could not be ASKED. The archive
+                                    // can still answer, and its answer is final; a
+                                    // letter is not, so where the archive has
+                                    // nothing either, nothing is written down and
+                                    // the next scan asks again. Writing the letter
+                                    // here is what kept a just-installed mod on one
+                                    // for the rest of the visit.
+                                    probed()
                                 }
-                            }.getOrDefault(ContentIconState.None)
-                        }
+                            }
+                        } ?: return@launch
+                        icons.put(storeKey(c), resolved)
                         // Resolved off-thread, written on the composition's own
                         // thread. Assigning straight from a worker used whatever
                         // snapshot the coroutine had inherited and threw once that
@@ -611,13 +644,15 @@ internal class ContentTabState(
 
     // -- browse ---------------------------------------------------------------
 
-    fun startBrowsing() {
-        browsing = true
-    }
-
-    /** Coming back from the browser picks up whatever it downloaded. */
-    fun stopBrowsing() {
-        browsing = false
+    /**
+     * Picks up whatever the project browser downloaded.
+     *
+     * Whether the browser is OPEN is not kept here. This holder is rebuilt on every
+     * visit, so a reader who opened the browser, opened a project page from it and
+     * came back landed in the content list instead of the search they left. The
+     * flag lives beside the tab index now, which is saved for exactly that reason.
+     */
+    fun refreshAfterBrowse() {
         scope.launch { rescan() }
     }
 
@@ -732,11 +767,16 @@ internal class ContentTabState(
      * broken release, or forward onto a beta on purpose.
      */
     fun openVersions(content: InstalledContent) {
+        // The previous row's lookup is taken down first. Without that, closing one
+        // row and opening another let the FIRST answer land under the second row's
+        // name -- and picking a build from that list swapped the shown row's file
+        // for a jar belonging to a different mod entirely.
+        versionsJob?.cancel()
         versionsOf = content
         versionList = null
         versionsFailed = false
         versionsUnknown = false
-        scope.launch {
+        versionsJob = scope.launch {
             try {
                 val project = resolveProject(content)
                 if (project == null) {
@@ -755,6 +795,8 @@ internal class ContentTabState(
     }
 
     fun closeVersions() {
+        versionsJob?.cancel()
+        versionsJob = null
         versionsOf = null
         versionList = null
         versionsFailed = false
@@ -804,16 +846,20 @@ internal class ContentTabState(
      * The item's Modrinth project by file hash, cached per item. Kind-agnostic
      * (mod, resource pack and shader all resolve the same way); null means
      * Modrinth does not index this file and callers fall back to embedded data.
+     *
+     * Throws when the lookup could not be made, which is a different answer from
+     * null and must not be filed as one. A row asked about while the network was
+     * down was otherwise recorded as absent from the catalogue for as long as the
+     * tab lived, taking its version list and its page link down with it.
      */
     suspend fun resolveProject(content: InstalledContent): ModrinthProject? {
         val key = content.selectionKey()
         if (projectCache.containsKey(key)) return projectCache[key]
         val file = fileOf(content)
         val project = withContext(Dispatchers.IO) {
-            val sha1 = runCatching { sha1Of(file) }.getOrNull() ?: return@withContext null
-            val version = runCatching { modrinth.versionByHash(sha1) }.getOrNull() ?: return@withContext null
+            val version = modrinth.versionByHash(sha1Of(file)) ?: return@withContext null
             withContext(Dispatchers.Main) { versionCache[key] = version }
-            runCatching { modrinth.resolveProject(version.projectId) }.getOrNull()
+            modrinth.resolveProject(version.projectId)
         }
         projectCache[key] = project
         return project
@@ -826,6 +872,10 @@ internal class ContentTabState(
         if (isMirror && content.kind == ContentKind.Mod) manifestMods[content.fileName] else null
 
     private fun fileOf(content: InstalledContent): Path = content.pathIn(instanceDir)
+
+    /** Where this file's icon is filed for the life of the process. */
+    private fun storeKey(content: InstalledContent): String =
+        iconKey(instanceDir.normalize().toString(), content.selectionKey(), content.sizeBytes)
 
     private companion object {
         const val ICON_PREFETCH_CONCURRENCY = 8
@@ -841,6 +891,7 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
     val iconResolver: ModIconResolver = koinInject()
     val modrinth: ModrinthClient = koinInject()
     val updater: InstanceContentUpdater = koinInject()
+    val icons: ContentIconStore = koinInject()
     val scope = rememberCoroutineScope()
     val writeScope: CoroutineScope = koinInject()
     val state = remember(instance.id) {
@@ -855,6 +906,7 @@ internal fun rememberContentTabState(instance: PackInstance): ContentTabState {
             modrinth     = modrinth,
             updater      = updater,
             watch        = ContentFolderWatch(),
+            icons        = icons,
             scope        = scope,
             writeScope   = writeScope,
         )

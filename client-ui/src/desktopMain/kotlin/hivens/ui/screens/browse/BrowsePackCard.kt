@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -117,17 +118,31 @@ fun BrowsePackCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
+                // A counted cap, and one line to put it on. The reference shows a
+                // few tags and a "+N" for the rest, which is what the count is. The
+                // single line is the guard the reference gets from the browser: a
+                // plain row SQUEEZED its last chip to make everything fit, so a card
+                // whose tags ran past the width ended on a word chopped in half. A
+                // flow row places a chip at its own width or not at all.
+                //
+                // The counter is last, so on a card too narrow for all of it the
+                // counter is the first thing dropped. Two tags plus the game version
+                // fit the width this card is used at; below that the row quietly
+                // shows fewer than it counted.
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                    maxLines              = 1,
                 ) {
                     pack.mcVersion?.let { NxMetaChip("MC $it", tone = NxMetaChipTone.OnMedia) }
-                    pack.tags.take(3).forEach { tag ->
+                    pack.tags.take(CARD_TAGS).forEach { tag ->
                         NxMetaChip(
                             if (pack.origin == PackOrigin.Modrinth) s.modrinthCategory(tag) else tag,
                             tone = NxMetaChipTone.OnMedia,
                         )
                     }
+                    val hidden = pack.tags.size - CARD_TAGS
+                    if (hidden > 0) NxMetaChip("+$hidden", tone = NxMetaChipTone.OnMedia)
                 }
             }
 
@@ -141,6 +156,15 @@ fun BrowsePackCard(
         }
     }
 }
+
+/**
+ * Tags a card names before it starts counting.
+ *
+ * Two, not the reference's five: this row also carries the game version, and the
+ * card is a fixed-height list row rather than a grid tile, so it has about a
+ * third of the width to spend.
+ */
+private const val CARD_TAGS = 2
 
 @Composable
 private fun BrowseAvatar(pack: CataloguePack, hue: Color) {

@@ -229,16 +229,16 @@ fun VersionPickerWindow(
 /**
  * The list of builds and the notes beside it, without the window around them.
  *
- * Extracted because the same thing is wanted in two places and one of them is not
- * a modal: a project page shows its versions as a tab, and a tab cannot be a card
- * with a scrim behind it. What a reader does here is identical either way -- find
- * the build, read why -- so it is one piece of furniture with two hosts rather
- * than two lists that drift.
+ * Its own piece because the filtering, the selection and the two panes are how the
+ * list is READ, while the window around it is how one is chosen: a scrim, a
+ * header and a confirm. The host learns the selection through [onSelectionChange]
+ * and puts its action where its own shape allows, a footer here or
+ * [detailAction] under the notes.
  *
- * The filtering and the selection live here, because they are how the list is
- * read and not what the host does with the answer. The host learns which build is
- * selected through [onSelectionChange] and puts its own action wherever its shape
- * allows: a footer in the window, [detailAction] under the notes in a tab.
+ * Not what the project page shows. A modal answers "which one do I switch to" for
+ * a reader who already knows the mod, so it puts the notes where the eye lands;
+ * the page's versions tab answers what a project has shipped and for what, which
+ * is a table. Two questions, two shapes.
  */
 @Composable
 fun VersionBrowser(

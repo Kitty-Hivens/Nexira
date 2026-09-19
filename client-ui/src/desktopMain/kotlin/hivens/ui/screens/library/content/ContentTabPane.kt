@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,11 +26,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,15 +40,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
+import coil3.compose.LocalPlatformContext
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthSearchHit
 import hivens.core.data.PackInstance
@@ -93,8 +100,8 @@ import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
-import hivens.ui.utils.humanSize
 import hivens.ui.screens.mod.ModTarget
+import hivens.ui.screens.mod.rememberLinkFollower
 import hivens.ui.screens.versions.pickerIntentFor
 import hivens.ui.screens.versions.pickerVersionsOf
 import hivens.ui.screens.versions.VersionPickerWindow
@@ -129,6 +136,12 @@ internal fun ContentTabPane(
      * blocks live in the shell's right rail and a dialog has no rail beside it.
      */
     onOpenProject: (ModTarget) -> Unit,
+    /**
+     * Whether the project browser is open, held by the screen so it survives a
+     * visit to a project page and back.
+     */
+    browsing: Boolean,
+    onBrowsing: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -177,7 +190,7 @@ internal fun ContentTabPane(
         onDispose { selections.clearIf(published) }
     }
 
-    if (state.browsing) {
+    if (browsing) {
         ModBrowser(
             mcVersion = instance.cachedManifest?.minecraftVersion.orEmpty(),
             loader    = instance.cachedManifest?.loaderName
@@ -185,7 +198,10 @@ internal fun ContentTabPane(
                 ?.lowercase().orEmpty(),
             modsDir   = state.instanceDir.resolve("mods"),
             modifier  = modifier,
-            onBack    = state::stopBrowsing,
+            onBack    = {
+                onBrowsing(false)
+                state.refreshAfterBrowse()
+            },
             instanceId = instance.id,
             onOpenProject = onOpenProject,
         )
@@ -215,7 +231,7 @@ internal fun ContentTabPane(
                 state.filter.kind == ContentKind.ShaderPack,
             canFindProjects = state.canAddContent,
             onAddFiles     = { state.addFiles(addDialogSettings) },
-            onFindProjects = state::startBrowsing,
+            onFindProjects = { onBrowsing(true) },
             // Updating is offered wherever replacing a file is: on a tracked pack
             // the pack decides what its mods are, and a swap behind its back is
             // undone by the next sync.
@@ -704,6 +720,9 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+/** How much of a row the update chip may take before its label yields. */
+private val UPDATE_CHIP_MAX = 200.dp
+
 /**
  * One content row, drawn from the [rules] the state computed for it: what the
  * switch reads, whether there is one at all, and whether the row may be deleted.
@@ -731,8 +750,9 @@ internal fun ContentRow(
     onVersions: (() -> Unit)?,
 ) {
     val s = LocalStrings.current
-    val uriHandler = LocalUriHandler.current
     val dim = if (rules.effectiveEnabled) 1f else 0.5f
+    var menuAt by remember(content.fileName) { mutableStateOf<Offset?>(null) }
+    var rowOrigin by remember(content.fileName) { mutableStateOf(Offset.Zero) }
     Row(
         modifier              = Modifier
             .fillMaxWidth()
@@ -741,6 +761,19 @@ internal fun ContentRow(
                 if (selected) NxTheme.colors.primary.copy(alpha = 0.14f)
                 else NxTheme.colors.surface.copy(alpha = 0.4f),
             )
+            .onGloballyPositioned { rowOrigin = it.boundsInWindow().topLeft }
+            .pointerInput(content.fileName) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type != PointerEventType.Press) continue
+                        if (!event.buttons.isSecondaryPressed) continue
+                        val change = event.changes.first()
+                        menuAt = rowOrigin + change.position
+                        change.consume()
+                    }
+                }
+            }
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -780,6 +813,11 @@ internal fun ContentRow(
         if (update != null) {
             NxMetaChip(
                 text    = s.contentUpdateTo(update.versionNumber),
+                // Capped: the label is a sentence WITH a version number in it, a
+                // Modrinth build number runs to forty characters, and a plain Row
+                // measures this before the name column beside it -- so one long
+                // build number ate the mod's own name off its row.
+                modifier = Modifier.widthIn(max = UPDATE_CHIP_MAX),
                 tone    = NxMetaChipTone.Success,
                 onClick = onUpdate,
             )
@@ -808,28 +846,62 @@ internal fun ContentRow(
         // (local metadata at minimum); Open page and Delete appear only when the
         // caller passed them (a mod with a known URL / a user-owned row).
         NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
-            NxMenuItem(label = s.contentActionDetails, icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
-            if (update != null) {
-                NxMenuItem(label = s.contentUpdateTo(update.versionNumber), icon = NxIcon.Download, onClick = { dismiss(); onUpdate() })
-            }
-            // "Open page" is kind-agnostic: the embedded homepage if the archive
-            // declared one, else the canonical Modrinth page (mod / resourcepack /
-            // shader all resolve by file hash). Resolved while the menu is open, so
-            // it appears once a URL is known and never sits there dead for content
-            // with no page anywhere.
-            var page by remember(content.fileName) { mutableStateOf(content.homepageUrl) }
-            if (page == null) {
-                LaunchedEffect(content.fileName) {
-                    page = resolveProject()?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
-                }
-            }
-            page?.let { url ->
-                NxMenuItem(label = s.contentActionOpenPage, icon = NxIcon.OpenInNew, onClick = { dismiss(); uriHandler.openUri(url) })
-            }
-            if (onDelete != null) {
-                NxMenuItem(label = s.editorDelete, icon = NxIcon.Delete, destructive = true, onClick = { dismiss(); onDelete() })
-            }
+            ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, dismiss)
         }
+    }
+
+    // The same menu on a right-click, which is where a desktop reader looks for it
+    // first. Anchored in window coordinates because the row is not the window, and
+    // consumed on the MAIN pass so the editor's own right-click entry -- which
+    // listens on the final pass over the whole shell -- never sees it. Without that
+    // the gesture opened "edit layout" over a mod, which is a menu about the panel
+    // answering a question asked about a file in it.
+    menuAt?.let { at ->
+        NxContextMenu(anchorInWindow = at, expanded = true, onDismissRequest = { menuAt = null }) {
+            ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete) { menuAt = null }
+        }
+    }
+}
+
+/**
+ * What a content row offers, in one place so the kebab and the right-click cannot
+ * drift into two different menus about the same file.
+ */
+@Composable
+private fun ContentRowMenuItems(
+    content: InstalledContent,
+    update: ModUpdate?,
+    resolveProject: suspend () -> ModrinthProject?,
+    onDetails: () -> Unit,
+    onUpdate: () -> Unit,
+    onDelete: (() -> Unit)?,
+    dismiss: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val follow = rememberLinkFollower()
+    NxMenuItem(label = s.contentActionDetails, icon = NxIcon.Info, onClick = { dismiss(); onDetails() })
+    if (update != null) {
+        NxMenuItem(label = s.contentUpdateTo(update.versionNumber), icon = NxIcon.Download, onClick = { dismiss(); onUpdate() })
+    }
+    // "Open page" is kind-agnostic: the embedded homepage if the archive declared
+    // one, else the canonical Modrinth page (mod / resourcepack / shader all
+    // resolve by file hash). Resolved while the menu is open, so it appears once a
+    // URL is known and never sits there dead for content with no page anywhere.
+    var page by remember(content.fileName) { mutableStateOf(content.homepageUrl) }
+    if (page == null) {
+        LaunchedEffect(content.fileName) {
+            // A lookup that could not be made leaves the entry off the menu, the
+            // same as a file the catalogue does not know. Nothing here can report
+            // a failure, and a menu is not where someone would read one.
+            page = runCatching { resolveProject() }.getOrNull()
+                ?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
+        }
+    }
+    page?.let { url ->
+        NxMenuItem(label = s.contentActionOpenPage, icon = NxIcon.OpenInNew, onClick = { dismiss(); follow(url) })
+    }
+    if (onDelete != null) {
+        NxMenuItem(label = s.editorDelete, icon = NxIcon.Delete, destructive = true, onClick = { dismiss(); onDelete() })
     }
 }
 
@@ -841,24 +913,61 @@ internal fun ContentRow(
  */
 @Composable
 private fun ContentIcon(state: ContentIconState?, seed: String, displayName: String, dim: Float) {
+    val context = LocalPlatformContext.current
     val box = Modifier.size(30.dp).clip(RoundedCornerShape(7.dp))
-    when (state) {
-        is ContentIconState.Bytes -> AsyncImage(model = state.data, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
-        is ContentIconState.Url   -> AsyncImage(model = state.url, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
-        ContentIconState.None     -> Box(
-            modifier         = box.background(NxTheme.colors.decorativeColor(seed).copy(alpha = dim)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text       = displayName.firstOrNull()?.uppercase() ?: "?",
-                style      = MaterialTheme.typography.labelMedium,
-                color      = Color.White,
-                fontWeight = FontWeight.Bold,
-                textAlign  = TextAlign.Center,
-            )
+    val plate = NxTheme.colors.decorativeColor(seed).copy(alpha = dim)
+
+    /** The tinted square, which is what an icon settles ONTO and never sits on. */
+    @Composable
+    fun Plate(letter: Boolean) {
+        Box(Modifier.fillMaxSize().background(plate), contentAlignment = Alignment.Center) {
+            if (letter) {
+                Text(
+                    text       = displayName.firstOrNull()?.uppercase() ?: "?",
+                    style      = MaterialTheme.typography.labelMedium,
+                    color      = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    textAlign  = TextAlign.Center,
+                )
+            }
         }
-        // Still resolving: tinted box, same tint as the letter, so settling doesn't flash.
-        null -> Box(box.background(NxTheme.colors.decorativeColor(seed).copy(alpha = dim)))
+    }
+
+    // The plate is what is drawn WHILE and INSTEAD, never UNDERNEATH. Putting it
+    // behind a loaded image killed the flash through an empty hole but tinted every
+    // icon with transparency: a mod whose art is a tree on nothing came out as a
+    // tree on a green square that was never part of it.
+    Box(box) {
+        when (state) {
+            is ContentIconState.Bytes -> SubcomposeAsyncImage(
+                // Keyed for the memory cache by hand: Coil has no keyer for a raw
+                // ByteArray, so an unkeyed one is decoded again on every mount and
+                // the jar's own icon flashed exactly like a fetched one.
+                model = remember(state.data, seed) {
+                    ImageRequest.Builder(context)
+                        .data(state.data)
+                        .memoryCacheKey("jar:$seed")
+                        .build()
+                },
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = { Plate(letter = false) },
+                error = { Plate(letter = true) },
+            )
+            is ContentIconState.Url -> SubcomposeAsyncImage(
+                model = state.url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = { Plate(letter = false) },
+                error = { Plate(letter = true) },
+            )
+            // Nothing found anywhere: the plate keeps its letter.
+            ContentIconState.None -> Plate(letter = true)
+            // Still resolving: the bare plate, which is what it settles onto.
+            null -> Plate(letter = false)
+        }
     }
 }
 
@@ -990,80 +1099,6 @@ internal fun ModResultRow(
             }
             else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
         }
-    }
-}
-
-/**
- * Read-only details for one installed item. Everything but the Modrinth link is
- * offline (the jar / pack declared it). [pageUrl] starts at the embedded homepage
- * and, for a mod without one, best-effort resolves the canonical Modrinth page by
- * file hash -- a non-Modrinth / private jar simply keeps a null link.
- */
-@Composable
-internal fun ContentDetailsDialog(
-    content: InstalledContent,
-    resolveProject: suspend () -> ModrinthProject?,
-    onDismiss: () -> Unit,
-) {
-    val s = LocalStrings.current
-    val uriHandler = LocalUriHandler.current
-    // The archive's own metadata is authoritative; the Modrinth project (resolved
-    // by file hash, any kind) only fills the gaps a sparse archive leaves -- so a
-    // resource pack from Modrinth reads like a mod from Modrinth.
-    var project by remember(content.fileName) { mutableStateOf<ModrinthProject?>(null) }
-    LaunchedEffect(content.fileName) { project = resolveProject() }
-    val description = content.description ?: project?.description?.takeIf { it.isNotBlank() }
-    val license = content.license ?: project?.license?.let { it.name ?: it.id }
-    val pageUrl = content.homepageUrl ?: project?.let { "https://modrinth.com/${it.projectType}/${it.slug}" }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Column {
-                Text(
-                    content.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = NxTheme.colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = familyForText(content.displayName),
-                )
-                content.version?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
-                }
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                description?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
-                }
-                MetaLine(s.contentDetailSize, humanSize(content.sizeBytes, s))
-                license?.let {
-                    Text(s.contentTabModLicensePrefix(it), style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
-                }
-                if (content.authors.isNotEmpty()) MetaLine(s.contentDetailAuthors, content.authors.joinToString(", "))
-                if (content.dependencies.isNotEmpty()) {
-                    Text(s.contentTabModDependencies(content.dependencies.size), style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
-                    Text(content.dependencies.joinToString(", "), style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary)
-                }
-            }
-        },
-        confirmButton = {
-            pageUrl?.let { url ->
-                TextButton(onClick = { uriHandler.openUri(url); onDismiss() }) {
-                    Text(s.contentActionOpenPage, color = NxTheme.colors.primary)
-                }
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(s.editorClose) } },
-        containerColor = NxTheme.colors.surface,
-    )
-}
-
-@Composable
-private fun MetaLine(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("$label:", style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary)
     }
 }
 

@@ -28,7 +28,21 @@ import hivens.core.api.dto.modrinth.ModrinthGameVersion
  *    a snapshot NEWER than the newest supported release, which is the project
  *    saying it is ready for what is coming; that one gets its own chip in front.
  */
-fun foldGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): List<String> {
+/**
+ * One chip, and the versions behind it.
+ *
+ * The label is a handle for a SET: `1.21.x` stands for every minor of that major
+ * the project supports. A filter built on the label alone could not say which
+ * builds it means, which is why the catalogue's own page carries the group and
+ * formats the label out of it rather than the other way round.
+ */
+data class GameVersionGroup(val label: String, val versions: List<String>)
+
+/** [groupGameVersions] reduced to what a chip shows. */
+fun foldGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): List<String> =
+    groupGameVersions(supported, all).map { it.label }
+
+fun groupGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): List<GameVersionGroup> {
     if (supported.isEmpty() || all.isEmpty()) return emptyList()
 
     val order = all.withIndex().associate { (i, v) -> v.version to i }
@@ -52,7 +66,7 @@ fun foldGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): L
     val legacyNames = legacy.mapTo(HashSet()) { it.version }
     val legacyRanges = adjacentRanges(ordered.filter { it in legacyNames }, legacy)
 
-    val out = mutableListOf<String>()
+    val out = mutableListOf<GameVersionGroup>()
 
     if (releaseRanges.isEmpty()) {
         // Nothing but snapshots. A handful reads better one per chip than folded
@@ -61,7 +75,7 @@ fun foldGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): L
         out += if (supportedSnapshots.size > 3) {
             adjacentRanges(supportedSnapshots, snapshots)
         } else {
-            supportedSnapshots
+            supportedSnapshots.map { GameVersionGroup(it, listOf(it)) }
         }
     } else {
         out += releaseRanges
@@ -69,7 +83,8 @@ fun foldGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): L
     out += legacyRanges
 
     if (releaseRanges.isNotEmpty()) {
-        newestForwardSnapshot(ordered, supportedReleases, releases, snapshots)?.let { out.add(0, it) }
+        newestForwardSnapshot(ordered, supportedReleases, releases, snapshots)
+            ?.let { out.add(0, GameVersionGroup(it, listOf(it))) }
     }
     return out
 }
@@ -81,18 +96,20 @@ fun foldGameVersions(supported: List<String>, all: List<ModrinthGameVersion>): L
  * a major is covered whole: `1.21.x` is a claim about the major and can only be
  * made against the full list, not against the project's own.
  */
-private fun majorRanges(supported: List<String>, published: List<String>): List<String> {
+private fun majorRanges(supported: List<String>, published: List<String>): List<GameVersionGroup> {
     val supportedByMajor = groupByMajor(supported, consecutive = true)
     val publishedByMajor = groupByMajor(published, consecutive = false)
 
     return supportedByMajor.map { (major, minors) ->
-        if (minors.size == 1) return@map minorLabel(major, minors.first())
+        val members = minors.map { minorLabel(major, it) }
+        if (minors.size == 1) return@map GameVersionGroup(members.first(), members)
         val whole = publishedByMajor.firstOrNull { it.first == major }?.second
-        if (whole != null && whole == minors) {
+        val label = if (whole != null && whole == minors) {
             "$major.x"
         } else {
-            "${minorLabel(major, minors.first())}-${minorLabel(major, minors.last())}"
+            "${members.first()}-${members.last()}"
         }
+        GameVersionGroup(label, members)
     }
 }
 
@@ -131,20 +148,20 @@ private fun minorLabel(major: String, minor: Int): String = if (minor == 0) majo
  * and beta versions" is what it means, and a project that supports the lot is
  * saying something simple.
  */
-private fun adjacentRanges(versions: List<String>, reference: List<ModrinthGameVersion>): List<String> {
+private fun adjacentRanges(versions: List<String>, reference: List<ModrinthGameVersion>): List<GameVersionGroup> {
     if (versions.isEmpty()) return emptyList()
     val index = reference.withIndex().associate { (i, v) -> v.version to i }
     val sorted = versions.filter { it in index }.sortedBy { index.getValue(it) }
     if (sorted.isEmpty()) return emptyList()
 
-    val out = mutableListOf<String>()
+    val out = mutableListOf<GameVersionGroup>()
     var start = 0
     for (i in 1..sorted.size) {
         val broken = i == sorted.size || index.getValue(sorted[i]) != index.getValue(sorted[i - 1]) + 1
         if (!broken) continue
         val run = sorted.subList(start, i)
         // The reference runs newest-first, so the run reads back to front.
-        out += namedSpan("${run.last()}-${run.first()}")
+        out += GameVersionGroup(namedSpan("${run.last()}-${run.first()}"), run.toList())
         start = i
     }
     return out

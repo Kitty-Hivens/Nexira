@@ -258,6 +258,27 @@ sealed class Screen {
     data class ModDetail(val target: ModTarget) : Screen()
 
     /**
+     * One build of a project: what it runs on, what it needs, what changed and
+     * which files it ships.
+     *
+     * The versions table answers "which builds exist" and cannot also answer
+     * "what is this one", because the second question needs a column per
+     * dependency and a paragraph of notes. It carries the [target] as well as the
+     * build so the rail keeps describing the project the build belongs to, and so
+     * an install from here knows which pack it is installing into.
+     *
+     * [versionNumber] rides along because the caller always has it and the
+     * breadcrumb needs it on the first frame. Resolving it would label the crumb
+     * with a catalogue id for as long as the fetch took, which is the one name
+     * nobody clicked.
+     */
+    data class ModVersion(
+        val target: ModTarget,
+        val versionId: String,
+        val versionNumber: String,
+    ) : Screen()
+
+    /**
      * Identity for state that outlives a visit, stable across the fields a screen
      * stamps onto its own back-stack entry.
      *

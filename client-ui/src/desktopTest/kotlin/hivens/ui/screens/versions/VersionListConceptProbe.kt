@@ -90,7 +90,7 @@ class VersionListConceptProbe {
     @Serializable data class FixtureFile(val size: Long = 0, val primary: Boolean = false)
 
     private val versions: List<Fixture> by lazy {
-        val raw = checkNotNull(javaClass.classLoader.getResourceAsStream("mockup/iris.versions.json"))
+        val raw = checkNotNull(javaClass.classLoader.getResourceAsStream("catalogue/iris.versions.json"))
             .bufferedReader().use { it.readText() }
         Json { ignoreUnknownKeys = true }.decodeFromString<List<Fixture>>(raw)
     }

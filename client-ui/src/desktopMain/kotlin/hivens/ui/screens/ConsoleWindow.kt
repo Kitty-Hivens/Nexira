@@ -33,6 +33,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -90,6 +91,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxSteadyText
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -1101,13 +1103,18 @@ private fun SeverityToggle(
             .padding(horizontal = 8.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text       = text,
-            color      = if (active) accent else accent.copy(alpha = 0.45f),
-            fontSize   = 11.sp,
-            lineHeight = 13.sp,
-            fontFamily = LocalMonoFamily.current,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+        // Measured bold, drawn at its current weight. Toggling a level bolded its
+        // chip, and even in a mono face the bold is wider, so the rest of the row
+        // stepped sideways every time one was switched.
+        NxSteadyText(
+            text   = text,
+            color  = if (active) accent else accent.copy(alpha = 0.45f),
+            style  = LocalTextStyle.current.copy(
+                fontSize   = 11.sp,
+                lineHeight = 13.sp,
+                fontFamily = LocalMonoFamily.current,
+            ),
+            weight = if (active) FontWeight.Bold else FontWeight.Normal,
         )
     }
 }

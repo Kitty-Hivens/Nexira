@@ -155,6 +155,11 @@ fun PackDetailScreen(
     val instanceDir = state.instanceDir ?: return
 
     var tabIndex by rememberSaveable(pack.id) { mutableIntStateOf(0) }
+    // Saved for the same reason the tab index is: the content tab's holder is
+    // rebuilt on every visit, so a reader who opened the project browser, opened a
+    // page from it and came back landed in the content list rather than in the
+    // search they left.
+    var browsingProjects by rememberSaveable(pack.id) { mutableStateOf(false) }
     val s = LocalStrings.current
 
     var showSettings by remember(pack.id) { mutableStateOf(initialShowSettings) }
@@ -238,7 +243,13 @@ fun PackDetailScreen(
         ) {
             tabRetention.SaveableStateProvider(tabIndex) {
             when (tabIndex) {
-                0 -> ContentTabPane(instance = pack, state = contentState, onOpenProject = onOpenProject)
+                0 -> ContentTabPane(
+                    instance = pack,
+                    state = contentState,
+                    onOpenProject = onOpenProject,
+                    browsing = browsingProjects,
+                    onBrowsing = { browsingProjects = it },
+                )
                 1 -> FileBrowserPane(rootDir = instanceDir)
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir)

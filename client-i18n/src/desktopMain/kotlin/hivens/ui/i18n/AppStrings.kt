@@ -921,9 +921,64 @@ interface AppStrings {
     val modPageInstallRetry: String
     /** Required dependencies the pack's game version and loader have no build for. */
     fun modPageInstallMissing(count: Int): String
-    /** Installing one NAMED build, which is what the versions tab is for. */
-    fun modPageInstallBuild(version: String): String
+    /** The same action on a table row, where the row already names the build. */
+    val modPageInstallShort: String
+
+    /**
+     * Nothing to install, and why, in the two words that decide it.
+     *
+     * The pick is strict: where no build runs on this pack, none is chosen. Saying
+     * which game version and which loader were looked for is the difference
+     * between a refusal and a shrug, and it is what tells a reader to go to the
+     * versions tab and pick one themselves. Only the axes actually KNOWN are
+     * named -- filling a blank one with the unknown placeholder produced a
+     * sentence about our own ignorance rather than about the pack.
+     */
+    fun modPageNoBuildFor(target: String): String
+    /** The same refusal where neither axis is known, so there is nothing to name. */
+    val modPageNoBuildAny: String
+    /** On a build the pack cannot run, which a reader may still install on purpose. */
+    val versionsIncompatibleHint: String
+
+    val versionsColumnVersion: String
+    val versionsColumnGameVersion: String
+    val versionsColumnPlatform: String
+    val versionsColumnPublished: String
+    val versionsColumnDownloads: String
+    /** The build list could not be fetched. Its own words: the pack content's were borrowed and said the wrong thing. */
+    val modPageVersionsFailed: String
+    /** Why it failed, in this pane's own words rather than the mirror's. */
+    val modPageVersionsFailedBody: String
+    /** There is no catalogue entry, so there is no list and never will be. */
+    val modPageVersionsNoEntry: String
+    /** The filter surface over the versions table. */
+    val versionsFilterChannel: String
+    val versionsFilterGameVersion: String
+    val versionsFilterPlatform: String
+    val versionsFilterReset: String
+    fun versionsFilterShown(shown: Int, total: Int): String
+    /** Every build was filtered out, which is not the same as a project with none. */
+    val versionsFilterNoMatch: String
     fun modPageInstalledVersion(version: String): String
+
+    /**
+     * One build's own page: what it needs, what changed, what it ships.
+     *
+     * The dependency headings are three separate statements and not one list with
+     * a column. "Requires" is a reason a pack will not start, "works with" is a
+     * suggestion, and "does not work with" is a warning, and a reader scanning for
+     * the first must not have to read the other two to find it.
+     */
+    val modVersionRequires: String
+    val modVersionOptional: String
+    val modVersionIncompatible: String
+    val modVersionFiles: String
+    /** The build that ships alongside the one being read, when the author pinned one. */
+    val modVersionPinnedBuild: String
+    /** Marks the file the installer actually takes, where a build ships several. */
+    val modVersionPrimaryFile: String
+    /** The lookup for this one build did not run. Distinct from a build with nothing to say. */
+    val modVersionFailed: String
 
     val modRailCompatibility: String
     val modRailGame: String
@@ -993,7 +1048,6 @@ interface AppStrings {
     fun contentTabRoleAltCount(count: Int): String
     val contentTabRoleAlternativesHeader: String
     val contentTabModNoDescription: String
-    fun contentTabModLicensePrefix(license: String): String
     val contentTabModUrlLabel: String
     fun contentTabModSizeLabel(kb: Long): String
     fun contentTabModDependencies(count: Int): String
@@ -1293,6 +1347,30 @@ interface AppStrings {
     fun notifTimeMinutes(minutes: Long): String
     fun notifTimeHours(hours: Long): String
     fun notifTimeDays(days: Long): String
+
+    /**
+     * A place that exists and is not built yet.
+     *
+     * One joke, said once. It is the launcher's own voice rather than the flat
+     * apology every other program uses for the same state, and a reader who has
+     * found the edge of what is finished has earned being spoken to like a person.
+     */
+    val notBuiltYetTitle: String
+    val notBuiltYetBody: String
+
+    /**
+     * How long ago, abbreviated, for a column that has no room for a date.
+     *
+     * Abbreviated for the same reason the notification stamps above are: a short
+     * form needs no agreement, so five languages do not each need three plural
+     * branches for a label two characters wide.
+     */
+    val ageJustNow: String
+    fun ageMinutes(minutes: Long): String
+    fun ageHours(hours: Long): String
+    fun ageDays(days: Long): String
+    fun ageMonths(months: Long): String
+    fun ageYears(years: Long): String
 
     // --- Home (new) + launch tiles ---
     val homeRecentTitle: String

@@ -48,7 +48,10 @@ import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalShellContext
 import hivens.ui.widgets.shell.ShellContext
 import hivens.ui.widgets.themepicker.ThemePickerSurface
+import hivens.ui.screens.mod.LocalLinkFollower
 import hivens.ui.screens.mod.ModDetailScreen
+import hivens.ui.screens.mod.rememberNavigatingLinkFollower
+import hivens.ui.screens.mod.ModVersionScreen
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -280,8 +283,17 @@ fun AppLayout(
                             onBack     = onBack,
                         )
 
-                    is Screen.ModDetail ->
-                        ModDetailScreen(target = screen.target, onBack = onBack)
+                    is Screen.ModDetail -> ModDetailScreen(
+                        target = screen.target,
+                        onOpenVersion = { id, number ->
+                            onScreenChange(Screen.ModVersion(screen.target, id, number))
+                        },
+                    )
+
+                    is Screen.ModVersion -> ModVersionScreen(
+                        target = screen.target,
+                        versionId = screen.versionId,
+                    )
                 }
             }
         }
@@ -320,7 +332,13 @@ fun AppLayout(
         // then sat over the rail it was meant to stop short of.
         centerEndInset         = RAIL_DEFAULT_WIDTH,
     ) {
-        CompositionLocalProvider(LocalShellContext provides shellCtx) {
+        // Links that point at a project the launcher can draw stop going out to a
+        // browser from here down. Provided at the shell rather than per surface, so
+        // a markdown body and a rail widget follow the same rule.
+        CompositionLocalProvider(
+            LocalShellContext provides shellCtx,
+            LocalLinkFollower provides rememberNavigatingLinkFollower(),
+        ) {
             SlotRenderer(
                 surface  = SurfaceId("appshell.root"),
                 slot     = SlotId("regions"),

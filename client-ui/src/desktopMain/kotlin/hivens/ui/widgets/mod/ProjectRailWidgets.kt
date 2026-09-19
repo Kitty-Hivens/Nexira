@@ -2,6 +2,9 @@ package hivens.ui.widgets.mod
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,14 +19,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.components.LoaderGlyph
@@ -34,8 +38,10 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxTooltip
 import coil3.compose.AsyncImage
 import hivens.ui.screens.mod.ProjectCreator
+import hivens.ui.screens.mod.rememberLinkFollower
 import hivens.ui.screens.mod.ProjectLinkKind
 import hivens.core.api.dto.modrinth.ModrinthDisclosure
 import hivens.ui.screens.mod.disclosureIsWarning
@@ -239,7 +245,7 @@ fun ProjectLinksWidget(instance: WidgetInstance) {
     val project by rememberSource(Sources.OpenProject)
     val p = project ?: return
     val s = LocalStrings.current
-    val uriHandler = LocalUriHandler.current
+    val follow = rememberLinkFollower()
     if (p.links.isEmpty()) return
 
     Section(s.modRailLinks) {
@@ -253,13 +259,29 @@ fun ProjectLinksWidget(instance: WidgetInstance) {
             ) {
                 HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
             }
+            // Underline on hover, no plate behind it. A link is text, and a filled
+            // rectangle appearing under a line of text reads as a row in a list
+            // rather than as the word you are about to follow. The reference
+            // underlines for exactly this reason.
+            val interaction = remember { MutableInteractionSource() }
+            val hovered by interaction.collectIsHoveredAsState()
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { uriHandler.openUri(link.url) },
+                modifier = Modifier.fillMaxWidth()
+                    .hoverable(interaction)
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                    ) { follow(link.url) },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
                 Symbol(linkIcon(link.kind), contentDescription = null, tint = NxTheme.colors.textSecondary, size = 16.dp)
-                Text(linkLabel(link, s), style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary)
+                Text(
+                    linkLabel(link, s),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxTheme.colors.textPrimary,
+                    textDecoration = if (hovered) TextDecoration.Underline else null,
+                )
                 Symbol(NxIcon.OpenInNew, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 12.dp)
             }
         }
@@ -426,8 +448,18 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         // entry rather than to the file, so a local one says it does not know
         // instead of showing the file's mtime as if it meant something.
         Fact(NxIcon.Shield, licenseLabel(p.licenseId, p.licenseName, s))
-        Fact(NxIcon.NewReleases, p.publishedAt?.let { s.modPublishedOn(it) } ?: s.modPublishedUnknown)
-        Fact(NxIcon.Update, p.updatedAt?.let { s.modUpdatedOn(it) } ?: s.modUpdatedUnknown)
+        // How long ago in the line, the exact moment on hover. A date column that
+        // spells out the timestamp makes the reader do the arithmetic on every row.
+        DatedFact(
+            NxIcon.NewReleases,
+            p.publishedAt?.let { s.modPublishedOn(it) } ?: s.modPublishedUnknown,
+            p.publishedExact,
+        )
+        DatedFact(
+            NxIcon.Update,
+            p.updatedAt?.let { s.modUpdatedOn(it) } ?: s.modUpdatedUnknown,
+            p.updatedExact,
+        )
 
         // What only the file can answer. These three were the whole of the
         // read-only dialog the page replaces, so they follow it here rather than
@@ -547,6 +579,16 @@ private fun ColumnScopeShim.Chips(values: List<String>) = FlowRow(
     horizontalArrangement = Arrangement.spacedBy(4.dp),
     verticalArrangement = Arrangement.spacedBy(4.dp),
 ) { values.forEach { NxMetaChip(it, tone = NxMetaChipTone.Surface) } }
+
+/** A fact whose precise form is a hover away. */
+@Composable
+private fun ColumnScopeShim.DatedFact(icon: IconKey, text: String, exact: String?) {
+    if (exact == null) {
+        Fact(icon, text)
+    } else {
+        NxTooltip(text = exact) { Fact(icon, text) }
+    }
+}
 
 @Composable
 private fun ColumnScopeShim.Fact(icon: IconKey, text: String) = Row(

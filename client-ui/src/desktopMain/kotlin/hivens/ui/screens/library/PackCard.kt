@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -136,11 +138,31 @@ fun PackCard(
                         if (showBadge) SourceBadge(instance.packRef.origin)
                     }
 
-                    Row(
-                        verticalAlignment     = Alignment.CenterVertically,
+                    // One line, and a chip is placed at its own width or not at all.
+                    // A plain row narrowed its last child to make everything fit, so
+                    // a source that publishes long version strings ended the row on a
+                    // word chopped in half.
+                    //
+                    // The cap below is not a yielding: it is a ceiling, so the row is
+                    // at most 180 + fork + last-played wide. Narrower than that -- a
+                    // small window with the right panel open -- and the last chip is
+                    // dropped rather than cut, which is the honest shape but is a
+                    // fact going missing with nothing said about it.
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                        maxLines              = 1,
                     ) {
-                        NxMetaChip(instance.packRef.version ?: "—", tone = NxMetaChipTone.OnMedia)
+                        // Capped, because it is the one chip here with no bound on its
+                        // length: a Modrinth pack names a build SNAPSHOT-0.0.0-2026.07.17
+                        // and that alone filled the row, pushing "last played" off the
+                        // card entirely. Truncated it still says which build; absent, the
+                        // other facts say nothing.
+                        NxMetaChip(
+                            instance.packRef.version ?: "—",
+                            modifier = Modifier.widthIn(max = VERSION_CHIP_MAX),
+                            tone = NxMetaChipTone.OnMedia,
+                        )
                         instance.forkedFrom?.let {
                             NxMetaChip("fork", tone = NxMetaChipTone.OnMediaAccent)
                         }
@@ -189,6 +211,14 @@ fun PackCard(
         }
     }
 }
+
+/**
+ * How much of the row a version string may take before it yields.
+ *
+ * Leaves room for the fork mark and for when the pack was last played, which
+ * are the two facts a long build name used to push off the card.
+ */
+private val VERSION_CHIP_MAX = 180.dp
 
 /** Compact pill for a pending build move; the card-corner sibling of [LaunchStatusPill]. */
 @Composable
