@@ -101,6 +101,22 @@ object AutoLoginCoordinator {
 
         if (saved == null) return Resolution.NoCredentials
 
+        // Experimental single-session: trust the saved SmartyCraft token and make no
+        // request. The re-login below is destructive on SmartyCraft -- it mints a new
+        // uid and invalidates the token in hand -- so for a 2FA account whose flag is
+        // not set yet it signs in only to kill the session it was about to open on,
+        // then returns that now-dead session as a success. With reuse on, the token
+        // is used until the server actually refuses it. Microsoft (a refresh token)
+        // keeps its own silent-refresh path; this is for the SC shape only.
+        if (settings.experimentalReuseSession &&
+            saved.refreshToken == null &&
+            !saved.offline &&
+            saved.accessToken.isNotBlank()
+        ) {
+            ActionRing.record("Auto-login: reusing the saved session, no sign-in (experimental)")
+            return Resolution.Success(saved)
+        }
+
         // Microsoft account: silent-refresh the stored token, falling back to the
         // cached Minecraft token on any failure (or no configured client id).
         // Only Microsoft sessions carry a refresh token, so this never shadows SC.

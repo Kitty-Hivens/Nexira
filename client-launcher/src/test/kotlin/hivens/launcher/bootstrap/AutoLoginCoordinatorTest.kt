@@ -124,6 +124,33 @@ class AutoLoginCoordinatorTest {
     }
 
     @Test
+    fun `with reuse-session on, a saved SC account opens on its token without signing in`() = runTest {
+        // The re-login is destructive on SC, so with reuse on the coordinator must
+        // make no request and hand back the token in hand. A strict authService
+        // mock also asserts login is never called.
+        val resolution = resolve(
+            SettingsData(experimentalReuseSession = true),
+            saved = scSaved,
+        )
+        assertEquals("sc-token", session(resolution).accessToken, "the saved token is carried as-is")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
+    fun `with reuse-session on, a Microsoft account still silent-refreshes`() = runTest {
+        // Reuse is for the SC shape; a refresh token means Microsoft, which has a
+        // real silent refresh and must not be short-circuited.
+        val msa = mockk<MsaAuthProvider>()
+        coEvery { msa.refresh("rt-old") } returns msSaved.copy(accessToken = "fresh-mc", refreshToken = "rt-new")
+        val resolution = resolve(
+            SettingsData(experimentalReuseSession = true),
+            saved = msSaved,
+            msa = msa,
+        )
+        assertEquals("fresh-mc", session(resolution).accessToken)
+    }
+
+    @Test
     fun `a marked two-factor account is never signed in again`() = runTest {
         // Not "the login is harmless because it fails": SmartyCraft mints a uid per
         // login and invalidates the previous one, so the REQUEST is what revokes the
