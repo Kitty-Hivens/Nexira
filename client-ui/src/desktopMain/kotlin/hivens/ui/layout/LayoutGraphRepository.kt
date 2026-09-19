@@ -87,6 +87,16 @@ class LayoutGraphRepository(
      */
     val migratedFromSchema: Int? get() = _migratedFromSchema
 
+    /**
+     * Which bundled widgets this graph has been offered. A sibling of the layout by
+     * definition, so it is derived from the path rather than injected: nothing can
+     * point the two at different directories.
+     *
+     * Declared above [state] on purpose. [load] reads it, and a property initialised
+     * after the one that uses it is null when it is used.
+     */
+    private val seeded = SeededWidgets(file.resolveSibling("layout-seeded.json"), json)
+
     private val state: MutableStateFlow<LayoutGraph> = MutableStateFlow(load())
 
     // Pending debounced persist. Replaced on each update; cancelled by
@@ -264,7 +274,7 @@ class LayoutGraphRepository(
             // traversal; update() guards live edits, this is the load-time
             // backstop -- serve the bundled default over a corrupted tree.
             when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, decoded, def)) {
-                is LayoutReconcile.Result.Ok -> result.graph
+                is LayoutReconcile.Result.Ok -> seedNewBundledWidgets(result.graph, def)
                 is LayoutReconcile.Result.DuplicateId -> {
                     log.error(
                         "Layout graph at {} has a duplicate instanceId '{}' after {} (schema_version {} -> {}). " +
@@ -278,6 +288,32 @@ class LayoutGraphRepository(
             log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
             defaultGraph()
         }
+    }
+
+    /**
+     * Hands the graph the bundled widgets it has never been offered.
+     *
+     * Runs after the reconcile so every slot a widget belongs to exists, and only on
+     * the branch that produced a usable graph: a tree rejected for a duplicate id is
+     * replaced by the bundled default, which carries them already.
+     *
+     * A read-only file is left alone entirely. It belongs to a newer build or to a
+     * schema this one cannot represent, and putting widgets into a graph that will
+     * never be written back would show them once and lose them on the next launch,
+     * which reads as the launcher forgetting.
+     */
+    private fun seedNewBundledWidgets(graph: LayoutGraph, def: LayoutGraph): LayoutGraph {
+        if (readOnly) return graph
+        val result = LayoutSeeding.seed(graph, def, seeded.load())
+        LayoutReconcile.firstDuplicateInstanceId(result.graph)?.let { dup ->
+            log.error("Seeding bundled widgets produced a duplicate instanceId '{}'; leaving the graph as it was", dup)
+            return graph
+        }
+        if (result.added.isNotEmpty()) {
+            log.info("Layout graph: seeding {} bundled widget(s) added since this file was written: {}", result.added.size, result.added)
+        }
+        seeded.save(result.offered)
+        return result.graph
     }
 
     // Synchronous file ops. Caller MUST hold [mutex] when invoking.
