@@ -83,10 +83,11 @@ fun AppLayout(
 ) {
     val protocolConfig: ServerProtocolConfig = koinInject()
 
-    // Session can be refreshed by the profile surface on auth-retry
-    var currentSession by remember(appState) {
-        mutableStateOf((appState as? AppState.Authenticated)?.session)
-    }
+    // Whoever signs in reports it upward, and the shell's own state is what comes
+    // back down here -- so this is derived rather than held. It used to be a var
+    // the classic home wrote into on an SC re-auth, which meant a refresh survived
+    // exactly until the next appState change discarded it.
+    val currentSession = (appState as? AppState.Authenticated)?.session
 
     // Go transparent only when the wallpaper can actually be drawn -- a deleted
     // image left the row transparent over a blank white window.
@@ -118,9 +119,8 @@ fun AppLayout(
                     // list, and SmartyCraft arrives as mirror packs now, so the
                     // screen it lived on went with the path it was a front for.
                     Screen.Home -> NewHomeScreen(
-                        appState         = appState,
-                        onScreenChange   = onScreenChange,
-                        onSessionUpdated = { currentSession = it },
+                        appState       = appState,
+                        onScreenChange = onScreenChange,
                     )
 
                     Screen.Profile ->

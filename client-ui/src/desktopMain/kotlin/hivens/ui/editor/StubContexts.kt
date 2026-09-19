@@ -25,7 +25,6 @@ import hivens.ui.widgets.shell.RightRailContext
 internal val STUB_HOME_NEW = HomeNewContext(
     appState         = AppState.Loading,
     onScreenChange   = {},
-    onSessionUpdated = {},
 )
 
 internal val STUB_LIBRARY = LibraryContext(

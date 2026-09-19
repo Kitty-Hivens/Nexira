@@ -7,7 +7,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.core.data.SessionData
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.puppet.PuppetScreen
@@ -27,16 +26,11 @@ import hivens.widget.model.SurfaceId
 fun NewHomeScreen(
     appState: AppState,
     onScreenChange: (Screen) -> Unit,
-    onSessionUpdated: (SessionData) -> Unit,
 ) {
     PuppetScreen("NewHome")
 
-    val ctx = remember(appState, onScreenChange, onSessionUpdated) {
-        HomeNewContext(
-            appState         = appState,
-            onScreenChange   = onScreenChange,
-            onSessionUpdated = onSessionUpdated,
-        )
+    val ctx = remember(appState, onScreenChange) {
+        HomeNewContext(appState = appState, onScreenChange = onScreenChange)
     }
     CompositionLocalProvider(LocalHomeNewContext provides ctx) {
         // No verticalScroll. The scroll modifier passes maxHeight =
