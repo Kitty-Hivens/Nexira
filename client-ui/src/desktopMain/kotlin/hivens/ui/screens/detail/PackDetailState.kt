@@ -134,7 +134,7 @@ internal fun rememberPackDetailState(instanceId: String): PackDetailState {
             // Prepare it subscribes after.
             launch     = { session, pack ->
                 if (controller.launchPackInstance(session, pack)) {
-                    launchDriver.observe(LaunchTarget.Pack(pack))
+                    launchDriver.observe(LaunchTarget(pack))
                 }
             },
             abort      = controller::abort,

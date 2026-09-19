@@ -37,9 +37,9 @@ import java.util.concurrent.ConcurrentHashMap
 // LaunchState carries no target identity, so binding the observer to the
 // click that started the launch is how we key the resulting
 // notification / indication / session entries on the right [LaunchTarget].
-// The target abstraction normalises the (id, label, icon, source-key) tuple,
-// so the observer is written once against it rather than against whatever
-// the controller was handed.
+// The target normalises the (id, label, icon, source-key) tuple, so the
+// observer is written once against it rather than against whatever the
+// controller was handed.
 class LaunchDriver(
     private val controller: LauncherController,
     private val notifications: NotificationCenter,
@@ -294,18 +294,13 @@ class LaunchDriver(
             // again, so the player clicks Play once and types a code once.
             indications.setLaunchIndication(target.id, null)
             activities.dismiss(launchKey(target))
-            val serverId = when (target) {
-                is LaunchTarget.Pack -> (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.SmartyCraft)
-                    ?.serverId
-                    ?: (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.Both)?.serverId
-                    ?: ""
-            }
+            val requirement = target.instance.cachedManifest?.authRequirement
+            val serverId = (requirement as? PackAuthRequirement.SmartyCraft)?.serverId
+                ?: (requirement as? PackAuthRequirement.Both)?.serverId
+                ?: ""
             twoFactorGate.request(target.displayName, serverId) { session ->
                 appScope.launch {
-                    val accepted = when (target) {
-                        is LaunchTarget.Pack -> controller.launchPackInstance(session, target.instance)
-                    }
-                    if (accepted) observe(target)
+                    if (controller.launchPackInstance(session, target.instance)) observe(target)
                 }
             }
             return
@@ -327,7 +322,7 @@ class LaunchDriver(
                 // Offer offline for a pack whose online auth failed: offline runs
                 // the modpack in singleplayer (an SC-bound pack still can't join
                 // its server offline). Only when an offline identity is resolvable.
-                if (target is LaunchTarget.Pack && reason.isAuthFailure()) {
+                if (reason.isAuthFailure()) {
                     val instance = target.instance
                     offlineName()?.let { name ->
                         add(NotifAction("play_offline", s.notifActionPlayOffline) {
@@ -357,7 +352,7 @@ class LaunchDriver(
             val session = offlineProvider.login(name, "", "")
             // Only narrate what the controller took: this action lives on a sticky
             // notification, so it can be clicked long after another game is up.
-            if (controller.launchPackInstance(session, instance)) observe(LaunchTarget.Pack(instance))
+            if (controller.launchPackInstance(session, instance)) observe(LaunchTarget(instance))
         }
     }
 

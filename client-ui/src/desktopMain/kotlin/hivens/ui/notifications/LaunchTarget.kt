@@ -7,23 +7,21 @@ import hivens.core.data.PackInstance
  * stable id, a display label, and the source-key prefix that groups
  * notifications.
  *
- * An interface over one case today. It stays one because the driver has no
- * business knowing what a launch target IS -- the pack is the unit of content,
- * and anything else the launcher learns to spawn plugs in here rather than
- * forking the driver.
+ * A class and not a sealed interface. It was one while the launcher could also
+ * spawn a SmartyCraft server, and keeping the shape after that left an interface
+ * over a single case -- which the driver saw through anyway, reaching for the
+ * instance three times to do its work. An abstraction nobody can be held to is
+ * not an abstraction. When something else becomes launchable, this becomes an
+ * interface again, and that is a smaller change than the vacuous branches were
+ * a cost.
  */
-sealed interface LaunchTarget {
-    val id: String
-    val displayName: String
-    val iconUrl: String?
-    val sourceKey: String
+data class LaunchTarget(val instance: PackInstance) {
+    val id: String get() = instance.id
+    val displayName: String get() = instance.displayName
 
-    data class Pack(val instance: PackInstance) : LaunchTarget {
-        override val id          get() = instance.id
-        override val displayName get() = instance.displayName
-        // PackInstance does not carry icon_url yet; surfaces null until
-        // project_pack_rich_metadata propagates summary.icon_url.
-        override val iconUrl     get(): String? = null
-        override val sourceKey   get() = "pack:${instance.id}:launch"
-    }
+    // PackInstance does not carry icon_url yet; surfaces null until
+    // project_pack_rich_metadata propagates summary.icon_url.
+    val iconUrl: String? get() = null
+
+    val sourceKey: String get() = "pack:${instance.id}:launch"
 }

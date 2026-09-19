@@ -103,7 +103,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
                 // Narrated only if the controller took it -- the button's own gate
                 // is a frame behind the state it reads.
                 if (controller.launchPackInstance(real, target)) {
-                    launchDriver.observe(LaunchTarget.Pack(target))
+                    launchDriver.observe(LaunchTarget(target))
                 }
             },
         )
@@ -126,7 +126,7 @@ internal fun rememberQuickLaunchTarget(): QuickLaunchTarget? {
                     if (name.isNullOrBlank()) return@launch
                     val offlineSession = withContext(Dispatchers.IO) { offlineProvider.login(name, "", "") }
                     if (controller.launchPackInstance(offlineSession, target)) {
-                        launchDriver.observe(LaunchTarget.Pack(target))
+                        launchDriver.observe(LaunchTarget(target))
                     }
                 }
             },
