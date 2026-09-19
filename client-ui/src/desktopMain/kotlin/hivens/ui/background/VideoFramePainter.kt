@@ -353,18 +353,10 @@ internal fun rememberSkinemaFrame(
             // a decoder to ask. Zero is a first open on this file, which starts
             // where the file does and needs no seek.
             //
-            // Two things this used to get wrong, and a GPU-decoded wallpaper paid
-            // for both with av_hwframe_transfer_data failing, which skinema makes
-            // fatal by design because there is no in-place software recovery.
-            //
-            // It was submitted straight after the constructor, which is inside the
-            // window where the hardware frame context is still coming up. And it
-            // was exact, which runs the decoder forward from the keyframe before
-            // the target and converts every frame on the way, so one resume was as
-            // many GPU-to-CPU transfers as the keyframe interval is long. Inexact
-            // lands on that keyframe instead and does one. A wallpaper put back
-            // roughly where it was is the whole requirement; frame precision is for
-            // a timeline somebody is dragging.
+            // Inexact for the reason the transport's own seek carries in full: an
+            // exact landing on a GPU-decoded file intermittently fails to download
+            // its frame, and skinema ends the player on that. A wallpaper put back
+            // roughly where it was is the whole requirement here anyway.
             if (!resumed && player.state != VideoPlayer.State.Opening) {
                 resumed = true
                 resume.positionNanos.takeIf { it > 0L }?.let { player.seek(it, exact = false) }
