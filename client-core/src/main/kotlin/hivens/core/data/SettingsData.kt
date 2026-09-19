@@ -3,28 +3,6 @@ package hivens.core.data
 import kotlinx.serialization.Serializable
 
 /**
- * Which Home surface the user is currently running. Set in Settings.
- * [New] (labelled "Modern") is the default widget-composed home; the
- * toggle also reaches the legacy [Classic] Dashboard (SC server grid +
- * launch panel + always-on right panel).
- *
- * A `LibraryFirst` option used to sit between them, opening Home straight onto
- * the Library. It is gone: the Library screen was already one click away in the
- * rail, so the choice bought a second route to the same surface and nothing
- * else. A settings file still naming it decodes to [New], because the shared
- * Json coerces an unknown enum value to the field's default rather than
- * throwing.
- */
-@Serializable
-enum class HomeView {
-    Classic,
-    // [New] -- widget-composed home (Phase 1 / kernel-3), the default surface.
-    // Carries the welcome / recent-packs / quick-launch widgets; the expressive
-    // build-out happens as user customization in later phases.
-    New,
-}
-
-/**
  * Which source drives the dark/light choice. Exactly one is active:
  *
  * - [Manual] -- the user's own day/night toggle; [SettingsData.isDarkTheme] as set.
@@ -62,26 +40,25 @@ fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
 /**
  * Folds the retired experimental master into the knobs it used to suppress.
  *
- * That master was read at four launch-path sites, so a user who switched it off
- * was switching off mandatory-update enforcement, both auto-update passes and
+ * That master was read at several launch-path sites, so a user who switched it
+ * off was switching off mandatory-update enforcement, the auto-update pass and
  * adaptive heap sizing -- whatever those knobs stored individually. Removing the
- * gate without this would turn all four back on at the next start, silently and
+ * gate without this would turn them all back on at the next start, silently and
  * on someone who had deliberately turned them off.
  *
  * Applied once on load and cleared, so the fold cannot re-fire against knobs the
  * user re-enables afterwards.
  *
  * The JVM-args builder and the mimic-version override are deliberately not
- * folded: the gate only ever greyed out their rows, while
- * `ServerSettingsState.jvmBuilderEnabled` and `SettingsRestoreHook` read the
- * stored values directly. They were live with the master off, so switching the
- * master off never expressed an intent to disable them.
+ * folded: the gate only ever greyed out their rows, while the builder's own
+ * gate and `SettingsRestoreHook` read the stored values directly. They were
+ * live with the master off, so switching the master off never expressed an
+ * intent to disable them.
  */
 fun foldLegacyExperimentalGate(s: SettingsData): SettingsData =
     if (s.experimentalFeaturesEnabled) s else s.copy(
         experimentalFeaturesEnabled = true,
         mandatoryUpdatesEnabled     = false,
-        autoSyncAllPacks            = false,
         autoUpdatePacks             = false,
         adaptiveMemoryEnabled       = false,
     )
@@ -219,30 +196,6 @@ data class SettingsData(
     val nightlyChannel: Boolean = false,
 
     /**
-     * Sync all installed SmartyCraft clients in background on startup.
-     * "Installed" means a non-empty `clients/<server>/` directory --
-     * never triggers a many-GB first-time download out of nowhere.
-     * Sequential to avoid bandwidth contention; ManifestCache makes the
-     * common nothing-changed case complete in milliseconds.
-     *
-     * Not a sibling of [autoUpdatePacks] despite reading like one. That one
-     * moves a mirror instance between pinned manifests; this one re-runs the
-     * SmartyCraft sync, and carries two limits that are not going away:
-     *
-     *  * A two-factor account is never logged in from here. SmartyCraft mints a
-     *    uid per login and invalidates the previous one, so a background pass
-     *    would revoke the session the player just unlocked with a code. Such an
-     *    account therefore syncs only against a manifest cached by an earlier
-     *    manual login, and a server without one is skipped.
-     *  * The whole raw-server path is on its way out, so its defects are being
-     *    left alone rather than worked around here.
-     *
-     * Off by default: most users play 1-2 servers; this is maintainer-
-     * grade convenience for users with many servers installed.
-     */
-    val autoSyncAllPacks: Boolean = false,
-
-    /**
      * Auto-update installed mirror packs to the latest build in the background.
      * A green (safe re-sync) update applies silently; an amber (MC/loader change)
      * update follows [amberUpdatePolicy]. On by default -- a stale pack desyncs
@@ -253,7 +206,6 @@ data class SettingsData(
     /**
      * How the unattended pass treats a pending update that changes Minecraft or the
      * loader family, as graded by `classifyCompat` against the installed manifest.
-     * A mirror-instance concept only: [autoSyncAllPacks] has no such classification.
      * See [AmberUpdatePolicy].
      */
     val amberUpdatePolicy: AmberUpdatePolicy = AmberUpdatePolicy.Ask,
@@ -290,14 +242,6 @@ data class SettingsData(
      * upstream version pin faster than the Nexira release cycle.
      */
     val mimicVersionOverride: String? = null,
-
-    /**
-     * Which Home surface to render. Defaults to the modern widget-composed
-     * home ([HomeView.New]); the classic Dashboard stays reachable from the
-     * Home-view toggle at any time. See [HomeView]
-     * for the option set.
-     */
-    val homeView: HomeView = HomeView.New,
 
     /**
      * "Do not disturb": mute the live top-right notification popups. Events are
@@ -352,26 +296,6 @@ data class SettingsData(
     val altNewsFeedUrl: String? = null,
 
     // ── Smarty server controls ───────────────────────────────────────────
-
-    /**
-     * Swap the upstream Smarty surveillance coremod for our open-smrt-network
-     * helper when syncing a raw SmartyCraft server. The mirror packs already
-     * carry the replacement in their manifest; this brings the same swap to
-     * servers synced straight from SC. The replacement jar is resolved per
-     * MC version from open-smrt-network's GitHub releases. Authoritative: the
-     * Smarty jar is always stripped, never re-admitted. If no replacement is
-     * available for the server's MC version (and none is cached on disk), the
-     * launch is BLOCKED rather than running the surveillance mod.
-     */
-    val useOpenSmrtHelper: Boolean = true,
-
-    /**
-     * After sync, delete every jar in `mods/` that the server manifest does not
-     * list (the injected open-smrt helper aside). The blunt, exact version of
-     * "only what the server asks for runs". Removes user-added client mods
-     * too -- that is the point, and the Settings copy says so.
-     */
-    val strictModVerification: Boolean = true,
 
     /**
      * Attach the network-support `-javaagent` when launching an SC-bound pack.

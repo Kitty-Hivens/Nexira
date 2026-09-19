@@ -31,34 +31,21 @@ object RussianStrings : AppStrings {
     override val navForward  = "Вперёд"
 
     // Dashboard
-    override fun dashboardWelcome(name: String) = "ДОБРО ПОЖАЛОВАТЬ, $name"
-    override val dashboardServers              = "Доступные серверы"
-    override val dashboardServersEmpty         = "Серверы не найдены"
-    override val dashboardLoginRequiredTitle   = "Войдите, чтобы увидеть серверы"
-    override val dashboardLoginRequiredHint    = "Список серверов SmartyCraft скрыт за авторизацией. Войти можно в разделе Профиль."
+    override fun homeWelcomeGreeting(name: String) = "С возвращением, $name"
+    override val homeWelcomeSubtitle = "Продолжайте с того места, где остановились."
 
     // Launch Control
-    override val launchReady       = "Готов к игре"
-    override val launchButton      = "Играть"
-    override val launchAbort       = "Отмена"
     override val launchRunning     = "Игра запущена"
-    override val launchStop        = "Остановить"
     override val launchDownloading = "Загрузка:"
     override val launchPreparing   = "Подготовка"
     override val launchFailed      = "Ошибка запуска"
 
     // Launcher States
-    override val stateInit        = "Инициализация..."
-    override val stateAuth        = "Авторизация..."
     override val stateAuthFail    = "Ошибка авторизации (оффлайн?)"
     override val stateNoPassword  = "Пароль не найден, используем текущую сессию."
-    override val stateSync        = "Синхронизация файлов..."
-    override val stateJvm         = "Подготовка JVM..."
     override val stateLaunching   = "Запуск процесса..."
     override fun stateExitCode(code: Int)  = "Игра закрылась с кодом $code"
     override fun stateError(msg: String)   = "Ошибка: $msg"
-    override fun stateHelperUnavailable(mcVersion: String) =
-        "Нет open-smrt хелпера для Minecraft $mcVersion. Запуск заблокирован, чтобы не запускать проприетарный мод Smarty; отключи подмену хелпера в настройках, чтобы играть с ним."
     override fun stateAuthlibUnavailable(mcVersion: String) =
         "Не удалось получить authlib SmartyCraft для Minecraft $mcVersion. Запуск заблокирован: сервер отклонит вход. Проверь соединение и вход в SmartyCraft и попробуй снова."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
@@ -145,33 +132,16 @@ object RussianStrings : AppStrings {
     override val paginationNext         = "Следующая страница"
 
     // Server Detail
-    override val serverDetailTitle         = "Информация о сервере"
-    override val serverDetailNoImage       = "Нет изображения"
-    override val serverDetailNoImageHint   = "banner.png"
-    override val serverDetailMissingTitle  = "Информация отсутствует"
-    override fun serverDetailMissingPath(file: String) = "Создайте файл $file в папке:"
 
     // Server Settings
-    override val serverSettingsSubtitle        = "Настройки запуска"
-    override val serverSettingsSectionSystem   = "Система"
-    override val serverSettingsSectionMods     = "Модификации"
     override val serverSettingsRam             = "ОЗУ"
     override fun serverSettingsRamValue(mb: Int) = "ОЗУ: $mb МБ"
-    override val serverSettingsJava            = "Версия Java"
-    override fun serverSettingsJavaAuto(version: String) = "Автоматически ($version)"
-    override val serverSettingsJavaHint        = "Оставьте пустым для использования встроенной Java"
     override val serverSettingsOpenFolder      = "Открыть папку"
-    override val serverSettingsReset           = "Сбросить клиент"
 
-    override val serverSettingsResetConfirmTitle = "Сбросить клиент?"
-    override val serverSettingsResetConfirmBody  = "Все скачанные файлы клиента этого сервера будут удалены без возможности восстановления."
     override val backgroundResetConfirmTitle     = "Сбросить фон?"
     override val backgroundResetConfirmBody      = "Вся конфигурация пользовательского фона вернётся к значениям по умолчанию."
     override val logoutConfirmTitle              = "Выйти из аккаунта?"
     override val logoutConfirmBody               = "Сохранённый вход будет удалён с этого устройства. Для повторного входа понадобится снова ввести данные."
-
-    override val serverSettingsNoMods          = "Нет опциональных модов"
-    override val serverSettingsPickJava        = "Выберите Java"
 
     // Update
     override val updateTitle           = "Доступно обновление"
@@ -264,20 +234,10 @@ object RussianStrings : AppStrings {
         "Удалено файлов, которых нет в сборке: $count ($names)"
     override val stateContentChanged       = "Сборка была изменена, запуск остановлен. Просим не модифицировать файлы сборки."
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
-    override val stateOfflineNoManifest    = "Нет кеша манифеста для этого сервера. Войдите онлайн хотя бы раз перед запуском оффлайн."
 
     // --- Server Settings: Extended ---
-    override val serverSettingsJvmArgs     = "Аргументы JVM"
-    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
-    override val serverSettingsJvmBuildArgs = "Собрать"
-    override val serverSettingsResolution  = "Размер окна"
-    override val serverSettingsWidth       = "Ширина"
-    override val serverSettingsHeight      = "Высота"
-    override val serverSettingsFullscreen  = "Полный экран"
-    override val serverSettingsAutoConnect = "Автоподключение к серверу"
 
     // --- Server Settings: Icon Upload ---
-    override val serverSettingsPickIcon    = "Выбрать иконку сервера"
 
     // =========================================================================
     // RAM Selector
@@ -296,7 +256,6 @@ object RussianStrings : AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    override val serversFavorites = "★ ИЗБРАННЫЕ"
 
     // =========================================================================
     // Custom Background
@@ -374,12 +333,6 @@ object RussianStrings : AppStrings {
     override val techSkiaDesc    = "Графический рендер"
     override val techCoilDesc    = "Загрузка изображений"
 
-    // --- Spawn Reset ---
-    override val spawnResetButton  = "Вернуться на спавн"
-    override val spawnResetLoading = "Сбрасываем..."
-    override val spawnResetSuccess = "Готово! Перезайди"
-    override val spawnResetError   = "Ошибка сервера"
-
     // --- Tray ---
     override val trayStatusIdle    = "Ожидание"
     override val trayStatusRunning = "Игра запущена"
@@ -395,8 +348,6 @@ object RussianStrings : AppStrings {
     override val settingsPreReleasesDesc     = "Получать бета-сборки до перевода в стабильные."
     override val settingsMandatoryUpdates       = "Обязательные обновления"
     override val settingsMandatoryUpdatesDesc   = "Блокировать запуск до установки критических обновлений, когда ломается совместимость с протоколом. По умолчанию выключено: порог может заблокировать и твой собственный запуск, поэтому его соблюдение — осознанный выбор."
-    override val settingsAutoSyncAllPacks       = "Автосинхронизация клиентов SmartyCraft при запуске"
-    override val settingsAutoSyncAllPacksDesc   = "Пересинхронизировать в фоне при старте лаунчера все уже установленные клиенты SmartyCraft. С двухфакторным входом вход не выполняется вообще — он отозвал бы сессию, которую ты подтвердил кодом, — поэтому синхронизация идёт только по манифесту, сохранённому при прошлом ручном входе, а сервер без такого манифеста пропускается. Путь серверов SmartyCraft уходит в 2.5.0, его дефекты не чинятся; поддерживаемый путь — сборка с зеркала. Тратит фоновый трафик."
     override val settingsAutoUpdatePacks        = "Автообновление установленных инстансов"
     override val settingsAutoUpdatePacksDesc    = "Держать установленные инстансы зеркала на последней версии. Безопасные обновления ставятся в фоне; смена версии Minecraft или загрузчика идёт по правилу ниже. Выключи, чтобы обновлять вручную."
     override val settingsAmberPolicy            = "Когда сборка меняет Minecraft или загрузчик"
@@ -411,9 +362,6 @@ object RussianStrings : AppStrings {
     override val settingsMimicVersion           = "Подмена версии лаунчера"
     override val settingsMimicVersionDesc       = "Зафиксировать строку версии, которая отправляется в рукопожатии и User-Agent. Оставь пустым для стандартного значения — заполни только если апстрим успел поднять свою версию быстрее цикла релизов Nexira. Применяется на следующем запросе к протоколу после сохранения, перезапуск не требуется."
     override fun settingsMimicVersionPlaceholder(default: String) = "По умолчанию: $default"
-    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
-        "Синхронизация $serverName ($current/$total)"
-    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB МБ"
     override val widgetProgressTitle = "Фоновая активность"
     override val widgetProgressIdle = "Сейчас ничего не качается."
     override fun widgetTabDefaultLabel(index: Int) = "Вкладка $index"
@@ -472,10 +420,6 @@ object RussianStrings : AppStrings {
     override fun sslBypassExpiresAt(formatted: String) = "Истекает: $formatted"
 
     override val settingsSectionSmarty           = "Серверы Smarty"
-    override val settingsOpenSmrtHelperTitle      = "Использовать альтернативный хелпер для сети smrt"
-    override val settingsStrictModCheckTitle      = "Точная проверка модификаций"
-    override val settingsOpenSmrtHelperDesc       = "Подменяет родной мод Smarty нашим открытым хелпером на серверах Smarty. Те же сетевые функции, но без слежки. Если для версии игры замены нет, запуск блокируется, а не запускает родной мод."
-    override val settingsStrictModCheckDesc       = "После синхронизации удаляет из папки mods всё, чего сервер не запрашивал. Держит сборку чистой, но заодно сносит и моды, которые ты добавил вручную."
     override val settingsNetworkAgentTitle        = "Использовать агента для поддержки работы сети"
     override val settingsNetworkAgentDesc         = "Направляет авторизацию игры на SmartyCraft прямо при запуске: вход на сервер и проверку скинов. Вход проходит через SmartyCraft, скины грузятся, и при этом не нужно подставлять пропатченную библиотеку авторизации от SmartyCraft. Нужно для входа на серверы SmartyCraft."
     override val settingsSmartyAuthLibTitle       = "Использовать библиотеку авторизации с SmartyCraft"
@@ -600,12 +544,6 @@ object RussianStrings : AppStrings {
 
     override val navLibrary = "Библиотека"
     override val navBrowse  = "Каталог"
-
-    override val settingsHomeViewTitle   = "Главный экран"
-    override val settingsHomeViewSub     = "Современный экран включён по умолчанию. Классический Dashboard доступен в любой момент."
-    override val settingsHomeViewClassic = "Классический"
-    override val settingsHomeViewNew     = "Современный"
-
 
     // --- Выделение в левой панели ---
     override val navSelectionTitle        = "Выделение пункта меню"
@@ -1166,7 +1104,6 @@ object RussianStrings : AppStrings {
     override val notifReasonAuthFail                    = "Не удалось войти"
     override fun notifReasonAuthFailDetail(detail: String) = detail
     override val notifReasonOfflineNoClient             = "Файлы сборки отсутствуют на диске"
-    override val notifReasonOfflineNoManifest           = "Нет кэша манифеста; выйди в сеть один раз для синхронизации"
     override val notifReasonTwoFactorExpired            = "Войди ещё раз, чтобы обновить учётные данные"
     override val notifSessionStaleTitle                 = "Сессия не обновилась"
     override val notifSessionStaleRejected              = "Сервер авторизации отклонил вход. Игра запустится со старой сессией, но зайти на сервер, скорее всего, не выйдет: войди в аккаунт заново."
@@ -1295,7 +1232,6 @@ object RussianStrings : AppStrings {
         "widget.container.tabs.label2" to "Вкладка 2",
         "widget.container.tabs.label3" to "Вкладка 3",
         "widget.container.tabs.tabCount" to "Вкладок",
-        "widget.home.classic.content" to "Классический дашборд",
         "widget.home.new.clock" to "Часы",
         "widget.home.new.clock.accent" to "Цвет акцента",
         "widget.home.new.clock.faceSize" to "Размер циферблата",
@@ -1374,11 +1310,6 @@ object RussianStrings : AppStrings {
         "widget.profile.nav" to "Навигация профиля",
         "widget.profile.skin.section" to "Скин",
         "widget.profile.skin.section.previewHeight" to "Высота превью",
-        "widget.server.details.banner" to "Баннер сервера",
-        "widget.server.details.banner.cornerRadius" to "Скругление углов",
-        "widget.server.details.description" to "Описание сервера",
-        "widget.server.details.tagbar" to "Теги сервера",
-        "widget.server.details.title" to "Заголовок сервера",
         "widget.theme.picker.grid" to "Сетка тем",
         "widget.theme.picker.preview" to "Превью темы",
     )
@@ -1518,14 +1449,12 @@ object RussianStrings : AppStrings {
     override val editorSurfShortAbout     = "О приложении"
     override val editorSurfShortBg        = "Фон"
     override val editorSurfShortProfile   = "Профиль"
-    override val editorSurfShortServer    = "Сервер"
     override val editorSurfShortTheme     = "Темы"
     override val editorSurfShortShell     = "Оболочка"
     override val editorSurfShortTopBar    = "Верх"
     override val editorSurfShortBody      = "Область"
 
     // --- Layout editor: surface long names ---
-    override val editorSurfHomeClassic = "Главная (классика)"
     override val editorSurfHomeNew     = "Главная (новая)"
     override val editorSurfLibrary     = "Библиотека"
     override val editorSurfLeftRail    = "Боковая панель"
@@ -1533,7 +1462,6 @@ object RussianStrings : AppStrings {
     override val editorSurfAbout       = "О приложении"
     override val editorSurfBg          = "Настройки фона"
     override val editorSurfProfile     = "Профиль"
-    override val editorSurfServer      = "Детали сервера"
     override val editorSurfTheme       = "Выбор темы"
     override val editorSurfShell        = "Оболочка приложения"
     override val editorSurfTopBar       = "Верхняя панель"

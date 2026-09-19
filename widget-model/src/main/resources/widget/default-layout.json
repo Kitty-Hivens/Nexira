@@ -1,5 +1,5 @@
 {
-  "schema_version": 11,
+  "schema_version": 12,
   "graph": {
     "surfaces": {
       "appshell.overlay": {
@@ -117,28 +117,6 @@
                 ],
                 "flow": {
                   "direction": "horizontal",
-                  "wrap": 0,
-                  "uniform": false
-                },
-                "grid": 0
-              }
-            }
-          }
-        }
-      },
-      "home.classic": {
-        "families": {
-          "general": {
-            "slots": {
-              "main": {
-                "widgets": [
-                  {
-                    "kind": "home.classic.content",
-                    "instance_id": "home-classic-content-default"
-                  }
-                ],
-                "flow": {
-                  "direction": "vertical",
                   "wrap": 0,
                   "uniform": false
                 },
@@ -509,50 +487,6 @@
                   {
                     "kind": "about.links.card",
                     "instance_id": "about-links-card-default"
-                  }
-                ],
-                "flow": {
-                  "direction": "vertical",
-                  "wrap": 0,
-                  "uniform": false
-                },
-                "grid": 0
-              }
-            }
-          }
-        }
-      },
-      "server.details": {
-        "families": {
-          "general": {
-            "slots": {
-              "text": {
-                "widgets": [
-                  {
-                    "kind": "server.details.title",
-                    "instance_id": "server-details-title-default"
-                  },
-                  {
-                    "kind": "server.details.tagbar",
-                    "instance_id": "server-details-tagbar-default"
-                  },
-                  {
-                    "kind": "server.details.description",
-                    "instance_id": "server-details-description-default"
-                  }
-                ],
-                "flow": {
-                  "direction": "vertical",
-                  "wrap": 0,
-                  "uniform": false
-                },
-                "grid": 0
-              },
-              "image": {
-                "widgets": [
-                  {
-                    "kind": "server.details.banner",
-                    "instance_id": "server-details-banner-default"
                   }
                 ],
                 "flow": {

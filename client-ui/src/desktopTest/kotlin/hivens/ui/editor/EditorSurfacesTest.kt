@@ -1,6 +1,5 @@
 package hivens.ui.editor
 
-import hivens.core.data.HomeView
 import hivens.ui.Screen
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.LayoutGraph
@@ -42,18 +41,18 @@ class EditorSurfacesTest {
 
     @Test
     fun `the screen's own surface leads, the shell follows`() {
-        val classic = EditorSurfaces.availableFor(Screen.Home, HomeView.Classic, bundled)
-        assertEquals(SurfaceId("home.classic"), classic.first(), "the centre surface is the default selection")
-        assertTrue(SurfaceId("appshell.root") in classic, "the shell is editable from every screen")
-        assertTrue(SurfaceId("home.new") !in classic, "the other home view is not mounted here")
+        val home = EditorSurfaces.availableFor(Screen.Home, bundled)
+        assertEquals(SurfaceId("home.new"), home.first(), "the centre surface is the default selection")
+        assertTrue(SurfaceId("appshell.root") in home, "the shell is editable from every screen")
 
-        val new = EditorSurfaces.availableFor(Screen.Home, HomeView.New, bundled)
-        assertEquals(SurfaceId("home.new"), new.first())
+        val library = EditorSurfaces.availableFor(Screen.Library, bundled)
+        assertEquals(SurfaceId("library"), library.first())
+        assertTrue(SurfaceId("home.new") !in library, "another screen's centre surface is not mounted here")
     }
 
     @Test
     fun `a screen with no widget surface still offers the shell`() {
-        val settings = EditorSurfaces.availableFor(Screen.Settings, HomeView.New, bundled)
+        val settings = EditorSurfaces.availableFor(Screen.Settings, bundled)
         assertTrue(settings.isNotEmpty(), "the shell frames every screen")
         assertTrue(settings.none { it.value.startsWith("home.") }, "no centre surface is mounted on Settings")
     }
@@ -62,7 +61,7 @@ class EditorSurfacesTest {
     fun `a surface the graph does not carry is not offered`() {
         assertEquals(
             emptyList(),
-            EditorSurfaces.availableFor(Screen.Home, HomeView.New, LayoutGraph.EMPTY),
+            EditorSurfaces.availableFor(Screen.Home, LayoutGraph.EMPTY),
             "selecting a surface with no slots would open an editor over nothing",
         )
     }

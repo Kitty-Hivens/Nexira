@@ -53,7 +53,7 @@ fun HomeNewWelcome(instance: WidgetInstance) {
         Text(
             text       = when {
                 p.customGreeting.isNotBlank() -> p.customGreeting
-                playerName != null            -> s.dashboardWelcome(playerName)
+                playerName != null            -> s.homeWelcomeGreeting(playerName)
                 else                          -> s.appName
             },
             style      = MaterialTheme.typography.titleMedium,
@@ -63,7 +63,7 @@ fun HomeNewWelcome(instance: WidgetInstance) {
         if (p.showSubtitle) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text  = s.settingsHomeViewSub,
+                text  = s.homeWelcomeSubtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = NxTheme.colors.textSecondary,
             )

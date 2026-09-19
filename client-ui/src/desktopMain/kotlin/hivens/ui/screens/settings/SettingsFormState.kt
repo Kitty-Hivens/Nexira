@@ -34,15 +34,12 @@ internal class SettingsFormState(initial: SettingsData) {
     var useCustomChrome        by mutableStateOf(initial.useCustomChrome)
     var isOfflineMode          by mutableStateOf(initial.isOfflineMode)
     var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
-    var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
     var autoUpdatePacks        by mutableStateOf(initial.autoUpdatePacks)
     var amberUpdatePolicy      by mutableStateOf(initial.amberUpdatePolicy)
     var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
     var adaptiveMemoryEnabled  by mutableStateOf(initial.adaptiveMemoryEnabled)
     var mimicOverrideEnabled   by mutableStateOf(!initial.mimicVersionOverride.isNullOrBlank())
     var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
-    var useOpenSmrtHelper      by mutableStateOf(initial.useOpenSmrtHelper)
-    var strictModVerification  by mutableStateOf(initial.strictModVerification)
     var useNetworkAgent        by mutableStateOf(initial.useNetworkAgent)
     var useSmartycraftAuthLib  by mutableStateOf(initial.useSmartycraftAuthLib)
     var altNewsFeedUrl         by mutableStateOf(initial.altNewsFeedUrl ?: "")
@@ -69,14 +66,11 @@ internal class SettingsFormState(initial: SettingsData) {
             useCustomChrome             = useCustomChrome,
             isOfflineMode               = isOfflineMode,
             mandatoryUpdatesEnabled     = mandatoryUpdates,
-            autoSyncAllPacks            = autoSyncAllPacks,
             autoUpdatePacks             = autoUpdatePacks,
             amberUpdatePolicy           = amberUpdatePolicy,
             jvmBuilderEnabled           = jvmBuilderEnabled,
             adaptiveMemoryEnabled       = adaptiveMemoryEnabled,
             mimicVersionOverride        = normalisedMimic,
-            useOpenSmrtHelper           = useOpenSmrtHelper,
-            strictModVerification       = strictModVerification,
             useNetworkAgent             = useNetworkAgent,
             useSmartycraftAuthLib       = useSmartycraftAuthLib,
             // Blank is the off state for this one, and null is how the field

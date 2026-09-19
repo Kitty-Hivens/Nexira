@@ -64,7 +64,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.core.data.HomeView
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
@@ -123,7 +122,7 @@ import org.slf4j.LoggerFactory
 
 // EditorSurfaceHost is the single coordinator for everything edit-mode
 // related on the active surface. It:
-//   * resolves which SurfaceId the active Screen/HomeView maps to
+//   * resolves which SurfaceId the active Screen maps to
 //   * holds DragController + DropTargetRegistry per surface
 //   * provides LocalEditMode, LocalDragController, LocalDropTargetRegistry,
 //     and LocalWidgetDecorator (the decorator wraps each widget with
@@ -141,7 +140,6 @@ private val log = LoggerFactory.getLogger("EditorSurfaceHost")
 @Composable
 fun EditorSurfaceHost(
     currentScreen: Screen,
-    homeView: HomeView,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
     // The host now wraps the WHOLE shell Row (rails included) so the editor's
@@ -153,8 +151,8 @@ fun EditorSurfaceHost(
     content: @Composable () -> Unit,
 ) {
     val graphForSurfaces = LocalLayoutGraph.current
-    val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView, graphForSurfaces) {
-        EditorSurfaces.availableFor(currentScreen, homeView, graphForSurfaces)
+    val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces) {
+        EditorSurfaces.availableFor(currentScreen, graphForSurfaces)
     }
     val controller: EditModeController = koinInject()
     val layoutRepo: LayoutGraphRepository = koinInject()

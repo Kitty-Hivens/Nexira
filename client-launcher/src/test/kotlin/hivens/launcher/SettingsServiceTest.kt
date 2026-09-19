@@ -72,7 +72,7 @@ class SettingsServiceTest {
     @Test
     fun `unknown enum value coerces to default and preserves other fields`() {
         // Scenario: launcher A writes settings with a new enum variant
-        // (HomeView.Future, say); launcher B (older binary, no Future
+        // (ThemeMode.Seasonal, say); launcher B (older binary, no Seasonal
         // variant) reads the same file. Without coerceInputValues this
         // crashes reload(), which then silently resets EVERY OTHER
         // field to defaults -- the user loses java path, memory, locale,
@@ -84,7 +84,7 @@ class SettingsServiceTest {
             {
               "javaPath": "/opt/jdk/bin/java",
               "locale": "de",
-              "homeView": "Future"
+              "themeMode": "Seasonal"
             }
             """.trimIndent(),
         )
@@ -95,8 +95,8 @@ class SettingsServiceTest {
         assertEquals("/opt/jdk/bin/java", loaded.javaPath, "non-enum fields must survive the coercion")
         assertEquals("de", loaded.locale, "non-enum fields must survive the coercion")
         assertEquals(
-            SettingsData().homeView,
-            loaded.homeView,
+            SettingsData().themeMode,
+            loaded.themeMode,
             "unknown enum value must coerce to the field default",
         )
     }

@@ -1,9 +1,7 @@
 package hivens.ui.editor
 
-import hivens.core.data.SessionData
 import hivens.ui.AppState
 import hivens.ui.Screen
-import hivens.ui.widgets.home.classic.HomeClassicContext
 import hivens.ui.widgets.home.new.HomeNewContext
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.shell.LeftRailContext
@@ -23,15 +21,6 @@ import hivens.ui.widgets.shell.RightRailContext
 // Phase 5 widget capability metadata + palette filtering will narrow
 // the palette to compatible widgets per surface so foreign-drop never
 // happens in the first place; until then the stubs are the safety net.
-
-internal val STUB_HOME_CLASSIC = HomeClassicContext(
-    session               = SessionData(),
-    initialSelectedServer = null,
-    onServerSelected      = {},
-    onSessionUpdated      = {},
-    onOpenServerSettings  = {},
-    onOpenDetails         = {},
-)
 
 internal val STUB_HOME_NEW = HomeNewContext(
     appState         = AppState.Loading,

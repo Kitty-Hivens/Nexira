@@ -1,7 +1,6 @@
 package hivens.ui.editor
 
 import androidx.compose.runtime.ProvidedValue
-import hivens.core.data.HomeView
 import hivens.ui.Screen
 import hivens.ui.i18n.AppStrings
 import hivens.ui.icons.IconKey
@@ -10,13 +9,10 @@ import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
 import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
-import hivens.ui.widgets.home.classic.LocalHomeClassicContext
 import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.ui.widgets.profile.LocalProfileContext
 import hivens.ui.widgets.profile.STUB_PROFILE
-import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
-import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
@@ -51,7 +47,7 @@ internal class EditorSurfaceSpec(
      * Whether this screen mounts the surface as its centre pane. Null for the
      * shell surfaces, which are present on every screen.
      */
-    val mountedOn: ((Screen, HomeView) -> Boolean)? = null,
+    val mountedOn: ((Screen) -> Boolean)? = null,
 )
 
 /**
@@ -66,20 +62,12 @@ internal object EditorSurfaces {
 
     private val centre: List<EditorSurfaceSpec> = listOf(
         EditorSurfaceSpec(
-            id        = SurfaceId("home.classic"),
-            icon      = NxIcon.Home,
-            name      = { it.editorSurfHomeClassic },
-            shortName = { it.editorSurfShortHome },
-            stub      = LocalHomeClassicContext provides STUB_HOME_CLASSIC,
-            mountedOn = { screen, view -> screen == Screen.Home && view == HomeView.Classic },
-        ),
-        EditorSurfaceSpec(
             id        = SurfaceId("home.new"),
             icon      = NxIcon.Home,
             name      = { it.editorSurfHomeNew },
             shortName = { it.editorSurfShortHome },
             stub      = LocalHomeNewContext provides STUB_HOME_NEW,
-            mountedOn = { screen, view -> screen == Screen.Home && view == HomeView.New },
+            mountedOn = { screen -> screen == Screen.Home },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("library"),
@@ -87,7 +75,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfLibrary },
             shortName = { it.editorSurfShortLibrary },
             stub      = LocalLibraryContext provides STUB_LIBRARY,
-            mountedOn = { screen, _ -> screen == Screen.Library },
+            mountedOn = { screen -> screen == Screen.Library },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("about"),
@@ -95,7 +83,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfAbout },
             shortName = { it.editorSurfShortAbout },
             stub      = LocalAboutContext provides STUB_ABOUT,
-            mountedOn = { screen, _ -> screen == Screen.About },
+            mountedOn = { screen -> screen == Screen.About },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("bg.settings"),
@@ -103,7 +91,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfBg },
             shortName = { it.editorSurfShortBg },
             stub      = LocalBgSettingsContext provides STUB_BG_SETTINGS,
-            mountedOn = { screen, _ -> screen == Screen.BackgroundSettings },
+            mountedOn = { screen -> screen == Screen.BackgroundSettings },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("profile"),
@@ -111,15 +99,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfProfile },
             shortName = { it.editorSurfShortProfile },
             stub      = LocalProfileContext provides STUB_PROFILE,
-            mountedOn = { screen, _ -> screen == Screen.Profile },
-        ),
-        EditorSurfaceSpec(
-            id        = SurfaceId("server.details"),
-            icon      = NxIcon.Home,
-            name      = { it.editorSurfServer },
-            shortName = { it.editorSurfShortServer },
-            stub      = LocalServerDetailsContext provides STUB_SERVER_DETAILS,
-            mountedOn = { screen, _ -> screen is Screen.ServerDetails },
+            mountedOn = { screen -> screen == Screen.Profile },
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("theme.picker"),
@@ -127,7 +107,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfTheme },
             shortName = { it.editorSurfShortTheme },
             stub      = LocalThemePickerContext provides STUB_THEME_PICKER,
-            mountedOn = { screen, _ -> screen == Screen.ThemePicker },
+            mountedOn = { screen -> screen == Screen.ThemePicker },
         ),
     )
 
@@ -198,9 +178,9 @@ internal object EditorSurfaces {
      * is missing, so in practice this only filters a surface that genuinely is
      * not part of this build's layout.
      */
-    fun availableFor(screen: Screen, homeView: HomeView, graph: LayoutGraph): List<SurfaceId> {
+    fun availableFor(screen: Screen, graph: LayoutGraph): List<SurfaceId> {
         val known = graph.surfaces.keys
-        val main = centre.firstOrNull { it.mountedOn?.invoke(screen, homeView) == true }
+        val main = centre.firstOrNull { it.mountedOn?.invoke(screen) == true }
         return (listOfNotNull(main) + shell)
             .map { it.id }
             .filter { it in known }

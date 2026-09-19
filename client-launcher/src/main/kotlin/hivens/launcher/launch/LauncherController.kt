@@ -6,7 +6,6 @@ import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.data.AuthStatus
 import hivens.core.api.interfaces.*
-import hivens.core.api.model.ServerProfile
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.toDomain
 import hivens.core.data.CachedManifestSnapshot
@@ -28,10 +27,6 @@ import hivens.core.launch.LaunchState
 import hivens.core.launch.PrepareStage
 import hivens.core.launch.SpawnResult
 import hivens.launcher.di.AppCoroutineScopeHook
-import hivens.launcher.platform.ServerNameValidator
-import hivens.launcher.smrt.ClientSyncCoordinator
-import hivens.launcher.smrt.OpenSmrtHelperResolver
-import hivens.launcher.smrt.SmartyModPlanner
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -70,16 +65,10 @@ class LauncherController(
     private val authProviderRegistry: AuthProviderRegistry,
     private val credentialsManager: ICredentialStore,
     private val settingsService: ISettingsService,
-    private val downloadService: IFileDownloadService,
-    private val javaManagerService: IJavaManager,
     private val launcherService: ILauncherService,
-    private val manifestProcessor: IManifestProcessorService,
-    private val manifestCache: IManifestStore,
-    private val profileManager: IInstanceProfileStore,
     private val packRepository: IPackRepository,
     private val smrtPackClient: IMirrorPackClient,
     private val smrtSyncService: IPackSyncService,
-    private val smartyPlanner: SmartyModPlanner,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
 ) : RunningPackSource {
@@ -271,27 +260,6 @@ class LauncherController(
     private fun ownsController(tag: Any): Boolean = currentLaunchTag === tag
 
     /**
-     * SC server-list launch. Delegates the gate/token/MDC/spawn/wait/exit
-     * machinery to [launchInternal]; [prepareServerLaunch] supplies the
-     * SC-specific auth + sync + java steps and the spawn binding.
-     *
-     * @return false when a launch was already under way and this one was refused.
-     */
-    fun launch(
-        currentSession: SessionData,
-        server: ServerProfile,
-        onSessionRefreshed: ((SessionData) -> Unit)? = null,
-    ) = launchInternal(
-        label = server.name,
-        onStart = {
-            emit(LaunchLogEvent.SessionStarted(server.assetDir, server.name))
-            emit(LaunchLogEvent.AppBanner)
-            emit(LaunchLogEvent.TargetServer(server.name, settingsService.getSettings().isOfflineMode))
-        },
-        prepare = { prepareServerLaunch(currentSession, server, onSessionRefreshed) },
-    )
-
-    /**
      * Outcome of a prepare phase. [Ready] carries the path-specific spawn (and
      * an optional post-spawn hook); [Bail] means prepare already called [fail]
      * and the flow must stop WITHOUT overwriting that error state.
@@ -324,7 +292,7 @@ class LauncherController(
     }
 
     /**
-     * Owns the launch state machine shared by both entry points: the atomic
+     * Owns the launch state machine: the atomic
      * re-entry gate, the per-launch abort token + MDC tag, the spawn, the
      * blocking wait, the exit-code verdict, and the cancellation-vs-crash catch
      * tail. [prepare] runs the path-specific steps and returns a
@@ -336,8 +304,8 @@ class LauncherController(
         prepare: suspend CoroutineScope.() -> Prepared,
     ): Boolean {
         // Re-entry guard must be atomic with the launchJob assignment. Without
-        // the lock two parallel callers (UI double-click, tray-launch racing
-        // dashboard-launch) could both observe Idle, both pass the gate, both
+        // the lock two parallel callers (a UI double-click, a tray launch racing
+        // one from the Library) could both observe Idle, both pass the gate, both
         // assign launchJob, and produce two in-flight game spawns -- of which
         // only the second is tracked for abort(). Claim the state slot under
         // the lock; the coroutine runs outside it so the gate isn't held
@@ -351,8 +319,7 @@ class LauncherController(
         // Tag every log line for this attempt with a stable launchId so a user
         // dump can be sliced per-play-click (`grep launchId=abcd1234 *.log`).
         // MDCContext (from kotlinx-coroutines-slf4j) propagates it across every
-        // dispatcher hop the flow takes, including FileDownloadService and
-        // LauncherService.
+        // dispatcher hop the flow takes, including LauncherService.
         val launchId = UUID.randomUUID().toString().take(8)
         val abortToken = AtomicBoolean(false)
         currentAbortToken = abortToken
@@ -448,208 +415,10 @@ class LauncherController(
     }
 
     /**
-     * SC server-list prepare phase: auth (skipped offline), ignored-file
-     * calculation, sync (or offline manifest recovery), and Java resolution.
-     * Bails -- with the semantic [LaunchError] already set on [fail] -- for the
-     * 2FA-no-manifest, offline-no-client/manifest, and helper-unavailable cases.
-     *
-     * A [CoroutineScope] extension so `isActive` inside the sync callbacks reads
-     * the launch coroutine's cancellation, matching the pre-extraction body.
-     *
-     * The file probes here block, deliberately: a launch runs on the app scope,
-     * whose dispatcher is [Dispatchers.IO]. Moving them to their own IO context
-     * would only add a hop -- and take the launch off the caller's dispatcher,
-     * which is what the tests drive it on.
-     */
-    @Suppress("BlockingMethodInNonBlockingContext")
-    private suspend fun CoroutineScope.prepareServerLaunch(
-        currentSession: SessionData,
-        server: ServerProfile,
-        onSessionRefreshed: ((SessionData) -> Unit)?,
-    ): Prepared {
-        // Named rather than implicit: `isActive` inside the sync callbacks below is
-        // the LAUNCH coroutine's, not that of whatever suspends around it, and an
-        // implicit receiver leaves the reader (and the linter) guessing which.
-        val launchScope = this
-        val settings = settingsService.getSettings()
-        val isOffline = settings.isOfflineMode
-
-        // 1. Auth -- skip in offline mode
-        setStage(PrepareStage.AUTH, 0.1f)
-        var session = currentSession
-        val targetServerId = server.assetDir
-
-        if (isOffline) {
-            emit(LaunchLogEvent.OfflineSkipAuth)
-            // Offline: no SC auth, so the bound server cannot be joined -- the
-            // client still launches for singleplayer/LAN. Mint a proper offline
-            // identity (vanilla OfflinePlayer UUID, blank token -> "0" in argv +
-            // userType legacy) rather than carrying a stale/garbage session.
-            ActionRing.record(
-                "Offline launch of '$targetServerId': singleplayer only, the server cannot be joined without auth",
-            )
-            session = session.copy(
-                uuid = if (session.offline) session.uuid else OfflineIdentity.dashlessUuidFor(session.playerName),
-                accessToken = "",
-                offline = true,
-            )
-        } else {
-            try {
-                val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
-                    ?: session.cachedPassword
-                if (session.twoFactor && !session.mintedNow) {
-                    // Same as the pack path: mint the session for this launch rather
-                    // than trust a stored one nothing can vouch for.
-                    fail(LaunchError.TwoFactorExpired)
-                    return Prepared.Bail
-                } else if (!pass.isNullOrEmpty()) {
-                    session = authService.login(session.playerName, pass, targetServerId)
-                    onSessionRefreshed?.invoke(session)
-                    emit(LaunchLogEvent.AuthSucceeded(session.uuid))
-                } else {
-                    emit(LaunchLogEvent.NoPassword)
-                }
-            } catch (_: TwoFactorRequiredException) {
-                // The demand itself says the account is two-factor; the UI persists
-                // that so later launches stop logging in behind the user's back.
-                //
-                // And it stops here rather than continuing on the stored session: a
-                // cached manifest would let the sync run, but the game would still be
-                // handed a token nothing minted for this launch, which is exactly what
-                // the code prompt exists to prevent.
-                emit(LaunchLogEvent.TwoFactorDetected)
-                ActionRing.record("Launch: second factor required for $targetServerId")
-                fail(LaunchError.TwoFactorExpired)
-                return Prepared.Bail
-            } catch (e: Exception) {
-                // No fresh session, so no session at all: same rule as the pack
-                // path. Carrying the previous token forward is what produced the
-                // launch that looks fine until the server answers "Failed to verify
-                // username" with nothing pointing back here.
-                emit(LaunchLogEvent.AuthFailed(e.message, classifyAuthFailure(e)))
-                emit(LaunchLogEvent.OfflineSkipAuth)
-                session = session.toOffline()
-            }
-        }
-
-        // 2. Ignored files
-        val ignoredFiles = calculateIgnoredFiles(server)
-
-        // 3. Download -- skip in offline mode if client exists
-        setStage(PrepareStage.SYNC, 0.2f)
-        val clientDir = dataDirectory.resolve("clients").resolve(ServerNameValidator.require(targetServerId))
-        if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
-
-        if (isOffline) {
-            // In offline mode, skip file sync but verify client exists.
-            // .use{} closes the directory stream; without it the OS file handle
-            // leaks until GC eventually collects the stream.
-            val hasClient = Files.exists(clientDir) &&
-                Files.list(clientDir).use { it.count() > 0 }
-            if (!hasClient) {
-                fail(LaunchError.OfflineNoClient)
-                return Prepared.Bail
-            }
-            // Recover the file manifest from the last successful online sync.
-            // Without it, ClasspathProvider has nothing to walk and builds an
-            // empty -cp argument -- the JVM then dies with "Could not find or
-            // load main class net.minecraft.launchwrapper.Launch" because the
-            // class IS on disk but classpath is "". TTL is intentionally ignored
-            // here: a stale-but-present manifest is strictly better than
-            // launching with no classpath. If the user has never logged in
-            // online, the cache is empty, and we bail with an actionable error
-            // rather than a cryptic JVM message.
-            if (session.fileManifest == null) {
-                val cached = manifestCache.loadManifest(targetServerId)
-                if (cached != null) {
-                    session = session.copy(fileManifest = cached)
-                } else {
-                    fail(LaunchError.OfflineNoManifest)
-                    return Prepared.Bail
-                }
-            }
-            emit(LaunchLogEvent.OfflineSkipSync)
-        } else {
-            // Smarty swap / strict plan -- computed here (not in the offline
-            // branch) so an offline launch never makes the resolver's doomed
-            // network fetch.
-            val smartyPlan = smartyPlanner.plan(server, session.fileManifest, settings)
-
-            // Block rather than strip Smarty with no replacement: if the swap is
-            // on and the manifest ships Smarty but no helper is available for
-            // this MC version (unsupported version / descriptor down / nothing
-            // cached), launching would either join with no network mod (kick)
-            // or, if we kept Smarty, run the surveillance mod.
-            if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
-                !helperPresent(clientDir, server.version, smartyPlan)) {
-                fail(LaunchError.HelperUnavailable(server.version))
-                return Prepared.Bail
-            }
-
-            ClientSyncCoordinator.withClientLock(clientDir) {
-                downloadService.processSession(
-                    session = session,
-                    serverId = targetServerId,
-                    targetDir = clientDir,
-                    extraCheckSum = server.extraCheckSum,
-                    ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
-                    messageUI = { /* log */ },
-                    progressUI = { progress ->
-                        if (!launchScope.isActive) return@processSession
-                        _state.value = LaunchState.Downloading(
-                            currentFileIdx   = progress.currentFileIdx,
-                            totalFiles       = progress.totalFiles,
-                            downloadedBytes  = progress.downloadedBytes,
-                            totalBytes       = progress.totalBytes,
-                            speedBytesPerSec = progress.bytesPerSec,
-                        )
-                    },
-                    // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
-                    // sub-range. The actual download progress takes over from
-                    // 0.7 upward via the Downloading state above. Without this,
-                    // the progress bar froze at 20% during the MD5 walk on
-                    // 1000-file modpacks -- 5-30s of perceived hang.
-                    verifyUI = { verified, total ->
-                        if (!launchScope.isActive) return@processSession
-                        val fraction = if (total > 0) verified.toFloat() / total else 0f
-                        setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
-                    },
-                    injectModJar = smartyPlan.injectJar,
-                    strictModCheck = smartyPlan.strict,
-                    helperKeepGlobs = smartyPlan.helperKeepGlobs,
-                )
-            }
-        }
-
-        // 4. Java
-        setStage(PrepareStage.JVM, 0.9f)
-        val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
-            Path.of(settings.javaPath!!)
-        } else {
-            javaManagerService.getJavaPath(server.version)
-        }
-
-        // 5. Spawn binding handed back to launchInternal.
-        return Prepared.Ready(
-            spawn = { onLog ->
-                launcherService.launchClientWithLogs(
-                    sessionData = session,
-                    serverProfile = server,
-                    clientRootPath = clientDir,
-                    javaExecutablePath = javaPath,
-                    adaptiveEnabled = settings.adaptiveMemoryEnabled,
-                    onLog = onLog,
-                )
-            },
-        )
-    }
-
-    /**
-     * Pack-centric launch path for the Hivens mirror world: a [PackInstance]
-     * from the local Library. Re-entry guard, MDC tagging, and abort semantics
-     * come from [launchInternal]; [preparePackLaunch] supplies the manifest
-     * resolve + pack auth + spawn binding, so the existing UI surfaces
-     * (LaunchControlPanel, GameConsoleService) plug in unchanged.
+     * The launch path: a [PackInstance] from the local Library. Re-entry guard,
+     * MDC tagging, and abort semantics come from [launchInternal];
+     * [preparePackLaunch] supplies the manifest resolve + pack auth + spawn
+     * binding.
      *
      * @return false when a launch was already under way and this one was refused.
      */
@@ -670,8 +439,8 @@ class LauncherController(
     )
 
     /**
-     * Pack-centric prepare phase. Skips SC auth + per-launch asset re-sync
-     * (mirror packs are static + already on disk after install):
+     * Prepare phase. Skips a per-launch asset re-sync -- mirror packs are static
+     * and already on disk after install:
      * - Resolves the [CachedManifestSnapshot]; when [PackInstance.cachedManifest]
      *   is null (instance predates the field) a one-time mirror fetch fills it
      *   and writes it back via [IPackRepository.put].
@@ -707,8 +476,7 @@ class LauncherController(
             return Prepared.Bail
         }
 
-        // 3. Auth requirement: refresh the session right before spawn. Mirrors
-        // the SC server path's pre-spawn re-auth.
+        // 3. Auth requirement: refresh the session right before spawn.
         //
         // Three ways a launch ends up without a token, and they share one rule:
         // the game process only gets a session that was earned for THIS launch.
@@ -781,10 +549,10 @@ class LauncherController(
                 ?: return Prepared.Bail
         }
 
-        // 4. Java override. The pack launch path picks the LOADER-declared Java
-        // itself (resolved.javaMajor) from the resolved runtime -- same MC +
-        // different loader can need different Java (Cleanroom-1.12.2 -> 25 vs
-        // legacy-Forge-1.12.2 -> 8), so the version-keyed heuristic moves out of
+        // 4. Java override. The launch picks the LOADER-declared Java itself
+        // (resolved.javaMajor) from the resolved runtime -- same MC + different
+        // loader can need different Java (Cleanroom-1.12.2 -> 25 vs
+        // legacy-Forge-1.12.2 -> 8), so the version-keyed heuristic stays out of
         // the controller. We only pass the user's explicit global setting; null
         // means "let the service provision."
         setStage(PrepareStage.JVM, 0.7f)
@@ -1059,11 +827,10 @@ class LauncherController(
     }
 
     /**
-     * SmartyCraft pre-spawn re-auth for an SC-bound pack, mirroring the SC
-     * server-list path's pre-spawn re-auth (see [launch], around the AUTH stage).
-     * Returns the refreshed [SessionData], a 2FA-fallback session with the cached
-     * manifest attached, or null after [fail] has already set the error state -- the
-     * caller bails on null.
+     * SmartyCraft pre-spawn re-auth for an SC-bound pack. Returns the refreshed
+     * [SessionData], a 2FA-fallback session with the cached manifest attached, or
+     * null after [fail] has already set the error state -- the caller bails on
+     * null.
      *
      * Precondition: missing player + password fails with
      * [LaunchError.MissingAuthProvider] rather than spawning the game and waiting
@@ -1160,7 +927,7 @@ class LauncherController(
      * Stops the in-flight launch. If the game process has already spawned,
      * terminates it via [LaunchHandle.terminate] before resetting state --
      * canceling the coroutine alone would orphan the spawned process and the
-     * next [launch] click would happily spawn a second game.
+     * next Play click would happily spawn a second game.
      */
     fun abort() {
         currentAbortToken?.set(true)
@@ -1174,19 +941,4 @@ class LauncherController(
     private fun setStage(stage: PrepareStage, progress: Float) {
         _state.value = LaunchState.Prepare(stage, progress)
     }
-
-    private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
-        val userState = profileManager.getProfile(server.assetDir).optionalModsState
-        return manifestProcessor.calculateIgnoredFiles(server, userState)
-    }
-
-    /**
-     * A helper is usable for [mcVersion] when one was resolved this launch
-     * ([SmartyModPlanner.Plan.injectJar]) or a previously-injected one of the
-     * exact expected name is still on disk.
-     */
-    private fun helperPresent(clientDir: Path, mcVersion: String, plan: SmartyModPlanner.Plan): Boolean =
-        plan.injectJar != null ||
-            Files.isRegularFile(clientDir.resolve("mods").resolve(OpenSmrtHelperResolver.helperFileName(mcVersion)))
-
 }

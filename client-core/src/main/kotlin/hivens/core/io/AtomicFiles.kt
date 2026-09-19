@@ -10,7 +10,7 @@ import java.nio.file.StandardOpenOption
 /**
  * Atomic, crash-durable file writes via the tmp-then-fsync-then-rename pattern,
  * extracted from the four places that had it copy-pasted (JsonPackRepository,
- * LayoutGraphRepository, JsonServerListCacheStore, ManifestCache).
+ * LayoutGraphRepository, ProfilerProfileStore).
  *
  * Sequence: write `<file>.tmp`, fsync its bytes to stable storage, then
  * `Files.move(ATOMIC_MOVE)`, then fsync the parent directory so the rename

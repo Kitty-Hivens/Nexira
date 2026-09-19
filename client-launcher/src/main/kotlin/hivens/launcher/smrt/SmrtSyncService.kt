@@ -32,9 +32,8 @@ import java.nio.file.StandardCopyOption
 import java.util.Comparator
 
 /**
- * v2-manifest sync. Parallel to [hivens.launcher.FileDownloadService] but speaks the
- * smrt mirror's flat `mods[] + assets[]` shape with a per-entry source
- * pointer, instead of SC's recursive `{directories,files}` tree.
+ * v2-manifest sync. Speaks the smrt mirror's flat `mods[] + assets[]` shape with
+ * a per-entry source pointer.
  *
  * Throws on any download error or sha1 mismatch. The caller does not
  * get a partial-success indicator and there is no silent fallback to

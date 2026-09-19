@@ -2,11 +2,8 @@ package hivens.launcher
 
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
-import hivens.core.api.model.ServerProfile
 import hivens.core.data.CachedManifestSnapshot
-import hivens.core.data.FileManifest
 import hivens.core.data.HeapProfile
-import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
 import hivens.core.data.RuntimePrefs
@@ -17,7 +14,6 @@ import hivens.core.jvm.SystemMemory
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.SpawnResult
-import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
@@ -40,16 +36,15 @@ import java.nio.file.Path
 /**
  * Implementation of the Minecraft client launch service.
  *
- * Acts as a facade, coordinating the work of [EnvironmentPreparer] (natives + assets),
- * [ClasspathProvider] (manifest -> classpath), [GameCommandBuilder] (version-specific JVM
- * command) and [ProcessLogHandler] (stdout/stderr interception). All collaborators are
- * supplied via constructor injection so that this service can be unit-tested in isolation.
+ * Acts as a facade, coordinating the work of [EnvironmentPreparer] (natives),
+ * [RuntimeProvisioner] (the loader-resolved runtime), [GameCommandBuilder] (the
+ * JVM command) and [ProcessLogHandler] (stdout/stderr interception). All
+ * collaborators are supplied via constructor injection so that this service can
+ * be unit-tested in isolation.
  */
 internal class LauncherService(
-    private val profileManager: ProfileManager,
     private val javaManager: IJavaManager,
     private val envPreparer: EnvironmentPreparer,
-    private val classpathProvider: ClasspathProvider,
     private val commandBuilder: GameCommandBuilder,
     private val logHandler: ProcessLogHandler,
     private val runtimeProvisioner: RuntimeProvisioner,
@@ -61,80 +56,6 @@ internal class LauncherService(
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
-
-    /**
-     * Launches a client with log interception.
-     *
-     * @see [ILauncherService.launchClientWithLogs]
-     */
-    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
-    override suspend fun launchClientWithLogs(
-        sessionData: SessionData,
-        serverProfile: ServerProfile,
-        clientRootPath: Path,
-        javaExecutablePath: Path,
-        adaptiveEnabled: Boolean,
-        onLog: (String, LauncherLogType) -> Unit
-    ): SpawnResult = try {
-        val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
-        val version = serverProfile.version
-
-        // 1. Heap: pinned -> explicit value; else the machine-aware Automatic baseline,
-        // which the adaptive sizer refines from when it is on.
-        val adaptive = resolveAdaptive(
-            enabled = adaptiveApplies(adaptiveEnabled, profile.fixedMemory),
-            instanceDir = clientRootPath,
-            baseMemoryMb = baselineMemory(profile.fixedMemory, profile.memoryMb, SystemMemory.totalPhysicalMb()),
-        )
-        val memory = adaptive.memoryMb
-
-        // 2. Determining the path to Java
-        val javaExec: String = resolveJavaPath(javaManager, profile, javaExecutablePath, version)
-
-        log.info("Session initialization: {}, Java: {}, Heap: {}MB", serverProfile.name, javaExec, memory)
-        onLog("Running ${serverProfile.name}...", LauncherLogType.INFO)
-
-        // 3. Preparation of native libraries and assets
-        val nativesDir = commandBuilder.getNativesDir(version)
-        envPreparer.prepareNatives(clientRootPath, nativesDir, version)
-        envPreparer.prepareAssets(clientRootPath, "assets-$version.zip")
-
-        // 4. Classpath assembly
-        val manifest = sessionData.fileManifest ?: FileManifest()
-        val excludedModules = emptyList<String>()
-        val classpath = classpathProvider.buildClasspath(clientRootPath, manifest, excludedModules)
-
-        // 5. Assembling the launch command
-        val command = commandBuilder.build(
-            javaExec, memory, clientRootPath,
-            serverProfile, sessionData, profile,
-            classpath,
-            agentJarPath = adaptive.agentJar,
-            metricsOutPath = adaptive.metricsOut,
-        )
-
-        // The SC server list is server-bound by construction -- every launch on it
-        // presents a session to someone's server.
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch = true, onLog = onLog)))
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        log.error("Launch failed for {}", serverProfile.name, e)
-        SpawnResult.Failed(LaunchError.Internal(e.message ?: ""))
-    }
-
-    @Deprecated("Retires with the SmartyCraft server list (#318); see the interface for what replaces it.")
-    override suspend fun launchClient(
-        sessionData: SessionData,
-        serverProfile: ServerProfile,
-        clientRootPath: Path,
-        javaExecutablePath: Path,
-    ): SpawnResult {
-        return launchClientWithLogs(
-            sessionData, serverProfile, clientRootPath, javaExecutablePath,
-            adaptiveEnabled = false,
-        ) { _, _ -> /* Logs are ignored */ }
-    }
 
     override suspend fun launchPackClient(
         sessionData: SessionData,
@@ -154,8 +75,8 @@ internal class LauncherService(
         val mcVersion = manifest.minecraftVersion
         val scBound = manifest.authRequirement?.scServerId != null
 
-        // 1. Heap: same tiering as the SC path -- pinned -> explicit value, else the
-        // machine-aware Automatic baseline that the adaptive sizer refines from.
+        // 1. Heap: pinned -> explicit value, else the machine-aware Automatic
+        // baseline that the adaptive sizer refines from.
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
@@ -226,10 +147,10 @@ internal class LauncherService(
             throw PackPrepBlocked(LaunchError.Internal("java-not-executable"))
         }
 
-        // 4. Natives stay per-instance, but are now extracted from the jars the
-        // provisioner resolved from the manifest -- so the LWJGL version matches
-        // the classpath for ANY MC version, not just the few the SC path hardcodes.
-        // Assets are the shared root the provisioner just populated.
+        // 4. Natives stay per-instance, extracted from the jars the provisioner
+        // resolved from the manifest -- so the LWJGL version matches the classpath
+        // for any MC version. Assets are the shared root the provisioner just
+        // populated.
         envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives, rebuild = boundLaunch)
 
         // 5. Profile-driven command: main class / classpath / args come from the
@@ -289,8 +210,6 @@ internal class LauncherService(
      * No mods are touched here. A pack carries its own mods (the open-smrt-network
      * interop included) and mod content is the sync's job, scoped to the manifest;
      * injecting a helper on top would duplicate the coremod the pack already ships.
-     * The open-smrt swap lives on the raw server-list path (SmartyModPlanner),
-     * which is the only place the proprietary Smarty jar arrives.
      *
      * The patched authlib comes from the SC session's own file manifest
      * ([SessionData.fileManifest], populated by the pre-spawn re-auth), so it is
@@ -323,9 +242,9 @@ internal class LauncherService(
     }
 
     /**
-     * Builds, starts, and log-attaches the game process. Both launch paths
-     * (SC server + pack) run on the caller's IO dispatcher, so the blocking
-     * ProcessBuilder.start happens on IO without an extra context switch.
+     * Builds, starts, and log-attaches the game process. The launch runs on the
+     * caller's IO dispatcher, so the blocking ProcessBuilder.start happens on IO
+     * without an extra context switch.
      */
     private fun spawnProcess(
         command: List<String>,
@@ -443,11 +362,9 @@ internal class LauncherService(
                  else AutomaticHeap.compute(systemRamMb)
 
         /**
-         * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s
-         * fallback ladder minus its managed-Java step, which the pack path
-         * has already taken: [RuntimePrefs.javaPath] wins, and without it
-         * the caller's pre-resolved [defaultPath] does (LauncherController
-         * already consulted JavaManager for the pack's Java major).
+         * Java path resolution: [RuntimePrefs.javaPath] wins, and without it
+         * the caller's pre-resolved [defaultPath] does -- the managed-Java step
+         * has already been taken by then, against the pack's declared major.
          */
         internal fun resolvePackJavaPath(
             runtime: RuntimePrefs,
@@ -455,29 +372,6 @@ internal class LauncherService(
         ): String {
             val explicit = runtime.javaPath
             if (!explicit.isNullOrEmpty()) return explicit
-            if (Files.exists(defaultPath)) return defaultPath.toString()
-            return "java"
-        }
-
-        /**
-         * Selects the appropriate Java Runtime.
-         * Priority: Profile Setup -> Managed Java ([IJavaManager]) -> System Java.
-         *
-         * Pulled into the companion (rather than instance method) so tests can
-         * exercise the full priority cascade with a fake [IJavaManager] without
-         * having to construct the rest of [LauncherService]'s collaborators.
-         */
-        internal suspend fun resolveJavaPath(
-            javaManager: IJavaManager,
-            profile: RuntimePrefs,
-            defaultPath: Path,
-            version: String
-        ): String {
-            if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
-            runCatching {
-                val managedPath = javaManager.getJavaPath(version)
-                if (Files.exists(managedPath)) return managedPath.toString()
-            }
             if (Files.exists(defaultPath)) return defaultPath.toString()
             return "java"
         }

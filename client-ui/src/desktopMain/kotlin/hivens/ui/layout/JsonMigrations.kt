@@ -7,8 +7,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import hivens.widget.model.GRID_MAX
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -46,8 +48,95 @@ internal object JsonMigrations {
     private fun step(toVersion: Int): (JsonObject) -> JsonObject = when (toVersion) {
         10 -> ::collapseOrientationsIntoPlacement
         11 -> ::wrapSlotsInGeneralFamily
+        12 -> ::dropRetiredServerLayout
         else -> { it -> it }
     }
+
+    /**
+     * The surfaces the SmartyCraft server list stood on, and the widgets that
+     * only ever drew on them, leave with it.
+     *
+     * A surface nothing mounts is not inert: it still holds whatever the reader
+     * arranged on it, the editor still lists it, and its widgets still count
+     * against a graph that is loaded and written on every change. Dropped here
+     * rather than left to the registry-aware pass, because that one reaps widget
+     * KINDS it does not recognise and has nothing to say about a surface.
+     *
+     * The kinds go here too, and that is not a duplicate of the pass. The pass
+     * prunes only after a schema bump, and only on the layout FILE; a preset
+     * carrying a retired kind is reconciled without it and writes the kind back
+     * into a graph that is already current, where nothing will ever reap it. So
+     * a reader who once dragged the server banner onto the right rail and saved
+     * a preset would carry an invisible hole between machines forever.
+     *
+     * Named explicitly rather than derived from the bundled layout: a surface or
+     * kind absent from the default is not necessarily retired, and a build that
+     * simply failed to load its own default would otherwise take the reader's
+     * arrangement with it.
+     */
+    private fun dropRetiredServerLayout(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        val kept = surfaces
+            .filterKeys { it !in RETIRED_SURFACES }
+            .mapValues { (_, layout) -> dropRetiredKinds(layout) }
+        if (JsonObject(kept) == surfaces) return graph
+        return buildJsonObject {
+            graph.forEach { (key, value) -> if (key != "surfaces") put(key, value) }
+            put("surfaces", JsonObject(kept))
+        }
+    }
+
+    /** Every slot of every family, plus the nested slots a container carries. */
+    private fun dropRetiredKinds(layout: JsonElement): JsonElement {
+        val obj = layout.asObjectOrNull() ?: return layout
+        val families = obj["families"]?.asObjectOrNull() ?: return layout
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "families") put(key, value) }
+            put("families", JsonObject(families.mapValues { (_, family) -> filterFamily(family) }))
+        }
+    }
+
+    private fun filterFamily(family: JsonElement): JsonElement {
+        val obj = family.asObjectOrNull() ?: return family
+        val slots = obj["slots"]?.asObjectOrNull() ?: return family
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "slots") put(key, value) }
+            put("slots", JsonObject(slots.mapValues { (_, slot) -> filterSlot(slot) }))
+        }
+    }
+
+    private fun filterSlot(slot: JsonElement): JsonElement {
+        val obj = slot.asObjectOrNull() ?: return slot
+        val widgets = obj["widgets"]?.jsonArrayOrNull() ?: return slot
+        val kept = widgets
+            .filter { it.asObjectOrNull()?.get("kind")?.jsonPrimitive?.contentOrNull !in RETIRED_KINDS }
+            .map { filterWidget(it) }
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "widgets") put(key, value) }
+            put("widgets", JsonArray(kept))
+        }
+    }
+
+    private fun filterWidget(widget: JsonElement): JsonElement {
+        val obj = widget.asObjectOrNull() ?: return widget
+        val children = obj["children"]?.asObjectOrNull() ?: return widget
+        return buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "children") put(key, value) }
+            put("children", JsonObject(children.mapValues { (_, child) -> filterSlot(child) }))
+        }
+    }
+
+    private fun JsonElement.jsonArrayOrNull(): JsonArray? = this as? JsonArray
+
+    private val RETIRED_SURFACES = setOf("home.classic", "server.details")
+
+    private val RETIRED_KINDS = setOf(
+        "home.classic.content",
+        "server.details.title",
+        "server.details.tagbar",
+        "server.details.description",
+        "server.details.banner",
+    )
 
     /**
      * A surface's slots become one family's slots, named `general`.

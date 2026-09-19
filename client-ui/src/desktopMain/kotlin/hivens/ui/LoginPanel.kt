@@ -25,7 +25,6 @@ import hivens.auth.AuthProvider
 import hivens.auth.OfflineAuthProvider
 import hivens.core.data.SessionData
 import hivens.auth.AccountStore
-import hivens.launcher.ProfileManager
 import hivens.launcher.network.CertificateTrustGate
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
@@ -58,7 +57,6 @@ fun LoginPanel(
     val authService: AuthProvider              = koinInject()
     val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
     val credentialsManager: AccountStore       = koinInject()
-    val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val certificateGate: CertificateTrustGate  = koinInject()
     val offlineProvider: OfflineAuthProvider   = koinInject()
@@ -124,8 +122,7 @@ fun LoginPanel(
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
-                    val sess = service.login(login, password, lastServer)
+                    val sess = service.login(login, password, Protocol.DEFAULT_SERVER_ID)
                     if (rememberMe) credentialsManager.save(sess)
                     sess
                 }
@@ -136,12 +133,11 @@ fun LoginPanel(
                 if (service.capabilities.supports2FA) {
                     // Provider runs a real second factor: open the code dialog.
                     hivens.core.diag.ActionRing.record("Login: 2FA required, prompting for code")
-                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                     twoFactorPending = TwoFactorPending(
                         uid = e.uid.orEmpty(),
                         username = login,
                         password = password,
-                        serverId = lastServer,
+                        serverId = Protocol.DEFAULT_SERVER_ID,
                         service = service,
                     )
                 } else {

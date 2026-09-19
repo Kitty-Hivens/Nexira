@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
-import hivens.core.data.HomeView
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
@@ -38,8 +37,6 @@ fun SettingsScreen(
     onOpenThemePicker: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
-    homeView: HomeView,
-    onHomeViewChanged: (HomeView) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
@@ -114,8 +111,6 @@ fun SettingsScreen(
                             onOpenBackgroundSettings     = onOpenBackgroundSettings,
                             currentLocale                = currentLocale,
                             onLocaleChanged              = onLocaleChanged,
-                            homeView                     = homeView,
-                            onHomeViewChanged            = onHomeViewChanged,
                         )
                         SettingsCategory.Console -> ConsoleSection()
                         SettingsCategory.Network -> NetworkSection()

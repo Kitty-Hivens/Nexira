@@ -9,8 +9,8 @@ import kotlin.test.assertNotNull
 /**
  * Regression test: decode a real-shape login response and confirm `client`
  * field (the file manifest) survives parsing. Caught a Phase 2 silent
- * regression where ClasspathProvider was getting an empty manifest because
- * LoginResponse parsing was dropping `client` somewhere.
+ * regression where the classpath came out empty because LoginResponse parsing
+ * was dropping `client` somewhere.
  *
  * The fixture is a stripped-down version of the real wire response from
  * www.smartycraft.ru/launcher2/index.php captured 2026-05-14.

@@ -43,34 +43,21 @@ object JapaneseStrings : AppStrings {
     override val navForward = "進む"
 
     // Dashboard
-    override fun dashboardWelcome(name: String) = "おかえりなさい、${name}"
-    override val dashboardServers = "利用可能なサーバー"
-    override val dashboardServersEmpty = "サーバーが見つかりません"
-    override val dashboardLoginRequiredTitle = "サインインしてサーバーを表示"
-    override val dashboardLoginRequiredHint = "SmartyCraft のサーバー一覧は認証の内側にあります。プロフィールからサインインしてください。"
+    override fun homeWelcomeGreeting(name: String) = "おかえりなさい、${name}"
+    override val homeWelcomeSubtitle = "前回の続きから始めましょう。"
 
     // Launch Control
-    override val launchReady = "プレイ準備完了"
-    override val launchButton = "プレイ"
-    override val launchAbort = "キャンセル"
     override val launchRunning = "ゲーム実行中"
-    override val launchStop = "停止"
     override val launchDownloading = "ダウンロード中:"
     override val launchPreparing = "準備中"
     override val launchFailed = "起動に失敗しました"
 
     // Launcher States
-    override val stateInit = "初期化中..."
-    override val stateAuth = "認証中..."
     override val stateAuthFail = "認証エラー (オフライン?)"
     override val stateNoPassword = "パスワードが見つからないため、現在のセッションを使用します。"
-    override val stateSync = "ファイルを同期中..."
-    override val stateJvm = "JVM を準備中..."
     override val stateLaunching = "プロセスを開始中..."
     override fun stateExitCode(code: Int) = "ゲームが終了コード $code で終了しました"
     override fun stateError(msg: String) = "エラー: ${msg}"
-    override fun stateHelperUnavailable(mcVersion: String) =
-        "Minecraft $mcVersion 向けの open-smrt ヘルパーがありません。独自の Smarty Mod を動かさないよう起動を中止しました。それでも使う場合は、設定でヘルパーの置き換えを無効にしてください。"
     override fun stateAuthlibUnavailable(mcVersion: String) =
         "Minecraft $mcVersion 向けの SmartyCraft authlib を取得できませんでした。参加が拒否されるため起動を中止しました。接続と SmartyCraft へのサインインを確認して、もう一度お試しください。"
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
@@ -157,33 +144,16 @@ object JapaneseStrings : AppStrings {
     override val paginationNext = "次のページ"
 
     // Server Detail
-    override val serverDetailTitle = "サーバー情報"
-    override val serverDetailNoImage = "画像なし"
-    override val serverDetailNoImageHint = "banner.png"
-    override val serverDetailMissingTitle = "情報がありません"
-    override fun serverDetailMissingPath(file: String) = "次の場所に $file を作成してください:"
 
     // Server Settings
-    override val serverSettingsSubtitle = "起動設定"
-    override val serverSettingsSectionSystem = "システム"
-    override val serverSettingsSectionMods = "Mod"
     override val serverSettingsRam = "メモリ"
     override fun serverSettingsRamValue(mb: Int) = "メモリ: $mb MB"
-    override val serverSettingsJava = "Java バージョン"
-    override fun serverSettingsJavaAuto(version: String) = "自動 ($version)"
-    override val serverSettingsJavaHint = "空欄にすると同梱の Java を使用します"
     override val serverSettingsOpenFolder = "フォルダーを開く"
-    override val serverSettingsReset = "クライアントをリセット"
 
-    override val serverSettingsResetConfirmTitle = "このクライアントをリセットしますか?"
-    override val serverSettingsResetConfirmBody = "このサーバーのクライアントについて、ダウンロード済みのファイルがすべて完全に削除されます。元に戻せません。"
     override val backgroundResetConfirmTitle = "背景をリセットしますか?"
     override val backgroundResetConfirmBody = "カスタム背景の設定がすべて既定値に戻ります。"
     override val logoutConfirmTitle = "ログアウトしますか?"
     override val logoutConfirmBody = "保存されたサインイン情報がこの端末から削除されます。再度ログインするには認証情報の入力が必要です。"
-
-    override val serverSettingsNoMods = "任意 Mod はありません"
-    override val serverSettingsPickJava = "Java を選択"
 
     // Update
     override val updateTitle = "更新があります"
@@ -276,20 +246,10 @@ object JapaneseStrings : AppStrings {
         "パックに含まれないファイルを $count 件削除しました: $names"
     override val stateContentChanged = "パックが変更されたため起動を中止しました。パックのファイルは変更しないでください。"
     override val stateOfflineNoClient = "クライアントのファイルが見つかりません。先にオンラインでダウンロードしてください。"
-    override val stateOfflineNoManifest = "このサーバーのマニフェストがキャッシュにありません。オフラインで起動する前に、一度オンラインでログインしてください。"
 
     // --- Server Settings: Extended ---
-    override val serverSettingsJvmArgs = "JVM 引数"
-    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
-    override val serverSettingsJvmBuildArgs = "引数を組み立てる"
-    override val serverSettingsResolution = "ウィンドウサイズ"
-    override val serverSettingsWidth = "幅"
-    override val serverSettingsHeight = "高さ"
-    override val serverSettingsFullscreen = "フルスクリーン"
-    override val serverSettingsAutoConnect = "サーバーに自動接続"
 
     // --- Server Settings: Icon Upload ---
-    override val serverSettingsPickIcon = "サーバーアイコンを選択"
 
     // =========================================================================
     // RAM Selector
@@ -308,7 +268,6 @@ object JapaneseStrings : AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    override val serversFavorites = "★ お気に入り"
 
     // =========================================================================
     // Custom Background
@@ -387,12 +346,6 @@ object JapaneseStrings : AppStrings {
     override val techSkiaDesc = "グラフィックスレンダラー"
     override val techCoilDesc = "画像読み込み"
 
-    // --- Spawn Reset ---
-    override val spawnResetButton = "スポーンに戻る"
-    override val spawnResetLoading = "リセット中..."
-    override val spawnResetSuccess = "完了しました。再接続すると反映されます"
-    override val spawnResetError = "サーバーエラー"
-
     // --- Tray ---
     override val trayStatusIdle = "待機中"
     override val trayStatusRunning = "ゲーム実行中"
@@ -408,8 +361,6 @@ object JapaneseStrings : AppStrings {
     override val settingsPreReleasesDesc = "安定版に昇格する前のベータ版を受け取ります。"
     override val settingsMandatoryUpdates = "必須の更新"
     override val settingsMandatoryUpdatesDesc = "上流のプロトコルが壊れた場合に、重要な更新を入れるまで起動を止めます。既定はオフです。この下限は自分の起動も止めうるため、従うかどうかは意識して選ぶ設定です。"
-    override val settingsAutoSyncAllPacks = "起動時に SmartyCraft クライアントを自動同期"
-    override val settingsAutoSyncAllPacksDesc = "ランチャーの起動時に、導入済みの SmartyCraft クライアントを背景で再同期します。二段階認証を使っている場合はログインしません。ログインするとコードで解除したセッションが無効になるためです。したがって、以前の手動サインインがキャッシュしたマニフェストだけを使い、それがないサーバーは飛ばします。SmartyCraft 経路は 2.5.0 で廃止予定で、不具合も修正しません。ミラーのパックが推奨経路です。背景で通信量を消費します。"
     override val settingsAutoUpdatePacks = "導入済みインスタンスを自動更新"
     override val settingsAutoUpdatePacksDesc = "導入済みのパックを最新ビルドに保ちます。安全な更新は背景で適用し、Minecraft やローダーが変わる場合は下の方針に従います。手動で更新したい場合はオフにしてください。"
     override val settingsAmberPolicy = "ビルドで Minecraft かローダーが変わるとき"
@@ -424,9 +375,6 @@ object JapaneseStrings : AppStrings {
     override val settingsMimicVersion = "擬装するランチャーのバージョン"
     override val settingsMimicVersionDesc = "ハンドシェイクと User-Agent で上流に送るバージョン文字列を固定します。空欄なら同梱の既定値を使います。上流が Nexira のリリース周期より速くバージョンを上げた場合にだけ設定してください。保存後、次のプロトコル呼び出しから有効になります。再起動は不要です。"
     override fun settingsMimicVersionPlaceholder(default: String) = "既定: ${default}"
-    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
-        "$serverName を同期中 ($current/$total)"
-    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
     override val widgetProgressTitle = "背景の処理"
     override val widgetProgressIdle = "いまダウンロード中のものはありません。"
     override fun widgetTabDefaultLabel(index: Int) = "タブ ${index}"
@@ -485,10 +433,6 @@ object JapaneseStrings : AppStrings {
     override fun sslBypassExpiresAt(formatted: String) = "期限: ${formatted}"
 
     override val settingsSectionSmarty = "Smarty サーバー"
-    override val settingsOpenSmrtHelperTitle = "代替の smrt ネットワークヘルパーを使う"
-    override val settingsOpenSmrtHelperDesc = "Smarty サーバーで、上流の Smarty Mod を私たちのオープンソースのヘルパーに置き換えます。ネットワーク機能は同じで、監視の仕組みはありません。そのゲームバージョン向けの代替がない場合は、元の Mod を動かすのではなく起動を中止します。"
-    override val settingsStrictModCheckTitle = "Mod の厳密な検証"
-    override val settingsStrictModCheckDesc = "同期のあと、サーバーが要求していないものを mods フォルダーからすべて削除します。導入は綺麗に保たれますが、自分で追加した Mod も消えます。"
     override val settingsNetworkAgentTitle = "ネットワーク支援エージェントを使う"
     override val settingsNetworkAgentDesc = "ゲームの起動時にログイン先を SmartyCraft に向けます。対象はゲーム内の参加処理とスキンの確認です。SmartyCraft が改変したログインライブラリを差し込まなくても参加時の認証が通り、スキンも読み込まれます。SmartyCraft のサーバーに参加するには必要です。"
     override val settingsSmartyAuthLibTitle = "SmartyCraft のログインライブラリを使う"
@@ -613,11 +557,6 @@ object JapaneseStrings : AppStrings {
 
     override val navLibrary = "ライブラリ"
     override val navBrowse = "探す"
-
-    override val settingsHomeViewTitle = "ホームの表示"
-    override val settingsHomeViewSub = "既定はモダンなホームです。従来のダッシュボードも切り替えひとつで使えます。"
-    override val settingsHomeViewClassic = "クラシック"
-    override val settingsHomeViewNew = "モダン"
 
     // --- Left-rail selection style ---
     override val navSelectionTitle = "選択中の項目の見せ方"
@@ -1157,7 +1096,6 @@ object JapaneseStrings : AppStrings {
     override val notifReasonAuthFail = "認証に失敗しました"
     override fun notifReasonAuthFailDetail(detail: String) = detail
     override val notifReasonOfflineNoClient = "パックのファイルがディスクにありません"
-    override val notifReasonOfflineNoManifest = "キャッシュしたマニフェストがありません。一度オンラインで同期してください"
     override val notifReasonTwoFactorExpired = "認証情報を更新するため、もう一度サインインしてください"
     override val notifSessionStaleTitle = "セッションを更新できませんでした"
     override val notifSessionStaleRejected = "認証サーバーがサインインを拒否しました。ゲームは古いセッションで起動しますが、サーバーへの参加はまず失敗します。もう一度サインインしてください。"
@@ -1286,7 +1224,6 @@ object JapaneseStrings : AppStrings {
         "widget.container.tabs.label2" to "タブ 2",
         "widget.container.tabs.label3" to "タブ 3",
         "widget.container.tabs.tabCount" to "タブ数",
-        "widget.home.classic.content" to "クラシックのダッシュボード",
         "widget.home.new.clock" to "時計",
         "widget.home.new.clock.accent" to "強調色",
         "widget.home.new.clock.faceSize" to "文字盤の大きさ",
@@ -1365,11 +1302,6 @@ object JapaneseStrings : AppStrings {
         "widget.profile.nav" to "プロフィールのナビ",
         "widget.profile.skin.section" to "スキン",
         "widget.profile.skin.section.previewHeight" to "プレビューの高さ",
-        "widget.server.details.banner" to "サーバーのバナー",
-        "widget.server.details.banner.cornerRadius" to "角の丸み",
-        "widget.server.details.description" to "サーバーの説明",
-        "widget.server.details.tagbar" to "サーバーのタグ",
-        "widget.server.details.title" to "サーバーの名前",
         "widget.theme.picker.grid" to "テーマの一覧",
         "widget.theme.picker.preview" to "テーマのプレビュー",
     )
@@ -1509,14 +1441,12 @@ object JapaneseStrings : AppStrings {
     override val editorSurfShortAbout = "情報"
     override val editorSurfShortBg = "背景"
     override val editorSurfShortProfile = "プロフィール"
-    override val editorSurfShortServer = "サーバー"
     override val editorSurfShortTheme = "テーマ"
     override val editorSurfShortShell = "シェル"
     override val editorSurfShortTopBar = "上部"
     override val editorSurfShortBody = "本体"
 
     // --- Layout editor: surface long names ---
-    override val editorSurfHomeClassic = "ホーム (クラシック)"
     override val editorSurfHomeNew = "ホーム (新)"
     override val editorSurfLibrary = "ライブラリ"
     override val editorSurfLeftRail = "横のパネル"
@@ -1524,7 +1454,6 @@ object JapaneseStrings : AppStrings {
     override val editorSurfAbout = "このアプリについて"
     override val editorSurfBg = "背景の設定"
     override val editorSurfProfile = "プロフィール"
-    override val editorSurfServer = "サーバーの詳細"
     override val editorSurfTheme = "テーマの選択"
     override val editorSurfShell = "アプリの外枠"
     override val editorSurfTopBar = "上部バー"

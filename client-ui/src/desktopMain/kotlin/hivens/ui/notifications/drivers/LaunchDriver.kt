@@ -37,10 +37,9 @@ import java.util.concurrent.ConcurrentHashMap
 // LaunchState carries no target identity, so binding the observer to the
 // click that started the launch is how we key the resulting
 // notification / indication / session entries on the right [LaunchTarget].
-// One observer for both pack launches (LaunchTarget.Pack) and SC server
-// launches (LaunchTarget.Server) -- the controller exposes the same state
-// shape for both, and the target abstraction normalises the (id, label,
-// icon, source-key) tuple.
+// The target abstraction normalises the (id, label, icon, source-key) tuple,
+// so the observer is written once against it rather than against whatever
+// the controller was handed.
 class LaunchDriver(
     private val controller: LauncherController,
     private val notifications: NotificationCenter,
@@ -296,7 +295,6 @@ class LaunchDriver(
             indications.setLaunchIndication(target.id, null)
             activities.dismiss(launchKey(target))
             val serverId = when (target) {
-                is LaunchTarget.Server -> target.server.assetDir
                 is LaunchTarget.Pack -> (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.SmartyCraft)
                     ?.serverId
                     ?: (target.instance.cachedManifest?.authRequirement as? PackAuthRequirement.Both)?.serverId
@@ -306,7 +304,6 @@ class LaunchDriver(
                 appScope.launch {
                     val accepted = when (target) {
                         is LaunchTarget.Pack -> controller.launchPackInstance(session, target.instance)
-                        is LaunchTarget.Server -> controller.launch(session, target.server)
                     }
                     if (accepted) observe(target)
                 }
@@ -407,11 +404,9 @@ class LaunchDriver(
                                                 ?.let { s.notifReasonInternalDetail(it) }
                                                 ?: s.notifReasonInternal
         is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
-        is LaunchError.HelperUnavailable   -> s.stateHelperUnavailable(reason.mcVersion)
         is LaunchError.AuthlibUnavailable  -> s.stateAuthlibUnavailable(reason.mcVersion)
         LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
         LaunchError.OfflineNoClient        -> s.notifReasonOfflineNoClient
-        LaunchError.OfflineNoManifest      -> s.notifReasonOfflineNoManifest
         LaunchError.TwoFactorExpired       -> s.notifReasonTwoFactorExpired
     }
 }

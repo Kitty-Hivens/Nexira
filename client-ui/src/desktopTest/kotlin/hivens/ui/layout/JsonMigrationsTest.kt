@@ -300,6 +300,58 @@ class JsonMigrationsTest {
     }
 
     @Test
+    fun `the surfaces the server list stood on are dropped, and only those`() {
+        val migrated = JsonMigrations.apply(
+            11,
+            json.parseToJsonElement(
+                """{"surfaces":{"home.classic":{"families":{}},"server.details":{"families":{}},"home.new":{"families":{}}}}""",
+            ).jsonObject,
+        )
+        assertEquals(setOf("home.new"), migrated["surfaces"]!!.jsonObject.keys)
+    }
+
+    @Test
+    fun `a file with none of the retired surfaces or kinds is handed back untouched`() {
+        val before = json.parseToJsonElement("""{"surfaces":{"home.new":{"families":{}}}}""").jsonObject
+        assertSame(before, JsonMigrations.apply(11, before))
+    }
+
+    /**
+     * A retired widget dropped onto a surface that SURVIVES.
+     *
+     * The registry-aware pass reaps unknown kinds only after a schema bump and
+     * only on the layout file, so a preset carrying one writes it into a graph
+     * that is already current, where nothing will ever reap it. Reaping here
+     * covers both readers, because both run this ladder.
+     */
+    @Test
+    fun `a retired widget is reaped from a surface that stays`() {
+        val migrated = JsonMigrations.apply(
+            11,
+            json.parseToJsonElement(
+                """
+                {"surfaces":{"appshell.rightrail":{"families":{"general":{"slots":{"news":{"widgets":[
+                  {"kind":"server.details.banner","instance_id":"a"},
+                  {"kind":"container.tabs","instance_id":"b","children":{"body":{"widgets":[
+                    {"kind":"home.classic.content","instance_id":"c"},
+                    {"kind":"notes.scratch","instance_id":"d"}
+                  ]}}}
+                ]}}}}}}}
+                """.trimIndent(),
+            ).jsonObject,
+        )
+        val decoded = json.decodeFromJsonElement(LayoutGraph.serializer(), migrated)
+        val slot = decoded.surfaces[SurfaceId("appshell.rightrail")]!!
+            .slotsOf(FamilyId.GENERAL)[SlotId("news")]!!
+        assertEquals(listOf("b"), slot.widgets.map { it.instanceId }, "the retired banner goes")
+        assertEquals(
+            listOf("d"),
+            slot.widgets.single().children[SlotId("body")]!!.widgets.map { it.instanceId },
+            "and so does one nested inside a container",
+        )
+    }
+
+    @Test
     fun `a file carrying every old shape survives all of them`() {
         // The bundle exercises three of the five: twenty slots leaning on the
         // field's own default, one Column and two Rows, no gridColumns, no canvas,
@@ -362,8 +414,16 @@ class JsonMigrationsTest {
      * matched because the bundle has no container in it: the first one to arrive
      * would have failed this for a reason that was never about the migration.
      */
+    private val RETIRED_AT_12 = setOf("home.classic", "server.details")
+
     private fun assertSurvives(envelope: JsonObject, from: Int) {
-        val oldSurfaces = envelope["graph"]!!.jsonObject["surfaces"]!!.jsonObject
+        // The two surfaces schema 12 retires are excluded on purpose: this asserts
+        // that nothing is lost by ACCIDENT, and a step whose whole job is to drop
+        // something would otherwise read as the loss it exists to make.
+        val oldSurfaces = JsonObject(
+            envelope["graph"]!!.jsonObject["surfaces"]!!.jsonObject
+                .filterKeys { it !in RETIRED_AT_12 },
+        )
         val migrated = json.decodeFromJsonElement(
             LayoutGraph.serializer(),
             JsonMigrations.apply(from, envelope["graph"]!!.jsonObject),

@@ -2,8 +2,6 @@ package hivens.launcher.component
 
 import hivens.config.Branding
 import hivens.config.Protocol
-import hivens.core.api.model.ServerProfile
-import hivens.core.data.RuntimePrefs
 import hivens.core.data.SessionData
 import hivens.core.logging.Redactor
 import hivens.core.platform.OS
@@ -21,7 +19,6 @@ internal class GameCommandBuilder(
     private val waylandSession: Boolean = OS.isLinux && !System.getenv("WAYLAND_DISPLAY").isNullOrBlank(),
 ) {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
-    private val neoForgeDetector = NeoForgeVersionDetector()
 
 
     /**
@@ -43,101 +40,12 @@ internal class GameCommandBuilder(
         if (waylandSession) args.add("-Dfml.earlyprogresswindow=false")
     }
 
-    private data class VersionConfig(
-        val mainClass: String,
-        val tweakClass: String?,
-        val assetIndex: String,
-        val jvmArgs: List<String>,
-        val nativesDir: String,
-        val programArgs: List<String> = emptyList()
-    )
-
-    // Registry of version configurations
-    private val configs = mapOf(
-        "1.7.10" to VersionConfig(
-            mainClass = "net.minecraft.launchwrapper.Launch",
-            tweakClass = "cpw.mods.fml.common.launcher.FMLTweaker",
-            assetIndex = "1.7.10",
-            jvmArgs = listOf("-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true", "-Dfml.ignoreInvalidMinecraftCertificates=true"),
-            nativesDir = "bin/natives-1.7.10"
-        ),
-        "1.12.2" to VersionConfig(
-            mainClass = "net.minecraft.launchwrapper.Launch",
-            tweakClass = "net.minecraftforge.fml.common.launcher.FMLTweaker",
-            assetIndex = "1.12.2",
-            jvmArgs = listOf("-Dfml.ignoreInvalidMinecraftCertificates=true"),
-            nativesDir = "bin/natives-1.12.2"
-        ),
-        "1.21.1" to VersionConfig(
-            mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher",
-            tweakClass = null,
-            assetIndex = "1.21.1",
-            jvmArgs = listOf(
-                // Java 9+ Modules Export (Mandatory for Java 21)
-                "--add-modules=ALL-MODULE-PATH",
-                "--add-modules=jdk.naming.dns", "--add-exports=jdk.naming.dns/com.sun.jndi.dns=java.naming",
-                "--add-opens=java.base/java.util.jar=ALL-UNNAMED", "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
-                "--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.util=ALL-UNNAMED",
-                "--add-opens=java.base/java.io=ALL-UNNAMED", "--add-opens=java.base/java.nio=ALL-UNNAMED",
-                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED", "--add-opens=java.base/java.time=ALL-UNNAMED",
-                // SecureJarHandler Specifics
-                "--add-opens=java.base/java.util.jar=cpw.mods.securejarhandler", "--add-opens=java.base/java.lang.invoke=cpw.mods.securejarhandler",
-                "--add-exports=java.base/sun.security.util=cpw.mods.securejarhandler",
-                "-Djava.awt.headless=false", "-Djava.net.preferIPv6Addresses=system"
-            ),
-            nativesDir = "bin/natives-1.21.1",
-            programArgs = listOf("--launchTarget", "forgeclient")
-        )
-    )
-
     /**
-     * Returns the path to the native libraries directory for the specified version.
-     */
-    fun getNativesDir(version: String): String {
-        return getConfig(version).nativesDir
-    }
-
-    /**
-     * Per-instance natives directory for a PACK launch. Unlike [getNativesDir]
-     * (the SC server path, limited to the hardcoded [VersionConfig] map), this
-     * works for any Minecraft version: the pack runtime is resolved generically,
-     * so the natives folder is just the conventional `bin/natives-<version>`.
-     * Using getNativesDir here threw "Unsupported client version" for every MC
-     * version outside the SC map (1.7.10 / 1.12.2 / 1.21.1).
+     * Per-instance natives directory. Works for any Minecraft version: the pack
+     * runtime is resolved generically, so the natives folder is just the
+     * conventional `bin/natives-<version>`.
      */
     fun packNativesDir(mcVersion: String): String = "bin/natives-$mcVersion"
-
-    /**
-     * Legacy SC server-centric entry point. Projects [serverProfile] +
-     * [userProfile] onto a [LaunchTarget] and delegates to the
-     * domain-agnostic [build] overload below.
-     */
-    fun build(
-        javaExec: String,
-        memoryMB: Int,
-        clientRoot: Path,
-        serverProfile: ServerProfile,
-        session: SessionData,
-        userProfile: RuntimePrefs,
-        classpath: String,
-        agentJarPath: Path? = null,
-        metricsOutPath: Path? = null,
-    ): List<String> = build(
-        javaExec   = javaExec,
-        memoryMB   = memoryMB,
-        clientRoot = clientRoot,
-        target     = LaunchTarget(
-            mcVersion       = serverProfile.version,
-            neoForgeArgs    = serverProfile.neoForgeArgs,
-            ignoredModules  = serverProfile.ignoredModules,
-            jvmArgsOverride = userProfile.jvmArgs,
-            displayName     = serverProfile.name,
-        ),
-        session    = session,
-        classpath  = classpath,
-        agentJarPath   = agentJarPath,
-        metricsOutPath = metricsOutPath,
-    )
 
     /**
      * Closes the JVM's attach listener for a launch carrying a session token.
@@ -179,168 +87,10 @@ internal class GameCommandBuilder(
     }
 
     /**
-     * Collects a list of arguments for [ProcessBuilder].
-     *
-     * @return An ordered list of strings, ready to be passed to the OS process.
-     */
-    fun build(
-        javaExec: String,
-        memoryMB: Int,
-        clientRoot: Path,
-        target: LaunchTarget,
-        session: SessionData,
-        classpath: String,
-        agentJarPath: Path? = null,
-        metricsOutPath: Path? = null,
-    ): List<String> {
-        val version = target.mcVersion
-        val config = getConfig(version)
-        val isModernEnvironment = config.mainClass.contains("BootstrapLauncher")
-        val args = ArrayList<String>()
-
-        // 1. JVM Binary
-        args.add(javaExec)
-        // -noverify was deprecated in Java 13 and prints a warning on every
-        // launch under Java 17+. Legacy MC (1.7.10 / 1.12.2 on Java 8) still
-        // needs it for the broken bytecode some Forge mods ship; modern
-        // (1.21.1+, Java 21+) doesn't tolerate the warning gracefully.
-        if (!isModernEnvironment) args.add("-noverify")
-
-        // 2. OS Specific Flags
-        addMacOsStartupFlags(args)
-
-        // 3. System Properties (Launcher Identity & Custom Authlib)
-        // Two eras, two bases. Legacy auth/account flows live under the SC
-        // launcher API (/launcher/). The SESSION service -- the join -- lives at
-        // the BARE host over plain http: SC's own patched authlib hardcodes
-        // http://<host>, and both https and /launcher/ variants 404. Modern
-        // authlib (1.16.4+) additionally IGNORES the redirect unless session AND
-        // services are both set, so the pair is emitted together.
-        args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
-        args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
-        args.add("-Dminecraft.api.session.host=http://${protocolConfig.sslBypassHost}")
-        args.add("-Dminecraft.api.services.host=http://${protocolConfig.sslBypassHost}")
-        args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
-        args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
-
-        // 4. Natives Configuration
-        val nativesPath = clientRoot.resolve(config.nativesDir)
-        args.add("-Djava.library.path=" + nativesPath.toAbsolutePath())
-
-        // 5. NeoForge / Modern Environment
-        if (isModernEnvironment) {
-            val libDirStandard = clientRoot.resolve("libraries")
-            // Dynamically resolve library directory based on asset index
-            val libDirCustom = clientRoot.resolve("libraries-${config.assetIndex}")
-            val libDir = if (libDirCustom.resolve("cpw").toFile().exists()) libDirCustom else libDirStandard
-
-            args.add("-Djna.tmpdir=" + nativesPath.toAbsolutePath())
-            args.add("-Dorg.lwjgl.system.SharedLibraryExtractPath=" + nativesPath.toAbsolutePath())
-            args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
-            args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
-
-            val defaultIgnore = "client,securejarhandler,asm,bootstraplauncher,JarJarFileSystems,client-extra,neoforge-"
-            val ignoreList = target.ignoredModules
-                .filter { it.isNotBlank() }
-                .takeIf { it.isNotEmpty() }
-                ?.joinToString(",")
-                ?: defaultIgnore
-            args.add("-DignoreList=$ignoreList")
-            args.add("-DmergeModules=jna-5.14.0.jar,jna-platform-5.14.0.jar")
-        }
-        addEarlyWindowGuard(args)
-
-        // 6. Memory Allocation & Custom JVM Args
-        val (gcArgs, systemArgs) = config.jvmArgs.partition { it.startsWith("-XX:") }
-        args.addAll(systemArgs)
-
-        // Java 21+ Vector API optimization for faster data structures in mods (e.g., JEI, Ars Nouveau)
-        if (isModernEnvironment) {
-            args.add("--add-modules=jdk.incubator.vector")
-        }
-
-        if (!target.jvmArgsOverride.isNullOrBlank()) {
-            args.addAll(userJvmArgs(target.jvmArgsOverride, restrict = true))
-        } else {
-            args.addAll(gcArgs)
-        }
-        addAttachGuard(args, restrict = true)
-
-        args.add("-Xms${minOf(memoryMB, 512)}M")
-        args.add("-Xmx${memoryMB}M")
-        addProfilerArgs(args, agentJarPath, metricsOutPath)
-
-        // 7. Java 9+ Module Path (NeoForge / Modern Forge) dynamically resolved
-        var validModules = emptyList<String>()
-        if (isModernEnvironment) {
-            // Strictly ONLY Bootstraplauncher, SecureJarHandler, ASM, and JarJar belong in the Module Path (-p).
-            val jvmModuleKeywords = listOf(
-                "securejarhandler",
-                "bootstraplauncher",
-                "ow2/asm",
-                "jarjar"
-            )
-
-            // Dynamically extract boot modules directly from the resolved classpath
-            validModules = classpath.split(File.pathSeparator).filter { path ->
-                val lowerPath = path.lowercase().replace("\\", "/")
-                jvmModuleKeywords.any { lowerPath.contains(it) }
-            }
-
-            if (validModules.isEmpty()) {
-                // Fail loud at command-build time rather than let the
-                // JVM limp into BootstrapLauncher without `-p`. The
-                // downstream failure ("module not found:
-                // cpw.mods.bootstraplauncher") surfaces in the game
-                // console long after the user committed to a launch.
-                // Exception propagates through LauncherService into
-                // LauncherController's error dialog so the user sees
-                // a launcher-side message instead.
-                throw IllegalStateException(
-                    "Cannot launch ${config.mainClass}: no NeoForge boot modules " +
-                        "(securejarhandler, bootstraplauncher, ow2/asm, jarjar) found " +
-                        "in the synced classpath. The pack's libraries directory is " +
-                        "missing the module-path entries -- re-sync the server or " +
-                        "delete clients/<server>/manifest-cache to force a full re-download.",
-                )
-            }
-            args.add("-p")
-            args.add(validModules.joinToString(File.pathSeparator))
-        }
-
-        // 8. Classpath & Entry Point
-        args.add("-cp")
-        if (isModernEnvironment) {
-            // Remove ONLY the strict boot modules from Classpath. All other libraries stay.
-            val cleanClasspath = classpath.split(File.pathSeparator)
-                .filter { path -> !validModules.contains(path) }
-                .joinToString(File.pathSeparator)
-
-            args.add(cleanClasspath.ifBlank { classpath })
-        } else {
-            args.add(classpath)
-        }
-
-        args.add(config.mainClass)
-        args.addAll(config.programArgs)
-
-        // 9. Game Arguments
-        args.addAll(buildMinecraftArgs(session, target, clientRoot, config.assetIndex, isModernEnvironment))
-
-        if (config.tweakClass != null) {
-            args.add("--tweakClass")
-            args.add(config.tweakClass)
-        }
-
-        return args
-    }
-
-    /**
      * Profile-driven command for a pack-centric launch. Everything that varies
      * by loader -- main class, classpath, jvm/game args (e.g. the FML tweak) --
-     * comes from the resolved [runtime], NOT the hardcoded [VersionConfig] map
-     * (which stays the SC server path's domain). Assets + libraries come from
-     * the SHARED roots; natives stay per-instance.
+     * comes from the resolved [runtime]. Assets and libraries come from the
+     * SHARED roots; natives stay per-instance.
      *
      * Handles all three launch eras:
      * - launchwrapper / Knot (vanilla, Forge <=1.12.2, Fabric, Quilt): plain
@@ -391,8 +141,8 @@ internal class GameCommandBuilder(
         addMacOsStartupFlags(args)
 
         // authlib redirect: point every era's host set at the SC backend so
-        // joining an SC/mirror-derived server authenticates there (same as the SC
-        // path). Legacy auth/account flows live under /launcher/; the SESSION
+        // joining an SC/mirror-derived server authenticates there. Legacy
+        // auth/account flows live under /launcher/; the SESSION
         // service -- the join -- lives at the BARE host over plain http (SC's own
         // patched authlib hardcodes http://<host>; https and /launcher/ both
         // 404). Modern authlib (1.16.4+) additionally IGNORES the redirect
@@ -644,57 +394,4 @@ internal class GameCommandBuilder(
         args.add("--userType"); args.add(if (session.offline) "legacy" else "mojang")
     }
 
-    private fun getConfig(version: String): VersionConfig {
-        return configs[version]
-            ?: configs.entries.find { version.startsWith(it.key) }?.value
-            ?: throw IllegalArgumentException("Unsupported client version: $version")
-    }
-
-    private fun buildMinecraftArgs(
-        session: SessionData,
-        target: LaunchTarget,
-        root: Path,
-        assetIndex: String,
-        isModernEnvironment: Boolean
-    ): List<String> {
-        val args = ArrayList<String>()
-        args.add("--username"); args.add(session.playerName)
-        args.add("--version"); args.add("Forge ${target.mcVersion}")
-        args.add("--gameDir"); args.add(root.toAbsolutePath().toString())
-        args.add("--assetsDir"); args.add(root.resolve("assets").toAbsolutePath().toString())
-        args.add("--assetIndex"); args.add(assetIndex)
-        addSessionAuthArgs(args, session)
-
-        if (isModernEnvironment) {
-            // NeoForge needs `--fml.{neoForgeVersion,fmlVersion,mcVersion,neoFormVersion}`.
-            // Auto-detect from `libraries-{mcVersion}/` first -- the
-            // values live in directory names and the universal jar's
-            // MANIFEST.MF, so a manifest sync always brings matching
-            // versions and we never drift. Fall back to baked-in
-            // defaults (mirror smrt-deco) only if the layout is
-            // unexpected.
-            val detected = neoForgeDetector.detect(root, assetIndex)?.toMap()
-            val defaultFmlArgs = detected ?: run {
-                logger.warn("NeoForge auto-detect failed; using baked-in defaults")
-                mapOf(
-                    "neoForgeVersion" to "21.1.506",
-                    "fmlVersion" to "4.0.42",
-                    "mcVersion" to assetIndex,
-                    "neoFormVersion" to "20240808.144430"
-                )
-            }
-
-            // Backend arguments still win -- server can override what was detected.
-            val backendArgs = target.neoForgeArgs?.asFmlArgs().orEmpty()
-            val finalFmlArgs = defaultFmlArgs + backendArgs
-
-            finalFmlArgs.forEach { (key, value) ->
-                if (value.isNotBlank()) {
-                    args.add("--fml.$key")
-                    args.add(value)
-                }
-            }
-        }
-        return args
-    }
 }

@@ -34,9 +34,7 @@ All scripts default to `127.0.0.1:58000`. Override via
 
 ## Scenarios
 
-* `login.sh <user> <pass>`         — login form -> dashboard
-* `select-server.sh <assetDir>`    — click a server card
-* `launch-server.sh <assetDir>`    — full flow: select + click PLAY
+* `login.sh <user> <pass>`         — login form -> home
 
 ## Diagnostics (read-only)
 
@@ -58,7 +56,7 @@ Suggested freeze-diagnosis workflow:
 
 ```sh
 ./diag-snapshot.sh > /tmp/baseline.json     # before the suspect action
-./launch-server.sh skyblock                 # trigger the suspect action
+./click.sh library.pack.<id>                # trigger the suspect action
 ./diag-snapshot.sh > /tmp/frozen.json       # while symptom is visible
 diff <(jq . /tmp/baseline.json) <(jq . /tmp/frozen.json)
 ```

@@ -45,7 +45,7 @@ data class ServerProtocolConfig(
     /** Latest official launcher binary -- used by [hivens.launcher.protocol.LauncherHashCache]. */
     val officialJarUrl: String get() = "$baseUrl/downloads/smartycraft.jar"
 
-    /** Per-server client-file CDN root -- `FileDownloadService` appends `/<server>/<file>`. */
+    /** Per-server client-file CDN root; a reader appends `/<server>/<file>`. */
     val clientFilesBase: String get() = "$baseUrl/launcher/clients"
 
     /**

@@ -199,9 +199,7 @@ private fun renderError(reason: LaunchError): String = when (reason) {
     LaunchError.ContentChangedDuringLaunch ->
         "pack content changed while the launch was being prepared; sync the pack and try again"
     LaunchError.OfflineNoClient -> "no installed client directory (install/sync the pack first)"
-    LaunchError.OfflineNoManifest -> "no cached manifest from a prior online run"
     LaunchError.TwoFactorExpired -> "2FA session expired -- re-login via the GUI"
-    is LaunchError.HelperUnavailable -> "open-smrt helper unavailable for MC ${reason.mcVersion}"
     is LaunchError.AuthlibUnavailable -> "SmartyCraft authlib unavailable for MC ${reason.mcVersion}"
     is LaunchError.MissingAuthProvider -> "sign in with '${reason.providerKey}' to play this pack (use the GUI)"
 }

@@ -73,7 +73,7 @@ class NavBackStackTest {
     @Test
     fun switchingTabsResetsHistory() {
         val nav = NavBackStack(Screen.Home)
-        nav.navigate(Screen.ServerSettings("industrial"))
+        nav.navigate(Screen.PackDetail("inst-1"))
         assertTrue(nav.canGoBack)
         nav.switchTo(Screen.Library)
         assertEquals(Screen.Library, nav.current)

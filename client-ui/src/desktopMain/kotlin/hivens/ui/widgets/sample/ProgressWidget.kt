@@ -19,8 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.launcher.AutoSyncService
+import hivens.core.activity.Activity
+import hivens.core.activity.ActivityPhase
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Sources
@@ -39,10 +41,9 @@ data class ProgressProps(
     @PropLabel("widget.home.new.progress.idleText") val idleText: String = "",
 )
 
-// Compact background-activity card. Shows AutoSyncService state when
-// a sync is in flight; collapses to a calm "idle" message otherwise.
-// Polished version of the dashboard's autosync strip, broken out so
-// the new home can host it independently.
+// Compact background-activity card. Names whatever the launcher is working on
+// right now -- an install, a pack update, a batch of content updates -- and
+// collapses to a calm "idle" message when there is nothing in flight.
 @Widget(
     id = "home.new.progress",
     displayName = "widget.home.new.progress",
@@ -53,10 +54,13 @@ data class ProgressProps(
 fun ProgressWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProgressProps>()
     val s = LocalStrings.current
-    // Bound declaratively to the autosync source -- the widget no longer knows
+    // Bound declaratively to the activity source -- the widget no longer knows
     // which service backs it (the SourceKey is wired in Sources + Main DI).
-    val snapshot by rememberSource(Sources.AutoSync)
-    val overall  = snapshot.overall
+    val activities by rememberSource(Sources.Activity)
+    // The oldest one still running. A card this size can name one thing, and the
+    // one that has been waiting longest is the one a reader is wondering about;
+    // the activity pill is where the whole list lives.
+    val running = activities.firstOrNull { it.phase is ActivityPhase.Running }
 
     Column(
         modifier = Modifier
@@ -71,17 +75,22 @@ fun ProgressWidget(instance: WidgetInstance) {
         )
         Spacer(Modifier.height(8.dp))
 
-        when (overall) {
-            is AutoSyncService.OverallState.InProgress -> InProgressBody(overall)
-            else                                       -> IdleBody(p.idleText.ifBlank { s.widgetProgressIdle })
+        if (running != null) {
+            InProgressBody(running)
+        } else {
+            IdleBody(p.idleText.ifBlank { s.widgetProgressIdle })
         }
     }
 }
 
 @Composable
-private fun InProgressBody(state: AutoSyncService.OverallState.InProgress) {
-    val fraction = if (state.totalBytes > 0L) {
-        (state.bytesRead.toFloat() / state.totalBytes.toFloat()).coerceIn(0f, 1f)
+private fun InProgressBody(activity: Activity) {
+    val phase = activity.phase as? ActivityPhase.Running ?: return
+    // Below zero means the size is not known yet, which the bar shows as an
+    // indeterminate sweep rather than as nothing having happened.
+    val measured = phase.total > 0L
+    val fraction = if (measured) {
+        (phase.done.toFloat() / phase.total.toFloat()).coerceIn(0f, 1f)
     } else 0f
     Row(
         verticalAlignment     = Alignment.CenterVertically,
@@ -89,32 +98,45 @@ private fun InProgressBody(state: AutoSyncService.OverallState.InProgress) {
         modifier              = Modifier.fillMaxWidth(),
     ) {
         Text(
-            text       = state.currentServer,
+            text       = activity.title,
             style      = MaterialTheme.typography.bodyMedium,
             color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
-            text  = "${state.currentIdx}/${state.total}",
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
-        )
+        if (measured) {
+            Text(
+                text  = "${phase.done}/${phase.total}",
+                style = MaterialTheme.typography.bodySmall,
+                color = NxTheme.colors.textSecondary,
+            )
+        }
     }
-    if (state.totalBytes > 0L) {
+    phase.detail?.takeIf { it.isNotBlank() }?.let { detail ->
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = "${state.bytesRead / 1_048_576} / ${state.totalBytes / 1_048_576} MB",
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary.copy(alpha = 0.75f),
+            text     = detail,
+            style    = MaterialTheme.typography.bodySmall,
+            color    = NxTheme.colors.textSecondary.copy(alpha = 0.75f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
     Spacer(Modifier.height(6.dp))
-    LinearProgressIndicator(
-        progress   = { fraction },
-        modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-        color      = NxTheme.colors.primary,
-        trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
-    )
+    val barModifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp))
+    if (measured) {
+        LinearProgressIndicator(
+            progress   = { fraction },
+            modifier   = barModifier,
+            color      = NxTheme.colors.primary,
+            trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
+        )
+    } else {
+        LinearProgressIndicator(
+            modifier   = barModifier,
+            color      = NxTheme.colors.primary,
+            trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
+        )
+    }
 }
 
 @Composable

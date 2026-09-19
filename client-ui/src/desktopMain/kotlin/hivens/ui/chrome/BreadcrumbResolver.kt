@@ -13,8 +13,6 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.screens.mod.ModTarget
 import hivens.ui.screens.mod.OpenProjectState
-import hivens.ui.screens.ServerResolution
-import hivens.ui.screens.rememberServerResolution
 import org.koin.compose.koinInject
 
 /**
@@ -35,11 +33,11 @@ fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
     Screen.BackgroundSettings     -> s.backgroundTitle
     is Screen.PackVersions        -> s.packVersionsTitle
     // Resolved to a human name by the catalogue / repository / roster (see below).
-    is Screen.ServerSettings      -> null
-    is Screen.ServerDetails       -> null
     is Screen.PackDetail          -> null
     is Screen.CataloguePackDetail -> null
     is Screen.ModDetail           -> null
+    // The route carries the build's own number, so this one needs nothing fetched.
+    is Screen.ModVersion          -> screen.versionNumber
 }
 
 /**
@@ -79,8 +77,6 @@ fun rememberCrumbLabel(screen: Screen): String {
             instances.firstOrNull { it.id == screen.instanceId }?.displayName
                 ?: screen.instanceId
         }
-        is Screen.ServerSettings      -> serverCrumb(screen.serverId)
-        is Screen.ServerDetails       -> serverCrumb(screen.serverId)
         is Screen.CataloguePackDetail -> catalogueCrumb(screen.origin, screen.packId, s.crumbLoading)
         is Screen.ModDetail           -> modCrumb(screen.target)
         else -> staticCrumbLabel(screen, s).orEmpty() // unreachable: statics returned above
@@ -102,16 +98,6 @@ private fun modCrumb(target: ModTarget): String {
     val open by state.open.collectAsState()
     return open?.takeIf { it.targetKey == target.key }?.title ?: modFallbackLabel(target)
 }
-
-/**
- * A server's display name from the roster; its id -- which is what the route
- * carries -- is the placeholder and the fallback while the roster is unreachable.
- */
-@Composable
-private fun serverCrumb(serverId: String): String =
-    (rememberServerResolution(serverId) as? ServerResolution.Ready)
-        ?.server?.let { it.title?.ifBlank { null } ?: it.name }
-        ?: serverId
 
 /** Resolve a catalogue pack's display title by id (cached when the detail screen
  *  has already fetched it); the raw id is the placeholder + failure fallback. */

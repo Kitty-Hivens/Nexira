@@ -7,7 +7,6 @@ import hivens.core.data.PackInstance
 import hivens.core.time.Clock
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
-import hivens.launcher.AutoSyncService
 import hivens.launcher.instance.InstanceContentUpdater
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -160,7 +159,6 @@ class ActivityDriverStaleTest {
         registry = reg,
         installs = MutableStateFlow(emptyMap()),
         updates = hub.statuses,
-        sync = MutableStateFlow(AutoSyncService.Snapshot(emptyMap(), AutoSyncService.OverallState.Idle)),
         contentUpdates = content,
         repository = FakeRepo(),
         appScope = backgroundScope,

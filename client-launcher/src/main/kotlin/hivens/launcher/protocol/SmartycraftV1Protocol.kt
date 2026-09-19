@@ -87,15 +87,6 @@ class SmartycraftV1Protocol(
             ?: LoginResponse(status = "ERROR", message = "Malformed login response")
     }
 
-    override suspend fun spawn(uid: String, login: String, server: String): StatusOnlyResponse {
-        val payload = json.encodeToString(SpawnRequest(login = login, server = server))
-        val signature = SmartycraftSignatureBuilder.forSpawn(uid, login, server)
-        // "tospawn", not "spawn": the server has no action by the latter name and
-        // answers unknown actions with a print_r of the request, which parses as a
-        // malformed response rather than as an error. Verified against the live API.
-        return postSignedAction("tospawn", payload, signature)
-    }
-
     override suspend fun twoauth(uid: String, login: String, code: String): StatusOnlyResponse {
         val payload = json.encodeToString(TwoAuthRequest(login = login, code = code))
         val signature = SmartycraftSignatureBuilder.forTwoAuth(uid, login, code)

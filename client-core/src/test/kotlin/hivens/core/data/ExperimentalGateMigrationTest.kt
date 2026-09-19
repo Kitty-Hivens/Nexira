@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 /**
  * Contract of [foldLegacyExperimentalGate]: a file written with the retired master
- * switched off carries an intent -- four features were off -- that the knobs
+ * switched off carries an intent -- those features were off -- that the knobs
  * themselves never recorded, because two of them default to on. The fold writes
  * that intent onto the knobs and clears the flag, so the next start honours what
  * the user chose instead of turning their heap sizing and pack updates back on.
@@ -25,14 +25,12 @@ class ExperimentalGateMigrationTest {
         val legacy = SettingsData(
             experimentalFeaturesEnabled = false,
             mandatoryUpdatesEnabled     = true,
-            autoSyncAllPacks            = true,
             autoUpdatePacks             = true,
             adaptiveMemoryEnabled       = true,
         )
         val folded = foldLegacyExperimentalGate(legacy)
 
         assertFalse(folded.mandatoryUpdatesEnabled)
-        assertFalse(folded.autoSyncAllPacks)
         assertFalse(folded.autoUpdatePacks)
         assertFalse(folded.adaptiveMemoryEnabled)
     }
@@ -51,7 +49,7 @@ class ExperimentalGateMigrationTest {
     @Test
     fun knobs_the_master_only_greyed_out_are_left_alone() {
         // The gate greyed these two rows out but never reached their readers:
-        // ServerSettingsState reads jvmBuilderEnabled directly, and
+        // The JVM-args builder reads jvmBuilderEnabled directly, and
         // SettingsRestoreHook applies the mimic override on every start. They were
         // live with the master off, so switching it off expressed no intent here.
         val legacy = SettingsData(

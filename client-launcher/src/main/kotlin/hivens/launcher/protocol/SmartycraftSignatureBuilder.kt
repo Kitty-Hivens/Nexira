@@ -27,12 +27,6 @@ internal object SmartycraftSignatureBuilder {
     fun currentTimeBucket(): Long = System.currentTimeMillis() / 1000L / 10L
 
     /**
-     * Signature for `action=spawn`: `MD5(timeBucket | uid | login | server)`.
-     */
-    fun forSpawn(uid: String, login: String, server: String, timeBucket: Long = currentTimeBucket()): String =
-        HashUtils.md5("$timeBucket|$uid|$login|$server")
-
-    /**
      * Signature for `action=twoauth`: `MD5(timeBucket | uid | login | code)`.
      */
     fun forTwoAuth(uid: String, login: String, code: String, timeBucket: Long = currentTimeBucket()): String =

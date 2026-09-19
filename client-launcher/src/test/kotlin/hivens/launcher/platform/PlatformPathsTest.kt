@@ -135,41 +135,7 @@ class PlatformPathsTest {
         assertEquals(data.resolve("crash-reports"), paths.crashDir)
         assertEquals(data.resolve("skin-cache"), paths.skinCacheDir)
         assertEquals(data.resolve("clients"), paths.clientsDir)
-        assertEquals(data.resolve("clients").resolve("Industrial"), paths.clientDir("Industrial"))
         assertEquals(data.resolve("libraries"), paths.librariesDir)
         assertEquals(data.resolve("assets"), paths.assetsDir)
-    }
-
-    // ── assetDir whitelist gate ────────────────────────────────────────────
-
-    @Test
-    fun `clientDir accepts SmartyCraft-style server identifiers`() {
-        val paths = PlatformPaths("Linux", home, env = { null })
-        // Real server names from upstream -- none should ever fail.
-        listOf("Industrial", "RPG", "SkyBlock", "MagicRPG", "Aura.v2", "Server-1_2")
-            .forEach { assertEquals(paths.clientsDir.resolve(it), paths.clientDir(it)) }
-    }
-
-    @Test
-    fun `clientDir rejects parent traversal`() {
-        val paths = PlatformPaths("Linux", home, env = { null })
-        assertFailsWith<IllegalArgumentException> { paths.clientDir("../../etc") }
-        assertFailsWith<IllegalArgumentException> { paths.clientDir("..") }
-    }
-
-    @Test
-    fun `clientDir rejects path separators (forward and back slash)`() {
-        val paths = PlatformPaths("Linux", home, env = { null })
-        assertFailsWith<IllegalArgumentException> { paths.clientDir("Industrial/sub") }
-        assertFailsWith<IllegalArgumentException> { paths.clientDir("Industrial\\sub") }
-    }
-
-    @Test
-    fun `clientDir rejects whitespace, NUL, and otherwise weird characters`() {
-        val paths = PlatformPaths("Linux", home, env = { null })
-        assertFailsWith<IllegalArgumentException> { paths.clientDir("Server With Space") }
-        assertFailsWith<IllegalArgumentException> { paths.clientDir("Server NUL") }
-        assertFailsWith<IllegalArgumentException> { paths.clientDir($$"$Hostile") }
-        assertFailsWith<IllegalArgumentException> { paths.clientDir("") }
     }
 }

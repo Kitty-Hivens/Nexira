@@ -141,7 +141,7 @@ class RedactorTest {
     @Test
     fun `a login response body leaks neither the uid nor the session`() {
         // The shape a decode failure used to put in the log, trimmed from the wire
-        // fixture. uid signs spawn, twoauth and the skin uploads; session is what the
+        // fixture. uid signs twoauth and the skin uploads; session is what the
         // game token is derived from.
         val uid = "a921e0baf5d4c4454774b09586a32d94"
         val session = "vRfeed1IvnNZPZFJ6c02h1qkxBru+PXd3KJA6OLWy18="

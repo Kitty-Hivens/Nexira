@@ -38,7 +38,6 @@ class WidgetRegistryConsistencyTest {
     fun `registry exposes the kernel-3 + editor sample widget kinds`() {
         val expected = setOf(
             // kernel-3 surface widgets
-            "home.classic.content",
             "home.new.welcome",
             "home.new.recent",
             "home.new.quicklaunch",
@@ -117,10 +116,6 @@ class WidgetRegistryConsistencyTest {
             "profile.skin.section",
             "profile.account.section",
             "profile.signin",
-            "server.details.title",
-            "server.details.tagbar",
-            "server.details.description",
-            "server.details.banner",
             "theme.picker.grid",
             "theme.picker.preview",
             // persistent notification history
@@ -253,7 +248,6 @@ class WidgetRegistryConsistencyTest {
             // right-rail compact news (show-title prop)
             "appshell.rightrail.compactnews",
             // expressive knobs on otherwise data-driven sections
-            "server.details.banner",
             "profile.skin.section",
             // tab container (tabCount + labels)
             "container.tabs",

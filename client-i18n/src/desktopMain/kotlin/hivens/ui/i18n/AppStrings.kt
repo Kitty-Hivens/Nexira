@@ -39,37 +39,25 @@ interface AppStrings {
     val byteUnits: List<String>
 
     // --- Dashboard ---
-    fun dashboardWelcome(name: String): String
-    val dashboardServers: String
-    val dashboardServersEmpty: String
+    fun homeWelcomeGreeting(name: String): String
+    val homeWelcomeSubtitle: String
     /** Shown in the main content area while no session exists — replaces the
      *  ambiguous "spinning indicator forever" state for unauthenticated users. */
-    val dashboardLoginRequiredTitle: String
-    val dashboardLoginRequiredHint: String
 
     // --- Launch Control ---
-    val launchReady: String
-    val launchButton: String
-    val launchAbort: String
     val launchRunning: String
     /** Stops the running game from the dashboard control. */
-    val launchStop: String
     val launchDownloading: String
     val launchPreparing: String
     val launchFailed: String
 
     // --- Launcher States ---
-    val stateInit: String
-    val stateAuth: String
     val stateAuthFail: String
     val stateNoPassword: String
-    val stateSync: String
-    val stateJvm: String
     val stateLaunching: String
     fun stateExitCode(code: Int): String
     fun stateError(msg: String): String
     fun stateMissingAuthProvider(providerKey: String): String
-    fun stateHelperUnavailable(mcVersion: String): String
     fun stateAuthlibUnavailable(mcVersion: String): String
 
     // --- Auth Success ---
@@ -172,34 +160,17 @@ interface AppStrings {
     val paginationNext: String
 
     // --- Server Detail ---
-    val serverDetailTitle: String
-    val serverDetailNoImage: String
-    val serverDetailNoImageHint: String
-    val serverDetailMissingTitle: String
-    fun serverDetailMissingPath(file: String): String
 
     // --- Server Settings ---
-    val serverSettingsSubtitle: String
-    val serverSettingsSectionSystem: String
-    val serverSettingsSectionMods: String
     val serverSettingsRam: String
     fun serverSettingsRamValue(mb: Int): String
-    val serverSettingsJava: String
-    fun serverSettingsJavaAuto(version: String): String
-    val serverSettingsJavaHint: String
     val serverSettingsOpenFolder: String
-    val serverSettingsReset: String
 
     // --- Destructive-action confirm dialogs ---
-    val serverSettingsResetConfirmTitle: String
-    val serverSettingsResetConfirmBody: String
     val backgroundResetConfirmTitle: String
     val backgroundResetConfirmBody: String
     val logoutConfirmTitle: String
     val logoutConfirmBody: String
-
-    val serverSettingsNoMods: String
-    val serverSettingsPickJava: String
 
     // --- Update ---
     val updateTitle: String
@@ -299,21 +270,11 @@ interface AppStrings {
     fun stateForeignContentRemoved(count: Int, names: String): String
     val stateContentChanged: String
     val stateOfflineNoClient: String
-    val stateOfflineNoManifest: String
 
     // --- Server Settings: Extended ---
-    val serverSettingsJvmArgs: String
-    val serverSettingsJvmArgsHint: String
     /** Button label that opens the visual JVM args builder when its toggle is on. */
-    val serverSettingsJvmBuildArgs: String
-    val serverSettingsResolution: String
-    val serverSettingsWidth: String
-    val serverSettingsHeight: String
-    val serverSettingsFullscreen: String
-    val serverSettingsAutoConnect: String
 
     // --- Server Settings: Icon Upload ---
-    val serverSettingsPickIcon: String
 
     // =========================================================================
     // RAM Selector
@@ -332,7 +293,6 @@ interface AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    val serversFavorites: String
 
     // =========================================================================
     // Custom Background
@@ -413,12 +373,6 @@ interface AppStrings {
     val techSkiaDesc: String
     val techCoilDesc: String
 
-    // --- Spawn Reset ---
-    val spawnResetButton: String
-    val spawnResetLoading: String
-    val spawnResetSuccess: String
-    val spawnResetError: String
-
     // --- Tray ---
     val trayStatusIdle: String
     val trayStatusRunning: String
@@ -437,8 +391,6 @@ interface AppStrings {
     val settingsPreReleasesDesc: String
     val settingsMandatoryUpdates: String
     val settingsMandatoryUpdatesDesc: String
-    val settingsAutoSyncAllPacks: String
-    val settingsAutoSyncAllPacksDesc: String
     val settingsAutoUpdatePacks: String
     val settingsAutoUpdatePacksDesc: String
     val settingsAmberPolicy: String
@@ -456,9 +408,7 @@ interface AppStrings {
     fun settingsMimicVersionPlaceholder(default: String): String
 
     /** Auto-sync progress strip — `Syncing <name> (3/7)` */
-    fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int): String
     /** Auto-sync byte progress — `123 / 456 MB` */
-    fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long): String
 
     /** Background-activity widget title, shown when the user hasn't set a custom one. */
     val widgetProgressTitle: String
@@ -516,10 +466,6 @@ interface AppStrings {
 
     // --- Smarty server controls (Settings → Smarty) ---
     val settingsSectionSmarty: String
-    val settingsOpenSmrtHelperTitle: String
-    val settingsOpenSmrtHelperDesc: String
-    val settingsStrictModCheckTitle: String
-    val settingsStrictModCheckDesc: String
     val settingsNetworkAgentTitle: String
     val settingsNetworkAgentDesc: String
     val settingsSmartyAuthLibTitle: String
@@ -663,10 +609,6 @@ interface AppStrings {
     val navBrowse: String
 
     // --- Home view variant picker (in Settings -> Interface) ---
-    val settingsHomeViewTitle: String
-    val settingsHomeViewSub: String
-    val settingsHomeViewClassic: String
-    val settingsHomeViewNew: String
 
     // --- UI style variant picker (in Settings -> Interface) ---
 
@@ -1323,7 +1265,6 @@ interface AppStrings {
     val notifReasonAuthFail: String
     fun notifReasonAuthFailDetail(detail: String): String
     val notifReasonOfflineNoClient: String
-    val notifReasonOfflineNoManifest: String
     val notifReasonTwoFactorExpired: String
     fun notifReasonMissingAuthProvider(providerKey: String): String
 
@@ -1560,14 +1501,12 @@ interface AppStrings {
     val editorSurfShortAbout: String
     val editorSurfShortBg: String
     val editorSurfShortProfile: String
-    val editorSurfShortServer: String
     val editorSurfShortTheme: String
     val editorSurfShortShell: String
     val editorSurfShortTopBar: String
     val editorSurfShortBody: String
 
     // --- Layout editor: surface long names ---
-    val editorSurfHomeClassic: String
     val editorSurfHomeNew: String
     val editorSurfLibrary: String
     val editorSurfLeftRail: String
@@ -1575,7 +1514,6 @@ interface AppStrings {
     val editorSurfAbout: String
     val editorSurfBg: String
     val editorSurfProfile: String
-    val editorSurfServer: String
     val editorSurfTheme: String
     val editorSurfShell: String
     val editorSurfTopBar: String

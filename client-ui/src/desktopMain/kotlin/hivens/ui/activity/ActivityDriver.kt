@@ -7,7 +7,6 @@ import hivens.core.activity.ActivityRegistry
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
-import hivens.launcher.AutoSyncService
 import hivens.launcher.InstallPhase
 import hivens.launcher.InstallSnapshot
 import hivens.launcher.instance.InstanceContentUpdater
@@ -35,7 +34,6 @@ class ActivityDriver(
     // which is why the first test for this file tested the registry instead.
     private val installs: StateFlow<Map<String, InstallSnapshot>>,
     private val updates: StateFlow<Map<String, PackUpdateStatus>>,
-    private val sync: StateFlow<AutoSyncService.Snapshot>,
     /** Per-file updates inside an instance's own folders, keyed by instance dir. */
     private val contentUpdates: StateFlow<Map<String, InstanceContentUpdater.Run>>,
     private val repository: IPackRepository,
@@ -58,7 +56,6 @@ class ActivityDriver(
     fun start() {
         appScope.launch { installs.collect { it.values.forEach(::onInstall) } }
         appScope.launch { updates.collect(::onUpdates) }
-        appScope.launch { sync.collect(::onSync) }
         appScope.launch { contentUpdates.collect { runs -> runs.forEach { (key, run) -> onContentUpdate(key, run) } } }
     }
 
@@ -157,46 +154,5 @@ class ActivityDriver(
             title = run.title,
             phase = phase,
         )
-    }
-
-    /**
-     * Per-server rather than per-pass. The aggregate only knows how many failed,
-     * not why, so an aggregate entry would have to invent a sentence outside the
-     * string table; a per-server entry names its own subject and needs no prose.
-     * Byte counts from the aggregate land on whichever server is current.
-     */
-    private fun onSync(snapshot: AutoSyncService.Snapshot) {
-        val current = snapshot.overall as? AutoSyncService.OverallState.InProgress
-        for ((serverId, state) in snapshot.perServer) {
-            val phase = when (state) {
-                AutoSyncService.ServerState.SYNCING ->
-                    if (current != null && current.currentServer == serverId) {
-                        ActivityPhase.Running(current.bytesRead, current.totalBytes)
-                    } else {
-                        ActivityPhase.Running(0, 0)
-                    }
-                AutoSyncService.ServerState.SYNCED -> ActivityPhase.Succeeded
-                AutoSyncService.ServerState.FAILED -> ActivityPhase.Failed()
-                // Queued and skipped are not work in flight and have no outcome
-                // worth a line of chrome. Dropping the entry rather than skipping
-                // the report is the point: a server that goes SYNCING -> SKIPPED
-                // (two-factor with no cached manifest, a missing helper) would
-                // otherwise leave its in-flight entry on a surface that never
-                // evicts one by age.
-                AutoSyncService.ServerState.QUEUED,
-                AutoSyncService.ServerState.SKIPPED -> {
-                    forget("sync:$serverId")
-                    continue
-                }
-            }
-            val key = "sync:$serverId"
-            if (!changed(key, phase)) continue
-            registry.report(
-                key   = key,
-                kind  = ActivityKind.Sync,
-                title = serverId,
-                phase = phase,
-            )
-        }
     }
 }

@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory
 
 /**
  * Background auto-updater over every installed instance whose source can offer
- * other builds, a sibling of the SC-server-side AutoSyncService. On a trigger (startup, or a manual "check
+ * other builds. On a trigger (startup, or a manual "check
  * all") it visits each mirror instance that follows latest and updates it per
  * policy: a green (safe re-sync) update applies automatically; an amber
  * (structural MC / loader) update applies only under

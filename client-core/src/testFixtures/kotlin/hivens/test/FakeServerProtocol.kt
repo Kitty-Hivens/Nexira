@@ -23,8 +23,7 @@ import hivens.core.api.protocol.StatusOnlyResponse
  *     loaderResult = { LoaderResponse(status = "OK", servers = listOf(...)) }
  *     loginResult = { req -> LoginResponse(status = "OK", playername = req.login, ...) }
  * }
- * val repo = ServerRepository(protocol)
- * val dashboard = repo.fetchDashboard()
+ * val dashboard = protocol.loader()
  * assertEquals(1, protocol.loaderCalls.size)
  * ```
  */
@@ -40,9 +39,6 @@ class FakeServerProtocol : IServerProtocol {
             session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
         )
     }
-    var spawnResult: (String, String, String) -> StatusOnlyResponse = { _, _, _ ->
-        StatusOnlyResponse(status = "OK")
-    }
     var twoauthResult: (String, String, String) -> StatusOnlyResponse = { _, _, _ ->
         StatusOnlyResponse(status = "OK")
     }
@@ -55,7 +51,6 @@ class FakeServerProtocol : IServerProtocol {
 
     val loaderCalls = mutableListOf<Unit>()
     val loginCalls = mutableListOf<LoginRequest>()
-    val spawnCalls = mutableListOf<Triple<String, String, String>>()
     val twoauthCalls = mutableListOf<Triple<String, String, String>>()
     val uploadSkinCalls = mutableListOf<Triple<String, String, ByteArray>>()
     val uploadCloakCalls = mutableListOf<Triple<String, String, ByteArray>>()
@@ -68,11 +63,6 @@ class FakeServerProtocol : IServerProtocol {
     override suspend fun login(request: LoginRequest): LoginResponse {
         loginCalls += request
         return loginResult(request)
-    }
-
-    override suspend fun spawn(uid: String, login: String, server: String): StatusOnlyResponse {
-        spawnCalls += Triple(uid, login, server)
-        return spawnResult(uid, login, server)
     }
 
     override suspend fun twoauth(uid: String, login: String, code: String): StatusOnlyResponse {

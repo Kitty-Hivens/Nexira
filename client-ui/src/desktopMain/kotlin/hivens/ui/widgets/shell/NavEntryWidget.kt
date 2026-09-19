@@ -75,14 +75,18 @@ fun NavEntry(instance: WidgetInstance) {
             icon         = NxIcon.Home,
             outlineSwap  = true,
             phase        = 0.0f,
-            active       = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
+            active       = screen is Screen.Home,
             onClick      = { ctx.onSwitchTab(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
             outlineSwap  = true,
             phase        = 0.55f,
-            active       = screen is Screen.Library || screen is Screen.PackDetail || screen is Screen.PackVersions,
+            // A project page and a build's page belong here too: both are opened
+            // from a pack's content tab, so the rail went dark the moment a reader
+            // followed a mod out of the pack they were standing in.
+            active       = screen is Screen.Library || screen is Screen.PackDetail ||
+                screen is Screen.PackVersions || screen is Screen.ModDetail || screen is Screen.ModVersion,
             onClick      = { ctx.onSwitchTab(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(

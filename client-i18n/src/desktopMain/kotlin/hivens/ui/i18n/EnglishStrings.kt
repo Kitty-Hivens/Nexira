@@ -33,34 +33,21 @@ object EnglishStrings : AppStrings {
     override val navForward  = "Forward"
 
     // Dashboard
-    override fun dashboardWelcome(name: String) = "WELCOME BACK, $name"
-    override val dashboardServers              = "Available servers"
-    override val dashboardServersEmpty         = "No servers found"
-    override val dashboardLoginRequiredTitle   = "Sign in to see servers"
-    override val dashboardLoginRequiredHint    = "The SmartyCraft server list lives behind authentication. Sign in from the Profile section."
+    override fun homeWelcomeGreeting(name: String) = "Welcome back, $name"
+    override val homeWelcomeSubtitle = "Pick up where you left off."
 
     // Launch Control
-    override val launchReady       = "Ready to play"
-    override val launchButton      = "Play"
-    override val launchAbort       = "Cancel"
     override val launchRunning     = "Game running"
-    override val launchStop        = "Stop"
     override val launchDownloading = "Downloading:"
     override val launchPreparing   = "Preparing"
     override val launchFailed      = "Launch failed"
 
     // Launcher States
-    override val stateInit        = "Initializing..."
-    override val stateAuth        = "Authenticating..."
     override val stateAuthFail    = "Authentication error (offline?)"
     override val stateNoPassword  = "No password found, using current session."
-    override val stateSync        = "Syncing files..."
-    override val stateJvm         = "Preparing JVM..."
     override val stateLaunching   = "Starting process..."
     override fun stateExitCode(code: Int)  = "Game exited with code $code"
     override fun stateError(msg: String)   = "Error: $msg"
-    override fun stateHelperUnavailable(mcVersion: String) =
-        "No open-smrt helper for Minecraft $mcVersion. Launch blocked so the proprietary Smarty mod isn't run; disable the helper swap in Settings to play with it."
     override fun stateAuthlibUnavailable(mcVersion: String) =
         "Could not get the SmartyCraft authlib for Minecraft $mcVersion. Launch blocked: the join would be rejected. Check your connection and SmartyCraft sign-in, then try again."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
@@ -147,33 +134,16 @@ object EnglishStrings : AppStrings {
     override val paginationNext         = "Next page"
 
     // Server Detail
-    override val serverDetailTitle         = "Server information"
-    override val serverDetailNoImage       = "No image"
-    override val serverDetailNoImageHint   = "banner.png"
-    override val serverDetailMissingTitle  = "Information missing"
-    override fun serverDetailMissingPath(file: String) = "Create $file in:"
 
     // Server Settings
-    override val serverSettingsSubtitle        = "Launch settings"
-    override val serverSettingsSectionSystem   = "System"
-    override val serverSettingsSectionMods     = "Modifications"
     override val serverSettingsRam             = "RAM"
     override fun serverSettingsRamValue(mb: Int) = "RAM: $mb MB"
-    override val serverSettingsJava            = "Java version"
-    override fun serverSettingsJavaAuto(version: String) = "Automatic ($version)"
-    override val serverSettingsJavaHint        = "Leave empty to use bundled Java"
     override val serverSettingsOpenFolder      = "Open folder"
-    override val serverSettingsReset           = "Reset client"
 
-    override val serverSettingsResetConfirmTitle = "Reset this client?"
-    override val serverSettingsResetConfirmBody  = "All downloaded files for this server's client are deleted permanently. This cannot be undone."
     override val backgroundResetConfirmTitle     = "Reset background?"
     override val backgroundResetConfirmBody      = "The entire custom background configuration returns to its defaults."
     override val logoutConfirmTitle              = "Log out?"
     override val logoutConfirmBody               = "Your saved sign-in is removed from this device. You will need to enter your credentials again to log back in."
-
-    override val serverSettingsNoMods          = "No optional mods"
-    override val serverSettingsPickJava        = "Select Java"
 
     // Update
     override val updateTitle           = "Update available"
@@ -265,20 +235,10 @@ object EnglishStrings : AppStrings {
         "Removed $count file(s) the pack does not include: $names"
     override val stateContentChanged       = "The pack was modified, so the launch was stopped. Please do not modify a pack's files."
     override val stateOfflineNoClient      = "Client files not found. Download them online first."
-    override val stateOfflineNoManifest    = "No cached manifest for this server. Log in online at least once before launching offline."
 
     // --- Server Settings: Extended ---
-    override val serverSettingsJvmArgs     = "JVM arguments"
-    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
-    override val serverSettingsJvmBuildArgs = "Build args"
-    override val serverSettingsResolution  = "Window size"
-    override val serverSettingsWidth       = "Width"
-    override val serverSettingsHeight      = "Height"
-    override val serverSettingsFullscreen  = "Fullscreen"
-    override val serverSettingsAutoConnect = "Auto-connect to server"
 
     // --- Server Settings: Icon Upload ---
-    override val serverSettingsPickIcon    = "Select server icon"
 
     // =========================================================================
     // RAM Selector
@@ -297,7 +257,6 @@ object EnglishStrings : AppStrings {
     // =========================================================================
     // Server grid
     // =========================================================================
-    override val serversFavorites = "★ FAVORITES"
 
     // =========================================================================
     // Custom Background
@@ -375,12 +334,6 @@ object EnglishStrings : AppStrings {
     override val techSkiaDesc    = "Graphics renderer"
     override val techCoilDesc    = "Image loading"
 
-    // --- Spawn Reset ---
-    override val spawnResetButton  = "Return to spawn"
-    override val spawnResetLoading = "Resetting..."
-    override val spawnResetSuccess = "Done! Rejoin to apply"
-    override val spawnResetError   = "Server error"
-
     // --- Tray ---
     override val trayStatusIdle    = "Idle"
     override val trayStatusRunning = "Game running"
@@ -396,8 +349,6 @@ object EnglishStrings : AppStrings {
     override val settingsPreReleasesDesc     = "Receive beta builds before they are promoted to stable."
     override val settingsMandatoryUpdates       = "Mandatory updates"
     override val settingsMandatoryUpdatesDesc   = "Block startup until critical updates are installed when the upstream protocol breaks. Off by default: the floor can block your own startup, so honouring it is a deliberate choice."
-    override val settingsAutoSyncAllPacks       = "Auto-sync SmartyCraft clients on launch"
-    override val settingsAutoSyncAllPacksDesc   = "Re-sync every SmartyCraft client you have already installed when the launcher starts, in the background. With two-factor sign-in it never logs in — a login would revoke the session you unlocked with a code — so it syncs only against a manifest an earlier manual sign-in cached, and skips a server without one. The SmartyCraft server path is retired from 2.5.0 and its faults are not being fixed; a mirror pack is the supported route. Costs background bandwidth."
     override val settingsAutoUpdatePacks        = "Auto-update installed instances"
     override val settingsAutoUpdatePacksDesc    = "Keep installed pack instances on the latest build. Safe updates apply in the background; a Minecraft or loader change follows the policy below. Turn off to update them by hand."
     override val settingsAmberPolicy            = "When a build changes Minecraft or the loader"
@@ -412,9 +363,6 @@ object EnglishStrings : AppStrings {
     override val settingsMimicVersion           = "Mimic launcher version override"
     override val settingsMimicVersionDesc       = "Pin the version string sent to upstream in the handshake and User-Agent. Leave blank to use the shipped default — set this only when upstream has bumped its version pin faster than Nexira's release cycle. Takes effect on the next protocol call after save; no restart needed."
     override fun settingsMimicVersionPlaceholder(default: String) = "Default: $default"
-    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
-        "Syncing $serverName ($current/$total)"
-    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
     override val widgetProgressTitle = "Background activity"
     override val widgetProgressIdle = "Nothing is downloading right now."
     override fun widgetTabDefaultLabel(index: Int) = "Tab $index"
@@ -473,10 +421,6 @@ object EnglishStrings : AppStrings {
     override fun sslBypassExpiresAt(formatted: String) = "Expires: $formatted"
 
     override val settingsSectionSmarty           = "Smarty servers"
-    override val settingsOpenSmrtHelperTitle      = "Use the alternative smrt network helper"
-    override val settingsOpenSmrtHelperDesc       = "Replace the upstream Smarty mod with our open-source helper on Smarty servers. Same network features, none of the surveillance. If no replacement exists for the game version, the launch is blocked rather than running the original mod."
-    override val settingsStrictModCheckTitle      = "Exact mod verification"
-    override val settingsStrictModCheckDesc       = "After syncing, delete everything in the mods folder the server did not ask for. Keeps the install clean, but also removes any mods you added by hand."
     override val settingsNetworkAgentTitle        = "Use the network-support agent"
     override val settingsNetworkAgentDesc         = "Point the game's login at SmartyCraft when it starts: the in-game join and the skin checks. The join then authenticates against SmartyCraft and skins still load, without swapping in SmartyCraft's patched login library. Needed to join SmartyCraft servers."
     override val settingsSmartyAuthLibTitle       = "Use SmartyCraft's login library"
@@ -601,12 +545,6 @@ object EnglishStrings : AppStrings {
 
     override val navLibrary = "Library"
     override val navBrowse  = "Browse"
-
-    override val settingsHomeViewTitle   = "Home view"
-    override val settingsHomeViewSub     = "The modern home is the default. The classic Dashboard stays one switch away."
-    override val settingsHomeViewClassic = "Classic"
-    override val settingsHomeViewNew     = "Modern"
-
 
     // --- Left-rail selection style ---
     override val navSelectionTitle        = "Selected item style"
@@ -1151,7 +1089,6 @@ object EnglishStrings : AppStrings {
     override val notifReasonAuthFail                    = "Authentication failed"
     override fun notifReasonAuthFailDetail(detail: String) = detail
     override val notifReasonOfflineNoClient             = "Pack files missing on disk"
-    override val notifReasonOfflineNoManifest           = "No cached manifest; go online once to sync"
     override val notifReasonTwoFactorExpired            = "Sign in again to refresh credentials"
     override val notifSessionStaleTitle                 = "Session was not refreshed"
     override val notifSessionStaleRejected              = "The auth server refused the sign-in. The game starts on the old session, but joining the server will most likely fail: sign in again."
@@ -1280,7 +1217,6 @@ object EnglishStrings : AppStrings {
         "widget.container.tabs.label2" to "Tab 2",
         "widget.container.tabs.label3" to "Tab 3",
         "widget.container.tabs.tabCount" to "Tabs",
-        "widget.home.classic.content" to "Classic dashboard",
         "widget.home.new.clock" to "Clock",
         "widget.home.new.clock.accent" to "Accent color",
         "widget.home.new.clock.faceSize" to "Dial size",
@@ -1359,11 +1295,6 @@ object EnglishStrings : AppStrings {
         "widget.profile.nav" to "Profile navigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Preview height",
-        "widget.server.details.banner" to "Server banner",
-        "widget.server.details.banner.cornerRadius" to "Corner rounding",
-        "widget.server.details.description" to "Server description",
-        "widget.server.details.tagbar" to "Server tags",
-        "widget.server.details.title" to "Server title",
         "widget.theme.picker.grid" to "Theme grid",
         "widget.theme.picker.preview" to "Theme preview",
     )
@@ -1503,14 +1434,12 @@ object EnglishStrings : AppStrings {
     override val editorSurfShortAbout     = "About"
     override val editorSurfShortBg        = "Background"
     override val editorSurfShortProfile   = "Profile"
-    override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
     override val editorSurfShortShell     = "Shell"
     override val editorSurfShortTopBar    = "Top"
     override val editorSurfShortBody      = "Main"
 
     // --- Layout editor: surface long names ---
-    override val editorSurfHomeClassic = "Home (classic)"
     override val editorSurfHomeNew     = "Home (new)"
     override val editorSurfLibrary     = "Library"
     override val editorSurfLeftRail    = "Side panel"
@@ -1518,7 +1447,6 @@ object EnglishStrings : AppStrings {
     override val editorSurfAbout       = "About"
     override val editorSurfBg          = "Background settings"
     override val editorSurfProfile     = "Profile"
-    override val editorSurfServer      = "Server details"
     override val editorSurfTheme       = "Theme picker"
     override val editorSurfShell        = "App shell"
     override val editorSurfTopBar       = "Top bar"

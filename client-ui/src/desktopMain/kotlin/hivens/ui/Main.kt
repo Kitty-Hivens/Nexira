@@ -31,6 +31,7 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
 import hivens.ui.activity.SelectionRegistry
+import hivens.ui.screens.library.content.ContentIconStore
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
@@ -60,7 +61,6 @@ import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
-import hivens.launcher.AutoSyncService
 import hivens.launcher.instance.InstanceContentUpdater
 import hivens.update.UpdateService
 import hivens.ui.widgets.Commands
@@ -103,7 +103,14 @@ val uiModule = module {
     single { SkinManager(get(), get()) }
     single { ClanRoleProvider(get()) }
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
-    single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
+    single {
+        val paths: PlatformPaths = get()
+        DefaultSkinProvider(
+            librariesDir     = paths.librariesDir,
+            cacheDir         = paths.skinCacheDir.resolve("defaults"),
+            legacyClientsDir = paths.clientsDir,
+        )
+    }
     single { GameConsoleService(get()) }
     // One owner of console.json for the three surfaces that read it: the shell's
     // window, Settings > Console and the pack's Logs tab.
@@ -173,7 +180,7 @@ val uiModule = module {
     // the registry is complete before the first widget composes.
     single {
         WidgetDataRegistry().apply {
-            register(Sources.AutoSync, flowSource(get<AutoSyncService>().snapshot))
+            register(Sources.Activity, flowSource(get<ActivityRegistry>().activities))
             register(Sources.Notifications, flowSource(get<NotificationArchiveStore>().log))
             register(Sources.DoNotDisturb, flowSource(get<NotificationCenter>().doNotDisturb))
             register(Sources.OpenProject, flowSource(get<OpenProjectState>().open))
@@ -373,6 +380,7 @@ val uiModule = module {
     // What the current view has selected. App-scoped so the surface can read it
     // without knowing which screen published it; the view clears it on the way out.
     single { SelectionRegistry() }
+    single { ContentIconStore() }
     single { SessionRegistry(appScope = get()) }
     // One-slot handoff: the launch driver parks "needs a code", the shell answers.
     single { hivens.ui.notifications.TwoFactorLaunchGate() }
@@ -405,7 +413,7 @@ val uiModule = module {
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         ).also { it.start() }
     }
-    // Feeds the self-identifying services (installs, updates, sync) into the
+    // Feeds the self-identifying services (installs, updates, content) into the
     // activity registry. Launch and game entries come from LaunchDriver, which
     // is the only place that knows which pack a LaunchState belongs to.
     // createdAtStart for the same reason as InstallDriver: the collector must
@@ -415,7 +423,6 @@ val uiModule = module {
             registry   = get(),
             installs   = get<PackInstallService>().installs,
             updates    = get<PackUpdateStatusHub>().statuses,
-            sync       = get<AutoSyncService>().snapshot,
             contentUpdates = get<InstanceContentUpdater>().runs,
             repository = get(),
             appScope   = get(),

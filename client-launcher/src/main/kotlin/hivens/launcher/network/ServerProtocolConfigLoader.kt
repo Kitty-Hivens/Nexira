@@ -26,8 +26,7 @@ class ServerProtocolConfigLoader(
     /**
      * Read and resolve the effective config for this launcher session.
      * Called once at DI setup; the resulting [ServerProtocolConfig] is
-     * a singleton consumed by [SmartycraftV1Protocol], [LauncherHashCache],
-     * and [FileDownloadService].
+     * a singleton consumed by [SmartycraftV1Protocol] and [LauncherHashCache].
      */
     @OptIn(ExperimentalConduitOverride::class)
     fun load(dataDir: Path): ServerProtocolConfig {

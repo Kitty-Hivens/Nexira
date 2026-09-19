@@ -28,7 +28,6 @@ class AutoLoginCoordinatorTest {
         AutoLoginCoordinator.resolveSession(
             settings = settings,
             saved = saved,
-            lastServerId = null,
             authService = authService,
             msaProvider = msa,
         )

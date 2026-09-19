@@ -10,29 +10,6 @@ import kotlin.test.assertTrue
 class SettingsFormStateTest {
 
     @Test
-    fun `Smarty toggles seed from settings and round-trip through mergeInto`() {
-        val form = SettingsFormState(
-            SettingsData(useOpenSmrtHelper = false, strictModVerification = true),
-        )
-        assertFalse(form.useOpenSmrtHelper, "seeded from SettingsData")
-        assertTrue(form.strictModVerification)
-
-        form.useOpenSmrtHelper = true
-        form.strictModVerification = false
-
-        val merged = form.mergeInto(SettingsData())
-        assertTrue(merged.useOpenSmrtHelper)
-        assertFalse(merged.strictModVerification)
-    }
-
-    @Test
-    fun `defaults are both on`() {
-        val form = SettingsFormState(SettingsData())
-        assertTrue(form.useOpenSmrtHelper)
-        assertTrue(form.strictModVerification)
-    }
-
-    @Test
     fun `amber policy seeds from settings and round-trips through mergeInto`() {
         val form = SettingsFormState(SettingsData())
         assertEquals(AmberUpdatePolicy.Ask, form.amberUpdatePolicy, "the cautious default seeds")

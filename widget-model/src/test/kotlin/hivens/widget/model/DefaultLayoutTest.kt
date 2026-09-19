@@ -39,13 +39,12 @@ class DefaultLayoutTest {
                 // carries the activity pill.
                 "appshell.overlay",
                 // kernel-3 originals
-                "home.classic", "home.new", "library",
+                "home.new", "library",
                 "appshell.leftrail", "appshell.rightrail",
                 // Phase B.1 widgetized screens (incremental landing)
                 "about",
                 "bg.settings",
                 "profile",
-                "server.details",
                 "theme.picker",
             ),
             surfaceIds,
@@ -113,7 +112,6 @@ class DefaultLayoutTest {
         fun slots(surface: String) = graph.surfaces[SurfaceId(surface)]?.slotsOf(FamilyId.GENERAL)?.keys?.map { it.value }?.toSet()
             ?: emptySet()
 
-        assertEquals(setOf("main"),           slots("home.classic"))
         assertEquals(setOf("main"),           slots("home.new"))
         assertEquals(setOf("header", "body"), slots("library"))
         assertEquals(setOf("top", "bottom"),  slots("appshell.leftrail"))

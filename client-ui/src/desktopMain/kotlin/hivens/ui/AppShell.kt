@@ -26,10 +26,7 @@ import hivens.auth.RefreshableAuthProvider
 import hivens.core.data.NewerBuildData
 import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
-import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
-import hivens.core.api.model.ServerProfile
-import hivens.core.data.HomeView
 import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.ui.screens.detail.settings.PackSettingsCategory
@@ -39,10 +36,8 @@ import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.data.darkThemeFor
 import hivens.core.data.resolveInitialThemeMode
-import hivens.launcher.AutoSyncService
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
-import hivens.launcher.ServerListCacheStore
 import hivens.core.diag.ActionRing
 import hivens.core.security.SslBypassStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
@@ -65,7 +60,6 @@ import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.chrome.computeSafeWindowMinSize
-import hivens.launcher.ProfileManager
 import hivens.tray.TrayController
 import hivens.tray.TrayStrings
 import hivens.ui.background.BackgroundManager
@@ -140,7 +134,6 @@ import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.walkInstances
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -195,16 +188,6 @@ sealed class Screen {
     object ThemePicker        : Screen()
     object About              : Screen()
     object BackgroundSettings : Screen()
-    /**
-     * The two server-scoped screens carry the roster id, not the roster entry.
-     * A [ServerProfile] copied into the back stack aged with every fetch -- the
-     * screens went on showing, and launching, an address the roster had since
-     * changed -- and made two visits to the same server structurally different
-     * entries, which is what the dedupe and popTo compare. Same reasoning as
-     * [PackDetail], which has carried an id since it was written.
-     */
-    data class ServerSettings(val serverId: String) : Screen()
-    data class ServerDetails (val serverId: String) : Screen()
 
     /**
      * Library card click target. Carries the PackInstance UUID; the
@@ -293,8 +276,7 @@ sealed class Screen {
         is PackVersions        -> "PackVersions:$instanceId"
         is CataloguePackDetail -> "CataloguePackDetail:$origin:$packId"
         is ModDetail           -> "ModDetail:${target.key}"
-        is ServerSettings      -> "ServerSettings:$serverId"
-        is ServerDetails       -> "ServerDetails:$serverId"
+        is ModVersion          -> "ModVersion:${target.key}:$versionId"
         else                   -> this::class.simpleName.orEmpty()
     }
 }
@@ -336,10 +318,7 @@ fun FrameWindowScope.AppShellContent(
     }
 
     val settingsService: ISettingsService      = koinInject()
-    val serverListService: IServerListService  = koinInject()
-    val serverListCache: ServerListCacheStore  = koinInject()
     val controller: LauncherController         = koinInject()
-    val profileManager: ProfileManager         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
     val debugOverlay: DebugOverlayState        = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
@@ -462,7 +441,6 @@ fun FrameWindowScope.AppShellContent(
     var currentLocale by remember {
         mutableStateOf(AppLocale.fromTag(settings.locale))
     }
-    var homeView      by remember { mutableStateOf(settings.homeView) }
 
     // The chaos engine is a plain singleton rather than a composable, so it is
     // told what the interface looks like rather than reading it. Both values were
@@ -568,16 +546,13 @@ fun FrameWindowScope.AppShellContent(
         PostLaunchGate(runningAtMount = (controller.state.value as? LaunchState.GameRunning)?.handle)
     }
 
-    // What the tray tooltip names: the session that is actually running. It used to
-    // read the last SmartyCraft server id, which is not what a pack launch started
-    // and is not even what the last launch was -- a pack played after a server left
-    // the tooltip naming the server. The registration lands from the launch driver,
-    // so the effect keys on it too and the name settles a moment after the state.
+    // What the tray tooltip names: the session that is actually running. The
+    // registration lands from the launch driver, so the effect keys on it too and
+    // the name settles a moment after the state.
     val activeSessions by sessions.active.collectAsState()
 
     LaunchedEffect(launchState, activeSessions) {
         val runningName = activeSessions.values.firstOrNull()?.packDisplayName
-            ?: profileManager.lastServerId
         when (launchState) {
             is LaunchState.GameRunning -> tray.setGameStatus(true, runningName)
             is LaunchState.Error -> {
@@ -712,7 +687,6 @@ fun FrameWindowScope.AppShellContent(
         }
 
         val dataDirectory: java.nio.file.Path = koinInject()
-        val autoSyncService: AutoSyncService = koinInject()
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
@@ -754,7 +728,7 @@ fun FrameWindowScope.AppShellContent(
             exit          = s.trayExit,
         )
 
-        // ── Bring-up: tray, notifier, roster, background services (run once) ──
+        // ── Bring-up: tray, notifier, background services (run once) ──
         // The sequence itself lives in ShellStartup, outside composition and
         // over functions rather than the singletons, so its order -- which is
         // load-bearing -- can be verified. This site only wires the real ones in.
@@ -763,7 +737,6 @@ fun FrameWindowScope.AppShellContent(
                 policy = StartupPolicy(
                     trayEnabled         = ModuleId.Tray.id   !in settings.disabledModules,
                     notifierEnabled     = ModuleId.Notify.id !in settings.disabledModules,
-                    autoSyncAllPacks    = settings.autoSyncAllPacks,
                     autoUpdatePacks     = settings.autoUpdatePacks,
                 ),
                 bringUpTray     = { icon ->
@@ -781,11 +754,6 @@ fun FrameWindowScope.AppShellContent(
                 readIcon        = { path -> withContext(Dispatchers.IO) { Res.readBytes(path) } },
                 trayIsSupported = { tray.isSupported },
                 showWindow      = revealWindow,
-                cachedRoster    = { withContext(Dispatchers.IO) { serverListCache.load() } },
-                fetchRoster     = {
-                    runInterruptible(Dispatchers.IO) { serverListService.fetchDashboardData().get() }.servers
-                },
-                syncAll             = { servers -> autoSyncService.syncAll(servers) },
                 recoverInterrupted  = { applyRecovery.recoverInterrupted() },
                 autoUpdatePacks     = { packAutoUpdateService.runOnce() },
                 appScope            = applicationScope,
@@ -1092,12 +1060,6 @@ fun FrameWindowScope.AppShellContent(
                             val current = settingsService.getSettings()
                             settingsService.saveSettings(current.copy(locale = newLocale.tag))
                         },
-                        homeView           = homeView,
-                        onHomeViewChanged = { newView ->
-                            homeView = newView
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(homeView = newView))
-                        },
                         customization              = customization,
                         onCustomizationChanged     = { newCustomization ->
                             customization = newCustomization
@@ -1163,14 +1125,11 @@ fun AppRoot(
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
-    homeView: HomeView,
-    onHomeViewChanged: (HomeView) -> Unit,
     customization: CustomizationSettings,
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
     val credentialsManager: AccountStore = koinInject()
     val authService: AuthProvider              = koinInject()
-    val profileManager: ProfileManager         = koinInject()
     val settingsService: ISettingsService      = koinInject()
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
@@ -1289,7 +1248,6 @@ fun AppRoot(
                 AutoLoginCoordinator.resolveSession(
                     settings     = settings,
                     saved        = saved,
-                    lastServerId = profileManager.lastServerId,
                     authService  = authService,
                     msaProvider  = msaProvider,
                 )
@@ -1414,8 +1372,6 @@ fun AppRoot(
               onCustomThemeChanged = onCustomThemeChanged,
               currentLocale = currentLocale,
               onLocaleChanged = onLocaleChanged,
-              homeView = homeView,
-              onHomeViewChanged = onHomeViewChanged,
               backgroundSettings = backgroundSettings,
               onBackgroundSettingsChanged = { backgroundSettings = it },
               customization              = customization,

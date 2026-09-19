@@ -21,8 +21,6 @@ import hivens.launcher.protocol.LauncherHashCache
 import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
 import hivens.core.net.TransferEngine
-import hivens.core.api.PlayerRepository
-import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
 import dev.hivens.libvault.SecretVault
@@ -31,7 +29,6 @@ import dev.hivens.libvault.VaultConfig
 import dev.hivens.libvault.VaultTier
 import hivens.auth.LazySecretVault
 import hivens.launcher.*
-import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
@@ -58,7 +55,9 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
-import hivens.core.data.DashboardData
+import hivens.core.cache.read
+import hivens.core.cache.StaleMode
+import hivens.core.data.NewsItem
 import hivens.core.data.NewsPage
 import hivens.core.data.ModuleId
 import hivens.core.time.Clock
@@ -94,6 +93,7 @@ import hivens.launcher.instance.InstanceSizeService
 import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.news.CuratedNewsFeed
 import hivens.launcher.news.SmartyCraftNewsFeed
+import hivens.launcher.news.toNewsItem
 import hivens.launcher.news.SyndicationNewsFeed
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
@@ -102,8 +102,6 @@ import hivens.launcher.catalogue.CachedPackCatalogue
 import hivens.core.api.catalogue.CataloguePack
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
-import hivens.launcher.smrt.OpenSmrtHelperResolver
-import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
@@ -177,7 +175,7 @@ val networkModule = module {
             // Coerce unknown enum values to the field's default instead
             // of throwing. Without this, downgrading the launcher to a
             // build that does not yet declare a recently-added enum
-            // variant (e.g. HomeView.New written by a newer build, read
+            // variant (e.g. a ThemeMode written by a newer build, read
             // by an older one) blows up SettingsService.reload() and
             // SilentlyResetsEverything to defaults -- the user loses
             // every other setting because of one unknown value.
@@ -396,9 +394,7 @@ val networkModule = module {
     }
 
     // Repositories -- thin adapters over IServerProtocol.
-    single { ServerRepository(get<IServerProtocol>()) }
     single { SkinRepository(get<IServerProtocol>()) }
-    single { PlayerRepository(get<IServerProtocol>()) }
 }
 
 // ── App composition modules ─────────────────────────────────────────────────
@@ -586,13 +582,9 @@ val mirrorModule = module {
     single { LocalPackCreator(runtimeProvisioner = get(), javaManager = get(), repository = get(), dataDir = get()) }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
-    // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
-    // raw.githubusercontent.com keep strict TLS. The planner is what both
-    // sync paths (LauncherController, AutoSyncService) consult.
-    single { OpenSmrtHelperResolver(get(named("direct")), get(), get(), get()) }
-    single { SmartyModPlanner(get<OpenSmrtHelperResolver>()::resolve, get()) }
     // SC-bound pack authlib swap. Default (smartycraft) channel: the patched jar
-    // is pulled from the SC client distribution, same source as the server-list sync.
+    // is pulled from the SC client distribution, the same source the pack's own
+    // sync reads.
     single { SmrtAuthlibSwapper(get(named("smartycraft")), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     // Instance-level mutations that reach past the registry (full delete, detach).
@@ -687,8 +679,7 @@ val runtimeModule = module {
     single<IJavaManager> { JavaManagerService(get(), get()) }
 
     // Direct channel -- Maven Central LWJGL/JInput natives keep strict TLS.
-    single { EnvironmentPreparer(get()) }
-    single { ClasspathProvider(get()) }
+    single { EnvironmentPreparer() }
     single { GameCommandBuilder(get()) }
     single { ProcessLogHandler() }
 
@@ -715,28 +706,13 @@ val runtimeModule = module {
 }
 
 /**
- * The launch flow: the orchestrator [LauncherController], the [ILauncherService]
- * that spawns the process, the file-download + manifest + profile collaborators
- * it drives, and the background AutoSyncService.
+ * The launch flow: the orchestrator [LauncherController] and the
+ * [ILauncherService] that spawns the process.
  */
 val launchPipelineModule = module {
-    single {
-        val dataDir: Path = get()
-        ManifestCache(dataDir.resolve("manifest-cache"), get())
-    }
-    single<IManifestStore> { get<ManifestCache>() }
-    single<IFileDownloadService> {
-        FileDownloadService(get(named("smartycraft")), get(), get(), get<ServerProtocolConfig>())
-    }
-    single<IManifestProcessorService> { ManifestProcessorService() }
-    single { ProfileManager(get(), get()) }
-    single<IInstanceProfileStore> { get<ProfileManager>() }
-
     /**
-     * Launch-flow orchestrator. Consumes client-core interfaces, the shared
-     * coroutine scope, and SmartyModPlanner -- the one concrete collaborator
-     * left, since its nested Plan return type resists a clean interface. No UI
-     * types (i18n strings, console service) leak in.
+     * Launch-flow orchestrator. Consumes client-core interfaces and the shared
+     * coroutine scope; no UI types (i18n strings, console service) leak in.
      */
     singleOf(::LauncherController)
 
@@ -750,10 +726,8 @@ val launchPipelineModule = module {
      */
     single<ILauncherService> {
         LauncherService(
-            profileManager     = get(),
             javaManager        = get(),
             envPreparer        = get(),
-            classpathProvider  = get(),
             commandBuilder     = get(),
             logHandler         = get(),
             runtimeProvisioner = get(),
@@ -762,26 +736,6 @@ val launchPipelineModule = module {
             authlibSwapper     = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
             sharedLibrariesDir = get<PlatformPaths>().librariesDir,
-        )
-    }
-
-    single {
-        val dataDir: Path = get()
-        val profiles: ProfileManager = get()
-        val credentials: ICredentialStore = get()
-        val settings: ISettingsService = get()
-        AutoSyncService(
-            authService = get(),
-            downloadService = get(),
-            manifestProcessor = get(),
-            manifestCache = get(),
-            dataDirectory = dataDir,
-            credentialsProvider = { credentials.load() },
-            optionalModsStateProvider = { serverId ->
-                profiles.getProfile(serverId).optionalModsState
-            },
-            smartyPlanner = get(),
-            settingsProvider = { settings.getSettings() },
         )
     }
 }
@@ -887,30 +841,22 @@ val appModule = module {
         ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
     }
 
-    // Cache feeds the tray menu's first published DBusMenu layout before
-    // the live fetch returns -- see [ServerListCacheStore] KDoc for the
-    // "(No servers)" placeholder bug it fixes.
-    single<ServerListCacheStore> {
-        val dataDir: Path = get()
-        JsonServerListCacheStore(
-            file = dataDir.resolve(Storage.SERVERS_CACHE_FILE),
-            json = get(),
-        )
-    }
-
-    single<IServerListService> {
-        SmartyCraftServerListService(get(), get(), get(), dashboardCache(), get())
-    }
-
     // The news archive, read from the site's paginated index rather than from the
     // dashboard payload -- which carries three entries and is why a widget asked
     // for twenty showed three. Same channel as the rest of the smartycraft
     // traffic; the dashboard stays the floor when the site cannot be read.
     single<INewsFeed> {
+        val protocol: IServerProtocol = get()
+        val config: ServerProtocolConfig = get()
+        val floor = dashboardNewsCache()
         SmartyCraftNewsFeed(
             clientProvider = get<HttpClientProvider>(),
-            config = get(),
-            dashboard = get(),
+            config = config,
+            dashboardNews = {
+                floor.read("dashboard", forceRefresh = false) {
+                    protocol.loader().news.map { it.toNewsItem(config.baseUrl) }
+                }
+            },
             cache = newsCache(),
         )
     }
@@ -977,8 +923,21 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
 }
 
 /**
- * Modrinth metadata caches. A published project version is immutable, so the
- * version cache keeps a long stale window; project metadata changes rarely.
+ * Modrinth metadata caches, with the two kinds told apart.
+ *
+ * A PUBLISHED VERSION is immutable: its id names one set of files and those files
+ * never change, so it is cached for a month and asked for again only when it falls
+ * out. The catalogue's own launcher says the same thing about the same records and
+ * keeps them effectively forever.
+ *
+ * A PROJECT is not. Its download count, its updated date and its description are
+ * read as current, and this used to hand back an hour-old entry and then anything
+ * up to a week old while a refresh ran behind it. A caller reads once, so the week
+ * old numbers were what the page showed for the whole visit: a mod with two
+ * hundred million downloads reported zero, because the entry predated the field.
+ * Thirty minutes is the catalogue launcher's own figure for the same record. The
+ * long window stays as a fallback for a machine with no network, which is the one
+ * case where an old answer beats no answer.
  */
 private fun Scope.modrinthCaches(): ModrinthCaches {
     val f: CacheFactory = get()
@@ -986,8 +945,16 @@ private fun Scope.modrinthCaches(): ModrinthCaches {
     val hour = 60 * min
     val day = 24 * hour
     return ModrinthCaches(
-        project = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
-        version = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
+        project = f.create(
+            "modrinth-project",
+            ModrinthProject.serializer(),
+            CacheConfig(ttlMs = 30 * min, staleTtlMs = 7 * day, staleMode = StaleMode.FallbackOnFailure),
+        ),
+        version = f.create(
+            "modrinth-version",
+            ModrinthVersion.serializer(),
+            CacheConfig(ttlMs = 30 * day, staleTtlMs = 90 * day),
+        ),
     )
 }
 
@@ -1044,18 +1011,19 @@ private fun Scope.altNewsCache() =
     )
 
 /**
- * In-memory dashboard cache (single-flight + 10-min SWR). The disk seed for the
- * tray stays in ServerListCacheStore (servers-only, read synchronously before
- * any coroutine); empty results don't get stored.
+ * The dashboard payload's news, cached (single-flight + 10-min SWR) so the
+ * archive's floor is not a fresh upstream call every time a page fails to
+ * parse. Empty results are not stored -- an outage must not become the answer
+ * for the next ten minutes.
  */
-private fun Scope.dashboardCache() =
-    get<CacheFactory>().createInMemory<DashboardData>(
-        "dashboard",
+private fun Scope.dashboardNewsCache() =
+    get<CacheFactory>().createInMemory<List<NewsItem>>(
+        "dashboard-news",
         CacheConfig(
             ttlMs = 10 * 60_000L,
             staleTtlMs = Long.MAX_VALUE,
             maxEntries = 4,
-            shouldStore = { it.servers.isNotEmpty() },
+            shouldStore = { it.isNotEmpty() },
         ),
     )
 

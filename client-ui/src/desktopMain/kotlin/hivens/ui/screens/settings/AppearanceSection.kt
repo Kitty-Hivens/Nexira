@@ -26,13 +26,11 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.core.data.HomeView
 import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMenuMark
@@ -50,8 +48,8 @@ import hivens.ui.theme.familyForText
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
  * launcher looks and how it behaves around launches: language, theme
- * preset shortcut, background shortcut, dark/light toggle, home-view
- * variant, UI style variant, close-after-launch, offline mode.
+ * preset shortcut, background shortcut, dark/light toggle, window chrome,
+ * close-after-launch, offline mode.
  *
  * Two [NxSection] planes (Interface, Behavior) per the island model;
  * expressiveness stays as a row state (day/night sun/moon + reveal,
@@ -70,8 +68,6 @@ internal fun AppearanceSection(
     onOpenBackgroundSettings: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
-    homeView: HomeView,
-    onHomeViewChanged: (HomeView) -> Unit,
 ) {
     val s = LocalStrings.current
     var langExpanded by remember { mutableStateOf(false) }
@@ -153,16 +149,6 @@ internal fun AppearanceSection(
         PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
             themeSwitchState = isChecked; onToggleTheme()
         }
-
-        // Home view variant. The modern widget-composed home is the default and
-        // leads; the legacy Dashboard follows. The parent updates routing on
-        // change.
-        PickerBlock(s.settingsHomeViewTitle, s.settingsHomeViewSub) {
-            NxChoiceChip(s.settingsHomeViewNew,     homeView == HomeView.New)          { onHomeViewChanged(HomeView.New) }
-            NxChoiceChip(s.settingsHomeViewClassic, homeView == HomeView.Classic)      { onHomeViewChanged(HomeView.Classic) }
-        }
-        PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
-        PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
 
         // Window chrome. `undecorated` is fixed when the window is created, so the flip
         // lands at the next launch and the row says so rather than looking inert. On a

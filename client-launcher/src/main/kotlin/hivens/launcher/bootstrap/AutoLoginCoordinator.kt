@@ -78,7 +78,6 @@ object AutoLoginCoordinator {
     suspend fun resolveSession(
         settings: SettingsData,
         saved: SessionData?,
-        lastServerId: String?,
         authService: AuthProvider,
         msaProvider: RefreshableAuthProvider? = null,
     ): Resolution {
@@ -96,7 +95,6 @@ object AutoLoginCoordinator {
                     uuid        = OfflineIdentity.dashlessUuidFor(name),
                     accessToken = "",
                     offline     = true,
-                    serverId    = lastServerId,
                 ),
             )
         }
@@ -112,7 +110,7 @@ object AutoLoginCoordinator {
                     log.warn("MSA silent refresh failed -- trusting the cached Microsoft token", it)
                     null
                 }
-            return Resolution.Success((refreshed ?: saved).copy(serverId = lastServerId))
+            return Resolution.Success(refreshed ?: saved)
         }
 
         // A known two-factor account is never signed in from here. The damage is
@@ -120,18 +118,17 @@ object AutoLoginCoordinator {
         // invalidates the previous one, so this call revokes the session the
         // player unlocked with a code, and a game already running is dropped with
         // a username verification error moments after the launcher window opens.
-        // Nothing on screen connects the two. AutoSyncService gates the same call
-        // for the same reason.
+        // Nothing on screen connects the two.
         //
         // Ahead of the cached-password read, because the token is what this branch
         // goes with and an account that never saved a password still has one.
         if (saved.twoFactor) {
             ActionRing.record("Auto-login: two-factor account, going with the session in hand")
-            return Resolution.Success(saved.copy(serverId = lastServerId))
+            return Resolution.Success(saved)
         }
 
         val cachedPass = saved.cachedPassword ?: return Resolution.NoCredentials
-        val server = lastServerId ?: Protocol.DEFAULT_SERVER_ID
+        val server = Protocol.DEFAULT_SERVER_ID
 
         return try {
             Resolution.Success(authService.login(saved.playerName, cachedPass, server))
@@ -149,7 +146,7 @@ object AutoLoginCoordinator {
             ActionRing.record(
                 "Auto-login: 2FA account, trusting cached accessToken (uid=${e.uid?.take(8) ?: "<missing>"})"
             )
-            Resolution.Success(saved.copy(serverId = lastServerId, twoFactor = true))
+            Resolution.Success(saved.copy(twoFactor = true))
         } catch (e: AuthException) {
             when {
                 e.isSslError -> {
