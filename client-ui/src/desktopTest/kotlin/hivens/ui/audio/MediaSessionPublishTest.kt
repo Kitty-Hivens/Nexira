@@ -9,6 +9,7 @@ import dev.hivens.libsound.SessionState
 import dev.hivens.libsound.PlaybackState as SessionPlayback
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Path
+import hivens.ui.testImageBitmap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -240,8 +241,8 @@ class MediaSessionPublishTest {
             return artwork?.let { "file:///covers/$writes.png" }
         }
 
-        val firstTrack = TrackInfo(title = "First", artwork = ImageBitmap(1, 1))
-        val secondTrack = TrackInfo(title = "Second", artwork = ImageBitmap(1, 1))
+        val firstTrack = TrackInfo(title = "First", artwork = testImageBitmap())
+        val secondTrack = TrackInfo(title = "Second", artwork = testImageBitmap())
 
         assertNull(trail.urlFor(snapshot(playing(first, 0L), track = null), ::write), "tags have not landed")
         val settled = trail.urlFor(snapshot(playing(first, 500L), track = firstTrack), ::write)
@@ -265,7 +266,7 @@ class MediaSessionPublishTest {
             return artwork?.let { "file:///covers/$writes.png" }
         }
 
-        val track = TrackInfo(title = "First", artwork = ImageBitmap(1, 1))
+        val track = TrackInfo(title = "First", artwork = testImageBitmap())
         repeat(20) { poll ->
             trail.urlFor(snapshot(playing(first, poll * SESSION_TICK_MS), track = track), ::write)
         }
@@ -290,7 +291,7 @@ class MediaSessionPublishTest {
     @Test
     fun `an emptied queue drops the cover with the file`() = runTest {
         val trail = CoverTrail()
-        val track = TrackInfo(title = "First", artwork = ImageBitmap(1, 1))
+        val track = TrackInfo(title = "First", artwork = testImageBitmap())
         suspend fun write(artwork: ImageBitmap?): String? = artwork?.let { "file:///covers/one.png" }
 
         assertEquals("file:///covers/one.png", trail.urlFor(snapshot(playing(first, 0L), track = track), ::write))
