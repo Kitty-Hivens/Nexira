@@ -41,12 +41,14 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -84,6 +86,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
+import java.awt.datatransfer.StringSelection
 
 /**
  * The project page: a header, the tabs, and the body.
@@ -249,12 +252,15 @@ private fun Unknown(text: String) = Text(
     color = NxTheme.colors.textSecondary,
 )
 
+// ClipEntry is still experimental; the console's copy actions carry the same
+// opt-in for the same call.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun Header(state: ModDetailState) {
     val scope = rememberCoroutineScope()
     val s = LocalStrings.current
     val uriHandler = LocalUriHandler.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val project = state.project
     val installed = state.installed
 
@@ -360,7 +366,11 @@ internal fun Header(state: ModDetailState) {
                                 dismiss()
                             }
                             NxMenuItem(label = s.modPageCopyLink, icon = NxIcon.ContentCopy) {
-                                clipboard.setText(AnnotatedString(pageUrl))
+                                // The write suspends now, so it rides the composition's
+                                // scope: the menu dismisses on this frame and the
+                                // clipboard lands on its own, which is what the console's
+                                // copy actions already do.
+                                scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(pageUrl))) }
                                 dismiss()
                             }
                         }

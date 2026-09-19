@@ -7,13 +7,16 @@ import hivens.core.data.PackInstance
  * stable id, a display label, and the source-key prefix that groups
  * notifications.
  *
- * A class and not a sealed interface. It was one while the launcher could also
- * spawn a SmartyCraft server, and keeping the shape after that left an interface
- * over a single case -- which the driver saw through anyway, reaching for the
- * instance three times to do its work. An abstraction nobody can be held to is
- * not an abstraction. When something else becomes launchable, this becomes an
- * interface again, and that is a smaller change than the vacuous branches were
- * a cost.
+ * A class and not a sealed interface, because there is one thing the launcher
+ * spawns. It was an interface while a SmartyCraft server could also be launched;
+ * with that gone, the pack IS the unit of content, and every entry point --
+ * a pack's page, quick launch, a relaunch from a notification, the CLI -- hands
+ * over a [PackInstance]. Microsoft is a requirement ON a pack rather than a
+ * second kind of target, so it changes nothing here.
+ *
+ * The interface that survived the removal was over a single case, and the driver
+ * saw through it anyway, reaching for the instance three times to do its work.
+ * An abstraction nobody can be held to is not one.
  */
 data class LaunchTarget(val instance: PackInstance) {
     val id: String get() = instance.id
