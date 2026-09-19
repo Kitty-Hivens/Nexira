@@ -54,6 +54,10 @@ import hivens.media.YtDlpService
 import hivens.tray.LibTrayController
 import hivens.tray.TrayController
 import hivens.ui.layout.LayoutGraphFlushHook
+import hivens.launcher.legacy.RetiredDataSweeper
+import hivens.ui.legacy.RetiredClientsGate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
@@ -111,6 +115,24 @@ val uiModule = module {
             legacyClientsDir = paths.clientsDir,
         )
     }
+
+    // The leftover-clients chore. The gate is what the reminder's action opens;
+    // the sweeper is registered here rather than beside the scanner because its
+    // one hook belongs to a client-ui type: the default skins are read out of a
+    // client jar, and on an upgraded install the retired tree is the only place
+    // one lives until a pack is installed. Listing them extracts and caches the
+    // nine PNGs for good, so the sweep does it once before the first deletion --
+    // otherwise somebody who cleared the folders first would find the wardrobe's
+    // defaults gone for a reason they could not act on.
+    single { RetiredClientsGate() }
+    single {
+        val skins: DefaultSkinProvider = get()
+        RetiredDataSweeper(
+            dataDir = get<Path>(),
+            beforeFirstDelete = { withContext(Dispatchers.IO) { skins.list() } },
+        )
+    }
+
     single { GameConsoleService(get()) }
     // One owner of console.json for the three surfaces that read it: the shell's
     // window, Settings > Console and the pack's Logs tab.

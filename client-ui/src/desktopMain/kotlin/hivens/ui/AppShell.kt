@@ -36,6 +36,7 @@ import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.data.darkThemeFor
 import hivens.core.data.resolveInitialThemeMode
+import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
 import hivens.core.diag.ActionRing
@@ -108,6 +109,7 @@ import hivens.ui.theme.ThemeManager
 import hivens.ui.system.SystemNotifier
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.legacy.RetiredClientsGate
 import hivens.ui.logic.PostLaunchGate
 import hivens.ui.logic.PostLaunchMove
 import hivens.widget.api.LocalLayoutGraph
@@ -687,6 +689,35 @@ fun FrameWindowScope.AppShellContent(
         }
 
         val dataDirectory: java.nio.file.Path = koinInject()
+        // What the retired SmartyCraft server path left under clients/. Announced
+        // once per session and only while it is there: the files are the player's,
+        // so the launcher says what it found and offers to help, and touches
+        // nothing until asked. The check lists one directory and stops at the first
+        // entry -- measuring gigabytes is the surface's job, when it is opened.
+        val retiredClients: RetiredClientScanner = koinInject()
+        val retiredGate: RetiredClientsGate = koinInject()
+        LaunchedEffect(Unit) {
+            val count = withContext(Dispatchers.IO) {
+                if (retiredClients.anyLeftBehind()) retiredClients.count() else 0
+            }
+            if (count == 0) return@LaunchedEffect
+            notificationCenter.push(
+                sourceKey = "retired-clients",
+                sender    = Branding.TITLE,
+                iconUrl   = null,
+                severity  = Severity.Info,
+                kind      = Kind.Sticky,
+                title     = s.retiredTitle,
+                body      = s.retiredNoticeBody(count),
+                actions   = listOf(
+                    hivens.ui.notifications.NotifAction(
+                        id = "retired-clients-open",
+                        label = s.retiredNoticeAction,
+                        onClick = { retiredGate.show() },
+                    ),
+                ),
+            )
+        }
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
@@ -1085,9 +1116,12 @@ fun FrameWindowScope.AppShellContent(
                 // composition, and one raised from outside finds no NxColors and takes
                 // the shell down.
                 hivens.ui.components.TwoFactorPromptHost()
-                // Whatever read the host -- the roster, the news, a login -- parks its
-                // refused certificate here for the user to answer once.
+                // Whatever read the host -- the news, a login -- parks its refused
+                // certificate here for the user to answer once.
                 hivens.ui.components.CertificatePromptHost()
+                // What the retired server path left on disk, when the player asks
+                // the reminder to show them.
+                hivens.ui.legacy.RetiredClientsHost()
             }
             // Synthetic resize grips -- undecorated drops the native border. Only
             // with custom chrome (else the OS frame resizes); self-gates to

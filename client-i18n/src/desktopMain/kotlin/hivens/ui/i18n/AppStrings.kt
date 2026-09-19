@@ -1337,6 +1337,49 @@ interface AppStrings {
     val editorClose: String
     /** Context-menu entry that enters layout edit mode -- the only way in besides Ctrl+E. */
     val editorEnterLayout: String
+    // --- What the retired SmartyCraft client path left on disk ---
+
+    /**
+     * The reminder, and the surface it opens.
+     *
+     * Said plainly and once. The files are the player's -- worlds, configs, mods
+     * they installed -- so the launcher names what it found and what it can do
+     * about it, and does none of it until asked. "Delete" is the honest word for
+     * what deleting is; a launcher that called it "clean up" would be choosing
+     * the word that makes the button easier to press.
+     */
+    val retiredTitle: String
+    fun retiredNoticeBody(count: Int): String
+    val retiredNoticeAction: String
+    val retiredIntro: String
+    fun retiredFound(count: Int, size: String): String
+    val retiredColumnClient: String
+    val retiredColumnSize: String
+    val retiredColumnRuntime: String
+    val retiredColumnChoice: String
+    fun retiredMods(count: Int): String
+    val retiredChoiceKeep: String
+    val retiredChoiceAdopt: String
+    val retiredChoiceDelete: String
+    /** On a client whose tree names no Minecraft version, so nothing can be provisioned for it. */
+    val retiredNoVersion: String
+    /** Over the version and loader fields: what the tree said, which the reader may correct. */
+    val retiredDetected: String
+    val retiredLoaderVanilla: String
+    val retiredApply: String
+    val retiredClose: String
+    val retiredBusy: String
+    /** The one sentence that has to be read before the button is pressed. */
+    val retiredWarning: String
+    val retiredAdopted: String
+    /** An adoption that could not move every file keeps its source, and says so. */
+    val retiredAdoptedSourceKept: String
+    val retiredDeleted: String
+    val retiredFailed: String
+    val retiredRemoveFailed: String
+    fun retiredDone(reclaimed: String): String
+    val retiredDoneNothing: String
+
     val editorCancel: String
     val editorDelete: String
     val editorReset: String

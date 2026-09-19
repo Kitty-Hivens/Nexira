@@ -70,6 +70,8 @@ import hivens.launcher.PackOperationService
 import hivens.launcher.imports.ForeignInstanceImporter
 import hivens.launcher.imports.FtbAppSource
 import hivens.launcher.imports.LocalPackCreator
+import hivens.launcher.legacy.RetiredClientAdopter
+import hivens.launcher.legacy.RetiredClientScanner
 import hivens.launcher.imports.LauncherImportService
 import hivens.launcher.imports.LauncherRootLocator
 import hivens.launcher.imports.MinecraftLauncherSource
@@ -580,6 +582,22 @@ val mirrorModule = module {
     // Create an empty local pack from scratch (name + MC + loader); the Content
     // tab's Modrinth browser + local-jar add fill it in.
     single { LocalPackCreator(runtimeProvisioner = get(), javaManager = get(), repository = get(), dataDir = get()) }
+
+    // What the retired SmartyCraft server path left under clients/. The scanner
+    // reads it, the adopter turns one tree into a Local pack by hardlinking its
+    // content, and the sweeper removes what the player chose to let go. None of
+    // the three runs on its own; the surface above them asks first.
+    single { RetiredClientScanner(get<PlatformPaths>().clientsDir) }
+    single {
+        val provisioner: RuntimeProvisioner = get()
+        RetiredClientAdopter(
+            ensureRuntime = { mc, loader, progress -> provisioner.ensureRuntime(mc, loader, "", progress) },
+            javaManager = get(),
+            repository = get(),
+            dataDir = get(),
+            assetsDir = get<PlatformPaths>().assetsDir,
+        )
+    }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // SC-bound pack authlib swap. Default (smartycraft) channel: the patched jar
