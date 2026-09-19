@@ -32,13 +32,43 @@ class SurfaceFamilies {
     /** What [surface] is showing, [FamilyId.GENERAL] until something says otherwise. */
     fun activeIn(surface: SurfaceId): FamilyId = active[surface] ?: FamilyId.GENERAL
 
-    /** Shows [family] on [surface]. Switching to the general family is [reset]. */
+    /**
+     * How many screens currently want [surface] off its general family.
+     *
+     * Not snapshot-backed: nothing renders from it, it only decides when [active]
+     * may be cleared. Written from composition effects, which run on one thread.
+     */
+    private val claims = mutableMapOf<SurfaceId, Int>()
+
+    /**
+     * Shows [family] on [surface], until as many [reset] calls come back.
+     *
+     * Counted, because two screens that want the same family OVERLAP: the shell
+     * animates between them, so the arriving one switches before the leaving one
+     * is disposed. An unconditional reset then took the family down a frame after
+     * it had been put up, and the rail beside an open project page fell back to
+     * showing the news.
+     */
     fun switch(surface: SurfaceId, family: FamilyId) {
-        if (family == FamilyId.GENERAL) active.remove(surface) else active[surface] = family
+        if (family == FamilyId.GENERAL) {
+            reset(surface)
+            return
+        }
+        active[surface] = family
+        claims[surface] = (claims[surface] ?: 0) + 1
     }
 
-    /** Puts [surface] back to its general family. */
+    /**
+     * Gives up one claim, and puts [surface] back to its general family with the
+     * last of them.
+     */
     fun reset(surface: SurfaceId) {
+        val remaining = (claims[surface] ?: 0) - 1
+        if (remaining > 0) {
+            claims[surface] = remaining
+            return
+        }
+        claims.remove(surface)
         active.remove(surface)
     }
 

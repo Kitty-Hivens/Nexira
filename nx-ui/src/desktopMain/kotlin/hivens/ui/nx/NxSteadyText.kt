@@ -36,11 +36,21 @@ fun NxSteadyText(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
     widest: FontWeight = FontWeight.Bold,
+    /**
+     * Where the visible label sits inside the box the heaviest face measured.
+     *
+     * Centre is right for a tab or a chip, which are centred anyway. It is WRONG
+     * for a label in a left-aligned list: the box is bold-wide, so a lighter row
+     * is indented by half the difference and the column's left edge comes out
+     * ragged -- a smaller version of the shifting this exists to stop, pointing
+     * the other way.
+     */
+    align: Alignment = Alignment.Center,
     maxLines: Int = 1,
     overflow: TextOverflow = TextOverflow.Ellipsis,
     textAlign: TextAlign? = null,
 ) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    Box(modifier = modifier, contentAlignment = align) {
         // Measures and never paints. Cleared out of the semantics tree as well,
         // or a reader would meet every label twice.
         Text(
@@ -59,6 +69,7 @@ fun NxSteadyText(
             maxLines   = maxLines,
             overflow   = overflow,
             textAlign  = textAlign,
+            modifier   = Modifier.align(align),
         )
     }
 }

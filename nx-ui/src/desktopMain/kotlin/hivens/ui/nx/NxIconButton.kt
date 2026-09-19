@@ -58,6 +58,7 @@ fun NxIconButton(
     val interaction = remember { MutableInteractionSource() }
     val shownTint = if (enabled) tint else tint.copy(alpha = 0.4f)
     NxTooltip(
+        behaviour = NxTooltipBehaviour.LabelCentred,
         text     = contentDescription.orEmpty(),
         enabled  = tooltip && !contentDescription.isNullOrBlank(),
         modifier = modifier,

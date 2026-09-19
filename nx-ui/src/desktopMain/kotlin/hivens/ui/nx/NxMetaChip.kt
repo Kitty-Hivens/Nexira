@@ -37,18 +37,23 @@ fun NxMetaChip(
     onClick: (() -> Unit)? = null,
 ) {
     val colors = NxTheme.colors
-    val (container, label) = when (tone) {
-        NxMetaChipTone.OnMedia       -> Color.Black.copy(alpha = 0.35f) to Color.White
-        NxMetaChipTone.OnMediaAccent -> colors.primary.copy(alpha = 0.85f) to Color.White
-        NxMetaChipTone.Surface       -> colors.outline.copy(alpha = 0.2f) to colors.textSecondary
-        NxMetaChipTone.Success       -> colors.success.copy(alpha = 0.15f) to colors.success
-        NxMetaChipTone.Warning       -> colors.warnAccent.copy(alpha = 0.15f) to colors.warnAccent
-        NxMetaChipTone.Error         -> colors.error.copy(alpha = 0.15f) to colors.error
+    // Fill, ink, hairline. The reference outlines a tinted tag in its own hue and
+    // a plain one in the neutral rule, which is what keeps a muted fact legible on
+    // a card that is itself a raised plane: without the line the chip and the card
+    // are two fills a shade apart and the chip stops having an edge.
+    val (container, label, border) = when (tone) {
+        NxMetaChipTone.OnMedia       -> Triple(Color.Black.copy(alpha = 0.35f), Color.White, Color.White.copy(alpha = 0.25f))
+        NxMetaChipTone.OnMediaAccent -> Triple(colors.primary.copy(alpha = 0.85f), Color.White, Color.Transparent)
+        NxMetaChipTone.Surface       -> Triple(colors.outline.copy(alpha = 0.2f), colors.textSecondary, colors.outline.copy(alpha = 0.45f))
+        NxMetaChipTone.Success       -> Triple(colors.success.copy(alpha = 0.15f), colors.success, colors.success.copy(alpha = 0.4f))
+        NxMetaChipTone.Warning       -> Triple(colors.warnAccent.copy(alpha = 0.15f), colors.warnAccent, colors.warnAccent.copy(alpha = 0.4f))
+        NxMetaChipTone.Error         -> Triple(colors.error.copy(alpha = 0.15f), colors.error, colors.error.copy(alpha = 0.4f))
     }
     NxPill(
         text       = text,
         container  = container,
         label      = label,
+        border     = border,
         modifier   = modifier,
         // Over art the label competes with the picture; on a flat surface it must
         // not outweigh the value it annotates.

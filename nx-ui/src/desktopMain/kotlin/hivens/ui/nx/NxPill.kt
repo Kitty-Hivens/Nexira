@@ -1,6 +1,7 @@
 package hivens.ui.nx
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 
 /**
  * The shell every small labelled tag in the app is cut from: one height, one
@@ -30,9 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
  * badge reports a live state (a launch in flight, a pending build) rather than a
  * static fact.
  *
- * Deliberately not a Material chip: those size their container for a labelLarge
- * body, and every badge here draws labelSmall, so the pill came out half again
- * taller than the text it wrapped and outweighed the value it annotated.
+ * Deliberately not a Material chip: those size their container for a label plus
+ * the touch target a phone needs, so the pill came out half again taller than
+ * the text it wrapped and outweighed the value it annotated.
  */
 @Composable
 internal fun NxPill(
@@ -40,6 +42,14 @@ internal fun NxPill(
     container: Color,
     label: Color,
     modifier: Modifier = Modifier,
+    /**
+     * The hairline around the shell.
+     *
+     * The same axis the other two colours are on, and for the same reason: a
+     * muted fact and a green "installed" want different outlines, and nothing
+     * else about the shell changes between them. Transparent draws none.
+     */
+    border: Color = Color.Transparent,
     fontWeight: FontWeight? = null,
     dot: Color? = null,
     /**
@@ -58,6 +68,7 @@ internal fun NxPill(
             .height(pillHeight)
             .clip(shape)
             .background(container)
+            .then(if (border.alpha > 0f) Modifier.border(pillBorder, border, shape) else Modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = pillPadding),
         verticalAlignment = Alignment.CenterVertically,
@@ -70,16 +81,31 @@ internal fun NxPill(
         }
         Text(
             text       = text,
-            style      = MaterialTheme.typography.labelSmall,
+            style      = MaterialTheme.typography.bodyMedium,
             color      = label,
             fontWeight = fontWeight,
             maxLines   = 1,
+            // A caller that caps the shell's width means the label to yield, and a
+            // hard clip yields by cutting a glyph in half. This says so instead.
+            overflow   = TextOverflow.Ellipsis,
         )
     }
 }
 
+/**
+ * Measured off the reference's tag, not chosen: 14 normal, a hairline, eight in
+ * from each end, four between a mark and its word, and a full round.
+ *
+ * The label used to be labelSmall, 11 and medium. In a sidebar block whose title
+ * is 18 and whose group labels are 16, an 11 chip read as a footnote to the
+ * thing it was supposed to BE -- a block holding one tag looked like a card
+ * somebody had forgotten to fill. Everything else in that block had already been
+ * measured against the reference and matched; the chip was the one piece still
+ * carrying a guess.
+ */
 private val pillCorner = CornerSize(50)
-private val pillHeight = 22.dp
-private val pillPadding = 9.dp
-private val pillGap = 6.dp
+private val pillHeight = 24.dp
+private val pillPadding = 8.dp
+private val pillGap = 4.dp
+private val pillBorder = 1.dp
 private val dotSize = 7.dp
