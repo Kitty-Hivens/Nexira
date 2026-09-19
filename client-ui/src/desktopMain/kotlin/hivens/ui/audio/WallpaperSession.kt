@@ -188,19 +188,43 @@ class WallpaperSession(
      */
     override fun stop() {
         val p = player ?: return
-        // Inexact, because the keyframe at or before zero IS zero, so it lands in
-        // the same place having done none of the decode-forward run an exact seek
-        // pays for. The scrub below keeps exact, which is what skinema's own note
-        // says a timeline somebody is dragging wants.
+        // The keyframe at or before zero IS zero, so this lands in the same place
+        // either way and skips the decode-forward run.
         p.seek(0L, exact = false)
         p.pause()
     }
 
+    /**
+     * Where the clip goes, to the nearest keyframe.
+     *
+     * Inexact because an exact landing kills a wallpaper that decodes on the GPU.
+     * The decoder downloads the landing frame to system memory, that download
+     * fails intermittently, and skinema ends the player on it: hardware decode
+     * has no in-place software recovery, so it surfaces as a decode failure and
+     * the wallpaper goes blank for the rest of the session.
+     *
+     * Measured on 720p60 H.264 over VAAPI. An exact seek died somewhere between
+     * the third press and the hundredth, at an unhurried pace rather than only
+     * under a storm, so a minute of dragging was enough to reach it. The same
+     * seeks asked inexactly ran 1920 times without a single failure, and the file
+     * decoded in software ran clean as well. A reference player doing the same
+     * GPU decode and the same frame download, on this machine and this driver,
+     * did not fail either, so the driver is not what refuses.
+     *
+     * What it costs is a landing up to a keyframe interval early. Nothing drifts
+     * apart from it: skinema re-anchors the position and the sound to the same
+     * keyframe, so the whole seek arrives sooner than asked rather than the
+     * picture and the sound disagreeing. Frame precision on a wallpaper buys
+     * nothing that staying alive does not buy more of.
+     *
+     * Every player widget and the media session reach the wallpaper through here,
+     * so this one call is all of them.
+     */
     override fun seek(positionMs: Long) {
         val p = player ?: return
         val wanted = positionMs.coerceAtLeast(0L) * 1_000_000L
         val duration = p.durationNanos
-        p.seek(if (duration != null && duration > 0L) wanted.coerceAtMost(duration) else wanted)
+        p.seek(if (duration != null && duration > 0L) wanted.coerceAtMost(duration) else wanted, exact = false)
     }
 
     override fun setVolume(level: Float) {
