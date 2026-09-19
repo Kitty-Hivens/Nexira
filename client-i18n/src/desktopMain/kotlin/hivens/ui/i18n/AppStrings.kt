@@ -470,6 +470,8 @@ interface AppStrings {
     val settingsNetworkAgentDesc: String
     val settingsSmartyAuthLibTitle: String
     val settingsSmartyAuthLibDesc: String
+    val settingsReuseSessionTitle: String
+    val settingsReuseSessionDesc: String
 
     // --- Data directory (Settings → Data dir) ---
     val settingsSectionDataDir: String

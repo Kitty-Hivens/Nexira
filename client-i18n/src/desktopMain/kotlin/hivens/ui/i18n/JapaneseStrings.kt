@@ -437,6 +437,8 @@ object JapaneseStrings : AppStrings {
     override val settingsNetworkAgentDesc = "ゲームの起動時にログイン先を SmartyCraft に向けます。対象はゲーム内の参加処理とスキンの確認です。SmartyCraft が改変したログインライブラリを差し込まなくても参加時の認証が通り、スキンも読み込まれます。SmartyCraft のサーバーに参加するには必要です。"
     override val settingsSmartyAuthLibTitle = "SmartyCraft のログインライブラリを使う"
     override val settingsSmartyAuthLibDesc = "従来の方式です。SmartyCraft のクライアントから改変済みのログインライブラリを取り出し、元のものの代わりにパックへ置きます。上のネットワークエージェントに置き換えられ、予備として残しています。ファイルを取得できない場合は起動を中止します。既定はオフです。"
+    override val settingsReuseSessionTitle = "セッションを保持する（実験的）"
+    override val settingsReuseSessionDesc = "起動のたびにログインし直しません。一度のログインが長く保つため、二要素コードは毎回ではなく一度だけ求められます。サーバーがセッションを終了した場合、次回の起動で再ログインを求めます。既定はオフです。"
 
     override val settingsSectionDataDir = "データディレクトリ"
     override val settingsDataDirCurrent = "現在のパス:"

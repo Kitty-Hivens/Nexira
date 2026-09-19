@@ -425,6 +425,8 @@ object EnglishStrings : AppStrings {
     override val settingsNetworkAgentDesc         = "Point the game's login at SmartyCraft when it starts: the in-game join and the skin checks. The join then authenticates against SmartyCraft and skins still load, without swapping in SmartyCraft's patched login library. Needed to join SmartyCraft servers."
     override val settingsSmartyAuthLibTitle       = "Use SmartyCraft's login library"
     override val settingsSmartyAuthLibDesc        = "The older approach: take SmartyCraft's patched login library from its client and put it on the pack instead of the original. Replaced by the network agent above and kept as a fallback. If the file cannot be fetched, the launch is blocked. Off by default."
+    override val settingsReuseSessionTitle        = "Keep one session (experimental)"
+    override val settingsReuseSessionDesc         = "Does not sign in again before every launch. One sign-in lasts a long time, so this asks for a two-factor code once instead of on each launch. If the server ends the session, the next launch asks you to sign in again. Off by default."
 
     override val settingsSectionDataDir       = "Data directory"
     override val settingsDataDirCurrent       = "Current path:"

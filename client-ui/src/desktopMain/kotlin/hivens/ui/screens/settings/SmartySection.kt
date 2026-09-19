@@ -32,5 +32,10 @@ internal fun SmartySection(
             form.useSmartycraftAuthLib = it; save()
         }
         PuppetToggle("settings.useSmartycraftAuthLib", form.useSmartycraftAuthLib) { form.useSmartycraftAuthLib = it; save() }
+
+        NxToggle(s.settingsReuseSessionTitle, form.experimentalReuseSession, description = s.settingsReuseSessionDesc, icon = NxIcon.Sync) {
+            form.experimentalReuseSession = it; save()
+        }
+        PuppetToggle("settings.experimentalReuseSession", form.experimentalReuseSession) { form.experimentalReuseSession = it; save() }
     }
 }

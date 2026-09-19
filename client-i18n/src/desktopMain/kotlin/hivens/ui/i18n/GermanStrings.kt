@@ -424,6 +424,8 @@ object GermanStrings : AppStrings {
     override val settingsNetworkAgentDesc         = "Richtet die Anmeldung des Spiels beim Start auf SmartyCraft aus: den Server-Beitritt und die Skin-Prüfung. Der Beitritt läuft dann über SmartyCraft und Skins werden weiterhin geladen, ohne SmartyCrafts gepatchte Anmelde-Bibliothek einzuspielen. Nötig, um SmartyCraft-Servern beizutreten."
     override val settingsSmartyAuthLibTitle       = "SmartyCrafts Anmelde-Bibliothek verwenden"
     override val settingsSmartyAuthLibDesc        = "Der ältere Weg: SmartyCrafts gepatchte Anmelde-Bibliothek aus dessen Client nehmen und statt der originalen in die Sammlung legen. Durch den Netzwerk-Agenten oben ersetzt und als Reserve behalten. Lässt sich die Datei nicht beziehen, wird der Start blockiert. Standardmäßig aus."
+    override val settingsReuseSessionTitle        = "Eine Sitzung behalten (experimentell)"
+    override val settingsReuseSessionDesc         = "Meldet sich nicht vor jedem Start neu an. Eine Anmeldung hält lange, daher wird der Zwei-Faktor-Code einmal abgefragt statt bei jedem Start. Beendet der Server die Sitzung, verlangt der nächste Start eine erneute Anmeldung. Standardmäßig aus."
 
     override val settingsSectionDataDir       = "Datenverzeichnis"
     override val settingsDataDirCurrent       = "Aktueller Pfad:"

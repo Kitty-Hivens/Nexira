@@ -424,6 +424,8 @@ object RussianStrings : AppStrings {
     override val settingsNetworkAgentDesc         = "Направляет авторизацию игры на SmartyCraft прямо при запуске: вход на сервер и проверку скинов. Вход проходит через SmartyCraft, скины грузятся, и при этом не нужно подставлять пропатченную библиотеку авторизации от SmartyCraft. Нужно для входа на серверы SmartyCraft."
     override val settingsSmartyAuthLibTitle       = "Использовать библиотеку авторизации с SmartyCraft"
     override val settingsSmartyAuthLibDesc        = "Старый способ: берёт пропатченную библиотеку авторизации из клиента SmartyCraft и кладёт её в сборку вместо родной. Заменён агентом выше, оставлен как запасной вариант. Если файл не удаётся получить, запуск блокируется. По умолчанию выключено."
+    override val settingsReuseSessionTitle        = "Держать одну сессию (эксперимент)"
+    override val settingsReuseSessionDesc         = "Не входит заново перед каждым запуском. Одного входа хватает надолго, поэтому код двухфакторной защиты спрашивается один раз, а не при каждом запуске. Если сервер прервёт сессию, следующий запуск попросит войти снова. По умолчанию выключено."
 
     override val settingsSectionDataDir       = "Каталог данных"
     override val settingsDataDirCurrent       = "Текущий путь:"

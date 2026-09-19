@@ -844,6 +844,19 @@ class LauncherController(
     ): SessionData? {
         // Multi-active: an SC-bound pack always uses the SmartyCraft account,
         // regardless of which account is the chrome "primary".
+        // Experimental: go with the token already in hand rather than minting a
+        // fresh one. The saved session lasts at least a day, so re-authenticating
+        // per launch is what makes a two-factor account ask for a code every time.
+        // With this on it asks once, at sign-in, and a stale token surfaces as a
+        // join refusal the player can act on -- not a code prompt before a game
+        // that would have run. The server, not a timer, decides when it is spent.
+        if (settingsService.getSettings().experimentalReuseSession && currentSession.reusableForSc()) {
+            emit(LaunchLogEvent.AuthSucceeded(currentSession.uuid))
+            ActionRing.record("Pack launch ${instance.displayName}: reusing the session in hand (experimental)")
+            return if (currentSession.serverId == serverId) currentSession
+            else currentSession.copy(serverId = serverId)
+        }
+
         val saved = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
         val pass = saved?.cachedPassword ?: currentSession.cachedPassword
         val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
@@ -898,6 +911,15 @@ class LauncherController(
      * keeping the online one is what makes singleplayer worlds line up with other
      * launchers' offline mode.
      */
+    /**
+     * Whether this session can be carried into an SC-bound launch as-is: a real
+     * signed-in SmartyCraft session with a token, not an offline or empty one. The
+     * experimental reuse path returns early on this; without a token there is
+     * nothing to reuse and the normal login path has to run.
+     */
+    private fun SessionData.reusableForSc(): Boolean =
+        !offline && status == AuthStatus.OK && accessToken.isNotBlank() && playerName.isNotBlank()
+
     private fun SessionData.toOffline(): SessionData = copy(
         uuid = if (offline) uuid else OfflineIdentity.dashlessUuidFor(playerName),
         accessToken = "",

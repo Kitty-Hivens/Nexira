@@ -319,6 +319,22 @@ data class SettingsData(
      */
     val useSmartycraftAuthLib: Boolean = false,
 
+    /**
+     * Experimental: trust the session already in hand at pack launch instead of
+     * re-authenticating just before spawn. Off by default.
+     *
+     * The pre-spawn re-login exists because the token lifetime was unknown, so the
+     * launcher minted a fresh one every launch to be safe. In practice one sign-in
+     * lasts at least a day, and the re-login is what makes a two-factor account ask
+     * for a code on every launch (a new login mints a new uid and invalidates the
+     * one confirmed with the code). With this on, an SC-bound pack launches with
+     * the saved token and only re-authenticates when the server actually refuses
+     * the join -- one code per sign-in, not per launch. Experimental because the
+     * refusal is only seen at join time; if it turns out reliable it becomes the
+     * default.
+     */
+    val experimentalReuseSession: Boolean = false,
+
     // ── Onboarding state (not a user-facing toggle) ──────────────────────
 
     /**

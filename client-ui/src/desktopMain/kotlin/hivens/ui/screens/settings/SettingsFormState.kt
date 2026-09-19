@@ -42,6 +42,7 @@ internal class SettingsFormState(initial: SettingsData) {
     var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
     var useNetworkAgent        by mutableStateOf(initial.useNetworkAgent)
     var useSmartycraftAuthLib  by mutableStateOf(initial.useSmartycraftAuthLib)
+    var experimentalReuseSession by mutableStateOf(initial.experimentalReuseSession)
     var altNewsFeedUrl         by mutableStateOf(initial.altNewsFeedUrl ?: "")
     // Simple pre-releases toggle: ON maps updateChannel to Beta (previews + betas),
     // OFF to Release. The old 5-channel picker is gone; nightly is a separate config
@@ -73,6 +74,7 @@ internal class SettingsFormState(initial: SettingsData) {
             mimicVersionOverride        = normalisedMimic,
             useNetworkAgent             = useNetworkAgent,
             useSmartycraftAuthLib       = useSmartycraftAuthLib,
+            experimentalReuseSession    = experimentalReuseSession,
             // Blank is the off state for this one, and null is how the field
             // stores it: an empty string would read as a configured address that
             // fails every validation downstream.

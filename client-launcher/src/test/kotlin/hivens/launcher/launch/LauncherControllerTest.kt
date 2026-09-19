@@ -924,6 +924,70 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `with reuse-session on, an SC launch carries the token in hand and does not re-login`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData(experimentalReuseSession = true)
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(
+                playerName = "tester", uuid = "u", accessToken = "live", status = AuthStatus.OK,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("live", captured.captured.accessToken, "the token in hand is carried, not a re-minted one")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
+    fun `with reuse-session on, a two-factor account is not sent back for a code`() = runTest {
+        // The whole point: a 2FA session that is not minted-now would normally hit
+        // TwoFactorExpired and demand a code at pack launch. With reuse on, the saved
+        // token is trusted and the launch proceeds -- one code at sign-in, not per launch.
+        every { settingsService.getSettings() } returns SettingsData(experimentalReuseSession = true)
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(
+                playerName = "tester", uuid = "u", accessToken = "live", status = AuthStatus.OK,
+                twoFactor = true, mintedNow = false,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("live", captured.captured.accessToken, "the confirmed 2FA token is carried, no fresh code")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
     fun `a session minted for this launch is not sent back for another code`() {
         // The relaunch that answers a 2FA demand carries the session the code just
         // produced. Without telling it apart from a stored one, the same demand fires
