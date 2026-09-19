@@ -101,6 +101,28 @@ internal class VideoFramePainter(
  * created for it would then be running with nothing left holding a reference to
  * close it. [onAbandoned] is the only callback that covers that.
  */
+/**
+ * Where the wallpaper had got to, carried across a re-open.
+ *
+ * Whether the picture sounds, how it loops and how it decodes are all constructor
+ * arguments, so changing any of them rebuilds the player. Without this the
+ * wallpaper went back to its first frame every time somebody flipped the sound,
+ * which for a switch a person is expected to try is the wrong answer even though
+ * re-opening is the right mechanism.
+ *
+ * The video widget already carries position, volume and play state across the
+ * swap it makes going fullscreen, for the same reason. A wallpaper has no volume
+ * to carry (the level is applied to the running player) and no play state (it
+ * plays), so one number is the whole of it.
+ *
+ * Held by the file rather than by the player, so a different wallpaper begins at
+ * its own beginning instead of at the last one's offset.
+ */
+private class BackgroundResume {
+    @Volatile
+    var positionNanos: Long = 0L
+}
+
 private class BackgroundVideo(
     file: File,
     loop: Boolean,
@@ -223,14 +245,20 @@ internal fun rememberSkinemaFrame(
     // instead of a throw out of composition.
     val koin = getKoin()
     val output = remember(koin) { koin.getOrNull<AudioOutput>() }
-    // Keyed on the decode policy, the loop mode and whether it sounds, as well as
-    // the file: all three are constructor arguments, so none takes effect until
-    // the player re-opens, and keying only on the file left the loop setting inert
-    // until the wallpaper itself changed. The loudness is NOT a key. It is
-    // settable on a running player, and re-opening the file to turn it down would
-    // restart the picture.
+    // Outlives the player on purpose: it exists to survive the re-open that a
+    // constructor argument forces, so it is keyed on the file and on nothing else.
+    val resume = remember(file) { BackgroundResume() }
+    // Keyed on what the player cannot be told after it is built: the file, the
+    // decode policy and whether it carries sound. Those three reach the
+    // constructor and nowhere else, so changing one means a new player, and
+    // [BackgroundResume] is what keeps the picture where it was across that.
+    //
+    // The loop mode and the loudness are NOT keys, and for the same reason: both
+    // are settable on a running player. Keying on the loop is what this used to
+    // do, and skinema's own note on the property names the cost -- a consumer
+    // offering a repeat button had to choose between the button and the position.
     val closeScope = koinInject<CoroutineScope>()
-    val video = remember(file, hardwareDecode, loopMode, audio) {
+    val video = remember(file, hardwareDecode, audio) {
         BackgroundVideo(
             file = file,
             // The background loops unless the user pinned it to a single pass.
@@ -254,6 +282,15 @@ internal fun rememberSkinemaFrame(
     // [0.5, 4]x internally.
     LaunchedEffect(player, speedMultiplier) { player.setRate(speedMultiplier) }
 
+    // A property write rather than a new player, which is what the property exists
+    // for. Read on the decode thread at the end of a lap, so a change lands at the
+    // next end of stream and never inside one: turning the loop off part way
+    // through still finishes the lap, and turning it on still wraps at the end of
+    // the one playing.
+    LaunchedEffect(player, loopMode) {
+        player.loop = loopMode != BackgroundLoopMode.PlayOnce
+    }
+
     // Settable on a running player, which is why it is an effect and not a
     // constructor argument: turning the wallpaper down must not restart its
     // picture. Applied only where there is a pipeline to apply it to.
@@ -262,6 +299,11 @@ internal fun rememberSkinemaFrame(
     }
 
     LaunchedEffect(video) {
+        // Put the picture back where the previous player left it. Zero is a first
+        // open on this file, which starts where the file does and needs no seek.
+        // Submitted rather than awaited: the decode thread takes it off its own
+        // queue, so this does not have to wait for a clock that may not exist yet.
+        resume.positionNanos.takeIf { it > 0L }?.let { player.seek(it) }
         var seedSent = false
         while (true) {
             withFrameNanos { }
@@ -278,6 +320,11 @@ internal fun rememberSkinemaFrame(
                 if (!seedSent) seedFromRgba(slot.rgba, slot.width, slot.height)?.let { seedSent = true; onSeed(it) }
                 frameStamp++
             }
+            // Read from the pump rather than on the way out. The close is
+            // asynchronous and joins a decode thread, so asking a player being torn
+            // down where it had got to races the thread that owns the clock. A zero
+            // is a player without one yet and is not a position.
+            player.positionNanos().takeIf { it > 0L }?.let { resume.positionNanos = it }
         }
     }
 
