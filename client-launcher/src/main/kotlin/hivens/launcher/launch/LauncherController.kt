@@ -912,13 +912,19 @@ class LauncherController(
      * launchers' offline mode.
      */
     /**
-     * Whether this session can be carried into an SC-bound launch as-is: a real
-     * signed-in SmartyCraft session with a token, not an offline or empty one. The
-     * experimental reuse path returns early on this; without a token there is
-     * nothing to reuse and the normal login path has to run.
+     * Whether this session can be carried into an SC-bound launch as-is: a
+     * SmartyCraft session with a token, not an offline one and not Microsoft.
+     *
+     * Deliberately NOT keyed on `status == OK`. A session restored from the store
+     * after a restart carries `status = null` (see CredentialsManager.loadSession),
+     * so requiring OK let the reuse work in the same run yet fail the very next
+     * launch, which is when it matters most: the account is signed in without a
+     * code, then a pack launch demands one anyway. A non-blank token is the real
+     * signal there is something to reuse; `refreshToken == null` keeps a Microsoft
+     * session (its only carrier of a refresh token) out of the SC path.
      */
     private fun SessionData.reusableForSc(): Boolean =
-        !offline && status == AuthStatus.OK && accessToken.isNotBlank() && playerName.isNotBlank()
+        !offline && refreshToken == null && accessToken.isNotBlank() && playerName.isNotBlank()
 
     private fun SessionData.toOffline(): SessionData = copy(
         uuid = if (offline) uuid else OfflineIdentity.dashlessUuidFor(playerName),

@@ -954,6 +954,43 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `with reuse-session on, a session restored from the store (status null) is reused`() = runTest {
+        // The regression that shipped: a session loaded after a restart carries
+        // status = null, and requiring status == OK made the pack launch demand a
+        // code even though auto-login had just signed in without one. A token is
+        // the signal, not the status.
+        every { settingsService.getSettings() } returns SettingsData(experimentalReuseSession = true)
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            // status = null and twoFactor = true, mintedNow = false: exactly what
+            // CredentialsManager.loadSession produces for a restored 2FA account.
+            currentSession = SessionData(
+                playerName = "tester", uuid = "u", accessToken = "restored", status = null,
+                twoFactor = true, mintedNow = false,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals("restored", captured.captured.accessToken, "the restored token is carried, no code demanded")
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
     fun `with reuse-session on, a two-factor account is not sent back for a code`() = runTest {
         // The whole point: a 2FA session that is not minted-now would normally hit
         // TwoFactorExpired and demand a code at pack launch. With reuse on, the saved
