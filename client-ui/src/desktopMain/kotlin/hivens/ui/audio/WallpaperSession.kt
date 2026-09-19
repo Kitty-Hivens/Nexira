@@ -188,7 +188,11 @@ class WallpaperSession(
      */
     override fun stop() {
         val p = player ?: return
-        p.seek(0L)
+        // Inexact, because the keyframe at or before zero IS zero, so it lands in
+        // the same place having done none of the decode-forward run an exact seek
+        // pays for. The scrub below keeps exact, which is what skinema's own note
+        // says a timeline somebody is dragging wants.
+        p.seek(0L, exact = false)
         p.pause()
     }
 

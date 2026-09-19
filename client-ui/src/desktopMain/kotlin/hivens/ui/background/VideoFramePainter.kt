@@ -345,14 +345,30 @@ internal fun rememberSkinemaFrame(
     }
 
     LaunchedEffect(video) {
-        // Put the picture back where the previous player left it. Zero is a first
-        // open on this file, which starts where the file does and needs no seek.
-        // Submitted rather than awaited: the decode thread takes it off its own
-        // queue, so this does not have to wait for a clock that may not exist yet.
-        resume.positionNanos.takeIf { it > 0L }?.let { player.seek(it) }
+        var resumed = false
         var seedSent = false
         while (true) {
             withFrameNanos { }
+            // Put the picture back where the previous player left it, once there is
+            // a decoder to ask. Zero is a first open on this file, which starts
+            // where the file does and needs no seek.
+            //
+            // Two things this used to get wrong, and a GPU-decoded wallpaper paid
+            // for both with av_hwframe_transfer_data failing, which skinema makes
+            // fatal by design because there is no in-place software recovery.
+            //
+            // It was submitted straight after the constructor, which is inside the
+            // window where the hardware frame context is still coming up. And it
+            // was exact, which runs the decoder forward from the keyframe before
+            // the target and converts every frame on the way, so one resume was as
+            // many GPU-to-CPU transfers as the keyframe interval is long. Inexact
+            // lands on that keyframe instead and does one. A wallpaper put back
+            // roughly where it was is the whole requirement; frame precision is for
+            // a timeline somebody is dragging.
+            if (!resumed && player.state != VideoPlayer.State.Opening) {
+                resumed = true
+                resume.positionNanos.takeIf { it > 0L }?.let { player.seek(it, exact = false) }
+            }
             player.acquireFrame()?.let { slot ->
                 video.update(slot)
                 if (displaySize == null) {
