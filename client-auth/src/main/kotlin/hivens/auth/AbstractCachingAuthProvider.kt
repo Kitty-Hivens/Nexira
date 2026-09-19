@@ -22,22 +22,34 @@ abstract class AbstractCachingAuthProvider : AuthProvider {
     protected val logger: Logger = LoggerFactory.getLogger(this::class.java)
 
     /**
-     * Per-server session cache key. Includes [passwordHash] because otherwise
-     * a second login with the WRONG password inside the TTL would succeed via
-     * cache, masking credential rotation. The hash (never plaintext) is the
-     * one the provider already computes for its request.
+     * Session cache key: an account, not an account-and-server.
+     *
+     * The server is deliberately NOT part of it. A live probe against the SC API
+     * (2026-09-19, Industrial vs RPG) showed the game token is not scoped to the
+     * server it was minted for: the join gate carries no world name, so a session
+     * earned for one 1.12.2 world is accepted for another. Keying the cache by
+     * server was the launcher imposing a per-server model the API does not have,
+     * and it cost a fresh login (and, for a 2FA account, a fresh code, killing the
+     * previous session) on every world switch. The provider still sends the server
+     * in the login body and still carries it on the returned session for authlib
+     * selection, it just does not split the cache on it.
+     *
+     * Includes [passwordHash] because otherwise a second login with the WRONG
+     * password inside the TTL would succeed via cache, masking credential
+     * rotation. The hash (never plaintext) is the one the provider already
+     * computes for its request.
      */
-    protected data class CacheKey(val username: String, val passwordHash: String, val serverId: String)
+    protected data class CacheKey(val username: String, val passwordHash: String)
 
     private data class CachedSession(val session: SessionData, val expiresAt: Long)
 
     private val sessionCache = ConcurrentHashMap<CacheKey, CachedSession>()
 
     /**
-     * 30 s: long enough for "open launcher -> pick server -> click Play" (which
-     * historically did two consecutive logins for the same server), short
-     * enough that the backend still considers the session fresh. In-memory
-     * only; a process restart re-auths.
+     * 30 s: long enough for "open launcher -> click Play", short enough that the
+     * backend still considers the session fresh. In-memory only; a process
+     * restart re-auths. The window also now covers a launch that follows sign-in
+     * across a different world, since the key no longer splits on the server.
      */
     private val sessionTtlMs = 30_000L
 

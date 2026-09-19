@@ -49,13 +49,16 @@ class SmartyCraftAuthProvider(
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
         val passwordEncoded = HashUtils.md5(password)
-        val key = CacheKey(username, passwordEncoded, serverId)
+        val key = CacheKey(username, passwordEncoded)
         // Drop any stale TWOAUTH state -- covers canceled-2FA-dialog and
         // previous-error retry paths; otherwise pendingTwoFactor grows unbounded.
         pendingTwoFactor.remove(key)
         cachedSession(key)?.let {
             logger.info("Login via API V3 (server: {}) -- cache hit, skipping network", serverId)
-            return it
+            // The cached session may have been earned for a different world; the
+            // token works regardless, but the returned session carries the server
+            // asked for now so authlib selection downstream matches the launch.
+            return if (it.serverId == serverId) it else it.copy(serverId = serverId)
         }
         logger.info("Login via API V3 (server: {})...", serverId)
 
@@ -154,7 +157,7 @@ class SmartyCraftAuthProvider(
         // again, so the user is asked for code after code while every confirmed
         // session dies behind them. Measured against the live API, not guessed.
         val passwordEncoded = HashUtils.md5(password)
-        val key = CacheKey(username, passwordEncoded, serverId)
+        val key = CacheKey(username, passwordEncoded)
         val cachedResponse = pendingTwoFactor.remove(key)
 
         // `session` MUST be checked too -- it's the AES bytes that become

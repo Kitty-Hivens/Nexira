@@ -453,4 +453,29 @@ class SmartyCraftAuthProviderTest {
         service.login("user", "pass2", "Industrial")
         assertEquals(2, proto.loginCalls.size)
     }
+
+    @Test
+    fun `a login for a second world reuses the first world's session`() = runTest {
+        // The token is not scoped to the server (live-probed 2026-09-19), so a
+        // sign-in for one world and a launch of a pack bound to another must not
+        // force a fresh login -- which on a 2FA account would demand another code
+        // and kill the session just confirmed. The cache key is the account, not
+        // the account-and-world.
+        val proto = protocol(ok())
+        val service = SmartyCraftAuthProvider(proto)
+        service.login("user", "pass", "Industrial")
+        service.login("user", "pass", "RPG")
+        assertEquals(1, proto.loginCalls.size, "the second world hits the cache, no second login")
+    }
+
+    @Test
+    fun `a cache hit for a second world carries that world on the session`() = runTest {
+        // The token is shared, but the returned session names the world asked for
+        // now, because the launch selects the SC authlib by it.
+        val proto = protocol(ok())
+        val service = SmartyCraftAuthProvider(proto)
+        service.login("user", "pass", "Industrial")
+        val second = service.login("user", "pass", "RPG")
+        assertEquals("RPG", second.serverId)
+    }
 }
