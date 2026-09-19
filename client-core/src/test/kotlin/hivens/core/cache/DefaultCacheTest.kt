@@ -1,6 +1,7 @@
 package hivens.core.cache
 
 import hivens.test.TestClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -146,6 +147,52 @@ class DefaultCacheTest {
         assertTrue(calls.get() >= 3, "failed refresh retries on subsequent stale reads")
     }
 
+    /**
+     * The failure this exists for: a caller that reads once got the old value and
+     * never the refresh, so a project page showed hour-old numbers for the whole
+     * visit and week-old ones after a while.
+     */
+    @Test
+    fun `fallback mode asks first and only keeps the old value when asking fails`() = runTest {
+        val clock = TestClock()
+        val cache = cache(
+            MapDiskStore<String>(),
+            CacheConfig(ttlMs = 1_000, staleTtlMs = 10_000, staleMode = StaleMode.FallbackOnFailure),
+            clock,
+        )
+        var answer = "old"
+        var failing = false
+        val loader: suspend () -> String = { if (failing) throw IllegalStateException("down") else answer }
+
+        assertEquals("old", cache.get("k", loader))
+        clock.advance(1_500)
+        answer = "new"
+        assertEquals("new", cache.get("k", loader), "an expired entry is refetched, not handed back")
+
+        // The other half the name promises, which used to be declared and never
+        // reached: `failing` was set nowhere, so only the asking was tested.
+        clock.advance(1_500)
+        failing = true
+        assertEquals("new", cache.get("k", loader), "a refetch that failed keeps what we had")
+    }
+
+    @Test
+    fun `fallback mode keeps the old value when the network is gone`() = runTest {
+        val clock = TestClock()
+        val cache = cache(
+            MapDiskStore<String>(),
+            CacheConfig(ttlMs = 1_000, staleTtlMs = 10_000, staleMode = StaleMode.FallbackOnFailure),
+            clock,
+        )
+        var failing = false
+        val loader: suspend () -> String = { if (failing) throw IllegalStateException("down") else "old" }
+
+        cache.get("k", loader)
+        failing = true
+        clock.advance(1_500)
+        assertEquals("old", cache.get("k", loader), "an old answer beats no answer with no network")
+    }
+
     @Test
     fun `past the hard staleness cap the loader error propagates`() = runTest {
         val clock = TestClock()
@@ -214,9 +261,64 @@ class DefaultCacheTest {
         advanceTimeBy(10)
         job.cancel()                                              // cancel the leader before it completes
         advanceUntilIdle()
-        // inFlight must have been cleared in the leader's finally, so a fresh get
-        // becomes a new leader rather than awaiting a dead deferred.
+        // The flight must have been released even though the release itself ran
+        // under a cancelled job, so a fresh get becomes a new leader rather than
+        // awaiting a deferred nobody is left to complete.
         assertEquals("v2", cache.get("k") { "v2" })
+    }
+
+    /**
+     * One reader leaving is not an answer for the others.
+     *
+     * The leader ran the load in its own coroutine and handed its cancellation to
+     * everyone awaiting the same key, so a person navigating away from a screen
+     * made every other reader of that key see a failed read.
+     */
+    @Test
+    fun `a follower outlives the leader that walked away`() = runTest {
+        val cache = cache(MapDiskStore<String>(), CacheConfig(ttlMs = 10_000), TestClock())
+        val calls = AtomicInteger(0)
+        val loader: suspend () -> String = { calls.incrementAndGet(); delay(1_000); "v" }
+
+        val leader = launch { cache.get("k", loader) }
+        advanceTimeBy(10)
+        // THREE of them, because one cannot tell "exactly one waiter takes over"
+        // from "every waiter reloads": both answer the single-follower case with
+        // two calls.
+        val followers = List(3) { async { cache.get("k", loader) } }
+        advanceTimeBy(10)
+        leader.cancel()
+
+        followers.forEach { assertEquals("v", it.await()) }
+        assertEquals(2, calls.get(), "one waiter takes the flight over and the rest join it")
+    }
+
+    /**
+     * A loader that gave up is not a caller that left.
+     *
+     * `withTimeout` throws a CancellationException, and reading the TYPE rather
+     * than asking whether this caller is still alive turned a timed-out fetch into
+     * a re-election: every waiter in turn paying the same timeout again, and none
+     * of them ever being told what went wrong.
+     */
+    @Test
+    fun `a loader that gives up reports to everyone instead of re-electing`() = runTest {
+        val calls = AtomicInteger(0)
+        val cache = cache(MapDiskStore<String>(), CacheConfig(ttlMs = 10_000), TestClock())
+        val loader: suspend () -> String = {
+            calls.incrementAndGet()
+            delay(50)
+            throw CancellationException("the loader timed out")
+        }
+
+        val leader = async { runCatching { cache.get("k", loader) } }
+        advanceTimeBy(10)
+        val follower = async { runCatching { cache.get("k", loader) } }
+        advanceUntilIdle()
+
+        assertTrue(leader.await().isFailure, "the leader is told")
+        assertTrue(follower.await().isFailure, "and so is the waiter")
+        assertEquals(1, calls.get(), "the failure is shared, not paid for again by each waiter")
     }
 
     @Test

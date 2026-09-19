@@ -20,6 +20,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
@@ -84,9 +85,14 @@ class ModrinthClient(
      * the hash is unknown to Modrinth (a local / non-Modrinth artifact -- a 404).
      * Backs the Content-tab icon fallback for origin-agnostic instances, where
      * there is no manifest project_id to look up by.
+     *
+     * Only the 404 answers null. A timeout, a rate limit or a cancelled caller
+     * used to come back indistinguishable from it, and callers cache this answer:
+     * a mod whose lookup was interrupted was then recorded as one the catalogue
+     * has never heard of, for as long as the launcher ran.
      */
     suspend fun versionByHash(sha1: String): ModrinthVersion? =
-        runCatching { getJson<ModrinthVersion>("$API_BASE/v2/version_file/$sha1?algorithm=sha1") }.getOrNull()
+        getJsonOrNull<ModrinthVersion>("$API_BASE/v2/version_file/$sha1?algorithm=sha1")
 
     /**
      * Search the catalogue, restricted to modpacks via a project-type facet.
@@ -203,14 +209,24 @@ class ModrinthClient(
         return out
     }
 
-    /** Newest version of [projectId] fitting the instance's MC + loader, else the newest overall. */
-    suspend fun bestModVersion(projectId: String, mcVersion: String, loader: String): ModrinthVersion? {
-        val versions = listVersions(projectId)
-        return versions.firstOrNull { v ->
+    /**
+     * The newest build of [projectId] that actually runs on this pack, or null.
+     *
+     * Null MEANS there is none. It used to fall back on the newest build overall,
+     * which every caller then read as "here is the one for you" and installed: a
+     * jar for another loader, or another game version, put into the folder without
+     * a word. All three callers already treat null as "this project does not
+     * support this pack", so the fallback was contradicting the only readings of
+     * its own result.
+     *
+     * A blank axis is not a constraint, which is how a pack with no recorded
+     * loader still gets an answer.
+     */
+    suspend fun newestMatchingVersion(projectId: String, mcVersion: String, loader: String): ModrinthVersion? =
+        listVersions(projectId).firstOrNull { v ->
             (mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
                 (loader.isBlank() || v.loaders.contains(loader))
-        } ?: versions.firstOrNull()
-    }
+        }
 
     /**
      * Fetch a mod jar to [target]; a file already there is left alone.
@@ -244,16 +260,34 @@ class ModrinthClient(
     }
 
     private suspend inline fun <reified T> getJson(url: String): T {
-        val resp: HttpResponse = httpProvider.current.get(url) {
-            headers.append("User-Agent", USER_AGENT)
-            headers.append("Accept", "application/json")
-            timeout { requestTimeoutMillis = METADATA_TIMEOUT_MS }
-        }
-        if (!resp.status.isSuccess()) {
-            val body = runCatching { resp.bodyAsText() }.getOrDefault("")
-            throw IOException("GET $url failed: ${resp.status} body=$body")
-        }
+        val resp = requestJson(url)
+        failUnlessSuccess(resp, url)
         return json.decodeFromString(resp.bodyAsText())
+    }
+
+    /**
+     * As [getJson], but a 404 is an answer rather than a failure: the catalogue
+     * has no such thing. Every other status still throws, so "we could not ask"
+     * never reads as "there is nothing to find".
+     */
+    private suspend inline fun <reified T> getJsonOrNull(url: String): T? {
+        val resp = requestJson(url)
+        if (resp.status == HttpStatusCode.NotFound) return null
+        failUnlessSuccess(resp, url)
+        return json.decodeFromString(resp.bodyAsText())
+    }
+
+    /** The GET every metadata read here shares: the agent, the accept, the tighter timeout. */
+    private suspend fun requestJson(url: String): HttpResponse = httpProvider.current.get(url) {
+        headers.append("User-Agent", USER_AGENT)
+        headers.append("Accept", "application/json")
+        timeout { requestTimeoutMillis = METADATA_TIMEOUT_MS }
+    }
+
+    private suspend fun failUnlessSuccess(resp: HttpResponse, url: String) {
+        if (resp.status.isSuccess()) return
+        val body = runCatching { resp.bodyAsText() }.getOrDefault("")
+        throw IOException("GET $url failed: ${resp.status} body=$body")
     }
 
     companion object {

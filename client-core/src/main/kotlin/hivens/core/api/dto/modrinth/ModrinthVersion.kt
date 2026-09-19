@@ -26,6 +26,8 @@ data class ModrinthVersion(
     @SerialName("game_versions") val gameVersions: List<String> = emptyList(),
     val loaders: List<String> = emptyList(),
     @SerialName("date_published") val datePublished: String = "",
+    /** How many times this build in particular was taken, which the list shows per row. */
+    val downloads: Long = 0,
     /** The author's notes for this version; Modrinth serves null for most versions. */
     val changelog: String? = null,
     /**

@@ -154,11 +154,7 @@ class ModInstaller(
     ): ModrinthVersion? = try {
         when {
             versionId != null && projectId != null -> modrinth.resolveVersion(projectId, versionId)
-            projectId != null -> modrinth.bestModVersion(projectId, mcVersion, loader)
-                ?.takeIf { v ->
-                    (mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
-                        (loader.isBlank() || v.loaders.contains(loader))
-                }
+            projectId != null -> modrinth.newestMatchingVersion(projectId, mcVersion, loader)
             else -> null
         }
     } catch (e: CancellationException) {

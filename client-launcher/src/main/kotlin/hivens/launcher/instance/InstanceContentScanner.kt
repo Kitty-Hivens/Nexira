@@ -58,16 +58,38 @@ class InstalledContent(
     val license: String? = null,
     val authors: List<String> = emptyList(),
     val dependencies: List<String> = emptyList(),
+    /**
+     * Every loader whose manifest this archive carries.
+     *
+     * A list, because a great many mods ship ONE jar that declares both a
+     * `fabric.mod.json` and a `neoforge.mods.toml`, and naming only the one that
+     * happened to be read first called a Fabric mod sitting in a Fabric pack a
+     * NeoForge mod. What the archive declares is what this reports; whether a
+     * loader can actually run it is the loader's verdict, not ours.
+     */
+    val loaders: List<String> = emptyList(),
+    /**
+     * The game versions the archive names, as it names them.
+     *
+     * Also a list: Fabric declares `depends.minecraft` as a set of alternatives
+     * ("1.21" OR "1.21.1"), and taking the first turned a mod built for the pack's
+     * own version into one built for the version before it. Forge and NeoForge
+     * declare a single range instead, which is one entry.
+     */
+    val gameVersions: List<String> = emptyList(),
 ) {
     // Identity for Compose list diffing excludes the icon bytes (a fresh array
     // each scan would otherwise read as a change); the file name + state is what
-    // a row actually renders on.
+    // a row actually renders on -- plus what the project page renders, which is
+    // why the loaders and the game versions are in here too.
     override fun equals(other: Any?): Boolean =
         other is InstalledContent &&
             kind == other.kind && fileName == other.fileName &&
-            enabled == other.enabled && version == other.version
+            enabled == other.enabled && version == other.version &&
+            loaders == other.loaders && gameVersions == other.gameVersions
     override fun hashCode(): Int =
-        (((kind.hashCode() * 31 + fileName.hashCode()) * 31) + enabled.hashCode()) * 31 + (version?.hashCode() ?: 0)
+        (((((kind.hashCode() * 31 + fileName.hashCode()) * 31) + enabled.hashCode()) * 31 +
+            (version?.hashCode() ?: 0)) * 31 + loaders.hashCode()) * 31 + gameVersions.hashCode()
 }
 
 /** Where this item actually sits under [instanceDir], disabled suffix and all. */
@@ -170,6 +192,8 @@ class InstanceContentScanner(
             license     = meta?.license?.takeIf { it.isNotBlank() },
             authors     = meta?.authors.orEmpty(),
             dependencies = meta?.dependencies.orEmpty(),
+            loaders = meta?.loaders.orEmpty(),
+            gameVersions = meta?.gameVersions.orEmpty(),
         )
     }
 
@@ -181,11 +205,29 @@ class InstanceContentScanner(
      * TOML loses nothing there.
      */
     private fun readModMeta(file: Path): Meta? = openSharedZip(file).use { zip ->
-        (zip.readEntry("META-INF/neoforge.mods.toml") ?: zip.readEntry("META-INF/mods.toml"))
-            ?.let { return parseForgeToml(zip, it) }
-        zip.readEntry("fabric.mod.json")?.let { return parseFabric(zip, it) }
-        zip.readEntry("quilt.mod.json")?.let { return parseQuilt(zip, it) }
-        null
+        val neoforge = zip.readEntry("META-INF/neoforge.mods.toml")
+        val forge = if (neoforge == null) zip.readEntry("META-INF/mods.toml") else null
+        val fabric = zip.readEntry("fabric.mod.json")
+        val quilt = zip.readEntry("quilt.mod.json")
+        // Every manifest the archive carries, not just the one that answered. A
+        // multiloader build declares two and runs under both; reading only the
+        // first put a NeoForge label on Fabric mods sitting in Fabric packs.
+        val loaders = buildList {
+            if (neoforge != null) add("neoforge")
+            if (forge != null) add("forge")
+            if (fabric != null) add("fabric")
+            if (quilt != null) add("quilt")
+        }
+        val meta = when {
+            neoforge != null -> parseForgeToml(zip, neoforge)
+            forge != null -> parseForgeToml(zip, forge)
+            fabric != null -> parseFabric(zip, fabric)
+            quilt != null -> parseQuilt(zip, quilt)
+            else -> return@use null
+        }
+        // The game versions come from whichever manifest was parsed; the loaders
+        // come from all of them.
+        meta.withLoaders(loaders)
     }
 
     private fun parseFabric(zip: SharedZip, bytes: ByteArray): Meta {
@@ -205,11 +247,12 @@ class InstanceContentScanner(
             runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()
                 ?: runCatching { el.jsonObject["name"]?.jsonPrimitive?.contentOrNull }.getOrNull()
         }
-        val depends = (root["depends"]?.let { runCatching { it.jsonObject.keys.toList() }.getOrNull() }.orEmpty())
-            .filterNot { it in PLATFORM_DEPS }
+        val dependsObject = root["depends"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val depends = dependsObject?.keys?.toList().orEmpty().filterNot { it in PLATFORM_DEPS }
         return Meta(
             name, version, description, iconPath?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = firstString(root["license"]), authors = authors, dependencies = depends,
+            gameVersions = allStrings(dependsObject?.get("minecraft")),
         )
     }
 
@@ -226,15 +269,28 @@ class InstanceContentScanner(
         // `contributors` is a { name: role } object.
         val authors = meta?.get("contributors")?.let { runCatching { it.jsonObject.keys.toList() }.getOrNull() }.orEmpty()
         // `quilt_loader.depends` is an array of `{ id }` objects (or bare id strings).
-        val depends = (loader?.get("depends")?.let { runCatching { it.jsonArray }.getOrNull() }.orEmpty())
+        val dependsArray = loader?.get("depends")?.let { runCatching { it.jsonArray }.getOrNull() }.orEmpty()
+        val depends = dependsArray
             .mapNotNull { el ->
                 runCatching { el.jsonObject["id"]?.jsonPrimitive?.contentOrNull }.getOrNull()
                     ?: runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()
             }
             .filterNot { it in PLATFORM_DEPS }
+        // The minecraft entry, whose range is the fact the dependency list drops.
+        val minecraft = dependsArray.firstNotNullOfOrNull { el ->
+            runCatching {
+                val obj = el.jsonObject
+                if (obj["id"]?.jsonPrimitive?.contentOrNull == "minecraft") {
+                    allStrings(obj["versions"]).ifEmpty { allStrings(obj["version"]) }.ifEmpty { null }
+                } else {
+                    null
+                }
+            }.getOrNull()
+        }.orEmpty()
         return Meta(
             name, version, description, iconPath?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = firstString(meta?.get("license")), authors = authors, dependencies = depends,
+            gameVersions = minecraft,
         )
     }
 
@@ -248,7 +304,13 @@ class InstanceContentScanner(
      * section-aware parsing the flat line scan can't do reliably.
      */
     private fun parseForgeToml(zip: SharedZip, bytes: ByteArray): Meta {
+        // Comment lines dropped before anything is matched. A mod that commented
+        // its whole dependency block out was still reporting the range inside it,
+        // which is a claim its manifest deliberately does not make.
         val text = bytes.decodeToString()
+            .lineSequence()
+            .filterNot { it.trimStart().startsWith("#") }
+            .joinToString("\n")
         val name = TOML_DISPLAY_NAME.tomlValue(text)
         val version = TOML_VERSION.tomlValue(text)
             ?.let { raw -> if (raw.startsWith($$"${")) manifestImplementationVersion(zip) else raw }
@@ -261,6 +323,9 @@ class InstanceContentScanner(
         return Meta(
             name, version, null, logo?.let { readEntryBytes(zip, it) },
             homepageUrl = homepage, license = license, authors = authors,
+            gameVersions = listOfNotNull(
+                TOML_MINECRAFT_RANGE.find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() },
+            ),
         )
     }
 
@@ -278,6 +343,20 @@ class InstanceContentScanner(
         el ?: return null
         runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()?.let { return it }
         return runCatching { el.jsonArray.firstNotNullOfOrNull { it.jsonPrimitive.contentOrNull } }.getOrNull()
+    }
+
+    /**
+     * Every usable value of a field that may be a bare string OR an array.
+     *
+     * The sibling of [firstString], for the fields where the array means "any of
+     * these" rather than "one of these will do": a Fabric mod that depends on
+     * `["1.21", "1.21.1"]` supports both, and answering with the first one names
+     * a version the author did not build for.
+     */
+    private fun allStrings(el: JsonElement?): List<String> {
+        el ?: return emptyList()
+        runCatching { el.jsonPrimitive.contentOrNull }.getOrNull()?.let { return listOf(it) }
+        return runCatching { el.jsonArray.mapNotNull { it.jsonPrimitive.contentOrNull } }.getOrDefault(emptyList())
     }
 
     /** Map a JSON array (strings or objects) through [transform] to a trimmed, non-blank list. */
@@ -335,7 +414,26 @@ class InstanceContentScanner(
         val license: String? = null,
         val authors: List<String> = emptyList(),
         val dependencies: List<String> = emptyList(),
+        /**
+         * Every loader whose manifest the archive carries.
+         *
+         * Filled by the caller, which is the only place that sees all of them: a
+         * parser only ever sees the one manifest it was handed.
+         */
+        val loaders: List<String> = emptyList(),
+        /**
+         * The game versions the archive names, where it names any.
+         *
+         * Fabric and Quilt declare them as a dependency on minecraft, which the
+         * dependency list filters out as platform noise -- correctly, since it is
+         * not a mod, but it is exactly what a reader wants under "Minecraft".
+         */
+        val gameVersions: List<String> = emptyList(),
     )
+
+    /** The same metadata, told which loaders the archive declared. */
+    private fun Meta.withLoaders(loaders: List<String>): Meta =
+        Meta(name, version, description, icon, homepageUrl, license, authors, dependencies, loaders, gameVersions)
 
     /** Runs the icon through the bound [icons] processor; identity when none is bound or there is no icon. */
     private fun Meta.normalizeIcon(): Meta {
@@ -343,14 +441,14 @@ class InstanceContentScanner(
         val original = icon ?: return this
         val processed = processor.process(original)
         return if (processed === original) this
-        else Meta(name, version, description, processed, homepageUrl, license, authors, dependencies)
+        else Meta(name, version, description, processed, homepageUrl, license, authors, dependencies, loaders, gameVersions)
     }
 
     private fun Meta.toCached() =
-        CachedMeta(name, version, description, icon, homepageUrl, license, authors, dependencies)
+        CachedMeta(name, version, description, icon, homepageUrl, license, authors, dependencies, loaders, gameVersions)
 
     private fun CachedMeta.toMeta() =
-        Meta(name, version, description, icon, homepageUrl, license, authors, dependencies)
+        Meta(name, version, description, icon, homepageUrl, license, authors, dependencies, loaders, gameVersions)
 
     private companion object {
         /** `key = "value"` / `key = 'value'`, each quote style closed by its own kind. */
@@ -369,5 +467,16 @@ class InstanceContentScanner(
         val ICON_CANDIDATES = listOf("icon.png", "pack.png", "logo.png", "icon.jpg", "logo.jpg")
         // Platform / loader ids that are always present and add no signal to a "requires" list.
         val PLATFORM_DEPS = setOf("minecraft", "java", "fabricloader", "quilt_loader", "quilted_fabric_api")
+
+        /**
+         * The game-version range out of a forge or neoforge dependency block.
+         *
+         * Section-aware parsing is what the dependency LIST needs and cannot have
+         * from a flat scan, but one well-known modId with one well-known key is
+         * findable without it: the pair is adjacent in every file that declares it.
+         */
+        val TOML_MINECRAFT_RANGE = Regex(
+            """modId\s*=\s*["']minecraft["'][\s\S]{0,200}?versionRange\s*=\s*["']([^"']*)["']""",
+        )
     }
 }

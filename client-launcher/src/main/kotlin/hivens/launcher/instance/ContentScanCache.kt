@@ -70,6 +70,7 @@ class ContentScanCache(
             val slim = CachedMeta(
                 meta.name, meta.version, meta.description, null,
                 meta.homepageUrl, meta.license, meta.authors, meta.dependencies,
+                meta.loaders, meta.gameVersions,
             )
             bytes = json.encodeToString(CachedScan.serializer(), CachedScan(size, mtime, slim, FORMAT)).encodeToByteArray()
         }
@@ -118,7 +119,8 @@ class ContentScanCache(
         // fixes, metadata priority) so unchanged files re-parse; entries written
         // before the field existed default to 1 and read as misses.
         // 2: quote-aware TOML values, TOML-over-stub priority, jarVersion resolve.
-        const val FORMAT = 2
+        // 3: every loader the archive declares, and every game version it names.
+        const val FORMAT = 3
     }
 }
 
@@ -156,4 +158,6 @@ class CachedMeta(
     val license: String? = null,
     val authors: List<String> = emptyList(),
     val dependencies: List<String> = emptyList(),
+    val loaders: List<String> = emptyList(),
+    val gameVersions: List<String> = emptyList(),
 )

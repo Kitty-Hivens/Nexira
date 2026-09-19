@@ -3,11 +3,13 @@ package hivens.core.smrt
 import hivens.core.api.dto.smrt.SmrtDisplay
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -48,15 +50,78 @@ class ModIconResolverTest {
         assertEquals(1, apiCalls, "second + third call should hit the cache")
     }
 
+    /**
+     * A failure is not an answer, and the cache keeps only answers.
+     *
+     * It used to keep both, which is how the mod a person had just installed --
+     * the one still being looked up when the list rescanned and cancelled the
+     * lookup -- ended up with a letter avatar for the rest of the session while
+     * every mod already sitting in the folder kept its art.
+     */
     @Test
-    fun `Modrinth source -- API failure returns null and is cached`() = runBlocking {
+    fun `Modrinth source -- a failed lookup is reported and asked again`() = runBlocking {
         var apiCalls = 0
-        val r = ModIconResolver { _ -> apiCalls++; throw RuntimeException("boom") }
+        val r = ModIconResolver { _ ->
+            apiCalls++
+            if (apiCalls == 1) throw RuntimeException("boom") else "https://cdn/icon.png"
+        }
         val mod = modWith(display = null, source = SmrtSource.Modrinth(projectId = "abc", versionId = "v"))
 
-        assertNull(r.resolve(mod))
-        assertNull(r.resolve(mod))
-        assertEquals(1, apiCalls, "failed lookup should still be cached so we don't keep hammering the API")
+        // Thrown, not answered with null: null is what "this project has no icon"
+        // looks like, and the caller writes that down.
+        assertFailsWith<RuntimeException> { r.resolve(mod) }
+        assertEquals("https://cdn/icon.png", r.resolve(mod), "the second ask is allowed to succeed")
+        assertEquals(2, apiCalls)
+    }
+
+    /**
+     * The hole the first pass left: only cancellation propagated, and an ordinary
+     * failure still came back as a bare null. A caller cannot tell that from "the
+     * catalogue has never seen this file", so it filed it as one.
+     */
+    @Test
+    fun `resolveByFile -- a failed lookup is reported rather than read as no icon`() = runBlocking {
+        var calls = 0
+        val r = ModIconResolver(
+            resolveProjectIcon = { "unused" },
+            resolveIconByHash = { _ ->
+                calls++
+                if (calls == 1) throw RuntimeException("rate limited") else "https://cdn/icon.png"
+            },
+        )
+        val file = Files.createTempFile("mod", ".jar").also { Files.write(it, byteArrayOf(4, 2)) }
+        try {
+            assertFailsWith<RuntimeException> { r.resolveByFile(file) }
+            assertEquals("https://cdn/icon.png", r.resolveByFile(file))
+            assertEquals(2, calls)
+        } finally {
+            Files.deleteIfExists(file)
+        }
+    }
+
+    /**
+     * Cancellation is the failure this actually saw in the wild: the prefetch runs
+     * on the composition, so leaving the screen or rescanning the folder kills
+     * whatever is in flight. It has to come back out rather than be written down.
+     */
+    @Test
+    fun `a cancelled lookup propagates and leaves the cache empty`() = runBlocking {
+        var calls = 0
+        val r = ModIconResolver(
+            resolveProjectIcon = { "unused" },
+            resolveIconByHash = { _ ->
+                calls++
+                if (calls == 1) throw CancellationException("left the composition") else "https://cdn/icon.png"
+            },
+        )
+        val file = Files.createTempFile("mod", ".jar").also { Files.write(it, byteArrayOf(7)) }
+        try {
+            assertFailsWith<CancellationException> { r.resolveByFile(file) }
+            assertEquals("https://cdn/icon.png", r.resolveByFile(file))
+            assertEquals(2, calls)
+        } finally {
+            Files.deleteIfExists(file)
+        }
     }
 
     @Test

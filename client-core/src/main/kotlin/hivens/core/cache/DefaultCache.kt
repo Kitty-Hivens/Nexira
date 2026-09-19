@@ -5,8 +5,12 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -31,7 +35,8 @@ import org.slf4j.LoggerFactory
  *  - A background refresh (stale read) runs on [scope] (a SupervisorJob), so a
  *    caller leaving composition cannot cancel a refresh other callers share.
  *  - A blocking miss runs the loader in the caller's own coroutine, so caller
- *    cancellation correctly aborts a first-ever fetch.
+ *    cancellation aborts a first-ever fetch nobody else is waiting for -- and
+ *    hands it to one of them when somebody is.
  *  - [ioDispatcher] is injectable so disk hops stay under a test scheduler's
  *    virtual time.
  */
@@ -92,8 +97,30 @@ class DefaultCache<V>(
             val age = ageOf(entry)
             if (age < config.ttlMs) return entry.value
             if (age < config.staleTtlMs) {
-                triggerRefresh(key, loader)
-                return entry.value
+                when (config.staleMode) {
+                    StaleMode.Eager -> {
+                        triggerRefresh(key, loader)
+                        return entry.value
+                    }
+                    // Ask, and keep what we had only if asking failed. A caller of
+                    // get() reads once, so handing it the old value means the old
+                    // value is what the screen shows until it is opened again.
+                    StaleMode.FallbackOnFailure -> {
+                        return runCatching { load(key, loader) }
+                            .getOrElse { e ->
+                                // Only THIS caller leaving skips the fallback. A
+                                // loader that timed out threw a CancellationException
+                                // too, and reading that as "the reader left" put an
+                                // error on the one screen the fallback exists for.
+                                currentCoroutineContext().ensureActive()
+                                log.warn(
+                                    "cache[{}] refresh failed for {}; falling back on the stale entry",
+                                    namespace, key, e,
+                                )
+                                entry.value
+                            }
+                    }
+                }
             }
             // past the hard-staleness cap -> fall through to a blocking reload
         }
@@ -168,26 +195,82 @@ class DefaultCache<V>(
      * Single-flight load: the first caller (leader) runs [loader] in its own
      * coroutine, stores the result, and completes the shared deferred; concurrent
      * callers (followers) await it -- one upstream call per key.
+     *
+     * A cancelled LEADER is not a failed load. It says the caller walked away,
+     * which is a fact about that caller and about nothing else, so the flight is
+     * released and whichever waiter is still there picks it up. Handing the
+     * cancellation on instead made one reader leaving a screen read, to every
+     * other reader of the same key, as the source having refused them.
      */
     private suspend fun load(key: String, loader: suspend () -> V): V {
-        val (deferred, isLeader) = mutex.withLock {
-            val existing = inFlight[key]
-            if (existing != null) existing to false
-            else CompletableDeferred<V>().also { inFlight[key] = it } to true
-        }
-        if (!isLeader) return deferred.await()
-        try {
-            val value = loader()
-            store(key, value)
-            deferred.complete(value)
-            return value
-        } catch (t: Throwable) {
-            deferred.completeExceptionally(t)
-            throw t
-        } finally {
-            mutex.withLock { inFlight.remove(key) }
+        while (true) {
+            val (deferred, isLeader) = mutex.withLock {
+                val existing = inFlight[key]
+                if (existing != null) existing to false
+                else CompletableDeferred<V>().also { inFlight[key] = it } to true
+            }
+            if (!isLeader) {
+                try {
+                    return deferred.await()
+                } catch (e: LeaderGone) {
+                    // Waking on somebody else's departure is no reason to carry on
+                    // if this caller has left too. A resume that carries an
+                    // exception skips the cancellation check that would otherwise
+                    // have stopped us here, and the mutex above takes its fast path
+                    // without one either -- so a dead waiter would take the flight
+                    // over and run the loader on behalf of nobody.
+                    currentCoroutineContext().ensureActive()
+                    // The flight is already released, so this pass either takes it
+                    // over or joins whoever took it first.
+                    continue
+                }
+            }
+            try {
+                val value = loader()
+                store(key, value)
+                deferred.complete(value)
+                // Released LAST on the way out with a value, and a caller arriving
+                // in the meantime joins a deferred that is already complete.
+                // Releasing first let that caller become a SECOND leader for the
+                // same key: two upstream calls, and -- since store() stamps the
+                // clock when it writes rather than when the value was fetched --
+                // the slower of the two could land its older answer on top of the
+                // newer one and have it read as the fresher entry for a whole TTL.
+                release(key, deferred)
+                return value
+            } catch (t: Throwable) {
+                // Released BEFORE the deferred is settled, so a waiter waking on
+                // [LeaderGone] finds the slot empty instead of re-awaiting the
+                // corpse it just woke from.
+                release(key, deferred)
+                // Whether the CALLER is gone, not whether the throwable happens to
+                // be a CancellationException. A loader with a withTimeout of its
+                // own throws one of those when the fetch times out, and reading
+                // that as "the reader left" would hand every waiter a re-election
+                // instead of the error -- each of them then paying the same
+                // timeout again, in turn, and none of them ever learning why.
+                if (!currentCoroutineContext().isActive) deferred.cancel(LeaderGone())
+                else deferred.completeExceptionally(t)
+                throw t
+            }
         }
     }
+
+    /**
+     * Takes this key's flight down, if it is still ours.
+     *
+     * Uncancellable, because it has to survive the cancellation it is cleaning up
+     * after: the previous version released under the caller's own job, so a
+     * cancelled leader left its entry behind and every later reader of that key
+     * awaited a deferred nobody would ever complete. Keyed on the deferred as
+     * well, so a leader finishing late cannot remove a successor's flight.
+     */
+    private suspend fun release(key: String, deferred: CompletableDeferred<V>) {
+        withContext(NonCancellable) { mutex.withLock { inFlight.remove(key, deferred) } }
+    }
+
+    /** The leader left. Distinct from a cancellation of the waiter's own making. */
+    private class LeaderGone : CancellationException("the caller loading this key went away")
 
     /**
      * Write-through to memory now + debounced to disk; [CacheConfig.shouldStore]
