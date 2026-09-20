@@ -1,6 +1,7 @@
 package hivens.ui.editor.palette
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,6 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,7 +33,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -68,6 +74,7 @@ fun PaletteItem(
     controller: DragController,
     registry: DropTargetRegistry,
     editController: EditModeController,
+    previews: WidgetPreviewHost,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
@@ -88,8 +95,8 @@ fun PaletteItem(
     val background = if (isHovered) NxTheme.colors.primary.copy(alpha = 0.12f)
                      else Color.Transparent
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    val preview = rememberWidgetPreview(previews, descriptor.kind)
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interaction)
@@ -100,7 +107,12 @@ fun PaletteItem(
                 controller            = controller,
                 payload               = DragPayload.PaletteWidget(descriptor.kind),
                 widgetBoundsProvider  = { rowBounds },
-                ghost                 = { PaletteGhost(displayName = label, sizing = descriptor.sizing) },
+                // The picture the tile is showing, carried out under the pointer.
+                // A ghost that is the widget answers "what am I placing" in the
+                // same breath as "how much room does it take".
+                ghost                 = {
+                    PaletteGhost(displayName = label, sizing = descriptor.sizing, preview = preview)
+                },
                 onDragEnd             = { pointer ->
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
                     val target = graph.traverse(targetPath)
@@ -150,51 +162,105 @@ fun PaletteItem(
                     }
                 },
             )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(6.dp),
     ) {
-        // Tiny icon block -- first letter of displayName as a kind of
-        // visual anchor. When Phase 5 widget-supplied previews land,
-        // this slot becomes the real widget thumbnail.
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(NxTheme.colors.primary.copy(alpha = 0.20f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text       = label.firstOrNull()?.uppercase() ?: "?",
-                style      = MaterialTheme.typography.titleMedium,
-                color      = NxTheme.colors.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text       = label,
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = NxTheme.colors.textPrimary,
-                fontWeight = FontWeight.Medium,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-            Text(
-                text       = descriptor.kind.value,
-                style      = MaterialTheme.typography.labelSmall,
-                color      = NxTheme.colors.textSecondary,
-                fontFamily = LocalMonoFamily.current,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-        }
-        Symbol(icon = NxIcon.DragIndicator,
-            contentDescription = null,
-            tint               = NxTheme.colors.textSecondary.copy(alpha = if (isHovered) 0.9f else 0.45f),
-            modifier           = Modifier.size(18.dp),
+        WidgetThumbnail(preview = preview, label = label, sizing = descriptor.sizing)
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text       = label,
+            style      = MaterialTheme.typography.labelMedium,
+            color      = NxTheme.colors.textPrimary,
+            fontWeight = FontWeight.Medium,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
+        )
+        Text(
+            // The footprint where the widget named one, its kind where it did not.
+            // Both are the same question asked of the tile: what is this, and how
+            // much of my surface is it about to take.
+            text       = descriptor.sizing.footprintLabel() ?: descriptor.kind.value,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = NxTheme.colors.textSecondary,
+            fontFamily = LocalMonoFamily.current,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
         )
     }
 }
+
+/** "200x230" for a widget that declared a preferred size, null for one that did not. */
+private fun WidgetSizing.footprintLabel(): String? =
+    if (prefWidth > 0 && prefHeight > 0) "${prefWidth}x$prefHeight" else null
+
+/**
+ * The picture on a tile.
+ *
+ * The widget itself once it has been drawn, letterboxed into the tile at its own
+ * proportions so a column reads as a column and a token as a token. Its letter
+ * until then, and for good if it declined to compose: a widget is free to need a
+ * context the palette cannot hand it, and a blank tile would say less than the
+ * letter the palette has always shown.
+ */
+@Composable
+private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: WidgetSizing) {
+    // The widget's own proportions, within what a tile can hold. A fixed box put a
+    // 340 by 48 control in the middle of two thirds of nothing, and a clock at 200
+    // by 230 into a letterbox. Held between the two so one very long widget cannot
+    // squash its whole row, and one very tall one cannot own the panel.
+    val ratio = when (preview) {
+        is WidgetPreview.Drawn -> (preview.inkSize.width.toFloat() / preview.inkSize.height)
+            .coerceIn(MIN_THUMB_RATIO, MAX_THUMB_RATIO)
+        else -> DEFAULT_THUMB_RATIO
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(ratio)
+            .clip(RoundedCornerShape(8.dp))
+            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.45f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (preview) {
+            is WidgetPreview.Drawn -> Image(
+                painter            = remember(preview) {
+                    // The widget's own rectangle out of the scene's frame. Fit
+                    // inside it, not crop: the whole widget or nothing, because a
+                    // cropped preview of a wide widget is a picture of its middle.
+                    BitmapPainter(preview.image, preview.inkOffset, preview.inkSize)
+                },
+                contentDescription = label,
+                contentScale       = ContentScale.Fit,
+                modifier           = Modifier.fillMaxSize().padding(4.dp),
+            )
+            else -> Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(NxTheme.colors.primary.copy(alpha = 0.20f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text       = label.firstOrNull()?.uppercase() ?: "?",
+                    style      = MaterialTheme.typography.titleMedium,
+                    color      = NxTheme.colors.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * How far a tile may depart from its widget's own shape.
+ *
+ * The floor keeps a tall widget from taking a whole panel of height for itself,
+ * the ceiling keeps a long thin one from flattening the row it shares. The
+ * default is for a tile with nothing in it yet, and is a shape that suits a
+ * letter.
+ */
+private const val MIN_THUMB_RATIO = 0.85f
+private const val MAX_THUMB_RATIO = 2.6f
+private const val DEFAULT_THUMB_RATIO = 1.45f
 
 /**
  * What follows the pointer out of the palette.
@@ -210,7 +276,7 @@ fun PaletteItem(
  * than none.
  */
 @Composable
-private fun PaletteGhost(displayName: String, sizing: WidgetSizing) {
+private fun PaletteGhost(displayName: String, sizing: WidgetSizing, preview: WidgetPreview) {
     val w = sizing.prefWidth
     val h = sizing.prefHeight
     if (w <= 0 || h <= 0) {
@@ -225,7 +291,22 @@ private fun PaletteGhost(displayName: String, sizing: WidgetSizing) {
             .border(2.dp, NxTheme.colors.primary.copy(alpha = 0.8f), RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        PaletteGhostChip(displayName)
+        // The widget itself where the gallery has it, at the size it will land at,
+        // so what is under the pointer is what the slot is about to hold. Faded,
+        // because it is not there yet.
+        if (preview is WidgetPreview.Drawn) {
+            Image(
+                painter            = remember(preview) {
+                    BitmapPainter(preview.image, preview.inkOffset, preview.inkSize)
+                },
+                contentDescription = null,
+                contentScale       = ContentScale.Fit,
+                alpha              = 0.85f,
+                modifier           = Modifier.fillMaxSize().padding(2.dp),
+            )
+        } else {
+            PaletteGhostChip(displayName)
+        }
     }
 }
 

@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.IconButton
@@ -57,6 +59,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.editor.rememberDockOffset
+import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.NxTheme
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
@@ -80,7 +83,9 @@ fun WidgetPalettePanel(
     val registry0 = LocalWidgetRegistry.current
     // Draggable dock: the header drags this offset (session-scoped).
     val paletteOffset = rememberDockOffset()
-    val paletteSize   = rememberDockSize(default = 280.dp)
+    // Wider than the list it replaces: tiles want two columns, and 280 gave them
+    // one. Only the default, so a panel somebody has already resized keeps its own.
+    val paletteSize   = rememberDockSize(default = 320.dp)
     // Only removable descriptors enter the palette. Non-removable
     // widgets (the auth panel, the three shell regions) are
     // surface-essential: shipping a default layout pins exactly one
@@ -234,17 +239,32 @@ fun WidgetPalettePanel(
                         )
                     }
                 } else {
-                    LazyColumn(
-                        modifier            = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    // Tiles under their own namespace, rather than one alphabetical
+                    // column of sixty. The heading is the kind's first segment and
+                    // nothing else: a table of pretty names for each prefix would be
+                    // a second place the namespaces are written down, and the one
+                    // that goes stale when a widget is added under a new one.
+                    val groups = remember(filtered) { filtered.groupBy { it.kind.value.substringBefore('.') } }
+                    val previews = rememberWidgetPreviewHost()
+                    LazyVerticalGrid(
+                        columns             = GridCells.Adaptive(TILE_MIN),
+                        modifier            = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement   = Arrangement.spacedBy(6.dp),
                     ) {
-                        items(items = filtered, key = { it.kind.value }) { descriptor ->
-                            PaletteItem(
-                                descriptor     = descriptor,
-                                controller     = controller,
-                                registry       = registry,
-                                editController = editController,
-                            )
+                        groups.forEach { (namespace, entries) ->
+                            item(span = { GridItemSpan(maxLineSpan) }, key = "head:$namespace") {
+                                PaletteGroupHeading(namespace, entries.size)
+                            }
+                            items(items = entries, key = { it.kind.value }) { descriptor ->
+                                PaletteItem(
+                                    descriptor     = descriptor,
+                                    controller     = controller,
+                                    registry       = registry,
+                                    editController = editController,
+                                    previews       = previews,
+                                )
+                            }
                         }
                     }
                 }
@@ -253,6 +273,44 @@ fun WidgetPalettePanel(
         }
     }
 }
+
+/**
+ * One namespace's heading.
+ *
+ * The raw first segment in the mono face the kind line already uses, because it
+ * IS the kind's first segment and dressing it up as a word would be a claim the
+ * grouping cannot back.
+ */
+@Composable
+private fun PaletteGroupHeading(namespace: String, count: Int) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 2.dp),
+    ) {
+        Text(
+            text       = namespace,
+            style      = MaterialTheme.typography.labelMedium,
+            color      = NxTheme.colors.textSecondary,
+            fontFamily = LocalMonoFamily.current,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text  = "$count",
+            style = MaterialTheme.typography.labelSmall,
+            color = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
+        )
+    }
+}
+
+/**
+ * How narrow a tile may get before the grid drops a column.
+ *
+ * Sized so the panel at its shipped width holds two, and a widened one holds
+ * three. At 128 it held one, because the panel's own gutters take it under two
+ * columns of that by four points, and one column of tiles is a list with pictures
+ * in it rather than a gallery.
+ */
+internal val TILE_MIN = 104.dp
 
 // Compact glass search field. Filters the palette by displayName / kind so the
 // now-large widget set stays navigable.
