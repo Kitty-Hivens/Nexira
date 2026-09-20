@@ -152,6 +152,23 @@ val LocalSlotMotionMs: ProvidableCompositionLocal<Int> =
 val LocalPlacementSlotSizeDp: ProvidableCompositionLocal<Size> =
     compositionLocalOf { Size.Zero }
 
+/**
+ * The room this widget was given on purpose, in dp, with zero on an axis nobody
+ * named.
+ *
+ * Published by the placement branch from the widget's own stored size, so it says
+ * "somebody chose this" and not "this is what happened to be free". A flow slot
+ * names nothing and leaves both axes zero.
+ *
+ * The difference matters to a widget that adapts to its footprint. Bounded is not
+ * the same as chosen: a Column inside a slot that fills its surface hands each
+ * child the whole remaining height, so a widget reading "both axes are bounded"
+ * as "I have been given a footprint" scaled itself to the rest of the screen. The
+ * clock did exactly that and drew a 140dp dial across 2974 points of it.
+ */
+val LocalWidgetFootprintDp: ProvidableCompositionLocal<Size> =
+    compositionLocalOf { Size.Zero }
+
 // Lattice cell geometry published by SlotRenderer's placement branch (dp): the
 // editor's move / resize gestures read it to turn a pointer delta into a whole
 // number of cells. Null in a free placement slot, where the unit is already the

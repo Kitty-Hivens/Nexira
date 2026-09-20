@@ -455,7 +455,14 @@ private fun BoxScope.PlacedBox(
             .offset(heldX.dp, heldY.dp)
             .onSizeChanged { ownDp = with(density) { Size(it.width.toDp().value, it.height.toDp().value) } }
             .then(sizeMod),
-    ) { content() }
+    ) {
+        // What was chosen, not what happened to be free. A widget that adapts to
+        // its footprint reads this rather than its constraints, which in a slot
+        // that fills its surface are the rest of the screen.
+        CompositionLocalProvider(LocalWidgetFootprintDp provides Size(width, height)) {
+            content()
+        }
+    }
 }
 
 private fun alignmentFor(anchor: String): Alignment = when (anchor) {
