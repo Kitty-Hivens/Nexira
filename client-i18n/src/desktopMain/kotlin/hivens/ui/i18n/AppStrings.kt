@@ -1546,6 +1546,8 @@ interface AppStrings {
     val editorPreviewHidden: String
     val editorPaletteToggleHide: String
     val editorRegionProps: String
+    /** Spoken name of a surface tab whose rail is rolled up. [name] is the tab's own name. */
+    fun editorSurfaceFolded(name: String): String
     val editorUndo: String
     val editorRedo: String
     val editorEscHint: String

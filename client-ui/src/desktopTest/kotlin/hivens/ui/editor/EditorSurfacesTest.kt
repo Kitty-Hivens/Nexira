@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -86,41 +87,55 @@ class EditorSurfacesTest {
         props = JsonObject(mapOf("collapsed" to JsonPrimitive(true))),
     )
 
+    private val wide = 1600f
+
     @Test
-    fun `a collapsed rail is not offered, and comes back when it does`() {
-        val folded = collapsed("right")
+    fun `a collapsed rail is reported folded, and unfolded when it comes back`() {
         assertTrue(
-            SurfaceId("appshell.rightrail") !in EditorSurfaces.availableFor(Screen.Home, folded),
+            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), collapsed("right"), wide),
             "a rail with no width is not a place to arrange anything: the drop targets are a hairline",
         )
-        assertTrue(
-            SurfaceId("appshell.rightrail") in EditorSurfaces.availableFor(Screen.Home, bundled),
-            "and the tab is back the moment the rail is, rather than hidden for good",
+        assertFalse(
+            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), bundled, wide),
+            "and it is unfolded the moment the rail is",
         )
     }
 
     @Test
     fun `the left rail answers the same question`() {
-        assertTrue(SurfaceId("appshell.leftrail") !in EditorSurfaces.availableFor(Screen.Home, collapsed("left")))
+        assertTrue(EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), collapsed("left"), wide))
+        assertFalse(EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), bundled, wide))
     }
 
     @Test
     fun `the right rail folds itself away on a narrow window`() {
-        val narrow = EditorSurfaces.availableFor(Screen.Home, bundled, windowWidthDp = 900f)
         assertTrue(
-            SurfaceId("appshell.rightrail") !in narrow,
+            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), bundled, windowWidthDp = 900f),
             "below its own fold-away width the rail is gone whatever the prop says",
         )
-        assertTrue(SurfaceId("appshell.leftrail") in narrow, "the left rail does not fold on width")
+        assertFalse(
+            EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), bundled, windowWidthDp = 900f),
+            "the left rail does not fold on width",
+        )
     }
 
     @Test
-    fun `collapsing a rail leaves every other tab alone`() {
-        val folded = EditorSurfaces.availableFor(Screen.Home, collapsed("right"))
+    fun `nothing but a rail folds`() {
+        listOf("home.new", "appshell.topbar", "appshell.root", "appshell.body", "appshell.overlay").forEach {
+            assertFalse(EditorSurfaces.foldedAway(SurfaceId(it), collapsed("left"), 400f), it)
+        }
+    }
+
+    @Test
+    fun `folding a rail leaves the tab set alone`() {
+        // The tabs are what the screen mounts, and folding a rail is not leaving
+        // the screen. The editor keys its whole state on this list, so a fold that
+        // changed it dropped the reader out of edit mode mid-edit.
         assertEquals(
-            EditorSurfaces.availableFor(Screen.Home, bundled).filterNot { it.value == "appshell.rightrail" },
-            folded,
+            EditorSurfaces.availableFor(Screen.Home, bundled),
+            EditorSurfaces.availableFor(Screen.Home, collapsed("right")),
         )
+        assertTrue(SurfaceId("appshell.leftrail") in EditorSurfaces.availableFor(Screen.Home, collapsed("left")))
     }
 
     // ── A region's own settings, from the region's own tab ───────────

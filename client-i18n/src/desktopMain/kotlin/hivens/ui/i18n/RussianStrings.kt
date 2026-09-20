@@ -1473,6 +1473,7 @@ object RussianStrings : AppStrings {
     override val editorPreviewHidden     = "Скрыто"
     override val editorPaletteToggleHide = "Скрыть"
     override val editorRegionProps       = "Сама область"
+    override fun editorSurfaceFolded(name: String) = "$name, свёрнута"
     override val editorUndo              = "Отменить"
     override val editorRedo              = "Вернуть"
     override val editorEscHint           = "Esc — выйти"

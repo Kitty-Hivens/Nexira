@@ -1458,6 +1458,7 @@ object EnglishStrings : AppStrings {
     override val editorPreviewHidden     = "Hidden"
     override val editorPaletteToggleHide = "Hide"
     override val editorRegionProps       = "This region"
+    override fun editorSurfaceFolded(name: String) = "$name, rolled up"
     override val editorUndo              = "Undo"
     override val editorRedo              = "Redo"
     override val editorEscHint           = "Esc to exit"

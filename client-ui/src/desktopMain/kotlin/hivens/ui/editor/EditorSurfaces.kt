@@ -206,33 +206,32 @@ internal object EditorSurfaces {
      * is missing, so in practice this only filters a surface that genuinely is
      * not part of this build's layout.
      */
-    fun availableFor(screen: Screen, graph: LayoutGraph, windowWidthDp: Float = Float.MAX_VALUE): List<SurfaceId> {
+    fun availableFor(screen: Screen, graph: LayoutGraph): List<SurfaceId> {
         val known = graph.surfaces.keys
         val main = centre.firstOrNull { it.mountedOn?.invoke(screen) == true }
-        return (listOfNotNull(main) + shell)
-            .map { it.id }
-            .filter { it in known && it.onScreenNow(graph, windowWidthDp) }
+        return (listOfNotNull(main) + shell).map { it.id }.filter { it in known }
     }
 
     /**
-     * Whether this surface is somewhere a person can currently see.
+     * Whether this surface is folded away rather than on screen.
      *
-     * A rail that is collapsed is not a place to arrange anything: selecting its
-     * tab opened an editor over a region with no width, so the drop targets were
-     * a hairline and the widgets inside were not on screen to be dragged. The tab
-     * came back the moment the rail did, which is the whole point of asking
-     * rather than of hiding it for good.
+     * A collapsed rail is not a place to arrange anything: its drop targets are a
+     * hairline and the widgets said to be in there are not on screen to be
+     * dragged. It is still the only place its own width, plane and the collapse
+     * itself can be reached from, so the answer marks the tab rather than
+     * removing it. A tab that disappears when a rail folds takes the way back
+     * with it.
      *
      * Read from the graph, because the collapse is a prop on the region widget
      * and the graph is the thing this function already has. The right rail also
-     * collapses itself below a window width it cannot lay out in, which is why
+     * folds itself away below a window width it cannot lay out in, which is why
      * the width is asked for rather than assumed.
      */
-    private fun SurfaceId.onScreenNow(graph: LayoutGraph, windowWidthDp: Float): Boolean = when (value) {
+    fun foldedAway(surface: SurfaceId, graph: LayoutGraph, windowWidthDp: Float): Boolean = when (surface.value) {
         "appshell.rightrail" ->
-            windowWidthDp >= RIGHT_RAIL_AUTO_COLLAPSE_DP && !graph.regionCollapsed("appshell.region.right")
-        "appshell.leftrail" -> !graph.regionCollapsed("appshell.region.left")
-        else -> true
+            windowWidthDp < RIGHT_RAIL_AUTO_COLLAPSE_DP || graph.regionCollapsed("appshell.region.right")
+        "appshell.leftrail" -> graph.regionCollapsed("appshell.region.left")
+        else -> false
     }
 
     /**

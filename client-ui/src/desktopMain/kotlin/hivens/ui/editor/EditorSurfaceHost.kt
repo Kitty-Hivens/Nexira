@@ -153,11 +153,20 @@ fun EditorSurfaceHost(
     content: @Composable () -> Unit,
 ) {
     val graphForSurfaces = LocalLayoutGraph.current
-    // The width decides whether the right rail is on screen at all, so the tab
-    // set has to be recomputed when the window crosses its fold-away point.
     val windowWidthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp().value }
-    val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces, windowWidthDp) {
-        EditorSurfaces.availableFor(currentScreen, graphForSurfaces, windowWidthDp)
+    val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces) {
+        EditorSurfaces.availableFor(currentScreen, graphForSurfaces)
+    }
+    // Which of those tabs point at something folded away. Separate from the tab
+    // set on purpose: the editor's whole state is keyed on the screen, and folding
+    // a rail is not leaving the screen. While the fold was part of the tab set, a
+    // rail collapsed from its own panel re-keyed every remember in this function
+    // and dropped the reader out of edit mode mid-edit -- as did a window resize
+    // across the right rail's fold-away width.
+    val foldedSurfaces: Set<SurfaceId> = remember(availableSurfaces, graphForSurfaces, windowWidthDp) {
+        availableSurfaces.filterTo(mutableSetOf()) {
+            EditorSurfaces.foldedAway(it, graphForSurfaces, windowWidthDp)
+        }
     }
     // The region this surface is the inside of, so its own settings are reachable
     // from its own tab rather than from the frame that happens to hold it.
@@ -168,15 +177,18 @@ fun EditorSurfaceHost(
     val coroutineScope = rememberCoroutineScope()
     val s = LocalStrings.current
 
-    var editing       by remember(availableSurfaces) { mutableStateOf(false) }
-    var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
-    var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
+    // Keyed on the screen: navigating away is what drops an edit session, which is
+    // what these used to say by keying on a tab set that only changed when the
+    // screen did.
+    var editing       by remember(currentScreen) { mutableStateOf(false) }
+    var paletteOpen   by remember(currentScreen) { mutableStateOf(true) }
+    var previewing    by remember(currentScreen) { mutableStateOf(false) }
     // Where a right-click landed while NOT editing, which is the only thing that
     // opens the way in. Null closes the menu.
     var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
-    var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
-    var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
-    var selectedSurface by remember(availableSurfaces) {
+    var presetPanelOpen by remember(currentScreen) { mutableStateOf(false) }
+    var resetSurfaceConfirm by remember(currentScreen) { mutableStateOf(false) }
+    var selectedSurface by remember(currentScreen) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
     // Which of the selected surface's families is being arranged. Null follows the
@@ -188,22 +200,28 @@ fun EditorSurfaceHost(
     val availableFamilies: List<FamilyId> = remember(selectedSurface, graphForSurfaces) {
         selectedSurface?.let { graphForSurfaces.surfaces[it]?.families?.keys?.toList() }.orEmpty()
     }
+    // A surface can leave the graph under a running editor: a preset load or a
+    // reset rebuilds it. Re-point rather than hold an id nothing answers to, which
+    // renders as an editor over nothing with no way to say so.
+    LaunchedEffect(availableSurfaces) {
+        if (selectedSurface !in availableSurfaces) selectedSurface = availableSurfaces.firstOrNull()
+    }
 
     // Prop editor target. Cleared on surface change (keyed remember), on
     // dismiss, and on leaving edit mode; while set, the palette hides so
     // the two right-edge panels do not overlap.
-    var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
+    var propTarget by remember(currentScreen) { mutableStateOf<PropTarget?>(null) }
     // Surface-level settings panel (currently the left rail's nav-selection
     // settings). Mutually exclusive with the per-widget prop panel + palette.
-    var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    var surfaceSettingsOpen by remember(currentScreen) { mutableStateOf(false) }
     // Selected slot (Tier 2 slot layout chrome): the highlighted slot, its window
     // rect (for the handle anchor), the cursor anchor for a right-click menu, and
     // whether the handle's menu is open. selectedSlotState stays a State so the slot
     // chrome modifier can read it without the host capturing a stale value.
-    val selectedSlotState = remember(availableSurfaces) { mutableStateOf<SlotPath?>(null) }
-    var selectedSlotRect  by remember(availableSurfaces) { mutableStateOf<Rect?>(null) }
-    var slotMenuCursor    by remember(availableSurfaces) { mutableStateOf<Offset?>(null) }
-    var handleMenuOpen    by remember(availableSurfaces) { mutableStateOf(false) }
+    val selectedSlotState = remember(currentScreen) { mutableStateOf<SlotPath?>(null) }
+    var selectedSlotRect  by remember(currentScreen) { mutableStateOf<Rect?>(null) }
+    var slotMenuCursor    by remember(currentScreen) { mutableStateOf<Offset?>(null) }
+    var handleMenuOpen    by remember(currentScreen) { mutableStateOf(false) }
     fun clearSlotSelection() {
         selectedSlotState.value = null
         selectedSlotRect = null
@@ -274,7 +292,7 @@ fun EditorSurfaceHost(
     // Window-level Escape (AppShell onPreviewKeyEvent, gated on the flag above)
     // bumps the signal; the same staged back-out runs here. `seen` initialises to
     // the current tick for the same reason the toggle observer does.
-    LaunchedEffect(availableSurfaces) {
+    LaunchedEffect(currentScreen) {
         var seen = controller.editorEscapeSignal.value
         snapshotFlow { controller.editorEscapeSignal.value }.collect { tick ->
             if (tick != seen) {
@@ -284,7 +302,7 @@ fun EditorSurfaceHost(
         }
     }
 
-    LaunchedEffect(availableSurfaces) {
+    LaunchedEffect(currentScreen) {
         var seen = controller.editToggleSignal.value
         snapshotFlow { controller.editToggleSignal.value }.collect { tick ->
             if (tick != seen) {
@@ -732,7 +750,21 @@ fun EditorSurfaceHost(
                     active                = editing,
                     surfaces              = availableSurfaces,
                     selectedSurface       = selectedSurface,
-                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false; clearSlotSelection() },
+                    folded                = foldedSurfaces,
+                    onSurfacePicked       = { picked ->
+                        selectedSurface = picked
+                        surfaceSettingsOpen = false
+                        clearSlotSelection()
+                        // Nothing can be arranged inside a folded rail, and the one
+                        // control that changes that is on its region. Opening it is
+                        // the answer to the press rather than a tab that shows a
+                        // hairline and explains nothing.
+                        propTarget = if (picked in foldedSurfaces) {
+                            ownerRegion(picked)?.let { (regionPath, id) -> PropTarget(regionPath, id) }
+                        } else {
+                            null
+                        }
+                    },
                     families              = availableFamilies,
                     selectedFamily        = selectedFamily,
                     onFamilyPicked        = { selectedFamily = it; clearSlotSelection() },
@@ -787,6 +819,8 @@ private fun EditModePill(
     active: Boolean,
     surfaces: List<SurfaceId>,
     selectedSurface: SurfaceId?,
+    /** Of [surfaces], the ones whose region is folded away right now. */
+    folded: Set<SurfaceId>,
     onSurfacePicked: (SurfaceId) -> Unit,
     families: List<FamilyId>,
     selectedFamily: FamilyId?,
@@ -846,6 +880,7 @@ private fun EditModePill(
                         SurfaceChip(
                             surface  = sid,
                             active   = sid == selectedSurface,
+                            folded   = sid in folded,
                             compact  = compact,
                             onClick  = { onSurfacePicked(sid) },
                         )
@@ -993,13 +1028,30 @@ private fun EditModePill(
     }
 }
 
+/**
+ * One surface's tab.
+ *
+ * [folded] says the surface is a rail that is currently rolled up. It stays in the
+ * row and stays pressable, because its region settings are the only place the fold
+ * can be undone from and they hang off this tab. It says so with the crossed-out
+ * eye and a dimmed label, so a tab that leads to settings rather than to a canvas
+ * looks different from one that does not.
+ */
 @Composable
-private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun SurfaceChip(
+    surface: SurfaceId,
+    active: Boolean,
+    folded: Boolean,
+    compact: Boolean,
+    onClick: () -> Unit,
+) {
     val s = LocalStrings.current
     val bg = if (active) NxTheme.colors.primary.copy(alpha = 0.18f)
              else Color.Transparent
-    val fg = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
+    val base = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
+    val fg = if (folded) base.copy(alpha = 0.45f) else base
     val name = humanSurfaceShortName(surface, s)
+    val label = if (folded) s.editorSurfaceFolded(name) else name
     Surface(
         color    = bg,
         shape    = RoundedCornerShape(12.dp),
@@ -1011,9 +1063,9 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, o
                 .clickable { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
-            Symbol(icon = surfaceIcon(surface),
+            Symbol(icon = if (folded) NxIcon.VisibilityOff else surfaceIcon(surface),
                 // Compact hides the label, so the icon carries the name for a11y.
-                contentDescription = if (compact) name else null,
+                contentDescription = if (compact) label else null,
                 tint               = fg,
                 modifier           = Modifier.size(14.dp),
             )
