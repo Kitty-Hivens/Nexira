@@ -266,6 +266,24 @@ fun LayoutGraph.setWidgetSize(path: SlotPath, instanceId: String, width: Float, 
         it.copy(width = width.coerceAtLeast(0f), height = height.coerceAtLeast(0f))
     }
 
+/**
+ * Offset and size in one write, for a resize that moves both.
+ *
+ * Dragging a leading edge changes where the widget starts as well as how big it
+ * is, and the two as separate writes are two entries in the editor's history and
+ * two chances for a frame to land out of order. One call is one change.
+ */
+fun LayoutGraph.setWidgetBounds(
+    path: SlotPath,
+    instanceId: String,
+    x: Float,
+    y: Float,
+    width: Float,
+    height: Float,
+): LayoutGraph = updatePlacement(path, instanceId) {
+    it.copy(x = x, y = y, width = width.coerceAtLeast(0f), height = height.coerceAtLeast(0f))
+}
+
 fun LayoutGraph.setWidgetZ(path: SlotPath, instanceId: String, z: Int): LayoutGraph =
     updatePlacement(path, instanceId) { it.copy(z = z) }
 

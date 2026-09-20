@@ -6,7 +6,9 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -97,6 +99,39 @@ class DropTargetRegistry {
         mutableStateMapOf()
     private val slotBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
 
+    /**
+     * Which widgets the one being moved is currently sitting on top of.
+     *
+     * Free placement has no collision rule and is not getting one: refusing a
+     * position mid-gesture would mean clearing a path before you could put
+     * anything anywhere, which on a full surface is half the screen moved by
+     * hand. What it gets instead is the answer to the question the editor could
+     * not answer at all, which is WHERE the overlap is. Published by whichever
+     * widget is being dragged or resized and read by everybody, so the ones being
+     * landed on say so while the gesture is still live and the drop is still the
+     * person's to make.
+     */
+    var overlapped: Set<String> by mutableStateOf(emptySet())
+        private set
+
+    fun publishOverlap(ids: Set<String>) {
+        if (overlapped != ids) overlapped = ids
+    }
+
+    /**
+     * Ids in [path] whose rect meets [rect], leaving out [movingId] itself.
+     *
+     * Touching edges do not count. A widget laid flush against its neighbour is
+     * the arrangement somebody wanted, and reporting it as a collision would
+     * leave the warning colour on half the surface.
+     */
+    fun overlapping(path: SlotPath, rect: Rect, movingId: String): Set<String> {
+        val byId = widgets[path] ?: return emptySet()
+        return byId.entries
+            .filter { (id, bounds) -> id != movingId && bounds.rect.overlapsStrictly(rect) }
+            .mapTo(mutableSetOf()) { it.key }
+    }
+
     fun registerSlot(path: SlotPath, rect: Rect) {
         slotBounds[path] = rect
     }
@@ -119,6 +154,9 @@ class DropTargetRegistry {
     // LocalSlotBoundsReporter). Lets a palette drop land at the release point.
     // Null when the slot has not reported bounds.
     fun slotOrigin(path: SlotPath): Offset? = slotBounds[path]?.topLeft
+
+    /** The whole reported rect of a slot, for a drop that has to land inside it. */
+    fun slotRect(path: SlotPath): Rect? = slotBounds[path]
 
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +
@@ -288,3 +326,12 @@ fun Modifier.widgetBounds(
 ): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
     registry.registerWidget(path, instanceId, index, coords.boundsInWindow())
 }
+
+/**
+ * Overlap with a shared edge left out.
+ *
+ * `Rect.overlaps` counts a touch as an intersection, which for two widgets laid
+ * flush is the arrangement rather than a fault.
+ */
+private fun Rect.overlapsStrictly(other: Rect): Boolean =
+    left < other.right && other.left < right && top < other.bottom && other.top < bottom

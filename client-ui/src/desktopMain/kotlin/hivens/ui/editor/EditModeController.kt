@@ -23,6 +23,7 @@ import hivens.widget.model.resizeWidgetInGrid
 import hivens.widget.model.setFlow
 import hivens.widget.model.setGrid
 import hivens.widget.model.setWidgetAnchor
+import hivens.widget.model.setWidgetBounds
 import hivens.widget.model.setWidgetOffset
 import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetZ
@@ -281,6 +282,21 @@ class EditModeController(
     fun setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float) {
         scope.launch(writeDispatcher) {
             edit("size:$instanceId", validate = false) { it.setWidgetSize(path, instanceId, width, height) }
+        }
+    }
+
+    /**
+     * Offset and size together, which is what dragging a leading edge changes.
+     *
+     * One key, so a resize is one step in the history. As two calls it was two
+     * keys alternating, and a run whose key changes every frame coalesces into
+     * nothing: every frame of the drag would have been its own undo.
+     */
+    fun setWidgetBounds(path: SlotPath, instanceId: String, x: Float, y: Float, width: Float, height: Float) {
+        scope.launch(writeDispatcher) {
+            edit("bounds:$instanceId", validate = false) {
+                it.setWidgetBounds(path, instanceId, x, y, width, height)
+            }
         }
     }
 

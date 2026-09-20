@@ -84,10 +84,104 @@ internal fun canvasResizeSize(
     accumXPx: Float,
     accumYPx: Float,
     density: Float,
-    minDp: Float = 48f,
+    minDp: Float = MIN_WIDGET_DP,
 ): Pair<Float, Float> =
     (startWDp + accumXPx / density).coerceAtLeast(minDp) to
         (startHDp + accumYPx / density).coerceAtLeast(minDp)
+
+/** The smallest a widget may be dragged to, so it cannot collapse out of reach. */
+internal const val MIN_WIDGET_DP = 48f
+
+/**
+ * Which edges of a widget a handle moves.
+ *
+ * [h] and [v] say which edge on each axis: -1 the leading one (left, top), +1 the
+ * trailing one (right, bottom), 0 neither. A corner moves one of each, a side one
+ * and nothing on the other axis.
+ */
+internal enum class ResizeEdge(val h: Int, val v: Int) {
+    North(0, -1),
+    South(0, 1),
+    West(-1, 0),
+    East(1, 0),
+    NorthWest(-1, -1),
+    NorthEast(1, -1),
+    SouthWest(-1, 1),
+    SouthEast(1, 1),
+}
+
+/** Where a resize drag leaves a widget: an offset in the slot's unit, and a size. */
+internal data class ResizedPlacement(val x: Float, val y: Float, val w: Float, val h: Float)
+
+/**
+ * Where [edge] dragged by an accumulated pointer delta leaves the widget.
+ *
+ * Dragging a leading edge moves the origin as well as the size, which the one
+ * corner handle never had to express. Doing that by adding the delta to the
+ * stored offset is wrong on six of the nine anchors: the offset is measured FROM
+ * the anchor, so on an end anchor it is an inset and the same pointer motion
+ * writes the opposite number, and on a centre anchor half of it.
+ *
+ * So the arithmetic goes through the edges in slot coordinates, where a drag is
+ * just "this edge moved and that one did not", and the offset is derived back out
+ * afterwards. [PlacedBox] positions by the same two rules, the alignment bias and
+ * the inward sign, so the inversion here is its inverse and not a second opinion.
+ *
+ * A clamp at the minimum holds the dragged edge and leaves the opposite one where
+ * it was, rather than letting the widget walk sideways once it has stopped
+ * shrinking.
+ */
+internal fun canvasResize(
+    edge: ResizeEdge,
+    startXDp: Float,
+    startYDp: Float,
+    startWDp: Float,
+    startHDp: Float,
+    accumXPx: Float,
+    accumYPx: Float,
+    density: Float,
+    slotWDp: Float,
+    slotHDp: Float,
+    hBias: Float,
+    vBias: Float,
+    minDp: Float = MIN_WIDGET_DP,
+): ResizedPlacement {
+    val (x, w) = resizeAxis(edge.h, startXDp, startWDp, accumXPx / density, slotWDp, hBias, minDp)
+    val (y, h) = resizeAxis(edge.v, startYDp, startHDp, accumYPx / density, slotHDp, vBias, minDp)
+    return ResizedPlacement(x, y, w, h)
+}
+
+/**
+ * One axis of [canvasResize]: the stored offset and extent in, the same two out.
+ *
+ * [side] is -1 for the leading edge, +1 for the trailing one, 0 for an axis this
+ * handle does not touch.
+ */
+private fun resizeAxis(
+    side: Int,
+    startDp: Float,
+    startExtentDp: Float,
+    deltaDp: Float,
+    slotDp: Float,
+    bias: Float,
+    minDp: Float,
+): Pair<Float, Float> {
+    if (side == 0) return startDp to startExtentDp
+    // An offset counts inward from its own edge, so a trailing anchor stores the
+    // negation of the slot-space position. Same rule PlacedBox draws by.
+    val sign = if (bias > 0.5f) -1f else 1f
+    val lead0 = bias * (slotDp - startExtentDp) + sign * startDp
+    val trail0 = lead0 + startExtentDp
+
+    val lead1 = if (side < 0) lead0 + deltaDp else lead0
+    val trail1 = if (side > 0) trail0 + deltaDp else trail0
+    val extent = (trail1 - lead1).coerceAtLeast(minDp)
+    // Re-derive the moving edge after the clamp: the still one is the one the
+    // gesture did not touch, and it must not drift because the other bottomed out.
+    val lead = if (side < 0) trail1 - extent else lead1
+
+    return sign * (lead - bias * (slotDp - extent)) to extent
+}
 
 // Target cell for a lattice MOVE drag: the widget's start cell shifted by the
 // accumulated pointer delta rounded to whole cells (stride = cell width + gutter).

@@ -63,10 +63,12 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
+import hivens.ui.editor.ResizeEdge
+import hivens.ui.editor.canvasResize
 import hivens.ui.editor.placementDragOffset
-import hivens.ui.editor.canvasResizeSize
 import hivens.ui.editor.gridDragCell
 import hivens.ui.editor.gridResizeSpan
 import hivens.ui.editor.dnd.DragController
@@ -165,7 +167,6 @@ fun EditableWidgetChrome(
     var latticeDrag by remember { mutableStateOf(Offset.Zero) }
     // Cursor anchor for the right-click context menu (null = closed).
     var menuAnchor by remember { mutableStateOf<Offset?>(null) }
-    val resizeCursor = remember { PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)) }
 
     // Drop-indicator hit test. Reading controller.active recomposes on
     // every pointer update; traverse + registry queries are O(depth +
@@ -223,6 +224,17 @@ fun EditableWidgetChrome(
     // applies the animated alpha (a snapshot read, so it redraws without recomposing).
     val borderColor = NxTheme.colors.primary
 
+    // Being landed on. Free placement lets widgets overlap and will keep letting
+    // them, so this is the warning and not a refusal: the border turns while the
+    // gesture is live, and where it goes is still the person's call.
+    val isOverlapped = instance.instanceId in registry.overlapped
+    val overlapColor = NxTheme.colors.error
+    val overlapAlpha by animateFloatAsState(
+        targetValue   = if (isOverlapped) 0.9f else 0f,
+        animationSpec = tween(chromeMotionMs),
+        label         = "edit-overlap-alpha",
+    )
+
     // Bordered widget + hover handles. Box-scoped so the AnimatedVisibility
     // buttons use plain BoxScope `.align` -- no this@Column / this@Row
     // qualifier, which lets the outer wrapper be either orientation.
@@ -254,6 +266,19 @@ fun EditableWidgetChrome(
                         cornerRadius = CornerRadius(radius, radius),
                         style        = Stroke(width = strokePx),
                     )
+                    // Over the resting outline rather than instead of it, and
+                    // thicker, so the pair being warned about reads at a glance
+                    // across a surface where every widget already has a border.
+                    if (overlapAlpha > 0f) {
+                        val warn = 2.dp.toPx()
+                        drawRoundRect(
+                            color        = overlapColor.copy(alpha = overlapAlpha),
+                            topLeft      = Offset(warn / 2f, warn / 2f),
+                            size         = Size(size.width - warn, size.height - warn),
+                            cornerRadius = CornerRadius(radius, radius),
+                            style        = Stroke(width = warn),
+                        )
+                    }
                 }
                 .onGloballyPositioned { coords: LayoutCoordinates ->
                     // Register the widget's own bounds for the drop hit-test.
@@ -368,8 +393,16 @@ fun EditableWidgetChrome(
                                         curX = nx
                                         curY = ny
                                         editController.setWidgetOffset(path, instance.instanceId, nx, ny)
+                                        // Who this is currently on top of, said while the
+                                        // gesture is live. The bounds are a frame behind the
+                                        // write, which for a warning colour is close enough
+                                        // and costs no extra measurement.
+                                        registry.publishOverlap(
+                                            wb?.let { registry.overlapping(path, it, instance.instanceId) }.orEmpty(),
+                                        )
                                         change.consume()
                                     }
+                                    registry.publishOverlap(emptySet())
                                 }
                                 else -> {
                                     // Flow reorder: drive the existing DnD controller
@@ -406,70 +439,116 @@ fun EditableWidgetChrome(
                     },
             )
 
-            // SE resize handle (hover-only). In a placement slot it sizes the widget,
+            // Resize handles (hover-only). In a placement slot they size the widget,
             // in dp or in whole cells depending on what the slot measures in; in an
-            // unwrapped flow SlotRenderer applies the size as an upper bound. It is
+            // unwrapped flow SlotRenderer applies the size as an upper bound. They are
             // absent from a uniform wrapped flow, which sizes its own cells and would
-            // take the number without ever reading it. Seizes the measured px as the
-            // baseline when the stored size is 0 (intrinsic) so the first drag does
-            // not jump from nothing.
-            AnimatedVisibility(
-                visible  = isHovered && resizable,
-                enter    = fadeIn(tween(chromeMotionMs)),
-                exit     = fadeOut(tween(chromeMotionMs)),
-                modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
-            ) {
-                Surface(
-                    color    = NxTheme.colors.primary.copy(alpha = 0.85f),
-                    shape    = RoundedCornerShape(5.dp),
-                    modifier = Modifier
-                        .size(16.dp)
-                        .pointerHoverIcon(resizeCursor)
-                        .pointerInput(instance.instanceId) {
-                            // Custom gesture (not detectDragGestures) so the press
-                            // is consumed -- otherwise the body drag overlay also
-                            // claims it and the widget jumps / size resets on the
-                            // next drag. Start size is read live each gesture.
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                down.consume()
-                                val p = livePlacement.value
-                                val wb = widgetWindowBounds
-                                val geo = gridGeo.value
-                                val startW = (p?.width ?: 0f).takeIf { it > 0f }
-                                    ?: ((wb?.width ?: 0f) / density)
-                                val startH = (p?.height ?: 0f).takeIf { it > 0f }
-                                    ?: ((wb?.height ?: 0f) / density)
-                                var accX = 0f
-                                var accY = 0f
-                                drag(down.id) { change ->
-                                    accX += change.positionChange().x
-                                    accY += change.positionChange().y
-                                    if (geo != null) {
-                                        // One gesture, two units: a lattice slot sizes in
-                                        // whole cells, so the same drag quantises instead
-                                        // of writing a dp extent.
-                                        val (cw, ch) = gridResizeSpan(
-                                            (p?.width ?: 1f).toInt().coerceAtLeast(1),
-                                            (p?.height ?: 1f).toInt().coerceAtLeast(1),
-                                            accX, accY, density,
-                                            geo.cellDp, geo.gutterDp, geo.columns,
-                                        )
-                                        editController.resizeWidgetInGrid(path, instance.instanceId, cw, ch, geo.columns)
-                                    } else {
-                                        val (nw, nh) = canvasResizeSize(startW, startH, accX, accY, density)
-                                        editController.setWidgetSize(path, instance.instanceId, nw, nh)
-                                    }
-                                    change.consume()
-                                }
-                            }
-                        },
+            // take the number without ever reading it. Each seizes the measured px as
+            // the baseline when the stored size is 0 (intrinsic) so the first drag
+            // does not jump from nothing.
+            //
+            // Eight of them, not one. The lone bottom-right corner could only grow a
+            // widget down and to the right, so pulling the left edge in meant moving
+            // the widget and then resizing it and then moving it back, and there was
+            // no way at all to grow it upward from where it sat.
+            //
+            // A lattice keeps the single corner. Its unit is a whole cell and its
+            // move and its resize are separate model operations that each refuse to
+            // disturb a neighbour, so a leading edge there is a different gesture
+            // rather than the same one mirrored. Free placement is what the shell
+            // ships and what this is for.
+            val edges = if (gridGeo.value != null) listOf(ResizeEdge.SouthEast) else ResizeEdge.entries
+            edges.forEach { edge ->
+                AnimatedVisibility(
+                    visible  = isHovered && resizable,
+                    enter    = fadeIn(tween(chromeMotionMs)),
+                    exit     = fadeOut(tween(chromeMotionMs)),
+                    modifier = Modifier.align(edge.alignment()).padding(2.dp),
                 ) {
-                    Symbol(icon = NxIcon.OpenInFull,
-                        contentDescription = null,
-                        tint               = NxTheme.colors.onPrimary,
-                        modifier           = Modifier.size(11.dp).padding(0.dp),
-                    )
+                    Surface(
+                        color    = NxTheme.colors.primary.copy(alpha = if (edge.isCorner()) 0.85f else 0.6f),
+                        shape    = RoundedCornerShape(4.dp),
+                        modifier = Modifier
+                            .size(edge.handleSize())
+                            .pointerHoverIcon(remember(edge) { PointerIcon(Cursor(edge.cursor())) })
+                            .pointerInput(instance.instanceId, edge) {
+                                // Custom gesture (not detectDragGestures) so the press
+                                // is consumed -- otherwise the body drag overlay also
+                                // claims it and the widget jumps / size resets on the
+                                // next drag. Start geometry is read live each gesture.
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    down.consume()
+                                    val p = livePlacement.value
+                                    val wb = widgetWindowBounds
+                                    val geo = gridGeo.value
+                                    val anchor = p?.anchor ?: Placement.TOP_START
+                                    val startW = (p?.width ?: 0f).takeIf { it > 0f }
+                                        ?: ((wb?.width ?: 0f) / density)
+                                    val startH = (p?.height ?: 0f).takeIf { it > 0f }
+                                        ?: ((wb?.height ?: 0f) / density)
+                                    val startX = p?.x ?: 0f
+                                    val startY = p?.y ?: 0f
+                                    var accX = 0f
+                                    var accY = 0f
+                                    drag(down.id) { change ->
+                                        accX += change.positionChange().x
+                                        accY += change.positionChange().y
+                                        if (geo != null) {
+                                            // One gesture, two units: a lattice slot sizes in
+                                            // whole cells, so the same drag quantises instead
+                                            // of writing a dp extent.
+                                            val (cw, ch) = gridResizeSpan(
+                                                (p?.width ?: 1f).toInt().coerceAtLeast(1),
+                                                (p?.height ?: 1f).toInt().coerceAtLeast(1),
+                                                accX, accY, density,
+                                                geo.cellDp, geo.gutterDp, geo.columns,
+                                            )
+                                            editController.resizeWidgetInGrid(path, instance.instanceId, cw, ch, geo.columns)
+                                        } else {
+                                            val slot = liveSlotSize.value
+                                            val r = canvasResize(
+                                                edge      = edge,
+                                                startXDp  = startX,
+                                                startYDp  = startY,
+                                                startWDp  = startW,
+                                                startHDp  = startH,
+                                                accumXPx  = accX,
+                                                accumYPx  = accY,
+                                                density   = density,
+                                                slotWDp   = slot.width,
+                                                slotHDp   = slot.height,
+                                                hBias     = anchorHorizontalBias(anchor),
+                                                vBias     = anchorVerticalBias(anchor),
+                                            )
+                                            // One write, so the offset and the size cannot
+                                            // land a frame apart and the history sees one step.
+                                            editController.setWidgetBounds(
+                                                path, instance.instanceId, r.x, r.y, r.w, r.h,
+                                            )
+                                            registry.publishOverlap(
+                                                widgetWindowBounds
+                                                    ?.let { registry.overlapping(path, it, instance.instanceId) }
+                                                    .orEmpty(),
+                                            )
+                                        }
+                                        change.consume()
+                                    }
+                                    registry.publishOverlap(emptySet())
+                                }
+                            },
+                    ) {
+                        // Only a corner carries the glyph. On a side strip six points
+                        // wide it would be a smudge, and the strip's own shape already
+                        // says which way it pulls.
+                        if (edge.isCorner()) {
+                            Symbol(icon = NxIcon.OpenInFull,
+                                contentDescription = null,
+                                tint               = NxTheme.colors.onPrimary,
+                                modifier           = Modifier.size(10.dp).padding(0.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -657,4 +736,43 @@ private fun DropIndicator(isRow: Boolean) {
                 .background(NxTheme.colors.primary),
         )
     }
+}
+
+// ── Resize handles ───────────────────────────────────────────────────
+
+/** Where on the widget's border a handle for this edge sits. */
+private fun ResizeEdge.alignment(): Alignment = when (this) {
+    ResizeEdge.North     -> Alignment.TopCenter
+    ResizeEdge.South     -> Alignment.BottomCenter
+    ResizeEdge.West      -> Alignment.CenterStart
+    ResizeEdge.East      -> Alignment.CenterEnd
+    ResizeEdge.NorthWest -> Alignment.TopStart
+    ResizeEdge.NorthEast -> Alignment.TopEnd
+    ResizeEdge.SouthWest -> Alignment.BottomStart
+    ResizeEdge.SouthEast -> Alignment.BottomEnd
+}
+
+/** True for a handle that moves both axes at once. */
+private fun ResizeEdge.isCorner(): Boolean = h != 0 && v != 0
+
+/**
+ * A corner is a square and a side is a strip lying along the edge it pulls, so
+ * the shape says which way it moves before the cursor does.
+ */
+private fun ResizeEdge.handleSize(): DpSize = when {
+    isCorner() -> DpSize(14.dp, 14.dp)
+    h != 0     -> DpSize(6.dp, 24.dp)
+    else       -> DpSize(24.dp, 6.dp)
+}
+
+/** The system cursor that names this edge while the pointer is over its handle. */
+private fun ResizeEdge.cursor(): Int = when (this) {
+    ResizeEdge.North     -> Cursor.N_RESIZE_CURSOR
+    ResizeEdge.South     -> Cursor.S_RESIZE_CURSOR
+    ResizeEdge.West      -> Cursor.W_RESIZE_CURSOR
+    ResizeEdge.East      -> Cursor.E_RESIZE_CURSOR
+    ResizeEdge.NorthWest -> Cursor.NW_RESIZE_CURSOR
+    ResizeEdge.NorthEast -> Cursor.NE_RESIZE_CURSOR
+    ResizeEdge.SouthWest -> Cursor.SW_RESIZE_CURSOR
+    ResizeEdge.SouthEast -> Cursor.SE_RESIZE_CURSOR
 }

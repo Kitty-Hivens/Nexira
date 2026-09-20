@@ -110,10 +110,21 @@ fun PaletteItem(
                         // the pointer names a dp, and turning that into a cell needs
                         // geometry this row does not have and the model already knows.
                         val seed = seedPlacement(target.widgets.size, target.grid, target.widgets)
-                        val origin = registry.slotOrigin(targetPath)
-                        val placement = if (target.grid == 0 && origin != null) {
-                            val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, origin.x, origin.y, density)
-                            seed.copy(x = xDp.coerceAtLeast(0f), y = yDp.coerceAtLeast(0f))
+                        val slotRect = registry.slotRect(targetPath)
+                        val placement = if (target.grid == 0 && slotRect != null) {
+                            val (xDp, yDp) = windowPointToSlotDp(
+                                pointer.x, pointer.y, slotRect.left, slotRect.top, density,
+                            )
+                            // Released near the far edge, a widget born at the raw
+                            // point starts there and hangs out of the slot, with only
+                            // the renderer's own grab margin keeping any of it
+                            // reachable. The floor at zero was the only bound there
+                            // was. A ceiling as well, so a drop anywhere inside the
+                            // slot puts the whole widget inside the slot.
+                            seed.copy(
+                                x = xDp.coerceIn(0f, ((slotRect.width / density) - DROP_INSET_DP).coerceAtLeast(0f)),
+                                y = yDp.coerceIn(0f, ((slotRect.height / density) - DROP_INSET_DP).coerceAtLeast(0f)),
+                            )
                         } else {
                             seed
                         }
@@ -219,3 +230,12 @@ private fun PaletteGhost(displayName: String) {
         }
     }
 }
+
+/**
+ * How far in from the far edge of a slot a palette drop can land.
+ *
+ * Not the widget's own size, which nothing knows before it is mounted, so this
+ * is the same floor a placed widget is held to: enough of it is inside that it
+ * can be seen and grabbed, and moving it the rest of the way is a drag.
+ */
+private const val DROP_INSET_DP = 48f

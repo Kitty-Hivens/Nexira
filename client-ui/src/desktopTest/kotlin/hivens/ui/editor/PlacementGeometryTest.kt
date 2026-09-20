@@ -113,4 +113,98 @@ class PlacementGeometryTest {
         val (cs, _) = gridResizeSpan(startColSpan = 1, startRowSpan = 1, accumXPx = 2200f, accumYPx = 0f, density = 2f, cellWidthDp = 100f, gutterDp = 10f, columns = 4)
         assertEquals(4, cs)
     }
+
+    // ── Resizing from any edge ───────────────────────────────────────
+
+    /**
+     * Dragging a leading edge moves the origin as well as the size, and which way
+     * the origin moves depends on the anchor the offset counts from. These pin all
+     * three readings, because getting the sign wrong walks the widget sideways
+     * under the pointer and looks like the handle is broken rather than the maths.
+     */
+    private fun resize(
+        edge: ResizeEdge,
+        x: Float = 100f,
+        y: Float = 100f,
+        w: Float = 200f,
+        h: Float = 200f,
+        dx: Float = 0f,
+        dy: Float = 0f,
+        hBias: Float = 0f,
+        vBias: Float = 0f,
+        slot: Float = 1000f,
+    ) = canvasResize(
+        edge, x, y, w, h, dx, dy, density = 1f,
+        slotWDp = slot, slotHDp = slot, hBias = hBias, vBias = vBias,
+    )
+
+    @Test
+    fun `a trailing edge grows the size and leaves the origin alone`() {
+        val r = resize(ResizeEdge.SouthEast, dx = 60f, dy = 40f)
+        assertEquals(100f, r.x, eps)
+        assertEquals(100f, r.y, eps)
+        assertEquals(260f, r.w, eps)
+        assertEquals(240f, r.h, eps)
+    }
+
+    @Test
+    fun `a leading edge moves the origin by the same amount it shrinks`() {
+        val r = resize(ResizeEdge.NorthWest, dx = 30f, dy = 50f)
+        assertEquals(130f, r.x, eps)
+        assertEquals(150f, r.y, eps)
+        assertEquals(170f, r.w, eps)
+        assertEquals(150f, r.h, eps)
+    }
+
+    @Test
+    fun `a side handle leaves the other axis untouched`() {
+        val r = resize(ResizeEdge.East, dx = 40f, dy = 999f)
+        assertEquals(240f, r.w, eps)
+        assertEquals(200f, r.h, eps, "a vertical delta on an east handle is not a resize")
+        assertEquals(100f, r.y, eps)
+    }
+
+    @Test
+    fun `against an end anchor the roles invert`() {
+        // The offset is an inset from the right, so the right edge is the pinned
+        // one: pulling the LEFT edge changes only the width.
+        val west = resize(ResizeEdge.West, dx = 30f, hBias = 1f)
+        assertEquals(100f, west.x, eps)
+        assertEquals(170f, west.w, eps)
+
+        // And pulling the right edge is what moves the stored number, downward,
+        // because the inset shrinks as the edge travels away from its own side.
+        val east = resize(ResizeEdge.East, dx = 30f, hBias = 1f)
+        assertEquals(70f, east.x, eps)
+        assertEquals(230f, east.w, eps)
+    }
+
+    @Test
+    fun `against a centre anchor the origin takes half the delta`() {
+        val r = resize(ResizeEdge.East, x = 0f, dx = 40f, hBias = 0.5f)
+        assertEquals(20f, r.x, eps, "growing one side moves the centre by half of it")
+        assertEquals(240f, r.w, eps)
+    }
+
+    @Test
+    fun `the minimum holds the dragged edge and does not drag the other one along`() {
+        // Pushing the left edge far past the right stops at the floor, and the
+        // right edge has to stay where it was rather than being carried with it.
+        val r = resize(ResizeEdge.West, dx = 400f)
+        assertEquals(MIN_WIDGET_DP, r.w, eps)
+        assertEquals(300f - MIN_WIDGET_DP, r.x, eps, "the untouched edge stays at 300")
+    }
+
+    @Test
+    fun `a corner resize round-trips back to where it started`() {
+        val out = resize(ResizeEdge.NorthWest, dx = 35f, dy = 35f)
+        val back = canvasResize(
+            ResizeEdge.NorthWest, out.x, out.y, out.w, out.h, -35f, -35f, density = 1f,
+            slotWDp = 1000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
+        )
+        assertEquals(100f, back.x, eps)
+        assertEquals(100f, back.y, eps)
+        assertEquals(200f, back.w, eps)
+        assertEquals(200f, back.h, eps)
+    }
 }
