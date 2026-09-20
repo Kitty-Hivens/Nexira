@@ -162,8 +162,11 @@ fun WidgetPalettePanel(
                             val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
                             drag(down.id) { change ->
-                                change.consume()
+                                // Delta first: positionChange() reports Offset.Zero once
+                                // the change is consumed, so claiming it before reading it
+                                // moves the panel by nothing.
                                 paletteOffset.drag(change.positionChange())
+                                change.consume()
                             }
                         }
                     }
