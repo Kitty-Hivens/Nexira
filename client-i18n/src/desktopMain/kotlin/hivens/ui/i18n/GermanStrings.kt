@@ -1459,6 +1459,8 @@ object GermanStrings : AppStrings {
     override val editorPreview           = "Vorschau"
     override val editorPreviewHidden     = "Ausgeblendet"
     override val editorPaletteToggleHide = "Ausblenden"
+    override val editorUndo              = "Rückgängig"
+    override val editorRedo              = "Wiederholen"
     override val editorEscHint           = "Esc zum Beenden"
     override val editorFabEdit           = "Layout bearbeiten"
     override val editorFabDone           = "Bearbeitung beenden"

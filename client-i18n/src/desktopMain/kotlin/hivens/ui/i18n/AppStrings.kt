@@ -1545,6 +1545,8 @@ interface AppStrings {
     val editorPreview: String
     val editorPreviewHidden: String
     val editorPaletteToggleHide: String
+    val editorUndo: String
+    val editorRedo: String
     val editorEscHint: String
     val editorFabEdit: String
     val editorFabDone: String

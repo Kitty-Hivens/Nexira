@@ -896,6 +896,8 @@ fun FrameWindowScope.AppShellContent(
                 ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()
                 ShellChord.ToggleDebugOverlay -> debugOverlay.toggle()
                 ShellChord.ExitEditor         -> editModeController.requestEditorEscape()
+                ShellChord.UndoEdit           -> editModeController.undo()
+                ShellChord.RedoEdit           -> editModeController.redo()
                 null                          -> Unit
             }
             resolved.consume

@@ -1464,6 +1464,8 @@ object JapaneseStrings : AppStrings {
     override val editorPreview = "プレビュー"
     override val editorPreviewHidden = "非表示"
     override val editorPaletteToggleHide = "隠す"
+    override val editorUndo = "元に戻す"
+    override val editorRedo = "やり直す"
     override val editorEscHint = "Esc で終了"
     override val editorFabEdit = "レイアウトを編集"
     override val editorFabDone = "編集を終える"

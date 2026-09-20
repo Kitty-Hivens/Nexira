@@ -71,6 +71,7 @@ Pause
 Person
 PlayArrow
 Public
+Redo
 Refresh
 Replay10
 RestartAlt
@@ -89,6 +90,7 @@ Sync
 Tag
 Tune
 Tv
+Undo
 Update
 Upload
 ViewQuilt

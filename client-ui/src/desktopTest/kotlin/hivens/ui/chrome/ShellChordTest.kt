@@ -79,6 +79,23 @@ class ShellChordTest {
     }
 
     @Test
+    fun `ctrl Z undoes, and with shift redoes, while the editor is open`() {
+        val undo = resolveChord(Key.Z, ctrl = true, released = true, debugOverlayAvailable = false, editing = true)
+        assertEquals(ShellChord.UndoEdit, undo.chord)
+        assertTrue(undo.consume)
+
+        val redo = resolveChord(Key.Z, ctrl = true, shift = true, released = true, debugOverlayAvailable = false, editing = true)
+        assertEquals(ShellChord.RedoEdit, redo.chord)
+    }
+
+    @Test
+    fun `ctrl Z belongs to the focused field with no editor open`() {
+        val idle = resolveChord(Key.Z, ctrl = true, released = true, debugOverlayAvailable = false, editing = false)
+        assertNull(idle.chord)
+        assertFalse(idle.consume, "taking Ctrl+Z at window scope would take it from every text field in the shell")
+    }
+
+    @Test
     fun `an unrelated chord is left alone`() {
         val resolved = resolveChord(Key.S, ctrl = true, released = true, debugOverlayAvailable = true, editing = false)
         assertNull(resolved.chord)

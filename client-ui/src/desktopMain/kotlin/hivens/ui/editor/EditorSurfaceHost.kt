@@ -736,6 +736,10 @@ fun EditorSurfaceHost(
                     onTogglePreview       = { previewing = !previewing },
                     onOpenPresets         = { presetPanelOpen = true },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
+                    canUndo               = controller.canUndo,
+                    canRedo               = controller.canRedo,
+                    onUndo                = { controller.undo() },
+                    onRedo                = { controller.redo() },
                     modifier              = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 )
             }
@@ -780,6 +784,10 @@ private fun EditModePill(
     onTogglePreview: () -> Unit,
     onOpenPresets: () -> Unit,
     onRequestReset: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -882,6 +890,29 @@ private fun EditModePill(
                         label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
                         selected = paletteOpen,
                         onClick  = onTogglePalette,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // Undo and redo. On the bar as well as on Ctrl+Z, because a
+                    // chord nobody is told about is a chord nobody has, and the
+                    // greyed pair is also the only place the editor says whether
+                    // there is anything to go back to.
+                    ToolChip(
+                        icon     = NxIcon.Undo,
+                        label    = s.editorUndo,
+                        selected = false,
+                        onClick  = onUndo,
+                        enabled  = canUndo,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    ToolChip(
+                        icon     = NxIcon.Redo,
+                        label    = s.editorRedo,
+                        selected = false,
+                        onClick  = onRedo,
+                        enabled  = canRedo,
                         compact  = compact,
                     )
                     Spacer(Modifier.width(4.dp))
