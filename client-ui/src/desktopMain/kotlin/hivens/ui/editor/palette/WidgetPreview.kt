@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalContext
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.currentCompositionLocalContext
@@ -45,9 +46,10 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.WidgetSizing
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 import org.jetbrains.skia.Bitmap
 import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
@@ -116,29 +118,50 @@ class WidgetPreviewHost internal constructor(
      */
     private val data = previewDataRegistry()
 
+    /**
+     * The one thread previews are drawn on, and the lock that keeps it to one at
+     * a time. Owned by the host, so [close] retires it with the gallery.
+     */
+    private val painter = newSingleThreadContext("widget-preview")
+    private val gate = Mutex()
+
+    /** Gives the drawing thread back. Called when the gallery leaves the composition. */
+    fun close() {
+        painter.close()
+    }
+
     /** What is known about [kind] right now, without asking for it to be drawn. */
     fun peek(kind: WidgetKind): WidgetPreview = cache[kind] ?: WidgetPreview.Pending
 
     /**
      * Draws [kind] unless it is already drawn, and records the outcome.
      *
-     * On the main dispatcher because a scene shares the launcher's AWT pump, and
-     * driving one from another thread while a widget's own effects wait on that
-     * pump is how an off-screen render deadlocks. One frame each, so the effects
-     * mostly have not run and a widget shows the state it opens in.
+     * Off the interface's thread, and never on it. Composing a widget costs
+     * between eighty and a hundred and forty milliseconds -- measured across the
+     * whole registry, and it is the composition, not the raster: halving the pixel
+     * scale made it no faster at all. A dozen visible tiles is therefore over a
+     * second, and it was being spent on the thread that draws the editor, which is
+     * how opening the palette came to freeze it.
+     *
+     * One dedicated thread rather than a pool. Each scene is built, drawn and
+     * closed inside a single call so nothing crosses threads, but skia holds
+     * native resources and a pool would scatter them over whichever worker was
+     * free. One at a time for the same reason a gallery does not need two: a
+     * reader looks at tiles in order, and a second core spent here is a core not
+     * spent on the interface. On a machine slower than the one this was written
+     * on, the tiles simply arrive further apart.
      */
     suspend fun draw(kind: WidgetKind, descriptor: WidgetDescriptor) {
         if (cache.containsKey(kind)) return
-        withContext(Dispatchers.Main) {
-            // Between widgets rather than inside one: a gallery asks for many at
-            // once and the pump is shared with everything the reader can see.
-            yield()
-            // Recorded inside the dispatch. Written after it, a tile scrolled out
-            // of the grid while its render was in flight cancelled the withContext
-            // and threw away a finished picture, so scrolling back re-rendered it
-            // from nothing every time.
-            cache[kind] = render(kind, descriptor)
+        val outcome = withContext(painter) {
+            // Serialised, so a gallery that asks for twelve at once does not start
+            // twelve scenes and leave the machine to arbitrate between them.
+            gate.withLock { cache[kind] ?: render(kind, descriptor) }
         }
+        // Written outside the lock: a snapshot write is safe from any thread, and
+        // holding the lock across it would queue the gallery's own recomposition
+        // behind the next render.
+        cache[kind] = outcome
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
@@ -383,7 +406,11 @@ private val PREVIEW_PATH = SlotPath(SurfaceId("preview"), SlotId("preview"))
 fun rememberWidgetPreviewHost(): WidgetPreviewHost {
     val locals = currentCompositionLocalContext
     val density = LocalDensity.current
-    return remember(locals, density) { WidgetPreviewHost(locals, density) }
+    val host = remember(locals, density) { WidgetPreviewHost(locals, density) }
+    // A real thread has to be given back. A theme change builds a new host, and
+    // this retires the one it replaced.
+    DisposableEffect(host) { onDispose { host.close() } }
+    return host
 }
 
 /**

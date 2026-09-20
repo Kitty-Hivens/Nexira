@@ -500,6 +500,24 @@ fun EditorSurfaceHost(
         if (editing && sid != null && fid != null) mapOf(sid to fid) else emptyMap()
     }
 
+    /**
+     * Remembered, and that is not a micro-optimisation.
+     *
+     * [LocalSlotBoundsReporter] is a STATIC local, so a new value recomposes the
+     * whole subtree it is provided over rather than the places that read it. A
+     * lambda literal built inline here is a new value on any recomposition the
+     * compiler cannot prove away, and this function recomposes on every frame of
+     * a drag. That put a second whole-shell invalidation per pointer move next to
+     * the one the layout graph was already causing.
+     */
+    val slotBoundsReporter: (SlotPath, Rect) -> Unit = remember(state, previewing, registry) {
+        if (state is EditModeState.On && !previewing) {
+            { path, rect -> registry.registerSlot(path, rect) }
+        } else {
+            { _, _ -> }
+        }
+    }
+
     CompositionLocalProvider(
         LocalShellChromeBounds  provides chromeBounds,
         LocalEditMode           provides state,
@@ -519,11 +537,7 @@ fun EditorSurfaceHost(
         } else 0,
         // Placement slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
-        LocalSlotBoundsReporter provides if (state is EditModeState.On && !previewing) {
-            { p, r -> registry.registerSlot(p, r) }
-        } else {
-            { _, _ -> }
-        },
+        LocalSlotBoundsReporter provides slotBoundsReporter,
         // Stub surface contexts, spread from the registry. Surface composables
         // that mount under content() override with the real values; widgets
         // dropped on a foreign surface fall through to the stubs and render
@@ -715,7 +729,6 @@ fun EditorSurfaceHost(
 
                 WidgetPalettePanel(
                     visible        = editing && paletteOpen && !previewing && propTarget == null && !surfaceSettingsOpen,
-                    dimmed         = dragController.active != null,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
                     registry       = registry,

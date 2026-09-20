@@ -72,7 +72,6 @@ import hivens.widget.api.LocalWidgetRegistry
 @Composable
 fun WidgetPalettePanel(
     visible: Boolean,
-    dimmed: Boolean = false,
     onDismiss: () -> Unit,
     controller: DragController,
     registry: DropTargetRegistry,
@@ -80,6 +79,10 @@ fun WidgetPalettePanel(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
+    // Read here rather than handed down. The drag state changes on every pointer
+    // move, so reading it in the host meant the host's whole body re-ran sixty
+    // times a second for a boolean only this panel uses.
+    val dimmed = controller.active != null
     val registry0 = LocalWidgetRegistry.current
     // Draggable dock: the header drags this offset (session-scoped).
     val paletteOffset = rememberDockOffset()

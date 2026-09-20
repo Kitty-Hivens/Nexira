@@ -15,12 +15,25 @@ import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetSizing
 
-// Locals provided once near the application root. Static because the
-// graph and registry references swap on whole-tree events (layout
-// reload, registry registration), not on per-frame state changes;
-// staticCompositionLocalOf avoids per-read snapshot tracking cost.
+/**
+ * The arrangement every slot renders from.
+ *
+ * Dynamic, and the reason is the editor. A static local does not track reads: it
+ * recomposes the WHOLE subtree it is provided over whenever its value changes,
+ * which is cheap when the value changes on whole-tree events and ruinous when it
+ * changes on every frame of a gesture. Dragging a widget writes a new graph per
+ * pointer move, so this was recomposing the entire shell -- every widget on every
+ * surface, the rails, the top bar and all sixty tiles of the open gallery -- sixty
+ * times a second, to move one box.
+ *
+ * Ten places in the whole codebase read it. Tracking those ten is the cheaper
+ * side of that trade by a very long way.
+ */
 val LocalLayoutGraph: ProvidableCompositionLocal<LayoutGraph> =
-    staticCompositionLocalOf { LayoutGraph.EMPTY }
+    compositionLocalOf { LayoutGraph.EMPTY }
+
+// Static: the registry is built once at startup and a module registering into it
+// is a whole-tree event, which is the case static is actually for.
 
 val LocalWidgetRegistry: ProvidableCompositionLocal<WidgetRegistry> =
     staticCompositionLocalOf {
