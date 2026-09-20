@@ -67,10 +67,14 @@ data class RecentProps(
 // behind them fills the slot's whole width while they keep their own, so the row
 // ends up sitting on a bar several times longer than itself. It also declared a top
 // inset the column below already applies, so the two stacked.
+// The ceiling is load-bearing: this lists lazily, and a lazy list cannot be
+// measured against an unbounded axis.
 @Widget(
     id = "home.new.recent",
     displayName = "widget.home.new.recent",
     propsClass = RecentProps::class,
+    minWidth = 240, minHeight = 120,
+    maxWidth = 1200, maxHeight = 720,
 )
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {

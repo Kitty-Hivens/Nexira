@@ -46,11 +46,18 @@ data class AboutCreditsProps(
     @PropLabel("widget.about.credits.title") val title: String = "",
 )
 
+// The ceiling is load-bearing rather than cosmetic: this widget scrolls its own
+// content, and Compose refuses to measure a scrolling component against an
+// unbounded height. The editor can put it in a slot that has none, and the
+// renderer fills that silence from here.
 @Widget(
     id = "about.credits",
     displayName = "widget.about.credits",
     propsClass = AboutCreditsProps::class,
     surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
+    minWidth = 260, minHeight = 180,
+    prefWidth = 320, prefHeight = 428,
+    maxWidth = 720, maxHeight = 1200,
 )
 @Composable
 fun AboutCreditsWidget(instance: WidgetInstance) {

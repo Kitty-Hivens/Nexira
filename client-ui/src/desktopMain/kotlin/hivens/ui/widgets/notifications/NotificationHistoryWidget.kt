@@ -99,11 +99,16 @@ private val PILL_BUTTON_SIZE = 28.dp
  * the whole list out before wiping it. Consecutive identical entries fold into
  * one row with a count, mirroring the live stack's progress coalescing.
  */
+// The ceiling is load-bearing: this scrolls its own list, and a scrolling
+// component cannot be measured against an unbounded height. No preferred size
+// until one is measured rather than guessed.
 @Widget(
     id = "notifications.history",
     displayName = "widget.notifications.history",
     propsClass = NotificationHistoryProps::class,
     surface = """{"fill":"base","opacity":0.5,"border":{"widthDp":1.0}}""",
+    minWidth = 260, minHeight = 160,
+    maxWidth = 720, maxHeight = 1200,
 )
 @Composable
 fun NotificationHistoryWidget(instance: WidgetInstance) {

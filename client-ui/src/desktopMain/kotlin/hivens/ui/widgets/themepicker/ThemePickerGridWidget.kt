@@ -49,7 +49,17 @@ import hivens.widget.model.Widget
 // reads the same context and re-renders. Removing this widget hides
 // the picker -- the user keeps whatever theme was active at edit time
 // and must restore-to-default to see the grid again.
-@Widget(id = "theme.picker.grid", displayName = "widget.theme.picker.grid", drawsOwnSurface = true)
+// The ceiling is load-bearing: a LazyVerticalGrid cannot be measured against an
+// unbounded height, and the editor can put this in a slot that has none. No
+// preferred size, because the grid has no natural one: it is as tall as the room
+// it is given and the theme count it is showing.
+@Widget(
+    id = "theme.picker.grid",
+    displayName = "widget.theme.picker.grid",
+    drawsOwnSurface = true,
+    minWidth = 260, minHeight = 220,
+    maxWidth = 960, maxHeight = 1600,
+)
 @Composable
 fun ThemePickerGridWidget() {
     val ctx = LocalThemePickerContext.current

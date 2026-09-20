@@ -53,7 +53,16 @@ data class LibraryBodyProps(
 // branching would force the layout graph to know about appState, which
 // belongs to navigation, not layout. Self-gating keeps the slot stable
 // across the empty -> populated transition.
-@Widget(id = "library.body", displayName = "widget.library.body", propsClass = LibraryBodyProps::class)
+// The ceiling is load-bearing: this lists lazily, and a lazy list cannot be
+// measured against an unbounded axis. Generous, because this is the library's
+// whole content pane and a bound under it would cut the list short.
+@Widget(
+    id = "library.body",
+    displayName = "widget.library.body",
+    propsClass = LibraryBodyProps::class,
+    minWidth = 320, minHeight = 200,
+    maxWidth = 2400, maxHeight = 1600,
+)
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()

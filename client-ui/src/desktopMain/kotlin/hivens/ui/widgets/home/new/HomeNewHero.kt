@@ -56,7 +56,13 @@ data class HeroProps(
 // and only the user grows it (height prop) or removes it; the full showcase
 // lives on the pack detail, which is where a card click goes. The button
 // launches. Empty repo elides the widget -- HomeNewRecent owns the CTA.
-@Widget(id = "home.new.hero", displayName = "widget.home.new.hero", propsClass = HeroProps::class)
+@Widget(
+    id = "home.new.hero",
+    displayName = "widget.home.new.hero",
+    propsClass = HeroProps::class,
+    minWidth = 280, minHeight = 140,
+    maxWidth = 1600, maxHeight = 640,
+)
 @Composable
 fun HomeNewHero(instance: WidgetInstance) {
     val p = instance.rememberProps<HeroProps>()

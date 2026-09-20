@@ -25,9 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.widget.model.FlowPlacement
@@ -536,10 +538,66 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance)
     // here, which is what keeps the number the annotation carries and the number
     // the widget draws at from being two numbers.
     CompositionLocalProvider(LocalWidgetSizing provides descriptor.sizing) {
-        if (surface == null) {
-            descriptor.Render(instance)
-        } else {
-            LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
+        val body = @Composable {
+            if (surface == null) {
+                descriptor.Render(instance)
+            } else {
+                LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
+            }
         }
+        // One funnel, so every widget in every branch is covered once. The node is
+        // added only for a widget that declared a ceiling, so nothing an
+        // undeclared widget sees changes: most of the registry declares nothing
+        // and none of it should start measuring differently for this.
+        val ceiling = descriptor.sizing.unboundedAxisCeiling()
+        if (ceiling == null) body() else Box(ceiling) { body() }
+    }
+}
+
+/**
+ * Substitutes the widget's declared maximum for an axis it was given no bound on,
+ * or null when it declared no maximum to substitute.
+ *
+ * An unbounded axis is not a generous offer, it is the absence of an answer, and
+ * a widget that scrolls or lazily lists cannot be measured against one: Compose
+ * throws rather than guessing. That is reachable from the editor, because the
+ * editor lets any widget be dropped in any slot and a slot inherits whatever its
+ * surface hands down. Two surfaces already avoid it by not scrolling around a
+ * slot, each with a comment saying so, which is a rule kept by hand in the places
+ * that happened to be written carefully.
+ *
+ * The declaration is the place that already answers "how much can this use", so
+ * it answers here too. Nothing is imposed where a bound exists: a slot that said
+ * a height is obeyed, including one that said less than the widget wants, and the
+ * claim rules in [boundedModifier] are untouched. This only fills a silence.
+ *
+ * A zero maximum means undeclared, and an undeclared widget in an unbounded slot
+ * is left exactly as it was, which is to say it still throws. That is deliberate:
+ * inventing a ceiling for it would be this file guessing at a widget's size, and
+ * the fix for those is the declaration they are missing.
+ */
+private fun WidgetSizing.unboundedAxisCeiling(): Modifier? {
+    if (maxWidth <= 0 && maxHeight <= 0) return null
+    val ceilingW = maxWidth
+    val ceilingH = maxHeight
+    return Modifier.layout { measurable, constraints ->
+        val filled = Constraints(
+            minWidth = constraints.minWidth,
+            // coerceAtLeast the minimum: a Constraints with max below min does not
+            // exist, and an unbounded axis can still carry a minimum.
+            maxWidth = if (ceilingW > 0 && constraints.maxWidth == Constraints.Infinity) {
+                ceilingW.dp.roundToPx().coerceAtLeast(constraints.minWidth)
+            } else {
+                constraints.maxWidth
+            },
+            minHeight = constraints.minHeight,
+            maxHeight = if (ceilingH > 0 && constraints.maxHeight == Constraints.Infinity) {
+                ceilingH.dp.roundToPx().coerceAtLeast(constraints.minHeight)
+            } else {
+                constraints.maxHeight
+            },
+        )
+        val placeable = measurable.measure(filled)
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
     }
 }

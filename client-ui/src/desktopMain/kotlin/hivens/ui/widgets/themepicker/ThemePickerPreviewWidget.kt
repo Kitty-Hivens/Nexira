@@ -38,7 +38,13 @@ import hivens.widget.model.Widget
 // never writes. Safe to remove from the surface: the user keeps
 // picking themes from the grid; the apply button in the header
 // still commits.
-@Widget(id = "theme.picker.preview", displayName = "widget.theme.picker.preview")
+@Widget(
+    id = "theme.picker.preview",
+    displayName = "widget.theme.picker.preview",
+    minWidth = 240, minHeight = 300,
+    prefWidth = 320, prefHeight = 432,
+    maxWidth = 720, maxHeight = 760,
+)
 @Composable
 fun ThemePickerPreviewWidget() {
     val ctx = LocalThemePickerContext.current

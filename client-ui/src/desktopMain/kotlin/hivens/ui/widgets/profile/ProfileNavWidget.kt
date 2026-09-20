@@ -31,7 +31,12 @@ import org.koin.compose.koinInject
 // to pick which content slot to render. Removing this widget locks
 // the user on whichever category was last selected -- reset the
 // surface to bring nav back.
-@Widget(id = "profile.nav", displayName = "widget.profile.nav")
+@Widget(
+    id = "profile.nav",
+    displayName = "widget.profile.nav",
+    minWidth = 150, minHeight = 160,
+    maxWidth = 360, maxHeight = 1200,
+)
 @Composable
 fun ProfileNavWidget() {
     val ctx = LocalProfileContext.current
