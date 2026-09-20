@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.editor.ShellChromeBounds
@@ -46,10 +47,8 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.WidgetSizing
-import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Bitmap
 import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
@@ -118,16 +117,15 @@ class WidgetPreviewHost internal constructor(
      */
     private val data = previewDataRegistry()
 
-    /**
-     * The one thread previews are drawn on, and the lock that keeps it to one at
-     * a time. Owned by the host, so [close] retires it with the gallery.
-     */
-    private val painter = newSingleThreadContext("widget-preview")
+    /** Holds the gallery to one preview at a time. See [draw] for why one. */
     private val gate = Mutex()
 
-    /** Gives the drawing thread back. Called when the gallery leaves the composition. */
+    /** The scenes previews are drawn into, kept warm for as long as the gallery is open. */
+    private val pool = ScenePool(density)
+
+    /** Releases the scenes. Called when the gallery leaves the composition. */
     fun close() {
-        painter.close()
+        pool.close()
     }
 
     /** What is known about [kind] right now, without asking for it to be drawn. */
@@ -136,31 +134,27 @@ class WidgetPreviewHost internal constructor(
     /**
      * Draws [kind] unless it is already drawn, and records the outcome.
      *
-     * Off the interface's thread, and never on it. Composing a widget costs
-     * between eighty and a hundred and forty milliseconds -- measured across the
-     * whole registry, and it is the composition, not the raster: halving the pixel
-     * scale made it no faster at all. A dozen visible tiles is therefore over a
-     * second, and it was being spent on the thread that draws the editor, which is
-     * how opening the palette came to freeze it.
+     * On the caller's thread, which is the composition's, and it has to be.
+     * Compose's snapshot apply-observers are process wide and run on whichever
+     * thread advanced the snapshot, so a scene composed on a worker reaches into
+     * the live window's own observer from that worker. Nothing fails there. The
+     * next pointer event on the interface thread finds the observer marked with
+     * another thread's id and the window dies on a multithreaded-access check.
+     * This ran on a dedicated thread for one session, and that is what it did.
      *
-     * One dedicated thread rather than a pool. Each scene is built, drawn and
-     * closed inside a single call so nothing crosses threads, but skia holds
-     * native resources and a pool would scatter them over whichever worker was
-     * free. One at a time for the same reason a gallery does not need two: a
-     * reader looks at tiles in order, and a second core spent here is a core not
-     * spent on the interface. On a machine slower than the one this was written
-     * on, the tiles simply arrive further apart.
+     * So the cost is cut rather than moved. Most of it was never the widget:
+     * building a scene costs thirty to forty five milliseconds against five to
+     * fourteen to draw a widget into a warm one, so [ScenePool] keeps them and
+     * a tile now pays for its own composition and nothing else.
+     *
+     * One at a time, by [gate]. An uncontended lock does not suspend, so the
+     * first tile draws inline and each one after it arrives on its own dispatch,
+     * which leaves the event queue a turn between them: the gallery fills in
+     * visibly rather than all at once after a freeze.
      */
     suspend fun draw(kind: WidgetKind, descriptor: WidgetDescriptor) {
         if (cache.containsKey(kind)) return
-        val outcome = withContext(painter) {
-            // Serialised, so a gallery that asks for twelve at once does not start
-            // twelve scenes and leave the machine to arbitrate between them.
-            gate.withLock { cache[kind] ?: render(kind, descriptor) }
-        }
-        // Written outside the lock: a snapshot write is safe from any thread, and
-        // holding the lock across it would queue the gallery's own recomposition
-        // behind the next render.
+        val outcome = gate.withLock { cache[kind] ?: render(kind, descriptor) }
         cache[kind] = outcome
     }
 
@@ -174,16 +168,13 @@ class WidgetPreviewHost internal constructor(
         val box = fitToRaster(frameFor(descriptor.sizing), density.density)
         val w = (box.width * density.density).roundToInt().coerceAtLeast(1)
         val h = (box.height * density.density).roundToInt().coerceAtLeast(1)
-        // Built empty, then handed its content. Nothing of the widget's runs in
-        // the constructor, so it cannot throw and the reference is in hand before
-        // anything can. Composing inline instead loses the object with the throw:
-        // the assignment never happens, close() is never reached, and an unclosed
-        // scene leaves a Recomposer registered as a global snapshot apply-observer
-        // for the life of the process, which every state write then walks. That is
-        // a leak on exactly the path this whole file exists to make survivable.
-        val scene = ImageComposeScene(width = w, height = h, density = density)
-        try {
-            return runCatching {
+        return runCatching {
+            // Handed to a scene that already exists, which is also what makes a
+            // failing widget catchable at all: an ImageComposeScene composes
+            // whatever its constructor was given, so content passed there has
+            // thrown before the reference comes back and there is nothing left
+            // to release. See OffscreenPreviewProbeTest.
+            pool.draw(IntSize(w, h)) { scene ->
                 scene.setContent {
                     CompositionLocalProvider(locals) {
                         PreviewEnvironment(data) { PreviewSubject(descriptor, kind, box) }
@@ -204,23 +195,73 @@ class WidgetPreviewHost internal constructor(
                 } finally {
                     frame.close()
                 }
-            }.onFailure { cause ->
-                // Debug: a widget declining to compose outside its surface is normal,
-                // and a palette that logs a warning per tile would drown the console
-                // the first time it is opened. The cause goes in whole, because one
-                // line naming neither the place nor the chain is not diagnostics.
-                log.debug("no preview for {}", kind.value, cause)
-            }.getOrElse { WidgetPreview.Refused }
-        } catch (error: Throwable) {
-            // Exceptions are the expected outcome and runCatching above owns them.
-            // This is only here so the scene is released when something the process
-            // cannot continue past goes by, and it is rethrown rather than turned
-            // into a tile: an OutOfMemoryError recorded as "no preview" is a
-            // launcher that quietly stops working.
-            throw error
-        } finally {
-            runCatching { scene.close() }
+            }
+        }.onFailure { cause ->
+            // Debug: a widget declining to compose outside its surface is normal,
+            // and a palette that logs a warning per tile would drown the console
+            // the first time it is opened. The cause goes in whole, because one
+            // line naming neither the place nor the chain is not diagnostics.
+            log.debug("no preview for {}", kind.value, cause)
+        }.getOrElse { WidgetPreview.Refused }
+    }
+}
+
+/**
+ * The scenes previews are drawn into, one per raster size, kept between widgets.
+ *
+ * A scene was built and closed per preview until it was measured: thirty to forty
+ * five milliseconds to build one against five to fourteen to draw a widget into a
+ * warm one. Most of what the gallery spent on a tile was therefore scaffolding,
+ * not the widget, and the registry only declares about a dozen distinct sizes
+ * across its widgets, so keeping them costs a dozen scenes and saves one
+ * construction per tile.
+ *
+ * Keyed by the raster and not pooled as one oversized scene. The raster is what
+ * the ink trim then walks, so a small widget drawn into a large frame would pay
+ * for every pixel of the frame twice, once to clear it and once to read it back.
+ *
+ * Every entry holds a skia surface and, while it lives, a Recomposer registered
+ * as a process-wide snapshot apply-observer that every state write in the
+ * launcher walks. [close] is not optional.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+internal class ScenePool(private val density: Density) {
+
+    private val scenes = mutableMapOf<IntSize, ImageComposeScene>()
+
+    /** How many scenes were built. The saving is only real if this stays well under the tile count. */
+    var built: Int = 0
+        private set
+
+    /** How many are held right now. */
+    val held: Int get() = scenes.size
+
+    /**
+     * Runs [block] against a scene of [raster], building one if none is held.
+     *
+     * A scene whose block threw is closed and dropped rather than handed on. A
+     * reused scene does survive a throwing composition, which was measured
+     * rather than assumed, but surviving is not the question: a composition that
+     * died halfway can leave nodes behind, and the next widget through the same
+     * scene would be a picture with someone else's leftovers in it. One rebuild
+     * on a widget that already has no preview is not worth reasoning about.
+     */
+    fun <T> draw(raster: IntSize, block: (ImageComposeScene) -> T): T {
+        val scene = scenes.getOrPut(raster) {
+            built++
+            ImageComposeScene(width = raster.width, height = raster.height, density = density)
         }
+        return try {
+            block(scene)
+        } catch (cause: Throwable) {
+            scenes.remove(raster)?.let { spoiled -> runCatching { spoiled.close() } }
+            throw cause
+        }
+    }
+
+    fun close() {
+        scenes.values.forEach { scene -> runCatching { scene.close() } }
+        scenes.clear()
     }
 }
 
@@ -407,8 +448,8 @@ fun rememberWidgetPreviewHost(): WidgetPreviewHost {
     val locals = currentCompositionLocalContext
     val density = LocalDensity.current
     val host = remember(locals, density) { WidgetPreviewHost(locals, density) }
-    // A real thread has to be given back. A theme change builds a new host, and
-    // this retires the one it replaced.
+    // The scenes hold native surfaces and a global snapshot observer each. A
+    // theme change builds a new host, and this retires the one it replaced.
     DisposableEffect(host) { onDispose { host.close() } }
     return host
 }
