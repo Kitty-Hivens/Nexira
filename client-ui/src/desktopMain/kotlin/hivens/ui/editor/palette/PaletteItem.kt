@@ -201,19 +201,10 @@ private fun WidgetSizing.footprintLabel(): String? =
  */
 @Composable
 private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: WidgetSizing) {
-    // The widget's own proportions, within what a tile can hold. A fixed box put a
-    // 340 by 48 control in the middle of two thirds of nothing, and a clock at 200
-    // by 230 into a letterbox. Held between the two so one very long widget cannot
-    // squash its whole row, and one very tall one cannot own the panel.
-    val ratio = when (preview) {
-        is WidgetPreview.Drawn -> (preview.image.width.toFloat() / preview.image.height)
-            .coerceIn(MIN_THUMB_RATIO, MAX_THUMB_RATIO)
-        else -> DEFAULT_THUMB_RATIO
-    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(ratio)
+            .aspectRatio(thumbRatio(sizing))
             .clip(RoundedCornerShape(8.dp))
             .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.45f)),
         contentAlignment = Alignment.Center,
@@ -247,16 +238,31 @@ private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: Widge
 }
 
 /**
- * How far a tile may depart from its widget's own shape.
+ * The shape of a tile, from what the widget declared rather than from its picture.
  *
- * The floor keeps a tall widget from taking a whole panel of height for itself,
- * the ceiling keeps a long thin one from flattening the row it shares. The
- * default is for a tile with nothing in it yet, and is a shape that suits a
- * letter.
+ * The widget's own proportions, within what a tile can hold: a fixed box put a
+ * 340 by 48 control in the middle of two thirds of nothing, and a clock at 200 by
+ * 230 into a letterbox. The floor keeps a tall widget from taking a whole panel
+ * of height for itself, the ceiling keeps a long thin one from flattening the row
+ * it shares.
+ *
+ * Read from the declaration and not from the bitmap, because the bitmap is not
+ * there yet. A tile that took its shape from its preview held a guessed shape
+ * until the preview landed and then changed height under a reader who was
+ * scrolling, one tile at a time, in whatever order the renders finished. The
+ * declaration is the same frame the preview is drawn into, so the picture fits
+ * the shape it finds and the shape never moves.
+ *
+ * A widget that declares nothing gets the frame [frameFor] draws it in, which is
+ * a stable answer rather than a right one. Its picture is letterboxed inside.
  */
+internal fun thumbRatio(sizing: WidgetSizing): Float {
+    val frame = frameFor(sizing)
+    return (frame.width / frame.height).coerceIn(MIN_THUMB_RATIO, MAX_THUMB_RATIO)
+}
+
 private const val MIN_THUMB_RATIO = 0.85f
 private const val MAX_THUMB_RATIO = 2.6f
-private const val DEFAULT_THUMB_RATIO = 1.45f
 
 /**
  * What follows the pointer out of the palette.
