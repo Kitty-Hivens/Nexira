@@ -1215,7 +1215,7 @@ object GermanStrings : AppStrings {
         "widget.appshell.topbar.controls" to "Fenstertasten",
         "widget.appshell.region.right" to "Rechte Leiste",
         "widget.appshell.region.showDivider" to "Trennlinie",
-        "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
+        "widget.appshell.region.widthDp" to "Breite (0 = automatisch)",
         "widget.mod.tags" to "Projekt-Tags",
         "widget.mod.creators" to "Projekt-Urheber",
         "widget.mod.compatibility" to "Projektkompatibilität",

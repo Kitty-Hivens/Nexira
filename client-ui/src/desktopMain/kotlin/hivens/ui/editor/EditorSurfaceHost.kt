@@ -1252,12 +1252,20 @@ internal data class PaneInsets(val start: Dp, val end: Dp)
  * padding is not a thing [androidx.compose.foundation.layout.padding] takes.
  * Nothing reported yet means no inset, which is the full frame -- the same place
  * the overlays sit on a build with no rails.
+ *
+ * A pane too narrow to hold a panel gets no inset either, and the overlays cover
+ * the rails instead. The editor's controls are how a reader undoes whatever made
+ * the pane that narrow, so they are the last thing allowed to go with it.
  */
 internal fun paneInsets(pane: Rect?, host: Rect, density: Density): PaneInsets {
     if (pane == null || host.width <= 0f) return PaneInsets(0.dp, 0.dp)
+    if (with(density) { pane.width.toDp() } < MIN_PANE) return PaneInsets(0.dp, 0.dp)
     fun gap(px: Float): Dp = with(density) { px.coerceAtLeast(0f).toDp() }
     return PaneInsets(start = gap(pane.left - host.left), end = gap(host.right - pane.right))
 }
+
+/** The widest of the editor's own panels. Below this there is nowhere to put one. */
+private val MIN_PANE = 320.dp
 
 private fun transparentPointerIcon(): PointerIcon {
     val image = java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB)

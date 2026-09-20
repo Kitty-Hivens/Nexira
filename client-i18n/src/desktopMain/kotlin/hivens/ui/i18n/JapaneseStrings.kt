@@ -1220,7 +1220,7 @@ object JapaneseStrings : AppStrings {
         "widget.appshell.topbar.controls" to "ウィンドウ操作",
         "widget.appshell.region.right" to "右のパネル",
         "widget.appshell.region.showDivider" to "区切り線",
-        "widget.appshell.region.widthDp" to "幅 (0 は可変)",
+        "widget.appshell.region.widthDp" to "幅 (0 は自動)",
         "widget.mod.tags" to "プロジェクトのタグ",
         "widget.mod.creators" to "プロジェクトの制作者",
         "widget.mod.compatibility" to "プロジェクトの対応状況",

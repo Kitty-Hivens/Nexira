@@ -1213,7 +1213,7 @@ object EnglishStrings : AppStrings {
         "widget.appshell.topbar.controls" to "Window controls",
         "widget.appshell.region.right" to "Right panel",
         "widget.appshell.region.showDivider" to "Divider",
-        "widget.appshell.region.widthDp" to "Width (0 = flexible)",
+        "widget.appshell.region.widthDp" to "Width (0 = automatic)",
         "widget.mod.tags" to "Project tags",
         "widget.mod.creators" to "Project creators",
         "widget.mod.compatibility" to "Project compatibility",

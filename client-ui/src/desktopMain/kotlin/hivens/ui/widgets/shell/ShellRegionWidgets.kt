@@ -216,9 +216,16 @@ fun ShellLeftRegion(instance: WidgetInstance) {
     val ctx = LocalShellContext.current
     Row(Modifier.fillMaxHeight()) {
         // The width lands on the rail, not on the row that also holds the divider.
-        // On the row, the surface's weight(1f) took whatever the divider left, so a
-        // named width came out a hairline short whenever the divider was on.
-        val railWidth = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier.weight(1f)
+        // On the row, the surface took whatever the divider left, so a named width
+        // came out a hairline short whenever the divider was on.
+        //
+        // No name means [NAV_RAIL_DEFAULT_WIDTH], the same answer the right rail
+        // gives. It used to mean a weight of the row, and a weight inside a row that
+        // is itself measured at its contents is the whole row: setting the width
+        // back to zero swallowed the window, and took the panel that could undo it
+        // with it. Its contents are no answer either, since the rail's slots fill
+        // whatever width they are offered so the items centre in it.
+        val railWidth = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else NAV_RAIL_DEFAULT_WIDTH)
         // The rail is an NxSurface at 35% by default. AppSidebar's NavigationRail is
         // transparent so this owns the background, and the divider stays OUTSIDE the
         // surface so the tinted area is exactly the rail. Light stops being forced
@@ -240,6 +247,14 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         RegionDivider(props.showDivider)
     }
 }
+
+/**
+ * The nav rail's width when nothing overrides it.
+ *
+ * Mirrors what the bundled layout stores, so a graph that lost the prop draws the
+ * rail it always drew rather than a rail of some other size.
+ */
+val NAV_RAIL_DEFAULT_WIDTH = 65.dp
 
 /**
  * Center region: the screen router. Carries weight=1 in the default layout so it

@@ -54,6 +54,20 @@ class PaneInsetsTest {
     }
 
     @Test
+    fun `a pane too narrow for a panel keeps the editor's controls instead`() {
+        // Two rails wide enough to squeeze the pane out is a state a reader has to
+        // be able to undo, and the undo lives in the overlays.
+        val squeezed = Rect(700f, 0f, 900f, 1000f)
+        assertEquals(PaneInsets(0.dp, 0.dp), paneInsets(squeezed, window, density))
+    }
+
+    @Test
+    fun `a pane exactly wide enough for a panel still gets its gaps`() {
+        val just = Rect(700f, 0f, 1020f, 1000f)
+        assertEquals(PaneInsets(start = 700.dp, end = 580.dp), paneInsets(just, window, density))
+    }
+
+    @Test
     fun `a pane wider than its frame reads as no gap, not a negative one`() {
         // Half a layout pass, not a real overhang. padding() rejects a negative.
         val overhang = Rect(-20f, 0f, 1700f, 1000f)

@@ -1228,7 +1228,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.topbar.controls" to "Кнопки окна",
         "widget.appshell.region.right" to "Правая панель",
         "widget.appshell.region.showDivider" to "Разделитель",
-        "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
+        "widget.appshell.region.widthDp" to "Ширина (0 — автоматически)",
         "widget.mod.tags" to "Теги проекта",
         "widget.mod.creators" to "Авторы проекта",
         "widget.mod.compatibility" to "Совместимость проекта",
