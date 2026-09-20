@@ -100,9 +100,13 @@ data class RecordPlayerProps(
 
 @Widget(
     id = "home.new.player.record",
-    minWidth = 72, minHeight = 72,
-    prefWidth = 168, prefHeight = 168,
-    maxWidth = 420, maxHeight = 420,
+    // Height bounds stay off: the size prop is a ceiling on the WIDTH, and with
+    // the caption switched on the disc is that plus the line under it. Mirroring
+    // the width's range onto the height clipped the caption the switch turns on.
+    // The preferred height is the square it draws at rest, which is what the
+    // gallery shows.
+    minWidth = 72, prefWidth = 168, maxWidth = 420,
+    prefHeight = 168,
     displayName = "widget.home.new.player.record",
     propsClass = RecordPlayerProps::class,
     drawsOwnSurface = true,

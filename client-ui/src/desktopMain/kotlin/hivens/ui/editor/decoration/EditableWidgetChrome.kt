@@ -175,6 +175,9 @@ fun EditableWidgetChrome(
     val widthBounds = remember(sizing) { ResizeBounds.of(sizing.minWidth, sizing.maxWidth) }
     val heightBounds = remember(sizing) { ResizeBounds.of(sizing.minHeight, sizing.maxHeight) }
     var resizing by remember { mutableStateOf(false) }
+    // Read outside the draw lambda: gridGeo is a State and the guides only apply
+    // where the unit is the dp.
+    val latticeGeo = gridGeo.value
     // Cursor anchor for the right-click context menu (null = closed).
     var menuAnchor by remember { mutableStateOf<Offset?>(null) }
 
@@ -285,7 +288,10 @@ fun EditableWidgetChrome(
                     // widget's own floor and its own ceiling. Nothing said where a
                     // drag could stop until it stopped, so the only way to find a
                     // limit was to hit it.
-                    if (resizing) {
+                    // Free placement only. A lattice resizes in whole cells through
+                    // gridResizeSpan, which these bounds are not passed to, so a
+                    // guide there would draw a limit the gesture does not honour.
+                    if (resizing && latticeGeo == null) {
                         val dash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))
                         val guide = borderColor.copy(alpha = 0.5f)
                         // An axis with no declared limit keeps the widget's own
@@ -308,8 +314,14 @@ fun EditableWidgetChrome(
                         // Only for a limit the widget declared. An axis that said
                         // nothing draws no line there, because the line would be
                         // the editor's own fallback presented as the widget's word.
+                        // Per axis, not per guide. ResizeBounds fills an undeclared
+                        // floor with the editor's own 48, which is a real limit but
+                        // not the widget's word, and drawing it said the column may
+                        // be squashed to 48 when nobody had said any such thing.
+                        // NaN stands for "said nothing" the way infinity does above.
+                        fun floor(declared: Int, bound: Float) = if (declared > 0) bound else Float.NaN
                         if (sizing.minWidth > 0 || sizing.minHeight > 0) {
-                            mark(widthBounds.minDp, heightBounds.minDp)
+                            mark(floor(sizing.minWidth, widthBounds.minDp), floor(sizing.minHeight, heightBounds.minDp))
                         }
                         if (sizing.maxWidth > 0 || sizing.maxHeight > 0) {
                             mark(widthBounds.maxDp, heightBounds.maxDp)

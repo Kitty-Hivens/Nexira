@@ -102,9 +102,14 @@ data class ColumnPlayerProps(
 
 @Widget(
     id = "home.new.player.column",
-    // Width only. The column's height follows from its width and its contents,
-    // and a number for it here would be one nobody measured.
+    // The height follows the width: the cover is square and the strip, the words
+    // and the transport are fixed, so it comes to the width plus 156. The floor is
+    // therefore the height at the NARROWEST width, which is the one number that is
+    // never too high whatever the column is set to. Without it the handle stopped
+    // at the editor's own 48 and a column pulled to 272 lost its transport, which
+    // is the exact bug this declaration was added for.
     minWidth = 88, prefWidth = 148, maxWidth = 320,
+    minHeight = 244, prefHeight = 304,
     displayName = "widget.home.new.player.column",
     propsClass = ColumnPlayerProps::class,
     drawsOwnSurface = true,

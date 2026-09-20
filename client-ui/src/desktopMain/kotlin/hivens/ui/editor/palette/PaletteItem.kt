@@ -135,16 +135,15 @@ fun PaletteItem(
                             // reachable. The floor at zero was the only bound there
                             // was. A ceiling as well, so a drop anywhere inside the
                             // slot puts the whole widget inside the slot.
+                            // Position only. Seeding the declared size as a claim
+                            // as well looked tidy and was not: a claim is a
+                            // maximum, and a widget whose height grows with a
+                            // setting was then clipped by the size it arrived at.
+                            // The resize handle does not need it either, it reads
+                            // the measured bounds when there is no claim.
                             seed.copy(
                                 x = xDp.coerceIn(0f, ((slotRect.width / density) - DROP_INSET_DP).coerceAtLeast(0f)),
                                 y = yDp.coerceIn(0f, ((slotRect.height / density) - DROP_INSET_DP).coerceAtLeast(0f)),
-                                // Arrives at the size it says it wants, which is
-                                // also the size the ghost just showed. A claim of
-                                // zero drew the same pixels but told the resize
-                                // handle nothing, so the first drag jumped from a
-                                // number nobody had written to one the pointer did.
-                                width = descriptor.sizing.prefWidth.toFloat(),
-                                height = descriptor.sizing.prefHeight.toFloat(),
                             )
                         } else {
                             seed

@@ -26,47 +26,14 @@ class WidgetSizingTest {
     }
 
     @Test
-    fun `an undeclared axis holds nothing back`() {
-        val none = WidgetSizing()
-        assertEquals(1f, none.holdWidth(1f))
-        assertEquals(9999f, none.holdWidth(9999f))
-        assertEquals(0f, none.holdWidth(0f))
-    }
-
-    @Test
-    fun `a hold is inside the declared range`() {
-        assertEquals(80f, clock.holdWidth(10f), "under the floor comes up to it")
-        assertEquals(200f, clock.holdWidth(200f), "inside the range is untouched")
-        assertEquals(800f, clock.holdWidth(4000f), "over the ceiling comes down to it")
-    }
-
-    @Test
-    fun `the fallback floor only applies where the widget names none`() {
-        val heightOnly = WidgetSizing(minHeight = 100)
-        assertEquals(48f, heightOnly.holdWidth(10f, fallbackMin = 48f))
-        assertEquals(100f, heightOnly.holdHeight(10f, fallbackMin = 48f), "a declared floor wins over the fallback")
-    }
-
-    @Test
-    fun `a ceiling under the fallback floor is still reachable`() {
-        // A spacer-like widget that cannot usefully be wider than 24 would
-        // otherwise be pinned at the editor's own 48 and never reach its own size.
-        val tiny = WidgetSizing(maxWidth = 24)
-        assertEquals(24f, tiny.holdWidth(10f, fallbackMin = 48f))
-    }
-
-    @Test
-    fun `no claim still stops at the ceiling`() {
-        // Nobody chose a size, but past the ceiling the widget paints nothing, so
-        // the space beyond it would be space held for no pixels.
-        assertEquals(800f, clock.boundWidth(0f))
-        assertEquals(920f, clock.boundHeight(-5f))
-    }
-
-    @Test
-    fun `no claim and no ceiling is no bound`() {
+    fun `no claim is no bound, even where a ceiling was declared`() {
+        // Substituting the ceiling here read as "never hold space you will not
+        // paint", and cost more than it saved: a widget nobody has sized already
+        // draws at its own size, and a ceiling that describes one configuration
+        // then clipped the others. The disc's caption was the casualty.
+        assertEquals(0f, clock.boundWidth(0f))
+        assertEquals(0f, clock.boundHeight(-5f))
         assertEquals(0f, WidgetSizing(minWidth = 100).boundWidth(0f))
-        assertEquals(0f, WidgetSizing().boundHeight(0f))
     }
 
     @Test
