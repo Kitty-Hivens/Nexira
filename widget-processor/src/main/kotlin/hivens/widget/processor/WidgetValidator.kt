@@ -48,6 +48,8 @@ internal object WidgetValidator {
         val injects: List<String>,
         /** The default plane as JSON, already checked to parse. Null for none. */
         val surfaceJson: String?,
+        /** What the widget needs, wants and can use, already checked to be in order. */
+        val sizing: SizingArgs,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -205,6 +207,19 @@ internal object WidgetValidator {
             rawSurface
         }
 
+        val sizing = SizingArgs(
+            minWidth = args.int("minWidth"),
+            minHeight = args.int("minHeight"),
+            prefWidth = args.int("prefWidth"),
+            prefHeight = args.int("prefHeight"),
+            maxWidth = args.int("maxWidth"),
+            maxHeight = args.int("maxHeight"),
+        )
+        sizingFault(sizing)?.let {
+            env.logger.error("@Widget '$id' $it", symbol)
+            return null
+        }
+
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
         // way. Carrying them through is what lets the mismatch be seen.
@@ -219,7 +234,30 @@ internal object WidgetValidator {
             provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
             injects = symbol.serviceContracts(INJECT_SERVICE_FQN, "services"),
             surfaceJson = surface,
+            sizing = sizing,
         )
+    }
+
+    private fun Map<String?, Any?>.int(name: String): Int = (this[name] as? Int) ?: 0
+
+    /**
+     * What is wrong with a size declaration, or null when nothing is.
+     *
+     * Separate and pure because it is the whole of the rule and every case is one
+     * assertion. A declaration out of order describes a widget nothing can draw,
+     * and it is a literal in source, so the author is right here and the cost of
+     * telling them is one line.
+     */
+    internal fun sizingFault(s: SizingArgs): String? {
+        fun axis(name: String, min: Int, pref: Int, max: Int): String? = when {
+            min < 0 || pref < 0 || max < 0 -> "declares a negative $name"
+            min > 0 && max > 0 && min > max -> "declares min$name $min above max$name $max"
+            pref > 0 && min > 0 && pref < min -> "declares pref$name $pref below min$name $min"
+            pref > 0 && max > 0 && pref > max -> "declares pref$name $pref above max$name $max"
+            else -> null
+        }
+        return axis("Width", s.minWidth, s.prefWidth, s.maxWidth)
+            ?: axis("Height", s.minHeight, s.prefHeight, s.maxHeight)
     }
 
     /**

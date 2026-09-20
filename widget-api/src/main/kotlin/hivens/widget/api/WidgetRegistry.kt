@@ -5,6 +5,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import hivens.widget.model.WidgetSizing
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 
@@ -60,6 +61,13 @@ interface WidgetDescriptor {
 
     val injects: Set<String>
         get() = emptySet()
+
+    // What this widget needs, wants and can use, per axis. Populated by the KSP
+    // processor from @Widget(minWidth = ..., prefWidth = ..., ...). Undeclared by
+    // default, which reads as "no floor, no ceiling, content decides" everywhere
+    // it is consulted. See [hivens.widget.model.WidgetSizing].
+    val sizing: WidgetSizing
+        get() = WidgetSizing.UNDECLARED
 
     @Composable
     fun Render(instance: WidgetInstance)

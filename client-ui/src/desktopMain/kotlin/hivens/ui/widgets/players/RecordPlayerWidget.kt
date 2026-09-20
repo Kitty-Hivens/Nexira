@@ -100,6 +100,9 @@ data class RecordPlayerProps(
 
 @Widget(
     id = "home.new.player.record",
+    minWidth = 72, minHeight = 72,
+    prefWidth = 168, prefHeight = 168,
+    maxWidth = 420, maxHeight = 420,
     displayName = "widget.home.new.player.record",
     propsClass = RecordPlayerProps::class,
     drawsOwnSurface = true,

@@ -71,6 +71,9 @@ data class ChecklistState(val items: List<ChecklistItem> = emptyList(), val next
  */
 @Widget(
     id = "checklist",
+    minWidth = 96, minHeight = 88,
+    prefWidth = 240, prefHeight = 220,
+    maxWidth = 960, maxHeight = 880,
     displayName = "widget.checklist",
     propsClass = ChecklistProps::class,
     surface = """{"fill":"base","opacity":0.55}""",
@@ -97,7 +100,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
     val shown = if (p.hideCompleted) state.items.filterNot { it.done } else state.items
     val doneCount = state.items.count { it.done }
 
-    AdaptiveWidget(referenceWidth = 240.dp, referenceHeight = 220.dp) { scale ->
+    AdaptiveWidget { scale ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

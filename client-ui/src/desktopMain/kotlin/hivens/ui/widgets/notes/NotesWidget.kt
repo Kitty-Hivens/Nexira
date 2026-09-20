@@ -53,6 +53,9 @@ data class NotesState(
  */
 @Widget(
     id = "notes.scratch",
+    minWidth = 88, minHeight = 72,
+    prefWidth = 220, prefHeight = 180,
+    maxWidth = 880, maxHeight = 720,
     displayName = "widget.notes.scratch",
     propsClass = NotesProps::class,
     surface = """{"fill":"base","opacity":0.55}""",
@@ -64,7 +67,7 @@ fun NotesWidget(instance: WidgetInstance) {
     val palette = NxTheme.colors
     var notes by instance.rememberWidgetState { NotesState() }
 
-    AdaptiveWidget(referenceWidth = 220.dp, referenceHeight = 180.dp) { scale ->
+    AdaptiveWidget { scale ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

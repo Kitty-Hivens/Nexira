@@ -50,6 +50,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -66,8 +67,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
+import hivens.ui.editor.ResizeBounds
 import hivens.ui.editor.ResizeEdge
 import hivens.ui.editor.canvasResize
+import hivens.ui.editor.guideLeadDp
 import hivens.ui.editor.placementDragOffset
 import hivens.ui.editor.gridDragCell
 import hivens.ui.editor.gridResizeSpan
@@ -165,6 +168,13 @@ fun EditableWidgetChrome(
     val liveInstance = rememberUpdatedState(instance)
     val liveCommitDrop = rememberUpdatedState(onCommitDrop)
     var latticeDrag by remember { mutableStateOf(Offset.Zero) }
+    // What this widget says it needs and can use. The gesture is held to it, the
+    // renderer bounds by it, and while a handle is down the two extremes are drawn
+    // so the range is visible before the drag ends rather than discovered by it.
+    val sizing = descriptor.sizing
+    val widthBounds = remember(sizing) { ResizeBounds.of(sizing.minWidth, sizing.maxWidth) }
+    val heightBounds = remember(sizing) { ResizeBounds.of(sizing.minHeight, sizing.maxHeight) }
+    var resizing by remember { mutableStateOf(false) }
     // Cursor anchor for the right-click context menu (null = closed).
     var menuAnchor by remember { mutableStateOf<Offset?>(null) }
 
@@ -223,6 +233,10 @@ fun EditableWidgetChrome(
     // Captured here because NxTheme.colors is a @Composable read; the draw lambda
     // applies the animated alpha (a snapshot read, so it redraws without recomposing).
     val borderColor = NxTheme.colors.primary
+    // The corner the resize pivots on, which is the corner the guides hang from.
+    val guideAnchor = instance.placement?.anchor ?: Placement.TOP_START
+    val hBiasForGuides = anchorHorizontalBias(parseAnchor(guideAnchor))
+    val vBiasForGuides = anchorVerticalBias(parseAnchor(guideAnchor))
 
     // Being landed on. Free placement lets widgets overlap and will keep letting
     // them, so this is the warning and not a refusal: the border turns while the
@@ -266,6 +280,41 @@ fun EditableWidgetChrome(
                         cornerRadius = CornerRadius(radius, radius),
                         style        = Stroke(width = strokePx),
                     )
+                    // Where the handle may still go, while it is down. Two dashed
+                    // rectangles hung off the corner the resize pivots on: the
+                    // widget's own floor and its own ceiling. Nothing said where a
+                    // drag could stop until it stopped, so the only way to find a
+                    // limit was to hit it.
+                    if (resizing) {
+                        val dash = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))
+                        val guide = borderColor.copy(alpha = 0.5f)
+                        // An axis with no declared limit keeps the widget's own
+                        // extent there, so the guide marks one axis without
+                        // claiming anything about the other.
+                        fun mark(wDp: Float, hDp: Float) {
+                            val w = if (wDp.isFinite()) wDp.dp.toPx() else size.width
+                            val h = if (hDp.isFinite()) hDp.dp.toPx() else size.height
+                            drawRoundRect(
+                                color = guide,
+                                topLeft = Offset(
+                                    guideLeadDp(size.width, w, hBiasForGuides),
+                                    guideLeadDp(size.height, h, vBiasForGuides),
+                                ),
+                                size = Size(w, h),
+                                cornerRadius = CornerRadius(radius, radius),
+                                style = Stroke(width = 1.dp.toPx(), pathEffect = dash),
+                            )
+                        }
+                        // Only for a limit the widget declared. An axis that said
+                        // nothing draws no line there, because the line would be
+                        // the editor's own fallback presented as the widget's word.
+                        if (sizing.minWidth > 0 || sizing.minHeight > 0) {
+                            mark(widthBounds.minDp, heightBounds.minDp)
+                        }
+                        if (sizing.maxWidth > 0 || sizing.maxHeight > 0) {
+                            mark(widthBounds.maxDp, heightBounds.maxDp)
+                        }
+                    }
                     // Over the resting outline rather than instead of it, and
                     // thicker, so the pair being warned about reads at a glance
                     // across a surface where every widget already has a border.
@@ -479,6 +528,7 @@ fun EditableWidgetChrome(
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = false)
                                     down.consume()
+                                    resizing = true
                                     val p = livePlacement.value
                                     val wb = widgetWindowBounds
                                     val geo = gridGeo.value
@@ -520,6 +570,8 @@ fun EditableWidgetChrome(
                                                 slotHDp   = slot.height,
                                                 hBias     = anchorHorizontalBias(anchor),
                                                 vBias     = anchorVerticalBias(anchor),
+                                                widthBounds  = widthBounds,
+                                                heightBounds = heightBounds,
                                             )
                                             // One write, so the offset and the size cannot
                                             // land a frame apart and the history sees one step.
@@ -534,6 +586,7 @@ fun EditableWidgetChrome(
                                         }
                                         change.consume()
                                     }
+                                    resizing = false
                                     registry.publishOverlap(emptySet())
                                 }
                             },

@@ -4,6 +4,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -258,5 +260,68 @@ class WidgetRegistryRendererTest {
         val src = renderRegistry(listOf(widget("home.new.clock")))
         assertContains(src, "package hivens.widget.generated")
         assertContains(src, "object GeneratedWidgetRegistry : WidgetRegistry {")
+    }
+
+    // ── Declared size ────────────────────────────────────────────────
+
+    @Test
+    fun `a widget that says nothing about its size emits nothing about it`() {
+        val out = renderRegistry(listOf(widget("a.b")))
+        assertFalse(out.contains("WidgetSizing"), "six zeroes is what the interface already defaults to")
+        assertFalse(out.contains("import hivens.widget.model.WidgetSizing"))
+    }
+
+    @Test
+    fun `a declared size is emitted, naming only the axes that were named`() {
+        val out = renderRegistry(
+            listOf(widget("a.b").copy(sizing = SizingArgs(prefWidth = 200, prefHeight = 230))),
+        )
+        assertTrue(out.contains("import hivens.widget.model.WidgetSizing"))
+        assertTrue(
+            out.contains("override val sizing: WidgetSizing = WidgetSizing(prefWidth = 200, prefHeight = 230)"),
+            out,
+        )
+    }
+
+    @Test
+    fun `one axis declared leaves the other silent rather than zeroed`() {
+        val out = renderRegistry(listOf(widget("a.b").copy(sizing = SizingArgs(minWidth = 96, maxWidth = 420))))
+        assertTrue(out.contains("WidgetSizing(minWidth = 96, maxWidth = 420)"), out)
+    }
+
+    @Test
+    fun `the import appears once for a build where only some widgets declare`() {
+        val out = renderRegistry(
+            listOf(widget("a.b"), widget("c.d").copy(sizing = SizingArgs(prefWidth = 10))),
+        )
+        assertEquals(1, out.lines().count { it == "import hivens.widget.model.WidgetSizing" })
+    }
+
+    // ── What the processor refuses ───────────────────────────────────
+
+    @Test
+    fun `a size in order passes`() {
+        assertNull(WidgetValidator.sizingFault(SizingArgs()))
+        assertNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 80, prefWidth = 200, maxWidth = 800)))
+        assertNull(
+            WidgetValidator.sizingFault(SizingArgs(minHeight = 92, prefHeight = 230, maxHeight = 920)),
+            "an axis declared alone is in order",
+        )
+    }
+
+    @Test
+    fun `a size out of order is named, because the author is right here`() {
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 400, maxWidth = 100)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 200, prefWidth = 100)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 900, maxWidth = 800)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(minHeight = -1)))
+    }
+
+    @Test
+    fun `a bound with nothing on the other side is not a contradiction`() {
+        // Declaring only a floor, or only a ceiling, is the common case.
+        assertNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 400)))
+        assertNull(WidgetValidator.sizingFault(SizingArgs(maxWidth = 400)))
+        assertNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 400)))
     }
 }

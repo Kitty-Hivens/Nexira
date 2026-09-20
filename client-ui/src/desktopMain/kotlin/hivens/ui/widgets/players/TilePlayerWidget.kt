@@ -103,6 +103,9 @@ data class TilePlayerProps(
 
 @Widget(
     id = "home.new.player.tile",
+    minWidth = 72, minHeight = 72,
+    prefWidth = 196, prefHeight = 196,
+    maxWidth = 480, maxHeight = 480,
     displayName = "widget.home.new.player.tile",
     propsClass = TilePlayerProps::class,
     drawsOwnSurface = true,

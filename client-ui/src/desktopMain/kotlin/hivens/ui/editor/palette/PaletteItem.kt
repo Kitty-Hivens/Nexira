@@ -1,6 +1,7 @@
 package hivens.ui.editor.palette
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -51,6 +52,7 @@ import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.seedPlacement
+import hivens.widget.model.WidgetSizing
 import hivens.widget.model.traverse
 
 // Palette row. Click + drag from the row drops the widget into the
@@ -98,7 +100,7 @@ fun PaletteItem(
                 controller            = controller,
                 payload               = DragPayload.PaletteWidget(descriptor.kind),
                 widgetBoundsProvider  = { rowBounds },
-                ghost                 = { PaletteGhost(displayName = label) },
+                ghost                 = { PaletteGhost(displayName = label, sizing = descriptor.sizing) },
                 onDragEnd             = { pointer ->
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
                     val target = graph.traverse(targetPath)
@@ -124,6 +126,13 @@ fun PaletteItem(
                             seed.copy(
                                 x = xDp.coerceIn(0f, ((slotRect.width / density) - DROP_INSET_DP).coerceAtLeast(0f)),
                                 y = yDp.coerceIn(0f, ((slotRect.height / density) - DROP_INSET_DP).coerceAtLeast(0f)),
+                                // Arrives at the size it says it wants, which is
+                                // also the size the ghost just showed. A claim of
+                                // zero drew the same pixels but told the resize
+                                // handle nothing, so the first drag jumped from a
+                                // number nobody had written to one the pointer did.
+                                width = descriptor.sizing.prefWidth.toFloat(),
+                                height = descriptor.sizing.prefHeight.toFloat(),
                             )
                         } else {
                             seed
@@ -187,8 +196,41 @@ fun PaletteItem(
     }
 }
 
+/**
+ * What follows the pointer out of the palette.
+ *
+ * A label chip rather than the real widget: a @Composable exception cannot be
+ * caught mid-composition, so rendering a surface-context-dependent widget during
+ * a palette drag crashes every frame.
+ *
+ * Inside the footprint the widget declared, when it declares one. The chip alone
+ * said what was being added and nothing about how much room it takes, so the only
+ * way to find out was to drop it and look. A widget that declares no preferred
+ * size still gets the bare chip, because an invented rectangle would be worse
+ * than none.
+ */
 @Composable
-private fun PaletteGhost(displayName: String) {
+private fun PaletteGhost(displayName: String, sizing: WidgetSizing) {
+    val w = sizing.prefWidth
+    val h = sizing.prefHeight
+    if (w <= 0 || h <= 0) {
+        PaletteGhostChip(displayName)
+        return
+    }
+    Box(
+        modifier = Modifier
+            .size(w.dp, h.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(NxTheme.colors.primary.copy(alpha = 0.16f))
+            .border(2.dp, NxTheme.colors.primary.copy(alpha = 0.8f), RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        PaletteGhostChip(displayName)
+    }
+}
+
+@Composable
+private fun PaletteGhostChip(displayName: String) {
     Surface(
         color           = NxTheme.colors.primary,
         contentColor    = Color.White,

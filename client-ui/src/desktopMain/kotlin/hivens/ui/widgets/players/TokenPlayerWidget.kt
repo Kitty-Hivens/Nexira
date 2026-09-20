@@ -102,6 +102,12 @@ data class TokenPlayerProps(
 
 @Widget(
     id = "home.new.player.token",
+    // Mirrors the size prop's own range and default. The prop is the ceiling the
+    // token draws under; this is the same range said where the editor can read it,
+    // so a resize handle and the slider stop at the same place.
+    minWidth = 48, minHeight = 48,
+    prefWidth = 96, prefHeight = 96,
+    maxWidth = 320, maxHeight = 320,
     displayName = "widget.home.new.player.token",
     propsClass = TokenPlayerProps::class,
     drawsOwnSurface = true,

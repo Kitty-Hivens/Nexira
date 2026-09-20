@@ -40,6 +40,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetSizing
 import hivens.widget.model.anchorHorizontalBias
 import hivens.widget.model.anchorVerticalBias
 import hivens.widget.model.clampPlacementAxis
@@ -220,7 +221,7 @@ private fun FlowWidgets(
                     is FlowPlacement.Weighted -> Box(weight(placement.weight)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
-                    is FlowPlacement.Bounded -> Box(boundedModifier(placement)) {
+                    is FlowPlacement.Bounded -> Box(boundedModifier(placement, descriptor.sizing)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
                     FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
@@ -268,10 +269,16 @@ private fun WrappedLine(
 // leaving empty space below or beside it -- so dragging the handle past the
 // content no longer inflates the box with phantom padding. A fixed extent only
 // suits a placement slot, which sets Modifier.size directly.
-private fun boundedModifier(placement: FlowPlacement.Bounded): Modifier {
+private fun boundedModifier(placement: FlowPlacement.Bounded, sizing: WidgetSizing): Modifier {
+    // Held inside what the widget says it can use, so a bound dragged under the
+    // content stops at the content instead of cutting it, and one dragged past
+    // where the widget stops drawing reserves nothing extra. Undeclared, which is
+    // most widgets, leaves the bound exactly as it was written.
+    val w = sizing.boundWidth(placement.widthDp)
+    val h = sizing.boundHeight(placement.heightDp)
     var m: Modifier = Modifier
-    if (placement.widthDp > 0f) m = m.widthIn(max = placement.widthDp.dp)
-    if (placement.heightDp > 0f) m = m.heightIn(max = placement.heightDp.dp)
+    if (w > 0f) m = m.widthIn(max = w.dp)
+    if (h > 0f) m = m.heightIn(max = h.dp)
     return m
 }
 
@@ -353,7 +360,8 @@ private fun PlacementSlot(
                     key(instance.instanceId) {
                         val p = instance.placement ?: Placement()
                         val descriptor = registry[instance.kind]
-                        PlacedBox(p, columns, cell, spacing.value, clampSize) {
+                        val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
+                        PlacedBox(p, columns, cell, spacing.value, clampSize, sizing) {
                             if (descriptor == null) {
                                 unknownDecorator(address, index, instance)
                             } else {
@@ -378,6 +386,7 @@ private fun BoxScope.PlacedBox(
     cell: Float,
     gutter: Float,
     slotDp: Size,
+    sizing: WidgetSizing,
     content: @Composable () -> Unit,
 ) {
     val lattice = columns > 0
@@ -446,9 +455,18 @@ private fun BoxScope.PlacedBox(
     // Each axis on its own: a widget that names a width and not a height is as
     // expressible as one that names both, and requiring the pair silently threw
     // the one away.
+    //
+    // Held inside what the widget says it can use, which is what finally makes
+    // the rule enforceable rather than hoped for. A claim under the widget's own
+    // floor comes up to the floor: the widget then spills past the box it was
+    // given, which is visible and correctable, where the cut it replaces was
+    // neither. In a lattice that means a cell too small for its occupant shows an
+    // occupant that overflows it, and the editor's overlap warning says so.
+    val boundW = sizing.boundWidth(width)
+    val boundH = sizing.boundHeight(height)
     var sizeMod: Modifier = Modifier
-    if (width > 0f) sizeMod = sizeMod.widthIn(max = width.dp)
-    if (height > 0f) sizeMod = sizeMod.heightIn(max = height.dp)
+    if (boundW > 0f) sizeMod = sizeMod.widthIn(max = boundW.dp)
+    if (boundH > 0f) sizeMod = sizeMod.heightIn(max = boundH.dp)
     Box(
         Modifier
             .align(alignmentFor(anchor))
@@ -512,9 +530,15 @@ private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: Widget
 @Composable
 private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
     val surface = descriptor.resolveSurface(instance)
-    if (surface == null) {
-        descriptor.Render(instance)
-    } else {
-        LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
+    // Published around the body so a widget can read its own declaration without
+    // being handed its descriptor. AdaptiveWidget takes its reference size from
+    // here, which is what keeps the number the annotation carries and the number
+    // the widget draws at from being two numbers.
+    CompositionLocalProvider(LocalWidgetSizing provides descriptor.sizing) {
+        if (surface == null) {
+            descriptor.Render(instance)
+        } else {
+            LocalWidgetSurfaceRenderer.current(surface) { descriptor.Render(instance) }
+        }
     }
 }

@@ -89,8 +89,52 @@ internal fun canvasResizeSize(
     (startWDp + accumXPx / density).coerceAtLeast(minDp) to
         (startHDp + accumYPx / density).coerceAtLeast(minDp)
 
-/** The smallest a widget may be dragged to, so it cannot collapse out of reach. */
+/**
+ * The smallest a widget may be dragged to when it declares no floor of its own,
+ * so it cannot collapse out of reach.
+ *
+ * A fallback. A widget that says what it needs is held to that instead, and the
+ * same number bounds what the renderer draws, so the handle cannot stop
+ * somewhere the drawing disagrees with.
+ */
 internal const val MIN_WIDGET_DP = 48f
+
+/**
+ * What a resize gesture is allowed to produce on one axis.
+ *
+ * Read off the widget's own declaration, with [MIN_WIDGET_DP] standing in for a
+ * floor nobody named and no ceiling at all for a ceiling nobody named.
+ */
+internal data class ResizeBounds(val minDp: Float, val maxDp: Float) {
+    fun hold(v: Float): Float = v.coerceIn(minDp, maxOf(minDp, maxDp))
+
+    companion object {
+        /**
+         * No opinion: the editor's own floor, and as large as the slot allows.
+         *
+         * Infinity rather than [Float.MAX_VALUE], because "no ceiling" has to be
+         * distinguishable from a very large one. A reader asking isFinite about
+         * MAX_VALUE is told yes, and the range guide then drew a rectangle the
+         * size of the number.
+         */
+        val OPEN = ResizeBounds(MIN_WIDGET_DP, Float.POSITIVE_INFINITY)
+
+        fun of(declaredMin: Int, declaredMax: Int): ResizeBounds = ResizeBounds(
+            minDp = if (declaredMin > 0) declaredMin.toFloat() else MIN_WIDGET_DP,
+            maxDp = if (declaredMax > 0) declaredMax.toFloat() else Float.POSITIVE_INFINITY,
+        )
+    }
+}
+
+/**
+ * Where a guide marking an extent of [extentDp] sits inside a widget currently
+ * [ownDp] across, for an anchor whose bias on that axis is [bias].
+ *
+ * The anchored edge is the one that does not move while the handle is dragged,
+ * so the guide has to hang off the same corner the resize pivots on. Same bias
+ * arithmetic the renderer positions by, so the guide lands where the widget will.
+ */
+internal fun guideLeadDp(ownDp: Float, extentDp: Float, bias: Float): Float = bias * (ownDp - extentDp)
 
 /**
  * Which edges of a widget a handle moves.
@@ -144,10 +188,11 @@ internal fun canvasResize(
     slotHDp: Float,
     hBias: Float,
     vBias: Float,
-    minDp: Float = MIN_WIDGET_DP,
+    widthBounds: ResizeBounds = ResizeBounds.OPEN,
+    heightBounds: ResizeBounds = ResizeBounds.OPEN,
 ): ResizedPlacement {
-    val (x, w) = resizeAxis(edge.h, startXDp, startWDp, accumXPx / density, slotWDp, hBias, minDp)
-    val (y, h) = resizeAxis(edge.v, startYDp, startHDp, accumYPx / density, slotHDp, vBias, minDp)
+    val (x, w) = resizeAxis(edge.h, startXDp, startWDp, accumXPx / density, slotWDp, hBias, widthBounds)
+    val (y, h) = resizeAxis(edge.v, startYDp, startHDp, accumYPx / density, slotHDp, vBias, heightBounds)
     return ResizedPlacement(x, y, w, h)
 }
 
@@ -164,7 +209,7 @@ private fun resizeAxis(
     deltaDp: Float,
     slotDp: Float,
     bias: Float,
-    minDp: Float,
+    bounds: ResizeBounds,
 ): Pair<Float, Float> {
     if (side == 0) return startDp to startExtentDp
     // An offset counts inward from its own edge, so a trailing anchor stores the
@@ -175,7 +220,10 @@ private fun resizeAxis(
 
     val lead1 = if (side < 0) lead0 + deltaDp else lead0
     val trail1 = if (side > 0) trail0 + deltaDp else trail0
-    val extent = (trail1 - lead1).coerceAtLeast(minDp)
+    // Both ends now, not just the floor. A handle dragged past where the widget
+    // stops drawing used to keep writing a larger number, so the stored size, the
+    // editor's frame and the pixels were three different answers.
+    val extent = bounds.hold(trail1 - lead1)
     // Re-derive the moving edge after the clamp: the still one is the one the
     // gesture did not touch, and it must not drift because the other bottomed out.
     val lead = if (side < 0) trail1 - extent else lead1

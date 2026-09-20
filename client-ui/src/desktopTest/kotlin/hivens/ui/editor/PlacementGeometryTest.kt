@@ -2,6 +2,8 @@ package hivens.ui.editor
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 // Pins the canvas placement + lattice math (offset / clamp / resize / window->local
 // / cell move / span resize) so the gesture code that wraps it stays an untested thin
@@ -193,6 +195,97 @@ class PlacementGeometryTest {
         val r = resize(ResizeEdge.West, dx = 400f)
         assertEquals(MIN_WIDGET_DP, r.w, eps)
         assertEquals(300f - MIN_WIDGET_DP, r.x, eps, "the untouched edge stays at 300")
+    }
+
+    // ── What the widget says it can be ───────────────────────────────
+
+    @Test
+    fun `an undeclared widget keeps the editor's own floor and no ceiling`() {
+        val open = ResizeBounds.OPEN
+        assertEquals(MIN_WIDGET_DP, open.hold(1f), eps)
+        assertEquals(9999f, open.hold(9999f), eps)
+    }
+
+    @Test
+    fun `a declared range replaces the fallback on the axis that declares it`() {
+        val b = ResizeBounds.of(declaredMin = 88, declaredMax = 320)
+        assertEquals(88f, b.hold(10f), eps)
+        assertEquals(320f, b.hold(9999f), eps)
+        assertEquals(148f, b.hold(148f), eps)
+    }
+
+    @Test
+    fun `no ceiling is distinguishable from a very large one`() {
+        // The range guide asks isFinite to decide whether to draw a line, and
+        // Float.MAX_VALUE answers yes, so it drew a rectangle the size of the
+        // number instead of drawing nothing.
+        assertFalse(ResizeBounds.OPEN.maxDp.isFinite())
+        assertFalse(ResizeBounds.of(declaredMin = 88, declaredMax = 0).maxDp.isFinite())
+        assertTrue(ResizeBounds.of(declaredMin = 88, declaredMax = 320).maxDp.isFinite())
+    }
+
+    @Test
+    fun `an axis that declares only a ceiling keeps the fallback floor`() {
+        val b = ResizeBounds.of(declaredMin = 0, declaredMax = 320)
+        assertEquals(MIN_WIDGET_DP, b.hold(1f), eps)
+        assertEquals(320f, b.hold(9999f), eps)
+    }
+
+    @Test
+    fun `a resize stops at the declared ceiling instead of writing past it`() {
+        // The stored size, the editor's frame and the pixels were three answers
+        // once a handle was dragged past where the widget stops drawing.
+        val r = canvasResize(
+            ResizeEdge.SouthEast, 100f, 100f, 200f, 200f, 9999f, 9999f, density = 1f,
+            slotWDp = 4000f, slotHDp = 4000f, hBias = 0f, vBias = 0f,
+            widthBounds = ResizeBounds.of(88, 320),
+            heightBounds = ResizeBounds.of(88, 240),
+        )
+        assertEquals(320f, r.w, eps)
+        assertEquals(240f, r.h, eps)
+    }
+
+    @Test
+    fun `a resize stops at the declared floor rather than the editor's`() {
+        val r = canvasResize(
+            ResizeEdge.SouthEast, 100f, 100f, 200f, 200f, -9999f, -9999f, density = 1f,
+            slotWDp = 1000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
+            widthBounds = ResizeBounds.of(88, 320),
+            heightBounds = ResizeBounds.of(88, 320),
+        )
+        assertEquals(88f, r.w, eps, "the widget's own floor, not the editor's 48")
+        assertEquals(88f, r.h, eps)
+    }
+
+    @Test
+    fun `the ceiling holds the dragged edge and leaves the other one alone`() {
+        // Same rule the floor follows: bottoming out on one edge must not carry
+        // the opposite edge along with it.
+        val r = canvasResize(
+            ResizeEdge.West, 100f, 100f, 200f, 200f, -9999f, 0f, density = 1f,
+            slotWDp = 4000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
+            widthBounds = ResizeBounds.of(0, 320),
+        )
+        assertEquals(320f, r.w, eps)
+        assertEquals(300f - 320f, r.x, eps, "the untouched right edge stays at 300")
+    }
+
+    // ── Where the range is drawn ─────────────────────────────────────
+
+    @Test
+    fun `a guide hangs off the corner the resize pivots on`() {
+        // Start anchor: the leading edge is pinned, so the guide starts there.
+        assertEquals(0f, guideLeadDp(ownDp = 200f, extentDp = 88f, bias = 0f), eps)
+        // End anchor: the trailing edge is pinned, so the guide ends there.
+        assertEquals(112f, guideLeadDp(ownDp = 200f, extentDp = 88f, bias = 1f), eps)
+        // Centre: split.
+        assertEquals(56f, guideLeadDp(ownDp = 200f, extentDp = 88f, bias = 0.5f), eps)
+    }
+
+    @Test
+    fun `a guide larger than the widget hangs outward rather than being clipped in`() {
+        assertEquals(-120f, guideLeadDp(ownDp = 200f, extentDp = 320f, bias = 1f), eps)
+        assertEquals(0f, guideLeadDp(ownDp = 200f, extentDp = 320f, bias = 0f), eps)
     }
 
     @Test

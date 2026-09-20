@@ -13,6 +13,7 @@ import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetSizing
 
 // Locals provided once near the application root. Static because the
 // graph and registry references swap on whole-tree events (layout
@@ -168,6 +169,22 @@ val LocalPlacementSlotSizeDp: ProvidableCompositionLocal<Size> =
  */
 val LocalWidgetFootprintDp: ProvidableCompositionLocal<Size> =
     compositionLocalOf { Size.Zero }
+
+/**
+ * What the widget currently rendering declared about its own size.
+ *
+ * Published by [SlotRenderer] around each widget from its descriptor, so a
+ * widget's body can read the numbers its own declaration carries without being
+ * handed its descriptor. Undeclared -- the default, and what a widget rendered
+ * outside a slot sees -- means the reader falls back to whatever it did before
+ * anything declared anything.
+ *
+ * Dynamic rather than static because it differs per widget: a static local
+ * provided around every one of them would invalidate the whole subtree each
+ * time the provider moved on to the next.
+ */
+val LocalWidgetSizing: ProvidableCompositionLocal<WidgetSizing> =
+    compositionLocalOf { WidgetSizing.UNDECLARED }
 
 // Lattice cell geometry published by SlotRenderer's placement branch (dp): the
 // editor's move / resize gestures read it to turn a pointer delta into a whole

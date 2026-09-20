@@ -70,6 +70,12 @@ data class ClockProps(
 // still.
 @Widget(
     id = "home.new.clock",
+    // The size the dial is drawn for, and how far it scales. These were the
+    // reference passed to AdaptiveWidget plus its own 0.4 and 4 scale bounds,
+    // which lived only in the body and so were a number the editor could not read.
+    minWidth = 80, minHeight = 92,
+    prefWidth = 200, prefHeight = 230,
+    maxWidth = 800, maxHeight = 920,
     displayName = "widget.home.new.clock",
     propsClass = ClockProps::class,
     surface = """{"fill":"base","opacity":0.65,"padding":{"top":12.0}}""",
@@ -106,7 +112,7 @@ fun ClockWidget(instance: WidgetInstance) {
         }
     }
 
-    AdaptiveWidget(referenceWidth = 200.dp, referenceHeight = 230.dp) { scale ->
+    AdaptiveWidget { scale ->
         Column(
             modifier = Modifier
                 .fillMaxSize()

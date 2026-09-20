@@ -102,6 +102,9 @@ data class ColumnPlayerProps(
 
 @Widget(
     id = "home.new.player.column",
+    // Width only. The column's height follows from its width and its contents,
+    // and a number for it here would be one nobody measured.
+    minWidth = 88, prefWidth = 148, maxWidth = 320,
     displayName = "widget.home.new.player.column",
     propsClass = ColumnPlayerProps::class,
     drawsOwnSurface = true,
