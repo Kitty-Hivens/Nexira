@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
@@ -207,7 +206,7 @@ private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: Widge
     // by 230 into a letterbox. Held between the two so one very long widget cannot
     // squash its whole row, and one very tall one cannot own the panel.
     val ratio = when (preview) {
-        is WidgetPreview.Drawn -> (preview.inkSize.width.toFloat() / preview.inkSize.height)
+        is WidgetPreview.Drawn -> (preview.image.width.toFloat() / preview.image.height)
             .coerceIn(MIN_THUMB_RATIO, MAX_THUMB_RATIO)
         else -> DEFAULT_THUMB_RATIO
     }
@@ -221,13 +220,11 @@ private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: Widge
     ) {
         when (preview) {
             is WidgetPreview.Drawn -> Image(
-                painter            = remember(preview) {
-                    // The widget's own rectangle out of the scene's frame. Fit
-                    // inside it, not crop: the whole widget or nothing, because a
-                    // cropped preview of a wide widget is a picture of its middle.
-                    BitmapPainter(preview.image, preview.inkOffset, preview.inkSize)
-                },
+                bitmap             = preview.image,
                 contentDescription = label,
+                // Fit, not crop: the whole widget or nothing, because a cropped
+                // preview of a wide widget is a picture of its middle. The frame
+                // around it was already trimmed off when it was rendered.
                 contentScale       = ContentScale.Fit,
                 modifier           = Modifier.fillMaxSize().padding(4.dp),
             )
@@ -295,9 +292,7 @@ private fun PaletteGhost(displayName: String, sizing: WidgetSizing, preview: Wid
         // because it is not there yet.
         if (preview is WidgetPreview.Drawn) {
             Image(
-                painter            = remember(preview) {
-                    BitmapPainter(preview.image, preview.inkOffset, preview.inkSize)
-                },
+                bitmap             = preview.image,
                 contentDescription = null,
                 contentScale       = ContentScale.Fit,
                 alpha              = 0.85f,

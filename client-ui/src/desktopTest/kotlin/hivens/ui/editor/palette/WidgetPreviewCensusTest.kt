@@ -123,11 +123,15 @@ class WidgetPreviewCensusTest {
                 }
             }
             val image = scene.render()
-            File(SHOT_DIR).mkdirs()
-            image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {
-                File("$SHOT_DIR/${kind.value}.png").writeBytes(it)
+            try {
+                File(SHOT_DIR).mkdirs()
+                image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {
+                    File("$SHOT_DIR/${kind.value}.png").writeBytes(it)
+                }
+                ink[kind] = coverage(image)
+            } finally {
+                image.close()
             }
-            ink[kind] = coverage(image)
             Unit
         }.also { runCatching { scene.close() } }.exceptionOrNull()
     }
@@ -135,25 +139,33 @@ class WidgetPreviewCensusTest {
     /**
      * How much of the frame the widget put anything into, as a fraction.
      *
-     * Against the page colour rather than against black: the scene is drawn on the
-     * theme's background, so "nothing here" is that colour and not an absence.
+     * Ink is anything not transparent, which is what an untouched pixel of the
+     * scene is: it clears to transparent and nothing here paints a page behind the
+     * widget. Measuring against the corner pixel instead reads a widget that
+     * paints its own full-bleed plane as empty, and several do.
+     *
+     * One read of the buffer rather than a call per sample, and the bitmap is
+     * closed: this runs sixty-eight times and the census should not itself be the
+     * expensive thing in the report.
      */
     private fun coverage(image: Image): Float {
         val bitmap = Bitmap.makeFromImage(image)
-        var page = 0
-        var drawn = 0
-        val step = 4
-        var y = 0
-        while (y < bitmap.height) {
-            var x = 0
-            while (x < bitmap.width) {
-                val c = bitmap.getColor(x, y)
-                if (c == bitmap.getColor(1, 1)) page++ else drawn++
-                x += step
+        try {
+            val info = bitmap.imageInfo
+            if (info.bytesPerPixel != 4) return 0f
+            val rowBytes = info.minRowBytes
+            val pixels = bitmap.readPixels(info, rowBytes, 0, 0) ?: return 0f
+            var drawn = 0
+            for (y in 0 until info.height) {
+                val row = y * rowBytes
+                for (x in 0 until info.width) {
+                    if (pixels[row + x * 4 + 3] != 0.toByte()) drawn++
+                }
             }
-            y += step
+            return drawn.toFloat() / (info.width * info.height)
+        } finally {
+            bitmap.close()
         }
-        return if (page + drawn == 0) 0f else drawn.toFloat() / (page + drawn)
     }
 
     private val ink = LinkedHashMap<WidgetKind, Float>()

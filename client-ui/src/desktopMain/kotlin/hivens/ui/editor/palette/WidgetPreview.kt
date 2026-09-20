@@ -22,8 +22,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.editor.ShellChromeBounds
@@ -52,6 +50,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.jetbrains.skia.Bitmap
 import org.slf4j.LoggerFactory
+import kotlin.math.roundToInt
 
 private val log = LoggerFactory.getLogger("WidgetPreview")
 
@@ -67,19 +66,15 @@ sealed interface WidgetPreview {
     data object Pending : WidgetPreview
 
     /**
-     * A picture, and the part of it the widget actually used.
+     * The widget, trimmed to what it drew.
      *
-     * The frame is larger than most widgets: one is 340 by 48 and is drawn at the
-     * top of a 320 by 200 scene, so the bitmap is mostly empty below it. Scaling
-     * that whole bitmap into a tile scales the emptiness with it and leaves a
-     * control the height of a hairline under a third of a tile of nothing. The
-     * tile draws [inkOffset] by [inkSize] instead, which is the widget.
+     * The scene is larger than most widgets: one is 340 by 48 and is drawn at the
+     * top of a 320 by 200 frame, so the raster is mostly nothing below it. The
+     * trim happens once, here, rather than every time a tile paints: it is what
+     * lets the tile take the widget's own proportions, and it is the difference
+     * between holding a megabyte per preview and holding what the widget covers.
      */
-    data class Drawn(
-        val image: ImageBitmap,
-        val inkOffset: IntOffset,
-        val inkSize: IntSize,
-    ) : WidgetPreview
+    data class Drawn(val image: ImageBitmap) : WidgetPreview
 
     data object Refused : WidgetPreview
 }
@@ -148,9 +143,14 @@ class WidgetPreviewHost internal constructor(
 
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(kind: WidgetKind, descriptor: WidgetDescriptor): WidgetPreview {
-        val box = frameFor(descriptor.sizing)
-        val w = (box.width * density.density).toInt().coerceIn(1, MAX_PX)
-        val h = (box.height * density.density).toInt().coerceIn(1, MAX_PX)
+        // The frame is capped, and the widget is drawn into the capped frame rather
+        // than into a larger one that gets cut. Clamping only the raster left a
+        // widget declaring a 900-point preferred size composing at 900 inside a
+        // scene 1024 pixels across, which on a 2x display is a preview of its left
+        // half with nothing saying so.
+        val box = fitToRaster(frameFor(descriptor.sizing), density.density)
+        val w = (box.width * density.density).roundToInt().coerceAtLeast(1)
+        val h = (box.height * density.density).roundToInt().coerceAtLeast(1)
         // Built empty, then handed its content. Nothing of the widget's runs in
         // the constructor, so it cannot throw and the reference is in hand before
         // anything can. Composing inline instead loses the object with the throw:
@@ -167,17 +167,20 @@ class WidgetPreviewHost internal constructor(
                     }
                 }
                 val image = scene.render()
-                // render() hands back a skia Image; the bitmap is what Compose can
-                // draw. Closed straight after: it is a second full-size raster and
-                // only the bitmap outlives this function.
-                val bitmap = try { Bitmap.makeFromImage(image) } finally { image.close() }
-                val ink = inkBounds(bitmap)
-                // A widget can compose without throwing and still draw nothing: an
-                // activity pill with no activity, a list with no items. An empty
-                // rectangle says less than the letter it would replace, so it is
-                // refused rather than shown.
-                if (ink == null) WidgetPreview.Refused
-                else WidgetPreview.Drawn(bitmap.asComposeImageBitmap(), ink.first, ink.second)
+                // render() hands back a skia Image; a bitmap is what the pixels can
+                // be read out of. Both are full-frame rasters and neither outlives
+                // this function: what is kept is the trimmed copy.
+                val frame = try { Bitmap.makeFromImage(image) } finally { image.close() }
+                try {
+                    // A widget can compose without throwing and still draw nothing:
+                    // an activity pill with no activity, a list with no items. An
+                    // empty rectangle says less than the letter it would replace, so
+                    // it is refused rather than shown.
+                    trimmedToInk(frame)?.let { WidgetPreview.Drawn(it.asComposeImageBitmap()) }
+                        ?: WidgetPreview.Refused
+                } finally {
+                    frame.close()
+                }
             }.onFailure { cause ->
                 // Debug: a widget declining to compose outside its surface is normal,
                 // and a palette that logs a warning per tile would drown the console
@@ -199,8 +202,8 @@ class WidgetPreviewHost internal constructor(
 }
 
 /**
- * The rectangle the widget actually drew into, or null if it drew too little to
- * be worth a tile.
+ * The widget's own rectangle, copied out of the frame, or null if it drew too
+ * little to be worth a tile.
  *
  * Ink is anything not transparent. The scene clears to transparent and the
  * preview paints no page behind the widget, so that is literally what "nothing
@@ -210,48 +213,67 @@ class WidgetPreviewHost internal constructor(
  * matching it reads as empty. Eleven players and the theme grid declare
  * drawsOwnSurface, and only their rounded corners kept it working.
  *
- * Sampled on a grid and then padded back out by the step, so the crop never cuts
- * into what it found: this runs once per widget and only has to be right to
- * within a few points.
+ * Every pixel, from one read of the buffer. Sampling every fourth was a way to
+ * keep the cost of a call-per-pixel down, and it cost correctness for it: a
+ * hairline off the sampling grid was invisible, and whether it landed on one
+ * depended on the display's scale, so the same widget had a preview on one
+ * machine and a letter on another. One readPixels and a walk over the bytes is
+ * both exact and cheaper than the sampling was.
  */
-private fun inkBounds(bitmap: Bitmap): Pair<IntOffset, IntSize>? {
-    val page = TRANSPARENT
-    var left = bitmap.width
-    var top = bitmap.height
+private fun trimmedToInk(frame: Bitmap): Bitmap? {
+    val info = frame.imageInfo
+    // Four-byte pixels with alpha last is what an N32 raster surface gives. A
+    // frame in any other layout is kept whole rather than measured wrongly.
+    if (info.bytesPerPixel != 4) return frame.copyOf(0, 0, info.width, info.height)
+    val rowBytes = info.minRowBytes
+    val pixels = frame.readPixels(info, rowBytes, 0, 0)
+        ?: return frame.copyOf(0, 0, info.width, info.height)
+
+    var left = info.width
+    var top = info.height
     var right = -1
     var bottom = -1
-    var drawn = 0
-    var seen = 0
-    var y = 0
-    while (y < bitmap.height) {
-        var x = 0
-        while (x < bitmap.width) {
-            if (bitmap.getColor(x, y) != page) {
-                drawn++
-                if (x < left) left = x
-                if (x > right) right = x
-                if (y < top) top = y
-                if (y > bottom) bottom = y
-            }
-            seen++
-            x += INK_STEP
+    for (y in 0 until info.height) {
+        val row = y * rowBytes
+        for (x in 0 until info.width) {
+            if (pixels[row + x * 4 + ALPHA_BYTE] == 0.toByte()) continue
+            if (x < left) left = x
+            if (x > right) right = x
+            if (y < top) top = y
+            bottom = y
         }
-        y += INK_STEP
     }
-    if (right < 0 || seen == 0 || drawn.toFloat() / seen < MIN_INK) return null
-    val l = (left - INK_STEP).coerceAtLeast(0)
-    val t = (top - INK_STEP).coerceAtLeast(0)
-    val r = (right + INK_STEP).coerceAtMost(bitmap.width - 1)
-    val b = (bottom + INK_STEP).coerceAtMost(bitmap.height - 1)
-    return IntOffset(l, t) to IntSize(r - l + 1, b - t + 1)
+    if (right < 0) return null
+
+    val w = right - left + 1
+    val h = bottom - top + 1
+    // Too little of the frame touched to read as anything. Measured against the
+    // frame rather than against the trim, because a widget that inked four pixels
+    // has a tiny trim and a huge magnification of nothing.
+    if (w.toLong() * h < info.width.toLong() * info.height * MIN_INK) return null
+    return frame.copyOf(left, top, w, h)
 }
 
-private const val INK_STEP = 4
+/**
+ * A standalone copy of one rectangle of [this].
+ *
+ * A copy and not a subset: skia's extractSubset shares the source's pixels, and
+ * the whole point here is that the frame goes away and only what the widget drew
+ * is kept. Null when skia declines, which the caller reads as no preview.
+ */
+private fun Bitmap.copyOf(x: Int, y: Int, w: Int, h: Int): Bitmap? {
+    val info = imageInfo.withWidthHeight(w, h)
+    val out = Bitmap()
+    if (!out.allocPixels(info)) return null
+    val bytes = readPixels(info, info.minRowBytes, x, y) ?: return null
+    if (!out.installPixels(info, bytes, info.minRowBytes)) return null
+    return out
+}
 
-/** What an untouched pixel of the scene is: [ImageComposeScene] clears to this. */
-private const val TRANSPARENT = 0
+/** Alpha's place in an N32 pixel, which is the last byte on every platform we ship to. */
+private const val ALPHA_BYTE = 3
 
-/** Under this the frame is empty enough that the letter says more. */
+/** Under this share of the frame touched, the letter says more than the picture. */
 private const val MIN_INK = 0.004f
 
 /**
@@ -329,6 +351,21 @@ internal fun frameFor(sizing: WidgetSizing): Size {
 
 private const val DEFAULT_FRAME_W = 320
 private const val DEFAULT_FRAME_H = 200
+
+/**
+ * [box] shrunk until its raster fits [MAX_PX] on both axes, keeping its shape.
+ *
+ * A tile is a thumbnail, so a widget that wants more than this gets drawn at a
+ * size it fits in. That is a different picture from the one it draws at its own
+ * size, and it is still a picture of the whole widget, which a clamped raster
+ * around an unclamped layout is not.
+ */
+private fun fitToRaster(box: Size, density: Float): Size {
+    val w = box.width * density
+    val h = box.height * density
+    val scale = minOf(1f, MAX_PX / w, MAX_PX / h)
+    return if (scale >= 1f) box else Size(box.width * scale, box.height * scale)
+}
 
 /** A ceiling on the bitmap, so a widget declaring a huge preferred size costs a tile and not a screen. */
 private const val MAX_PX = 1024
