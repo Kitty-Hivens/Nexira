@@ -19,6 +19,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
+import hivens.ui.settle
 
 /**
  * The leftover-clients surface, drawn so it can be looked at.
@@ -73,7 +74,7 @@ class RetiredClientsRenderProbe {
         }
         try {
             var t = 0L
-            repeat(40) { t += 16_000_000L; scene.render(t) }
+            t = scene.settle(frames = 40)
             val png = scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
             Files.write(out, png.bytes)
         } finally {

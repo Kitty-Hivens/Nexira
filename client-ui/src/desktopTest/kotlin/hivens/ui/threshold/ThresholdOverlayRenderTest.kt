@@ -143,7 +143,7 @@ class ThresholdOverlayRenderTest {
             // failure branch decides. Walk the clock first, the way the beat does,
             // or the assertion below passes on an empty screen.
             var ms = 0L
-            while (ms < 200) { scene.render(ms * 1_000_000L); ms += 16 }
+            while (ms < 200) { scene.render(ms * 1_000_000L).close(); ms += 16 }
             val png = scene.render(200L * 1_000_000L).encodeToData(EncodedImageFormat.PNG)
                 ?: error("PNG encode failed")
             Files.createDirectories(Path.of("build/render"))

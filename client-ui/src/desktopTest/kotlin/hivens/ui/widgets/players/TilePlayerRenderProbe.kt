@@ -25,6 +25,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
 import kotlin.test.Test
+import hivens.ui.settle
 
 /**
  * Concepts B and D on screen, in one probe because they share the question.
@@ -71,12 +72,8 @@ class TilePlayerRenderProbe {
         }
         // The chrome fades in, and one render photographs the fade at zero. A few
         // frames of clock settle it without the sheet being about the animation.
-        var t = 0L
-        var img = scene.render(t)
-        repeat(30) {
-            t += 16_000_000L
-            img = scene.render(t)
-        }
+        val t = scene.settle(frames = 30)
+        val img = scene.render(t)
         scene.close()
         File("build/render").mkdirs()
         img.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {

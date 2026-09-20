@@ -24,6 +24,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
 import kotlin.test.Test
+import hivens.ui.settle
 
 /**
  * Concept F on screen, which is the only way to see whether it IS concept F.
@@ -67,12 +68,8 @@ class SeededPlayerRenderProbe {
         // The seed lands from another thread, so the clock is advanced until the
         // body colour has had a chance to arrive. One render() would photograph the
         // card before it took the cover's colour.
-        var t = 0L
-        var img = scene.render(t)
-        repeat(40) {
-            t += 16_000_000L
-            img = scene.render(t)
-        }
+        val t = scene.settle(frames = 40)
+        val img = scene.render(t)
         scene.close()
         File("build/render").mkdirs()
         img.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {

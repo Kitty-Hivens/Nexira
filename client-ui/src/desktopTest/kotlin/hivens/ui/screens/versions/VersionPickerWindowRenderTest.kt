@@ -93,7 +93,7 @@ class VersionPickerWindowRenderTest {
         val png = try {
             var frameNanos = 0L
             repeat(20) {
-                scene.render(frameNanos)
+                scene.render(frameNanos).close()
                 frameNanos += 16_000_000L
                 Thread.sleep(10)
             }

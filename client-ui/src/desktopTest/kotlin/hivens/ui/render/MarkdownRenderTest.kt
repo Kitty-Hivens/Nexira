@@ -106,7 +106,7 @@ class MarkdownRenderTest {
             // run off the composition now and the page has nothing to draw until
             // they land.
             repeat(30) {
-                scene.render(frameNanos)
+                scene.render(frameNanos).close()
                 frameNanos += 16_000_000L
                 Thread.sleep(20)
             }

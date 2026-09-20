@@ -47,7 +47,7 @@ class OffscreenPreviewProbeTest {
         val scene = ImageComposeScene(width = 64, height = 64, density = Density(1f))
         val result = runCatching {
             scene.setContent(content)
-            scene.render()
+            scene.render().close()
             Unit
         }
         val closed = runCatching { scene.close() }.isSuccess

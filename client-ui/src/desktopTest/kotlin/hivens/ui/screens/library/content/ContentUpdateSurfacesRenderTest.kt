@@ -284,14 +284,14 @@ class ContentUpdateSurfacesRenderTest {
         val png = try {
             var frameNanos = 0L
             repeat(12) {
-                scene.render(frameNanos)
+                scene.render(frameNanos).close()
                 frameNanos += 16_000_000L
             }
             if (clickAt != null) {
                 scene.sendPointerEvent(PointerEventType.Press, clickAt)
                 scene.sendPointerEvent(PointerEventType.Release, clickAt)
                 repeat(12) {
-                    scene.render(frameNanos)
+                    scene.render(frameNanos).close()
                     frameNanos += 16_000_000L
                 }
             }

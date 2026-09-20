@@ -55,6 +55,7 @@ import java.nio.file.Path
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.settle
 
 /**
  * Off-screen render smoke of the pack versions screen with a scripted mirror:
@@ -204,12 +205,7 @@ class PackVersionsScreenRenderTest {
             // Pump frames so the screen's suspend loads (build list, preview, diff)
             // land before the captured frame -- a single render would freeze the
             // initial spinner. Wall-clock sleeps let the IO-dispatched fakes hop back.
-            var frameNanos = 0L
-            repeat(40) {
-                scene.render(frameNanos)
-                frameNanos += 16_000_000L
-                Thread.sleep(10)
-            }
+            val frameNanos = scene.settle(frames = 40, sleepMs = 10)
             val frame = scene.render(frameNanos)
             Files.write(out, frame.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed"))
             painted = paintedFraction(frame)

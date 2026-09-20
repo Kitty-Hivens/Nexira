@@ -72,7 +72,7 @@ class ImageGalleryRenderTest {
         }
         val frame = try {
             var t = 0L
-            repeat(6) { scene.render(t); t += 16_000_000L }
+            repeat(6) { scene.render(t).close(); t += 16_000_000L }
             scene.render(t)
         } finally {
             scene.close()

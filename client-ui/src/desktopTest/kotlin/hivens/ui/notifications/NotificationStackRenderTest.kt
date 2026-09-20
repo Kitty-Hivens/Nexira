@@ -69,7 +69,7 @@ class NotificationStackRenderTest {
         }
         try {
             var t = 0L
-            fun step(frames: Int) { repeat(frames) { scene.render(t); t += FRAME } }
+            fun step(frames: Int) { repeat(frames) { scene.render(t).close(); t += FRAME } }
 
             step(20)
             val inkTwoCards = ink(scene, t)
@@ -105,7 +105,7 @@ class NotificationStackRenderTest {
         }
         try {
             var t = 0L
-            repeat(10) { scene.render(t); t += FRAME }
+            repeat(10) { scene.render(t).close(); t += FRAME }
             // Mounted-but-empty is deliberate (it is what gives the first toast its
             // fade-in), so it must cost nothing on screen.
             assertTrue(ink(scene, t) == 0, "an empty stack must paint no ink")

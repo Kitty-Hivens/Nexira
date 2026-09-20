@@ -90,7 +90,7 @@ class ModBrowserRowsRenderTest {
         val png = try {
             var frameNanos = 0L
             repeat(14) {
-                scene.render(frameNanos)
+                scene.render(frameNanos).close()
                 frameNanos += 16_000_000L
             }
             scene.render(frameNanos).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")

@@ -32,7 +32,7 @@ class HtmlRenderHostileTest {
         }
         try {
             var t = 0L
-            repeat(12) { scene.render(t); t += 16_000_000L; Thread.sleep(15) }
+            repeat(12) { scene.render(t).close(); t += 16_000_000L; Thread.sleep(15) }
         } finally {
             scene.close()
         }

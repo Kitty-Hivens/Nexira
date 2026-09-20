@@ -178,18 +178,18 @@ class CoverPlayerRenderProbe {
                 }
             }
             var t = 0L
-            scene.render(t)
+            scene.render(t).close()
             // The overflow sits at the card's top-right corner, inset by its own padding.
             val at = Offset(414f, 38f) * d
             scene.sendPointerEvent(PointerEventType.Enter, at)
             scene.sendPointerEvent(PointerEventType.Move, at)
             scene.sendPointerEvent(PointerEventType.Press, at)
             scene.sendPointerEvent(PointerEventType.Release, at)
-            var img = scene.render(t)
             repeat(45) {
+                scene.render(t).close()
                 t += 16_000_000L
-                img = scene.render(t)
             }
+            val img = scene.render(t)
             scene.close()
             File("build/render").mkdirs()
             img.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {

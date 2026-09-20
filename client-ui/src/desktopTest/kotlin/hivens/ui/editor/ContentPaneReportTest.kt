@@ -37,7 +37,7 @@ class ContentPaneReportTest {
         val s = ImageComposeScene(width = 400, height = 200, density = Density(density))
         try {
             s.setContent(content)
-            s.render()
+            s.render().close()
         } finally {
             s.close()
         }

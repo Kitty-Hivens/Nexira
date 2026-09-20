@@ -73,7 +73,7 @@ class NotBuiltYetRenderTest {
         }
         val png = try {
             var t = 0L
-            repeat(20) { scene.render(t); t += 16_000_000L }
+            repeat(20) { scene.render(t).close(); t += 16_000_000L }
             scene.render(t).encodeToData(EncodedImageFormat.PNG) ?: error("PNG encode failed")
         } finally {
             scene.close()

@@ -66,7 +66,7 @@ class LogCanvasRenderTest {
         }
         try {
             var f = 0L
-            repeat(6) { scene.render(f); f += 16_000_000L }
+            repeat(6) { scene.render(f).close(); f += 16_000_000L }
         } finally {
             scene.close()
         }

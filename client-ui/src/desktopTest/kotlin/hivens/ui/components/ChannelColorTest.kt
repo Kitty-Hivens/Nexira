@@ -40,7 +40,7 @@ class ChannelColorTest {
             }
         }
         try {
-            scene.render(0L)
+            scene.render(0L).close()
         } finally {
             scene.close()
         }

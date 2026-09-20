@@ -76,13 +76,9 @@ class NewsChannelRenderTest {
                 }
             }
         }
-        var t = 0L
-        var img = scene.render(t)
         // The feed is fetched in an effect, so the first frame is the skeleton.
-        repeat(30) {
-            t += 16_000_000L
-            img = scene.render(t)
-        }
+        val t = scene.settle(frames = 30)
+        val img = scene.render(t)
         scene.close()
         File("build/render").mkdirs()
         img.encodeToData(EncodedImageFormat.PNG)?.bytes?.let {

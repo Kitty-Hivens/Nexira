@@ -43,6 +43,7 @@ import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.settle
 
 /**
  * Every card that stacks metadata chips over cover art, in one sheet.
@@ -152,14 +153,10 @@ class PackCardRenderTest {
                 }
             }
         }
-        var t = 0L
-        var img = scene.render(t)
         // The art and the update status arrive in effects, so the first frame is
         // the seed rather than the card.
-        repeat(20) {
-            t += 16_000_000L
-            img = scene.render(t)
-        }
+        val t = scene.settle(frames = 20)
+        val img = scene.render(t)
         scene.close()
         File("build/render").mkdirs()
         val bytes = img.encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("PNG encode failed")
