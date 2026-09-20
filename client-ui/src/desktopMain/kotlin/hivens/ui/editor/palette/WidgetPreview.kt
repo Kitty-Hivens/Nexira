@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalSlotPath
+import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetFootprintDp
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSizing
@@ -103,6 +104,15 @@ class WidgetPreviewHost internal constructor(
 ) {
     private val cache: SnapshotStateMap<WidgetKind, WidgetPreview> = mutableStateMapOf()
 
+    /**
+     * Stand-in sources, built once and handed to every preview.
+     *
+     * Several widgets show what is happening, and in a gallery nothing is. See
+     * [previewDataRegistry] for why the live registry is replaced rather than
+     * fallen back to.
+     */
+    private val data = previewDataRegistry()
+
     /** What is known about [kind] right now, without asking for it to be drawn. */
     fun peek(kind: WidgetKind): WidgetPreview = cache[kind] ?: WidgetPreview.Pending
 
@@ -134,7 +144,11 @@ class WidgetPreviewHost internal constructor(
         return runCatching {
             scene = ImageComposeScene(width = w, height = h, density = density) {
                 CompositionLocalProvider(locals) {
-                    PreviewSubject(descriptor, kind, box)
+                    // After the captured locals, so the stand-in sources win over
+                    // the live ones the launcher is running on.
+                    CompositionLocalProvider(LocalWidgetDataRegistry provides data) {
+                        PreviewSubject(descriptor, kind, box)
+                    }
                 }
             }
             // render() hands back a skia Image; the bitmap is what Compose can draw.
