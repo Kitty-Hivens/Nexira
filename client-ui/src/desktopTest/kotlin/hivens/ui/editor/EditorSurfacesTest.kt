@@ -3,7 +3,12 @@ package hivens.ui.editor
 import hivens.ui.Screen
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SlotId
+import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.updateWidgetProps
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -70,5 +75,50 @@ class EditorSurfacesTest {
     fun `every stub belongs to a surface that declares one`() {
         val declared = EditorSurfaces.all.count { it.stub != null }
         assertEquals(declared, EditorSurfaces.stubs.size, "the spread must carry exactly the declared stubs")
+    }
+
+    // ── What is on screen right now ──────────────────────────────────
+
+    private fun collapsed(kind: String): LayoutGraph = bundled.updateWidgetProps(
+        SlotPath(SurfaceId("appshell.body"), SlotId("content")),
+        instanceId = "appshell-region-$kind-default",
+        props = JsonObject(mapOf("collapsed" to JsonPrimitive(true))),
+    )
+
+    @Test
+    fun `a collapsed rail is not offered, and comes back when it does`() {
+        val folded = collapsed("right")
+        assertTrue(
+            SurfaceId("appshell.rightrail") !in EditorSurfaces.availableFor(Screen.Home, folded),
+            "a rail with no width is not a place to arrange anything: the drop targets are a hairline",
+        )
+        assertTrue(
+            SurfaceId("appshell.rightrail") in EditorSurfaces.availableFor(Screen.Home, bundled),
+            "and the tab is back the moment the rail is, rather than hidden for good",
+        )
+    }
+
+    @Test
+    fun `the left rail answers the same question`() {
+        assertTrue(SurfaceId("appshell.leftrail") !in EditorSurfaces.availableFor(Screen.Home, collapsed("left")))
+    }
+
+    @Test
+    fun `the right rail folds itself away on a narrow window`() {
+        val narrow = EditorSurfaces.availableFor(Screen.Home, bundled, windowWidthDp = 900f)
+        assertTrue(
+            SurfaceId("appshell.rightrail") !in narrow,
+            "below its own fold-away width the rail is gone whatever the prop says",
+        )
+        assertTrue(SurfaceId("appshell.leftrail") in narrow, "the left rail does not fold on width")
+    }
+
+    @Test
+    fun `collapsing a rail leaves every other tab alone`() {
+        val folded = EditorSurfaces.availableFor(Screen.Home, collapsed("right"))
+        assertEquals(
+            EditorSurfaces.availableFor(Screen.Home, bundled).filterNot { it.value == "appshell.rightrail" },
+            folded,
+        )
     }
 }

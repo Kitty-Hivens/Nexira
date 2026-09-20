@@ -17,8 +17,12 @@ import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
+import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * What the editor knows about one surface.
@@ -178,11 +182,54 @@ internal object EditorSurfaces {
      * is missing, so in practice this only filters a surface that genuinely is
      * not part of this build's layout.
      */
-    fun availableFor(screen: Screen, graph: LayoutGraph): List<SurfaceId> {
+    fun availableFor(screen: Screen, graph: LayoutGraph, windowWidthDp: Float = Float.MAX_VALUE): List<SurfaceId> {
         val known = graph.surfaces.keys
         val main = centre.firstOrNull { it.mountedOn?.invoke(screen) == true }
         return (listOfNotNull(main) + shell)
             .map { it.id }
-            .filter { it in known }
+            .filter { it in known && it.onScreenNow(graph, windowWidthDp) }
     }
+
+    /**
+     * Whether this surface is somewhere a person can currently see.
+     *
+     * A rail that is collapsed is not a place to arrange anything: selecting its
+     * tab opened an editor over a region with no width, so the drop targets were
+     * a hairline and the widgets inside were not on screen to be dragged. The tab
+     * came back the moment the rail did, which is the whole point of asking
+     * rather than of hiding it for good.
+     *
+     * Read from the graph, because the collapse is a prop on the region widget
+     * and the graph is the thing this function already has. The right rail also
+     * collapses itself below a window width it cannot lay out in, which is why
+     * the width is asked for rather than assumed.
+     */
+    private fun SurfaceId.onScreenNow(graph: LayoutGraph, windowWidthDp: Float): Boolean = when (value) {
+        "appshell.rightrail" ->
+            windowWidthDp >= RIGHT_RAIL_AUTO_COLLAPSE_DP && !graph.regionCollapsed("appshell.region.right")
+        "appshell.leftrail" -> !graph.regionCollapsed("appshell.region.left")
+        else -> true
+    }
+
+    /** The collapse prop on a shell region, false when the region or the prop is absent. */
+    private fun LayoutGraph.regionCollapsed(kind: String): Boolean =
+        surfaces[SurfaceId("appshell.body")]
+            ?.slotsOf(FamilyId.GENERAL)
+            ?.get(SlotId("content"))
+            ?.widgets
+            ?.firstOrNull { it.kind.value == kind }
+            ?.props
+            ?.get("collapsed")
+            ?.jsonPrimitive
+            ?.booleanOrNull
+            ?: false
+
+    /**
+     * The width the right rail folds itself away below.
+     *
+     * Mirrors ShellRightRegion's own number. Two literals that have to agree is
+     * one too many, but the region's copy is private to a file the editor does
+     * not depend on, and the alternative is a dependency the other way round.
+     */
+    private const val RIGHT_RAIL_AUTO_COLLAPSE_DP = 980f
 }
