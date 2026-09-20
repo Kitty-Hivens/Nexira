@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -273,6 +274,12 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     // reconstructed from the rails' props: a rail with no named width takes a
     // weight of the row, so the props do not carry the answer.
     val chromeBounds = LocalShellChromeBounds.current
+    // onGloballyPositioned never fires for a node that is removed, so without this
+    // the holder keeps the last rectangle for good and the overlays stay inset
+    // around a pane that is no longer on screen.
+    DisposableEffect(chromeBounds) {
+        onDispose { chromeBounds.center = null }
+    }
     NxSurface(
         NxSurfaceLevel.Base,
         Modifier.fillMaxSize().onGloballyPositioned { chromeBounds.center = it.boundsInWindow() },

@@ -264,16 +264,25 @@ internal object EditorSurfaces {
         SurfaceId("appshell.body") to SlotId("content"),
     )
 
-    /** The collapse prop on a shell region, false when the region or the prop is absent. */
+    /**
+     * The collapse prop on a shell region, false when the region or the prop is
+     * absent.
+     *
+     * Both frames are searched, for the reason [ownerRegionOf] searches both: the
+     * model does not say which frame holds a region, and a region moved to the
+     * other one read as permanently unfolded while its own settings chip went on
+     * resolving.
+     */
     private fun LayoutGraph.regionCollapsed(kind: String): Boolean =
-        surfaces[SurfaceId("appshell.body")]
-            ?.slotsOf(FamilyId.GENERAL)
-            ?.get(SlotId("content"))
-            ?.widgets
-            ?.firstOrNull { it.kind.value == kind }
-            ?.props
-            ?.get("collapsed")
-            ?.jsonPrimitive
-            ?.booleanOrNull
-            ?: false
+        FRAMES.firstNotNullOfOrNull { (frame, slot) ->
+            surfaces[frame]
+                ?.slotsOf(FamilyId.GENERAL)
+                ?.get(slot)
+                ?.widgets
+                ?.firstOrNull { it.kind.value == kind }
+                ?.props
+                ?.get("collapsed")
+                ?.jsonPrimitive
+                ?.booleanOrNull
+        } ?: false
 }

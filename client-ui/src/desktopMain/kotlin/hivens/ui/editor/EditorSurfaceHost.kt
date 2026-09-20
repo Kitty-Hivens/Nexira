@@ -173,18 +173,22 @@ fun EditorSurfaceHost(
     val coroutineScope = rememberCoroutineScope()
     val s = LocalStrings.current
 
-    // Keyed on the screen: navigating away is what drops an edit session, which is
-    // what these used to say by keying on a tab set that only changed when the
-    // screen did.
-    var editing       by remember(currentScreen) { mutableStateOf(false) }
-    var paletteOpen   by remember(currentScreen) { mutableStateOf(true) }
-    var previewing    by remember(currentScreen) { mutableStateOf(false) }
+    // Keyed on the tab set, which is a List compared by content, so it re-keys
+    // only when what is editable actually changes. Keying on the screen instead
+    // looked equivalent and was not: the shell surfaces are on every screen, so
+    // moving between two screens that mount no centre surface leaves this list
+    // equal, and an edit session arranging the rails survived the navigation. On
+    // the screen it did not, and arranging the rails while walking through the
+    // app is most of why they are reachable from everywhere.
+    var editing       by remember(availableSurfaces) { mutableStateOf(false) }
+    var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
+    var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
     // Where a right-click landed while NOT editing, which is the only thing that
     // opens the way in. Null closes the menu.
     var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
-    var presetPanelOpen by remember(currentScreen) { mutableStateOf(false) }
-    var resetSurfaceConfirm by remember(currentScreen) { mutableStateOf(false) }
-    var selectedSurface by remember(currentScreen) {
+    var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
+    var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
     // Which of the selected surface's families is being arranged. Null follows the
@@ -196,33 +200,40 @@ fun EditorSurfaceHost(
     val availableFamilies: List<FamilyId> = remember(selectedSurface, graphForSurfaces) {
         selectedSurface?.let { graphForSurfaces.surfaces[it]?.families?.keys?.toList() }.orEmpty()
     }
-    // A surface can leave the graph under a running editor: a preset load or a
-    // reset rebuilds it. Re-point rather than hold an id nothing answers to, which
-    // renders as an editor over nothing with no way to say so.
-    LaunchedEffect(availableSurfaces) {
-        if (selectedSurface !in availableSurfaces) selectedSurface = availableSurfaces.firstOrNull()
-    }
 
     // Prop editor target. Cleared on surface change (keyed remember), on
     // dismiss, and on leaving edit mode; while set, the palette hides so
     // the two right-edge panels do not overlap.
-    var propTarget by remember(currentScreen) { mutableStateOf<PropTarget?>(null) }
+    var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
     // Surface-level settings panel (currently the left rail's nav-selection
     // settings). Mutually exclusive with the per-widget prop panel + palette.
-    var surfaceSettingsOpen by remember(currentScreen) { mutableStateOf(false) }
+    var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
     // Selected slot (Tier 2 slot layout chrome): the highlighted slot, its window
     // rect (for the handle anchor), the cursor anchor for a right-click menu, and
     // whether the handle's menu is open. selectedSlotState stays a State so the slot
     // chrome modifier can read it without the host capturing a stale value.
-    val selectedSlotState = remember(currentScreen) { mutableStateOf<SlotPath?>(null) }
-    var selectedSlotRect  by remember(currentScreen) { mutableStateOf<Rect?>(null) }
-    var slotMenuCursor    by remember(currentScreen) { mutableStateOf<Offset?>(null) }
-    var handleMenuOpen    by remember(currentScreen) { mutableStateOf(false) }
+    val selectedSlotState = remember(availableSurfaces) { mutableStateOf<SlotPath?>(null) }
+    var selectedSlotRect  by remember(availableSurfaces) { mutableStateOf<Rect?>(null) }
+    var slotMenuCursor    by remember(availableSurfaces) { mutableStateOf<Offset?>(null) }
+    var handleMenuOpen    by remember(availableSurfaces) { mutableStateOf(false) }
     fun clearSlotSelection() {
         selectedSlotState.value = null
         selectedSlotRect = null
         slotMenuCursor = null
         handleMenuOpen = false
+    }
+
+    // A surface can leave the graph under a running editor: a preset load or a
+    // reset rebuilds it. Re-point rather than hold an id nothing answers to, which
+    // renders as an editor over nothing with no way to say so.
+    LaunchedEffect(availableSurfaces) {
+        if (selectedSurface !in availableSurfaces) {
+            selectedSurface = availableSurfaces.firstOrNull()
+            // The same clean-up every other route to a new surface does. Without
+            // it the handle and its menu stay anchored to a slot on a surface that
+            // is gone, and act on a path nothing answers to.
+            clearSlotSelection()
+        }
     }
 
     // One Escape backs out one step: an open slot menu first, then the slot
@@ -288,7 +299,7 @@ fun EditorSurfaceHost(
     // Window-level Escape (AppShell onPreviewKeyEvent, gated on the flag above)
     // bumps the signal; the same staged back-out runs here. `seen` initialises to
     // the current tick for the same reason the toggle observer does.
-    LaunchedEffect(currentScreen) {
+    LaunchedEffect(availableSurfaces) {
         var seen = controller.editorEscapeSignal.value
         snapshotFlow { controller.editorEscapeSignal.value }.collect { tick ->
             if (tick != seen) {
@@ -298,7 +309,7 @@ fun EditorSurfaceHost(
         }
     }
 
-    LaunchedEffect(currentScreen) {
+    LaunchedEffect(availableSurfaces) {
         var seen = controller.editToggleSignal.value
         snapshotFlow { controller.editToggleSignal.value }.collect { tick ->
             if (tick != seen) {
@@ -743,10 +754,10 @@ fun EditorSurfaceHost(
             }
             } // end center-anchored chrome layer
 
-            // Editor toolbar pill: centered over the WHOLE window, NOT the inset
-            // center pane. The inset is a fixed 65/265, but the rails collapse
-            // (Ctrl+N) and resize, so centering inside it drifted the pill across
-            // rail states. The full-window box keeps it put.
+            // Editor toolbar pill: centered over the WHOLE window, NOT the content
+            // pane. The rails collapse (Ctrl+N) and resize, so centring inside the
+            // pane drifts the pill across rail states. The full-window box keeps it
+            // put.
             if (availableSurfaces.isNotEmpty()) {
                 EditModePill(
                     active                = editing,
@@ -761,11 +772,12 @@ fun EditorSurfaceHost(
                         // control that changes that is on its region. Opening it is
                         // the answer to the press rather than a tab that shows a
                         // hairline and explains nothing.
-                        propTarget = if (picked in foldedSurfaces) {
-                            ownerRegion(picked)?.let { (regionPath, id) -> PropTarget(regionPath, id) }
-                        } else {
-                            null
-                        }
+                        // Null when the surface is nobody's inside, which leaves
+                        // the tab selected and nothing opened rather than opening
+                        // a panel about a region that does not exist.
+                        propTarget = (picked.takeIf { it in foldedSurfaces })
+                            ?.let { ownerRegion(it) }
+                            ?.let { (regionPath, id) -> PropTarget(regionPath, id) }
                     },
                     families              = availableFamilies,
                     selectedFamily        = selectedFamily,
@@ -1066,8 +1078,11 @@ private fun SurfaceChip(
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
             Symbol(icon = if (folded) NxIcon.VisibilityOff else surfaceIcon(surface),
-                // Compact hides the label, so the icon carries the name for a11y.
-                contentDescription = if (compact) label else null,
+                // Named whenever the tab is folded, not only when the pill is too
+                // narrow for words: the wide pill writes the plain name and the
+                // only other cue is a dimmed tint, which a screen reader has no
+                // way to report.
+                contentDescription = if (compact || folded) label else null,
                 tint               = fg,
                 modifier           = Modifier.size(14.dp),
             )
@@ -1253,19 +1268,40 @@ internal data class PaneInsets(val start: Dp, val end: Dp)
  * Nothing reported yet means no inset, which is the full frame -- the same place
  * the overlays sit on a build with no rails.
  *
- * A pane too narrow to hold a panel gets no inset either, and the overlays cover
- * the rails instead. The editor's controls are how a reader undoes whatever made
- * the pane that narrow, so they are the last thing allowed to go with it.
+ * The gaps are then given back, continuously, until what is left between them is
+ * at least [MIN_PANE]. A threshold that dropped both insets the moment the pane
+ * got narrow was worse than having none: it had no hysteresis, so a reader
+ * dragging a rail's width slider watched the panel they were holding teleport
+ * across the window and back on every pixel across the boundary. And in the band
+ * just under it, dropping the insets put the palette squarely over the right
+ * rail, which is itself an editable surface and quite possibly the one being
+ * arranged, where simply letting the panel be narrower cost nothing.
+ *
+ * The end gap gives way first, because the panels hang off that edge and the
+ * vignette is all the start gap buys.
  */
 internal fun paneInsets(pane: Rect?, host: Rect, density: Density): PaneInsets {
     if (pane == null || host.width <= 0f) return PaneInsets(0.dp, 0.dp)
-    if (with(density) { pane.width.toDp() } < MIN_PANE) return PaneInsets(0.dp, 0.dp)
     fun gap(px: Float): Dp = with(density) { px.coerceAtLeast(0f).toDp() }
-    return PaneInsets(start = gap(pane.left - host.left), end = gap(host.right - pane.right))
+    val room = (host.width - with(density) { MIN_PANE.toPx() }).coerceAtLeast(0f)
+    var start = (pane.left - host.left).coerceAtLeast(0f)
+    var end = (host.right - pane.right).coerceAtLeast(0f)
+    if (start + end > room) {
+        end = (room - start).coerceAtLeast(0f)
+        if (start > room) start = room
+    }
+    return PaneInsets(start = gap(start), end = gap(end))
 }
 
-/** The widest of the editor's own panels. Below this there is nowhere to put one. */
-private val MIN_PANE = 320.dp
+/**
+ * How little room the overlays will leave themselves.
+ *
+ * The narrowest a floating panel goes under its own resize (DockSize.MIN), so the
+ * clamp stops exactly where the panel would stop anyway. It is not the widest
+ * panel: one pulled out to 560 has been pulled there deliberately, and holding
+ * the whole pane open for it would cover the rails on any ordinary window.
+ */
+private val MIN_PANE = 200.dp
 
 private fun transparentPointerIcon(): PointerIcon {
     val image = java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB)

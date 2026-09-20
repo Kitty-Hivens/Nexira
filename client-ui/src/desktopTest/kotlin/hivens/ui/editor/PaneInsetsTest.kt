@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * The editor's overlays used to be held off the rails by two constants, and both
@@ -49,22 +50,44 @@ class PaneInsetsTest {
     }
 
     @Test
-    fun `a host with no width yet is the full frame`() {
-        assertEquals(PaneInsets(0.dp, 0.dp), paneInsets(Rect(0f, 0f, 10f, 10f), Rect.Zero, density))
-    }
-
-    @Test
-    fun `a pane too narrow for a panel keeps the editor's controls instead`() {
+    fun `the overlays are given room back rather than dropped all at once`() {
         // Two rails wide enough to squeeze the pane out is a state a reader has to
-        // be able to undo, and the undo lives in the overlays.
-        val squeezed = Rect(700f, 0f, 900f, 1000f)
-        assertEquals(PaneInsets(0.dp, 0.dp), paneInsets(squeezed, window, density))
+        // be able to undo, and the undo lives in the overlays. They creep over the
+        // rail instead of jumping: a threshold that dropped both gaps at a stroke
+        // teleported the panel a reader was dragging, across the window and back,
+        // on every pixel over the line.
+        val squeezed = Rect(750f, 0f, 900f, 1000f)
+        val insets = paneInsets(squeezed, window, density)
+        assertEquals(750.dp, insets.start, "the start edge is left where the rail put it")
+        assertEquals(650.dp, insets.end, "the end gap gives way, because the panels hang off it")
     }
 
     @Test
-    fun `a pane exactly wide enough for a panel still gets its gaps`() {
+    fun `what is left between the gaps is never less than a panel`() {
+        listOf(
+            Rect(750f, 0f, 900f, 1000f),
+            Rect(900f, 0f, 1000f, 1000f),
+            Rect(0f, 0f, 20f, 1000f),
+            Rect(1580f, 0f, 1600f, 1000f),
+        ).forEach { pane ->
+            val insets = paneInsets(pane, window, density)
+            val left = 1600f - insets.start.value - insets.end.value
+            assertTrue(left >= 200f - 0.001f, "pane $pane left only $left")
+        }
+    }
+
+    @Test
+    fun `a pane with room to spare keeps both gaps untouched`() {
         val just = Rect(700f, 0f, 1020f, 1000f)
         assertEquals(PaneInsets(start = 700.dp, end = 580.dp), paneInsets(just, window, density))
+    }
+
+    @Test
+    fun `an unmeasured frame is the full frame, and not by accident`() {
+        // The pane here is wide and offset, so nothing but the host guard can
+        // produce a zero: the previous version used a 10 by 10 pane, which the old
+        // threshold caught first and left the guard untested.
+        assertEquals(PaneInsets(0.dp, 0.dp), paneInsets(Rect(100f, 0f, 500f, 10f), Rect.Zero, density))
     }
 
     @Test

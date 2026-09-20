@@ -97,6 +97,9 @@ fun WidgetPalettePanel(
             .filter { it.removable }
             .sortedBy { s.widgetLabel(it.displayName).lowercase() }
     }
+    // Above the search branch: remembered inside it, a query matching nothing
+    // takes the host out of the composition and every preview is lost to a typo.
+    val previews = rememberWidgetPreviewHost()
     var query by remember { mutableStateOf("") }
     val filtered = remember(descriptors, query, s) {
         if (query.isBlank()) descriptors
@@ -165,6 +168,12 @@ fun WidgetPalettePanel(
                         // requireUnconsumed yields to the close button sitting in here.
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = true)
+                            // awaitFirstDown answers to any button, and the panel's
+                            // own resize is on the secondary one. Before the drag
+                            // worked at all this combination did nothing; once it
+                            // did, a right-drag started on the header moved the
+                            // panel instead of widening it.
+                            if (currentEvent.buttons.isSecondaryPressed) return@awaitEachGesture
                             down.consume()
                             drag(down.id) { change ->
                                 // Delta first: positionChange() reports Offset.Zero once
@@ -245,7 +254,6 @@ fun WidgetPalettePanel(
                     // a second place the namespaces are written down, and the one
                     // that goes stale when a widget is added under a new one.
                     val groups = remember(filtered) { filtered.groupBy { it.kind.value.substringBefore('.') } }
-                    val previews = rememberWidgetPreviewHost()
                     LazyVerticalGrid(
                         columns             = GridCells.Adaptive(TILE_MIN),
                         modifier            = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
