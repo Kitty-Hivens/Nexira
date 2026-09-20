@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -408,7 +406,7 @@ private fun BoxScope.PlacedBox(
     val dx = if (hBias > 0.5f) -offX else offX
     val dy = if (vBias > 0.5f) -offY else offY
 
-    // Its own measured size, a frame late, which is all a recovery clamp needs:
+    // What it actually drew, a frame late, which is all a recovery clamp needs:
     // nobody is dragging on the frame a widget first appears.
     val density = LocalDensity.current
     var ownDp by remember { mutableStateOf(Size.Zero) }
@@ -422,21 +420,35 @@ private fun BoxScope.PlacedBox(
     //
     // How big it is has to be known first, or the clamp reads a widget as having
     // no size and demands the offset itself clear the margin, which shoves every
-    // widget near the origin away from it. The declared size answers on the frame
-    // it appears; a widget that names none waits for its own measurement, and
-    // until then nothing is held, because holding by a guess moves things that
-    // were never out of place.
-    val ownW = if (width > 0f) width else ownDp.width
-    val ownH = if (height > 0f) height else ownDp.height
+    // widget near the origin away from it. What it drew is the answer, because
+    // that is what somebody has to be able to grab; the placement is only an upper
+    // bound on it (see [sizeMod]) and a widget that draws smaller would otherwise
+    // be held by the edge of a box nobody can see. The bound stands in for the
+    // frame before the first measurement, and a widget that names neither waits,
+    // because holding by a guess moves things that were never out of place.
+    val ownW = ownDp.width.takeIf { it > 0f } ?: width
+    val ownH = ownDp.height.takeIf { it > 0f } ?: height
     val heldX = if (lattice || ownW <= 0f) dx else clampPlacementAxis(dx, slotDp.width, ownW, hBias)
     val heldY = if (lattice || ownH <= 0f) dy else clampPlacementAxis(dy, slotDp.height, ownH, vBias)
 
+    // A placement is a claim on territory, not an order to stretch, so it lands
+    // as a MAXIMUM and never as a fixed extent. The flow branch has always read
+    // it that way ([boundedModifier]); this one set Modifier.size and so broke
+    // the rule at both ends. Too small a claim cut the widget off with nothing
+    // saying so: a column player given 272 of the 304 it draws lost its transport
+    // and looked like a player with no play button. Too large a claim was worse
+    // because it was invisible: a token given 412 reported 412 wide and painted
+    // 96, so the editor's frame, the reported size and the space the widget held
+    // against its neighbours were all the claim, and none of them was the pixels.
+    // Content that fills still fills to the bound; content that does not sits at
+    // its own size inside it, which is the widget keeping its look.
+    //
     // Each axis on its own: a widget that names a width and not a height is as
     // expressible as one that names both, and requiring the pair silently threw
     // the one away.
     var sizeMod: Modifier = Modifier
-    if (width > 0f) sizeMod = sizeMod.width(width.dp)
-    if (height > 0f) sizeMod = sizeMod.height(height.dp)
+    if (width > 0f) sizeMod = sizeMod.widthIn(max = width.dp)
+    if (height > 0f) sizeMod = sizeMod.heightIn(max = height.dp)
     Box(
         Modifier
             .align(alignmentFor(anchor))

@@ -3,10 +3,7 @@ package hivens.ui.widgets.players
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.remember
 import androidx.compose.ui.input.pointer.pointerInput
@@ -195,18 +192,20 @@ internal fun Modifier.openWhenEmpty(
 }
 
 /**
- * Fills the slot, and puts an object of at most [maxSide] in the middle of it.
+ * Caps an object at [maxSide] and lets it measure to whatever it draws.
  *
- * Four of the kinds are drawn as one grid cell: a tile, a disc, a token, a
- * column for a rail. They are sized in the concept sheet and they mean nothing
- * stretched, so a slot's width is a ceiling rather than an instruction. Handed a
+ * Four of the kinds are drawn as one cell: a tile, a disc, a token, a column for
+ * a rail. They are sized in the concept sheet and they mean nothing stretched, so
+ * the room they are given is a ceiling rather than an instruction. Handed a
  * home-screen slot, `fillMaxWidth` plus a square aspect made a token seventeen
  * hundred points across and swallowed the page.
  *
- * A chain rather than a wrapper, deliberately: `wrapContentWidth` is what lets
- * the content measure smaller than the slot and sit centred in the rest, so the
- * cap costs no extra layout node and nothing inside the card has to know. What
- * a `BoxWithConstraints` inside it reads is already the capped width.
+ * It used to take the whole width and centre the object in the rest, which capped
+ * the drawing and not the claim: a token in a 412 wide placement measured 412 and
+ * painted 96, so the editor's frame, the reported size and the space it held
+ * against a neighbour were all three hundred points of nothing. The cap alone
+ * leaves the node the size of the object, and where that object sits in a larger
+ * space is the slot's business rather than the widget's. What a
+ * `BoxWithConstraints` inside reads is still the capped width.
  */
-internal fun Modifier.playerObject(maxSide: Dp): Modifier =
-    fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = maxSide)
+internal fun Modifier.playerObject(maxSide: Dp): Modifier = widthIn(max = maxSide)
