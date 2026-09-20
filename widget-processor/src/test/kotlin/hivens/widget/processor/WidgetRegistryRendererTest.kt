@@ -302,10 +302,17 @@ class WidgetRegistryRendererTest {
     @Test
     fun `a size in order passes`() {
         assertNull(WidgetValidator.sizingFault(SizingArgs()))
-        assertNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 80, prefWidth = 200, maxWidth = 800)))
         assertNull(
-            WidgetValidator.sizingFault(SizingArgs(minHeight = 92, prefHeight = 230, maxHeight = 920)),
-            "an axis declared alone is in order",
+            WidgetValidator.sizingFault(
+                SizingArgs(
+                    minWidth = 80, prefWidth = 200, maxWidth = 800,
+                    minHeight = 92, prefHeight = 230, maxHeight = 920,
+                ),
+            ),
+        )
+        assertNull(
+            WidgetValidator.sizingFault(SizingArgs(minHeight = 92, maxHeight = 920)),
+            "bounds on one axis alone are in order, because a bound is per axis",
         )
     }
 
@@ -322,6 +329,15 @@ class WidgetRegistryRendererTest {
         // Declaring only a floor, or only a ceiling, is the common case.
         assertNull(WidgetValidator.sizingFault(SizingArgs(minWidth = 400)))
         assertNull(WidgetValidator.sizingFault(SizingArgs(maxWidth = 400)))
-        assertNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 400)))
+    }
+
+    @Test
+    fun `a preferred size is a shape, so half of one is refused`() {
+        // Three readers ask for both axes before they will use it, and on an
+        // AdaptiveWidget half of one is worse than none: the widget falls through
+        // to filling whatever slot it lands in.
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 400)))
+        assertNotNull(WidgetValidator.sizingFault(SizingArgs(prefHeight = 400)))
+        assertNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 400, prefHeight = 300)))
     }
 }

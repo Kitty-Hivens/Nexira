@@ -256,8 +256,20 @@ internal object WidgetValidator {
             pref > 0 && max > 0 && pref > max -> "declares pref$name $pref above max$name $max"
             else -> null
         }
+        // A preferred size is a footprint, and three of its readers ask for both
+        // axes before they will use it: the palette tile, the drag ghost and
+        // AdaptiveWidget. Half of one is therefore not half an answer, it is no
+        // answer, and on an adaptive widget it is worse than none -- the widget
+        // falls through to filling whatever slot it lands in. Named at build time
+        // rather than discovered as a widget that swallowed a surface.
+        val halfPreferred = when {
+            s.prefWidth > 0 && s.prefHeight == 0 -> "declares prefWidth with no prefHeight"
+            s.prefHeight > 0 && s.prefWidth == 0 -> "declares prefHeight with no prefWidth"
+            else -> null
+        }
         return axis("Width", s.minWidth, s.prefWidth, s.maxWidth)
             ?: axis("Height", s.minHeight, s.prefHeight, s.maxHeight)
+            ?: halfPreferred
     }
 
     /**
