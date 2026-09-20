@@ -37,9 +37,13 @@ import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetFootprintDp
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.LocalWidgetServiceRegistry
 import hivens.widget.api.LocalWidgetSizing
+import hivens.widget.api.LocalWidgetStateHost
 import hivens.widget.api.LocalWidgetSurfaceRenderer
 import hivens.widget.api.WidgetDescriptor
+import hivens.widget.api.WidgetServiceRegistry
+import hivens.widget.api.WidgetStateHost
 import hivens.widget.api.resolveSurface
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
@@ -49,6 +53,7 @@ import hivens.widget.model.WidgetKind
 import hivens.widget.model.WidgetSizing
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.skia.Bitmap
 import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
@@ -239,6 +244,15 @@ internal class ScenePool(private val density: Density) {
     /**
      * Runs [block] against a scene of [raster], building one if none is held.
      *
+     * The scene comes empty and is emptied again afterwards, which is the part
+     * a pool has to do and a scene closed after every use got for free. A
+     * widget's composition is live for as long as it is mounted, so a preview
+     * left in a kept scene goes on running its effects: an animation, a flow
+     * collection, a service registration renewed on every composition. Held
+     * until the gallery closed, that is a widget nobody can see doing work
+     * nobody asked for. Emptying the scene unmounts it and the effects come
+     * down with it.
+     *
      * A scene whose block threw is closed and dropped rather than handed on. A
      * reused scene does survive a throwing composition, which was measured
      * rather than assumed, but surviving is not the question: a composition that
@@ -256,6 +270,10 @@ internal class ScenePool(private val density: Density) {
         } catch (cause: Throwable) {
             scenes.remove(raster)?.let { spoiled -> runCatching { spoiled.close() } }
             throw cause
+        } finally {
+            // Reads the map rather than the local, so a scene the catch above
+            // already closed is not composed into.
+            scenes[raster]?.let { kept -> runCatching { kept.setContent {} } }
         }
     }
 
@@ -355,12 +373,30 @@ private const val MIN_INK = 0.004f
  * So the four editor hooks are stood down and the sources are substituted. The
  * shell's own measurements get a throwaway holder for the same reason: a preview
  * is not the shell and has no business reporting where the content pane is.
+ *
+ * The same argument reaches two of the kernel's own registries, and the service
+ * one is the sharper of the two. provideService registers from a SideEffect, so
+ * it fires on every successful composition with nothing to opt out of, and a
+ * preview would put itself in the live registry under the instance id
+ * "preview:<kind>". useService picks the lowest instance id of a kind, so a
+ * preview player is not merely present, it can WIN: the real player on a real
+ * surface then binds to a widget that exists only in an off-screen scene.
+ * rememberWidgetState is the quieter one, a snapshotFlow that persists whatever
+ * the preview's state settles at under the same fictional id.
+ *
+ * The command registry is deliberately left live. An empty one would not silence
+ * a dispatch, it would throw from it, and a widget that fires on mount does so
+ * inside the scene's own coroutine scope where the render's net cannot reach.
+ * Nothing in the registry dispatches without input, and a preview gets none.
  */
 @Composable
-private fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable () -> Unit) {
+internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable () -> Unit) {
     val ownBounds = remember { ShellChromeBounds() }
+    val ownServices = remember { WidgetServiceRegistry() }
     CompositionLocalProvider(
         LocalWidgetDataRegistry provides data,
+        LocalWidgetServiceRegistry provides ownServices,
+        LocalWidgetStateHost provides DiscardedState,
         LocalEmptySlotDecorator provides {},
         LocalSlotBoundsReporter provides { _, _ -> },
         LocalSlotChromeModifier provides { _, _ -> Modifier },
@@ -369,6 +405,18 @@ private fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable ()
         LocalShellChromeBounds provides ownBounds,
         content = content,
     )
+}
+
+/**
+ * The state store a preview writes into, which is nowhere.
+ *
+ * Reading nothing is not a loss: a gallery entry is the widget as it ships, not
+ * as somebody configured it, and the live store holds nothing under a preview's
+ * fictional instance id anyway. Writing nowhere is the point.
+ */
+private object DiscardedState : WidgetStateHost {
+    override fun load(instanceId: String): JsonObject? = null
+    override fun store(instanceId: String, value: JsonObject) = Unit
 }
 
 /**
