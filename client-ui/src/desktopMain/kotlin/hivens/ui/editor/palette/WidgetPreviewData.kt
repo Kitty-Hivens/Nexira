@@ -48,24 +48,24 @@ internal fun previewDataRegistry(): WidgetDataRegistry = WidgetDataRegistry().ap
     register(Sources.OpenProject, flowSource(MutableStateFlow<OpenProject?>(SAMPLE_PROJECT)))
 }
 
-// Relative to the render rather than fixed, so a widget that writes "2 minutes
-// ago" writes something a reader recognises instead of a date from whenever this
-// was written.
-private val NOW = System.currentTimeMillis()
+// Read per call rather than once per class load, which is what a `val` here did:
+// the first palette of the session froze the clock, and a launcher left open for
+// an afternoon showed a sample notification from three hours ago.
+private val now: Long get() = System.currentTimeMillis()
 private const val MINUTE = 60_000L
 
 /**
  * One of each phase a feed can show, because a feed that is all progress bars
  * demonstrates a third of the widget.
  */
-private val SAMPLE_ACTIVITY = listOf(
+private val SAMPLE_ACTIVITY: List<Activity> get() = listOf(
     Activity(
         key = "preview:install",
         kind = ActivityKind.Install,
         title = "Industrial",
         phase = ActivityPhase.Running(done = 62, total = 100, detail = "assets"),
-        startedAtMillis = NOW - MINUTE,
-        updatedAtMillis = NOW,
+        startedAtMillis = now - MINUTE,
+        updatedAtMillis = now,
         actions = setOf(ActivityAction.Cancel),
     ),
     Activity(
@@ -73,13 +73,13 @@ private val SAMPLE_ACTIVITY = listOf(
         kind = ActivityKind.Update,
         title = "Nevermine",
         phase = ActivityPhase.Succeeded,
-        startedAtMillis = NOW - 8 * MINUTE,
-        updatedAtMillis = NOW - 6 * MINUTE,
+        startedAtMillis = now - 8 * MINUTE,
+        updatedAtMillis = now - 6 * MINUTE,
         actions = setOf(ActivityAction.Dismiss),
     ),
 )
 
-private val SAMPLE_NOTIFICATIONS = listOf(
+private val SAMPLE_NOTIFICATIONS: List<PersistedNotification> get() = listOf(
     PersistedNotification(
         sourceKey = "preview:update",
         sender = "Industrial",
@@ -87,7 +87,7 @@ private val SAMPLE_NOTIFICATIONS = listOf(
         severity = Severity.Info,
         kind = Kind.ActionRequired,
         title = "A newer build is available",
-        createdAtEpoch = (NOW - 3 * MINUTE) / 1000,
+        createdAtEpoch = (now - 3 * MINUTE) / 1000,
     ),
     PersistedNotification(
         sourceKey = "preview:done",
@@ -96,7 +96,7 @@ private val SAMPLE_NOTIFICATIONS = listOf(
         kind = Kind.OneShot,
         title = "Installed",
         body = "Ready to play",
-        createdAtEpoch = (NOW - 40 * MINUTE) / 1000,
+        createdAtEpoch = (now - 40 * MINUTE) / 1000,
     ),
 )
 

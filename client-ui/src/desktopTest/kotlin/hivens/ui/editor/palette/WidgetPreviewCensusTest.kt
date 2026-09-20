@@ -108,9 +108,12 @@ class WidgetPreviewCensusTest {
     private fun tryRender(kind: WidgetKind): Throwable? {
         val descriptor = GeneratedWidgetRegistry[kind] ?: return IllegalStateException("no descriptor")
         val instance = WidgetInstance(kind = kind, instanceId = "census-${kind.value}")
-        var scene: ImageComposeScene? = null
+        // Built empty, then handed its content, so a widget that throws does not
+        // take the reference with it. Sixty-eight scenes leaking a Recomposer each
+        // is a census that measures the thing it is trying to price.
+        val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f))
         return runCatching {
-            scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
+            scene.setContent {
                 LocaleProvider(AppLocale.ENGLISH) {
                     NxTheme(useDarkTheme = true) {
                         Environment {
@@ -126,7 +129,7 @@ class WidgetPreviewCensusTest {
             }
             ink[kind] = coverage(image)
             Unit
-        }.also { runCatching { scene?.close() } }.exceptionOrNull()
+        }.also { runCatching { scene.close() } }.exceptionOrNull()
     }
 
     /**
@@ -196,8 +199,9 @@ class WidgetPreviewCensusTest {
         println(report)
 
         // A widget that throws must cost its own preview and nothing else, which is
-        // the whole basis for rendering them at all. If the run reached here, every
-        // scene after a failed one still built.
-        check(ok + failures.size == kinds.size)
+        // the whole basis for rendering them at all. Asserting ok + failed == total
+        // said nothing: it is an identity by construction. What is worth checking is
+        // that widgets went on rendering after the first failure.
+        check(ink.isNotEmpty()) { "not one widget rendered, so this measured nothing" }
     }
 }

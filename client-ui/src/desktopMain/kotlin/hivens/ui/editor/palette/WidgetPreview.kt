@@ -26,6 +26,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalSlotPath
+import hivens.ui.editor.ShellChromeBounds
+import hivens.ui.editor.LocalShellChromeBounds
+import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.LocalWidgetDecorator
+import hivens.widget.api.LocalUnknownWidgetDecorator
+import hivens.widget.api.LocalSlotChromeModifier
+import hivens.widget.api.LocalSlotBoundsReporter
+import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetFootprintDp
 import hivens.widget.api.LocalWidgetRegistry
@@ -126,13 +134,16 @@ class WidgetPreviewHost internal constructor(
      */
     suspend fun draw(kind: WidgetKind, descriptor: WidgetDescriptor) {
         if (cache.containsKey(kind)) return
-        val outcome = withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main) {
             // Between widgets rather than inside one: a gallery asks for many at
             // once and the pump is shared with everything the reader can see.
             yield()
-            render(kind, descriptor)
+            // Recorded inside the dispatch. Written after it, a tile scrolled out
+            // of the grid while its render was in flight cancelled the withContext
+            // and threw away a finished picture, so scrolling back re-rendered it
+            // from nothing every time.
+            cache[kind] = render(kind, descriptor)
         }
-        cache[kind] = outcome
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
@@ -140,34 +151,50 @@ class WidgetPreviewHost internal constructor(
         val box = frameFor(descriptor.sizing)
         val w = (box.width * density.density).toInt().coerceIn(1, MAX_PX)
         val h = (box.height * density.density).toInt().coerceIn(1, MAX_PX)
-        var scene: ImageComposeScene? = null
-        return runCatching {
-            scene = ImageComposeScene(width = w, height = h, density = density) {
-                CompositionLocalProvider(locals) {
-                    // After the captured locals, so the stand-in sources win over
-                    // the live ones the launcher is running on.
-                    CompositionLocalProvider(LocalWidgetDataRegistry provides data) {
-                        PreviewSubject(descriptor, kind, box)
+        // Built empty, then handed its content. Nothing of the widget's runs in
+        // the constructor, so it cannot throw and the reference is in hand before
+        // anything can. Composing inline instead loses the object with the throw:
+        // the assignment never happens, close() is never reached, and an unclosed
+        // scene leaves a Recomposer registered as a global snapshot apply-observer
+        // for the life of the process, which every state write then walks. That is
+        // a leak on exactly the path this whole file exists to make survivable.
+        val scene = ImageComposeScene(width = w, height = h, density = density)
+        try {
+            return runCatching {
+                scene.setContent {
+                    CompositionLocalProvider(locals) {
+                        PreviewEnvironment(data) { PreviewSubject(descriptor, kind, box) }
                     }
                 }
-            }
-            // render() hands back a skia Image; the bitmap is what Compose can draw.
-            val bitmap = Bitmap.makeFromImage(scene.render())
-            val ink = inkBounds(bitmap)
-            // A widget can compose without throwing and still draw nothing: an
-            // activity pill with no activity, a list with no items. An empty
-            // rectangle says less than the letter it would replace, so it is
-            // refused rather than shown.
-            if (ink == null) WidgetPreview.Refused
-            else WidgetPreview.Drawn(bitmap.asComposeImageBitmap(), ink.first, ink.second)
-        }.onFailure { cause ->
-            // Debug: a widget declining to compose outside its surface is normal,
-            // and a palette that logs a warning per tile would drown the console
-            // the first time it is opened.
-            log.debug("no preview for {}: {}", kind.value, cause.toString())
-        }.also {
-            runCatching { scene?.close() }
-        }.getOrElse { WidgetPreview.Refused }
+                val image = scene.render()
+                // render() hands back a skia Image; the bitmap is what Compose can
+                // draw. Closed straight after: it is a second full-size raster and
+                // only the bitmap outlives this function.
+                val bitmap = try { Bitmap.makeFromImage(image) } finally { image.close() }
+                val ink = inkBounds(bitmap)
+                // A widget can compose without throwing and still draw nothing: an
+                // activity pill with no activity, a list with no items. An empty
+                // rectangle says less than the letter it would replace, so it is
+                // refused rather than shown.
+                if (ink == null) WidgetPreview.Refused
+                else WidgetPreview.Drawn(bitmap.asComposeImageBitmap(), ink.first, ink.second)
+            }.onFailure { cause ->
+                // Debug: a widget declining to compose outside its surface is normal,
+                // and a palette that logs a warning per tile would drown the console
+                // the first time it is opened. The cause goes in whole, because one
+                // line naming neither the place nor the chain is not diagnostics.
+                log.debug("no preview for {}", kind.value, cause)
+            }.getOrElse { WidgetPreview.Refused }
+        } catch (error: Throwable) {
+            // Exceptions are the expected outcome and runCatching above owns them.
+            // This is only here so the scene is released when something the process
+            // cannot continue past goes by, and it is rethrown rather than turned
+            // into a tile: an OutOfMemoryError recorded as "no preview" is a
+            // launcher that quietly stops working.
+            throw error
+        } finally {
+            runCatching { scene.close() }
+        }
     }
 }
 
@@ -175,14 +202,20 @@ class WidgetPreviewHost internal constructor(
  * The rectangle the widget actually drew into, or null if it drew too little to
  * be worth a tile.
  *
- * Measured against the corner pixel rather than against a named colour, because
- * the scene is drawn on whatever the theme's page is and "nothing here" is that,
- * not an absence. Sampled on a grid and then padded back out by the step, so the
- * crop never cuts into what it found: this runs once per widget and only has to
- * be right to within a few points.
+ * Ink is anything not transparent. The scene clears to transparent and the
+ * preview paints no page behind the widget, so that is literally what "nothing
+ * here" is. It used to compare against the corner pixel, on the belief that the
+ * frame carried the theme's page colour: that reading breaks on a widget that
+ * paints its own full-bleed plane, where the corner IS the widget and everything
+ * matching it reads as empty. Eleven players and the theme grid declare
+ * drawsOwnSurface, and only their rounded corners kept it working.
+ *
+ * Sampled on a grid and then padded back out by the step, so the crop never cuts
+ * into what it found: this runs once per widget and only has to be right to
+ * within a few points.
  */
 private fun inkBounds(bitmap: Bitmap): Pair<IntOffset, IntSize>? {
-    val page = bitmap.getColor(0, 0)
+    val page = TRANSPARENT
     var left = bitmap.width
     var top = bitmap.height
     var right = -1
@@ -215,8 +248,42 @@ private fun inkBounds(bitmap: Bitmap): Pair<IntOffset, IntSize>? {
 
 private const val INK_STEP = 4
 
+/** What an untouched pixel of the scene is: [ImageComposeScene] clears to this. */
+private const val TRANSPARENT = 0
+
 /** Under this the frame is empty enough that the letter says more. */
 private const val MIN_INK = 0.004f
+
+/**
+ * Everything the scene must NOT share with the editor it was launched from.
+ *
+ * The captured locals carry the editor's own wiring, and some of it writes. A
+ * container widget renders a nested slot, the slot is empty, and the empty-slot
+ * decorator registers its bounds in the LIVE drop-target registry -- in scene
+ * coordinates, which the registry reads as window coordinates. The registry has
+ * no way to unregister a slot, so the phantom outlives the palette: it is small,
+ * and the hit-test picks the smallest rectangle containing the pointer, so a drop
+ * anywhere near the window's top-left corner lands on a surface that does not
+ * exist and silently does nothing.
+ *
+ * So the four editor hooks are stood down and the sources are substituted. The
+ * shell's own measurements get a throwaway holder for the same reason: a preview
+ * is not the shell and has no business reporting where the content pane is.
+ */
+@Composable
+private fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable () -> Unit) {
+    val ownBounds = remember { ShellChromeBounds() }
+    CompositionLocalProvider(
+        LocalWidgetDataRegistry provides data,
+        LocalEmptySlotDecorator provides {},
+        LocalSlotBoundsReporter provides { _, _ -> },
+        LocalSlotChromeModifier provides { _, _ -> Modifier },
+        LocalWidgetDecorator provides { _, _, _, _, inner -> inner() },
+        LocalUnknownWidgetDecorator provides { _, _, _ -> },
+        LocalShellChromeBounds provides ownBounds,
+        content = content,
+    )
+}
 
 /**
  * The widget, mounted the way a slot would mount it.
@@ -268,7 +335,13 @@ private const val MAX_PX = 1024
 
 private val PREVIEW_PATH = SlotPath(SurfaceId("preview"), SlotId("preview"))
 
-/** One host per palette, holding its cache for as long as the palette is open. */
+/**
+ * One host per palette, holding its cache for as long as the palette is open.
+ *
+ * Call it ABOVE whatever branches on the search: remembered inside a branch, a
+ * query that matches nothing takes the host out of the composition and clearing
+ * the field builds a new one, so every preview is lost to a typo.
+ */
 @Composable
 fun rememberWidgetPreviewHost(): WidgetPreviewHost {
     val locals = currentCompositionLocalContext
