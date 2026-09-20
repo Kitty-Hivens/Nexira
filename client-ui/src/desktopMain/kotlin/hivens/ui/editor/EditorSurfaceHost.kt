@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -152,15 +153,15 @@ fun EditorSurfaceHost(
     // pane. The regions report where they landed; see [ShellChromeBounds] for why
     // the two constants this replaces could not be right.
     val chromeBounds = remember { ShellChromeBounds() }
-    var hostRect by remember { mutableStateOf(Rect.Zero) }
+    val hostRect = remember { mutableStateOf(Rect.Zero) }
     val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces) {
         EditorSurfaces.availableFor(currentScreen, graphForSurfaces)
     }
     // Which of those tabs point at something folded away. Separate from the tab
-    // set on purpose: the editor's whole state is keyed on the screen, and folding
-    // a rail is not leaving the screen. While the fold was part of the tab set, a
-    // rail collapsed from its own panel re-keyed every remember in this function
-    // and dropped the reader out of edit mode mid-edit.
+    // set on purpose: the editor's whole state is keyed on that set, and folding a
+    // rail does not change what is editable. While the fold was part of it, a rail
+    // collapsed from its own panel re-keyed every remember in this function and
+    // dropped the reader out of edit mode mid-edit.
     val foldedSurfaces: Set<SurfaceId> = remember(availableSurfaces, graphForSurfaces) {
         availableSurfaces.filterTo(mutableSetOf()) { EditorSurfaces.foldedAway(it, graphForSurfaces) }
     }
@@ -535,7 +536,7 @@ fun EditorSurfaceHost(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .onGloballyPositioned { hostRect = it.boundsInWindow() }
+                .onGloballyPositioned { hostRect.value = it.boundsInWindow() }
                 // The way into edit mode for anyone who does not already know the
                 // chord. Right-clicking the background of the thing you want to
                 // rearrange is how every desktop offers this, so it is the gesture
@@ -597,13 +598,7 @@ fun EditorSurfaceHost(
             // reported rather than a guess at what the rails leave. Padding on an
             // inner box, because a box that both measures and pads itself chases
             // its own tail.
-            val pane = chromeBounds.center
-            val insets = remember(pane, hostRect, density) { paneInsets(pane, hostRect, density) }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(start = insets.start, end = insets.end),
-            ) {
+            ContentPaneBox(chromeBounds, hostRect) {
             EditModeVignette(active = editing)
 
             if (availableSurfaces.isNotEmpty()) {
@@ -824,6 +819,29 @@ fun EditorSurfaceHost(
             DragGhostOverlay(dragController = dragController)
         }
     }
+}
+
+/**
+ * The overlays' own box, sitting over the content pane.
+ *
+ * A composable of its own purely for the size of its restart scope. Reading the
+ * two rectangles where they were used put them in the same scope as the whole
+ * shell, so dragging the window's edge or swiping the right rail re-ran the
+ * pill, the panels and all the editor's wiring on every frame of the gesture.
+ * Read here, only this box re-measures.
+ */
+@Composable
+private fun ContentPaneBox(
+    bounds: ShellChromeBounds,
+    host: State<Rect>,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val density = LocalDensity.current
+    val insets = paneInsets(bounds.center, host.value, density)
+    Box(
+        modifier = Modifier.fillMaxSize().padding(start = insets.start, end = insets.end),
+        content = content,
+    )
 }
 
 // ── Top pill ────────────────────────────────────────────────────────────────

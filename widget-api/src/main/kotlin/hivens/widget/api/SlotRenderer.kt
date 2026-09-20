@@ -456,12 +456,13 @@ private fun BoxScope.PlacedBox(
     // expressible as one that names both, and requiring the pair silently threw
     // the one away.
     //
-    // Held inside what the widget says it can use, which is what finally makes
-    // the rule enforceable rather than hoped for. A claim under the widget's own
-    // floor comes up to the floor: the widget then spills past the box it was
-    // given, which is visible and correctable, where the cut it replaces was
-    // neither. In a lattice that means a cell too small for its occupant shows an
-    // occupant that overflows it, and the editor's overlap warning says so.
+    // Held inside what the widget says it can use, which is what finally makes the
+    // rule enforceable rather than hoped for. A claim under the widget's own floor
+    // is raised to the floor, so the widget is drawn at the size it needs instead
+    // of cut down to a claim that removes content. What it does NOT do is spill:
+    // the bound IS the box here, so the widget still ends at the floor. In a
+    // lattice the cell and the bound are different numbers, and there an occupant
+    // larger than its cell does overflow it, which the overlap warning says.
     val boundW = sizing.boundWidth(width)
     val boundH = sizing.boundHeight(height)
     var sizeMod: Modifier = Modifier

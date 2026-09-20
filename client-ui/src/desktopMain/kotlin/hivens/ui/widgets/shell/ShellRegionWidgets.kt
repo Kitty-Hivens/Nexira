@@ -61,6 +61,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.editor.LocalShellChromeBounds
+import hivens.ui.editor.reportsContentPane
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
@@ -271,8 +272,8 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     val chrome = NxTheme.colors.surface.copy(alpha = CHROME_OPACITY_PCT / 100f)
     val cornerDp = 12.dp
     // This rectangle is what the editor's overlays sit over. Reported rather than
-    // reconstructed from the rails' props: a rail with no named width takes a
-    // weight of the row, so the props do not carry the answer.
+    // reconstructed from the rails' props: a rail animates, folds itself away on a
+    // narrow window and carries an inset, so the props do not carry the answer.
     val chromeBounds = LocalShellChromeBounds.current
     // onGloballyPositioned never fires for a node that is removed, so without this
     // the holder keeps the last rectangle for good and the overlays stay inset
@@ -282,7 +283,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     }
     NxSurface(
         NxSurfaceLevel.Base,
-        Modifier.fillMaxSize().onGloballyPositioned { chromeBounds.center = it.boundsInWindow() },
+        Modifier.fillMaxSize().reportsContentPane(chromeBounds),
         RectangleShape,
         borderWidthDp = 0f,
         opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
@@ -318,11 +319,12 @@ private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-col
 /**
  * The right rail's width when nothing overrides it.
  *
- * Public because the shell insets its editor chrome by the same amount, and the
- * two were separate literals that happened to agree: a rail given another width
- * left the overlay measuring against a number nobody had updated.
+ * Mirrors what the bundled layout stores, the way [NAV_RAIL_DEFAULT_WIDTH] does,
+ * so a graph that lost the prop draws the rail it always drew. The editor used to
+ * read this to inset its own chrome; it measures the content pane now, so this is
+ * the rail's business alone.
  */
-val RAIL_DEFAULT_WIDTH = 265.dp
+internal val RAIL_DEFAULT_WIDTH = 265.dp
 
 /**
  * How far the panel sits off the window's edges: clear of the top bar, the bottom

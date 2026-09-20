@@ -5,7 +5,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 
 /**
  * Where the shell's content pane actually landed, in window pixels.
@@ -17,9 +20,10 @@ import androidx.compose.ui.geometry.Rect
  * drifted sideways by whatever the difference was, and a collapsed right rail
  * left them a whole rail short of the edge.
  *
- * Measured rather than derived, because the answer is not in the props either: a
- * rail with no named width takes a weight of the row, and reproducing that here
- * would be a second copy of the shell's layout rules kept in step by hand.
+ * Measured rather than derived, because the answer is not in the props either.
+ * A rail animates its width open and shut, folds itself away below a window it
+ * cannot lay out in, and sits inside an inset of its own, so reproducing where it
+ * ends up would be a second copy of the shell's layout rules kept in step by hand.
  *
  * Null means "not reported yet", which is the first frame and any build with no
  * centre region. The reader falls back to the space it has.
@@ -35,3 +39,15 @@ class ShellChromeBounds {
  * of it recomposes, and everything else under the shell does not.
  */
 val LocalShellChromeBounds = staticCompositionLocalOf { ShellChromeBounds() }
+
+/**
+ * Marks this node as the content pane, so the editor's overlays can find it.
+ *
+ * Named rather than written inline at the one call site, because it is one link
+ * of a three-link chain -- report, provide, read -- whose failure mode is silence:
+ * with nothing reported the insets are zero, which is also what a first frame
+ * looks like, so a broken link leaves the overlays full-screen and says nothing.
+ * A name is something a test can hold and a reader can grep for.
+ */
+fun Modifier.reportsContentPane(bounds: ShellChromeBounds): Modifier =
+    onGloballyPositioned { bounds.center = it.boundsInWindow() }
