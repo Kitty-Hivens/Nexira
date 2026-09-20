@@ -59,7 +59,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -153,7 +152,6 @@ fun EditorSurfaceHost(
     content: @Composable () -> Unit,
 ) {
     val graphForSurfaces = LocalLayoutGraph.current
-    val windowWidthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp().value }
     val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces) {
         EditorSurfaces.availableFor(currentScreen, graphForSurfaces)
     }
@@ -161,12 +159,9 @@ fun EditorSurfaceHost(
     // set on purpose: the editor's whole state is keyed on the screen, and folding
     // a rail is not leaving the screen. While the fold was part of the tab set, a
     // rail collapsed from its own panel re-keyed every remember in this function
-    // and dropped the reader out of edit mode mid-edit -- as did a window resize
-    // across the right rail's fold-away width.
-    val foldedSurfaces: Set<SurfaceId> = remember(availableSurfaces, graphForSurfaces, windowWidthDp) {
-        availableSurfaces.filterTo(mutableSetOf()) {
-            EditorSurfaces.foldedAway(it, graphForSurfaces, windowWidthDp)
-        }
+    // and dropped the reader out of edit mode mid-edit.
+    val foldedSurfaces: Set<SurfaceId> = remember(availableSurfaces, graphForSurfaces) {
+        availableSurfaces.filterTo(mutableSetOf()) { EditorSurfaces.foldedAway(it, graphForSurfaces) }
     }
     // The region this surface is the inside of, so its own settings are reachable
     // from its own tab rather than from the frame that happens to hold it.

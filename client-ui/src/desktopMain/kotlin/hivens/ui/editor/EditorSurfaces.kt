@@ -222,14 +222,13 @@ internal object EditorSurfaces {
      * removing it. A tab that disappears when a rail folds takes the way back
      * with it.
      *
-     * Read from the graph, because the collapse is a prop on the region widget
-     * and the graph is the thing this function already has. The right rail also
-     * folds itself away below a window width it cannot lay out in, which is why
-     * the width is asked for rather than assumed.
+     * The stored prop is the whole question. The right rail also folds itself away
+     * below a window width it cannot lay out in, but only outside the editor: edit
+     * mode renders it at its full width whatever the window measures, so counting
+     * that fold here marked a tab folded while the rail it names was on screen.
      */
-    fun foldedAway(surface: SurfaceId, graph: LayoutGraph, windowWidthDp: Float): Boolean = when (surface.value) {
-        "appshell.rightrail" ->
-            windowWidthDp < RIGHT_RAIL_AUTO_COLLAPSE_DP || graph.regionCollapsed("appshell.region.right")
+    fun foldedAway(surface: SurfaceId, graph: LayoutGraph): Boolean = when (surface.value) {
+        "appshell.rightrail" -> graph.regionCollapsed("appshell.region.right")
         "appshell.leftrail" -> graph.regionCollapsed("appshell.region.left")
         else -> false
     }
@@ -277,13 +276,4 @@ internal object EditorSurfaces {
             ?.jsonPrimitive
             ?.booleanOrNull
             ?: false
-
-    /**
-     * The width the right rail folds itself away below.
-     *
-     * Mirrors ShellRightRegion's own number. Two literals that have to agree is
-     * one too many, but the region's copy is private to a file the editor does
-     * not depend on, and the alternative is a dependency the other way round.
-     */
-    private const val RIGHT_RAIL_AUTO_COLLAPSE_DP = 980f
 }

@@ -87,42 +87,34 @@ class EditorSurfacesTest {
         props = JsonObject(mapOf("collapsed" to JsonPrimitive(true))),
     )
 
-    private val wide = 1600f
-
     @Test
     fun `a collapsed rail is reported folded, and unfolded when it comes back`() {
         assertTrue(
-            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), collapsed("right"), wide),
+            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), collapsed("right")),
             "a rail with no width is not a place to arrange anything: the drop targets are a hairline",
         )
         assertFalse(
-            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), bundled, wide),
+            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), bundled),
             "and it is unfolded the moment the rail is",
         )
     }
 
     @Test
     fun `the left rail answers the same question`() {
-        assertTrue(EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), collapsed("left"), wide))
-        assertFalse(EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), bundled, wide))
+        assertTrue(EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), collapsed("left")))
+        assertFalse(EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), bundled))
     }
 
     @Test
-    fun `the right rail folds itself away on a narrow window`() {
-        assertTrue(
-            EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), bundled, windowWidthDp = 900f),
-            "below its own fold-away width the rail is gone whatever the prop says",
-        )
-        assertFalse(
-            EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), bundled, windowWidthDp = 900f),
-            "the left rail does not fold on width",
-        )
+    fun `one rail folding says nothing about the other`() {
+        assertFalse(EditorSurfaces.foldedAway(SurfaceId("appshell.rightrail"), collapsed("left")))
+        assertFalse(EditorSurfaces.foldedAway(SurfaceId("appshell.leftrail"), collapsed("right")))
     }
 
     @Test
     fun `nothing but a rail folds`() {
         listOf("home.new", "appshell.topbar", "appshell.root", "appshell.body", "appshell.overlay").forEach {
-            assertFalse(EditorSurfaces.foldedAway(SurfaceId(it), collapsed("left"), 400f), it)
+            assertFalse(EditorSurfaces.foldedAway(SurfaceId(it), collapsed("left")), it)
         }
     }
 
