@@ -36,6 +36,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
@@ -57,6 +59,7 @@ import hivens.ui.chrome.windowDragArea
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
+import hivens.ui.editor.LocalShellChromeBounds
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
@@ -251,8 +254,14 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     // colour rather than one of its own -- see [CHROME_OPACITY_PCT].
     val chrome = NxTheme.colors.surface.copy(alpha = CHROME_OPACITY_PCT / 100f)
     val cornerDp = 12.dp
+    // This rectangle is what the editor's overlays sit over. Reported rather than
+    // reconstructed from the rails' props: a rail with no named width takes a
+    // weight of the row, so the props do not carry the answer.
+    val chromeBounds = LocalShellChromeBounds.current
     NxSurface(
-        NxSurfaceLevel.Base, Modifier.fillMaxSize(), RectangleShape,
+        NxSurfaceLevel.Base,
+        Modifier.fillMaxSize().onGloballyPositioned { chromeBounds.center = it.boundsInWindow() },
+        RectangleShape,
         borderWidthDp = 0f,
         opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
     ) {

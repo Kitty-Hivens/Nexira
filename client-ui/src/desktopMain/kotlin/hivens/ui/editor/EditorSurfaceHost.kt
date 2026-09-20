@@ -61,6 +61,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -143,15 +144,15 @@ fun EditorSurfaceHost(
     currentScreen: Screen,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
-    // The host now wraps the WHOLE shell Row (rails included) so the editor's
-    // decorators reach rail widgets. These insets keep the chrome overlays
-    // (pill / palette / prop panel / vignette) anchored over the center pane,
-    // past the left rail and right panel, matching their pre-hoist place.
-    centerStartInset: Dp = 0.dp,
-    centerEndInset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     val graphForSurfaces = LocalLayoutGraph.current
+    // The host wraps the WHOLE shell Row (rails included) so its decorators reach
+    // rail widgets, and its overlays then have to be put back over the content
+    // pane. The regions report where they landed; see [ShellChromeBounds] for why
+    // the two constants this replaces could not be right.
+    val chromeBounds = remember { ShellChromeBounds() }
+    var hostRect by remember { mutableStateOf(Rect.Zero) }
     val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces) {
         EditorSurfaces.availableFor(currentScreen, graphForSurfaces)
     }
@@ -488,6 +489,7 @@ fun EditorSurfaceHost(
     }
 
     CompositionLocalProvider(
+        LocalShellChromeBounds  provides chromeBounds,
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
         LocalDropTargetRegistry provides registry,
@@ -522,6 +524,7 @@ fun EditorSurfaceHost(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .onGloballyPositioned { hostRect = it.boundsInWindow() }
                 // The way into edit mode for anyone who does not already know the
                 // chord. Right-clicking the background of the thing you want to
                 // rearrange is how every desktop offers this, so it is the gesture
@@ -578,13 +581,17 @@ fun EditorSurfaceHost(
                 }
             }
 
-            // Center-anchored chrome layer: inset past the left rail and right
-            // panel so the vignette + overlays stay over the center pane exactly
-            // as before the host was hoisted around the whole shell Row.
+            // Center-anchored chrome layer: the vignette and the overlays belong
+            // over the content pane, so they take the rectangle the centre region
+            // reported rather than a guess at what the rails leave. Padding on an
+            // inner box, because a box that both measures and pads itself chases
+            // its own tail.
+            val pane = chromeBounds.center
+            val insets = remember(pane, hostRect, density) { paneInsets(pane, hostRect, density) }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start = centerStartInset, end = centerEndInset),
+                    .padding(start = insets.start, end = insets.end),
             ) {
             EditModeVignette(active = editing)
 
@@ -1228,6 +1235,28 @@ private fun DragGhostOverlay(dragController: DragController) {
             active.ghost()
         }
     }
+}
+
+/** How far in from the host's own left and right edges the content pane starts. */
+internal data class PaneInsets(val start: Dp, val end: Dp)
+
+/**
+ * The pane's rectangle expressed as padding on the host's frame.
+ *
+ * Sideways only. The overlays' distance from the top is the editor's own
+ * composition and the top bar is behind them by design, so only the rails, which
+ * they must not cover, are measured.
+ *
+ * Coerced at zero on both sides: a pane wider than the frame it is measured
+ * against is a half-laid-out frame rather than a negative gap, and a negative
+ * padding is not a thing [androidx.compose.foundation.layout.padding] takes.
+ * Nothing reported yet means no inset, which is the full frame -- the same place
+ * the overlays sit on a build with no rails.
+ */
+internal fun paneInsets(pane: Rect?, host: Rect, density: Density): PaneInsets {
+    if (pane == null || host.width <= 0f) return PaneInsets(0.dp, 0.dp)
+    fun gap(px: Float): Dp = with(density) { px.coerceAtLeast(0f).toDp() }
+    return PaneInsets(start = gap(pane.left - host.left), end = gap(host.right - pane.right))
 }
 
 private fun transparentPointerIcon(): PointerIcon {

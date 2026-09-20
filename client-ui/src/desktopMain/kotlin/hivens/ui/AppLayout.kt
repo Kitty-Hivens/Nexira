@@ -11,7 +11,6 @@ import hivens.core.data.SessionData
 import hivens.core.data.ThemeMode
 import hivens.core.security.SslBypassStore
 import hivens.launcher.network.ServerProtocolConfig
-import hivens.ui.widgets.shell.RAIL_DEFAULT_WIDTH
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
@@ -263,18 +262,13 @@ fun AppLayout(
     )
 
     // The editor host wraps the WHOLE shell (rails included) so its decorators
-    // reach rail widgets; the insets keep the chrome over the center pane (past
-    // the 64dp rail + 264dp panel, each plus a 1dp divider). The shell itself is
-    // now a widget surface: appshell.root lays its three region widgets in a Row.
+    // reach rail widgets; it puts its own chrome back over the content pane from
+    // what the centre region reports. The shell itself is a widget surface:
+    // appshell.root lays its three region widgets in a Row.
     EditorSurfaceHost(
         currentScreen          = currentScreen,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
-        centerStartInset       = 65.dp,
-        // The rail's own default, not a copy of the number it happens to be. A
-        // rail widened in the editor used to leave this behind, and the overlay
-        // then sat over the rail it was meant to stop short of.
-        centerEndInset         = RAIL_DEFAULT_WIDTH,
     ) {
         // Links that point at a project the launcher can draw stop going out to a
         // browser from here down. Provided at the shell rather than per surface, so
