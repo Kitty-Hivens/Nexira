@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -120,5 +121,41 @@ class EditorSurfacesTest {
             EditorSurfaces.availableFor(Screen.Home, bundled).filterNot { it.value == "appshell.rightrail" },
             folded,
         )
+    }
+
+    // ── A region's own settings, from the region's own tab ───────────
+
+    @Test
+    fun `each rail and the top bar resolve to the region that holds them`() {
+        val cases = mapOf(
+            "appshell.leftrail" to "appshell-region-left-default",
+            "appshell.rightrail" to "appshell-region-right-default",
+            "appshell.topbar" to "appshell-region-top-default",
+            "home.new" to "appshell-region-center-default",
+        )
+        cases.forEach { (surface, expected) ->
+            val owner = EditorSurfaces.ownerRegionOf(SurfaceId(surface), bundled)
+            assertEquals(expected, owner?.second, "$surface should reach its own region's settings")
+        }
+    }
+
+    @Test
+    fun `the two frames are searched, not assumed`() {
+        // The top bar sits in the window's column and the rails in its row. Both
+        // resolve, which is the whole point of looking in both rather than
+        // writing the frame's shape down a fourth time.
+        val top = EditorSurfaces.ownerRegionOf(SurfaceId("appshell.topbar"), bundled)
+        val rail = EditorSurfaces.ownerRegionOf(SurfaceId("appshell.rightrail"), bundled)
+        assertEquals(SurfaceId("appshell.root"), top?.first?.surface)
+        assertEquals(SurfaceId("appshell.body"), rail?.first?.surface)
+    }
+
+    @Test
+    fun `a surface that is nobody's inside resolves to nothing`() {
+        assertNull(
+            EditorSurfaces.ownerRegionOf(SurfaceId("appshell.overlay"), bundled),
+            "the overlay lane is a lane inside the centre, not a region with settings of its own",
+        )
+        assertNull(EditorSurfaces.ownerRegionOf(SurfaceId("appshell.body"), bundled))
     }
 }

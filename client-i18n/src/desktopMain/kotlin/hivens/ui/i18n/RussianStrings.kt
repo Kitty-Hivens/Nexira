@@ -1472,6 +1472,7 @@ object RussianStrings : AppStrings {
     override val editorPreview           = "Просмотр"
     override val editorPreviewHidden     = "Скрыто"
     override val editorPaletteToggleHide = "Скрыть"
+    override val editorRegionProps       = "Сама область"
     override val editorUndo              = "Отменить"
     override val editorRedo              = "Вернуть"
     override val editorEscHint           = "Esc — выйти"

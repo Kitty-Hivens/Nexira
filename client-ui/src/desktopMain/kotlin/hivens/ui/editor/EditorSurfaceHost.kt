@@ -112,6 +112,7 @@ import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.FamilyId
+import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.traverse
@@ -158,6 +159,9 @@ fun EditorSurfaceHost(
     val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces, windowWidthDp) {
         EditorSurfaces.availableFor(currentScreen, graphForSurfaces, windowWidthDp)
     }
+    // The region this surface is the inside of, so its own settings are reachable
+    // from its own tab rather than from the frame that happens to hold it.
+    val ownerRegion = selectedSurfaceOwnerRegion(graphForSurfaces)
     val controller: EditModeController = koinInject()
     val layoutRepo: LayoutGraphRepository = koinInject()
     val presetRepo: PresetRepository      = koinInject()
@@ -740,6 +744,13 @@ fun EditorSurfaceHost(
                     onTogglePreview       = { previewing = !previewing },
                     onOpenPresets         = { presetPanelOpen = true },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
+                    hasRegionProps        = ownerRegion(selectedSurface) != null,
+                    onOpenRegionProps     = {
+                        ownerRegion(selectedSurface)?.let { (regionPath, id) ->
+                            surfaceSettingsOpen = false
+                            propTarget = if (propTarget?.instanceId == id) null else PropTarget(regionPath, id)
+                        }
+                    },
                     canUndo               = controller.canUndo,
                     canRedo               = controller.canRedo,
                     onUndo                = { controller.undo() },
@@ -782,6 +793,8 @@ private fun EditModePill(
     onFamilyPicked: (FamilyId?) -> Unit,
     surfaceHasSettings: Boolean,
     onOpenSurfaceSettings: () -> Unit,
+    hasRegionProps: Boolean,
+    onOpenRegionProps: () -> Unit,
     paletteOpen: Boolean,
     onTogglePalette: () -> Unit,
     previewing: Boolean,
@@ -870,6 +883,24 @@ private fun EditModePill(
                             label    = s.editorSurfaceSettings,
                             selected = false,
                             onClick  = onOpenSurfaceSettings,
+                            compact  = compact,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+
+                    // The region this surface sits in, by its own settings.
+                    //
+                    // Its width, its plane and whether it is folded away are props on
+                    // a widget in the frame, and the frame is a surface of its own, so
+                    // reaching them meant knowing that the shell is a row, that the row
+                    // is editable, and which of the three widgets in it is the rail you
+                    // can see. They are one press from the rail's own tab now.
+                    if (hasRegionProps) {
+                        ToolChip(
+                            icon     = NxIcon.ViewSidebar,
+                            label    = s.editorRegionProps,
+                            selected = false,
+                            onClick  = onOpenRegionProps,
                             compact  = compact,
                         )
                         Spacer(Modifier.width(4.dp))
@@ -1158,3 +1189,16 @@ private fun transparentPointerIcon(): PointerIcon {
         .createCustomCursor(image, java.awt.Point(0, 0), "drag-ghost")
     return PointerIcon(cursor)
 }
+
+/**
+ * Resolves a surface to the region widget that contains it, once per graph.
+ *
+ * A function returned rather than a value computed, because the caller asks
+ * about whichever surface is selected and that changes without the graph doing
+ * so.
+ */
+@Composable
+private fun selectedSurfaceOwnerRegion(graph: LayoutGraph): (SurfaceId?) -> Pair<SlotPath, String>? =
+    remember(graph) {
+        { surface -> surface?.let { EditorSurfaces.ownerRegionOf(it, graph) } }
+    }

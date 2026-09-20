@@ -20,6 +20,7 @@ import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotId
+import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -52,6 +53,20 @@ internal class EditorSurfaceSpec(
      * shell surfaces, which are present on every screen.
      */
     val mountedOn: ((Screen) -> Boolean)? = null,
+    /**
+     * The region widget this surface is the inside of, by kind.
+     *
+     * A region's own settings and its contents were on different tabs, and the
+     * tab carrying the settings was named after the container rather than the
+     * region: the right rail's width lived under "the row of regions" while what
+     * is in the rail lived under "right rail". So anybody wanting a wider rail
+     * had to know that the frame is a row, and that the row is a surface, and
+     * which of the three widgets in it is the one they can see.
+     *
+     * Named here so the region's own tab can offer its settings, which is where
+     * a person looks for them. Null for a surface that is nobody's inside.
+     */
+    val ownerRegion: String? = null,
 )
 
 /**
@@ -72,6 +87,7 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortHome },
             stub      = LocalHomeNewContext provides STUB_HOME_NEW,
             mountedOn = { screen -> screen == Screen.Home },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("library"),
@@ -80,6 +96,7 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortLibrary },
             stub      = LocalLibraryContext provides STUB_LIBRARY,
             mountedOn = { screen -> screen == Screen.Library },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("about"),
@@ -88,6 +105,7 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortAbout },
             stub      = LocalAboutContext provides STUB_ABOUT,
             mountedOn = { screen -> screen == Screen.About },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("bg.settings"),
@@ -96,6 +114,7 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortBg },
             stub      = LocalBgSettingsContext provides STUB_BG_SETTINGS,
             mountedOn = { screen -> screen == Screen.BackgroundSettings },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("profile"),
@@ -104,6 +123,7 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortProfile },
             stub      = LocalProfileContext provides STUB_PROFILE,
             mountedOn = { screen -> screen == Screen.Profile },
+            ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("theme.picker"),
@@ -112,6 +132,7 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortTheme },
             stub      = LocalThemePickerContext provides STUB_THEME_PICKER,
             mountedOn = { screen -> screen == Screen.ThemePicker },
+            ownerRegion = "appshell.region.center",
         ),
     )
 
@@ -123,6 +144,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Layers,
             name      = { it.editorSurfTopBar },
             shortName = { it.editorSurfShortTopBar },
+            ownerRegion = "appshell.region.top",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.overlay"),
@@ -137,6 +159,7 @@ internal object EditorSurfaces {
             shortName   = { it.editorSurfShortLeftRail },
             hasSettings = true,
             stub        = LocalLeftRailContext provides STUB_LEFTRAIL,
+            ownerRegion = "appshell.region.left",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.rightrail"),
@@ -144,6 +167,7 @@ internal object EditorSurfaces {
             name      = { it.editorSurfRightRail },
             shortName = { it.editorSurfShortRightRail },
             stub      = LocalRightRailContext provides STUB_RIGHTRAIL,
+            ownerRegion = "appshell.region.right",
         ),
         EditorSurfaceSpec(
             id        = SurfaceId("appshell.body"),
@@ -210,6 +234,37 @@ internal object EditorSurfaces {
         "appshell.leftrail" -> !graph.regionCollapsed("appshell.region.left")
         else -> true
     }
+
+    /**
+     * Where the region widget that owns [surface] lives, so its own settings can
+     * be opened from the tab of the thing it contains.
+     *
+     * Two frames hold all five regions and the model does not say which, so both
+     * are searched rather than mapped: a table saying "the top bar is in the root
+     * and the rails are in the body" is a fourth place the frame's shape is
+     * written down, and the one that would be wrong after it changed.
+     *
+     * Null when the surface is nobody's inside, or when the frame does not carry
+     * the region this build expects.
+     */
+    fun ownerRegionOf(surface: SurfaceId, graph: LayoutGraph): Pair<SlotPath, String>? {
+        val kind = spec(surface)?.ownerRegion ?: return null
+        return FRAMES.firstNotNullOfOrNull { (frame, slot) ->
+            val path = SlotPath(frame, slot)
+            graph.surfaces[frame]
+                ?.slotsOf(FamilyId.GENERAL)
+                ?.get(slot)
+                ?.widgets
+                ?.firstOrNull { it.kind.value == kind }
+                ?.let { path to it.instanceId }
+        }
+    }
+
+    /** The two slots the shell's regions live in: the window's column and its row. */
+    private val FRAMES = listOf(
+        SurfaceId("appshell.root") to SlotId("regions"),
+        SurfaceId("appshell.body") to SlotId("content"),
+    )
 
     /** The collapse prop on a shell region, false when the region or the prop is absent. */
     private fun LayoutGraph.regionCollapsed(kind: String): Boolean =
