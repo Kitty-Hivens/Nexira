@@ -472,6 +472,11 @@ compose.desktop {
             "-Xms64m",
             "-Xmx512m",
             "-XX:G1PeriodicGCInterval=20000",
+            // Non-concurrent, because G1 hands pages back to the OS only at the
+            // end of a STOP-THE-WORLD collection, never during a concurrent mark.
+            // A launcher sitting in the tray never triggers a young GC on its own,
+            // so the default concurrent periodic cycle reclaimed nothing there.
+            "-XX:-G1PeriodicGCInvokesConcurrent",
             "-XX:MinHeapFreeRatio=10",
             "-XX:MaxHeapFreeRatio=30",
             "-XX:MaxMetaspaceSize=256m",
@@ -593,6 +598,11 @@ packaging {
             "-Xms64m",
             "-Xmx512m",
             "-XX:G1PeriodicGCInterval=20000",
+            // Non-concurrent, because G1 hands pages back to the OS only at the
+            // end of a STOP-THE-WORLD collection, never during a concurrent mark.
+            // A launcher sitting in the tray never triggers a young GC on its own,
+            // so the default concurrent periodic cycle reclaimed nothing there.
+            "-XX:-G1PeriodicGCInvokesConcurrent",
             "-XX:MinHeapFreeRatio=10",
             "-XX:MaxHeapFreeRatio=30",
             "-XX:MaxMetaspaceSize=256m",
