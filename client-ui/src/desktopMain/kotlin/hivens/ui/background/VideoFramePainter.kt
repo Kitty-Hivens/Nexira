@@ -10,14 +10,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.skiaCanvas
 import dev.hivens.skinema.audio.PcmSink
-import dev.hivens.skinema.compose.rememberPlayerState
 import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.player.VideoPlayer
 import dev.hivens.skinema.player.WhenUnwatched
@@ -28,6 +26,7 @@ import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.WallpaperSession
 import hivens.ui.theme.seedFromRgba
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image
@@ -348,7 +347,14 @@ internal fun rememberSkinemaFrame(
         var resumed = false
         var seedSent = false
         while (true) {
-            withFrameNanos { }
+            // A poll, not a frame clock. withFrameNanos here woke this loop once
+            // per vsync and, like skinema's own player-state poll above, held
+            // Compose's frame clock open so the window redrew at the monitor's
+            // refresh. delay lets the clock sleep between frames; a new frame still
+            // bumps the stamp and invalidates the draw, so the wallpaper renders on
+            // its own cadence rather than the display's. Sixty hertz of polling is
+            // comfortably above any wallpaper's frame rate.
+            delay(WALLPAPER_POLL_MS)
             // Put the picture back where the previous player left it, once there is
             // a decoder to ask. Zero is a first open on this file, which starts
             // where the file does and needs no seek.
@@ -382,9 +388,26 @@ internal fun rememberSkinemaFrame(
         }
     }
 
-    val state = rememberPlayerState(player)
-    if (state is VideoPlayer.State.Failed) {
-        LaunchedEffect(player) { log.error("Background media failed to play: {}", file.absolutePath, state.cause) }
+    // Polled slowly, on purpose, and not through skinema's rememberPlayerState.
+    // That helper reads the player's state inside a withFrameNanos loop, i.e. once
+    // per vsync, which keeps Compose's frame clock awake for as long as a video
+    // wallpaper is up: the window then re-rasterises at the monitor's refresh
+    // (measured at 96% of the render engine on a 210 Hz display) to serve a video
+    // that changes a couple of dozen times a second. The only thing read off the
+    // state here is whether the decode failed, which is a rare, early, one-shot
+    // fact, so a quarter-second poll catches it without holding the clock open.
+    // With this gone the sole remaining invalidation is the frame stamp the pump
+    // bumps, so the wallpaper renders when a frame lands rather than every vsync.
+    var state by remember(player) { mutableStateOf(player.state) }
+    LaunchedEffect(player) {
+        while (true) {
+            state = player.state
+            delay(250)
+        }
+    }
+    val failed = state
+    if (failed is VideoPlayer.State.Failed) {
+        LaunchedEffect(player) { log.error("Background media failed to play: {}", file.absolutePath, failed.cause) }
         return null
     }
 
@@ -409,3 +432,5 @@ internal fun rememberSkinemaFrame(
  */
 private fun repeatOf(mode: BackgroundLoopMode): RepeatMode =
     if (mode == BackgroundLoopMode.PlayOnce) RepeatMode.Off else RepeatMode.One
+
+private const val WALLPAPER_POLL_MS = 16L
