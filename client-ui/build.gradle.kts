@@ -462,9 +462,18 @@ compose.desktop {
             // over once the steady state kicks in; the startup ms saved by C1-only
             // are noise next to the 5+ seconds we spend on first window paint.
 
-            // Memory optimization
-            "-Xms128m",
+            // Memory optimization. The heap is returned to the OS once a burst of
+            // work is over. Measured on a boot: the live set after a full GC was
+            // 44 MB, but 133 MB stayed committed, because Xms was the floor and G1
+            // neither uncommits below it nor runs a GC while the launcher sits idle.
+            // A lower floor, a periodic idle GC and a tighter free-ratio give the
+            // heap back -- the launcher grows to Xmx for a download or a game launch
+            // and shrinks again on the tray-idle it spends most of its life in.
+            "-Xms64m",
             "-Xmx512m",
+            "-XX:G1PeriodicGCInterval=20000",
+            "-XX:MinHeapFreeRatio=10",
+            "-XX:MaxHeapFreeRatio=30",
             "-XX:MaxMetaspaceSize=256m",
             "-XX:ReservedCodeCacheSize=128m",
 
@@ -578,8 +587,14 @@ packaging {
             "-XX:+UseStringDeduplication",
             "-XX:+OptimizeStringConcat",
             "-XX:+UseCompressedOops",
-            "-Xms128m",
+            // Idle heap returned to the OS (see the application block above for the
+            // measurement): a low floor plus a periodic idle GC and a tight
+            // free-ratio, so committed follows the live set down after a burst.
+            "-Xms64m",
             "-Xmx512m",
+            "-XX:G1PeriodicGCInterval=20000",
+            "-XX:MinHeapFreeRatio=10",
+            "-XX:MaxHeapFreeRatio=30",
             "-XX:MaxMetaspaceSize=256m",
             "-XX:ReservedCodeCacheSize=128m",
         ))
