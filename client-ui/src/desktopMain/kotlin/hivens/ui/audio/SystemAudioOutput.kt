@@ -3,6 +3,7 @@ package hivens.ui.audio
 import dev.hivens.libsound.AudioBackend
 import dev.hivens.libsound.AudioFormat
 import dev.hivens.libsound.AudioSink
+import dev.hivens.libsound.LatencyProfile
 import dev.hivens.libsound.MediaRole
 import dev.hivens.libsound.PcmEncoding
 import dev.hivens.libsound.SinkConfig
@@ -20,9 +21,16 @@ import org.slf4j.LoggerFactory
  * an engine refused to take, and that is a path worth being able to drive without
  * a sound server on the machine.
  */
-public fun interface AudioOutput {
-    /** A stream for one track, or null to let the decoder open its own line. */
-    public fun sink(): PcmSink?
+public interface AudioOutput {
+    /**
+     * A stream for one track, or null to let the decoder open its own line.
+     *
+     * [latency] is the buffer depth the sink asks for. The default suits video,
+     * where a short path keeps audio in step with the picture. A standalone music
+     * track has no picture to sync to and every reason never to underrun, so it
+     * asks for [LatencyProfile.RELAXED].
+     */
+    public fun sink(latency: LatencyProfile = LatencyProfile.BALANCED): PcmSink?
 }
 
 /**
@@ -62,7 +70,7 @@ class SystemAudioOutput : AudioOutput, AutoCloseable {
      * a connection to the sound server, and a launcher that never plays anything
      * has no business holding one.
      */
-    override fun sink(): PcmSink? {
+    override fun sink(latency: LatencyProfile): PcmSink? {
         val open = backendOrNull() ?: return null
         return try {
             SkinemaAdapter(
@@ -72,6 +80,7 @@ class SystemAudioOutput : AudioOutput, AutoCloseable {
                         applicationId = APPLICATION_ID,
                         iconName = ICON,
                         mediaRole = MediaRole.MUSIC,
+                        latency = latency,
                     ),
                 ),
             )

@@ -462,21 +462,19 @@ compose.desktop {
             // over once the steady state kicks in; the startup ms saved by C1-only
             // are noise next to the 5+ seconds we spend on first window paint.
 
-            // Memory optimization. The heap is returned to the OS once a burst of
-            // work is over. Measured on a boot: the live set after a full GC was
-            // 44 MB, but 133 MB stayed committed, because Xms was the floor and G1
-            // neither uncommits below it nor runs a GC while the launcher sits idle.
-            // A lower floor, a periodic idle GC and a tighter free-ratio give the
-            // heap back -- the launcher grows to Xmx for a download or a game launch
-            // and shrinks again on the tray-idle it spends most of its life in.
+            // Memory optimization. A low floor plus a tight free-ratio let a real GC
+            // hand committed heap back to the OS: the launcher grows to Xmx for a
+            // download or a game launch and shrinks afterwards. Measured on a boot the
+            // live set after a full GC was 44 MB while 133 MB stayed committed, because
+            // Xms was the floor and G1 does not uncommit below it.
+            //
+            // No periodic idle GC here. The only form that actually uncommitted on an
+            // idle launcher was a non-concurrent (stop-the-world) periodic collection,
+            // and that full pause froze the audio-feed thread every interval, so a
+            // playing track stuttered once per cycle. A few MB of idle heap is not
+            // worth stalling playback, and the free-ratio still trims after any real GC.
             "-Xms64m",
             "-Xmx512m",
-            "-XX:G1PeriodicGCInterval=20000",
-            // Non-concurrent, because G1 hands pages back to the OS only at the
-            // end of a STOP-THE-WORLD collection, never during a concurrent mark.
-            // A launcher sitting in the tray never triggers a young GC on its own,
-            // so the default concurrent periodic cycle reclaimed nothing there.
-            "-XX:-G1PeriodicGCInvokesConcurrent",
             "-XX:MinHeapFreeRatio=10",
             "-XX:MaxHeapFreeRatio=30",
             "-XX:MaxMetaspaceSize=256m",
@@ -592,17 +590,12 @@ packaging {
             "-XX:+UseStringDeduplication",
             "-XX:+OptimizeStringConcat",
             "-XX:+UseCompressedOops",
-            // Idle heap returned to the OS (see the application block above for the
-            // measurement): a low floor plus a periodic idle GC and a tight
-            // free-ratio, so committed follows the live set down after a burst.
+            // Idle heap trimmed by a real GC: a low floor plus a tight free-ratio, so
+            // committed follows the live set down after a burst. No periodic idle GC:
+            // its only uncommitting form was a stop-the-world collection that froze the
+            // audio-feed thread each interval (see the application block above).
             "-Xms64m",
             "-Xmx512m",
-            "-XX:G1PeriodicGCInterval=20000",
-            // Non-concurrent, because G1 hands pages back to the OS only at the
-            // end of a STOP-THE-WORLD collection, never during a concurrent mark.
-            // A launcher sitting in the tray never triggers a young GC on its own,
-            // so the default concurrent periodic cycle reclaimed nothing there.
-            "-XX:-G1PeriodicGCInvokesConcurrent",
             "-XX:MinHeapFreeRatio=10",
             "-XX:MaxHeapFreeRatio=30",
             "-XX:MaxMetaspaceSize=256m",

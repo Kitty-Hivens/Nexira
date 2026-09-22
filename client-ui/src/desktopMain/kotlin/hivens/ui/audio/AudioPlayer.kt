@@ -1,5 +1,6 @@
 package hivens.ui.audio
 
+import dev.hivens.libsound.LatencyProfile
 import dev.hivens.skinema.player.VideoPlayer
 import hivens.ui.diag.SkinemaGate
 import kotlinx.coroutines.CoroutineDispatcher
@@ -355,7 +356,13 @@ class AudioPlayer(
         // the sound server and dropped it unreferenced. Not yet a stream on the
         // graph, since a sink connects on its first open, but it is an arena and
         // a registration and it is ours until the engine takes it.
-        val sink = output?.sink()
+        //
+        // RELAXED (a 200 ms buffer) because this is a music track nobody is syncing
+        // to a picture: the depth rides out an occasional GC pause a shorter buffer
+        // would underrun on, and the added latency is imperceptible for playback.
+        // The video wallpaper keeps the default, where audio must stay in step with
+        // the frame.
+        val sink = output?.sink(LatencyProfile.RELAXED)
         return try {
             engines.open(file, sink)
         } catch (e: Exception) {
