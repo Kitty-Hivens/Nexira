@@ -9,6 +9,9 @@ import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.Rect
 import org.jetbrains.skia.SamplingMode
 import org.slf4j.LoggerFactory
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 import java.nio.file.Path
 import java.util.Locale
 import kotlin.io.path.name
@@ -45,7 +48,9 @@ data class TrackInfo(
 internal fun trackInfoFrom(tags: Map<String, String>, file: Path, artwork: ImageBitmap? = null): TrackInfo {
     val byLowerKey = tags.entries.associate { (key, value) -> key.lowercase(Locale.ROOT) to value }
     fun tag(vararg aliases: String): String? =
-        aliases.firstNotNullOfOrNull { alias -> byLowerKey[alias]?.trim()?.takeIf { it.isNotEmpty() } }
+        aliases.firstNotNullOfOrNull { alias ->
+            byLowerKey[alias]?.trim()?.takeIf { it.isNotEmpty() }?.let(::repairMojibake)
+        }
 
     return TrackInfo(
         title   = tag("title", "track_title") ?: fileTitle(file),
@@ -54,6 +59,67 @@ internal fun trackInfoFrom(tags: Map<String, String>, file: Path, artwork: Image
         artwork = artwork,
     )
 }
+
+/**
+ * Best-effort repair of a tag string a decoder read as ISO-8859-1 when its bytes
+ * were really a legacy CJK encoding, the mojibake a lot of ID3 tags carry.
+ *
+ * The bytes are lossless to recover, since Latin-1 is a 1:1 byte-to-codepoint map,
+ * so the string is re-encoded to those bytes and tried against the encodings a
+ * mislabelled tag is most often written in. A candidate is accepted only when it
+ * both carries a CJK glyph and has shed the Latin-1 supplement bytes that flagged
+ * the string, so a wrong guess that merely re-scrambles the bytes is rejected.
+ *
+ * Two gates keep it off legitimate text. A string with any character above U+00FF
+ * is genuine Unicode a decoder already got right and is returned untouched, and a
+ * string that is mostly ASCII is ordinary accented Western text (Cafe, Motorhead)
+ * rather than the near-all-high-byte run a CJK glyph turns into. It cannot recover
+ * a byte the tag itself lost: a character replaced by '?' in the file stays a '?'.
+ */
+internal fun repairMojibake(s: String): String {
+    if (s.isEmpty() || s.any { it.code > 0xFF }) return s
+    val high = s.count { it.code in 0x80..0xFF }
+    if (high * 2 < s.length) return s
+    val bytes = s.toByteArray(Charsets.ISO_8859_1)
+    for (charset in MOJIBAKE_CANDIDATES) {
+        val decoded = decodeStrict(bytes, charset) ?: continue
+        if (looksRepaired(decoded)) return decoded
+    }
+    return s
+}
+
+/** A strict decode, or null when the bytes are not valid in [charset]. */
+private fun decodeStrict(bytes: ByteArray, charset: Charset): String? = runCatching {
+    charset.newDecoder()
+        .onMalformedInput(CodingErrorAction.REPORT)
+        .onUnmappableCharacter(CodingErrorAction.REPORT)
+        .decode(ByteBuffer.wrap(bytes))
+        .toString()
+}.getOrNull()
+
+/** Whether a candidate decode is the repair rather than more noise. */
+private fun looksRepaired(s: String): Boolean =
+    s.any { isCjk(it.code) } && s.none { it.code in 0x80..0xFF }
+
+private fun isCjk(code: Int): Boolean =
+    code in 0x3040..0x30FF ||   // hiragana and katakana
+    code in 0x3400..0x4DBF ||   // CJK extension A
+    code in 0x4E00..0x9FFF ||   // CJK unified ideographs
+    code in 0xF900..0xFAFF ||   // CJK compatibility ideographs
+    code in 0xFF00..0xFFEF      // fullwidth and halfwidth forms
+
+/**
+ * The encodings a mislabelled tag is tried against, in order of how much their own
+ * structure vouches for a clean decode: UTF-8 rejects almost everything that is not
+ * UTF-8, Shift_JIS is stricter than GBK, and GBK is the permissive last resort a
+ * Chinese-locale tagger's Japanese title lands in. Absent from a runtime built
+ * without jdk.charsets an entry is skipped rather than fatal.
+ */
+private val MOJIBAKE_CANDIDATES: List<Charset> = listOfNotNull(
+    Charsets.UTF_8,
+    runCatching { Charset.forName("Shift_JIS") }.getOrNull(),
+    runCatching { Charset.forName("GBK") }.getOrNull(),
+)
 
 /**
  * The file name without its extension, or the whole name when it has none.

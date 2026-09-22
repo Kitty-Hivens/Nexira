@@ -378,7 +378,11 @@ compose.desktop {
                 // adding it is cheaper than hand-wrapping the Linux backend.
                 "jdk.security.auth",
                 "jdk.unsupported",
-                "jdk.zipfs"
+                "jdk.zipfs",
+                // Extended charsets (Shift_JIS, GBK, and the rest) for the tag
+                // mojibake repair in TrackInfo: legacy ID3 tags are often a CJK
+                // encoding mislabelled as Latin-1, and re-decoding needs these tables.
+                "jdk.charsets"
             )
 
             windows {
@@ -555,6 +559,8 @@ packaging {
         "jdk.security.auth",
         "jdk.unsupported",
         "jdk.zipfs",
+        // Extended charsets for the tag mojibake repair (see the compose block).
+        "jdk.charsets",
         "jdk.localedata",
         // jdk.jfr: Flight Recorder. Without it the packaged build refuses to
         // start under -XX:StartFlightRecording ("Module jdk.jfr not found"),

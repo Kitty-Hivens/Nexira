@@ -79,4 +79,53 @@ class TrackInfoTest {
         assertNull(decodeArtwork(ByteArray(0)))
         assertNull(decodeArtwork(byteArrayOf(1, 2, 3, 4)), "four bytes of noise are not a picture")
     }
+
+    // ---- mojibake repair -------------------------------------------------
+
+    @Test
+    fun `a gbk tag mislabelled as latin-1 is repaired`() {
+        // The osu case, from a real file: a Japanese title written in GBK by a
+        // Chinese-locale tagger, its frame declared ISO-8859-1, so the decoder
+        // handed back Latin-1 noise. The '?' is a byte the file itself already
+        // lost, and it stays lost.
+        val bytes = byteArrayOf(
+            0x8f.toByte(), 0x72.toByte(), 0xa3.toByte(), 0xac.toByte(), 0xcf.toByte(), 0xfc.toByte(),
+            0x3f.toByte(), 0xbb.toByte(), 0xa8.toByte(), 0xbb.toByte(), 0xf0.toByte(),
+        )
+        assertEquals("弐，宵?花火", repairMojibake(String(bytes, Charsets.ISO_8859_1)))
+    }
+
+    @Test
+    fun `a utf-8 tag mislabelled as latin-1 is repaired`() {
+        val garbage = String("音楽".toByteArray(Charsets.UTF_8), Charsets.ISO_8859_1)
+        assertEquals("音楽", repairMojibake(garbage))
+    }
+
+    @Test
+    fun `plain ascii is left untouched`() {
+        assertEquals("audio", repairMojibake("audio"))
+        assertEquals("Bus Stop", repairMojibake("Bus Stop"))
+    }
+
+    @Test
+    fun `legitimate accented latin-1 is not mistaken for mojibake`() {
+        // Mostly ASCII with the odd accent, so the high-byte ratio never trips the
+        // repair and the umlaut and accent stay themselves.
+        assertEquals("Motörhead", repairMojibake("Motörhead"))
+        assertEquals("Café del Mar", repairMojibake("Café del Mar"))
+        assertEquals("Über", repairMojibake("Über"))
+    }
+
+    @Test
+    fun `text already in unicode is returned as is`() {
+        // Above U+00FF, so it cannot be a Latin-1 mis-decode: a tag read correctly
+        // the first time is not touched.
+        assertEquals("宵闇花火", repairMojibake("宵闇花火"))
+    }
+
+    @Test
+    fun `a mislabelled tag reaches the title field`() {
+        val garbage = String("夜想曲".toByteArray(Charsets.UTF_8), Charsets.ISO_8859_1)
+        assertEquals("夜想曲", trackInfoFrom(mapOf("title" to garbage), file).title)
+    }
 }
