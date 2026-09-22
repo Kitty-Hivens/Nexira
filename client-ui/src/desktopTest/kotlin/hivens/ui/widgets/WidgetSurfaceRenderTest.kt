@@ -166,12 +166,10 @@ class WidgetSurfaceRenderTest {
         assertTrue(!pixel(spec, X + W / 2, Y + H / 2).isPage, "an unknown kind drew nothing at all")
     }
 
-    @Test
-    fun `padding insets the plane from the widget's box`() {
-        val spec = SurfaceSpec(fill = "#FF000000", opacity = 1f, padding = hivens.widget.model.SurfaceInsets(all = 12f))
-        val inset = pixel(spec, X + 4, Y + H / 2)
-        assertTrue(inset.isPage, "padding did not inset the plane: $inset")
-    }
+    // Padding no longer lives on the plane: it moved to Placement and is applied by
+    // the slot wrapper as an outer inset, so WidgetSurface draws the plane full and
+    // the test that asserted it inset here is gone. The placement-level behaviour is
+    // covered where the slot wrapper is exercised, not here in the plane renderer.
 
     private data class Px(val r: Int, val g: Int, val b: Int) {
         val isPage: Boolean get() = r > 200 && g < 60 && b > 200

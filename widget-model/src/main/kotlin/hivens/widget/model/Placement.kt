@@ -108,6 +108,15 @@ data class Placement(
     val z: Int = 0,
     /** A share of a flow slot's main axis. 0 means natural size. Read only by a flow. */
     val weight: Float = 0f,
+    /**
+     * Space reserved AROUND the widget, in dp, applied by the slot wrapper rather
+     * than by the widget's own plane. It lives here, on the record every widget
+     * carries in both slot modes, so a widget that paints its own plane
+     * (drawsOwnSurface) gets spacing too, which a plane-only setting could not
+     * give it. Outer, so it never shrinks the plane: it offsets and reserves,
+     * the way a margin does, not the way inner padding does.
+     */
+    val padding: SurfaceInsets = SurfaceInsets(),
 ) {
     companion object {
         const val TOP_START = "topStart"

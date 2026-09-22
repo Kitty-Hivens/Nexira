@@ -1410,6 +1410,7 @@ object RussianStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Сбросить к умолчанию"
     override val editorBackingTitle   = "Подложка"
+    override val editorPaddingTitle   = "Отступы"
     override val editorSurfaceNone    = "У этого виджета нет подложки. Если добавить, за ним появится поверхность, которую можно настроить."
     override val editorSurfaceAdd     = "Добавить подложку"
     override val editorSurfaceOwn     = "Этот виджет рисует подложку сам, поэтому настраивать здесь нечего. Её форма меняется вместе с тем, что он делает, а запись такое описать не может."

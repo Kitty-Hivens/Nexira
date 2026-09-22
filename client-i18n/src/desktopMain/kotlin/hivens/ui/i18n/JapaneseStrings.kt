@@ -1402,6 +1402,7 @@ object JapaneseStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "既定に戻す"
     override val editorBackingTitle = "下地"
+    override val editorPaddingTitle = "余白"
     override val editorSurfaceNone = "このウィジェットは面を描きません。追加すると背後に面が入り、形を整えられます。"
     override val editorSurfaceAdd = "面を追加"
     override val editorSurfaceOwn = "このウィジェットは自分で面を描くため、ここに設定するものはありません。形は状態に応じて変わり、保存された記録では表せません。"

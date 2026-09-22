@@ -1395,6 +1395,7 @@ object EnglishStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Reset to default"
     override val editorBackingTitle   = "Backing"
+    override val editorPaddingTitle   = "Padding"
     override val editorSurfaceNone    = "This widget draws no plane. Adding one puts a surface behind it that you can then shape."
     override val editorSurfaceAdd     = "Add a plane"
     override val editorSurfaceOwn     = "This widget paints its own plane, so there is nothing here to set. Its shape changes with what it is doing, which a stored record cannot describe."

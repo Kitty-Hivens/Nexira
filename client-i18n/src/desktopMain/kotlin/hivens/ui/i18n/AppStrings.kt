@@ -1482,6 +1482,8 @@ interface AppStrings {
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String
     val editorBackingTitle: String
+    /** Header for the per-widget outer spacing section, above the backing one. */
+    val editorPaddingTitle: String
     val editorSurfaceNone: String
     val editorSurfaceOwn: String
     val editorSurfaceAdd: String

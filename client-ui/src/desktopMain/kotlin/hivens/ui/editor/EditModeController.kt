@@ -11,6 +11,7 @@ import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -25,6 +26,7 @@ import hivens.widget.model.setGrid
 import hivens.widget.model.setWidgetAnchor
 import hivens.widget.model.setWidgetBounds
 import hivens.widget.model.setWidgetOffset
+import hivens.widget.model.setWidgetPadding
 import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetZ
 import hivens.widget.model.traverse
@@ -282,6 +284,14 @@ class EditModeController(
     fun setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float) {
         scope.launch(writeDispatcher) {
             edit("size:$instanceId", validate = false) { it.setWidgetSize(path, instanceId, width, height) }
+        }
+    }
+
+    // Outer spacing around the widget, set from the panel's sliders. Keyed like the
+    // other geometry writes so a slider drag coalesces into one history entry.
+    fun setWidgetPadding(path: SlotPath, instanceId: String, padding: SurfaceInsets) {
+        scope.launch(writeDispatcher) {
+            edit("padding:$instanceId", validate = false) { it.setWidgetPadding(path, instanceId, padding) }
         }
     }
 

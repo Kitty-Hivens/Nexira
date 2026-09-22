@@ -307,6 +307,14 @@ fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Floa
     updatePlacement(path, instanceId) { it.copy(weight = weight.coerceAtLeast(0f)) }
 
 /**
+ * The space reserved around the widget, applied by the slot wrapper as an outer
+ * inset. Set on any widget in either slot mode, drawsOwnSurface included, which is
+ * the reason it lives on the placement rather than on the plane.
+ */
+fun LayoutGraph.setWidgetPadding(path: SlotPath, instanceId: String, padding: SurfaceInsets): LayoutGraph =
+    updatePlacement(path, instanceId) { it.copy(padding = padding) }
+
+/**
  * Reads the widget's current placement (or the default when it carries none),
  * applies [edit], and writes it back, so offset, size, z, anchor and weight
  * edits compose without clobbering one another mid-drag.

@@ -1,8 +1,5 @@
 package hivens.ui.widgets
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -31,44 +28,33 @@ import hivens.widget.model.parseFill
  * first rather than changing the one on screen, which is the shape of "the knob moves
  * something other than what I am looking at".
  *
- * Padding is an OUTER inset applied before the plane, so the rounding hugs the widget's
- * own view rather than the padded footprint. That is what lets a panel be inset from a
- * window edge without its corners detaching onto the padding.
+ * Padding is NOT here. It moved to [hivens.widget.model.Placement.padding] and is
+ * applied by the slot wrapper as an outer inset, so it reserves space around the
+ * widget rather than shrinking the plane, and so a widget that paints its own plane
+ * (which never reaches this function) gets spacing too.
  */
 @Composable
 fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
     val fill = parseFill(spec.fill)
-    val padding = spec.padding
-    Box(
-        Modifier.padding(
-            PaddingValues(
-                start = padding.start(0f).dp,
-                top = padding.top(0f).dp,
-                end = padding.end(0f).dp,
-                bottom = padding.bottom(0f).dp,
-            ),
-        ),
-    ) {
-        NxSurface(
-            level = fill.level(),
-            shape = spec.shape.toShape(),
-            opacity = spec.opacity,
-            // A widget that does not name a radius gets none. This call site used to
-            // say so by passing a preset that carried no backdrop, and when the presets
-            // went the null started meaning "ask the style" -- so every widget asking
-            // only for a translucent plate got 18dp of frosted glass it never
-            // requested, under the whole home surface. The style's radius is for the
-            // library's own planes, which have no other way to name one.
-            blurDp = spec.blurDp ?: 0f,
-            // A spec that names no border has none: a widget's plane is described
-            // entirely by what is in it, so an unnamed value is nothing rather than
-            // the library's default edge.
-            borderWidthDp = spec.border.widthDp ?: 0f,
-            borderColor = borderColor(spec),
-            shadowDp = spec.shadowDp ?: 0f,
-            fillColor = (fill as? FillSource.Literal)?.let { Color(it.argb) },
-        ) { content() }
-    }
+    NxSurface(
+        level = fill.level(),
+        shape = spec.shape.toShape(),
+        opacity = spec.opacity,
+        // A widget that does not name a radius gets none. This call site used to
+        // say so by passing a preset that carried no backdrop, and when the presets
+        // went the null started meaning "ask the style" -- so every widget asking
+        // only for a translucent plate got 18dp of frosted glass it never
+        // requested, under the whole home surface. The style's radius is for the
+        // library's own planes, which have no other way to name one.
+        blurDp = spec.blurDp ?: 0f,
+        // A spec that names no border has none: a widget's plane is described
+        // entirely by what is in it, so an unnamed value is nothing rather than
+        // the library's default edge.
+        borderWidthDp = spec.border.widthDp ?: 0f,
+        borderColor = borderColor(spec),
+        shadowDp = spec.shadowDp ?: 0f,
+        fillColor = (fill as? FillSource.Literal)?.let { Color(it.argb) },
+    ) { content() }
 }
 
 /**

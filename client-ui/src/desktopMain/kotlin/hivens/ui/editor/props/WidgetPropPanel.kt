@@ -57,6 +57,7 @@ import hivens.widget.model.FillSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceCorners
+import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.propsWith
 import hivens.widget.model.parseFill
@@ -241,6 +242,15 @@ private fun PropPanelBody(
                 Spacer(Modifier.size(8.dp))
             }
 
+            // Outer spacing, read off the placement so every widget carries it, the
+            // players (which paint their own plane and reach no backing rows) included.
+            // Above Backing because it frames the widget rather than describing its plane.
+            PaddingSection(
+                padding = instance.placement?.padding ?: SurfaceInsets(),
+                write   = { controller.setWidgetPadding(path, instanceId, it) },
+            )
+            Spacer(Modifier.size(8.dp))
+
             // The widget's own surface, as the seven values it is. Available on
             // every widget, propless included. Each row writes one field and leaves
             // the rest alone, so nothing here can move something the eye is not on.
@@ -376,14 +386,6 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
             write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = it))))
         },
     )
-    LabeledSlider(
-        label         = s.editorBackingPadding,
-        value         = surface.padding.all ?: 0f,
-        range         = 0f..32f,
-        format        = "%.0f",
-        keyStep       = 1f,
-        onValueChange = { write(surface.copy(padding = surface.padding.copy(all = it))) },
-    )
 
     // Everything past this point is a refinement of one of the rows above.
     // Shown on request rather than always: the panel had eleven rows for a
@@ -490,20 +492,50 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               keyStep       = 1f,
               onValueChange = { write(surface.copy(shadowDp = it)) },
           )
-          // Per-side padding. Each opens at the uniform value and, once moved,
-          // pins that side independently of it.
-          CornerRow(s.editorBackingPaddingTop, surface.padding.top(0f)) {
-              write(surface.copy(padding = surface.padding.copy(top = it)))
-          }
-          CornerRow(s.editorBackingPaddingEnd, surface.padding.end(0f)) {
-              write(surface.copy(padding = surface.padding.copy(end = it)))
-          }
-          CornerRow(s.editorBackingPaddingBottom, surface.padding.bottom(0f)) {
-              write(surface.copy(padding = surface.padding.copy(bottom = it)))
-          }
-          CornerRow(s.editorBackingPaddingStart, surface.padding.start(0f)) {
-              write(surface.copy(padding = surface.padding.copy(start = it)))
-          }
       }
+    }
+}
+
+/**
+ * The widget's outer spacing, from [Placement.padding] rather than the plane.
+ *
+ * Universal, drawsOwnSurface included: it is the one spacing control a widget that
+ * paints its own plane can carry, because it reserves room around the widget
+ * instead of insetting a surface the widget never asked the kernel to draw. An
+ * all-sides slider, with the four sides under the same disclosure the backing
+ * section uses.
+ */
+@Composable
+private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Unit) {
+    val s = LocalStrings.current
+    Text(
+        text       = s.editorPaddingTitle,
+        style      = MaterialTheme.typography.labelMedium,
+        color      = NxTheme.colors.textSecondary,
+        fontWeight = FontWeight.SemiBold,
+    )
+    LabeledSlider(
+        label         = s.editorBackingPadding,
+        value         = padding.all ?: 0f,
+        range         = 0f..64f,
+        format        = "%.0f",
+        keyStep       = 1f,
+        onValueChange = { write(padding.copy(all = it)) },
+    )
+    var showMore by remember { mutableStateOf(false) }
+    DisclosureRow(s.editorSurfaceMore, showMore) { showMore = !showMore }
+    AnimatedVisibility(
+        visible = showMore,
+        enter = Motion.reveal.enter,
+        exit = Motion.reveal.exit,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Each side opens at the uniform value and, once moved, pins that side
+            // independently of it.
+            CornerRow(s.editorBackingPaddingTop, padding.top(0f)) { write(padding.copy(top = it)) }
+            CornerRow(s.editorBackingPaddingEnd, padding.end(0f)) { write(padding.copy(end = it)) }
+            CornerRow(s.editorBackingPaddingBottom, padding.bottom(0f)) { write(padding.copy(bottom = it)) }
+            CornerRow(s.editorBackingPaddingStart, padding.start(0f)) { write(padding.copy(start = it)) }
+        }
     }
 }

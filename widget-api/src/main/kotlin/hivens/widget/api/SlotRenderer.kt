@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -41,6 +43,7 @@ import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetSizing
 import hivens.widget.model.anchorHorizontalBias
@@ -217,16 +220,21 @@ private fun FlowWidgets(
                 unknownDecorator(address, index, instance)
             } else {
                 val movable = rememberWidgetMovable(descriptor, instance)
+                // Outer spacing around the widget, from its placement so a flow
+                // widget reserves room the same way a placed one does.
+                val pad = Modifier.padding((instance.placement?.padding ?: SurfaceInsets()).asPadding())
                 // Precedence lives on the model as flowPlacement(), so the rule is
                 // testable without a composition.
                 when (val placement = instance.flowPlacement()) {
-                    is FlowPlacement.Weighted -> Box(weight(placement.weight)) {
+                    is FlowPlacement.Weighted -> Box(weight(placement.weight).then(pad)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
-                    is FlowPlacement.Bounded -> Box(boundedModifier(placement, descriptor.sizing)) {
+                    is FlowPlacement.Bounded -> Box(boundedModifier(placement, descriptor.sizing).then(pad)) {
                         decorator(address, index, descriptor, instance) { movable() }
                     }
-                    FlowPlacement.Natural -> decorator(address, index, descriptor, instance) { movable() }
+                    FlowPlacement.Natural -> Box(pad) {
+                        decorator(address, index, descriptor, instance) { movable() }
+                    }
                 }
             }
         }
@@ -258,7 +266,8 @@ private fun WrappedLine(
                     unknownDecorator(address, index, instance)
                 } else {
                     val movable = rememberWidgetMovable(descriptor, instance)
-                    decorator(address, index, descriptor, instance) { movable() }
+                    val pad = Modifier.padding((instance.placement?.padding ?: SurfaceInsets()).asPadding())
+                    Box(pad) { decorator(address, index, descriptor, instance) { movable() } }
                 }
             }
         }
@@ -283,6 +292,16 @@ private fun boundedModifier(placement: FlowPlacement.Bounded, sizing: WidgetSizi
     if (h > 0f) m = m.heightIn(max = h.dp)
     return m
 }
+
+// Outer spacing from a widget's placement, as PaddingValues, so a widget's padding
+// reads the same in a flow slot as in a placement one. All zero is the common case
+// and draws as no inset.
+private fun SurfaceInsets.asPadding(): PaddingValues = PaddingValues(
+    start = start(0f).dp,
+    top = top(0f).dp,
+    end = end(0f).dp,
+    bottom = bottom(0f).dp,
+)
 
 // ── Placement ────────────────────────────────────────────────────────
 
@@ -476,16 +495,32 @@ private fun BoxScope.PlacedBox(
     var sizeMod: Modifier = Modifier
     if (boundW > 0f) sizeMod = sizeMod.widthIn(max = boundW.dp)
     if (boundH > 0f) sizeMod = sizeMod.heightIn(max = boundH.dp)
+    // Space reserved around the widget, from the placement rather than the plane,
+    // so a widget that paints its own plane gets it too. Outside sizeMod and inside
+    // onSizeChanged: the plane keeps its claimed size, the padding sits around it,
+    // and what the clamp measures (ownDp) is the padded footprint, so the reserved
+    // space stays inside the slot the same way the plane does. Never a Modifier.size,
+    // so it offsets and reserves rather than shrinking the plane.
+    val pad = placement.padding
     Box(
         Modifier
             .align(alignmentFor(anchor))
             .offset(heldX.dp, heldY.dp)
             .onSizeChanged { ownDp = with(density) { Size(it.width.toDp().value, it.height.toDp().value) } }
+            .padding(
+                PaddingValues(
+                    start = pad.start(0f).dp,
+                    top = pad.top(0f).dp,
+                    end = pad.end(0f).dp,
+                    bottom = pad.bottom(0f).dp,
+                ),
+            )
             .then(sizeMod),
     ) {
         // What was chosen, not what happened to be free. A widget that adapts to
         // its footprint reads this rather than its constraints, which in a slot
-        // that fills its surface are the rest of the screen.
+        // that fills its surface are the rest of the screen. The plane size, not
+        // the padded one: padding is around the widget, not part of it.
         CompositionLocalProvider(LocalWidgetFootprintDp provides Size(width, height)) {
             content()
         }
