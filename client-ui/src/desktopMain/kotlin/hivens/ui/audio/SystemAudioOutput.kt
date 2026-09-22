@@ -21,16 +21,24 @@ import org.slf4j.LoggerFactory
  * an engine refused to take, and that is a path worth being able to drive without
  * a sound server on the machine.
  */
-public interface AudioOutput {
+public fun interface AudioOutput {
     /**
-     * A stream for one track, or null to let the decoder open its own line.
+     * A stream for one track at the given buffer depth, or null to let the decoder
+     * open its own line.
      *
-     * [latency] is the buffer depth the sink asks for. The default suits video,
-     * where a short path keeps audio in step with the picture. A standalone music
-     * track has no picture to sync to and every reason never to underrun, so it
-     * asks for [LatencyProfile.RELAXED].
+     * [latency] is what the sink asks the server for. A standalone music track has
+     * no picture to sync to and every reason never to underrun, so it asks for
+     * [LatencyProfile.RELAXED]. The no-argument overload takes the video default, a
+     * short path that keeps audio in step with the picture.
+     *
+     * The single abstract method here is what lets a test supply the output as a
+     * lambda. A default value on it is a compile error on a functional interface, so
+     * the video convenience is the concrete overload below rather than a default.
      */
-    public fun sink(latency: LatencyProfile = LatencyProfile.BALANCED): PcmSink?
+    public fun sink(latency: LatencyProfile): PcmSink?
+
+    /** A stream at the default (video) buffer depth, for callers that do not choose one. */
+    public fun sink(): PcmSink? = sink(LatencyProfile.BALANCED)
 }
 
 /**
