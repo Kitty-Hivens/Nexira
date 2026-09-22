@@ -6,6 +6,7 @@ import hivens.ui.widgets.home.new.HomeNewContext
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.RightRailContext
+import hivens.ui.widgets.shell.ShellContext
 
 // No-op stubs for every per-surface context. EditorSurfaceHost provides
 // them at its level BELOW the active surface composable. The active
@@ -45,4 +46,27 @@ internal val STUB_RIGHTRAIL = RightRailContext(
     onLogin   = {},
     onLogout  = {},
     sslBypass = false,
+)
+
+// The shell frame's context, read by the breadcrumb and the three region widgets.
+// It is the one error()-defaulted surface local with no stub, so those widgets
+// were the only ones that threw (and flooded the console) when the palette drew
+// their off-surface preview. centerBody draws nothing here: a preview is not the
+// shell and has no screen to route.
+internal val STUB_SHELL = ShellContext(
+    currentScreen   = Screen.Home,
+    isAuthenticated = false,
+    onScreenChange  = {},
+    onSwitchTab     = {},
+    onLogout        = {},
+    appState        = AppState.Loading,
+    onLogin         = {},
+    sslBypass       = false,
+    centerBody      = {},
+    trail           = emptyList(),
+    canGoBack       = false,
+    canGoForward    = false,
+    onBack          = {},
+    onForward       = {},
+    onPopTo         = {},
 )

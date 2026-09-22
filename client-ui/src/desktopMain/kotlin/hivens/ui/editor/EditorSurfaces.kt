@@ -15,6 +15,7 @@ import hivens.ui.widgets.profile.LocalProfileContext
 import hivens.ui.widgets.profile.STUB_PROFILE
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.widgets.shell.LocalShellContext
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.model.FamilyId
@@ -144,6 +145,11 @@ internal object EditorSurfaces {
             icon      = NxIcon.Layers,
             name      = { it.editorSurfTopBar },
             shortName = { it.editorSurfShortTopBar },
+            // Stands the shell context down for the palette's off-surface preview
+            // (the breadcrumb reads it). One entry covers every shell reader: the
+            // stubs array is spread globally, and it sits below the real provider so
+            // on-screen widgets still see live data.
+            stub        = LocalShellContext provides STUB_SHELL,
             ownerRegion = "appshell.region.top",
         ),
         EditorSurfaceSpec(
