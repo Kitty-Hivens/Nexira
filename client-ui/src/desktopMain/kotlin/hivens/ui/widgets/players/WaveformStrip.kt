@@ -71,13 +71,11 @@ internal fun WaveformStrip(
     val density = LocalDensity.current
     val slotPx = with(density) { (barWidth + gap).toPx() }.coerceAtLeast(1f)
     val barPx = with(density) { barWidth.toPx() }.coerceAtLeast(1f)
+    val barsMemo = remember(waveform) { BarsMemo(waveform) }
 
     Canvas(modifier.seekAlong(vertical = false, onSeekFraction = onSeekFraction)) {
         val count = (size.width / slotPx).toInt().coerceAtLeast(1)
-        // Resampling per draw rather than per recomposition: the count depends on
-        // the measured width, which is not known until here, and the reduction is
-        // a single pass over a few hundred floats.
-        val bars = waveform.bars(count)
+        val bars = barsMemo.bars(count)
         val floor = size.height * FLOOR_SHARE
         val cut = count * fraction.coerceIn(0f, 1f)
         val radius = CornerRadius(barPx / 2f, barPx / 2f)
@@ -120,10 +118,11 @@ internal fun WaveformColumn(
     val density = LocalDensity.current
     val slotPx = with(density) { (barHeight + gap).toPx() }.coerceAtLeast(1f)
     val barPx = with(density) { barHeight.toPx() }.coerceAtLeast(1f)
+    val barsMemo = remember(waveform) { BarsMemo(waveform) }
 
     Canvas(modifier.seekAlong(vertical = true, onSeekFraction = onSeekFraction)) {
         val count = (size.height / slotPx).toInt().coerceAtLeast(1)
-        val bars = waveform.bars(count)
+        val bars = barsMemo.bars(count)
         val floor = size.width * FLOOR_SHARE
         val cut = count * fraction.coerceIn(0f, 1f)
         val radius = CornerRadius(barPx / 2f, barPx / 2f)
@@ -173,6 +172,7 @@ internal fun WaveformRing(
     val density = LocalDensity.current
     val strokePx = with(density) { strokeWidth.toPx() }.coerceAtLeast(1f)
     val spacingPx = with(density) { spacing.toPx() }.coerceAtLeast(1f)
+    val barsMemo = remember(waveform) { BarsMemo(waveform) }
 
     Canvas(modifier) {
         val centreX = size.width / 2f
@@ -180,7 +180,7 @@ internal fun WaveformRing(
         val inner = innerRadius.coerceAtLeast(1f)
         val room = ((size.minDimension / 2f - inner) * reach.coerceIn(0.1f, 1f)).coerceAtLeast(1f)
         val count = ((2.0 * PI * inner) / spacingPx).toInt().coerceIn(12, MAX_RING_BARS)
-        val bars = waveform.bars(count)
+        val bars = barsMemo.bars(count)
         val cut = count * fraction.coerceIn(0f, 1f)
         val floor = room * FLOOR_SHARE
         for (i in 0 until count) {
@@ -214,6 +214,28 @@ private fun Waveform?.bars(count: Int): FloatArray {
     if (this == null) return FloatArray(count)
     val source = FloatArray(size) { this[it] }
     return resampleTo(source, count)
+}
+
+/**
+ * Holds one envelope's resampled bars, recomputing only when the bar count changes.
+ *
+ * The reduction is fixed for a given envelope and count: the envelope belongs to
+ * the track and the count follows the card's width, so neither moves between
+ * frames. Doing it inside the draw lambda allocated a fresh FloatArray on every
+ * draw, which a video wallpaper turns into steady churn by holding the draw clock
+ * awake at the display refresh. A caller remembers one of these keyed on the
+ * envelope, so a new track starts from an empty memo.
+ */
+private class BarsMemo(private val waveform: Waveform?) {
+    private var count = -1
+    private var cached = FloatArray(0)
+    fun bars(barCount: Int): FloatArray {
+        if (barCount != count) {
+            count = barCount
+            cached = waveform.bars(barCount)
+        }
+        return cached
+    }
 }
 
 /**
