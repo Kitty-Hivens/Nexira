@@ -167,9 +167,13 @@ fun anchorDragSignY(anchor: String): Float = if (anchorVerticalBias(anchor) > 0.
  * from the same function, because the two disagreeing is how a widget ends up
  * somewhere the pointer cannot reach: the drag stops writing past the edge, and
  * anything already past it is still drawn where it can be grabbed. The record
- * itself is left alone, so a slot that grows gives the arrangement back.
+ * itself is left alone, so a slot that grows gives the arrangement back. A widget
+ * that leaves the margin inside may still bleed the rest of itself past the edge,
+ * which is what a full-bleed placement wants.
  *
- * The bias is what makes this more than a coerce. An offset counts from its
+ * The value is the offset in the record's own space, counted inward from the
+ * anchor, for every anchor: the caller supplies the offset, not the already-signed
+ * nudge, and the bias here turns one into the other. An offset counts from its
  * anchor, so the same number is a different place depending on the corner, and a
  * clamp written for the top left lets a centred one travel a whole slot width
  * before it notices. A degenerate slot, or one too small to hold the margins,

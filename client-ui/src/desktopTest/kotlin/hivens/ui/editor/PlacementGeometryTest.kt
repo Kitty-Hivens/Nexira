@@ -135,8 +135,17 @@ class PlacementGeometryTest {
         hBias: Float = 0f,
         vBias: Float = 0f,
         slot: Float = 1000f,
+        // A widget that fills its claim: an unbounded drawn size is capped to the
+        // claim inside the resize, so the origin tracks the grown box. The
+        // content-limited case (a drawn size that holds) is exercised on its own.
+        liveW: Float = Float.MAX_VALUE,
+        liveH: Float = Float.MAX_VALUE,
     ) = canvasResize(
-        edge, x, y, w, h, dx, dy, density = 1f,
+        edge, x, y,
+        startDrawnWDp = w, startDrawnHDp = h,
+        liveDrawnWDp = liveW, liveDrawnHDp = liveH,
+        startClaimWDp = w, startClaimHDp = h,
+        accumXPx = dx, accumYPx = dy, density = 1f,
         slotWDp = slot, slotHDp = slot, hBias = hBias, vBias = vBias,
     )
 
@@ -197,6 +206,57 @@ class PlacementGeometryTest {
         assertEquals(300f - MIN_WIDGET_DP, r.x, eps, "the untouched edge stays at 300")
     }
 
+    // ── Content that does not fill its claim ─────────────────────────
+
+    @Test
+    fun `growing a leading edge past the content leaves a content-limited widget put`() {
+        // The reported bug. A player draws at a fixed size, so its placement size is
+        // a ceiling it never reaches. Dragging the top edge up used to slide the
+        // whole widget, because the origin hung off the growing claim and not off the
+        // pixels. With the drawn size held (liveDrawn == startDrawn), it must not move.
+        val r = canvasResize(
+            ResizeEdge.North, 100f, 100f,
+            startDrawnWDp = 200f, startDrawnHDp = 200f,
+            liveDrawnWDp = 200f, liveDrawnHDp = 200f,   // content does not grow
+            startClaimWDp = 0f, startClaimHDp = 0f,      // intrinsic
+            accumXPx = 0f, accumYPx = -120f, density = 1f,
+            slotWDp = 1000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
+        )
+        assertEquals(100f, r.y, eps, "the top edge cannot grow past the content, so it stays")
+        assertEquals(100f, r.x, eps)
+    }
+
+    @Test
+    fun `a bottom-anchored content-limited widget holds when its top is dragged up`() {
+        // Same case against the anchor whose sign is inverted, so the fix is not just
+        // the top-left one working by accident.
+        val r = canvasResize(
+            ResizeEdge.North, 40f, 40f,
+            startDrawnWDp = 200f, startDrawnHDp = 200f,
+            liveDrawnWDp = 200f, liveDrawnHDp = 200f,
+            startClaimWDp = 0f, startClaimHDp = 0f,
+            accumXPx = 0f, accumYPx = -120f, density = 1f,
+            slotWDp = 1000f, slotHDp = 1000f, hBias = 1f, vBias = 1f,
+        )
+        assertEquals(40f, r.y, eps, "the inset from the bottom is unchanged")
+    }
+
+    @Test
+    fun `shrinking a leading edge on a content-limited widget tracks the content down`() {
+        // Shrinking clips the content, so the drawn size does follow the claim, and
+        // the dragged edge moves exactly as it does for a widget that fills.
+        val r = canvasResize(
+            ResizeEdge.North, 100f, 100f,
+            startDrawnWDp = 200f, startDrawnHDp = 200f,
+            liveDrawnWDp = 200f, liveDrawnHDp = 200f,   // ignored on the shrink branch
+            startClaimWDp = 0f, startClaimHDp = 0f,
+            accumXPx = 0f, accumYPx = 60f, density = 1f,
+            slotWDp = 1000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
+        )
+        assertEquals(160f, r.y, eps, "the top moves down by 60 as the widget shrinks")
+        assertEquals(140f, r.h, eps)
+    }
+
     // ── What the widget says it can be ───────────────────────────────
 
     @Test
@@ -236,7 +296,11 @@ class PlacementGeometryTest {
         // The stored size, the editor's frame and the pixels were three answers
         // once a handle was dragged past where the widget stops drawing.
         val r = canvasResize(
-            ResizeEdge.SouthEast, 100f, 100f, 200f, 200f, 9999f, 9999f, density = 1f,
+            ResizeEdge.SouthEast, 100f, 100f,
+            startDrawnWDp = 200f, startDrawnHDp = 200f,
+            liveDrawnWDp = Float.MAX_VALUE, liveDrawnHDp = Float.MAX_VALUE,
+            startClaimWDp = 200f, startClaimHDp = 200f,
+            accumXPx = 9999f, accumYPx = 9999f, density = 1f,
             slotWDp = 4000f, slotHDp = 4000f, hBias = 0f, vBias = 0f,
             widthBounds = ResizeBounds.of(88, 320),
             heightBounds = ResizeBounds.of(88, 240),
@@ -248,7 +312,11 @@ class PlacementGeometryTest {
     @Test
     fun `a resize stops at the declared floor rather than the editor's`() {
         val r = canvasResize(
-            ResizeEdge.SouthEast, 100f, 100f, 200f, 200f, -9999f, -9999f, density = 1f,
+            ResizeEdge.SouthEast, 100f, 100f,
+            startDrawnWDp = 200f, startDrawnHDp = 200f,
+            liveDrawnWDp = Float.MAX_VALUE, liveDrawnHDp = Float.MAX_VALUE,
+            startClaimWDp = 200f, startClaimHDp = 200f,
+            accumXPx = -9999f, accumYPx = -9999f, density = 1f,
             slotWDp = 1000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
             widthBounds = ResizeBounds.of(88, 320),
             heightBounds = ResizeBounds.of(88, 320),
@@ -262,7 +330,11 @@ class PlacementGeometryTest {
         // Same rule the floor follows: bottoming out on one edge must not carry
         // the opposite edge along with it.
         val r = canvasResize(
-            ResizeEdge.West, 100f, 100f, 200f, 200f, -9999f, 0f, density = 1f,
+            ResizeEdge.West, 100f, 100f,
+            startDrawnWDp = 200f, startDrawnHDp = 200f,
+            liveDrawnWDp = Float.MAX_VALUE, liveDrawnHDp = Float.MAX_VALUE,
+            startClaimWDp = 200f, startClaimHDp = 200f,
+            accumXPx = -9999f, accumYPx = 0f, density = 1f,
             slotWDp = 4000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
             widthBounds = ResizeBounds.of(0, 320),
         )
@@ -292,7 +364,11 @@ class PlacementGeometryTest {
     fun `a corner resize round-trips back to where it started`() {
         val out = resize(ResizeEdge.NorthWest, dx = 35f, dy = 35f)
         val back = canvasResize(
-            ResizeEdge.NorthWest, out.x, out.y, out.w, out.h, -35f, -35f, density = 1f,
+            ResizeEdge.NorthWest, out.x, out.y,
+            startDrawnWDp = out.w, startDrawnHDp = out.h,
+            liveDrawnWDp = Float.MAX_VALUE, liveDrawnHDp = Float.MAX_VALUE,
+            startClaimWDp = out.w, startClaimHDp = out.h,
+            accumXPx = -35f, accumYPx = -35f, density = 1f,
             slotWDp = 1000f, slotHDp = 1000f, hBias = 0f, vBias = 0f,
         )
         assertEquals(100f, back.x, eps)

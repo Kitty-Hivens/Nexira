@@ -414,8 +414,6 @@ private fun BoxScope.PlacedBox(
     val anchor = parseAnchor(placement.anchor)
     val hBias = anchorHorizontalBias(anchor)
     val vBias = anchorVerticalBias(anchor)
-    val dx = if (hBias > 0.5f) -offX else offX
-    val dy = if (vBias > 0.5f) -offY else offY
 
     // What it actually drew, a frame late, which is all a recovery clamp needs:
     // nobody is dragging on the frame a widget first appears.
@@ -439,8 +437,16 @@ private fun BoxScope.PlacedBox(
     // because holding by a guess moves things that were never out of place.
     val ownW = ownDp.width.takeIf { it > 0f } ?: width
     val ownH = ownDp.height.takeIf { it > 0f } ?: height
-    val heldX = if (lattice || ownW <= 0f) dx else clampPlacementAxis(dx, slotDp.width, ownW, hBias)
-    val heldY = if (lattice || ownH <= 0f) dy else clampPlacementAxis(dy, slotDp.height, ownH, vBias)
+    // Clamp in offset space, the unit the record and the drag both use, then apply
+    // the anchor's inward sign. Passing the already-signed nudge in read an end
+    // anchor's inset as a leading offset, which stayed invisible only because the
+    // grab-margin range was wide enough on both sides to contain a small value of
+    // either sign. Containment is one-sided and would have drawn end and centre
+    // anchors in the wrong place.
+    val clampedX = if (lattice || ownW <= 0f) offX else clampPlacementAxis(offX, slotDp.width, ownW, hBias)
+    val clampedY = if (lattice || ownH <= 0f) offY else clampPlacementAxis(offY, slotDp.height, ownH, vBias)
+    val heldX = if (hBias > 0.5f) -clampedX else clampedX
+    val heldY = if (vBias > 0.5f) -clampedY else clampedY
 
     // A placement is a claim on territory, not an order to stretch, so it lands
     // as a MAXIMUM and never as a fixed extent. The flow branch has always read

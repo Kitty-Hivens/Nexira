@@ -95,6 +95,7 @@ import hivens.widget.model.anchorDragSignX
 import hivens.widget.model.anchorDragSignY
 import hivens.widget.model.anchorHorizontalBias
 import hivens.widget.model.anchorVerticalBias
+import hivens.widget.model.clampPlacementAxis
 import hivens.widget.model.parseAnchor
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
@@ -136,6 +137,12 @@ fun EditableWidgetChrome(
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }
+    // The widget's own measured size, unclipped by ancestors. boundsInWindow is
+    // intersected with every clipping parent, so a widget bleeding past the content
+    // pane reports a cut-down rect; a resize driven off that walked the widget while
+    // it was under the panel and only settled once it cleared the clip. The layout
+    // size is what the widget actually occupies, which is what the resize needs.
+    var widgetLayoutSize by remember { mutableStateOf(Size.Zero) }
     var forceRemoveOpen by remember { mutableStateOf(false) }
     val activeDrag = controller.active
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
@@ -345,6 +352,9 @@ fun EditableWidgetChrome(
                     // Register the widget's own bounds for the drop hit-test.
                     val rect = coords.boundsInWindow()
                     widgetWindowBounds = rect
+                    // The unclipped size (coords.size), not the rect, which a clipping
+                    // parent may have trimmed. The resize gesture reads this.
+                    widgetLayoutSize = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
                     registry.registerWidget(path, instance.instanceId, index, rect)
                 },
         ) {
@@ -435,8 +445,18 @@ fun EditableWidgetChrome(
                                     // once -- no dead-zone from an unbounded
                                     // accumulator. canvasDragOffset clamps the output.
                                     val p = livePlacement.value
-                                    var curX = p?.x ?: 0f
-                                    var curY = p?.y ?: 0f
+                                    // Start from where the widget is DRAWN, which the clamp may
+                                    // have pulled in off the stored offset. Without it, a drag of
+                                    // a widget the shrunk slot had reflowed jumps back to the
+                                    // stored spot on the first frame. Sized off the unclipped
+                                    // layout, not the (clip-trimmed) window bounds.
+                                    val slot0 = liveSlotSize.value
+                                    var curX = clampPlacementAxis(
+                                        p?.x ?: 0f, slot0.width, widgetLayoutSize.width / density, anchorHorizontalBias(a),
+                                    )
+                                    var curY = clampPlacementAxis(
+                                        p?.y ?: 0f, slot0.height, widgetLayoutSize.height / density, anchorVerticalBias(a),
+                                    )
                                     drag(down.id) { change ->
                                         val slot = liveSlotSize.value
                                         val wb = widgetWindowBounds
@@ -446,8 +466,8 @@ fun EditableWidgetChrome(
                                             density,
                                             slotWDp   = slot.width,
                                             slotHDp   = slot.height,
-                                            widgetWDp = (wb?.width ?: 0f) / density,
-                                            widgetHDp = (wb?.height ?: 0f) / density,
+                                            widgetWDp = widgetLayoutSize.width / density,
+                                            widgetHDp = widgetLayoutSize.height / density,
                                             hBias     = anchorHorizontalBias(a),
                                             vBias     = anchorVerticalBias(a),
                                         )
@@ -542,15 +562,27 @@ fun EditableWidgetChrome(
                                     down.consume()
                                     resizing = true
                                     val p = livePlacement.value
-                                    val wb = widgetWindowBounds
                                     val geo = gridGeo.value
                                     val anchor = p?.anchor ?: Placement.TOP_START
-                                    val startW = (p?.width ?: 0f).takeIf { it > 0f }
-                                        ?: ((wb?.width ?: 0f) / density)
-                                    val startH = (p?.height ?: 0f).takeIf { it > 0f }
-                                        ?: ((wb?.height ?: 0f) / density)
-                                    val startX = p?.x ?: 0f
-                                    val startY = p?.y ?: 0f
+                                    val slot0 = liveSlotSize.value
+                                    // The drawn box at the start of the gesture, sized off the
+                                    // unclipped layout so a widget under the panel is not measured
+                                    // by its clipped sliver. A placement size is a ceiling the
+                                    // renderer draws under, so what is on screen is what the handle
+                                    // sits on and what the origin has to track.
+                                    val startDrawnW = widgetLayoutSize.width / density
+                                    val startDrawnH = widgetLayoutSize.height / density
+                                    // Kept unchanged for the axis the handle does not touch, so a side
+                                    // handle never rewrites the other axis to a measured number.
+                                    val startClaimW = p?.width ?: 0f
+                                    val startClaimH = p?.height ?: 0f
+                                    // Start from the offset the widget is DRAWN at, which the clamp
+                                    // may have pulled in off the stored one when the slot is narrow.
+                                    // Off the raw stored offset the handle sat where the widget was
+                                    // drawn but the maths ran from where it was recorded, and the
+                                    // two disagreeing walked the widget across the slot.
+                                    val startX = clampPlacementAxis(p?.x ?: 0f, slot0.width, startDrawnW, anchorHorizontalBias(anchor))
+                                    val startY = clampPlacementAxis(p?.y ?: 0f, slot0.height, startDrawnH, anchorVerticalBias(anchor))
                                     var accX = 0f
                                     var accY = 0f
                                     drag(down.id) { change ->
@@ -569,21 +601,30 @@ fun EditableWidgetChrome(
                                             editController.resizeWidgetInGrid(path, instance.instanceId, cw, ch, geo.columns)
                                         } else {
                                             val slot = liveSlotSize.value
+                                            // Read live off the unclipped layout: the widget
+                                            // re-lays-out under each write, so this is the size it
+                                            // draws at now, which tells a widget that fills its claim
+                                            // apart from one capped by its content.
+                                            val live = widgetLayoutSize
                                             val r = canvasResize(
-                                                edge      = edge,
-                                                startXDp  = startX,
-                                                startYDp  = startY,
-                                                startWDp  = startW,
-                                                startHDp  = startH,
-                                                accumXPx  = accX,
-                                                accumYPx  = accY,
-                                                density   = density,
-                                                slotWDp   = slot.width,
-                                                slotHDp   = slot.height,
-                                                hBias     = anchorHorizontalBias(anchor),
-                                                vBias     = anchorVerticalBias(anchor),
-                                                widthBounds  = widthBounds,
-                                                heightBounds = heightBounds,
+                                                edge          = edge,
+                                                startXDp      = startX,
+                                                startYDp      = startY,
+                                                startDrawnWDp = startDrawnW,
+                                                startDrawnHDp = startDrawnH,
+                                                liveDrawnWDp  = live.width / density,
+                                                liveDrawnHDp  = live.height / density,
+                                                startClaimWDp = startClaimW,
+                                                startClaimHDp = startClaimH,
+                                                accumXPx      = accX,
+                                                accumYPx      = accY,
+                                                density       = density,
+                                                slotWDp       = slot.width,
+                                                slotHDp       = slot.height,
+                                                hBias         = anchorHorizontalBias(anchor),
+                                                vBias         = anchorVerticalBias(anchor),
+                                                widthBounds   = widthBounds,
+                                                heightBounds  = heightBounds,
                                             )
                                             // One write, so the offset and the size cannot
                                             // land a frame apart and the history sees one step.

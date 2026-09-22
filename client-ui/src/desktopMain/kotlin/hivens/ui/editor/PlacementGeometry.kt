@@ -171,16 +171,26 @@ internal data class ResizedPlacement(val x: Float, val y: Float, val w: Float, v
  * afterwards. [PlacedBox] positions by the same two rules, the alignment bias and
  * the inward sign, so the inversion here is its inverse and not a second opinion.
  *
- * A clamp at the minimum holds the dragged edge and leaves the opposite one where
- * it was, rather than letting the widget walk sideways once it has stopped
- * shrinking.
+ * The size a placement stores is a CEILING, not an extent. The renderer draws a
+ * widget at its own content and never past the claim, so a widget whose content
+ * does not fill draws smaller than the number stored for it. The origin has to
+ * hang off what the widget DREW, passed in as [liveDrawnWDp] and [liveDrawnHDp],
+ * and never off the claim. Growing the claim past the content is a ceiling the
+ * pixels never reach, and hanging the origin off it slid the whole widget across
+ * the slot instead of resizing it: the reported "drag the top edge and the player
+ * just moves". The claim still records the drag, so a widget that DOES fill grows
+ * into it.
  */
 internal fun canvasResize(
     edge: ResizeEdge,
     startXDp: Float,
     startYDp: Float,
-    startWDp: Float,
-    startHDp: Float,
+    startDrawnWDp: Float,
+    startDrawnHDp: Float,
+    liveDrawnWDp: Float,
+    liveDrawnHDp: Float,
+    startClaimWDp: Float,
+    startClaimHDp: Float,
     accumXPx: Float,
     accumYPx: Float,
     density: Float,
@@ -191,44 +201,54 @@ internal fun canvasResize(
     widthBounds: ResizeBounds = ResizeBounds.OPEN,
     heightBounds: ResizeBounds = ResizeBounds.OPEN,
 ): ResizedPlacement {
-    val (x, w) = resizeAxis(edge.h, startXDp, startWDp, accumXPx / density, slotWDp, hBias, widthBounds)
-    val (y, h) = resizeAxis(edge.v, startYDp, startHDp, accumYPx / density, slotHDp, vBias, heightBounds)
+    val (x, w) = resizeAxis(edge.h, startXDp, startDrawnWDp, liveDrawnWDp, startClaimWDp, accumXPx / density, slotWDp, hBias, widthBounds)
+    val (y, h) = resizeAxis(edge.v, startYDp, startDrawnHDp, liveDrawnHDp, startClaimHDp, accumYPx / density, slotHDp, vBias, heightBounds)
     return ResizedPlacement(x, y, w, h)
 }
 
 /**
- * One axis of [canvasResize]: the stored offset and extent in, the same two out.
+ * One axis of [canvasResize]. Takes the stored offset, the drawn extent at the
+ * start of the gesture, the drawn extent right now, and the stored claim. Returns
+ * the new stored offset and the new stored claim.
  *
  * [side] is -1 for the leading edge, +1 for the trailing one, 0 for an axis this
- * handle does not touch.
+ * handle does not touch. An untouched axis keeps its stored claim exactly, so a
+ * one-axis resize never rewrites the other axis to a measured number.
  */
 private fun resizeAxis(
     side: Int,
-    startDp: Float,
-    startExtentDp: Float,
+    startOffsetDp: Float,
+    startDrawnDp: Float,
+    liveDrawnDp: Float,
+    startClaimDp: Float,
     deltaDp: Float,
     slotDp: Float,
     bias: Float,
     bounds: ResizeBounds,
 ): Pair<Float, Float> {
-    if (side == 0) return startDp to startExtentDp
+    if (side == 0) return startOffsetDp to startClaimDp
     // An offset counts inward from its own edge, so a trailing anchor stores the
     // negation of the slot-space position. Same rule PlacedBox draws by.
     val sign = if (bias > 0.5f) -1f else 1f
-    val lead0 = bias * (slotDp - startExtentDp) + sign * startDp
-    val trail0 = lead0 + startExtentDp
+    // The claim the drag asks for, measured off what the widget drew rather than
+    // off the old stored ceiling, so a handle sitting on the content moves the
+    // number with the content and not with a stale claim it drew nowhere near.
+    val target = if (side < 0) startDrawnDp - deltaDp else startDrawnDp + deltaDp
+    val claim = bounds.hold(target)
+    // What the widget will actually DRAW at that claim, which is all the origin may
+    // hang off. Shrinking cuts the content, so the drawn size follows the claim
+    // down exactly. Growing cannot make content-limited pixels any larger, so the
+    // drawn size holds at what is on screen (liveDrawn) and only a widget that
+    // fills climbs toward the claim.
+    val drawn = if (claim <= startDrawnDp) claim else liveDrawnDp.coerceIn(startDrawnDp, claim)
+    // The fixed-edge anchor, taken from the drawn box at the start of the gesture.
+    val lead0 = bias * (slotDp - startDrawnDp) + sign * startOffsetDp
+    val trail0 = lead0 + startDrawnDp
+    // Re-derive the moving edge from the drawn size: the edge the gesture did not
+    // touch stays where it was, and the other one follows the pixels.
+    val lead = if (side < 0) trail0 - drawn else lead0
 
-    val lead1 = if (side < 0) lead0 + deltaDp else lead0
-    val trail1 = if (side > 0) trail0 + deltaDp else trail0
-    // Both ends now, not just the floor. A handle dragged past where the widget
-    // stops drawing used to keep writing a larger number, so the stored size, the
-    // editor's frame and the pixels were three different answers.
-    val extent = bounds.hold(trail1 - lead1)
-    // Re-derive the moving edge after the clamp: the still one is the one the
-    // gesture did not touch, and it must not drift because the other bottomed out.
-    val lead = if (side < 0) trail1 - extent else lead1
-
-    return sign * (lead - bias * (slotDp - extent)) to extent
+    return sign * (lead - bias * (slotDp - drawn)) to claim
 }
 
 // Target cell for a lattice MOVE drag: the widget's start cell shifted by the
