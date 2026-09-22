@@ -247,19 +247,20 @@ private class BarsMemo(private val waveform: Waveform?) {
 private const val FLOOR_SHARE = 0.08f
 
 /**
- * Seeking round a ring: a press or a drag lands where the angle points.
+ * Seeking round a ring: sweep the band, applied once on release.
  *
  * Twelve o'clock is the start and it runs clockwise, matching what the ring
- * draws, so the position follows the finger rather than the arithmetic.
+ * draws, so the angle the finger lifts at is where the track lands.
  *
  * A press has to LAND on the ring, and only a press. Nearer the middle than
  * [innerFraction] is the transport's own ground, and past the outer edge is
  * outside the object altogether, since both shapes that use this are round and are
- * laid out in a square: without the second test a click on nothing, in the corner
- * beside a token, moved the track.
+ * laid out in a square: without that test a click on nothing, in the corner beside
+ * a token, moved the track. Once a press has landed, every angle it reaches
+ * afterwards is followed, and the one it is on when it lifts is the seek.
  *
- * Neither test is applied once a gesture is under way. The whole point of a rotary
- * control is that it follows the angle for as long as the button is held.
+ * One seek, on release. The press and the sweep only track where it would land, so
+ * the transport is not asked to move on the press and again on the lift.
  */
 internal fun Modifier.seekByAngle(
     innerFraction: Float,
@@ -277,12 +278,12 @@ internal fun Modifier.seekByAngle(
             return reach >= inner && reach <= radius
         }
 
-        fun report(at: Offset) {
+        fun fractionAt(at: Offset): Float {
             // atan2 answers from three o'clock and counts anticlockwise on a
             // screen's y-down axes, so a quarter turn puts zero at the top and the
             // sweep runs the way the arc is drawn.
             val turns = (atan2(at.y - centre.y, at.x - centre.x) / (2.0 * PI) + 0.25).toFloat()
-            onSeekFraction(((turns % 1f) + 1f) % 1f)
+            return ((turns % 1f) + 1f) % 1f
         }
 
         awaitPointerEventScope {
@@ -294,29 +295,33 @@ internal fun Modifier.seekByAngle(
                 // The band decides whether a gesture STARTS, and nothing after
                 // that. A rotary control follows the angle for as long as the
                 // button is held, and a hand sweeping round a small disc leaves the
-                // band constantly: asked on every move, the position froze wherever
-                // the pointer crossed an edge, with nothing on screen to say the
-                // drag had been dropped. Once a press has landed on the ring, every
-                // angle it reaches afterwards is meant.
+                // band constantly: tested on every move, a crossing of the edge
+                // would drop the gesture with nothing on screen to say so. Once a
+                // press has landed on the ring, every angle it reaches afterwards is
+                // meant, and the last one is the seek.
                 if (!onBand(down.position)) continue
-                report(down.position)
+                var last = fractionAt(down.position)
                 do {
                     val event = awaitPointerEvent()
-                    event.changes.firstOrNull()?.let { report(it.position) }
+                    event.changes.firstOrNull()?.let { last = fractionAt(it.position) }
                 } while (event.changes.any { it.pressed })
+                onSeekFraction(last)
             }
         }
     }
 }
 
 /**
- * Seeking along a strip: the press lands, and the drag carries on from it.
+ * Seeking along a strip: drag freely, applied once on release.
  *
  * One gesture rather than a tap detector beside a drag detector. Two of them on
  * the same element race for the press, and the drag wins often enough that a
- * plain click on the strip did nothing perhaps half the time. There is no tap
- * here at all: a press is the first report and every move after it is another,
- * which is the same thing a tap would have been and cannot be stolen.
+ * plain click on the strip did nothing perhaps half the time.
+ *
+ * The seek fires ONCE, when the pointer lifts, at the fraction it lifted from. A
+ * press and every move only track where it would land, so a click no longer seeks
+ * twice (on the press and again on the release) and a scrub does not fire a seek
+ * per frame it crosses. What the track lands on is where the finger let go.
  */
 internal fun Modifier.seekAlong(
     vertical: Boolean,
@@ -324,19 +329,20 @@ internal fun Modifier.seekAlong(
 ): Modifier {
     if (onSeekFraction == null) return this
     return pointerInput(onSeekFraction, vertical) {
-        fun report(at: Offset) {
+        fun fractionAt(at: Offset): Float {
             val span = (if (vertical) size.height else size.width).toFloat()
-            if (span <= 0f) return
-            onSeekFraction(((if (vertical) at.y else at.x) / span).coerceIn(0f, 1f))
+            if (span <= 0f) return 0f
+            return ((if (vertical) at.y else at.x) / span).coerceIn(0f, 1f)
         }
         awaitPointerEventScope {
             while (true) {
                 val down = awaitFirstDown(requireUnconsumed = true)
-                report(down.position)
+                var last = fractionAt(down.position)
                 do {
                     val event = awaitPointerEvent()
-                    event.changes.firstOrNull()?.let { report(it.position) }
+                    event.changes.firstOrNull()?.let { last = fractionAt(it.position) }
                 } while (event.changes.any { it.pressed })
+                onSeekFraction(last)
             }
         }
     }

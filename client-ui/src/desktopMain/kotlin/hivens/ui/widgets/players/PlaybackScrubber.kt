@@ -109,11 +109,15 @@ internal fun PlaybackScrubber(
                     pressing = true
                     try {
                         val w = size.width.coerceAtLeast(1).toFloat()
-                        seek((down.position.x / w).coerceIn(0f, 1f))
+                        // Track where the gesture would land, seek once when it
+                        // lifts: a press then release used to seek twice, and a drag
+                        // once per frame it crossed.
+                        var last = (down.position.x / w).coerceIn(0f, 1f)
                         drag(down.id) { change ->
-                            seek((change.position.x / w).coerceIn(0f, 1f))
+                            last = (change.position.x / w).coerceIn(0f, 1f)
                             change.consume()
                         }
+                        seek(last)
                     } finally {
                         pressing = false
                     }
