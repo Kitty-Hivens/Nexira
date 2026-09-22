@@ -197,8 +197,12 @@ class AudioPlayer(
     fun open(file: Path) = open(listOf(file))
 
     /**
-     * Replaces the queue with [files] and loads the first of them, silent, the way
-     * a single open has always behaved: the user pressed a picker, not Play.
+     * Replaces the queue with [files] and loads the first of them, sounding only if
+     * a track was already playing when it arrived.
+     *
+     * A first open with nothing playing stays silent, the way a picker rather than a
+     * Play press always has. An open onto a playing track keeps playing, because
+     * changing what is on while the transport runs is a change of track, not a stop.
      *
      * Replaces rather than appends because this is what the picker does, and a
      * picker that grew the queue every time would make "open" mean "open plus
@@ -208,8 +212,11 @@ class AudioPlayer(
         if (files.isEmpty()) return
         scope.launch(engine) {
             log.info("Audio open requested: {} file(s)", files.size)
+            // Read before the load, which closes the current engine and clears the
+            // flag: this is the transport as it stood when the open arrived.
+            val wasPlaying = _state.value is PlaybackState.Playing
             _queue.value = files
-            loadAt(0, autoplay = false)
+            loadAt(0, autoplay = wasPlaying)
             rememberQueue()
         }
     }
