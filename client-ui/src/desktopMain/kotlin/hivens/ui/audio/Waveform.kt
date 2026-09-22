@@ -1,5 +1,6 @@
 package hivens.ui.audio
 
+import dev.hivens.skinema.audio.PcmEncoding
 import dev.hivens.skinema.audio.PcmFormat
 import dev.hivens.skinema.audio.PcmSink
 import dev.hivens.skinema.player.VideoPlayer
@@ -125,12 +126,11 @@ private suspend fun awaitEnd(player: VideoPlayer, file: Path): Boolean {
 /**
  * The sink that measures instead of playing.
  *
- * The seam carries one shape, S16LE interleaved stereo, and the rate is the only
- * thing an open negotiates, so there is nothing here to refuse and no conversion
- * to write. A later skinema widens the seam to five encodings and every channel
- * count; when that version is the one this builds against, what changes is this
- * class and not the fold below it, which already measures in samples rather than
- * in frames.
+ * The seam now carries five encodings and any channel count, and an open states
+ * both. The fold below reads each sample at the width the encoding names and
+ * normalises it to 0..1, so a float track and an integer one draw at the same
+ * scale. It measures in samples rather than in frames, so the channel count never
+ * enters the arithmetic.
  */
 internal class EnvelopeSink : PcmSink {
 
@@ -155,7 +155,7 @@ internal class EnvelopeSink : PcmSink {
         // spliced onto what follows.
         played.set(0)
         bytesPerFrame = format.bytesPerFrame
-        fold = PeakFold(WINDOW_FRAMES * format.channels)
+        fold = PeakFold(WINDOW_FRAMES * format.channels, format.encoding)
     }
 
     override fun write(data: ByteArray, offset: Int, length: Int) {
@@ -185,7 +185,8 @@ internal class EnvelopeSink : PcmSink {
 }
 
 /**
- * Folds interleaved S16LE bytes into one peak per window of samples.
+ * Folds interleaved PCM bytes into one peak per window of samples, reading each
+ * sample at the width and interpretation [encoding] names.
  *
  * Pure and separate from the sink for the reason the queue helpers are: the
  * arithmetic is the whole of the behaviour, it is easy to get the endianness or
@@ -194,33 +195,64 @@ internal class EnvelopeSink : PcmSink {
  *
  * Samples rather than frames, so the channel count never enters the arithmetic.
  * The peak of a window is the loudest sample in it whichever channel carried it,
- * which is what a single strip draws.
+ * normalised to 0..1 by the encoding's own range, which is what a single strip
+ * draws. Reading S16LE bytes as though every stream were S16 was the bug this
+ * fixed: most music decodes to F32LE (float), and a float read as a short is
+ * noise, so the strip drew a flat line for every ordinary track.
  */
-internal class PeakFold(private val windowSamples: Int) {
+internal class PeakFold(private val windowSamples: Int, private val encoding: PcmEncoding) {
 
     private var values = FloatArray(INITIAL_WINDOWS)
     private var count = 0
     private var inWindow = 0
     private var peak = 0f
+    private val sampleBytes = encoding.bytesPerSample
 
     fun accept(data: ByteArray, offset: Int, length: Int) {
-        if (windowSamples <= 0) return
+        if (windowSamples <= 0 || sampleBytes <= 0) return
         var i = offset
-        // One short is two bytes, so a trailing odd byte is not a sample. It
-        // cannot happen on a frame boundary and is dropped rather than read past.
-        val last = offset + length - 1
-        while (i < last) {
-            // Little endian, and the high byte sign extends on its own, so the
-            // value arrives signed without a cast back through Short.
-            val sample = (data[i + 1].toInt() shl 8) or (data[i].toInt() and 0xFF)
-            val magnitude = abs(sample) / FULL_SCALE
+        val end = offset + length
+        // A trailing partial sample cannot land on a frame boundary and is dropped
+        // rather than read past.
+        while (i + sampleBytes <= end) {
+            val magnitude = magnitudeAt(data, i)
             if (magnitude > peak) peak = magnitude
-            i += 2
+            i += sampleBytes
             if (++inWindow >= windowSamples) {
                 add(peak)
                 peak = 0f
                 inWindow = 0
             }
+        }
+    }
+
+    /** One little-endian sample's magnitude in 0..1, read as [encoding] names it. */
+    private fun magnitudeAt(data: ByteArray, i: Int): Float = when (encoding) {
+        PcmEncoding.U8 -> abs((data[i].toInt() and 0xFF) - 128) / U8_FULL_SCALE
+        PcmEncoding.S16LE -> {
+            // The high byte sign-extends on its own, so the value arrives signed.
+            val s = (data[i + 1].toInt() shl 8) or (data[i].toInt() and 0xFF)
+            abs(s) / S16_FULL_SCALE
+        }
+        PcmEncoding.S32LE -> {
+            val s = (data[i].toInt() and 0xFF) or
+                ((data[i + 1].toInt() and 0xFF) shl 8) or
+                ((data[i + 2].toInt() and 0xFF) shl 16) or
+                (data[i + 3].toInt() shl 24)
+            // abs as Long: abs(Int.MIN_VALUE) is negative on its own width.
+            abs(s.toLong()) / S32_FULL_SCALE
+        }
+        PcmEncoding.F32LE -> {
+            val bits = (data[i].toInt() and 0xFF) or
+                ((data[i + 1].toInt() and 0xFF) shl 8) or
+                ((data[i + 2].toInt() and 0xFF) shl 16) or
+                (data[i + 3].toInt() shl 24)
+            abs(Float.fromBits(bits))
+        }
+        PcmEncoding.F64LE -> {
+            var bits = 0L
+            for (b in 0 until 8) bits = bits or ((data[i + b].toLong() and 0xFF) shl (b * 8))
+            abs(Double.fromBits(bits)).toFloat()
         }
     }
 
@@ -284,7 +316,7 @@ const val DEFAULT_BUCKETS = 512
  */
 private const val WINDOW_FRAMES = 1024
 
-/** What the seam carries, fixed rather than negotiated at this version. */
+/** Assumed for the fallback stride only. Open reads the stream's real channel count. */
 private const val CHANNELS = 2
 
 /** Only a starting value: the stream states its own stride on open. */
@@ -292,7 +324,13 @@ private const val DEFAULT_BYTES_PER_FRAME = CHANNELS * 2
 
 private const val INITIAL_WINDOWS = 1024
 
-private const val FULL_SCALE = 32768f
+/**
+ * 0..1 normalisation divisors, one per integer range the fold reads. The float
+ * encodings arrive in range already and take none.
+ */
+private const val U8_FULL_SCALE = 128f
+private const val S16_FULL_SCALE = 32768f
+private const val S32_FULL_SCALE = 2147483648f
 
 private const val POLL_MS = 20L
 

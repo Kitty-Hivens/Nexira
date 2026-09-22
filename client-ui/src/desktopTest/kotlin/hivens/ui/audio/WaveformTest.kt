@@ -1,5 +1,6 @@
 package hivens.ui.audio
 
+import dev.hivens.skinema.audio.PcmEncoding
 import dev.hivens.skinema.audio.PcmFormat
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -28,9 +29,22 @@ class WaveformTest {
         return out
     }
 
+    /** Interleaved F32LE bytes from sample values in -1..1. */
+    private fun f32(vararg samples: Float): ByteArray {
+        val out = ByteArray(samples.size * 4)
+        samples.forEachIndexed { i, v ->
+            val bits = v.toRawBits()
+            out[i * 4] = (bits and 0xFF).toByte()
+            out[i * 4 + 1] = ((bits shr 8) and 0xFF).toByte()
+            out[i * 4 + 2] = ((bits shr 16) and 0xFF).toByte()
+            out[i * 4 + 3] = ((bits shr 24) and 0xFF).toByte()
+        }
+        return out
+    }
+
     @Test
     fun `a sample is read little endian and signed`() {
-        val fold = PeakFold(windowSamples = 1)
+        val fold = PeakFold(windowSamples = 1, encoding = PcmEncoding.S16LE)
         // 0x4000 is half of full scale, and the negative of it must measure the same.
         fold.accept(s16(0x4000, -0x4000), 0, 4)
         val peaks = fold.finish()
@@ -40,8 +54,22 @@ class WaveformTest {
     }
 
     @Test
+    fun `a float sample is read at its own width and normalised`() {
+        // The regression this guards: most music decodes to F32LE, and reading a
+        // float as a short is noise, so the strip drew a flat line for every
+        // ordinary track until the fold learned the encoding.
+        val fold = PeakFold(windowSamples = 1, encoding = PcmEncoding.F32LE)
+        fold.accept(f32(0.5f, -0.5f, 1.0f), 0, 12)
+        val peaks = fold.finish()
+        assertEquals(3, peaks.size)
+        assertEquals(0.5f, peaks[0], 1e-6f)
+        assertEquals(0.5f, peaks[1], 1e-6f)
+        assertEquals(1.0f, peaks[2], 1e-6f)
+    }
+
+    @Test
     fun `the most negative sample is full scale and does not overflow`() {
-        val fold = PeakFold(windowSamples = 1)
+        val fold = PeakFold(windowSamples = 1, encoding = PcmEncoding.S16LE)
         fold.accept(s16(-32768), 0, 2)
         assertEquals(1.0f, fold.finish()[0], 1e-6f)
     }
@@ -49,7 +77,7 @@ class WaveformTest {
     @Test
     fun `a window is the loudest sample in it, whichever channel carried it`() {
         // Four samples per window: a quiet left channel and a loud right one.
-        val fold = PeakFold(windowSamples = 4)
+        val fold = PeakFold(windowSamples = 4, encoding = PcmEncoding.S16LE)
         fold.accept(s16(100, 32767, 100, 200), 0, 8)
         val peaks = fold.finish()
         assertEquals(1, peaks.size)
@@ -58,7 +86,7 @@ class WaveformTest {
 
     @Test
     fun `windows close on their boundary and not on the write boundary`() {
-        val fold = PeakFold(windowSamples = 2)
+        val fold = PeakFold(windowSamples = 2, encoding = PcmEncoding.S16LE)
         // Three writes that do not line up with the window: 1, 3 and 2 samples.
         fold.accept(s16(0), 0, 2)
         fold.accept(s16(32767, 0, 0), 0, 6)
@@ -73,7 +101,7 @@ class WaveformTest {
 
     @Test
     fun `a partial window is kept rather than dropped`() {
-        val fold = PeakFold(windowSamples = 4)
+        val fold = PeakFold(windowSamples = 4, encoding = PcmEncoding.S16LE)
         fold.accept(s16(32767), 0, 2)
         val peaks = fold.finish()
         assertEquals(1, peaks.size, "the tail of a track is a window too")
@@ -82,7 +110,7 @@ class WaveformTest {
 
     @Test
     fun `an odd trailing byte is not read as a sample`() {
-        val fold = PeakFold(windowSamples = 1)
+        val fold = PeakFold(windowSamples = 1, encoding = PcmEncoding.S16LE)
         val data = s16(0x4000) + byteArrayOf(0x7F)
         fold.accept(data, 0, data.size)
         assertEquals(1, fold.finish().size)
@@ -90,7 +118,7 @@ class WaveformTest {
 
     @Test
     fun `offset and length are honoured`() {
-        val fold = PeakFold(windowSamples = 1)
+        val fold = PeakFold(windowSamples = 1, encoding = PcmEncoding.S16LE)
         val data = s16(32767, 0x4000, 32767)
         // Only the middle sample.
         fold.accept(data, 2, 2)
@@ -101,7 +129,7 @@ class WaveformTest {
 
     @Test
     fun `nothing written is no windows`() {
-        assertEquals(0, PeakFold(windowSamples = 4).finish().size)
+        assertEquals(0, PeakFold(windowSamples = 4, encoding = PcmEncoding.S16LE).finish().size)
     }
 
     @Test
@@ -146,7 +174,7 @@ class WaveformTest {
         sampleRate = sampleRate,
         channels = 2,
         layout = "stereo",
-        encoding = dev.hivens.skinema.audio.PcmEncoding.S16LE,
+        encoding = PcmEncoding.S16LE,
         significantBits = 16,
     )
 
