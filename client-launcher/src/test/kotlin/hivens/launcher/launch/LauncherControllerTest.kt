@@ -32,6 +32,7 @@ import hivens.launcher.smrt.SmrtPackClient
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -1063,6 +1064,35 @@ class LauncherControllerTest {
         assertEquals("", captured.captured.accessToken, "offline, since there is no licence to carry")
     }
 
+    /**
+     * What a held jar kept an earlier switch or update from doing is carried out
+     * here, and before the roster is read: the check has to see the instance as the
+     * player's choice left it, not with a switched-off mod still loading.
+     */
+    @Test
+    fun `a launch settles what a held file left owing before it checks the roster`() = runTest {
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live-token"),
+            packInstance = scBoundPackInstance(),
+        )
+
+        coVerifyOrder {
+            packSyncService.settlePending(any())
+            packSyncService.enforceRoster(any(), any())
+        }
+    }
+
+    /** An unbound pack is not swept, and its owner's switches still take effect. */
+    @Test
+    fun `an unbound launch settles what a held file left owing too`() = runTest {
+        capturePackSession(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "live-token"),
+            packInstance = scBoundPackInstance(authRequirement = null),
+        )
+
+        coVerify(exactly = 1) { packSyncService.settlePending(any()) }
+    }
+
     @Test
     fun `an unverified instance launches with no token`() = runTest {
         // No roster on disk -- nothing vouched for what is in mods/, so the game
@@ -1253,7 +1283,7 @@ class LauncherControllerTest {
         controller.launchPackInstance(currentSession = currentSession, packInstance = packInstance)
         advanceUntilIdle()
         collectorJob?.cancel()
-        return captured.captured.takeIf { captured.isCaptured }
+        return if (captured.isCaptured) captured.captured else null
     }
 
     @Test
