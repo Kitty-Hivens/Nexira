@@ -4,7 +4,6 @@ package hivens.config
 object Storage {
     const val SETTINGS_FILE         = "settings.json"
     const val HASH_CACHE_FILE       = "smarty_hash.cache"
-    const val PROTECTED_PATHS_FILE  = "protected-paths.json"
     const val PACKS_FILE            = "packs.json"
     const val LAYOUT_GRAPH_FILE     = "layout-graph.json"
 

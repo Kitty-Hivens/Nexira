@@ -103,14 +103,16 @@ class RetiredDataSweeper(
 
     /**
      * The files the retired path kept beside the clients: per-server launch
-     * profiles, the roster the tray seeded from, and the manifest cache each sync
-     * compared against. None is read by anything now.
+     * profiles, the roster the tray seeded from, the manifest cache each sync
+     * compared against, and the list of names that sync was told to leave alone.
+     * None is read by anything now.
      */
     private fun removeLeftovers() {
         val targets = listOf(
             dataDir.resolve("manifest-cache"),
             dataDir.resolve(RETIRED_PROFILES_FILE),
             dataDir.resolve(RETIRED_SERVERS_CACHE_FILE),
+            dataDir.resolve(RETIRED_PROTECTED_PATHS_FILE),
             clientsDir(),
         )
         for (path in targets) {
@@ -175,5 +177,6 @@ class RetiredDataSweeper(
          */
         const val RETIRED_PROFILES_FILE = "profiles.json"
         const val RETIRED_SERVERS_CACHE_FILE = "servers-cache.json"
+        const val RETIRED_PROTECTED_PATHS_FILE = "protected-paths.json"
     }
 }

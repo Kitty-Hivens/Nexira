@@ -37,6 +37,7 @@ class RetiredDataSweeperTest {
         (data / "manifest-cache" / "Industrial.json").writeText("{}")
         (data / "profiles.json").writeText("{}")
         (data / "servers-cache.json").writeText("{}")
+        (data / "protected-paths.json").writeText("{}")
         // A file the retired path never owned, to prove the sweep is not a broom.
         (data / "settings.json").writeText("{}")
     }
@@ -70,6 +71,7 @@ class RetiredDataSweeperTest {
         assertFalse((data / "manifest-cache").exists())
         assertFalse((data / "profiles.json").exists())
         assertFalse((data / "servers-cache.json").exists())
+        assertFalse((data / "protected-paths.json").exists())
         assertTrue((data / "settings.json").exists(), "the sweep touches only the retired path's own files")
     }
 
@@ -86,6 +88,7 @@ class RetiredDataSweeperTest {
         assertTrue((clients / "Galaxy").exists())
         assertTrue((data / "manifest-cache").exists(), "it still describes the one left")
         assertTrue((data / "profiles.json").exists())
+        assertTrue((data / "protected-paths.json").exists())
     }
 
     @Test

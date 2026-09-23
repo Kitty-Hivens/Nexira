@@ -36,10 +36,8 @@ import java.util.Comparator
  * a per-entry source pointer.
  *
  * Throws on any download error or sha1 mismatch. The caller does not
- * get a partial-success indicator and there is no silent fallback to
- * the SC sync path -- mirror failures must surface, otherwise a broken
- * mirror is masked by a stale-but-working SC sync and the regression
- * stays invisible.
+ * get a partial-success indicator: a mirror failure surfaces rather than
+ * leaving an instance that only looks installed.
  */
 class SmrtSyncService(
     private val modrinth: ModrinthClient,
@@ -121,11 +119,9 @@ class SmrtSyncService(
             transfers.fetchAll(sink.transfers) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
             reportStuckVariants(manifest.packId, sweepStale(stuck))
 
-            // Drop manifest-removed mods and catch foreign payloads that
-            // the wipe missed (an SC sync ran between two mirror syncs
-            // without touching the marker, so the wipe gate saw a stale
-            // "mirror" value). Only top-level mods/{expected_filename}
-            // entries survive.
+            // Drop manifest-removed mods and any other archive the manifest
+            // does not name. Only top-level mods/{expected_filename} entries
+            // survive.
             val expected = manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet()
             // One rule for both cases. The old split -- wipe everything on a source
             // change, drop stray jars otherwise -- dates from the clients era, where

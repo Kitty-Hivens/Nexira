@@ -854,11 +854,6 @@ val appModule = module {
     // the hook can be tested independently if needed.
     single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
 
-    single {
-        val dataDir: Path = get()
-        ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
-    }
-
     // The news archive, read from the site's paginated index rather than from the
     // dashboard payload -- which carries three entries and is why a widget asked
     // for twenty showed three. Same channel as the rest of the smartycraft

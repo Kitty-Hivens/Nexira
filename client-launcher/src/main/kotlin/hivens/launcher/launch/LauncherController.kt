@@ -179,6 +179,16 @@ class LauncherController(
     private val _state = MutableStateFlow<LaunchState>(LaunchState.Idle)
     val state: StateFlow<LaunchState> = _state.asStateFlow()
 
+    private val _runningPackInstanceId = MutableStateFlow<String?>(null)
+
+    /**
+     * [LaunchState] deliberately carries no target identity -- it is the shared
+     * Compose-free contract and a frontend renders it without caring what was
+     * launched. This is the separate question "whose files are in use right now",
+     * which the settings surfaces need in order to warn about rewriting them.
+     */
+    override val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
+
     /**
      * Push-side log channel. UI subscribes (`LaunchLogCollector` in
      * `Main.kt`'s application block) and routes each event to the
@@ -191,16 +201,6 @@ class LauncherController(
      * itself capped at 2000 lines, so lossy-under-pressure semantics
      * stay consistent across the two layers.
      */
-    private val _runningPackInstanceId = MutableStateFlow<String?>(null)
-
-    /**
-     * [LaunchState] deliberately carries no target identity -- it is the shared
-     * Compose-free contract and a frontend renders it without caring what was
-     * launched. This is the separate question "whose files are in use right now",
-     * which the settings surfaces need in order to warn about rewriting them.
-     */
-    override val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
-
     private val _events = MutableSharedFlow<LaunchLogEvent>(
         extraBufferCapacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -905,13 +905,6 @@ class LauncherController(
     }
 
     /**
-     * The same session with nothing on it that could join a server: vanilla offline
-     * uuid, no token, marked offline (which is what puts `--userType legacy` on the
-     * command line). Minting the offline uuid from the player name rather than
-     * keeping the online one is what makes singleplayer worlds line up with other
-     * launchers' offline mode.
-     */
-    /**
      * Whether this session can be carried into an SC-bound launch as-is: a
      * SmartyCraft session with a token, not an offline one and not Microsoft.
      *
@@ -926,6 +919,13 @@ class LauncherController(
     private fun SessionData.reusableForSc(): Boolean =
         !offline && refreshToken == null && accessToken.isNotBlank() && playerName.isNotBlank()
 
+    /**
+     * The same session with nothing on it that could join a server: vanilla offline
+     * uuid, no token, marked offline (which is what puts `--userType legacy` on the
+     * command line). Minting the offline uuid from the player name rather than
+     * keeping the online one is what makes singleplayer worlds line up with other
+     * launchers' offline mode.
+     */
     private fun SessionData.toOffline(): SessionData = copy(
         uuid = if (offline) uuid else OfflineIdentity.dashlessUuidFor(playerName),
         accessToken = "",

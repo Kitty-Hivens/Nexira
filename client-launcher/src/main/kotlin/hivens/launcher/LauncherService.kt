@@ -213,8 +213,7 @@ internal class LauncherService(
      *
      * The patched authlib comes from the SC session's own file manifest
      * ([SessionData.fileManifest], populated by the pre-spawn re-auth), so it is
-     * pulled from the same distribution the `clients/` cache already uses -- nothing of
-     * SC's is rehosted. Only the resolved classpath entry is rewritten; the
+     * pulled from SC's own client distribution and nothing of SC's is rehosted. Only the resolved classpath entry is rewritten; the
      * shared `libraries/` root stays vanilla (a patched jar there would hit every
      * pack of that MC version and be reverted by the provisioner's size check).
      */

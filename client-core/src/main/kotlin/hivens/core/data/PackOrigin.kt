@@ -17,9 +17,9 @@ import kotlinx.serialization.Serializable
 enum class PackOrigin {
     /**
      * SmartyCraft launcher API. Pack identity is the SC `assetDir`
-     * string. Requires SC auth at play time. SC's manifest format
-     * is its own thing -- see SmartyCraftServerListService and the
-     * legacy manifest-processor.
+     * string. Requires SC auth at play time. Nothing produces it since
+     * the server-list path was retired, because SmartyCraft packs arrive
+     * as [Mirror]. It stays so a record saved before then still decodes.
      */
     Smartycraft,
 
