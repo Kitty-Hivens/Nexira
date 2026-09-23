@@ -69,8 +69,9 @@ class PackSnapshotService(
     }
 
     /**
-     * Restore snapshot [id]: put every captured file back, delete a managed path
-     * the apply created (present now, absent from the snapshot), and return the
+     * Restore snapshot [id]: put every captured file back, delete a managed path or
+     * an instance state file the apply created (present now, absent from the
+     * snapshot), and return the
      * pre-update [PackInstance] for the caller to re-persist. [managedRealPaths]
      * is the current (post-update) managed set whose non-captured members are the
      * files to remove.
@@ -92,7 +93,11 @@ class PackSnapshotService(
         // (for a manual retry) and tell the user rather than trust a broken state.
         val failures = ArrayList<String>()
 
-        for (rel in managedRealPaths) {
+        // The state files go with the managed set: one the snapshot did not hold was
+        // absent before the update, so any copy now on disk is the apply's. Left in
+        // place, the roster written for the build being undone becomes the next
+        // launch's delete list over the build that was just put back.
+        for (rel in managedRealPaths + SmrtSyncService.INSTANCE_STATE_FILES) {
             if (rel in capturedSet) continue
             val live = root.resolve(rel).normalize()
             if (live.startsWith(root)) {

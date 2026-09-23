@@ -112,6 +112,35 @@ class PackSnapshotServiceTest {
         )
     }
 
+    /**
+     * An instance installed before the roster existed has none to capture, and the
+     * update is what writes the first one. That roster names the build being undone,
+     * so a rollback that kept it would hand the next launch a delete list for the
+     * wrong build on exactly the instance with no baseline to outrank it.
+     */
+    @Test
+    fun `a rollback removes the roster the update wrote when the snapshot had none`() {
+        val dataDir = Files.createTempDirectory("snap-roster-born")
+        val dir = "inst"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        val modsDir = clientDir.resolve("mods")
+        Files.createDirectories(modsDir)
+        Files.writeString(modsDir.resolve("a.jar"), "old-a")
+        val svc = PackSnapshotService(dataDir, json)
+        val managed = setOf("mods/a.jar", "mods/b.jar")
+        val snap = svc.capture(clientDir, instance(dir), managed, "s1", 1L)
+
+        Files.writeString(modsDir.resolve("b.jar"), "new-b")
+        AtomicFiles.writeString(clientDir.resolve(".nexira-mods"), "b.jar\nb.jar.disabled")
+        AtomicFiles.writeString(clientDir.resolve(".nexira-sync-source"), "mirror")
+
+        svc.restore(clientDir, dir, snap.id, managed)
+
+        assertFalse(Files.exists(clientDir.resolve(".nexira-mods")), "the update's roster goes with the update")
+        assertFalse(Files.exists(clientDir.resolve(".nexira-sync-source")), "so does the marker it wrote")
+        assertEquals("old-a", Files.readString(modsDir.resolve("a.jar")))
+    }
+
     @Test
     fun `restore throws when a captured snapshot file is missing`() {
         val dataDir = Files.createTempDirectory("snap2")
