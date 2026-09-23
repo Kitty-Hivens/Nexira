@@ -192,9 +192,11 @@ private fun RowScope.RegionDivider(show: Boolean) {
     if (show) VerticalDivider(Modifier.fillMaxHeight(), color = NxTheme.colors.outline)
 }
 
-// Shown for a collapsed region while editing: thin but visible, so the region's
-// edit chrome (and its Tune affordance -- the only un-collapse path in edit
-// mode) stays hoverable. A fully-returned region leaves nothing to hover.
+// Shown for a collapsed LEFT rail while editing: thin but visible, so its edit
+// chrome (the Tune, the only un-collapse path the left rail has in edit mode) stays
+// hoverable. A fully-returned region leaves nothing to hover. The right rail dropped
+// its strip: Ctrl+N reopens the right rail while editing, so it needs no hover target,
+// and the strip only narrowed the editing canvas below its live width.
 @Composable
 private fun CollapsedRegionStrip() {
     NxSurface(
@@ -313,7 +315,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
 /** Sub-surface for widgets that float over the content rather than sit in it. */
 private const val OVERLAY_SURFACE = "appshell.overlay"
 
-private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width -- it is not part of the layout; reopen via Ctrl+N / edit-mode Tune
+private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width and is not part of the layout, reopen via Ctrl+N
 private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-collapses the right rail
 
 /**
@@ -343,9 +345,11 @@ private val RAIL_INSET = 4.dp
  * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
  * pointer and snaps on release; vertical scrolls and taps still reach the news).
  *
- * Collapsed it reserves no width at all -- see [RAIL_COLLAPSED_GRAB] -- so there is
- * nothing left on screen to swipe, and it reopens through Ctrl+N or, in edit mode,
- * the region's own Tune. Neither reaches it while the window is under
+ * Collapsed it reserves no width at all (see [RAIL_COLLAPSED_GRAB]) in either mode,
+ * so there is nothing left on screen to swipe, and it reopens through Ctrl+N. Edit
+ * mode used to draw a 22dp strip so the region stayed hoverable for a mouse Tune,
+ * but that strip narrowed the editing canvas below its live width, so it is gone and
+ * Ctrl+N is the reopen. Ctrl+N does not reach it while the window is under
  * [AUTO_COLLAPSE_BELOW]: the auto-collapse is not a state the chord can leave,
  * because there is no room to open into. This used to describe a slim catch at the edge; the catch
  * went to zero and the sentence outlived it. Edit mode keeps the static
@@ -397,7 +401,11 @@ fun ShellRightRegion(instance: WidgetInstance) {
 
     // Edit mode: static, no swipe/animation.
     if (editing) {
-        if (props.collapsed) { CollapsedRegionStrip(); return }
+        // Collapsed reserves nothing in edit mode too, so the editing canvas is the
+        // width it will be live: no 22dp strip stealing from the centre and pushing
+        // right-edge widgets into an overflow that exists only while editing. Reopen
+        // stays Ctrl+N (window-scoped, fires while editing), so nothing is stranded.
+        if (props.collapsed) return
         val sized = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH)
         NxSurface(
             NxSurfaceLevel.Floating,
