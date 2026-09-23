@@ -1,6 +1,7 @@
 package hivens.ui.screens.detail.settings
 
 import androidx.compose.foundation.background
+import hivens.core.launch.InstanceWorkRegistry
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.ImageComposeScene
@@ -106,7 +107,7 @@ class PackSettingsWindowRenderTest {
                 // The window persists an edit on the app scope, so the graph has
                 // to hold one -- a write must outlive the window that made it.
                 single<CoroutineScope> { scope }
-                single { PackOperationService(scope = scope, sizes = get()) }
+                single { PackOperationService(scope = scope, sizes = get(), work = InstanceWorkRegistry()) }
                 single<PackUpdater> { VersionedSource }
             })
         }

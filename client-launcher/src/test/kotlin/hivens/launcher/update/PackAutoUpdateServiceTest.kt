@@ -7,6 +7,8 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.data.SettingsData
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.update.CompatChange
 import hivens.core.update.PackSnapshot
 import hivens.core.update.PackUpdateStatus
@@ -20,6 +22,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -86,7 +91,7 @@ class PackAutoUpdateServiceTest {
         val updater = FakeUpdater(
             mapOf("green" to available(CompatChange.Same), "amber" to available(CompatChange.McBump)),
         )
-        val service = PackAutoUpdateService(repo, updater) { settings(amber = AmberUpdatePolicy.Ask) }
+        val service = PackAutoUpdateService(repo, updater, { settings(amber = AmberUpdatePolicy.Ask) }, InstanceWorkRegistry(), { null })
 
         service.runOnce()
 
@@ -102,7 +107,7 @@ class PackAutoUpdateServiceTest {
         suspend fun pendingUnder(amber: AmberUpdatePolicy): PackUpdateStatus.Pending {
             val repo = FakeRepo(listOf(instance("amber")))
             val updater = FakeUpdater(mapOf("amber" to available(CompatChange.McBump)))
-            val service = PackAutoUpdateService(repo, updater) { settings(amber = amber) }
+            val service = PackAutoUpdateService(repo, updater, { settings(amber = amber) }, InstanceWorkRegistry(), { null })
             service.runOnce()
             assertTrue(updater.applied.isEmpty(), "$amber must not apply an amber change")
             return service.statuses.value["amber"] as PackUpdateStatus.Pending
@@ -112,11 +117,60 @@ class PackAutoUpdateServiceTest {
         assertEquals(true, pendingUnder(AmberUpdatePolicy.Hold).held)
     }
 
+    /**
+     * The pass used to ask nothing about what else was happening to a pack, so it
+     * rewrote the files of a game that was reading them, or raced an update the
+     * player had started from the pack's page.
+     */
+    @Test
+    fun `a pack in use or already being worked on is left for the next pass`() = runTest {
+        val repo = FakeRepo(listOf(instance("playing"), instance("busy"), instance("free")))
+        val updater = FakeUpdater(
+            mapOf(
+                "playing" to available(CompatChange.Same),
+                "busy" to available(CompatChange.Same),
+                "free" to available(CompatChange.Same),
+            ),
+        )
+        val work = InstanceWorkRegistry()
+        val release = CompletableDeferred<Unit>()
+        val holder = launch { work.during("busy", InstanceWork.Repair) { release.await() } }
+        runCurrent()
+
+        PackAutoUpdateService(repo, updater, { settings() }, work, { "playing" }).runOnce()
+
+        assertEquals(listOf("free"), updater.applied)
+        release.complete(Unit)
+        holder.join()
+    }
+
+    @Test
+    fun `an applying update marks its pack as busy while it runs`() = runTest {
+        val repo = FakeRepo(listOf(instance("green")))
+        val work = InstanceWorkRegistry()
+        var seen: InstanceWork? = null
+        val updater = object : PackUpdater by FakeUpdater(mapOf("green" to available(CompatChange.Same))) {
+            override suspend fun applyUpdate(
+                instance: PackInstance,
+                targetVersion: String?,
+                progress: ((Int, Int, String) -> Unit)?,
+            ): UpdateOutcome {
+                seen = work.workOn(instance.id)
+                return UpdateOutcome.Applied("2026.02.02", CompatChange.Same, UpdatePlan())
+            }
+        }
+
+        PackAutoUpdateService(repo, updater, { settings() }, work, { null }).runOnce()
+
+        assertEquals(InstanceWork.Update, seen, "the launch controls read this to say why Play waits")
+        assertEquals(null, work.workOn("green"))
+    }
+
     @Test
     fun `amber applies under snapshot-then-apply`() = runTest {
         val repo = FakeRepo(listOf(instance("amber")))
         val updater = FakeUpdater(mapOf("amber" to available(CompatChange.LoaderSwap)))
-        val service = PackAutoUpdateService(repo, updater) { settings(amber = AmberUpdatePolicy.SnapshotThenApply) }
+        val service = PackAutoUpdateService(repo, updater, { settings(amber = AmberUpdatePolicy.SnapshotThenApply) }, InstanceWorkRegistry(), { null })
 
         service.runOnce()
 
@@ -128,7 +182,7 @@ class PackAutoUpdateServiceTest {
     fun `a pinned instance is skipped whatever its source offers`() = runTest {
         val repo = FakeRepo(listOf(instance("pinned", followLatest = false)))
         val updater = FakeUpdater(mapOf("pinned" to available(CompatChange.Same)))
-        val service = PackAutoUpdateService(repo, updater) { settings() }
+        val service = PackAutoUpdateService(repo, updater, { settings() }, InstanceWorkRegistry(), { null })
 
         service.runOnce()
 
@@ -144,7 +198,7 @@ class PackAutoUpdateServiceTest {
         // learns to update is not silently left out of this loop.
         val repo = FakeRepo(listOf(instance("local", origin = PackOrigin.Local)))
         val updater = FakeUpdater(mapOf("local" to available(CompatChange.Same)), unhandled = setOf("local"))
-        val service = PackAutoUpdateService(repo, updater) { settings() }
+        val service = PackAutoUpdateService(repo, updater, { settings() }, InstanceWorkRegistry(), { null })
 
         service.runOnce()
 
@@ -158,7 +212,7 @@ class PackAutoUpdateServiceTest {
         // a Modrinth instance was never even checked no matter what could update it.
         val repo = FakeRepo(listOf(instance("mr", origin = PackOrigin.Modrinth)))
         val updater = FakeUpdater(mapOf("mr" to available(CompatChange.Same)))
-        val service = PackAutoUpdateService(repo, updater) { settings() }
+        val service = PackAutoUpdateService(repo, updater, { settings() }, InstanceWorkRegistry(), { null })
 
         service.runOnce()
 
@@ -169,7 +223,7 @@ class PackAutoUpdateServiceTest {
     fun `disabled setting is a no-op`() = runTest {
         val repo = FakeRepo(listOf(instance("green")))
         val updater = FakeUpdater(mapOf("green" to available(CompatChange.Same)))
-        val service = PackAutoUpdateService(repo, updater) { settings(auto = false) }
+        val service = PackAutoUpdateService(repo, updater, { settings(auto = false) }, InstanceWorkRegistry(), { null })
 
         service.runOnce()
 

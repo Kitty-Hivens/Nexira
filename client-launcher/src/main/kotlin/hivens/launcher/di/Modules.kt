@@ -32,6 +32,7 @@ import hivens.launcher.*
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.launch.RunningPackSource
 import hivens.launcher.mrpack.MrpackInstaller
@@ -512,7 +513,7 @@ val mirrorModule = module {
     // Per-file updates for an instance's own folders: checks Modrinth by hash and
     // swaps jars in place. App-scoped, so a batch of forty survives leaving the tab
     // that started it.
-    single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get()) }
+    single { InstanceContentUpdater(modrinth = get(), manager = InstanceContentManager(), scope = get(), work = get()) }
     // Installing a mod means installing what it cannot run without: the browser
     // used to fetch the one jar that was clicked and leave the player to meet the
     // missing dependency on the loading screen.
@@ -613,14 +614,17 @@ val mirrorModule = module {
     // App-scoped owner of the operations that rewrite an installed instance
     // (an update apply, a repair): one per instance, outliving the surface that
     // started it -- see PackOperationService.
-    single { PackOperationService(scope = get(), sizes = get()) }
+    single { PackOperationService(scope = get(), sizes = get(), work = get()) }
     // Update write side: moves an installed mirror instance to another build
     // (forward update or version switch) via the reconcile engine. Concrete
     // SmrtPackClient for the summary/version-list poll the interface slice lacks.
     single { PackSnapshotService(dataDir = get(), json = get()) }
+    // What each instance is busy with, for the launch controls and the controller
+    // that must not start a game over files being rewritten.
+    single { InstanceWorkRegistry() }
     single { ApplyJournal(dataDir = get(), json = get()) }
     // Startup rollback for updates a hard crash interrupted (journal + snapshot).
-    single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get()) }
+    single { ApplyRecovery(snapshotService = get(), repository = get(), journal = get(), dataDir = get(), work = get()) }
     single {
         PackUpdateService(
             client = get<SmrtPackClient>(),
@@ -658,10 +662,13 @@ val mirrorModule = module {
     // status hub so UI badges and manual flows share one state.
     single {
         val settings = get<ISettingsService>()
+        val running = get<RunningPackSource>()
         PackAutoUpdateService(
             repository = get(),
             updater = get<PackUpdater>(),
             settingsProvider = { settings.getSettings() },
+            work = get(),
+            runningPackId = { running.runningPackInstanceId.value },
         )
     } bind PackUpdateStatusHub::class
     single {

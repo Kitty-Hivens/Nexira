@@ -17,6 +17,8 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.launch.AuthRefreshFailure
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -90,6 +92,7 @@ class LauncherControllerTest {
     private lateinit var credentialsManager: CredentialsManager
     private lateinit var packRepository: IPackRepository
     private lateinit var smrtPackClient: SmrtPackClient
+    private val work = InstanceWorkRegistry()
 
     @BeforeTest
     fun setUp() {
@@ -143,6 +146,7 @@ class LauncherControllerTest {
         smrtSyncService    = packSyncService,
         dataDirectory      = sandbox,
         appScope           = scope,
+        work               = work,
     )
 
     @Test
@@ -244,7 +248,7 @@ class LauncherControllerTest {
         // instance arrived pre-populated.
         val puts = mutableListOf<hivens.core.data.PackInstance>()
         coJustRun { packRepository.put(capture(puts)) }
-        coEvery { packRepository.get(any()) } answers { puts.lastOrNull() }
+        coEvery { packRepository.get(any()) } answers { puts.lastOrNull() ?: instance }
 
         val controller = newController(this)
         controller.launchPackInstance(
@@ -389,6 +393,36 @@ class LauncherControllerTest {
             "and the field the toggle does own is the one that changed",
         )
         assertEquals("2026.06.01.1", returned.pinnedPackVersion, "the caller adopts the record as written")
+    }
+
+    /**
+     * The spawn wrote back the record captured before the click. Preparing a launch
+     * takes a sign-in and possibly a catch-up repair, and an update committed in that
+     * time was quietly reverted: pin, baseline and cached manifest back to the build
+     * the update had just left.
+     */
+    @Test
+    fun `the spawn does not write back the build an update just left`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val clicked = packInstance("i-moved")
+        Files.createDirectories(sandbox.resolve("instances").resolve(clicked.instanceDirName))
+        val committed = clicked.copy(pinnedPackVersion = "2026.06.01.1")
+        coEvery { packRepository.get("i-moved") } returns committed
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+
+        newController(this).launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), clicked)
+        advanceUntilIdle()
+
+        val stamped = puts.first()
+        assertEquals("2026.06.01.1", stamped.pinnedPackVersion, "the committed build stays")
+        assertTrue(stamped.lastPlayedEpochOrZero > 0, "and the one field the spawn owns is written")
     }
 
     /**
@@ -1213,6 +1247,72 @@ class LauncherControllerTest {
         val state = controller.state.value
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.ExitCode(137), state.reason)
+    }
+
+    /**
+     * The launch controls already refuse this, but a launch can also arrive from a
+     * notification's relaunch or the second-factor retry. Started over an update, the
+     * game read a mix of two builds.
+     */
+    @Test
+    fun `a pack whose files are being rewritten is refused, and says why`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        val release = CompletableDeferred<Unit>()
+        launch { work.during("i-sc", InstanceWork.Update) { release.await() } }
+        advanceUntilIdle()
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(LaunchError.InstanceBusy(InstanceWork.Update), state.reason)
+        assertNull(controller.runningPackInstanceId.value, "a refused launch holds nothing")
+        coVerify(exactly = 0) {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+        release.complete(Unit)
+    }
+
+    /**
+     * Preparing a launch already reads the instance, so it is in use from the moment
+     * the launch is accepted. Named only once the game spawned, an update started in
+     * between swapped files under the check that had just vouched for them.
+     */
+    @Test
+    fun `the pack is named as in use while its launch is still preparing`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val spawnMay = CompletableDeferred<Unit>()
+        lateinit var controller: LauncherController
+        var namedBeforeSpawn: String? = null
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } coAnswers {
+            namedBeforeSpawn = controller.runningPackInstanceId.value
+            spawnMay.await()
+            SpawnResult.Started(handle)
+        }
+        coJustRun { packRepository.put(any()) }
+
+        controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        assertEquals("i-sc", controller.runningPackInstanceId.value, "claimed as soon as the launch is accepted")
+        advanceUntilIdle()
+        assertEquals("i-sc", namedBeforeSpawn)
+
+        spawnMay.complete(Unit)
+        advanceUntilIdle()
+        assertNull(controller.runningPackInstanceId.value)
     }
 
     @Test

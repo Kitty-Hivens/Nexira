@@ -750,7 +750,7 @@ internal class ContentTabState(
         if (chosen.isEmpty()) return
         val enabledBy = items.orEmpty().associate { ContentRef(it.kind, it.fileName) to rulesFor(it).effectiveEnabled }
         val targets = chosen.map { InstanceContentUpdater.Target(it, enabledBy[it.ref] ?: true) }
-        updater.start(instanceDir, instance.displayName, targets) {
+        updater.start(instance.id, instanceDir, instance.displayName, targets) {
             rescan()
             // The batch is done with the folder; re-asking is one request and it
             // is the only thing that can tell a swap that kept its file name from
@@ -816,6 +816,7 @@ internal class ContentTabState(
         val swap = version.swapFor(ref, content.version) ?: return
         switchingTo = version.id
         val started = updater.start(
+            instance.id,
             instanceDir,
             instance.displayName,
             listOf(InstanceContentUpdater.Target(swap, rulesFor(content).effectiveEnabled)),

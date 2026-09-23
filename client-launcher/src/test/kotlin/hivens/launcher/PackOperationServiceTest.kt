@@ -145,7 +145,7 @@ class PackOperationServiceTest {
     @Test
     fun `the instance is measured again once the operation is done`() = runTest {
         val sizes = sizes()
-        val service = PackOperationService(scope = this, sizes = sizes)
+        val service = PackOperationService(scope = this, sizes = sizes, work = hivens.core.launch.InstanceWorkRegistry())
 
         service.start(instance, PackOperationKind.Repair) { PackOperationPhase.Repaired(1, 0) }
         advanceUntilIdle()
@@ -159,5 +159,5 @@ class PackOperationServiceTest {
         ioDispatcher = StandardTestDispatcher(testScheduler),
     )
 
-    private fun TestScope.service() = PackOperationService(scope = this, sizes = sizes())
+    private fun TestScope.service() = PackOperationService(scope = this, sizes = sizes(), work = hivens.core.launch.InstanceWorkRegistry())
 }

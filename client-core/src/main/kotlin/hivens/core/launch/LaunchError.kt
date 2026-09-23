@@ -49,4 +49,12 @@ sealed class LaunchError {
      * [providerKey] is a stable identifier the UI maps to a localized name.
      */
     data class MissingAuthProvider(val providerKey: String) : LaunchError()
+
+    /**
+     * The instance is in the middle of [work] that rewrites its files. A game started
+     * now would load a mix of two builds, or files that are about to be replaced.
+     * The launch controls say this before anyone presses them; this is the refusal
+     * for a launch that arrives some other way, from a notification or a relaunch.
+     */
+    data class InstanceBusy(val work: InstanceWork) : LaunchError()
 }

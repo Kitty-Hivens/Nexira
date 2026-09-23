@@ -20,6 +20,7 @@ import hivens.core.data.flatten
 import hivens.core.diag.ActionRing
 import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.AuthRefreshFailure
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
@@ -71,6 +72,7 @@ class LauncherController(
     private val smrtSyncService: IPackSyncService,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
+    private val work: InstanceWorkRegistry,
 ) : RunningPackSource {
 
     private val logger = LoggerFactory.getLogger(LauncherController::class.java)
@@ -185,7 +187,12 @@ class LauncherController(
      * [LaunchState] deliberately carries no target identity -- it is the shared
      * Compose-free contract and a frontend renders it without caring what was
      * launched. This is the separate question "whose files are in use right now",
-     * which the settings surfaces need in order to warn about rewriting them.
+     * which the settings surfaces need in order to warn about rewriting them and
+     * the auto-updater needs in order to leave them alone.
+     *
+     * Set when a launch is accepted, not when its game spawns: preparing a launch
+     * already reads the instance, and an update that started under it would swap
+     * files between the check and the game reading them.
      */
     override val runningPackInstanceId: StateFlow<String?> = _runningPackInstanceId.asStateFlow()
 
@@ -301,6 +308,8 @@ class LauncherController(
     private fun launchInternal(
         label: String,
         onStart: () -> Unit,
+        /** Runs under the gate, once this launch is accepted, before anything else can observe it. */
+        onAccepted: () -> Unit = {},
         prepare: suspend CoroutineScope.() -> Prepared,
     ): Boolean {
         // Re-entry guard must be atomic with the launchJob assignment. Without
@@ -314,6 +323,7 @@ class LauncherController(
             if (_state.value !is LaunchState.Idle &&
                 _state.value !is LaunchState.Error) return false
             _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+            onAccepted()
         }
 
         // Tag every log line for this attempt with a stable launchId so a user
@@ -338,7 +348,10 @@ class LauncherController(
 
                 val prepared = when (val r = prepare()) {
                     // prepare() already called fail(); stop without touching _state.
-                    is Prepared.Bail -> return@launch
+                    is Prepared.Bail -> {
+                        if (ownsController(launchTag)) _runningPackInstanceId.value = null
+                        return@launch
+                    }
                     is Prepared.Ready -> r
                 }
 
@@ -349,7 +362,10 @@ class LauncherController(
                 when (val result = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }) {
                     // The service maps its own failures (provisioning, spawn IO,
                     // SC-binding block) to a semantic LaunchError; surface it.
-                    is SpawnResult.Failed -> fail(result.error)
+                    is SpawnResult.Failed -> {
+                        if (ownsController(launchTag)) _runningPackInstanceId.value = null
+                        fail(result.error)
+                    }
                     is SpawnResult.Started -> {
                         val handle = result.handle
                         runningHandle = handle
@@ -427,6 +443,7 @@ class LauncherController(
         packInstance: PackInstance,
     ) = launchInternal(
         label = packInstance.displayName,
+        onAccepted = { _runningPackInstanceId.value = packInstance.id },
         onStart = {
             emit(LaunchLogEvent.SessionStarted(packInstance.id, packInstance.displayName))
             emit(LaunchLogEvent.AppBanner)
@@ -457,6 +474,15 @@ class LauncherController(
         currentSession: SessionData,
         packInstance: PackInstance,
     ): Prepared {
+        // Before anything reads the instance. The launch controls already say this and
+        // do not offer Play, so this is the refusal for a launch that arrives some other
+        // way: a notification's relaunch, the second-factor retry, a tray entry.
+        work.workOn(packInstance.id)?.let { busy ->
+            ActionRing.record("Pack launch ${packInstance.displayName}: refused, the instance is busy (${busy.name})")
+            fail(LaunchError.InstanceBusy(busy))
+            return Prepared.Bail
+        }
+
         val settings = settingsService.getSettings()
 
         // 1. Resolve the manifest snapshot. Stored on the instance after
@@ -627,10 +653,14 @@ class LauncherController(
                 )
             },
             onSpawned = { handle ->
-                _runningPackInstanceId.value = refreshedInstance.id
-                packRepository.put(
-                    refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
-                )
+                // Re-read, then change the one field this owns. The record in hand was
+                // captured before the click, and preparing a launch takes long enough
+                // (a sign-in, a catch-up repair) for an update or a settings edit to
+                // commit meanwhile. Writing the captured copy back whole put all of
+                // that back to how it was. Skipped when the instance is gone.
+                packRepository.get(refreshedInstance.id)?.let { current ->
+                    packRepository.put(current.copy(lastPlayedEpochOrZero = Instant.now().epochSecond))
+                }
                 // Armed for exactly the launches the seal covers. A launch that got
                 // no token has nothing to lend to a jar that arrives late, and its
                 // owner's `mods/` is their own business.
@@ -795,8 +825,11 @@ class LauncherController(
             authRequirement  = manifest.auth?.toDomain(),
         )
         val refreshed = instance.copy(cachedManifest = snapshot)
-        runCatching { packRepository.put(refreshed) }
-            .onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
+        // Onto the record as it stands, for the same reason onSpawned re-reads: the
+        // fetch is a network round trip, and the copy in hand may be older than it.
+        runCatching {
+            packRepository.get(instance.id)?.let { current -> packRepository.put(current.copy(cachedManifest = snapshot)) }
+        }.onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
         return snapshot to refreshed
     }
 

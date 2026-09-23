@@ -399,6 +399,7 @@ class LaunchDriver(
                                                 ?.let { s.notifReasonInternalDetail(it) }
                                                 ?: s.notifReasonInternal
         is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
+        is LaunchError.InstanceBusy        -> s.notifReasonInstanceBusy
         is LaunchError.AuthlibUnavailable  -> s.stateAuthlibUnavailable(reason.mcVersion)
         LaunchError.ContentChangedDuringLaunch -> s.stateContentChanged
         LaunchError.OfflineNoClient        -> s.notifReasonOfflineNoClient

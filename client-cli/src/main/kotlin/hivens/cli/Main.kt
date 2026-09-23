@@ -203,6 +203,7 @@ private fun renderError(reason: LaunchError): String = when (reason) {
     LaunchError.TwoFactorExpired -> "2FA session expired -- re-login via the GUI"
     is LaunchError.AuthlibUnavailable -> "SmartyCraft authlib unavailable for MC ${reason.mcVersion}"
     is LaunchError.MissingAuthProvider -> "sign in with '${reason.providerKey}' to play this pack (use the GUI)"
+    is LaunchError.InstanceBusy -> "the pack is busy (${reason.work.name.lowercase()}), try again when it finishes"
 }
 
 private fun coarseLabel(state: LaunchState): String? = when (state) {

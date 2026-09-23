@@ -1,6 +1,7 @@
 package hivens.ui.screens.detail.versions
 
 import androidx.compose.foundation.background
+import hivens.core.launch.InstanceWorkRegistry
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.ImageComposeScene
@@ -188,7 +189,7 @@ class PackVersionsScreenRenderTest {
                 // The screen narrates whatever operation the instance is running,
                 // its own switch included, so it reaches for the app-scoped owner.
                 single { InstanceSizeService(dataDir = Path.of("/tmp/render"), scope = scope) }
-                single { PackOperationService(scope = scope, sizes = get()) }
+                single { PackOperationService(scope = scope, sizes = get(), work = InstanceWorkRegistry()) }
             })
         }
         val out = Path.of("build/render", name)

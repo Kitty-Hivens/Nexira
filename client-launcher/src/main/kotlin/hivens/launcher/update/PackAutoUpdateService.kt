@@ -3,6 +3,8 @@ package hivens.launcher.update
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.AmberUpdatePolicy
 import hivens.core.data.SettingsData
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.PackUpdater
@@ -34,6 +36,9 @@ class PackAutoUpdateService(
     private val repository: IPackRepository,
     private val updater: PackUpdater,
     private val settingsProvider: () -> SettingsData,
+    private val work: InstanceWorkRegistry,
+    /** The pack whose game is launching or running, or null. Its files are in use. */
+    private val runningPackId: () -> String?,
 ) : PackUpdateStatusHub {
     private val log = LoggerFactory.getLogger(PackAutoUpdateService::class.java)
     private val state = MutableStateFlow<Map<String, PackUpdateStatus>>(emptyMap())
@@ -51,6 +56,13 @@ class PackAutoUpdateService(
             // had to be added here by hand, and one that had not been was
             // silently never checked.
             if (!updater.handles(instance) || !instance.followLatest) continue
+            // Not under a game that is reading these files, and not beside other work
+            // already rewriting them. Nothing is lost by skipping: the next pass asks
+            // again, and the player can apply it by hand from the pack's page.
+            if (runningPackId() == instance.id || work.workOn(instance.id) != null) {
+                log.info("auto-update: {} is in use, left for the next pass", instance.id)
+                continue
+            }
             setStatus(instance.id, PackUpdateStatus.Checking)
             try {
                 when (val check = updater.checkForUpdate(instance)) {
@@ -85,7 +97,7 @@ class PackAutoUpdateService(
             return
         }
         val instance = repository.get(id) ?: return
-        val status = when (updater.applyUpdate(instance)) {
+        val status = when (work.during(id, InstanceWork.Update) { updater.applyUpdate(instance) }) {
             is UpdateOutcome.Applied -> PackUpdateStatus.Updated(check.toVersion)
             UpdateOutcome.AlreadyCurrent -> PackUpdateStatus.UpToDate
         }

@@ -113,4 +113,5 @@ private fun localizeError(error: LaunchError, s: AppStrings): String = when (err
     is LaunchError.TwoFactorExpired     -> s.auth2faExpired
     is LaunchError.AuthlibUnavailable   -> s.stateAuthlibUnavailable(error.mcVersion)
     is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)
+    is LaunchError.InstanceBusy         -> s.notifReasonInstanceBusy
 }

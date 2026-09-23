@@ -5,6 +5,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.core.io.InstanceMutationLock
+import hivens.core.launch.InstanceWorkRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -89,7 +90,7 @@ class ApplyRecoveryTest {
         Files.writeString(modsDir.resolve("b.jar"), "new-b")
         journal.begin(PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L))
 
-        val recovered = ApplyRecovery(snapshots, repo, journal, dataDir).recoverInterrupted()
+        val recovered = ApplyRecovery(snapshots, repo, journal, dataDir, InstanceWorkRegistry()).recoverInterrupted()
 
         assertEquals(listOf(dir), recovered)
         assertEquals("old-a", Files.readString(modsDir.resolve("a.jar")), "captured file restored to pre-update bytes")
@@ -116,7 +117,7 @@ class ApplyRecoveryTest {
         val entry = PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L)
         journal.begin(entry)
 
-        val recovery = ApplyRecovery(snapshots, CancellingRepo(), journal, dataDir)
+        val recovery = ApplyRecovery(snapshots, CancellingRepo(), journal, dataDir, InstanceWorkRegistry())
         val outcome = runCatching { recovery.recoverInterrupted() }
 
         assertTrue(outcome.exceptionOrNull() is CancellationException, "the cancellation must propagate, not be logged as a failure")
@@ -160,7 +161,7 @@ class ApplyRecoveryTest {
         }
         advanceUntilIdle()
 
-        val recovery = ApplyRecovery(snapshots, FakeRepo(), journal, dataDir, io = StandardTestDispatcher(testScheduler))
+        val recovery = ApplyRecovery(snapshots, FakeRepo(), journal, dataDir, InstanceWorkRegistry(), io = StandardTestDispatcher(testScheduler))
         var recovered: List<String>? = null
         launch { recovered = recovery.recoverInterrupted() }
         advanceUntilIdle()
@@ -177,7 +178,7 @@ class ApplyRecoveryTest {
         val journal = ApplyJournal(dataDir, json)
         journal.begin(PendingApply("1", "gone", "missing-snap", "5", "6", listOf("mods/a.jar"), 100L))
 
-        val recovered = ApplyRecovery(PackSnapshotService(dataDir, json), FakeRepo(), journal, dataDir).recoverInterrupted()
+        val recovered = ApplyRecovery(PackSnapshotService(dataDir, json), FakeRepo(), journal, dataDir, InstanceWorkRegistry()).recoverInterrupted()
 
         assertTrue(recovered.isEmpty())
         assertTrue(journal.listPending().isEmpty(), "unrecoverable marker cleared so it does not loop every boot")

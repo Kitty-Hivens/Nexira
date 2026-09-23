@@ -1,5 +1,7 @@
 package hivens.launcher.instance
 
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.util.sha1Of
 import kotlinx.coroutines.CancellationException
@@ -44,6 +46,7 @@ class InstanceContentUpdater(
     private val modrinth: ModrinthClient,
     private val manager: InstanceContentManager,
     private val scope: CoroutineScope,
+    private val work: InstanceWorkRegistry,
 ) {
 
     private val log = LoggerFactory.getLogger(InstanceContentUpdater::class.java)
@@ -214,6 +217,7 @@ class InstanceContentUpdater(
      * the batch goes rather than all at once at the end.
      */
     fun start(
+        instanceId: String,
         instanceDir: Path,
         title: String,
         targets: List<Target>,
@@ -224,34 +228,45 @@ class InstanceContentUpdater(
         jobs[key]?.let { if (it.isActive) return false }
 
         _runs.update { it + (key to Run(title = title, total = targets.size, done = 0, current = null, failed = emptyList(), finished = false)) }
+        // Marked for as long as files are being swapped, so a game is not started
+        // over a folder that is half the old mods and half the new ones.
         val job = scope.launch {
-            // A download interrupted by the app closing leaves its scratch file
-            // behind. The scanner ignores those, so nobody would ever see them
-            // and nothing else would ever remove them.
-            sweepScratch(instanceDir, targets.map { it.update.ref.kind }.distinct())
-            val gate = Semaphore(DOWNLOAD_CONCURRENCY)
-            coroutineScope {
-                targets.map { target ->
-                    async {
-                        val name = target.update.ref.fileName
-                        mark(key) { it.copy(current = name) }
-                        val ok = gate.withPermit { runCatching { applyOne(instanceDir, target) }.getOrDefault(false) }
-                        mark(key) { run ->
-                            run.copy(
-                                done   = run.done + 1,
-                                failed = if (ok) run.failed else run.failed + name,
-                            )
-                        }
-                        if (ok) runCatching { onChanged() }
-                    }
-                }.awaitAll()
-            }
-            mark(key) { it.copy(current = null, finished = true) }
-            runCatching { onChanged() }
+            work.during(instanceId, InstanceWork.ContentUpdate) { runBatch(key, instanceDir, targets, onChanged) }
         }
         jobs[key] = job
         job.invokeOnCompletion { jobs.remove(key, job) }
         return true
+    }
+
+    private suspend fun runBatch(
+        key: String,
+        instanceDir: Path,
+        targets: List<Target>,
+        onChanged: suspend () -> Unit,
+    ) {
+        // A download interrupted by the app closing leaves its scratch file
+        // behind. The scanner ignores those, so nobody would ever see them
+        // and nothing else would ever remove them.
+        sweepScratch(instanceDir, targets.map { it.update.ref.kind }.distinct())
+        val gate = Semaphore(DOWNLOAD_CONCURRENCY)
+        coroutineScope {
+            targets.map { target ->
+                async {
+                    val name = target.update.ref.fileName
+                    mark(key) { it.copy(current = name) }
+                    val ok = gate.withPermit { runCatching { applyOne(instanceDir, target) }.getOrDefault(false) }
+                    mark(key) { run ->
+                        run.copy(
+                            done   = run.done + 1,
+                            failed = if (ok) run.failed else run.failed + name,
+                        )
+                    }
+                    if (ok) runCatching { onChanged() }
+                }
+            }.awaitAll()
+        }
+        mark(key) { it.copy(current = null, finished = true) }
+        runCatching { onChanged() }
     }
 
     /** Drop a finished run once the screen has shown its outcome. */

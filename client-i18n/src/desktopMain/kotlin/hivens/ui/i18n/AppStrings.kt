@@ -1202,6 +1202,17 @@ interface AppStrings {
     val packDetailPlay: String
     /** Shown above the Play button when the user is not authenticated. */
     val packDetailPlayLoginRequired: String
+    /** What the launch control says while the pack's files are being rewritten, one per kind of work. */
+    val launchBlockUpdating: String
+    val launchBlockRepairing: String
+    val launchBlockRecovering: String
+    val launchBlockUpdatingContent: String
+    /** The launch control of a pack whose instance folder is gone. */
+    val launchBlockMissing: String
+    /** The launch control while another pack's launch or game holds the launcher. */
+    val launchBlockOtherRunning: String
+    /** Notification and console text for a launch refused because the pack was busy with its files. */
+    val notifReasonInstanceBusy: String
     /** Wait state on the hero Play pill while the launch prepares or syncs. */
     val packPlayWait: String
     /** Run state on the hero Play pill; activating it stops the game. */
