@@ -7,6 +7,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -73,5 +74,30 @@ class FabricLikeResolverTest {
         assertEquals("net.fabricmc.loader.impl.launch.knot.KnotClient", profile.mainClass)
         assertTrue(requested.none { it.contains("//profile/json") }, "must not build the empty-segment URL: $requested")
         assertTrue(profileUrl in requested, "should fetch the newest STABLE loader's profile (0.19.3), not the newer 0.20.0")
+    }
+
+    /**
+     * The profile for a named version never changes upstream, and fetching it on
+     * every launch was the one thing that kept a provisioned pack from starting
+     * offline.
+     */
+    @Test
+    fun `a named version relaunches from the kept profile with the network gone`() = runTest {
+        val cacheDir = Files.createTempDirectory("fabric-cache").also { it.toFile().deleteOnExit() }
+        val profileJson = """{"mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient","libraries":[]}"""
+        var online = true
+        val engine = MockEngine { req ->
+            if (online && req.url.toString().endsWith("/1.20.1/0.16.0/profile/json")) respond(profileJson, HttpStatusCode.OK)
+            else respond("offline", HttpStatusCode.ServiceUnavailable)
+        }
+        val resolver = FabricLikeResolver(HttpClientProvider { HttpClient(engine) }, json, "fabric", "https://meta.test/v2", cacheDir)
+        resolver.resolve("1.20.1", "0.16.0")
+
+        online = false
+        val again = resolver.resolve("1.20.1", "0.16.0")
+
+        assertEquals("net.fabricmc.loader.impl.launch.knot.KnotClient", again.mainClass)
+        assertEquals("0.16.0", again.version)
+        cacheDir.toFile().deleteRecursively()
     }
 }

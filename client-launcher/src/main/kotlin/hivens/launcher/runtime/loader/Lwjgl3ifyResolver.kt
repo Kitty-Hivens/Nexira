@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.file.Path
 
 /**
  * lwjgl3ify resolver: Minecraft 1.7.10 modernised onto LWJGL3 and Java 21+.
@@ -53,24 +54,35 @@ class Lwjgl3ifyResolver(
     private val json: Json,
     osName: String = System.getProperty("os.name", ""),
     private val releaseBase: String = LWJGL3IFY_RELEASES,
+    /** Where a version's profile is kept, so a relaunch needs no release fetch. */
+    cacheDir: Path? = null,
 ) : LoaderResolver {
 
     override val loaderId: String = "lwjgl3ify"
 
     private val log = LoggerFactory.getLogger(Lwjgl3ifyResolver::class.java)
     private val mojangOs: String = Platform.classify(osName).mojang
+    private val cache = LoaderSourceCache(cacheDir)
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
-            val url = "${releaseBase.trimEnd('/')}/$loaderVersion/version.json"
-            log.info("lwjgl3ify: fetching profile {}", url)
-            val text = clientProvider.current.prepareGet(url).execute { resp ->
-                if (!resp.status.isSuccess()) {
-                    throw IOException("lwjgl3ify $loaderVersion: GET $url -> HTTP ${resp.status}")
+            // No index to ask for the latest, as with Cleanroom.
+            if (loaderVersion.isBlank()) throw IOException("lwjgl3ify needs a version to install, and none was given")
+            val kept = cache.fileFor(loaderId, loaderVersion, "version.json")
+            val parsed = cache.readText(kept)
+                ?.let { runCatching { json.decodeFromString(LoaderVersionJson.serializer(), it) }.getOrNull() }
+                ?: run {
+                    val url = "${releaseBase.trimEnd('/')}/$loaderVersion/version.json"
+                    log.info("lwjgl3ify: fetching profile {}", url)
+                    val text = clientProvider.current.prepareGet(url).execute { resp ->
+                        if (!resp.status.isSuccess()) {
+                            throw IOException("lwjgl3ify $loaderVersion: GET $url -> HTTP ${resp.status}")
+                        }
+                        resp.bodyAsText()
+                    }
+                    json.decodeFromString(LoaderVersionJson.serializer(), text).also { cache.writeText(kept, text) }
                 }
-                resp.bodyAsText()
-            }
-            buildProfile(json.decodeFromString(LoaderVersionJson.serializer(), text)).copy(version = loaderVersion)
+            buildProfile(parsed).copy(version = loaderVersion)
         }
 
     /**

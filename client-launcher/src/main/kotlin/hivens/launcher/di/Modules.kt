@@ -712,7 +712,7 @@ val runtimeModule = module {
     // Canonical runtime provisioner -- vanilla + loader libraries from the
     // official Mojang/Forge CDNs into the shared roots. Direct channel: these
     // CDNs keep strict TLS (same rationale as JavaManagerService).
-    single { ForgeLegacyResolver(get(named("direct")), get(), get()) }
+    single { ForgeLegacyResolver(get(named("direct")), get(), get(), cacheDir = get<Path>().resolve("loader-cache")) }
     single { loaderRegistry() }
     single {
         RuntimeProvisioner(
@@ -1062,10 +1062,10 @@ private fun Scope.loaderRegistry(): LoaderRegistry {
                 modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), get(), loaderCacheDir),
             ),
             ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), get(), loaderCacheDir),
-            FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
-            FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
-            CleanroomResolver(get(named("direct")), get(), get()),
-            Lwjgl3ifyResolver(get(named("direct")), get()),
+            FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META, loaderCacheDir),
+            FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META, loaderCacheDir),
+            CleanroomResolver(get(named("direct")), get(), get(), cacheDir = loaderCacheDir),
+            Lwjgl3ifyResolver(get(named("direct")), get(), cacheDir = loaderCacheDir),
         ),
     )
 }

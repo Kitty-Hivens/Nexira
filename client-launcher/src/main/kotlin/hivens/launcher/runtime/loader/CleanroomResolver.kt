@@ -52,36 +52,53 @@ class CleanroomResolver(
     private val transfers: TransferEngine,
     private val json: Json,
     private val releaseBase: String = CLEANROOM_RELEASES,
+    /** Where a version's installer is kept, so a relaunch downloads nothing. */
+    cacheDir: Path? = null,
 ) : LoaderResolver {
 
     override val loaderId: String = "cleanroom"
 
     private val log = LoggerFactory.getLogger(CleanroomResolver::class.java)
+    private val cache = LoaderSourceCache(cacheDir)
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
+            // Releases are a GitHub page with no index to ask for the latest, so a
+            // blank version has nothing to resolve to. It used to reach the URL as an
+            // empty segment and come back as a bare 404.
+            if (loaderVersion.isBlank()) throw IOException("Cleanroom needs a version to install, and none was given")
+            val kept = cache.fileFor(loaderId, loaderVersion, "installer.jar")
+            kept?.takeIf { Files.isRegularFile(it) }?.let { cached ->
+                runCatching { profileFrom(cached, loaderVersion) }
+                    .onFailure { cache.discard(cached) }
+                    .getOrNull()
+                    ?.let { return@withContext it }
+            }
             val installerUrl =
                 "${releaseBase.trimEnd('/')}/$loaderVersion/cleanroom-$loaderVersion-installer.jar"
             log.info("cleanroom: fetching installer {}", installerUrl)
-            val installer = Files.createTempFile("cleanroom-$loaderVersion-installer", ".jar")
+            val installer = kept ?: Files.createTempFile("cleanroom-$loaderVersion-installer", ".jar")
             try {
                 downloadTo(installerUrl, installer)
-                ZipFile(installer.toFile()).use { zip ->
-                    val versionEntry = zip.getEntry("version.json")
-                        ?: throw IOException("cleanroom installer $loaderVersion has no version.json")
-                    val version = json.decodeFromString(
-                        LoaderVersionJson.serializer(),
-                        zip.getInputStream(versionEntry).readBytes().decodeToString(),
-                    )
-                    buildProfile(
-                        version.mainClass,
-                        version.minecraftArguments,
-                        version.libraries.map { toSpec(it, zip) },
-                    ).copy(version = loaderVersion)
-                }
+                profileFrom(installer, loaderVersion)
             } finally {
-                Files.deleteIfExists(installer)
+                if (kept == null) Files.deleteIfExists(installer)
             }
+        }
+
+    private fun profileFrom(installer: Path, loaderVersion: String): LoaderProfile =
+        ZipFile(installer.toFile()).use { zip ->
+            val versionEntry = zip.getEntry("version.json")
+                ?: throw IOException("cleanroom installer $loaderVersion has no version.json")
+            val version = json.decodeFromString(
+                LoaderVersionJson.serializer(),
+                zip.getInputStream(versionEntry).readBytes().decodeToString(),
+            )
+            buildProfile(
+                version.mainClass,
+                version.minecraftArguments,
+                version.libraries.map { toSpec(it, zip) },
+            ).copy(version = loaderVersion)
         }
 
     /**

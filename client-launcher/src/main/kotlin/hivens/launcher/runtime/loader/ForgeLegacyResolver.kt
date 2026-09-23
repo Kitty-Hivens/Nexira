@@ -39,39 +39,70 @@ class ForgeLegacyResolver(
     private val transfers: TransferEngine,
     private val json: Json,
     private val forgeMavenBase: String = FORGE_MAVEN,
+    /**
+     * Where a named version's installer is kept, beside the build it resolved to.
+     * Fetched into a temp file and thrown away before, so every launch of every
+     * 1.12.2 pack read the maven's metadata and downloaded the installer again, and
+     * none of them could start offline.
+     */
+    cacheDir: Path? = null,
 ) : LoaderResolver {
 
     override val loaderId: String = "forge"
 
     private val log = LoggerFactory.getLogger(ForgeLegacyResolver::class.java)
+    private val cache = LoaderSourceCache(cacheDir)
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
+            // Kept by the version the pack names, which for a build nobody published
+            // is not the one installed: the answer to that is kept alongside.
+            val named = loaderVersion.takeIf { it.isNotBlank() }
+            named?.let { fromCache(mcVersion, it) }?.let { return@withContext it }
+
             val build = resolveForgeBuild(mcVersion, loaderVersion)
+            val key = "$mcVersion-${named ?: build}"
             val slug = "$mcVersion-$build"
             val installerUrl =
                 "${forgeMavenBase.trimEnd('/')}/net/minecraftforge/forge/$slug/forge-$slug-installer.jar"
             log.info("forge: fetching installer {}", installerUrl)
-            val installer = Files.createTempFile("forge-$slug-installer", ".jar")
+            val kept = cache.fileFor(CACHE_ID, key, INSTALLER)
+            val installer = kept ?: Files.createTempFile("forge-$slug-installer", ".jar")
             try {
                 downloadTo(installerUrl, installer)
-                ZipFile(installer.toFile()).use { zip ->
-                    val versionEntry = zip.getEntry("version.json")
-                        ?: throw IOException("forge installer $slug has no version.json")
-                    val version = json.decodeFromString(
-                        LoaderVersionJson.serializer(),
-                        zip.getInputStream(versionEntry).readBytes().decodeToString(),
-                    )
-                    LoaderProfile(
-                        libraries = version.libraries.map { toSpec(it, zip) },
-                        mainClass = version.mainClass,
-                        version = build,
-                        gameArgs = extractTweakArgs(version.minecraftArguments),
-                    )
-                }
+                profileFrom(installer, slug, build).also { cache.writeText(cache.fileFor(CACHE_ID, key, BUILD), build) }
             } finally {
-                Files.deleteIfExists(installer)
+                if (kept == null) Files.deleteIfExists(installer)
             }
+        }
+
+    /** The profile from a kept installer, or null when there is none or it does not read. */
+    private fun fromCache(mcVersion: String, named: String): LoaderProfile? {
+        val key = "$mcVersion-$named"
+        val build = cache.readText(cache.fileFor(CACHE_ID, key, BUILD))?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val installer = cache.fileFor(CACHE_ID, key, INSTALLER)?.takeIf { Files.isRegularFile(it) } ?: return null
+        return runCatching { profileFrom(installer, "$mcVersion-$build", build) }
+            .onFailure {
+                log.warn("forge: kept installer for {} does not read, fetching it again", key, it)
+                cache.discard(installer)
+            }
+            .getOrNull()
+    }
+
+    private fun profileFrom(installer: Path, slug: String, build: String): LoaderProfile =
+        ZipFile(installer.toFile()).use { zip ->
+            val versionEntry = zip.getEntry("version.json")
+                ?: throw IOException("forge installer $slug has no version.json")
+            val version = json.decodeFromString(
+                LoaderVersionJson.serializer(),
+                zip.getInputStream(versionEntry).readBytes().decodeToString(),
+            )
+            LoaderProfile(
+                libraries = version.libraries.map { toSpec(it, zip) },
+                mainClass = version.mainClass,
+                version = build,
+                gameArgs = extractTweakArgs(version.minecraftArguments),
+            )
         }
 
     private fun toSpec(lib: MojangLibrary, zip: ZipFile): LibrarySpec {
@@ -158,6 +189,9 @@ class ForgeLegacyResolver(
 
     companion object {
         const val FORGE_MAVEN = "https://maven.minecraftforge.net"
+        private const val CACHE_ID = "forge-legacy"
+        private const val INSTALLER = "installer.jar"
+        private const val BUILD = "build"
         val DEFAULT_TWEAK_ARGS = listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker")
     }
 }

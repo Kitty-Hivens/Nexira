@@ -12,6 +12,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.file.Path
 
 /**
  * Fabric + Quilt resolver. Both expose a meta API that returns a ready launch
@@ -30,9 +31,12 @@ class FabricLikeResolver(
     private val json: Json,
     override val loaderId: String,
     private val metaBaseUrl: String,
+    /** Where a named version's profile is kept, so a relaunch needs no meta call. */
+    cacheDir: Path? = null,
 ) : LoaderResolver {
 
     private val log = LoggerFactory.getLogger(FabricLikeResolver::class.java)
+    private val cache = LoaderSourceCache(cacheDir)
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
@@ -40,9 +44,15 @@ class FabricLikeResolver(
             // LocalPackCreator): resolve the latest, so the URL never carries an
             // empty segment -- `/loader/<mc>//profile/json` is a 404.
             val version = loaderVersion.ifBlank { latestLoaderVersion(mcVersion) }
-            val url = "${metaBaseUrl.trimEnd('/')}/versions/loader/$mcVersion/$version/profile/json"
-            log.info("{}: fetching loader profile {}", loaderId, url)
-            val profile = json.decodeFromString(FabricProfileJson.serializer(), fetchText(url))
+            val kept = cache.fileFor(loaderId, "$mcVersion-$version", "profile.json")
+            val profile = cache.readText(kept)
+                ?.let { runCatching { json.decodeFromString(FabricProfileJson.serializer(), it) }.getOrNull() }
+                ?: run {
+                    val url = "${metaBaseUrl.trimEnd('/')}/versions/loader/$mcVersion/$version/profile/json"
+                    log.info("{}: fetching loader profile {}", loaderId, url)
+                    val text = fetchText(url)
+                    json.decodeFromString(FabricProfileJson.serializer(), text).also { cache.writeText(kept, text) }
+                }
             LoaderProfile(
                 libraries = profile.libraries.map { it.toSpec() },
                 mainClass = profile.mainClass,
