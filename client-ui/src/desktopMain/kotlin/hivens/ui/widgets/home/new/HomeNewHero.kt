@@ -32,6 +32,8 @@ import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.InitialsAvatar
+import hivens.ui.nx.PlayGround
+import hivens.ui.nx.PlayLayout
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.NxTheme
@@ -48,6 +50,7 @@ import kotlinx.serialization.Serializable
 data class HeroProps(
     @PropLabel("widget.home.new.hero.height") @PropRange(120.0, 340.0) val height: Int = 170,
     @PropLabel("widget.home.new.hero.showMeta") val showMeta: Boolean = true,
+    @PropLabel("widget.home.new.hero.playLayout") val playLayout: PlayLayout = PlayLayout.Plate,
 )
 
 // The quicklaunch grown art: a compact "continue playing" card filled with
@@ -153,12 +156,12 @@ fun HomeNewHero(instance: WidgetInstance) {
                 }
             }
             Flexible("home_hero_play_btn", FlexibleKind.Button) {
-                QuickLaunchButton(quickLaunch = quickLaunch)
+                QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Media, layout = p.playLayout)
             }
         }
 
         val control = quickLaunch.control
-        PuppetClick("home.hero.launch", enabled = control.enabled && !control.busy) { control.onClick() }
+        PuppetClick("home.hero.launch", enabled = control.actionable) { control.onClick() }
         PuppetClick("home.hero.open") { openDetail() }
     }
 }

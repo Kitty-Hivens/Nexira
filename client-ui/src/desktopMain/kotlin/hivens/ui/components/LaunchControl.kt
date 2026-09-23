@@ -17,6 +17,9 @@ import hivens.core.launch.LaunchBlock
 import hivens.core.launch.LaunchControlMode
 import hivens.core.launch.LaunchState
 import hivens.core.launch.launchBlockFor
+import hivens.launcher.PackOperationPhase
+import hivens.launcher.PackOperationService
+import hivens.launcher.instance.InstanceContentUpdater
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.Screen
@@ -27,6 +30,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
+import hivens.ui.notifications.IndicationCenter.LaunchIndication
+import hivens.ui.nx.PlayTone
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import kotlinx.coroutines.Dispatchers
@@ -59,17 +64,17 @@ data class LaunchControl(
     val label: String,
     val icon: IconKey,
     /**
-     * False when the control refuses: nothing will change by waiting, so it is drawn
-     * as unavailable. A block the player can act on, signing in, stays enabled.
+     * How the control is drawn: offering its verb, waiting on something in progress,
+     * or refusing. A block the player can act on, signing in, offers a verb.
      */
-    val enabled: Boolean,
-    /**
-     * Something is in progress and the control is waiting on it rather than refusing:
-     * a launch preparing, or work on the files. Drawn as a wait, and not pressable.
-     */
-    val busy: Boolean,
+    val tone: PlayTone,
+    /** The share of the work being waited on, or null when its size is not known. */
+    val progress: Float?,
     val onClick: () -> Unit,
-)
+) {
+    /** Whether a press does anything. */
+    val actionable: Boolean get() = tone == PlayTone.Ready
+}
 
 @Composable
 fun rememberLaunchControl(
@@ -86,6 +91,8 @@ fun rememberLaunchControl(
     val offlineProvider: OfflineAuthProvider = koinInject()
     val navRequests: NavRequests = koinInject()
     val paths: PlatformPaths = koinInject()
+    val operations: PackOperationService = koinInject()
+    val contentUpdater: InstanceContentUpdater = koinInject()
     val scope = rememberCoroutineScope()
 
     val indication by indications.launchIndication(pack.id).collectAsState()
@@ -111,6 +118,9 @@ fun rememberLaunchControl(
             Files.isDirectory(paths.dataDir.resolve("instances").resolve(pack.instanceDirName))
         }
     }
+
+    val runningOperations by operations.operations.collectAsState()
+    val contentRuns by contentUpdater.runs.collectAsState()
 
     val mode = indication.controlMode()
     val block = if (mode != LaunchControlMode.Play) {
@@ -140,20 +150,41 @@ fun rememberLaunchControl(
         }
     }
 
+    // The share of whatever the control is waiting on, where its source counts. An
+    // update or repair started from the pack reports files done; a content batch
+    // reports its own; the auto-updater and crash recovery report nothing, and draw
+    // as work of unknown size.
+    val workProgress: Float? = when (work) {
+        InstanceWork.Update, InstanceWork.Repair ->
+            (runningOperations[pack.id]?.phase as? PackOperationPhase.Running)
+                ?.takeIf { it.total > 0 }?.let { it.current.toFloat() / it.total }
+        InstanceWork.ContentUpdate ->
+            contentRuns[contentUpdater.keyOf(paths.dataDir.resolve("instances").resolve(pack.instanceDirName))]
+                ?.takeIf { it.total > 0 }?.let { it.done.toFloat() / it.total }
+        else -> null
+    }
+
     return when {
         mode == LaunchControlMode.Stop -> LaunchControl(
-            mode, null, s.packPlayExit, NxIcon.Stop, enabled = true, busy = false, onClick = controller::abort,
+            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = controller::abort,
         )
         mode == LaunchControlMode.Wait -> LaunchControl(
-            mode, null, s.packPlayWait, NxIcon.PlayArrow, enabled = true, busy = true, onClick = {},
+            mode, null, s.packPlayWait, NxIcon.PlayArrow, PlayTone.Waiting,
+            progress = (indication as? LaunchIndication.Downloading)?.progress,
+            onClick = {},
         )
         block != null -> LaunchControl(
             mode = mode,
             block = block,
             label = block.label(s),
             icon = block.icon(),
-            enabled = block == LaunchBlock.NoIdentity || block is LaunchBlock.Busy,
-            busy = block is LaunchBlock.Busy,
+            tone = when (block) {
+                LaunchBlock.NoIdentity -> PlayTone.Ready
+                is LaunchBlock.Busy -> PlayTone.Waiting
+                LaunchBlock.Missing -> PlayTone.Problem
+                LaunchBlock.OtherGameRunning -> PlayTone.Unavailable
+            },
+            progress = if (block is LaunchBlock.Busy) workProgress else null,
             onClick = if (block == LaunchBlock.NoIdentity) {
                 { navRequests.open(Screen.Profile) }
             } else {
@@ -165,8 +196,8 @@ fun rememberLaunchControl(
             block = null,
             label = if (session == null) s.loginPlayOffline else playLabel ?: s.packDetailPlay,
             icon = NxIcon.PlayArrow,
-            enabled = true,
-            busy = false,
+            tone = PlayTone.Ready,
+            progress = null,
             onClick = launch,
         )
     }

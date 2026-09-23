@@ -19,9 +19,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import hivens.ui.nx.workProgress
+import hivens.ui.nx.PlayTone
+import hivens.ui.icons.NxIcon
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.ui.components.LaunchControl
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
@@ -49,18 +53,27 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<LaunchButtonProps>()
     val s = LocalStrings.current
     val quickLaunch = rememberQuickLaunchTarget(p.label.ifBlank { s.launchTileReady }) ?: return
-    val target = quickLaunch.target
-    val control = quickLaunch.control
+    LaunchTile(quickLaunch.control, quickLaunch.target.displayName)
+}
 
+/**
+ * The tile itself, apart from choosing its pack. Split out so a render probe can draw
+ * every state without a launcher behind it.
+ */
+@Composable
+internal fun LaunchTile(control: LaunchControl, packName: String) {
     // Lit whenever the tile has something to do: play, stop the running game, or
     // take a signed-out player to sign in. It used to go grey for every reason at
     // once and say "can't play yet", which answered none of them.
-    val ready = control.enabled && !control.busy
+    val ready = control.actionable
+    val colors = NxTheme.colors
+    val ink = if (ready) colors.onPrimary else colors.textPrimary
+    val quiet = if (ready) colors.onPrimary.copy(alpha = 0.85f) else colors.textSecondary
 
     val gradient = Brush.linearGradient(
         colors = listOf(
-            NxTheme.colors.primary,
-            NxTheme.colors.primary.copy(alpha = 0.78f),
+            colors.primary,
+            colors.primary.copy(alpha = 0.78f),
         ),
     )
 
@@ -69,10 +82,10 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             .fillMaxWidth()
             .padding(top = 12.dp)
             .clip(MaterialTheme.shapes.small)
-            .background(if (ready) gradient else Brush.linearGradient(listOf(
-                NxTheme.colors.surfaceVariant,
-                NxTheme.colors.surfaceVariant,
-            )))
+            .then(if (ready) Modifier.background(gradient) else Modifier.background(colors.surfaceVariant))
+            // The tile is its own progress bar while it waits, the same language the
+            // Play plate speaks: the work fills the tile rather than a bar beside it.
+            .then(if (control.tone == PlayTone.Waiting) Modifier.workProgress(control.progress, colors.primary.copy(alpha = 0.22f)) else Modifier)
             .clickable(enabled = ready, onClick = control.onClick)
             .padding(horizontal = 20.dp, vertical = 18.dp),
     ) {
@@ -84,12 +97,13 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(MaterialTheme.shapes.extraSmall)
-                    .background(Color.White.copy(alpha = if (ready) 0.18f else 0.06f)),
+                    .background(ink.copy(alpha = if (ready) 0.18f else 0.08f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Symbol(icon = control.icon,
                     contentDescription = null,
-                    tint               = if (ready) Color.White else NxTheme.colors.textSecondary,
+                    tint               = if (control.tone == PlayTone.Problem) colors.warnAccent else ink,
+                    fill               = if (control.icon == NxIcon.PlayArrow || control.icon == NxIcon.Stop) 1f else 0f,
                     modifier           = Modifier.size(28.dp),
                 )
             }
@@ -98,15 +112,22 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                 Text(
                     text       = control.label,
                     style      = MaterialTheme.typography.titleLarge,
-                    color      = if (ready) Color.White else NxTheme.colors.textSecondary,
+                    color      = if (control.tone == PlayTone.Unavailable) colors.textSecondary else ink,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
                 )
+                // The share rides the pack's line rather than the title's: beside the
+                // title it cut the longer states short ("updating mods" lost its noun).
+                val share = control.progress?.takeIf { control.tone == PlayTone.Waiting }
+                    ?.let { " \u00b7 ${(it * 100).toInt()}%" }.orEmpty()
                 Text(
-                    text  = target.displayName,
-                    fontFamily = familyForText(target.displayName),
+                    text  = packName + share,
+                    fontFamily = familyForText(packName),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (ready) Color.White.copy(alpha = 0.85f)
-                            else NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                    color = quiet,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.PlayGround
+import hivens.ui.nx.PlayLayout
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -27,6 +29,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class QuickLaunchProps(
     @PropLabel("widget.home.new.quicklaunch.buttonLabel") val buttonLabel: String = "",
+    @PropLabel("widget.home.new.quicklaunch.playLayout") val playLayout: PlayLayout = PlayLayout.Plate,
 )
 
 // Quick-launch target = most recently played, falling back to most
@@ -79,7 +82,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            QuickLaunchButton(quickLaunch = quickLaunch)
+            QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Surface, layout = p.playLayout)
         }
     }
 }

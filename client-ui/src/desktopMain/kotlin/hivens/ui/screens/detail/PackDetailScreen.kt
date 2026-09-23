@@ -73,6 +73,7 @@ import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.PlayButton
+import hivens.ui.nx.PlayGround
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -167,7 +168,7 @@ fun PackDetailScreen(
     // The hero's play/abort are the only way to drive a pack launch, so the control
     // surface has to reach them -- a scenario that cannot start a launch cannot check
     // what a launch does to the instance.
-    PuppetClick("packDetail.play", enabled = launchControl.enabled && !launchControl.busy) {
+    PuppetClick("packDetail.play", enabled = launchControl.actionable) {
         launchControl.onClick()
     }
     PuppetClick("packDetail.abort") { state.abortLaunch() }
@@ -532,9 +533,10 @@ private fun Hero(
                 PlayButton(
                     label    = launchControl.label,
                     icon     = launchControl.icon,
-                    busy     = launchControl.busy,
+                    tone     = launchControl.tone,
+                    progress = launchControl.progress,
                     onClick  = launchControl.onClick,
-                    enabled  = launchControl.enabled,
+                    ground   = PlayGround.Media,
                     iconOnly = playIconOnly,
                 )
             }

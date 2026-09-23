@@ -11,6 +11,8 @@ import hivens.ui.AppState
 import hivens.ui.components.LaunchControl
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.nx.PlayButton
+import hivens.ui.nx.PlayGround
+import hivens.ui.nx.PlayLayout
 import org.koin.compose.koinInject
 
 /**
@@ -48,10 +50,15 @@ internal fun rememberQuickLaunchTarget(playLabel: String? = null): QuickLaunchTa
     return QuickLaunchTarget(target, rememberLaunchControl(target, session, playLabel))
 }
 
-/** The shared launch pill for the home widgets. */
+/**
+ * The shared launch pill for the home widgets. [ground] is what the widget draws it
+ * over, which only the widget knows; [layout] is the widget's own setting.
+ */
 @Composable
 internal fun QuickLaunchButton(
     quickLaunch: QuickLaunchTarget,
+    ground: PlayGround,
+    layout: PlayLayout,
     modifier: Modifier = Modifier,
     iconOnly: Boolean = false,
 ) {
@@ -59,9 +66,11 @@ internal fun QuickLaunchButton(
     PlayButton(
         label    = control.label,
         icon     = control.icon,
-        busy     = control.busy,
+        tone     = control.tone,
+        progress = control.progress,
         onClick  = control.onClick,
-        enabled  = control.enabled,
+        ground   = ground,
+        layout   = layout,
         iconOnly = iconOnly,
         modifier = modifier,
     )

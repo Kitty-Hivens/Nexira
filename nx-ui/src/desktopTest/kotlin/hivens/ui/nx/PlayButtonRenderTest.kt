@@ -26,12 +26,12 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Static render sheet of the Play pill's moments (play, busy wait, exit-the-
- * game, disabled ghost, compact, icon-only) over a dark art-like ground -- the
- * scrimmed hero the pill actually lives on. Both styles (capsule vs hard edge)
- * and both palettes (the static ink flips black/white with the theme). Smoke +
- * a PNG under build/render for a manual look; hover/press are animated and
- * verified live.
+ * Static render sheet of the Play pill's moments (play, a wait, exit-the-game,
+ * an unavailable ghost, compact, icon-only) over a dark art-like ground -- the
+ * scrimmed hero the pill actually lives on -- in both palettes (the static ink
+ * flips black/white with the theme). Smoke plus a PNG under build/render for a
+ * manual look; every state on both grounds is drawn by `PlayButtonStatesProbe`
+ * in client-ui, and hover/press are animated and verified live.
  */
 class PlayButtonRenderTest {
 
@@ -47,9 +47,9 @@ class PlayButtonRenderTest {
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         PlayButton(label = "Играть", onClick = {})
-                        PlayButton(label = "Подождите", onClick = {}, busy = true)
+                        PlayButton(label = "Подождите", onClick = {}, tone = PlayTone.Waiting)
                         PlayButton(label = "Выход", onClick = {}, icon = NxIcon.Stop)
-                        PlayButton(label = "Играть", onClick = {}, enabled = false)
+                        PlayButton(label = "Играть", onClick = {}, tone = PlayTone.Unavailable)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         PlayButton(label = "Играть", onClick = {}, compact = true)
