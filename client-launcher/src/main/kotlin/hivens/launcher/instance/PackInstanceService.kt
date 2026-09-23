@@ -7,6 +7,8 @@ import hivens.core.io.InstanceMutationLock
 import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.launch.RunningPackSource
+import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.PackSnapshotService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -26,6 +28,9 @@ class PackInstanceService(
     private val dataDir: Path,
     private val running: RunningPackSource,
     private val work: InstanceWorkRegistry,
+    private val snapshots: PackSnapshotService,
+    private val journal: ApplyJournal,
+    private val sizes: InstanceSizeService,
 ) {
     private val log = LoggerFactory.getLogger(PackInstanceService::class.java)
 
@@ -67,6 +72,12 @@ class PackInstanceService(
             InstanceMutationLock.withLock(dir) {
                 if (deleteTree(dir)) {
                     repository.delete(instance.id)
+                    // What was kept about the instance outside its directory goes with
+                    // it. Left behind, up to three snapshots of its files stayed on disk
+                    // for good, since the prune runs only inside an apply.
+                    snapshots.deleteAll(instance.instanceDirName)
+                    journal.complete(instance.instanceDirName)
+                    sizes.forget(instance.id)
                     DeleteOutcome.Deleted
                 } else {
                     DeleteOutcome.Incomplete

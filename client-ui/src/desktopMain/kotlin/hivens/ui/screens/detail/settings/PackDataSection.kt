@@ -161,10 +161,7 @@ internal fun PackDataSection(
             onConfirm = {
                 pendingDelete = false
                 scope.launch {
-                    if (service.deleteCompletely(pack) == PackInstanceService.DeleteOutcome.Deleted) {
-                        sizes.forget(pack.id)
-                        onDismiss()
-                    }
+                    if (service.deleteCompletely(pack) == PackInstanceService.DeleteOutcome.Deleted) onDismiss()
                 }
             },
             onDismiss = { pendingDelete = false },

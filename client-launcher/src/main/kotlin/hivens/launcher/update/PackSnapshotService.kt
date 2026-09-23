@@ -142,6 +142,13 @@ class PackSnapshotService(
         list(instanceDirName).drop(keepLast.coerceAtLeast(0)).forEach { delete(instanceDirName, it.id) }
     }
 
+    /** Every snapshot of an instance, for one that is gone: nothing can restore into it now. */
+    fun deleteAll(instanceDirName: String) {
+        val root = rootFor(instanceDirName)
+        runCatching { if (Files.exists(root)) deleteTree(root) }
+            .onFailure { log.warn("snapshot: failed to remove the snapshots of {}", instanceDirName, it) }
+    }
+
     fun delete(instanceDirName: String, id: String) {
         val dir = rootFor(instanceDirName).resolve(id)
         runCatching { deleteTree(dir) }

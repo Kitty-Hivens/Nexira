@@ -8,6 +8,12 @@ import hivens.core.launch.InstanceWork
 import hivens.core.launch.InstanceWorkRegistry
 import hivens.launcher.instance.PackInstanceService.DeleteOutcome
 import hivens.launcher.launch.RunningPackSource
+import hivens.launcher.update.ApplyJournal
+import hivens.launcher.update.PackSnapshotService
+import hivens.launcher.update.PendingApply
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -46,7 +52,13 @@ class PackInstanceServiceTest {
     }
     private val work = InstanceWorkRegistry()
 
-    private fun service(repo: IPackRepository, data: java.nio.file.Path) = PackInstanceService(repo, data, running, work)
+    private fun service(repo: IPackRepository, data: java.nio.file.Path) = PackInstanceService(
+        repo, data, running, work,
+        snapshots = PackSnapshotService(data, json),
+        journal = ApplyJournal(data, json),
+        sizes = InstanceSizeService(data, CoroutineScope(Dispatchers.Unconfined)),
+    )
+    private val json = Json { ignoreUnknownKeys = true }
 
     private fun instance(id: String, dir: String = id, origin: PackOrigin = PackOrigin.Mirror) = PackInstance(
         id = id,
@@ -142,5 +154,24 @@ class PackInstanceServiceTest {
         runningId.value = "2"
 
         assertEquals(DeleteOutcome.Deleted, service(repo, data).deleteCompletely(pack))
+    }
+
+    /** Up to three snapshots of a deleted pack's files used to stay on disk for good. */
+    @Test
+    fun `deleting a pack removes its snapshots and its journal marker too`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val instDir = Files.createDirectories(data.resolve("instances").resolve("industrial").resolve("mods"))
+        Files.writeString(instDir.resolve("a.jar"), "x")
+        val repo = FakeRepo()
+        val pack = instance("1", dir = "industrial")
+        repo.put(pack)
+        PackSnapshotService(data, json).capture(data.resolve("instances/industrial"), pack, setOf("mods/a.jar"), "snap-1", 1L)
+        ApplyJournal(data, json).begin(PendingApply("1", "industrial", "snap-1", "1", "2", listOf("mods/a.jar"), 1L))
+
+        assertEquals(DeleteOutcome.Deleted, service(repo, data).deleteCompletely(pack))
+
+        assertFalse(Files.exists(data.resolve("snapshots/industrial")), "snapshots gone")
+        assertNull(ApplyJournal(data, json).read("industrial"), "and the marker, which recovery would otherwise chase")
+        data.toFile().deleteRecursively()
     }
 }
