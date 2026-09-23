@@ -3,6 +3,10 @@ package hivens.launcher.instance
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.io.InstanceMutationLock
+import hivens.core.launch.InstanceWork
+import hivens.core.launch.InstanceWorkRegistry
+import hivens.launcher.launch.RunningPackSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -20,22 +24,60 @@ import java.nio.file.Path
 class PackInstanceService(
     private val repository: IPackRepository,
     private val dataDir: Path,
+    private val running: RunningPackSource,
+    private val work: InstanceWorkRegistry,
 ) {
     private val log = LoggerFactory.getLogger(PackInstanceService::class.java)
 
     private fun instanceDirOf(instance: PackInstance): Path =
         dataDir.resolve("instances").resolve(instance.instanceDirName)
 
+    /** How a delete went. Only [Deleted] removed anything. */
+    sealed interface DeleteOutcome {
+        data object Deleted : DeleteOutcome
+
+        /** The instance's game is running or being launched. Nothing was touched. */
+        data object GameRunning : DeleteOutcome
+
+        /** Something else is rewriting the instance. Nothing was touched. */
+        data class Busy(val work: InstanceWork) : DeleteOutcome
+
+        /** Some files would not go, so the registry entry was kept. */
+        data object Incomplete : DeleteOutcome
+    }
+
     /**
      * Remove the instance's files, then its registry entry -- in that order so a
-     * locked file (a running game holding a jar) leaves the entry in place rather
-     * than orphaning data on disk with the pack gone from the Library. Returns
-     * true only when every file was removed and the entry dropped.
+     * file that will not go leaves the entry in place rather than orphaning data
+     * on disk with the pack gone from the Library.
+     *
+     * Refused while the instance's game runs or other work rewrites it. Neither
+     * used to be asked: on Linux the tree went from under a live game, which went
+     * on writing its world into a directory that no longer existed, and on Windows
+     * the locked jars stopped the delete halfway, and an update running beside it
+     * kept writing into what was being removed. The delete is marked as work on
+     * the instance for its length, so a launch arriving meanwhile is refused too,
+     * and the running check is asked again once that mark is up.
      */
-    suspend fun deleteCompletely(instance: PackInstance): Boolean = withContext(Dispatchers.IO) {
-        val removed = deleteTree(instanceDirOf(instance))
-        if (removed) repository.delete(instance.id)
-        removed
+    suspend fun deleteCompletely(instance: PackInstance): DeleteOutcome = withContext(Dispatchers.IO) {
+        refusal(instance.id)?.let { return@withContext it }
+        work.during(instance.id, InstanceWork.Delete) {
+            if (running.runningPackInstanceId.value == instance.id) return@during DeleteOutcome.GameRunning
+            val dir = instanceDirOf(instance)
+            InstanceMutationLock.withLock(dir) {
+                if (deleteTree(dir)) {
+                    repository.delete(instance.id)
+                    DeleteOutcome.Deleted
+                } else {
+                    DeleteOutcome.Incomplete
+                }
+            }
+        }
+    }
+
+    private fun refusal(instanceId: String): DeleteOutcome? = when {
+        running.runningPackInstanceId.value == instanceId -> DeleteOutcome.GameRunning
+        else -> work.workOn(instanceId)?.let { DeleteOutcome.Busy(it) }
     }
 
     /**

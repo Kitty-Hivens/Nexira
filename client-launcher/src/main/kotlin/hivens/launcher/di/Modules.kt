@@ -607,7 +607,7 @@ val mirrorModule = module {
     single { SmrtAuthlibSwapper(get(named("smartycraft")), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     // Instance-level mutations that reach past the registry (full delete, detach).
-    single { PackInstanceService(repository = get(), dataDir = get()) }
+    single { PackInstanceService(repository = get(), dataDir = get(), running = get(), work = get()) }
     // On-disk size of an instance, measured on the app scope and shared, so a
     // surface that asks again does not re-walk a tree the size of a world save.
     single { InstanceSizeService(dataDir = get(), scope = get(), clock = get()) }

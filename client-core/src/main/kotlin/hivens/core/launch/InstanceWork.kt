@@ -27,6 +27,9 @@ enum class InstanceWork {
 
     /** Replacing individual mods or resource packs with newer builds. */
     ContentUpdate,
+
+    /** Removing the instance and its files. */
+    Delete,
 }
 
 /**

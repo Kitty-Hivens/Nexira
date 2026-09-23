@@ -38,6 +38,7 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
 import hivens.ui.Screen
 import hivens.ui.components.SourceBadge
+import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -173,6 +174,7 @@ fun PackCard(
                 // No Play / Settings on the card: the whole card opens the detail,
                 // where launch + every setting live. Card keeps only the overflow
                 // (open folder / delete) as out-of-the-way quick actions.
+                val deleteBlock = rememberPackDeleteBlock(instance.id)
                 NxKebabButton(contentDescription = s.packCardMore, tint = Color.White) { dismiss ->
                     NxMenuItem(
                         label   = s.serverSettingsOpenFolder,
@@ -183,6 +185,8 @@ fun PackCard(
                         label       = s.editorDelete,
                         icon        = NxIcon.Delete,
                         destructive = true,
+                        hint        = deleteBlock,
+                        enabled     = deleteBlock == null,
                         onClick     = { dismiss(); onDelete() },
                     )
                 }

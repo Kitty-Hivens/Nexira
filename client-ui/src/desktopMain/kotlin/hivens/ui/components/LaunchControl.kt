@@ -207,15 +207,19 @@ fun rememberLaunchControl(
 }
 
 private fun LaunchBlock.label(s: AppStrings): String = when (this) {
-    is LaunchBlock.Busy -> when (work) {
-        InstanceWork.Update -> s.launchBlockUpdating
-        InstanceWork.Repair -> s.launchBlockRepairing
-        InstanceWork.Recovery -> s.launchBlockRecovering
-        InstanceWork.ContentUpdate -> s.launchBlockUpdatingContent
-    }
+    is LaunchBlock.Busy -> work.label(s)
     LaunchBlock.Missing -> s.launchBlockMissing
     LaunchBlock.OtherGameRunning -> s.launchBlockOtherRunning
     LaunchBlock.NoIdentity -> s.packDetailPlayLoginRequired
+}
+
+/** What the work in progress on a pack is called, wherever it is the reason for waiting. */
+internal fun InstanceWork.label(s: AppStrings): String = when (this) {
+    InstanceWork.Update -> s.launchBlockUpdating
+    InstanceWork.Repair -> s.launchBlockRepairing
+    InstanceWork.Recovery -> s.launchBlockRecovering
+    InstanceWork.ContentUpdate -> s.launchBlockUpdatingContent
+    InstanceWork.Delete -> s.launchBlockDeleting
 }
 
 private fun LaunchBlock.icon(): IconKey = when (this) {
@@ -224,6 +228,7 @@ private fun LaunchBlock.icon(): IconKey = when (this) {
         InstanceWork.Repair -> NxIcon.Build
         InstanceWork.Recovery -> NxIcon.History
         InstanceWork.ContentUpdate -> NxIcon.Sync
+        InstanceWork.Delete -> NxIcon.Delete
     }
     LaunchBlock.Missing -> NxIcon.Warning
     LaunchBlock.OtherGameRunning -> NxIcon.HourglassEmpty

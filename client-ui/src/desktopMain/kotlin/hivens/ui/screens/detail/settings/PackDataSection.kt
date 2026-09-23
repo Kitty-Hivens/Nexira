@@ -18,6 +18,7 @@ import hivens.launcher.instance.PackInstanceService
 import hivens.launcher.update.PackUpdateService
 import hivens.ui.utils.humanSize
 import hivens.ui.components.DestructiveConfirmDialog
+import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
@@ -72,6 +73,7 @@ internal fun PackDataSection(
 
     var pendingDelete by remember(pack.id) { mutableStateOf(false) }
     val busy = operation?.isRunning == true
+    val deleteBlock = rememberPackDeleteBlock(pack.id)
 
     // Asks for a measurement rather than taking one: the service walks the tree
     // only when what it holds is too old to serve, so moving between sections
@@ -138,11 +140,12 @@ internal fun PackDataSection(
     }
 
     NxSection(s.packSettingsDangerZone) {
-        NxRow(title = s.packSettingsDelete, subtitle = s.packSettingsDeleteDesc) {
+        NxRow(title = s.packSettingsDelete, subtitle = deleteBlock ?: s.packSettingsDeleteDesc) {
             NxButton(
                 s.packSettingsDelete,
                 onClick = { pendingDelete = true },
                 style = NxButtonStyle.Destructive,
+                enabled = deleteBlock == null,
                 compact = true,
             )
         }
@@ -158,7 +161,7 @@ internal fun PackDataSection(
             onConfirm = {
                 pendingDelete = false
                 scope.launch {
-                    if (service.deleteCompletely(pack)) {
+                    if (service.deleteCompletely(pack) == PackInstanceService.DeleteOutcome.Deleted) {
                         sizes.forget(pack.id)
                         onDismiss()
                     }

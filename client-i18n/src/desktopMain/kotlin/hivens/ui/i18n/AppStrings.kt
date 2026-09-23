@@ -1188,6 +1188,8 @@ interface AppStrings {
     val packSettingsDangerZone: String
     val packSettingsDelete: String
     val packSettingsDeleteDesc: String
+    /** Why a pack cannot be deleted right now: its game is running. */
+    val packDeleteBlockedRunning: String
     // Version -- restore points
     val packVersionSnapshots: String
     val packVersionRestore: String
@@ -1206,6 +1208,7 @@ interface AppStrings {
     val launchBlockUpdating: String
     val launchBlockRepairing: String
     val launchBlockRecovering: String
+    val launchBlockDeleting: String
     val launchBlockUpdatingContent: String
     /** The launch control of a pack whose instance folder is gone. */
     val launchBlockMissing: String

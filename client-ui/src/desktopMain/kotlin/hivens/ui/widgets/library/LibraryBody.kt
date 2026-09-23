@@ -15,7 +15,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +37,7 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import java.nio.file.Path
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
@@ -71,7 +71,9 @@ fun LibraryBody(instance: WidgetInstance) {
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
     val packInstanceService: PackInstanceService = koinInject()
-    val scope = rememberCoroutineScope()
+    // The app's scope, not this composition's: leaving the Library mid-delete
+    // cancelled it halfway through the tree.
+    val scope: CoroutineScope = koinInject()
     var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
     val instances by remember { repo.observe() }.collectAsState()
 

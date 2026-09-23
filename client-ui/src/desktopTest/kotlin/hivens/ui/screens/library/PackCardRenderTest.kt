@@ -37,6 +37,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.EncodedImageFormat
 import org.koin.core.context.startKoin
+import hivens.core.launch.InstanceWorkRegistry
+import hivens.launcher.launch.RunningPackSource
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import java.io.File
@@ -133,6 +135,13 @@ class PackCardRenderTest {
                         )
                     }
                     single { NavRequests() }
+                    // The card asks whether the pack may be deleted right now.
+                    single<RunningPackSource> {
+                        object : RunningPackSource {
+                            override val runningPackInstanceId = MutableStateFlow<String?>(null)
+                        }
+                    }
+                    single { InstanceWorkRegistry() }
                 },
             )
         }
