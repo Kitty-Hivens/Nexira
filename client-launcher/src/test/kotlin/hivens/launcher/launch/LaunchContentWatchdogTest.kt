@@ -159,14 +159,35 @@ class LaunchContentWatchdogTest {
         assertTrue(running.isCancelled)
     }
 
+    /**
+     * A bound launch whose `mods/` is gone at the check passes it, and the watch used
+     * to switch itself off for exactly that session. Creating the directory after the
+     * spawn, with a jar in it, then reached the loader with nothing looking.
+     */
     @Test
-    fun `an instance with no mods directory is not a finding`() = runTest {
+    fun `a mods directory created after the spawn is watched like any other`() = runTest {
+        val dir = tempDir("watchdog-late-mods")
+        val planted = dir.resolve("mods/freecam.jar")
+        val sync = DiskSensingSync(planted)
+
+        val watchdog = LaunchContentWatchdog(sync, dir, expected = null, settleMillis = 5_000, pollMillis = 20)
+        val running = async(Dispatchers.IO) { watchdog.run() }
+        withContext(Dispatchers.IO) {
+            delay(100)
+            Files.createDirectories(planted.parent)
+            Files.write(planted, "CHEAT".toByteArray())
+        }
+
+        assertEquals(listOf("freecam.jar"), running.await())
+    }
+
+    @Test
+    fun `an instance whose mods directory never appears stays clean`() = runTest {
         val dir = tempDir("watchdog-bare")
-        val sync = ScriptedSync(RosterInspection(foreign = listOf("would-not-be-asked.jar")))
+        val sync = DiskSensingSync(dir.resolve("mods/freecam.jar"))
 
         val findings = LaunchContentWatchdog(sync, dir, expected = null, settleMillis = 100, pollMillis = 20).run()
 
-        assertTrue(findings.isEmpty())
-        assertEquals(0, sync.calls.get(), "nothing to hold to the pack, so nothing is claimed about it")
+        assertTrue(findings.isEmpty(), "a vanilla pack has nothing under mods/ and nothing to report")
     }
 }
