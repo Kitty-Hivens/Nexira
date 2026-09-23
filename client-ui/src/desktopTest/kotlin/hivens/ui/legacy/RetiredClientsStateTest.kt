@@ -104,7 +104,7 @@ class RetiredClientsStateTest {
             adopter = RetiredClientAdopter(
                 // A real runtime download is a network stack the assertions never
                 // look at; what this exercises is what the adoption does to disk.
-                ensureRuntime = { _, _, _ -> },
+                ensureRuntime = { _, _, _ -> null },
                 javaManager = FixedJavaManager,
                 repository = repo,
                 dataDir = data,

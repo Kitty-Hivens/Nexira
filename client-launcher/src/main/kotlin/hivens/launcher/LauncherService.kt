@@ -184,7 +184,10 @@ internal class LauncherService(
             log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
             throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
         }
-        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog)))
+        SpawnResult.Started(
+            ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog)),
+            resolvedLoaderVersion = resolved.loaderVersion,
+        )
     } catch (e: PackPrepBlocked) {
         // SC-binding step could not complete; surface the carried reason.
         SpawnResult.Failed(e.error)

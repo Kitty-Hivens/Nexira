@@ -439,7 +439,7 @@ class RuntimeProvisionerTest {
         val stub = object : LoaderResolver {
             override val loaderId = "stub"
             override suspend fun resolve(mcVersion: String, loaderVersion: String) =
-                LoaderProfile(libraries = emptyList(), mainClass = "fake.Main", javaMajor = 25)
+                LoaderProfile(version = "test", libraries = emptyList(), mainClass = "fake.Main", javaMajor = 25)
         }
         val p = RuntimeProvisioner(
             librariesDir = librariesDir,

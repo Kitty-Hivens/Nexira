@@ -681,7 +681,7 @@ class LauncherController(
         return Prepared.Ready(
             contentFailed = contentFailed,
             spawn = { onLog ->
-                launcherService.launchPackClient(
+                pinLoaderVersion(refreshedInstance.id, manifestSnapshot, launcherService.launchPackClient(
                     sessionData          = session,
                     // The manifest's own declaration, the same one serverBound reads,
                     // so the service's SC binding and the guards below cannot answer
@@ -729,7 +729,7 @@ class LauncherController(
                     useSmartycraftAuthLib = settings.useSmartycraftAuthLib,
                     displayName          = refreshedInstance.displayName,
                     onLog                = onLog,
-                )
+                ))
             },
             onSpawned = { handle ->
                 // The one field this owns, set on the record as it stands. The record in
@@ -755,6 +755,34 @@ class LauncherController(
                 packRepository.update(refreshedInstance.id) { it.copy(playtimeSeconds = it.playtimeSeconds + secs) }
             },
         )
+    }
+
+    /**
+     * Records the loader version a launch resolved onto a pack that named none, and
+     * hands [result] on unchanged.
+     *
+     * A blank version meant "the latest", asked again on every launch: the loader
+     * moved under the pack with no notice, a new Forge promotion ran its installer
+     * again at the next Play, and the lookup needed the network, so the pack could
+     * not start offline. The first launch now settles it, and the next ones ask
+     * for that version by name. A version the pack does name is left as it is,
+     * including a legacy Forge build the resolver had to substitute.
+     */
+    private suspend fun pinLoaderVersion(
+        instanceId: String,
+        manifest: CachedManifestSnapshot,
+        result: SpawnResult,
+    ): SpawnResult {
+        val resolved = (result as? SpawnResult.Started)?.resolvedLoaderVersion?.takeIf { it.isNotBlank() }
+        if (resolved != null && manifest.loaderVersion.isBlank()) {
+            runCatching {
+                packRepository.update(instanceId) { current ->
+                    val cached = current.cachedManifest ?: return@update current
+                    if (cached.loaderVersion.isNotBlank()) current else current.copy(cachedManifest = cached.copy(loaderVersion = resolved))
+                }
+            }.onFailure { logger.warn("Could not record the loader version {} for {}", resolved, instanceId, it) }
+        }
+        return result
     }
 
     /**

@@ -46,6 +46,7 @@ class FabricLikeResolver(
             LoaderProfile(
                 libraries = profile.libraries.map { it.toSpec() },
                 mainClass = profile.mainClass,
+                version = version,
             )
         }
 

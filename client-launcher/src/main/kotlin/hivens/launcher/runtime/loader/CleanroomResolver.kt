@@ -77,7 +77,7 @@ class CleanroomResolver(
                         version.mainClass,
                         version.minecraftArguments,
                         version.libraries.map { toSpec(it, zip) },
-                    )
+                    ).copy(version = loaderVersion)
                 }
             } finally {
                 Files.deleteIfExists(installer)
@@ -100,6 +100,7 @@ class CleanroomResolver(
         return LoaderProfile(
             libraries = classpath,
             mainClass = mainClass,
+            version = "",
             gameArgs = extractTweakClassArgs(minecraftArguments),
             // Cleanroom's installer version.json is a complete, self-contained set
             // (inheritsFrom null). Replacing the vanilla libraries wholesale drops

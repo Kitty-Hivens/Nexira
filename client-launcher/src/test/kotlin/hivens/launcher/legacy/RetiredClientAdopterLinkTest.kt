@@ -44,7 +44,7 @@ class RetiredClientAdopterLinkTest {
     }
 
     private fun adopter() = RetiredClientAdopter(
-        ensureRuntime = { _, _, _ -> },
+        ensureRuntime = { _, _, _ -> null },
         javaManager = NoJava,
         repository = NullRepo,
         dataDir = data,

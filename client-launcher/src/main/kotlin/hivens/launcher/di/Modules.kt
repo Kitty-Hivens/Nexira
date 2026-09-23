@@ -592,7 +592,7 @@ val mirrorModule = module {
     single {
         val provisioner: RuntimeProvisioner = get()
         RetiredClientAdopter(
-            ensureRuntime = { mc, loader, progress -> provisioner.ensureRuntime(mc, loader, "", progress) },
+            ensureRuntime = { mc, loader, progress -> provisioner.ensureRuntime(mc, loader, "", progress).loaderVersion },
             javaManager = get(),
             repository = get(),
             dataDir = get(),

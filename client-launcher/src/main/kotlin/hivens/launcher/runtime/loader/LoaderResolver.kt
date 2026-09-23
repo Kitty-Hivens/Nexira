@@ -65,6 +65,13 @@ data class PlaceOnlyFile(
 data class LoaderProfile(
     val libraries: List<LibrarySpec>,
     val mainClass: String,
+    /**
+     * The loader version this profile is, which is not always the one asked for: a
+     * blank request resolves to the latest, and legacy Forge substitutes the nearest
+     * published build for one that never was. Recorded so a pack that pinned
+     * nothing is pinned to what it got, rather than moving on the next launch.
+     */
+    val version: String,
     val jvmArgs: List<String> = emptyList(),
     val gameArgs: List<String> = emptyList(),
     /**
@@ -170,6 +177,8 @@ data class ResolvedRuntime(
      * module. Null for legacy/vanilla, which already carry the full client on `-cp`.
      */
     val clientResourcesJar: Path? = null,
+    /** The loader version resolved for this runtime, or null for vanilla. See [LoaderProfile.version]. */
+    val loaderVersion: String? = null,
 )
 
 /**

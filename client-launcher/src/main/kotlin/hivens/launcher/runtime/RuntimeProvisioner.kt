@@ -201,6 +201,7 @@ class RuntimeProvisioner(
             natives = baseNatives + overrideNatives,
             // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
             javaMajor = profile.javaMajor ?: vanilla.javaMajor,
+            loaderVersion = profile.version,
         )
     }
 

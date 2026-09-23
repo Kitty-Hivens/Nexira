@@ -70,7 +70,7 @@ class Lwjgl3ifyResolver(
                 }
                 resp.bodyAsText()
             }
-            buildProfile(json.decodeFromString(LoaderVersionJson.serializer(), text))
+            buildProfile(json.decodeFromString(LoaderVersionJson.serializer(), text)).copy(version = loaderVersion)
         }
 
     /**
@@ -85,6 +85,7 @@ class Lwjgl3ifyResolver(
         return LoaderProfile(
             libraries = classpath,
             mainClass = version.mainClass,
+            version = "",
             jvmArgs = stripCommandOwnedArgs(flattenArguments(args?.jvm.orEmpty(), mojangOs)),
             gameArgs = extractTweakClassArgs(flattenArguments(args?.game.orEmpty(), mojangOs)),
             removeFromBase = { it.group == LWJGL2_GROUP || it.groupArtifact in SUPERSEDED_BY_FORGEPATCHES },

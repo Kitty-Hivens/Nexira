@@ -206,13 +206,17 @@ class FtbAppSource(
     private fun readFtbInstance(dir: Path): DiscoveredInstance? {
         if (!looksLikeGameDir(dir)) return null
         val meta = readJsonObject(dir.resolve("instance.json"), json)
+        // `<loader>-<version>`. The version used to be cut off with the dash, and an
+        // import with no version became "the latest" rather than what FTB had.
+        val modLoader = meta?.str("modLoader")
         return DiscoveredInstance(
             launcher = launcher,
             id = dir.fileName.toString(),
             displayName = meta?.str("name") ?: dir.fileName.toString(),
             gameDir = dir,
             mcVersion = meta?.str("mcVersion"),
-            loader = meta?.str("modLoader")?.substringBefore('-')?.lowercase()?.takeIf { it.isNotBlank() },
+            loader = modLoader?.substringBefore('-')?.lowercase()?.takeIf { it.isNotBlank() },
+            loaderVersion = modLoader?.substringAfter('-', "")?.takeIf { it.isNotBlank() },
             modCount = countMods(dir),
         )
     }

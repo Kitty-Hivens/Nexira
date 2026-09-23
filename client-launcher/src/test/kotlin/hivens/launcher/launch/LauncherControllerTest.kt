@@ -355,6 +355,46 @@ class LauncherControllerTest {
         ),
     )
 
+    /** Launches [pack] with the service reporting [resolved] as the loader version it used. */
+    private suspend fun TestScope.launchResolving(pack: PackInstance, resolved: String): List<PackInstance> {
+        every { settingsService.getSettings() } returns SettingsData()
+        Files.createDirectories(sandbox.resolve("instances").resolve(pack.instanceDirName))
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
+        coEvery { packRepository.get(pack.id) } answers { puts.lastOrNull() ?: pack }
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle, resolvedLoaderVersion = resolved)
+        newController(this).launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), pack)
+        advanceUntilIdle()
+        return puts
+    }
+
+    /**
+     * A blank version was "the latest" asked again on every launch: it moved under the
+     * pack, reran a Forge installer at each new promotion, and needed the network.
+     */
+    @Test
+    fun `a pack that named no loader version is pinned to the one its launch resolved`() = runTest {
+        val blank = packInstance("i-blank").let { it.copy(cachedManifest = it.cachedManifest!!.copy(loaderName = "fabric", loaderVersion = "")) }
+
+        val puts = launchResolving(blank, resolved = "0.16.14")
+
+        assertEquals("0.16.14", puts.last().cachedManifest?.loaderVersion)
+    }
+
+    /** Legacy Forge substitutes a published build for one that never was; the pack keeps what it names. */
+    @Test
+    fun `a named loader version is left as the pack names it`() = runTest {
+        val named = packInstance("i-named")
+
+        val puts = launchResolving(named, resolved = "14.23.5.2864")
+
+        assertTrue(puts.none { it.cachedManifest?.loaderVersion == "14.23.5.2864" }, "got ${puts.map { it.cachedManifest?.loaderVersion }}")
+    }
+
     /**
      * A toggle owns one field and must write only that one.
      *

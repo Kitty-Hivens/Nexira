@@ -92,6 +92,13 @@ class ForgeLegacyResolverTest {
         assertEquals("14.23.5.2864", r.resolveForgeBuild("1.12.2", "14.23.5.2864"))
     }
 
+    /** Written the way other launchers write it, with the Minecraft version in front. */
+    @Test
+    fun `resolveForgeBuild keeps a published build named with its Minecraft prefix`() = runTest {
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, testTransferEngine(HttpClientProvider { HttpClient(metadataEngine()) }), json, forgeMavenBase = MAVEN_BASE)
+        assertEquals("14.23.5.2860", r.resolveForgeBuild("1.12.2", "1.12.2-14.23.5.2860"))
+    }
+
     @Test
     fun `resolveForgeBuild maps a non-published SC-custom build to latest official`() = runTest {
         val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, testTransferEngine(HttpClientProvider { HttpClient(metadataEngine()) }), json, forgeMavenBase = MAVEN_BASE)

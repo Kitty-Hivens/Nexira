@@ -47,9 +47,10 @@ class RetiredClientAdopter(
      * this needs out of [hivens.launcher.runtime.RuntimeProvisioner]. Taken as a
      * function rather than the provisioner itself so the adoption can be exercised
      * over a real tree without standing up an HTTP stack to download a runtime the
-     * assertions never look at.
+     * assertions never look at. Answers the loader version it resolved, which the
+     * adopted pack records, or null for vanilla.
      */
-    private val ensureRuntime: suspend (mcVersion: String, loader: String?, progress: (Int, Int, String) -> Unit) -> Unit,
+    private val ensureRuntime: suspend (mcVersion: String, loader: String?, progress: (Int, Int, String) -> Unit) -> String?,
     private val javaManager: IJavaManager,
     private val repository: IPackRepository,
     private val dataDir: Path,
@@ -115,10 +116,11 @@ class RetiredClientAdopter(
         Files.createDirectories(clientDir)
         log.info("adopt: '{}' ({} on {}) -> {}", client.name, loaderId ?: "vanilla", mc, clientDir)
 
+        var loaderVersion: String? = null
         val transfer = try {
             linkContent(client.dir, clientDir, progress).also {
                 seedSharedAssets(client.dir)
-                ensureRuntime(mc, loaderId, progress)
+                loaderVersion = ensureRuntime(mc, loaderId, progress)
             }
         } catch (e: Throwable) {
             // The directory was reserved and is now half-filled with hardlinks to
@@ -145,7 +147,9 @@ class RetiredClientAdopter(
             cachedManifest = CachedManifestSnapshot(
                 minecraftVersion = mc,
                 loaderName = loaderId ?: "vanilla",
-                loaderVersion = "",
+                // Pinned to what the adoption resolved. Left blank it was "the latest"
+                // on every launch, which moved and needed the network.
+                loaderVersion = loaderVersion.orEmpty(),
                 javaMajor = javaManager.detectJavaVersion(mc),
             ),
         )

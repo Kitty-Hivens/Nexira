@@ -25,10 +25,10 @@ import java.util.UUID
  * [ForeignInstanceImporter], which all start from existing content.
  *
  * [loader] is the LoaderRegistry id (`forge` / `neoforge` / `fabric` / `quilt`)
- * or null for vanilla. A blank [loaderVersion] asks the resolver for its default
- * / latest where it supports that (Fabric does; Forge-legacy best-effort) --
- * ensureRuntime surfaces an unresolvable loader as an error rather than a broken
- * instance.
+ * or null for vanilla. A blank [loaderVersion] asks the resolver for its latest,
+ * and the version it resolved is what the pack records. Cleanroom and lwjgl3ify
+ * have no latest to offer and need one named. ensureRuntime surfaces an
+ * unresolvable loader as an error rather than a broken instance.
  */
 class LocalPackCreator(
     private val runtimeProvisioner: RuntimeProvisioner,
@@ -60,7 +60,9 @@ class LocalPackCreator(
         Files.createDirectories(clientDir.resolve("config"))
         log.info("create: '{}' ({} {} on {}) -> {}", displayName, loaderId ?: "vanilla", loaderVersion, mc, clientDir)
 
-        runtimeProvisioner.ensureRuntime(mc, loaderId, loaderVersion, progress)
+        // What the loader resolved to, recorded instead of a blank: a blank version
+        // was "the latest" again on every launch.
+        val resolved = runtimeProvisioner.ensureRuntime(mc, loaderId, loaderVersion, progress)
 
         val instance = PackInstance(
             id = instanceId,
@@ -77,7 +79,7 @@ class LocalPackCreator(
             cachedManifest = CachedManifestSnapshot(
                 minecraftVersion = mc,
                 loaderName = loaderId ?: "vanilla",
-                loaderVersion = loaderVersion,
+                loaderVersion = resolved.loaderVersion ?: "",
                 javaMajor = javaManager.detectJavaVersion(mc),
             ),
         )

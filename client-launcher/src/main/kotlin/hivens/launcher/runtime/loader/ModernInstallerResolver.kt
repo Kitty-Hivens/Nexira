@@ -106,6 +106,7 @@ class ModernInstallerResolver(
                     .filter { libraryRulesAllow(it.rules, os) }
                     .map { harvest(it, dotMinecraft) },
                 mainClass = version.mainClass,
+                version = resolvedVersion,
                 jvmArgs = version.arguments?.let { flattenArguments(it.jvm, os) } ?: emptyList(),
                 gameArgs = version.arguments?.let { flattenArguments(it.game, os) } ?: emptyList(),
                 placeOnlyFiles = collectPlaceOnly(dotMinecraft),

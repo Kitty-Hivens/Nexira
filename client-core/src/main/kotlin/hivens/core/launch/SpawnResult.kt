@@ -8,6 +8,10 @@ package hivens.core.launch
  * failure, or an SC-binding block).
  */
 sealed interface SpawnResult {
-    data class Started(val handle: LaunchHandle) : SpawnResult
+    data class Started(
+        val handle: LaunchHandle,
+        /** The loader version the launch resolved, for a pack that pinned none. Null for vanilla. */
+        val resolvedLoaderVersion: String? = null,
+    ) : SpawnResult
     data class Failed(val error: LaunchError) : SpawnResult
 }

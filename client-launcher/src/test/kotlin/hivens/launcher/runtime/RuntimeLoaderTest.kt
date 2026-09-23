@@ -121,6 +121,7 @@ class RuntimeLoaderTest {
     @Test
     fun `ensureRuntime merges a loader overlay onto vanilla`() = runTest {
         val fabricProfile = LoaderProfile(
+            version = "test",
             libraries = listOf(LibrarySpec(MavenCoord.parse("net.fabricmc:fabric-loader:0.16.0"), LOADER_LIB_URL, sha1(loaderBytes), loaderBytes.size.toLong())),
             mainClass = "net.fabricmc.loader.impl.launch.knot.KnotClient",
             gameArgs = listOf("--fabric"),
@@ -243,6 +244,7 @@ class RuntimeLoaderTest {
     @Test
     fun `removeFromBase strips vanilla LWJGL2 across group while the overlay adds LWJGL3`() = runTest {
         val profile = LoaderProfile(
+            version = "test",
             libraries = listOf(LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), LWJGL3_URL, sha1(lwjgl3Bytes), lwjgl3Bytes.size.toLong())),
             mainClass = "cleanroom.Foundation",
             removeFromBase = { it.group == "org.lwjgl.lwjgl" },
@@ -260,6 +262,7 @@ class RuntimeLoaderTest {
     fun `nativesOverride becomes the runtime native set`() = runTest {
         val nativeSpec = LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3:natives-linux"), NATIVE_URL, sha1(nativeBytes), nativeBytes.size.toLong())
         val profile = LoaderProfile(
+            version = "test",
             libraries = emptyList(),
             mainClass = "cleanroom.Foundation",
             nativesOverride = listOf(nativeSpec),
@@ -281,6 +284,7 @@ class RuntimeLoaderTest {
         // nativesOverride left at their defaults must change neither the merged
         // library set nor the native set.
         val profile = LoaderProfile(
+            version = "test",
             libraries = listOf(LibrarySpec(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), LWJGL3_URL, sha1(lwjgl3Bytes), lwjgl3Bytes.size.toLong())),
             mainClass = "cleanroom.Foundation",
         )
@@ -332,6 +336,7 @@ class RuntimeLoaderTest {
         val resolver = object : LoaderResolver {
             override val loaderId = "swap"
             override suspend fun resolve(mcVersion: String, loaderVersion: String) = LoaderProfile(
+            version = "test",
                 libraries = emptyList(),
                 mainClass = "x.Main",
                 removeFromBase = { it.group == "org.lwjgl.lwjgl" },

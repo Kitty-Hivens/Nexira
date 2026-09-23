@@ -74,7 +74,7 @@ class ForeignInstanceImporter(
 
         copyInstanceContent(instance.gameDir, clientDir, progress)
         seedSharedRuntime(instance.gameDir, mc, progress)
-        runtimeProvisioner.ensureRuntime(mc, instance.loader, instance.loaderVersion.orEmpty(), progress)
+        val resolved = runtimeProvisioner.ensureRuntime(mc, instance.loader, instance.loaderVersion.orEmpty(), progress)
 
         val packInstance = PackInstance(
             id = instanceId,
@@ -87,7 +87,8 @@ class ForeignInstanceImporter(
             cachedManifest = CachedManifestSnapshot(
                 minecraftVersion = mc,
                 loaderName = instance.loader ?: "vanilla",
-                loaderVersion = instance.loaderVersion.orEmpty(),
+                // What was resolved, which is what the source named when it named one.
+                loaderVersion = resolved.loaderVersion ?: instance.loaderVersion.orEmpty(),
                 javaMajor = javaManager.detectJavaVersion(mc),
             ),
         )

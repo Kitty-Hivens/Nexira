@@ -65,6 +65,7 @@ class ForgeLegacyResolver(
                     LoaderProfile(
                         libraries = version.libraries.map { toSpec(it, zip) },
                         mainClass = version.mainClass,
+                        version = build,
                         gameArgs = extractTweakArgs(version.minecraftArguments),
                     )
                 }
@@ -109,7 +110,10 @@ class ForgeLegacyResolver(
     internal suspend fun resolveForgeBuild(mcVersion: String, requested: String): String {
         val builds = forgeBuildsFor(mcVersion)
         if (builds.isEmpty()) throw IOException("no Forge builds for Minecraft $mcVersion on Forge maven")
-        if (requested in builds) return requested
+        // Accepted with its Minecraft prefix too (`1.12.2-14.23.5.2860`), the way
+        // other launchers write it, rather than read as a build nobody published.
+        val build = requested.removePrefix("$mcVersion-")
+        if (build in builds) return build
         val latest = builds.maxWith { a, b -> compareForgeBuilds(a, b) }
         log.warn(
             "forge build {} is not published for {} (custom/non-official?); using nearest official {}",
