@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.nio.file.Files
@@ -29,13 +30,18 @@ class ApplyGuardTest {
     @AfterTest
     fun cleanup() = temps.forEach { it.toFile().deleteRecursively() }
 
+    /**
+     * Suspends before it writes, as the real registry does. A write that never
+     * suspends never notices a cancellation, which is what hid the rollback being
+     * cut short on exactly the write that commits it.
+     */
     private class FakeRepo : IPackRepository {
         val map = LinkedHashMap<String, PackInstance>()
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
         override fun observe(): StateFlow<List<PackInstance>> = flow
         override suspend fun list(): List<PackInstance> = map.values.toList()
         override suspend fun get(id: String): PackInstance? = map[id]
-        override suspend fun put(instance: PackInstance) { map[instance.id] = instance }
+        override suspend fun put(instance: PackInstance) { yield(); map[instance.id] = instance }
         override suspend fun delete(id: String) { map.remove(id) }
     }
 
