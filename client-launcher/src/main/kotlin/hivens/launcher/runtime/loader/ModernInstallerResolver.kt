@@ -15,7 +15,11 @@ import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
@@ -28,6 +32,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -80,7 +85,10 @@ class ModernInstallerResolver(
             // never carries an empty version segment (which 404s).
             val resolvedVersion = loaderVersion.ifBlank { latestVersion(mcVersion) }
             val dotMinecraft = cacheDir.resolve("$loaderId-$mcVersion-$resolvedVersion".replace(Regex("[^A-Za-z0-9._-]"), "_"))
-            ensureInstalled(mcVersion, resolvedVersion, dotMinecraft)
+            // One install per cache directory at a time. A second resolve that found
+            // no marker deleted the directory the first installer was still writing
+            // into; this is what happened when a stopped launch was followed by Play.
+            installLock(dotMinecraft).withLock { ensureInstalled(mcVersion, resolvedVersion, dotMinecraft) }
 
             val versionJsonPath = locateVersionJson(dotMinecraft, mcVersion)
             val version = json.decodeFromString(
@@ -224,7 +232,15 @@ class ModernInstallerResolver(
         return chosen
     }
 
-    private fun runInstaller(java: Path, installer: Path, dotMinecraft: Path) {
+    /**
+     * Runs the installer and waits for it, for as long as the caller wants it.
+     *
+     * The wait is interruptible, and a cancelled one kills the installer and its
+     * children on the way out. It used to park on a plain `waitFor` for up to
+     * twenty minutes that no cancellation could reach, so a stopped launch left the
+     * installer writing into a cache the next launch was about to delete.
+     */
+    private suspend fun runInstaller(java: Path, installer: Path, dotMinecraft: Path) {
         // --installClient runs the installer's console (non-GUI) path;
         // headless=true keeps it from touching AWT on a display-less host.
         val command = listOf(
@@ -255,9 +271,15 @@ class ModernInstallerResolver(
             }
         }.apply { isDaemon = true; start() }
 
-        if (!process.waitFor(INSTALL_TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
-            process.destroyForcibly()
-            process.waitFor(5, TimeUnit.SECONDS)
+        val finished = try {
+            runInterruptible { process.waitFor(INSTALL_TIMEOUT_MINUTES, TimeUnit.MINUTES) }
+        } catch (e: CancellationException) {
+            log.info("{}: launch cancelled, stopping the installer", loaderId)
+            kill(process)
+            throw e
+        }
+        if (!finished) {
+            kill(process)
             throw IOException("$loaderId installer timed out after $INSTALL_TIMEOUT_MINUTES min")
         }
         drain.join(2000)
@@ -265,6 +287,13 @@ class ModernInstallerResolver(
             val recent = synchronized(tail) { tail.joinToString("\n") }
             throw IOException("$loaderId installer exited ${process.exitValue()}:\n$recent")
         }
+    }
+
+    /** Ends the installer and anything it started, and waits briefly for it to go. */
+    private fun kill(process: Process) {
+        runCatching { process.descendants().forEach { it.destroyForcibly() } }
+        runCatching { process.destroyForcibly() }
+        runCatching { process.waitFor(5, TimeUnit.SECONDS) }
     }
 
     /**
@@ -284,6 +313,11 @@ class ModernInstallerResolver(
         const val NEOFORGE_META_LATEST = "https://maven.neoforged.net/api/maven/latest/version/releases/net/neoforged/neoforge"
 
         private const val INSTALLED_MARKER = ".nexira-installed"
+
+        /** One lock per cache directory, shared by every resolver instance in the process. */
+        private val installLocks = ConcurrentHashMap<Path, Mutex>()
+
+        private fun installLock(dir: Path): Mutex = installLocks.computeIfAbsent(dir.toAbsolutePath().normalize()) { Mutex() }
         private const val INSTALL_TIMEOUT_MINUTES = 20L
         private const val INSTALLER_LOG_TAIL = 40
 

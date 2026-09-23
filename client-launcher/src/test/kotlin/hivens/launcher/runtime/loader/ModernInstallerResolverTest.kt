@@ -13,6 +13,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
+import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS as JunitOs
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.nio.file.Files
@@ -209,6 +217,49 @@ class ModernInstallerResolverTest {
             assertTrue(rels.contains("net/neoforged/neoforge/21.1.232/neoforge-21.1.232-universal.jar"))
         } finally {
             staging.toFile().deleteRecursively()
+        }
+    }
+
+    /**
+     * The installer used to be waited on with a plain `waitFor` of up to twenty
+     * minutes that no cancellation reached, so a stopped launch left it writing into
+     * a cache the next launch then deleted. A shell script stands in for the JVM: it
+     * marks that it started, sleeps, and marks that it finished, which it must not
+     * get to do.
+     */
+    @Test
+    @EnabledOnOs(JunitOs.LINUX, disabledReason = "the stand-in installer is a shell script")
+    fun `a cancelled launch kills the installer instead of waiting for it`() = runBlocking {
+        val cache = Files.createTempDirectory("modern-cancel")
+        val fakeJava = cache.resolve("java").also {
+            Files.writeString(it, "#!/bin/sh\ntouch started\nsleep 30\ntouch finished\n")
+            it.toFile().setExecutable(true)
+        }
+        val engine = MockEngine { respond(ByteReadChannel("JAR".toByteArray()), HttpStatusCode.OK) }
+        val resolver = ModernInstallerResolver(
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = Json { ignoreUnknownKeys = true },
+            javaManager = object : IJavaManager {
+                override suspend fun getJavaPath(version: String): Path = fakeJava
+                override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path = fakeJava
+            },
+            cacheDir = cache,
+            loaderId = "neoforge",
+            latestVersion = { "21.1.0" },
+        ) { _, version -> "https://example.test/neoforge-$version-installer.jar" }
+        val target = cache.resolve("neoforge-1.21.1-21.1.0")
+        try {
+            val job = launch(Dispatchers.IO) { resolver.resolve("1.21.1", "21.1.0") }
+            withTimeout(15_000) { while (!Files.exists(target.resolve("started"))) delay(50) }
+
+            job.cancel()
+            withTimeout(10_000) { job.join() }
+            delay(1_500)
+
+            assertFalse(Files.exists(target.resolve("finished")), "the installer outlived the launch that started it")
+        } finally {
+            cache.toFile().deleteRecursively()
         }
     }
 
