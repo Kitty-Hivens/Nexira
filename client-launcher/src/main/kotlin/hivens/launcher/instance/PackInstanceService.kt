@@ -95,14 +95,23 @@ class PackInstanceService(
      * Fork this instance into a Local one the user owns: flip origin to Local and
      * record where it came from in [PackInstance.forkedFrom] so provenance (and
      * its art) survive. Moves no files -- the same on-disk instance is now Local.
+     *
+     * The server binding goes too. Flipping only the origin left the cached
+     * manifest's auth requirement in place, so the launch still treated the pack as
+     * bound and swept `mods/` against the mirror's baseline, while the Content tab
+     * opened adding and removing mods because the origin was now Local: whatever
+     * the player added was deleted at Play. A pack whose contents are its owner's
+     * is not one a server session can be lent to, so it launches unbound.
      */
     suspend fun detachToLocal(instance: PackInstance): PackInstance {
-        val detached = instance.copy(
-            packRef = instance.packRef.copy(origin = PackOrigin.Local),
-            forkedFrom = instance.forkedFrom ?: instance.packRef,
-        )
-        repository.put(detached)
-        return detached
+        val detach: (PackInstance) -> PackInstance = { current ->
+            current.copy(
+                packRef = current.packRef.copy(origin = PackOrigin.Local),
+                forkedFrom = current.forkedFrom ?: current.packRef,
+                cachedManifest = current.cachedManifest?.copy(authRequirement = null),
+            )
+        }
+        return repository.update(instance.id, detach) ?: detach(instance)
     }
 
     /**

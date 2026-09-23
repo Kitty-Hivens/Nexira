@@ -1,6 +1,8 @@
 package hivens.launcher.instance
 
 import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
@@ -173,5 +175,25 @@ class PackInstanceServiceTest {
         assertFalse(Files.exists(data.resolve("snapshots/industrial")), "snapshots gone")
         assertNull(ApplyJournal(data, json).read("industrial"), "and the marker, which recovery would otherwise chase")
         data.toFile().deleteRecursively()
+    }
+
+    /**
+     * Detached, the pack stayed bound: the launch swept mods/ against the mirror's
+     * baseline and deleted what the now-unlocked Content tab had let the player add.
+     */
+    @Test
+    fun `a detached pack is no longer bound to its server`() = runTest {
+        val data = Files.createTempDirectory("pis")
+        val repo = FakeRepo()
+        val bound = instance("1").copy(
+            cachedManifest = CachedManifestSnapshot("1.12.2", "forge", "14.23.5.2860", 8, PackAuthRequirement.SmartyCraft("Industrial")),
+        )
+        repo.put(bound)
+
+        val detached = service(repo, data).detachToLocal(bound)
+
+        assertNull(detached.cachedManifest?.authRequirement)
+        assertNull(repo.get("1")?.cachedManifest?.authRequirement, "persisted unbound")
+        assertEquals("forge", repo.get("1")?.cachedManifest?.loaderName, "and nothing else about the runtime moves")
     }
 }

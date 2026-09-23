@@ -1013,7 +1013,7 @@ object GermanStrings : AppStrings {
     override val packSettingsOpenFolder         = "Öffnen"
     override val packSettingsSizeComputing      = "Größe wird berechnet"
     override val packSettingsDetach             = "In lokale Kopie lösen"
-    override val packSettingsDetachDesc         = "Werde deine eigene Kopie; Herkunft bleibt erhalten"
+    override val packSettingsDetachDesc         = "Wird deine eigene Kopie. Keine Updates und keine Anmeldung am Server des Packs mehr, die Herkunft bleibt erhalten"
     override val packSettingsDetachAction       = "Lösen"
     override val packSettingsRepair             = "Dateien prüfen und reparieren"
     override val packSettingsRepairDesc         = "Alle Dateien prüfen und nur die beschädigten wiederherstellen"

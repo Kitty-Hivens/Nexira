@@ -1016,7 +1016,7 @@ object RussianStrings : AppStrings {
     override val packSettingsOpenFolder         = "Открыть"
     override val packSettingsSizeComputing      = "подсчёт размера"
     override val packSettingsDetach             = "Отсоединить в локальную"
-    override val packSettingsDetachDesc         = "Стать своей копией; провенанс сохранится"
+    override val packSettingsDetachDesc         = "Станет вашей копией. Обновлений и входа на сервер сборки больше не будет, происхождение сохранится"
     override val packSettingsDetachAction       = "Отсоединить"
     override val packSettingsRepair             = "Проверить и восстановить файлы"
     override val packSettingsRepairDesc         = "Проверить все файлы и восстановить только повреждённые"

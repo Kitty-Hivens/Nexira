@@ -1014,7 +1014,7 @@ object EnglishStrings : AppStrings {
     override val packSettingsOpenFolder         = "Open"
     override val packSettingsSizeComputing      = "computing size"
     override val packSettingsDetach             = "Detach to local"
-    override val packSettingsDetachDesc         = "Become your own copy; provenance is kept"
+    override val packSettingsDetachDesc         = "Becomes your own copy. No more updates and no sign-in to the pack's server, and where it came from is kept"
     override val packSettingsDetachAction       = "Detach"
     override val packSettingsRepair             = "Verify and repair files"
     override val packSettingsRepairDesc         = "Check every file and restore only what is damaged"

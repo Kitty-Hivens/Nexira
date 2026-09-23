@@ -1021,7 +1021,7 @@ object JapaneseStrings : AppStrings {
     override val packSettingsOpenFolder = "開く"
     override val packSettingsSizeComputing = "サイズを計算中"
     override val packSettingsDetach = "ローカルに切り離す"
-    override val packSettingsDetachDesc = "自分専用の複製になります。由来は残ります"
+    override val packSettingsDetachDesc = "自分専用の複製になります。更新とパックのサーバーへのログインはなくなり、由来は残ります"
     override val packSettingsDetachAction = "切り離す"
     override val packSettingsRepair = "ファイルを検証して修復"
     override val packSettingsRepairDesc = "すべてのファイルを調べ、壊れているものだけを戻します"
