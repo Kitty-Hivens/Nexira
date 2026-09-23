@@ -1,5 +1,6 @@
 package hivens.launcher.imports
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
@@ -51,7 +52,7 @@ class LocalPackCreator(
         val displayName = name.trim().ifEmpty { "New pack" }
         val loaderId = loader?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it != "vanilla" }
         val instanceId = UUID.randomUUID().toString()
-        val instanceDirName = sanitize("$displayName-$instanceId")
+        val instanceDirName = instanceDirName(displayName, instanceId)
         val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
         onReserveDir(clientDir)
         // Seed the folders the Content-tab browser writes into, so adding the

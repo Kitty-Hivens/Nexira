@@ -1,5 +1,6 @@
 package hivens.launcher.mrpack
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.net.Digest
 import hivens.core.net.DigestAlgorithm
 import hivens.core.net.SkipIfPresent
@@ -76,7 +77,7 @@ class MrpackInstaller(
             val displayName = index.name.ifBlank { "Imported pack" }
 
             val instanceId = UUID.randomUUID().toString()
-            val instanceDirName = sanitize("$displayName-$instanceId")
+            val instanceDirName = instanceDirName(displayName, instanceId)
             val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
             // Reserve before createDirectories, so a cancel mid-download can
             // delete exactly this partial dir.

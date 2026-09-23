@@ -1,5 +1,6 @@
 package hivens.launcher.curseforge
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.api.dto.curseforge.CfManifest
 import hivens.core.io.UnpackBudget
 import hivens.core.io.UnpackLimits
@@ -61,7 +62,7 @@ class CurseForgeZipInstaller(
             val displayName = manifest.name.ifBlank { "Imported pack" }
 
             val instanceId = UUID.randomUUID().toString()
-            val instanceDirName = sanitize("$displayName-$instanceId")
+            val instanceDirName = instanceDirName(displayName, instanceId)
             val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
             Files.createDirectories(clientDir)
             onReserveDir(clientDir)

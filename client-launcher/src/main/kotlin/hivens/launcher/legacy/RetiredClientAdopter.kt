@@ -1,5 +1,6 @@
 package hivens.launcher.legacy
 
+import hivens.launcher.instance.instanceDirName
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
@@ -106,11 +107,9 @@ class RetiredClientAdopter(
             ?: throw IOException("Cannot adopt '${client.name}' without a Minecraft version.")
         val loaderId = loader?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it != "vanilla" }
         val instanceId = UUID.randomUUID().toString()
-        // The id is appended after the cap rather than sanitized with the name:
-        // inside it, a long folder name pushes the UUID out and two adoptions
-        // reduce to one directory, where the second lands in the first's tree and
-        // the sweep then removes a source whose content went nowhere.
-        val instanceDirName = sanitize(client.name).take(NAME_BUDGET) + "-" + instanceId
+        // The id after the bound, not inside it: see instanceDirName. Here a
+        // collision also meant the sweep removing a source whose content went nowhere.
+        val instanceDirName = instanceDirName(client.name, instanceId)
         val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
         onReserveDir(clientDir)
         Files.createDirectories(clientDir)
@@ -344,12 +343,6 @@ class RetiredClientAdopter(
     private fun sanitize(raw: String): String = raw.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96)
 
     internal companion object {
-        /**
-         * How much of the folder name the instance directory keeps, leaving room
-         * for the separator and the 36-character id that makes it unique.
-         */
-        private const val NAME_BUDGET = 59
-
         /**
          * Top-level names that are the retired path's own runtime rather than the
          * player's content, matched case-insensitively.
