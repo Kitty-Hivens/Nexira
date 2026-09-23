@@ -27,8 +27,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -370,29 +368,6 @@ private fun PlacementSlot(
             0f
         }
 
-        // Free placement always scales the whole arrangement down to fit a width too
-        // narrow for the stored coordinates, rather than clipping. A lattice is left
-        // out (it reflows through its cell already), and the scale only ever goes down:
-        // when the content fits, it is 1 and nothing moves, so this is a no-op until a
-        // slot is squeezed (the right panel opening, a narrow window). The extent is
-        // read off the stored positions, so it is known before the draw and there is
-        // no measure-then-scale loop.
-        val adaptive = columns == 0
-        val placeScale: Float = if (adaptive && boundedWidth > 0f) {
-            val extentW = content.widgets.maxOfOrNull { placedFarRight(it.placement ?: Placement(), boundedWidth) } ?: 0f
-            val extentH = content.widgets.maxOfOrNull { placedFarBottom(it.placement ?: Placement(), boundedHeight) } ?: 0f
-            val sw = if (extentW > 0f) boundedWidth / extentW else 1f
-            val sh = if (extentH > 0f && boundedHeight > 0f) boundedHeight / extentH else 1f
-            val r = minOf(1f, sw, sh)
-            // A widget stored far out of bounds (a corrupt file, a hand edit) would
-            // otherwise drag the whole arrangement down to nothing to "fit" it. Past
-            // this much shrink it is not content that should fit but a stray the grab
-            // margin already keeps reachable, so scaling gives up and the clamp draws it.
-            if (r < MIN_ADAPTIVE_SCALE) 1f else r
-        } else {
-            1f
-        }
-
         CompositionLocalProvider(
             LocalPlacementSlotSizeDp provides measuredDp,
             // Published only when there is a cell to convert against. A geometry
@@ -400,24 +375,8 @@ private fun PlacementSlot(
             // answers every pointer delta with "no movement", which is a gesture
             // that is present and does nothing.
             LocalGridGeometry provides if (columns > 0 && cell > 0f) GridGeometry(cell, spacing.value, columns) else null,
-            // The editor's gestures divide the pointer delta by this, or a widget in
-            // a scaled slot outruns the pointer.
-            LocalPlacementScale provides placeScale,
         ) {
-            // The scale sits on a full-slot box the widgets align within, off the top
-            // start, so the arrangement shrinks toward the origin rather than the
-            // centre. Not a clip: the content is drawn smaller, and the freed space
-            // at the far edges stays empty.
-            val scaled = if (placeScale != 1f) {
-                Modifier.fillMaxSize().graphicsLayer {
-                    scaleX = placeScale
-                    scaleY = placeScale
-                    transformOrigin = TransformOrigin(0f, 0f)
-                }
-            } else {
-                Modifier.fillMaxSize()
-            }
-            Box(scaled) {
+            Box(Modifier.fillMaxSize()) {
                 content.widgets.withIndex()
                     .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
                     .forEach { (index, instance) ->
@@ -437,38 +396,6 @@ private fun PlacementSlot(
                     }
             }
         }
-    }
-}
-
-// The floor below which adaptive scaling gives up. A slot squeezed to a fifth of the
-// content it holds is not a slot that shrank but a widget parked far outside it, and
-// scaling everything to fit that one stray reads as the arrangement vanishing. Below
-// this the grab-margin clamp keeps the stray reachable instead.
-private const val MIN_ADAPTIVE_SCALE = 0.2f
-
-// The far edges of a placed widget in the slot's own coordinates, for the adaptive
-// extent. Read off the stored size (the claim): an intrinsic widget that named no
-// size counts only as its offset, which under-counts it, but the widgets a person
-// sizes wide enough to overflow are the ones that carry a size. An end anchor's far
-// edge is an inset from the far side and so never exceeds the slot; a start anchor's
-// is the one that runs past it.
-private fun placedFarRight(p: Placement, slotW: Float): Float {
-    val bias = anchorHorizontalBias(p.anchor)
-    val w = p.width
-    return when {
-        bias < 0.5f -> p.x + w
-        bias > 0.5f -> slotW - p.x
-        else -> (slotW - w) / 2f + p.x + w
-    }
-}
-
-private fun placedFarBottom(p: Placement, slotH: Float): Float {
-    val bias = anchorVerticalBias(p.anchor)
-    val h = p.height
-    return when {
-        bias < 0.5f -> p.y + h
-        bias > 0.5f -> slotH - p.y
-        else -> (slotH - h) / 2f + p.y + h
     }
 }
 
