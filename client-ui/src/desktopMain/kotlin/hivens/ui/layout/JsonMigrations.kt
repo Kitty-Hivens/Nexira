@@ -6,6 +6,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import hivens.widget.model.GRID_MAX
+import hivens.widget.model.anchorHorizontalBias
+import hivens.widget.model.anchorVerticalBias
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.floatOrNull
@@ -49,7 +51,95 @@ internal object JsonMigrations {
         10 -> ::collapseOrientationsIntoPlacement
         11 -> ::wrapSlotsInGeneralFamily
         12 -> ::dropRetiredServerLayout
+        13 -> ::compensateHomeSlotPadding
         else -> { it -> it }
+    }
+
+    // The home slot dropped its blanket 24/20 padding: widgets own their spacing
+    // now, carried on each placement. A widget placed against that padded inner edge
+    // would jump toward the window by that much, so this puts the same gap back on
+    // each PLACED widget as its own padding, on the side its anchor counts from, and
+    // the arrangement is preserved while the gap becomes the widget's to change. Only
+    // a placement slot (flow explicitly null) carries offsets to compensate; the
+    // bundled flow default is seeded with its own padding instead and is left alone.
+    private const val HOME_SLOT_PAD_H = 24f
+    private const val HOME_SLOT_PAD_V = 20f
+    private val PLACEMENT_SLOTS_OWNER = "home.new"
+
+    private fun compensateHomeSlotPadding(graph: JsonObject): JsonObject {
+        val surfaces = graph["surfaces"]?.asObjectOrNull() ?: return graph
+        val home = surfaces[PLACEMENT_SLOTS_OWNER]?.asObjectOrNull() ?: return graph
+        val families = home["families"]?.asObjectOrNull() ?: return graph
+        val newFamilies = families.mapValues { (_, fam) -> compensateFamilyMain(fam) }
+        // Identity when nothing was compensated (no home.new, a flow main, no placed
+        // widgets), so a file that needs no change is handed back the same object the
+        // ladder's own no-op contract rests on.
+        if (JsonObject(newFamilies) == families) return graph
+        val newHome = buildJsonObject {
+            home.forEach { (k, v) -> if (k != "families") put(k, v) }
+            put("families", JsonObject(newFamilies))
+        }
+        return buildJsonObject {
+            graph.forEach { (k, v) -> if (k != "surfaces") put(k, v) }
+            put("surfaces", JsonObject(surfaces + (PLACEMENT_SLOTS_OWNER to newHome)))
+        }
+    }
+
+    private fun compensateFamilyMain(family: JsonElement): JsonElement {
+        val obj = family.asObjectOrNull() ?: return family
+        val slots = obj["slots"]?.asObjectOrNull() ?: return family
+        val main = slots["main"]?.asObjectOrNull() ?: return family
+        // Placement mode is flow explicitly null. A flow slot has offsets nowhere to
+        // compensate and keeps the padding the seed gives it.
+        if (main["flow"] !is JsonNull) return family
+        val widgets = main["widgets"]?.jsonArrayOrNull() ?: return family
+        val newMain = buildJsonObject {
+            main.forEach { (k, v) -> if (k != "widgets") put(k, v) }
+            put("widgets", JsonArray(widgets.map { compensatePlacedWidget(it) }))
+        }
+        return buildJsonObject {
+            obj.forEach { (k, v) -> if (k != "slots") put(k, v) }
+            put("slots", JsonObject(slots + ("main" to newMain)))
+        }
+    }
+
+    private fun compensatePlacedWidget(widget: JsonElement): JsonElement {
+        val obj = widget.asObjectOrNull() ?: return widget
+        val placement = obj["placement"]?.asObjectOrNull() ?: return widget
+        val anchor = placement["anchor"]?.jsonPrimitive?.contentOrNull ?: "topStart"
+        val hBias = anchorHorizontalBias(anchor)
+        val vBias = anchorVerticalBias(anchor)
+        // The side the offset counts from is the side the removed padding sat on. A
+        // centred axis does not move under symmetric padding, so it gets nothing.
+        val addStart = if (hBias < 0.5f) HOME_SLOT_PAD_H else 0f
+        val addEnd = if (hBias > 0.5f) HOME_SLOT_PAD_H else 0f
+        val addTop = if (vBias < 0.5f) HOME_SLOT_PAD_V else 0f
+        val addBottom = if (vBias > 0.5f) HOME_SLOT_PAD_V else 0f
+        // A widget centred on both axes moves nowhere under symmetric padding, so it
+        // is handed back unchanged rather than gaining an empty padding record.
+        if (addStart == 0f && addEnd == 0f && addTop == 0f && addBottom == 0f) return widget
+        val existing = placement["padding"]?.asObjectOrNull()
+        fun eff(side: String): Float =
+            existing?.get(side)?.jsonPrimitive?.floatOrNull
+                ?: existing?.get("all")?.jsonPrimitive?.floatOrNull ?: 0f
+        val start = eff("start") + addStart
+        val end = eff("end") + addEnd
+        val top = eff("top") + addTop
+        val bottom = eff("bottom") + addBottom
+        val newPadding = buildJsonObject {
+            if (start != 0f) put("start", JsonPrimitive(start))
+            if (end != 0f) put("end", JsonPrimitive(end))
+            if (top != 0f) put("top", JsonPrimitive(top))
+            if (bottom != 0f) put("bottom", JsonPrimitive(bottom))
+        }
+        val newPlacement = buildJsonObject {
+            placement.forEach { (k, v) -> if (k != "padding") put(k, v) }
+            put("padding", newPadding)
+        }
+        return buildJsonObject {
+            obj.forEach { (k, v) -> if (k != "placement") put(k, v) }
+            put("placement", newPlacement)
+        }
     }
 
     /**

@@ -1,7 +1,6 @@
 package hivens.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -40,12 +39,14 @@ fun NewHomeScreen(
         // their own viewport. A stack of fixed-height widgets that
         // exceeds the pane overflows -- the per-surface reset action
         // is the recovery path.
+        // No blanket slot padding. Spacing between widgets a flow still owns, but the
+        // margin from the window edge is each widget's own now, carried on its
+        // placement, so a widget that wants to reach the edge can and a widget that
+        // wants room says so. The bundled layout seeds the gutter it used to get here.
         SlotRenderer(
             SurfaceId(SURFACE),
             SlotId("main"),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+            modifier = Modifier.fillMaxSize(),
             spacing  = 8.dp,
         )
     }

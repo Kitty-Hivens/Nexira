@@ -1,5 +1,5 @@
 {
-  "schema_version": 12,
+  "schema_version": 13,
   "graph": {
     "surfaces": {
       "appshell.overlay": {
@@ -137,6 +137,9 @@
                     "instance_id": "home-new-welcome-default",
                     "props": {
                       "showSubtitle": false
+                    },
+                    "placement": {
+                      "padding": { "start": 24.0, "end": 24.0, "top": 20.0 }
                     }
                   },
                   {
@@ -145,11 +148,17 @@
                   },
                   {
                     "kind": "home.new.hero",
-                    "instance_id": "home-new-hero-default"
+                    "instance_id": "home-new-hero-default",
+                    "placement": {
+                      "padding": { "start": 24.0, "end": 24.0 }
+                    }
                   },
                   {
                     "kind": "home.new.recent",
-                    "instance_id": "home-new-recent-default"
+                    "instance_id": "home-new-recent-default",
+                    "placement": {
+                      "padding": { "start": 24.0, "end": 24.0, "bottom": 20.0 }
+                    }
                   }
                 ],
                 "flow": {

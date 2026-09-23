@@ -399,6 +399,59 @@ class JsonMigrationsTest {
         assertEquals(3, p.z)
     }
 
+    // ── Home slot padding (schema 13) ─────────────────────────────────
+
+    @Test
+    fun `home placement widgets gain padding for the slot gutter the screen dropped`() {
+        // The offset is left alone; the compensation is per-widget padding on the side
+        // the anchor counts from, so the arrangement holds while the gutter becomes the
+        // widget's own to change.
+        val graph = """
+            {"surfaces":{"home.new":{"families":{"general":{"slots":{"main":{
+              "flow":null,"grid":0,"widgets":[
+                {"kind":"home.new.hero","instance_id":"h","placement":{"anchor":"topStart","x":100.0,"y":50.0}},
+                {"kind":"home.new.player.wave","instance_id":"p","placement":{"anchor":"bottomEnd","x":0.0,"y":0.0}}
+              ]}}}}}}}
+        """.trimIndent()
+        val g = json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(12, json.parseToJsonElement(graph).jsonObject),
+        )
+        val main = g.surfaces[SurfaceId("home.new")]!!.slotsOf(FamilyId.GENERAL)[SlotId("main")]!!
+        val hero = assertNotNull(main.widgets.first { it.instanceId == "h" }.placement)
+        assertEquals(24f, hero.padding.start, "a start anchor compensates on the start side")
+        assertEquals(20f, hero.padding.top, "a top anchor compensates on the top side")
+        assertNull(hero.padding.end)
+        assertNull(hero.padding.bottom)
+        assertEquals(100f, hero.x, "the offset is untouched")
+        val player = assertNotNull(main.widgets.first { it.instanceId == "p" }.placement)
+        assertEquals(24f, player.padding.end, "an end anchor compensates on the end side")
+        assertEquals(20f, player.padding.bottom, "a bottom anchor compensates on the bottom side")
+        assertNull(player.padding.start)
+        assertNull(player.padding.top)
+    }
+
+    @Test
+    fun `the home flow default is left alone by the padding step`() {
+        // A flow slot has offsets nowhere to compensate; its gutter comes from the
+        // seed, so the step must not touch it or add a second one.
+        val graph = """
+            {"surfaces":{"home.new":{"families":{"general":{"slots":{"main":{
+              "flow":{"direction":"vertical","wrap":0,"uniform":false},"grid":0,"widgets":[
+                {"kind":"home.new.welcome","instance_id":"w","placement":{"padding":{"start":24.0}}}
+              ]}}}}}}}
+        """.trimIndent()
+        val g = json.decodeFromJsonElement(
+            LayoutGraph.serializer(),
+            JsonMigrations.apply(12, json.parseToJsonElement(graph).jsonObject),
+        )
+        val w = assertNotNull(
+            g.surfaces[SurfaceId("home.new")]!!.slotsOf(FamilyId.GENERAL)[SlotId("main")]!!.widgets.single().placement,
+        )
+        assertEquals(24f, w.padding.start, "the seed's own padding is untouched")
+        assertNull(w.padding.top, "and nothing was added")
+    }
+
     private fun fixture(name: String): JsonObject =
         json.parseToJsonElement(
             javaClass.getResourceAsStream("/layout/$name")!!
