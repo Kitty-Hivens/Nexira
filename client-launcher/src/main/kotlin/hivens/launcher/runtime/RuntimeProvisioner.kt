@@ -130,6 +130,13 @@ class RuntimeProvisioner(
         loaderVersion: String,
         progress: DownloadProgress = { _, _, _ -> },
     ): ResolvedRuntime = withContext(Dispatchers.IO) {
+        // Before anything is downloaded. A loader nothing here serves used to read as
+        // no loader at all, so the pack started as plain vanilla with every mod
+        // ignored and nothing said: a typo in a free-text field, a manifest naming
+        // LiteLoader, a loader a newer build knows.
+        if (loaderRegistry.resolverFor(loaderName) == null && !LoaderRegistry.isVanilla(loaderName)) {
+            throw IOException("The loader '${loaderName!!.trim()}' is not one this launcher can install")
+        }
         val vanilla = ensureVanilla(mcVersion, progress)
         val resolver = loaderRegistry.resolverFor(loaderName)
             ?: return@withContext ResolvedRuntime(

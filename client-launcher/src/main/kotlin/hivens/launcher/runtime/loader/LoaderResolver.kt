@@ -202,10 +202,18 @@ interface LoaderResolver {
 class LoaderRegistry(resolvers: List<LoaderResolver>) {
     private val byId: Map<String, LoaderResolver> = resolvers.associateBy { it.loaderId.lowercase() }
 
+    /** The resolver for [loaderName], or null when it names vanilla or a loader nothing here serves. */
     fun resolverFor(loaderName: String?): LoaderResolver? {
-        val id = loaderName?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return null
-        if (id == "vanilla" || id == "none") return null
-        return byId[id]
+        if (isVanilla(loaderName)) return null
+        return byId[loaderName!!.trim().lowercase()]
+    }
+
+    companion object {
+        /** Whether [loaderName] means no loader at all, as opposed to one this build does not know. */
+        fun isVanilla(loaderName: String?): Boolean {
+            val id = loaderName?.trim()?.lowercase()
+            return id.isNullOrEmpty() || id == "vanilla" || id == "none"
+        }
     }
 }
 

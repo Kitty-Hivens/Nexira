@@ -457,6 +457,25 @@ class RuntimeProvisionerTest {
         assertEquals(25, resolved.javaMajor, "loader profile.javaMajor must win over vanilla.javaMajor")
     }
 
+    /**
+     * A loader nothing here serves used to read as no loader at all: the pack
+     * started as plain vanilla with every mod ignored and nothing said.
+     */
+    @Test
+    fun `a loader nothing here serves is refused before anything is downloaded`() = runTest {
+        val requested = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            requested += req.url.toString()
+            respond("missing", HttpStatusCode.NotFound)
+        }
+        val p = provisioner(HttpClient(engine))
+
+        val failure = runCatching { p.ensureRuntime(mcVersion = "1.20.1", loaderName = "forg", loaderVersion = "") }.exceptionOrNull()
+
+        assertTrue(failure is IOException && "forg" in failure.message.orEmpty(), "got $failure")
+        assertTrue(requested.isEmpty(), "nothing is fetched for a pack that cannot run: $requested")
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://test.invalid/manifest.json"
         const val VERSION_URL = "https://test.invalid/1.12.2.json"
