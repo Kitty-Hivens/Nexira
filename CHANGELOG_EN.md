@@ -32,6 +32,8 @@ And a long list of smaller things. A click on a measure lands every time instead
 
 A pack that is not tied to a server now always starts offline. Before, it could receive the session of the account you were signed in with, and a mod in that pack could take it. Signing in offline from your profile now works and is still there after a restart.
 
+The Play button now says why you cannot play: the pack is updating, its files are being checked, another game is running, or you need to sign in. While an update runs, the button itself becomes the progress bar. In the "Pack hero card" and "Quick launch" widgets you can choose where the explanation goes: inside the button or beside it.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.

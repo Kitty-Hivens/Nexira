@@ -24,6 +24,8 @@ Und eine lange Liste von Kleinigkeiten. Ein Klick auf eine Anzeige trifft jedes 
 
 Ein Paket, das an keinen Server gebunden ist, startet jetzt immer offline. Bisher konnte es die Sitzung des Kontos erhalten, mit dem Sie angemeldet waren, und eine Mod in diesem Paket konnte sie an sich nehmen. Die Offline-Anmeldung im Profil funktioniert jetzt und bleibt nach einem Neustart erhalten.
 
+Die Schaltfläche „Spielen“ sagt jetzt, warum Sie nicht spielen können: Das Paket wird aktualisiert, seine Dateien werden geprüft, ein anderes Spiel läuft oder Sie müssen sich anmelden. Während einer Aktualisierung wird die Schaltfläche selbst zum Fortschrittsbalken. In den Widgets „Pack-Hero-Karte“ und „Schnellstart“ können Sie wählen, wo die Erklärung steht: in der Schaltfläche oder daneben.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.
