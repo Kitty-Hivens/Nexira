@@ -97,7 +97,7 @@ class MrpackInstallerTest {
     private val modBytes = "COOL-MOD".toByteArray()
     private val clientBytes = "VANILLA-CLIENT".toByteArray()
 
-    private fun buildMrpack(): Path {
+    private fun buildMrpack(planted: Boolean = false): Path {
         val file = Files.createTempFile("test", ".mrpack").also { tempDirs.add(it) }
         val index = """
             {"formatVersion":1,"game":"minecraft","versionId":"1.0.0","name":"Test Pack",
@@ -112,6 +112,9 @@ class MrpackInstallerTest {
             zos.putNextEntry(ZipEntry("overrides/config/foo.txt")); zos.write("FOO".toByteArray()); zos.closeEntry()
             zos.putNextEntry(ZipEntry("client-overrides/options.txt")); zos.write("OPT".toByteArray()); zos.closeEntry()
             zos.putNextEntry(ZipEntry("server-overrides/server.properties")); zos.write("SRV".toByteArray()); zos.closeEntry()
+            if (planted) {
+                zos.putNextEntry(ZipEntry("overrides/mods/planted.jar")); zos.write("PLANTED".toByteArray()); zos.closeEntry()
+            }
         }
         return file
     }
@@ -507,7 +510,8 @@ class MrpackInstallerTest {
     @Test
     fun `an archive that does not match its published digest installs nothing`() = runTest {
         val published = Files.readAllBytes(buildMrpack())
-        val served = Files.readAllBytes(buildVersionedPack(second = true))
+        // Installable on its own, so only the digest can stop it.
+        val served = Files.readAllBytes(buildMrpack(planted = true))
         val repo = FakeRepository()
         val dataDir = tempDir("data")
 
