@@ -260,13 +260,13 @@ class MrpackInstallerTest {
     }
 
     /** Builds a pack whose contents differ between versions, so an update has work to do. */
-    private fun buildVersionedPack(second: Boolean): Path {
+    private fun buildVersionedPack(second: Boolean, minecraft: String = "1.20.1"): Path {
         val file = Files.createTempFile("test-v", ".mrpack").also { tempDirs.add(it) }
         val cool = if (second) modV2Bytes to MOD_V2_URL else modBytes to MOD_URL
         val lib = if (second) Triple("mods/lib-2.0.jar", libV2Bytes, LIB_V2_URL) else Triple("mods/lib-1.0.jar", libV1Bytes, LIB_V1_URL)
         val index = """
             {"formatVersion":1,"game":"minecraft","versionId":"${if (second) "2.0.0" else "1.0.0"}","name":"Test Pack",
-             "dependencies":{"minecraft":"1.20.1"},
+             "dependencies":{"minecraft":"$minecraft"},
              "files":[
                {"path":"mods/cool.jar","hashes":{"sha1":"${sha1(cool.first)}"},"downloads":["${cool.second}"],"fileSize":${cool.first.size}},
                {"path":"mods/stable.jar","hashes":{"sha1":"${sha1(stableBytes)}"},"downloads":["$STABLE_URL"],"fileSize":${stableBytes.size}},
@@ -431,6 +431,63 @@ class MrpackInstallerTest {
         installer.update(instance, buildVersionedPack(second = true))
 
         assertTrue(Files.exists(clientDir.resolve("mods/lib-1.0.jar")), "nothing knew this file was the pack's")
+    }
+
+    /**
+     * A pre-update snapshot holds each file by a hardlink, which only keeps the old
+     * bytes while a changed file arrives as a new inode. Overrides were written into
+     * the existing one, so a Modrinth rollback restored the content it was undoing.
+     */
+    @Test
+    fun `a changed override arrives as a new file, leaving a hardlink to the old one intact`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        val held = tempDir("held").resolve("foo.txt")
+        Files.createLink(held, clientDir.resolve("config/foo.txt"))
+
+        installer.update(instance, buildVersionedPack(second = true))
+
+        assertEquals("FOO-V2", clientDir.resolve("config/foo.txt").readText())
+        assertEquals("FOO", held.readText(), "the old inode is untouched, so a snapshot of it still holds the old bytes")
+        assertFalse(
+            Files.list(clientDir.resolve("config")).use { s -> s.anyMatch { it.fileName.toString().endsWith(".nexira-staged") } },
+            "no staging file is left behind",
+        )
+    }
+
+    /**
+     * The runtime used to be provisioned after the overrides were written and the
+     * retired files dropped. A failure there left the directory on the new version
+     * under a registry entry still naming the old Minecraft and loader.
+     */
+    @Test
+    fun `an update whose runtime cannot be provisioned leaves the instance as it was`() = runTest {
+        val dataDir = tempDir("data")
+        val installer = updatableInstaller(dataDir)
+        val instance = installer.install(buildVersionedPack(second = false))
+        val clientDir = dataDir.resolve("instances").resolve(instance.instanceDirName)
+        val recordBefore = clientDir.resolve(PackFileRecord.FILE_NAME).readText()
+
+        // The version manifest lists 1.20.1 only, so provisioning 1.20.2 fails.
+        runCatching { installer.update(instance, buildVersionedPack(second = true, minecraft = "1.20.2")) }
+            .onSuccess { error("provisioning an unknown version must fail") }
+
+        assertEquals("COOL-MOD", clientDir.resolve("mods/cool.jar").readText())
+        assertEquals("FOO", clientDir.resolve("config/foo.txt").readText())
+        assertTrue(Files.exists(clientDir.resolve("config/gone.txt")))
+        assertTrue(Files.exists(clientDir.resolve("mods/lib-1.0.jar")))
+        assertEquals(recordBefore, clientDir.resolve(PackFileRecord.FILE_NAME).readText())
+    }
+
+    @Test
+    fun `archivePaths names what a version places, and not what it skips`() {
+        assertEquals(
+            setOf("mods/cool.jar", "config/foo.txt", "options.txt"),
+            bareInstaller().archivePaths(buildMrpack()),
+            "not the client-unsupported file and not the server override",
+        )
     }
 
     private companion object {

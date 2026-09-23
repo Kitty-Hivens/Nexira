@@ -1,5 +1,6 @@
 package hivens.launcher.update
 
+import hivens.core.io.AtomicFiles
 import hivens.launcher.util.sha1Of
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
@@ -114,12 +115,19 @@ internal object PackFileRecord {
         return out
     }
 
-    /** Sorted, one file per line, so the thing diffs and reads by eye. */
+    /**
+     * Sorted, one file per line, so the thing diffs and reads by eye.
+     *
+     * Published by replacing the file, never by writing into it. A pre-update
+     * snapshot holds the record by a hardlink, so an in-place write would rewrite
+     * the snapshot's copy as well, and a rollback would restore the files of one
+     * version under the record of the other.
+     */
     fun write(clientDir: Path, entries: Map<String, PackFileEntry>) {
         val body = entries.entries.sortedBy { it.key }.joinToString("\n") { (path, e) ->
             "${e.sha1} ${e.size} ${e.mtimeMs} ${e.crc32?.toString() ?: "-"} $path"
         }
-        runCatching { Files.writeString(clientDir.resolve(FILE_NAME), if (body.isEmpty()) "" else body + "\n") }
+        runCatching { AtomicFiles.writeString(clientDir.resolve(FILE_NAME), if (body.isEmpty()) "" else body + "\n") }
             .onFailure { log.warn("pack record: could not write it to {}", clientDir, it) }
             .onSuccess { log.info("pack record: {} file(s) recorded for {}", entries.size, clientDir.fileName) }
     }

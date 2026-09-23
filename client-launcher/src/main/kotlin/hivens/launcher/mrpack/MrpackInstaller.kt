@@ -66,12 +66,7 @@ class MrpackInstaller(
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         ZipFile(mrpack.toFile()).use { zip ->
-            val indexEntry = zip.getEntry(INDEX_NAME)
-                ?: throw IOException("not a .mrpack: no $INDEX_NAME at the archive root")
-            val index = json.decodeFromString(
-                MrpackIndex.serializer(),
-                zip.getInputStream(indexEntry).readBytes().decodeToString(),
-            )
+            val index = readIndex(zip)
             val mcVersion = index.dependencies[DEP_MINECRAFT]
                 ?: throw IOException("mrpack has no '$DEP_MINECRAFT' dependency")
             val (loaderName, loaderVersion) = resolveLoader(index.dependencies)
@@ -185,15 +180,16 @@ class MrpackInstaller(
         if (!Files.isDirectory(clientDir)) throw IOException("instance dir is gone: $clientDir")
 
         ZipFile(mrpack.toFile()).use { zip ->
-            val indexEntry = zip.getEntry(INDEX_NAME)
-                ?: throw IOException("not a .mrpack: no $INDEX_NAME at the archive root")
-            val index = json.decodeFromString(
-                MrpackIndex.serializer(),
-                zip.getInputStream(indexEntry).readBytes().decodeToString(),
-            )
+            val index = readIndex(zip)
             val mcVersion = index.dependencies[DEP_MINECRAFT]
                 ?: throw IOException("mrpack has no '$DEP_MINECRAFT' dependency")
             val (loaderName, loaderVersion) = resolveLoader(index.dependencies)
+
+            // First, before anything is written into the instance. It fills only the
+            // shared roots, so a failure here leaves the instance on the version it
+            // was on. Run last, as it was, a failure left the directory on the new
+            // version under a record still naming the old Minecraft and loader.
+            runtimeProvisioner.ensureRuntime(mcVersion, loaderName, loaderVersion, progress)
 
             // Without a baseline an update cannot retire what the previous
             // version shipped, and a pack that renames its jars per version --
@@ -247,8 +243,6 @@ class MrpackInstaller(
                 ),
             )
 
-            runtimeProvisioner.ensureRuntime(mcVersion, loaderName, loaderVersion, progress)
-
             PackFileRecord.write(
                 clientDir,
                 PackFileRecord.captureOf(
@@ -275,11 +269,8 @@ class MrpackInstaller(
      */
     private fun baselineFrom(archive: Path): Map<String, PackFileEntry> = runCatching {
         ZipFile(archive.toFile()).use { zip ->
-            val indexEntry = zip.getEntry(INDEX_NAME) ?: return@use emptyMap()
-            val index = json.decodeFromString(
-                MrpackIndex.serializer(),
-                zip.getInputStream(indexEntry).readBytes().decodeToString(),
-            )
+            if (zip.getEntry(INDEX_NAME) == null) return@use emptyMap()
+            val index = readIndex(zip)
             val out = HashMap<String, PackFileEntry>()
             index.files.filter { it.env?.client != ENV_UNSUPPORTED }.forEach { file ->
                 out[file.path] = PackFileEntry(file.hashes[HASH_SHA1].orEmpty(), file.fileSize, 0L, null)
@@ -293,6 +284,28 @@ class MrpackInstaller(
     }.getOrElse {
         log.warn("mrpack update: could not read the installed version's archive; nothing will be retired", it)
         emptyMap()
+    }
+
+    /**
+     * Every path a version of the pack places into an instance, read out of its
+     * archive: the index's client files and both override trees.
+     *
+     * What an update of this version can create or replace, which is what a
+     * snapshot taken before it has to hold and what a rollback may remove.
+     */
+    fun archivePaths(archive: Path): Set<String> = ZipFile(archive.toFile()).use { zip ->
+        val index = readIndex(zip)
+        index.files.filter { it.env?.client != ENV_UNSUPPORTED }.map { it.path }.toSet() +
+            overrideEntries(zip, OVERRIDES).keys + overrideEntries(zip, CLIENT_OVERRIDES).keys
+    }
+
+    private fun readIndex(zip: ZipFile): MrpackIndex {
+        val indexEntry = zip.getEntry(INDEX_NAME)
+            ?: throw IOException("not a .mrpack: no $INDEX_NAME at the archive root")
+        return json.decodeFromString(
+            MrpackIndex.serializer(),
+            zip.getInputStream(indexEntry).readBytes().decodeToString(),
+        )
     }
 
     /** An override entry as the archive holds it: where it lands, and its recorded CRC. */
@@ -340,7 +353,18 @@ class MrpackInstaller(
             }
             Files.createDirectories(dest.parent)
             budget.entry()
-            zip.getInputStream(zip.getEntry(entry.name)).use { input -> budget.copyTo(input, dest) }
+            // Beside the destination and moved over it, never written into it. A
+            // pre-update snapshot holds the old file by a hardlink, and a write into
+            // the same inode rewrites the snapshot's copy with it, so a rollback put
+            // back the very bytes it was meant to undo.
+            val staged = dest.resolveSibling("${dest.fileName}$STAGING_SUFFIX")
+            try {
+                zip.getInputStream(zip.getEntry(entry.name)).use { input -> budget.copyTo(input, staged) }
+                moveAtomic(staged, dest)
+            } catch (e: Throwable) {
+                runCatching { Files.deleteIfExists(staged) }
+                throw e
+            }
             written++
         }
         log.info("mrpack update: wrote {} of {} override(s)", written, overrides.size)
@@ -462,6 +486,7 @@ class MrpackInstaller(
         const val HASH_SHA1 = "sha1"
         const val HASH_SHA512 = "sha512"
         const val DOWNLOADS_DIR = "downloads"
+        const val STAGING_SUFFIX = ".nexira-staged"
 
         /** Modrinth dependency key -> LoaderRegistry id, checked in this order. */
         val LOADER_KEYS = linkedMapOf(
