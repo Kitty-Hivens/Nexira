@@ -274,10 +274,44 @@ class ModernInstallerResolverTest {
     }
 
     @Test
-    fun `neoforgeVersionPrefix maps Minecraft to the NeoForge version-index prefix`() {
-        assertEquals("21.1.", ModernInstallerResolver.neoforgeVersionPrefix("1.21.1"))
-        assertEquals("21.0.", ModernInstallerResolver.neoforgeVersionPrefix("1.21")) // no patch -> .0
-        assertEquals("20.4.", ModernInstallerResolver.neoforgeVersionPrefix("1.20.4"))
+    fun `neoforgeLine maps each Minecraft era to NeoForge's artifact and prefix`() {
+        assertEquals(NeoForgeLine("neoforge", "21.1."), ModernInstallerResolver.neoforgeLine("1.21.1"))
+        assertEquals(NeoForgeLine("neoforge", "21.0."), ModernInstallerResolver.neoforgeLine("1.21")) // no patch -> .0
+        assertEquals(NeoForgeLine("neoforge", "20.4."), ModernInstallerResolver.neoforgeLine("1.20.4"))
+        // Published under Forge's coordinates, with the Minecraft version in front.
+        assertEquals(NeoForgeLine("forge", "1.20.1-"), ModernInstallerResolver.neoforgeLine("1.20.1"))
+        // The year-numbered releases keep every part.
+        assertEquals(NeoForgeLine("neoforge", "26.3.0."), ModernInstallerResolver.neoforgeLine("26.3"))
+        assertEquals(NeoForgeLine("neoforge", "26.1.2."), ModernInstallerResolver.neoforgeLine("26.1.2"))
+    }
+
+    @Test
+    fun `pickNeoForge takes the newest release, else the newest beta, never a snapshot`() {
+        val index = listOf(
+            "21.1.250", "26.1.0.0-alpha.1+snapshot-1", "26.1.0.19-beta",
+            "26.2.0.87-beta", "26.2.0.86", "26.2.0.88",
+            "26.3.0.15-beta", "26.3.0.16-beta",
+        )
+        assertEquals("26.2.0.88", ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "26.2.0.")))
+        assertEquals("26.3.0.16-beta", ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "26.3.0.")),
+            "a release NeoForge only has betas for is still installable")
+        assertEquals("26.1.0.19-beta", ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "26.1.0.")))
+        assertNull(ModernInstallerResolver.pickNeoForge(index, NeoForgeLine("neoforge", "27.1.0.")))
+    }
+
+    @Test
+    fun `the 1_20_1 line reads the forge artifact and accepts a version typed without its prefix`() {
+        val line = ModernInstallerResolver.neoforgeLine("1.20.1")
+        val index = listOf("1.20.1-47.1.105", "1.20.1-47.1.106", "47.1.82")
+        assertEquals("1.20.1-47.1.106", ModernInstallerResolver.pickNeoForge(index, line), "the stray unprefixed entry is not this line")
+        assertEquals("1.20.1-47.1.106", ModernInstallerResolver.neoforgeCoordinate(line, "47.1.106"))
+        assertEquals("1.20.1-47.1.106", ModernInstallerResolver.neoforgeCoordinate(line, "1.20.1-47.1.106"))
+    }
+
+    @Test
+    fun `a Forge version typed with its Minecraft prefix is not prefixed twice`() {
+        assertEquals("47.2.0", ModernInstallerResolver.forgeBuild("1.20.1", "1.20.1-47.2.0"))
+        assertEquals("47.2.0", ModernInstallerResolver.forgeBuild("1.20.1", "47.2.0"))
     }
 
     @Test

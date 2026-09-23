@@ -23,6 +23,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
@@ -310,9 +311,12 @@ class ModernInstallerResolver(
         const val NEOFORGE_MAVEN = "https://maven.neoforged.net/releases"
         const val FORGE_MAVEN = "https://maven.minecraftforge.net"
         const val FORGE_PROMOTIONS = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
-        const val NEOFORGE_META_LATEST = "https://maven.neoforged.net/api/maven/latest/version/releases/net/neoforged/neoforge"
+        const val NEOFORGE_META_VERSIONS = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged"
 
         private const val INSTALLED_MARKER = ".nexira-installed"
+
+        /** The one Minecraft version NeoForge published under Forge's coordinates. */
+        private const val NEOFORGE_FORGE_ERA = "1.20.1"
 
         /** One lock per cache directory, shared by every resolver instance in the process. */
         private val installLocks = ConcurrentHashMap<Path, Mutex>()
@@ -329,16 +333,52 @@ class ModernInstallerResolver(
                 "\"authenticationDatabase\":{},\"launcherVersion\":{\"name\":\"2.0\",\"format\":21}}"
 
         /**
-         * NeoForge's version encodes the Minecraft version (minus the leading "1."):
-         * MC "1.21.1" -> "21.1.", MC "1.21" -> "21.0.". Used as the version-index
-         * filter that finds the latest build for a Minecraft version.
+         * Where NeoForge publishes its builds for one Minecraft version, and how their
+         * version strings begin.
+         *
+         * Three schemes, by Minecraft version:
+         * - 1.20.1, NeoForge's first, continued Forge's coordinates: the artifact is
+         *   `net.neoforged:forge` and a version is `1.20.1-47.1.106`.
+         * - 1.20.2 through 1.21.x drop the leading "1.": MC `1.21.1` -> `21.1.x`,
+         *   MC `1.21` -> `21.0.x`.
+         * - The year-numbered releases keep every part: MC `26.3` -> `26.3.0.x`,
+         *   MC `26.1.2` -> `26.1.2.x`.
+         *
+         * Only the middle one was known here, so the first failed on a path that does
+         * not exist and the third asked for `3.0.` and found nothing: every release
+         * newer than 1.21.11 could not install NeoForge.
          */
-        internal fun neoforgeVersionPrefix(mc: String): String {
+        internal fun neoforgeLine(mc: String): NeoForgeLine {
+            if (mc == NEOFORGE_FORGE_ERA) return NeoForgeLine(artifact = "forge", prefix = "$mc-")
             val parts = mc.split('.')
-            val minor = parts.getOrNull(1) ?: throw IOException("cannot derive a NeoForge version from Minecraft '$mc'")
-            val patch = parts.getOrNull(2) ?: "0"
-            return "$minor.$patch."
+            val major = parts.getOrNull(0)?.toIntOrNull()
+            val minor = parts.getOrNull(1)?.takeIf { it.all(Char::isDigit) && it.isNotEmpty() }
+            if (major == null || minor == null) throw IOException("cannot derive a NeoForge version from Minecraft '$mc'")
+            val patch = parts.getOrNull(2)?.takeIf { it.all(Char::isDigit) && it.isNotEmpty() } ?: "0"
+            val prefix = if (major == 1) "$minor.$patch." else "$major.$minor.$patch."
+            return NeoForgeLine(artifact = "neoforge", prefix = prefix)
         }
+
+        /**
+         * The newest release build among [versions] for [line], else the newest
+         * pre-release: a Minecraft version NeoForge has only published betas for is
+         * still one it supports, and that is every release for its first weeks.
+         * [versions] is in the index's own order, which is publication order.
+         */
+        internal fun pickNeoForge(versions: List<String>, line: NeoForgeLine): String? {
+            val matching = versions.filter { it.startsWith(line.prefix) && '+' !in it }
+            return matching.lastOrNull { '-' !in it.removePrefix(line.prefix) } ?: matching.lastOrNull()
+        }
+
+        /**
+         * A version as the maven names it for [line], accepting what a person types:
+         * `47.1.106` for 1.20.1 is `1.20.1-47.1.106`.
+         */
+        internal fun neoforgeCoordinate(line: NeoForgeLine, version: String): String =
+            if (line.artifact == "forge" && !version.startsWith(line.prefix)) line.prefix + version else version
+
+        /** The Forge build part of a version, whether or not it was typed with its Minecraft prefix. */
+        internal fun forgeBuild(mc: String, version: String): String = version.removePrefix("$mc-")
 
         /** The recommended build for [mc] from a promotions_slim.json body, else the latest. */
         internal fun pickForgePromotion(json: Json, promotionsBody: String, mc: String): String? {
@@ -363,12 +403,17 @@ class ModernInstallerResolver(
         ): ModernInstallerResolver = ModernInstallerResolver(
             clientProvider, transfers, json, javaManager, cacheDir, loaderId = "neoforge",
             latestVersion = { mc ->
-                val prefix = neoforgeVersionPrefix(mc)
-                json.parseToJsonElement(fetchText(clientProvider, "$NEOFORGE_META_LATEST?filter=$prefix"))
-                    .jsonObject["version"]?.jsonPrimitive?.contentOrNull
-                    ?: throw IOException("no NeoForge version for Minecraft $mc (prefix $prefix)")
+                val line = neoforgeLine(mc)
+                val index = json.parseToJsonElement(fetchText(clientProvider, "$NEOFORGE_META_VERSIONS/${line.artifact}"))
+                    .jsonObject["versions"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+                pickNeoForge(index, line)
+                    ?: throw IOException("no NeoForge version for Minecraft $mc (prefix ${line.prefix})")
             },
-        ) { _, version -> "$NEOFORGE_MAVEN/net/neoforged/neoforge/$version/neoforge-$version-installer.jar" }
+        ) { mc, version ->
+            val line = neoforgeLine(mc)
+            val coordinate = neoforgeCoordinate(line, version)
+            "$NEOFORGE_MAVEN/net/neoforged/${line.artifact}/$coordinate/${line.artifact}-$coordinate-installer.jar"
+        }
 
         /** Modern Forge: `<mc>-<build>` slug, same shape as the legacy maven. */
         fun forge(
@@ -383,7 +428,11 @@ class ModernInstallerResolver(
                 pickForgePromotion(json, fetchText(clientProvider, FORGE_PROMOTIONS), mc)
                     ?: throw IOException("no Forge promotion for Minecraft $mc")
             },
-        ) { mc, version -> "$FORGE_MAVEN/net/minecraftforge/forge/$mc-$version/forge-$mc-$version-installer.jar" }
+        ) { mc, version ->
+            // Typed in full (`1.20.1-47.2.0`) the Minecraft part used to be added twice.
+            val build = forgeBuild(mc, version)
+            "$FORGE_MAVEN/net/minecraftforge/forge/$mc-$build/forge-$mc-$build-installer.jar"
+        }
     }
 }
 
@@ -414,3 +463,6 @@ class ForgeResolver(
         }
     }
 }
+
+/** One NeoForge release line: the maven artifact and the prefix its versions share. */
+internal data class NeoForgeLine(val artifact: String, val prefix: String)
