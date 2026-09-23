@@ -242,6 +242,7 @@ private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modi
         is IndicationCenter.LaunchIndication.Downloading ->
             NxTheme.colors.progressAccent to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
         IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
+        IndicationCenter.LaunchIndication.Stopping -> NxTheme.colors.progressAccent to s.launchStopping
         IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
     }
     NxMetaChip(text = label, modifier = modifier, tone = NxMetaChipTone.OnMedia, dot = dotColor)

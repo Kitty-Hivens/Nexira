@@ -1211,6 +1211,13 @@ interface AppStrings {
     val launchBlockMissing: String
     /** The launch control while another pack's launch or game holds the launcher. */
     val launchBlockOtherRunning: String
+    /** The launch control while its game has been asked to end and has not gone yet. */
+    val launchStopping: String
+    /** Asked on quit while a game is running: whether to leave it running or stop it first. */
+    val quitGameTitle: String
+    fun quitGameBody(packName: String): String
+    val quitLeaveGame: String
+    val quitStopGame: String
     /** Notification and console text for a launch refused because the pack was busy with its files. */
     val notifReasonInstanceBusy: String
     /** Wait state on the hero Play pill while the launch prepares or syncs. */

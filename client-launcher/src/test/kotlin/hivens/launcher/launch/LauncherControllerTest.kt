@@ -426,13 +426,13 @@ class LauncherControllerTest {
     }
 
     /**
-     * Stopping one pack and starting another immediately is allowed: abort sets Idle
-     * while the first launch is still parked in a wait that cancellation cannot
-     * interrupt. When it finally wakes -- after the second game is live -- everything
-     * its tail would clear belongs to the second one.
+     * A game told to stop has up to the termination grace left, and until it goes it
+     * is still writing its instance. Stop used to reopen Play at once, so a second
+     * launch could start beside it, and it cancelled the launch, which skipped the
+     * tail that records the session: a stopped game left no playtime at all.
      */
     @Test
-    fun `an aborted launch waking up late does not clear the session that replaced it`() = runTest {
+    fun `a stopped game holds the launcher until it exits, and its session is recorded`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
 
@@ -442,15 +442,15 @@ class LauncherControllerTest {
             Files.createDirectories(sandbox.resolve("instances").resolve(i.instanceDirName))
         }
         coEvery { packRepository.get(any()) } answers { if (firstArg<String>() == "first") first else second }
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
 
-        // Uninterruptible, the way `Process.waitFor` is: cancelling the launch job
-        // does not free it, which is the whole premise of the race.
+        // Uninterruptible, the way `Process.waitFor` is.
         val firstExit = CompletableDeferred<Int>()
         val firstHandle = mockk<LaunchHandle>(relaxed = true)
         coEvery { firstHandle.awaitExit() } coAnswers { withContext(NonCancellable) { firstExit.await() } }
         val secondHandle = mockk<LaunchHandle>(relaxed = true)
-        val secondExit = CompletableDeferred<Int>()
-        coEvery { secondHandle.awaitExit() } coAnswers { withContext(NonCancellable) { secondExit.await() } }
+        coEvery { secondHandle.awaitExit() } returns 0
 
         val handles = ArrayDeque(listOf(firstHandle, secondHandle))
         coEvery {
@@ -470,18 +470,81 @@ class LauncherControllerTest {
         assertEquals("first", controller.runningPackInstanceId.value)
 
         controller.abort()
-        controller.launchPackInstance(session, second)
         advanceUntilIdle()
-        assertEquals("second", controller.runningPackInstanceId.value, "the second launch owns the controller now")
+        assertIs<LaunchState.Stopping>(controller.state.value, "stopping, not idle, while the process is alive")
+        coVerify(exactly = 1) { firstHandle.terminate() }
+        assertEquals(false, controller.launchPackInstance(session, second), "nothing starts beside a game still going")
+        assertEquals("first", controller.runningPackInstanceId.value, "its files are still in use")
 
-        // The first game finally dies, long after the second is live.
         firstExit.complete(143)
         advanceUntilIdle()
+        assertEquals(LaunchState.Idle, controller.state.value, "a stop is not a crash")
+        assertNull(controller.runningPackInstanceId.value)
+        assertTrue(puts.any { it.id == "first" && it.lastPlayedEpochOrZero == 0L }, "the exit wrote the session's playtime")
 
-        assertEquals("second", controller.runningPackInstanceId.value, "the first launch's tail cleared the second's session")
-        assertIs<LaunchState.GameRunning>(controller.state.value, "and overwrote the state it had no claim on")
+        assertTrue(controller.launchPackInstance(session, second), "and the launcher is free again")
+        advanceUntilIdle()
+    }
 
-        secondExit.complete(0)
+    /** A pack's own Stop names that pack; a control left over from an ended launch must not end another game. */
+    @Test
+    fun `stopping one pack does nothing to another pack's game`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val playing = packInstance("playing")
+        Files.createDirectories(sandbox.resolve("instances").resolve(playing.instanceDirName))
+        coEvery { packRepository.get(any()) } returns playing
+        coJustRun { packRepository.put(any()) }
+        val exit = CompletableDeferred<Int>()
+        val handle = mockk<LaunchHandle>(relaxed = true)
+        coEvery { handle.awaitExit() } coAnswers { withContext(NonCancellable) { exit.await() } }
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+
+        val controller = newController(this)
+        controller.launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), playing)
+        advanceUntilIdle()
+
+        controller.abort("some-other-pack")
+        advanceUntilIdle()
+
+        assertIs<LaunchState.GameRunning>(controller.state.value)
+        coVerify(exactly = 0) { handle.terminate() }
+        exit.complete(0)
+        advanceUntilIdle()
+    }
+
+    /**
+     * Quitting the launcher and leaving the game running never reaches the launch's
+     * own tail, which was the only writer of playtime, so the session went unrecorded.
+     */
+    @Test
+    fun `a session left running on quit is recorded before the launcher goes`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        val playing = packInstance("left")
+        Files.createDirectories(sandbox.resolve("instances").resolve(playing.instanceDirName))
+        coEvery { packRepository.get(any()) } returns playing
+        val puts = mutableListOf<PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
+        val exit = CompletableDeferred<Int>()
+        val handle = mockk<LaunchHandle>(relaxed = true)
+        coEvery { handle.awaitExit() } coAnswers { withContext(NonCancellable) { exit.await() } }
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+
+        val controller = newController(this)
+        controller.launchPackInstance(SessionData(playerName = "tester", uuid = "u", accessToken = "tok"), playing)
+        advanceUntilIdle()
+        val beforeQuit = puts.size
+
+        controller.settleSessionForQuit()
+
+        assertEquals(beforeQuit + 1, puts.size, "the playtime so far is written before the process goes")
+        coVerify(exactly = 0) { handle.terminate() }
+        exit.complete(0)
         advanceUntilIdle()
     }
 

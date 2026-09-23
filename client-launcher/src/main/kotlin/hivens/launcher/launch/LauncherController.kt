@@ -55,11 +55,10 @@ import kotlinx.coroutines.slf4j.MDCContext
  * graph automatically; production wiring stays a one-liner.
  *
  * Note: [appScope] is the shared `single<CoroutineScope>(createdAtStart)`
- * registered alongside [AppCoroutineScopeHook] -- the
- * JVM shutdown hook cancels every in-flight launch on process exit. The
- * prior dedicated `CoroutineScope(SupervisorJob() + IO)` here was
- * unreachable from any shutdown hook, so a SIGTERM mid-launch could
- * leave the spawned game process and its sockets hanging.
+ * registered alongside [AppCoroutineScopeHook], whose JVM shutdown hook cancels
+ * the launcher's own work in flight. A running game is not part of that work and
+ * survives it; see the hook for why, and [settleSessionForQuit] for how its
+ * session is still recorded when the launcher quits around it.
  */
 class LauncherController(
     private val authService: AuthProvider,
@@ -223,6 +222,7 @@ class LauncherController(
         emit(LaunchLogEvent.Error(reason))
     }
 
+    /** Read and written under [launchLock] only. */
     private var launchJob: Job? = null
     /**
      * Tracked separately from [launchJob] so [abort] can terminate the live
@@ -235,19 +235,14 @@ class LauncherController(
     private val launchLock = Any()
 
     /**
-     * Per-launch abort token. Each launch installs a fresh
-     * AtomicBoolean here and captures it in its coroutine; [abort] flips
-     * whatever token is current. The launch coroutine -- parked in the
-     * blocking `process.waitFor()`, which resumes with SIGTERM code 143
-     * once the process is destroyed -- checks ITS OWN captured token to
-     * tell a user stop from a crash.
+     * Per-launch abort token. Each launch installs a fresh AtomicBoolean here and
+     * captures it in its coroutine; [abort] flips whatever token is current. The
+     * launch coroutine, parked in the process wait, checks ITS OWN captured token
+     * to tell a user stop from a crash.
      *
-     * A single shared flag would race: aborting game A then immediately
-     * launching B (allowed, because abort sets state Idle synchronously
-     * while A's coroutine is still blocked in waitFor) would let B reset
-     * the flag before A's exit handler reads it, so A would falsely
-     * report a crash and clobber B's state. A per-launch token each
-     * coroutine reads in isolation removes the race.
+     * Per launch rather than one shared flag, because a launch that was stopped
+     * during its preparation unwinds after [abort] has already reopened the gate,
+     * and a shared flag would be reset under it by the launch that followed.
      */
     @Volatile private var currentAbortToken: AtomicBoolean? = null
 
@@ -255,16 +250,41 @@ class LauncherController(
      * Identity of the launch that currently owns the controller's shared state --
      * [runningHandle], [_runningPackInstanceId] and [_state].
      *
-     * Aborting A and immediately launching B is allowed: abort sets Idle
-     * synchronously while A's coroutine is still parked in a blocking `awaitExit`
-     * that cancellation cannot interrupt. A then wakes up, potentially long after B
-     * spawned, and everything its tail clears would be B's. Each launch checks that
-     * it is still the current one before touching anything shared, and otherwise
-     * unwinds silently.
+     * A launch stopped while it was still preparing is cancelled, and [abort] opens
+     * the gate at once, since there is no game to wait for; its coroutine unwinds
+     * afterwards, possibly after the next launch has started. Each launch checks
+     * that it is still the current one before touching anything shared, and
+     * otherwise unwinds silently. A launch with a game running is not reopened
+     * until that game exits, so this is no longer the case for a stopped game.
      */
     @Volatile private var currentLaunchTag: Any? = null
 
     private fun ownsController(tag: Any): Boolean = currentLaunchTag === tag
+
+    /**
+     * The session of the game that is up: which launch it belongs to, where its
+     * playtime has been counted up to, and what records it.
+     *
+     * Kept outside the launch coroutine because a session has two ways to end. The
+     * usual one is the process exiting, when the coroutine's own tail records it.
+     * The other is the launcher quitting with the game left running, where the tail
+     * never runs and [settleSessionForQuit] records what has been played so far.
+     * Counting from [countedFrom] rather than from a fixed start keeps the two from
+     * adding the same minutes twice.
+     */
+    private class LiveSession(
+        val tag: Any,
+        val countedFrom: AtomicLong,
+        val record: (suspend (sessionSeconds: Long) -> Unit)?,
+    ) {
+        /** The seconds since the last count, moving the mark to now. */
+        fun take(): Long {
+            val now = Instant.now().epochSecond
+            return (now - countedFrom.getAndSet(now)).coerceAtLeast(0)
+        }
+    }
+
+    @Volatile private var liveSession: LiveSession? = null
 
     /**
      * Outcome of a prepare phase. [Ready] carries the path-specific spawn (and
@@ -312,111 +332,161 @@ class LauncherController(
         onAccepted: () -> Unit = {},
         prepare: suspend CoroutineScope.() -> Prepared,
     ): Boolean {
-        // Re-entry guard must be atomic with the launchJob assignment. Without
-        // the lock two parallel callers (a UI double-click, a tray launch racing
-        // one from the Library) could both observe Idle, both pass the gate, both
-        // assign launchJob, and produce two in-flight game spawns -- of which
-        // only the second is tracked for abort(). Claim the state slot under
-        // the lock; the coroutine runs outside it so the gate isn't held
-        // during the long flow.
-        synchronized(launchLock) {
-            if (_state.value !is LaunchState.Idle &&
-                _state.value !is LaunchState.Error) return false
-            _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
-            onAccepted()
-        }
-
         // Tag every log line for this attempt with a stable launchId so a user
         // dump can be sliced per-play-click (`grep launchId=abcd1234 *.log`).
         // MDCContext (from kotlinx-coroutines-slf4j) propagates it across every
         // dispatcher hop the flow takes, including LauncherService.
         val launchId = UUID.randomUUID().toString().take(8)
         val abortToken = AtomicBoolean(false)
-        currentAbortToken = abortToken
         val launchTag = Any()
-        currentLaunchTag = launchTag
+        val job: Job
 
-        launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
-            // Local, not a field: a field would let an aborted launch's tail cancel
-            // the guard of the launch that started after it -- the same shape of
-            // race currentAbortToken's KDoc describes.
-            var sessionGuard: Job? = null
-            try {
-                _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
-                onStart()
-                ActionRing.record("Launching: $label (launchId=$launchId)")
+        // The gate, the fields that identify this launch, and its job are claimed in
+        // one step under the lock that [abort] also takes. Two parallel callers (a UI
+        // double-click, a tray launch racing one from the Library) must not both pass
+        // the gate. And the identity must not be written after the lock is released:
+        // an abort in that window flipped the previous launch's token and cancelled
+        // the previous job, and this launch then ran on to a game the person believed
+        // they had stopped. The job is created lazily inside the lock and started
+        // outside it, so the long flow never runs under the gate.
+        synchronized(launchLock) {
+            if (_state.value !is LaunchState.Idle &&
+                _state.value !is LaunchState.Error) return false
+            _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+            onAccepted()
+            currentAbortToken = abortToken
+            currentLaunchTag = launchTag
+            job = appScope.launch(MDCContext(mapOf("launchId" to launchId)), start = CoroutineStart.LAZY) {
+                runLaunch(label, launchId, launchTag, abortToken, onStart, prepare)
+            }
+            launchJob = job
+        }
+        job.start()
+        return true
+    }
 
-                val prepared = when (val r = prepare()) {
-                    // prepare() already called fail(); stop without touching _state.
-                    is Prepared.Bail -> {
-                        if (ownsController(launchTag)) _runningPackInstanceId.value = null
-                        return@launch
-                    }
-                    is Prepared.Ready -> r
+    /** The body of one accepted launch; see [launchInternal]. */
+    private suspend fun CoroutineScope.runLaunch(
+        label: String,
+        launchId: String,
+        launchTag: Any,
+        abortToken: AtomicBoolean,
+        onStart: () -> Unit,
+        prepare: suspend CoroutineScope.() -> Prepared,
+    ) {
+        // Local, not a field: a field would let an aborted launch's tail cancel
+        // the guard of the launch that started after it -- the same shape of
+        // race currentAbortToken's KDoc describes.
+        var sessionGuard: Job? = null
+        // The game this launch started, so a stop that interrupts the launch
+        // before the wait is armed can still end it.
+        var spawned: LaunchHandle? = null
+        try {
+            _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+            onStart()
+            ActionRing.record("Launching: $label (launchId=$launchId)")
+
+            val prepared = when (val r = prepare()) {
+                // prepare() already called fail(); stop without touching _state.
+                is Prepared.Bail -> {
+                    if (ownsController(launchTag)) _runningPackInstanceId.value = null
+                    return
                 }
+                is Prepared.Ready -> r
+            }
 
-                setStage(PrepareStage.LAUNCH, 0.95f)
-                ActionRing.record("Game running: $label")
-                emit(LaunchLogEvent.Launching)
+            setStage(PrepareStage.LAUNCH, 0.95f)
+            ActionRing.record("Game running: $label")
+            emit(LaunchLogEvent.Launching)
 
-                when (val result = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }) {
-                    // The service maps its own failures (provisioning, spawn IO,
-                    // SC-binding block) to a semantic LaunchError; surface it.
-                    is SpawnResult.Failed -> {
-                        if (ownsController(launchTag)) _runningPackInstanceId.value = null
-                        fail(result.error)
-                    }
-                    is SpawnResult.Started -> {
-                        val handle = result.handle
-                        runningHandle = handle
-                        _state.value = LaunchState.GameRunning(handle)
-                        // Post-spawn hook guarded centrally: a throwing hook must
-                        // not flip the running game into an Error state.
-                        prepared.onSpawned?.let { hook ->
-                            runCatching { sessionGuard = hook(handle) }
-                                .onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+            when (val result = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }) {
+                // The service maps its own failures (provisioning, spawn IO,
+                // SC-binding block) to a semantic LaunchError; surface it.
+                is SpawnResult.Failed -> {
+                    if (ownsController(launchTag)) _runningPackInstanceId.value = null
+                    fail(result.error)
+                }
+                is SpawnResult.Started -> {
+                    val handle = result.handle
+                    spawned = handle
+                    val live = LiveSession(launchTag, AtomicLong(Instant.now().epochSecond), prepared.onExit)
+                    synchronized(launchLock) {
+                        if (ownsController(launchTag)) {
+                            runningHandle = handle
+                            liveSession = live
+                            // A stop that arrived while the process was being
+                            // started found no game to end. It is ended now,
+                            // and the launch waits for it like any other stop.
+                            if (abortToken.get()) {
+                                _state.value = LaunchState.Stopping(handle)
+                                runCatching { handle.terminate() }
+                            } else {
+                                _state.value = LaunchState.GameRunning(handle)
+                            }
                         }
-                        val sessionStart = Instant.now().epochSecond
+                    }
+                    // Post-spawn hook guarded centrally: a throwing hook must
+                    // not flip the running game into an Error state.
+                    prepared.onSpawned?.let { hook ->
+                        runCatching { sessionGuard = hook(handle) }
+                            .onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+                    }
 
-                        // Reads its OWN captured abortToken, never the
-                        // currentAbortToken field -- see that field's KDoc for the
-                        // abort-A-then-launch-B race a shared flag would reopen.
-                        val exitCode = handle.awaitExit()
-                        // Whatever the post-spawn guard was still watching for, the
-                        // process is gone and there is nothing left to watch it on.
-                        // Unconditional: this one is this launch's own.
-                        sessionGuard?.cancel()
+                    // Reads its OWN captured abortToken, never the
+                    // currentAbortToken field -- see that field's KDoc.
+                    val exitCode = handle.awaitExit()
+                    // Whatever the post-spawn guard was still watching for, the
+                    // process is gone and there is nothing left to watch it on.
+                    // Unconditional: this one is this launch's own.
+                    sessionGuard?.cancel()
+                    ActionRing.record("Game exited: $label (code $exitCode)")
+                    // Recorded before the state settles, and before anything
+                    // could reopen the gate: a stop is a normal end of a session
+                    // and its playtime counts. It used to be skipped whole,
+                    // because the stop cancelled the coroutine and the wait
+                    // threw past this tail.
+                    live.record?.let { hook ->
+                        runCatching { hook(live.take()) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
+                    }
+
+                    synchronized(launchLock) {
                         if (ownsController(launchTag)) {
                             runningHandle = null
+                            liveSession = null
                             // Cleared here rather than in the pack path's own exit
                             // hook: that hook is guarded and may be skipped, and "no
                             // files are in use" has to be true the moment the
                             // process is gone.
                             _runningPackInstanceId.value = null
+                            when {
+                                // The watchdog ended this session. Reported now that
+                                // the process is gone rather than when it was told to
+                                // go: Error reads as Play, and a second game started
+                                // inside the grace would share the instance with this
+                                // one. Read before the exit code, which is the
+                                // watchdog's own doing.
+                                prepared.contentFailed.get() -> fail(LaunchError.ContentChangedDuringLaunch)
+                                exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
+                                else -> _state.value = LaunchState.Idle
+                            }
                         }
-                        ActionRing.record("Game exited: $label (code $exitCode)")
-                        prepared.onExit?.let { hook ->
-                            val secs = (Instant.now().epochSecond - sessionStart).coerceAtLeast(0)
-                            runCatching { hook(secs) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
-                        }
-
-                        when {
-                            // A newer launch owns the state now: this one exited
-                            // into a world that has moved on and says nothing.
-                            !ownsController(launchTag) -> Unit
-                            // Read before the exit code: that code IS the guard's
-                            // doing, and judging it would overwrite the reason.
-                            prepared.contentFailed.get() -> Unit
-                            exitCode != 0 && !abortToken.get() -> fail(LaunchError.ExitCode(exitCode))
-                            else -> _state.value = LaunchState.Idle
-                        }
+                        // A newer launch owns the state otherwise: this one exited
+                        // into a world that has moved on and says nothing.
                     }
                 }
-            } catch (e: Exception) {
-                sessionGuard?.cancel()
+            }
+        } catch (e: Exception) {
+            sessionGuard?.cancel()
+            // A game the person asked to stop is ended whatever interrupted the
+            // wait. Not otherwise: when the launcher itself is shutting down the
+            // scope is cancelled with no stop requested, and a game the person
+            // chose to leave running on quit has to stay running.
+            if (abortToken.get()) spawned?.let { runCatching { it.terminate() } }
+            synchronized(launchLock) {
                 val mine = ownsController(launchTag)
                 if (mine) {
                     runningHandle = null
+                    liveSession = null
                     _runningPackInstanceId.value = null
                 }
                 if (e !is CancellationException) {
@@ -427,7 +497,6 @@ class LauncherController(
                 }
             }
         }
-        return true
     }
 
     /**
@@ -775,16 +844,20 @@ class LauncherController(
         }
 
         // Raised BEFORE the process is ended, so the exit verdict already sees it
-        // when the wait returns and does not overwrite the reason with an exit code.
+        // when the wait returns and reports this reason instead of an exit code.
         contentFailed.set(true)
         logger.warn("Content changed after the spawn for {}: {}", instance.displayName, findings)
         ActionRing.record(
             "Pack launch ${instance.displayName}: content changed after the spawn, ending the session (${findings.size})",
         )
-        // No ForeignContentRemoved here: nothing was removed, and the console line
-        // for that event says otherwise. fail() emits the error the UI already
-        // renders for this reason.
-        fail(LaunchError.ContentChangedDuringLaunch)
+        // Stopping, not failed, until the process is gone. Failed reads as Play, and
+        // the process has up to the termination grace left: a second launch inside
+        // it put two games on one instance, one world and one log. The error is
+        // raised by the launch's own tail once the game has exited, which is also
+        // what emits the line the UI renders for this reason.
+        synchronized(launchLock) {
+            if (runningHandle === handle) _state.value = LaunchState.Stopping(handle)
+        }
         runCatching { handle.terminate() }
     }
 
@@ -1008,18 +1081,53 @@ class LauncherController(
     }
 
     /**
-     * Stops the in-flight launch. If the game process has already spawned,
-     * terminates it via [LaunchHandle.terminate] before resetting state --
-     * canceling the coroutine alone would orphan the spawned process and the
-     * next Play click would happily spawn a second game.
+     * Stops the in-flight launch.
+     *
+     * With a game up, it asks the game to end and leaves the rest to the launch:
+     * the state reads [LaunchState.Stopping] until the process has actually gone,
+     * and the launch's own tail then records the session and settles to Idle. It
+     * used to set Idle at once and cancel the launch, which reopened Play while the
+     * old game had up to the termination grace left, and skipped the tail that is
+     * the only writer of playtime.
+     *
+     * Still preparing, there is no game to wait for: the launch is cancelled and
+     * the gate reopens now.
      */
     fun abort() {
-        currentAbortToken?.set(true)
-        val handle = runningHandle
-        runningHandle = null
-        runCatching { handle?.terminate() }
-        launchJob?.cancel()
-        _state.value = LaunchState.Idle
+        synchronized(launchLock) {
+            currentAbortToken?.set(true)
+            val handle = runningHandle
+            if (handle != null) {
+                _state.value = LaunchState.Stopping(handle)
+                runCatching { handle.terminate() }
+            } else {
+                launchJob?.cancel()
+                _state.value = LaunchState.Idle
+            }
+        }
+    }
+
+    /**
+     * Stops the launch of [instanceId], and nothing else.
+     *
+     * What a pack's own control calls. A control left showing Stop after its
+     * launch ended would otherwise end whichever game is running now, which is not
+     * the one it names.
+     */
+    fun abort(instanceId: String) {
+        if (_runningPackInstanceId.value == instanceId) abort()
+    }
+
+    /**
+     * Records the running game's session up to now, for a launcher that is about to
+     * quit and leave the game running. Its launch never reaches its own tail in that
+     * case, so this is the only record the session gets. Minutes counted here are
+     * not counted again if the game does exit first.
+     */
+    suspend fun settleSessionForQuit() {
+        val live = liveSession ?: return
+        val record = live.record ?: return
+        runCatching { record(live.take()) }.onFailure { logger.warn("Recording the session before quit failed", it) }
     }
 
     private fun setStage(stage: PrepareStage, progress: Float) {

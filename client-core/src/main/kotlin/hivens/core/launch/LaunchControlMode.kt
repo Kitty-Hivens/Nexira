@@ -37,4 +37,5 @@ fun LaunchState.controlMode(): LaunchControlMode = when (this) {
     is LaunchState.Prepare     -> LaunchControlMode.Wait
     is LaunchState.Downloading -> LaunchControlMode.Wait
     is LaunchState.GameRunning -> LaunchControlMode.Stop
+    is LaunchState.Stopping    -> LaunchControlMode.Wait
 }

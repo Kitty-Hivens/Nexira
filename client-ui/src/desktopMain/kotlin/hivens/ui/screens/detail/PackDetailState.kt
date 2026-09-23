@@ -119,7 +119,7 @@ internal fun rememberPackDetailState(instanceId: String): PackDetailState {
             instanceId = instanceId,
             repo       = repo,
             dataDir    = paths.dataDir,
-            abort      = controller::abort,
+            abort      = { controller.abort(instanceId) },
             openInFileManager = { dir -> SystemActions.openFolder(dir.toString()) },
             writeScope = writeScope,
         )

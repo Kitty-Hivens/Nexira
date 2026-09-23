@@ -166,10 +166,13 @@ fun rememberLaunchControl(
 
     return when {
         mode == LaunchControlMode.Stop -> LaunchControl(
-            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = controller::abort,
+            mode, null, s.packPlayExit, NxIcon.Stop, PlayTone.Ready, null, onClick = { controller.abort(pack.id) },
         )
         mode == LaunchControlMode.Wait -> LaunchControl(
-            mode, null, s.packPlayWait, NxIcon.PlayArrow, PlayTone.Waiting,
+            mode, null,
+            if (indication == LaunchIndication.Stopping) s.launchStopping else s.packPlayWait,
+            if (indication == LaunchIndication.Stopping) NxIcon.Stop else NxIcon.PlayArrow,
+            PlayTone.Waiting,
             progress = (indication as? LaunchIndication.Downloading)?.progress,
             onClick = {},
         )

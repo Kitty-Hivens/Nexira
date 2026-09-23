@@ -210,5 +210,6 @@ private fun coarseLabel(state: LaunchState): String? = when (state) {
     is LaunchState.Prepare -> "prepare:${state.stage}"
     is LaunchState.Downloading -> "downloading"
     is LaunchState.GameRunning -> "running"
+    is LaunchState.Stopping -> "stopping"
     LaunchState.Idle, is LaunchState.Error -> null
 }

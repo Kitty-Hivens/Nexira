@@ -35,6 +35,16 @@ sealed class LaunchState {
         val handle: LaunchHandle,
     ) : LaunchState()
 
+    /**
+     * The game was asked to end and its process has not gone yet. It takes up to the
+     * termination grace, and until it is gone its files are in use and its session
+     * is not over, so nothing may start another launch and nothing may call the
+     * session finished. The launch settles to Idle, or to an Error, once it exits.
+     */
+    data class Stopping(
+        val handle: LaunchHandle,
+    ) : LaunchState()
+
     data class Error(
         val reason: LaunchError,
         /** Original throwable when available (catch-all path). UI does not render this directly. */

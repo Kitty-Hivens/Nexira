@@ -28,6 +28,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -119,6 +120,10 @@ class LaunchDriver(
                             is LaunchState.Prepare     -> onPrepare(target, state)
                             is LaunchState.Downloading -> onDownloading(target, state)
                             is LaunchState.GameRunning -> onRunning(target, state)
+                            // Still this pack's session: its files are in use until
+                            // the process goes, and the control waits rather than
+                            // offering Play or a second Stop.
+                            is LaunchState.Stopping    -> indications.setLaunchIndication(target.id, LaunchIndication.Stopping)
                             is LaunchState.Error       -> onError(target, state.reason)
                             LaunchState.Idle           -> onIdle(target)
                         }
@@ -131,6 +136,19 @@ class LaunchDriver(
                 // evicted by age, and the surface only offers Dismiss once a phase
                 // is terminal, so nothing could ever remove it.
                 activities.dismiss(launchKey(target))
+                // The indication and the session go too, the same three the failure
+                // arm clears. A new launch is only accepted once the previous one has
+                // ended, so a cancelled observer's launch is over even when the
+                // observer never saw it end (the state is conflated). Left behind,
+                // its pack kept showing Exit, and that Exit stopped whichever game
+                // was running next. Unless the launch that replaced it is the same
+                // pack's, whose observer owns these entries now.
+                val self = currentCoroutineContext()[Job]
+                val current = observerJobs[target.id]
+                if (current == null || current === self) {
+                    indications.setLaunchIndication(target.id, null)
+                    sessions.unregister(target.id)
+                }
                 throw e
             } catch (e: Exception) {
                 log.warn("LaunchDriver observation aborted for ${target.id}", e)
@@ -254,7 +272,7 @@ class LaunchDriver(
             packInstanceId  = target.id,
             packDisplayName = target.displayName,
             packIconUrl     = target.iconUrl,
-            abort           = { controller.abort() },
+            abort           = { controller.abort(target.id) },
             showConsole     = { gameConsole.show() },
         )
         // Wire command-input -> process stdin while the game is alive.

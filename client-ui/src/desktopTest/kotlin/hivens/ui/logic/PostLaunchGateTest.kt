@@ -101,6 +101,21 @@ class PostLaunchGateTest {
         assertEquals(PostLaunchMove.HideToTray, gate.feed(LaunchState.GameRunning(handle())))
     }
 
+    /**
+     * The content watchdog now reports its failure once the process has gone, so a
+     * session passes through Stopping on its way to that Error. Treated as the end of
+     * the session, Stopping forgot the window this gate iconified and the failure had
+     * nothing to raise.
+     */
+    @Test
+    fun `a game on its way out keeps what the gate did to the window`() {
+        val gate = PostLaunchGate()
+        val h = handle()
+        gate.feed(LaunchState.GameRunning(h), trayReady = false)
+        assertEquals(PostLaunchMove.Stay, gate.feed(LaunchState.Stopping(h)))
+        assertEquals(PostLaunchMove.Restore, gate.feed(failed))
+    }
+
     @Test
     fun `a failed launch raises the window this gate iconified`() {
         val gate = PostLaunchGate()

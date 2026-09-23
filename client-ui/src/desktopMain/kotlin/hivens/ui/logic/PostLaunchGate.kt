@@ -57,6 +57,10 @@ class PostLaunchGate(runningAtMount: LaunchHandle? = null) {
         trayReady: Boolean,
         windowMinimized: Boolean,
     ): PostLaunchMove {
+        // The game is on its way out and the session is not over: whatever this gate
+        // did to the window stands until the launch settles, which is when a failure
+        // reported on the way out gets its chance to raise it.
+        if (state is LaunchState.Stopping) return PostLaunchMove.Stay
         if (state !is LaunchState.GameRunning) {
             // A failed launch has something to read, and the window this gate
             // iconified is where it would be read. Anything else, including a
