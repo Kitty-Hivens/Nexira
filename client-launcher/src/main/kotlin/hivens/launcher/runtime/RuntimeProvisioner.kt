@@ -11,6 +11,7 @@ import hivens.core.platform.Platform
 import hivens.launcher.runtime.loader.DownloadProgress
 import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.runtime.loader.LoaderVersionOption
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
 import hivens.launcher.runtime.loader.mergeLibraries
@@ -279,6 +280,14 @@ class RuntimeProvisioner(
             javaMajor = version.javaVersion?.majorVersion,
         )
     }
+
+    /**
+     * The versions [loaderName] publishes for [mcVersion], newest first, for the
+     * create dialog's picker. Empty for vanilla, for a loader nothing here serves,
+     * and for one with no listing.
+     */
+    suspend fun availableLoaderVersions(loaderName: String?, mcVersion: String): List<LoaderVersionOption> =
+        loaderRegistry.resolverFor(loaderName)?.availableVersions(mcVersion).orEmpty()
 
     /**
      * Every Minecraft version id from Mojang's manifest, newest-first -- the

@@ -47,6 +47,7 @@ import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallService
 import hivens.launcher.imports.LocalPackCreator
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.loader.LoaderVersionOption
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.LocalStrings
@@ -78,6 +79,7 @@ import hivens.widget.model.SurfaceId
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -290,6 +292,26 @@ private fun NewLocalPackDialog(
     val effectiveName = name.ifBlank { defaultName }
     val canCreate = mc.isNotBlank() && (!versionRequired || loaderVersion.isNotBlank())
 
+    // What the loader publishes for the chosen Minecraft version, asked once the
+    // version is one Mojang lists rather than on every keystroke of one being typed.
+    // The field stays free text: a build the listing does not carry is still one
+    // a person may name.
+    var loaderVersions by remember { mutableStateOf<List<LoaderVersionOption>>(emptyList()) }
+    var loaderMenuOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(loaderId, mc.trim(), versions) {
+        loaderVersions = emptyList()
+        val target = mc.trim()
+        if (loaderId == null || target !in versions) return@LaunchedEffect
+        delay(300)
+        loaderVersions = runCatching {
+            withContext(Dispatchers.IO) { provisioner.availableLoaderVersions(loaderId, target) }
+        }.getOrDefault(emptyList())
+    }
+    val loaderMatches = remember(loaderVersion, loaderVersions) {
+        val typed = loaderVersion.trim()
+        (if (typed.isEmpty()) loaderVersions else loaderVersions.filter { it.version.contains(typed, ignoreCase = true) }).take(60)
+    }
+
     LaunchedEffect(Unit) {
         versions = runCatching { withContext(Dispatchers.IO) { provisioner.availableMinecraftVersions() } }.getOrDefault(emptyList())
     }
@@ -389,12 +411,38 @@ private fun NewLocalPackDialog(
 
                     if (loaderId != null) {
                         FieldLabel(s.createPackLoaderVersion)
-                        NxField(
-                            value = loaderVersion,
-                            onValueChange = { loaderVersion = it },
-                            placeholder = if (versionRequired) s.createPackLoaderVersionRequired else s.createPackLoaderVersionLatest,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        Box {
+                            NxField(
+                                value = loaderVersion,
+                                onValueChange = { loaderVersion = it; loaderMenuOpen = true },
+                                placeholder = if (versionRequired) s.createPackLoaderVersionRequired else s.createPackLoaderVersionLatest,
+                                modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) loaderMenuOpen = true },
+                            )
+                            NxContextMenu(
+                                expanded         = loaderMenuOpen && loaderMatches.isNotEmpty(),
+                                onDismissRequest = { loaderMenuOpen = false },
+                                align            = NxMenuAlign.Start,
+                                maxHeight        = 240.dp,
+                                matchAnchorWidth = true,
+                            ) {
+                                loaderMatches.forEach { option ->
+                                    NxMenuItem(
+                                        label = option.version,
+                                        hint = when {
+                                            option.recommended -> s.createPackLoaderRecommended
+                                            !option.stable -> s.createPackLoaderPreRelease
+                                            else -> null
+                                        },
+                                        selected = option.version == loaderVersion,
+                                        mark = NxMenuMark.Radio,
+                                    ) {
+                                        loaderVersion = option.version
+                                        loaderMenuOpen = false
+                                    }
+                                }
+                            }
+                        }
+                        PuppetField("createPack.loaderVersion", loaderVersion) { loaderVersion = it; loaderMenuOpen = true }
                     }
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {

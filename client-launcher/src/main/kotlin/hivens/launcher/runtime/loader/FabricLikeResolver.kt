@@ -60,6 +60,13 @@ class FabricLikeResolver(
             )
         }
 
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> = withContext(Dispatchers.IO) {
+        val url = "${metaBaseUrl.trimEnd('/')}/versions/loader/$mcVersion"
+        json.decodeFromString(ListSerializer(FabricLoaderEntry.serializer()), fetchText(url))
+            // Quilt flags no entry stable, which would read as every build a beta.
+            .let { entries -> entries.map { LoaderVersionOption(it.loader.version, stable = it.loader.stable || entries.none { e -> e.loader.stable }) } }
+    }
+
     /**
      * The loader version to use when a pack pins none. The meta list
      * (`/versions/loader/<mc>`) is newest-first; prefer the newest STABLE loader,

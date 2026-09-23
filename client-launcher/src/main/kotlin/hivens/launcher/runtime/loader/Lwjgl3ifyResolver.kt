@@ -54,6 +54,7 @@ class Lwjgl3ifyResolver(
     private val json: Json,
     osName: String = System.getProperty("os.name", ""),
     private val releaseBase: String = LWJGL3IFY_RELEASES,
+    private val releasesApi: String = LWJGL3IFY_RELEASES_API,
     /** Where a version's profile is kept, so a relaunch needs no release fetch. */
     cacheDir: Path? = null,
 ) : LoaderResolver {
@@ -85,6 +86,12 @@ class Lwjgl3ifyResolver(
                     json.decodeFromString(LoaderVersionJson.serializer(), text).also { cache.writeText(kept, text) }
                 }
             buildProfile(parsed).copy(version = loaderVersion)
+        }
+
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> =
+        if (mcVersion != LWJGL3IFY_MINECRAFT) emptyList()
+        else withContext(Dispatchers.IO) {
+            githubReleaseVersions(clientProvider, json, releasesApi) { "version.json" }
         }
 
     /**
@@ -145,6 +152,7 @@ class Lwjgl3ifyResolver(
 
     companion object {
         const val LWJGL3IFY_RELEASES = "https://github.com/GTNewHorizons/lwjgl3ify/releases/download"
+        const val LWJGL3IFY_RELEASES_API = "https://api.github.com/repos/GTNewHorizons/lwjgl3ify/releases?per_page=50"
         /** Vanilla's LWJGL2 maven group, dropped so LWJGL3 is the only LWJGL on -cp. */
         const val LWJGL2_GROUP = "org.lwjgl.lwjgl"
 

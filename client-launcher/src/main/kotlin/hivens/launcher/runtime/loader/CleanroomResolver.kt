@@ -52,6 +52,7 @@ class CleanroomResolver(
     private val transfers: TransferEngine,
     private val json: Json,
     private val releaseBase: String = CLEANROOM_RELEASES,
+    private val releasesApi: String = CLEANROOM_RELEASES_API,
     /** Where a version's installer is kept, so a relaunch downloads nothing. */
     cacheDir: Path? = null,
 ) : LoaderResolver {
@@ -63,9 +64,9 @@ class CleanroomResolver(
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
-            // Releases are a GitHub page with no index to ask for the latest, so a
-            // blank version has nothing to resolve to. It used to reach the URL as an
-            // empty segment and come back as a bare 404.
+            // The only index of its releases is GitHub's rate-limited API, which a
+            // launch does not ask, so a blank version has nothing to resolve to. It
+            // used to reach the URL as an empty segment and come back as a bare 404.
             if (loaderVersion.isBlank()) throw IOException("Cleanroom needs a version to install, and none was given")
             // It modernises one Minecraft version and nothing else, and layered onto
             // another it assembled a classpath that could only crash.
@@ -102,6 +103,12 @@ class CleanroomResolver(
                 version.minecraftArguments,
                 version.libraries.map { toSpec(it, zip) },
             ).copy(version = loaderVersion)
+        }
+
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> =
+        if (mcVersion != CLEANROOM_MINECRAFT) emptyList()
+        else withContext(Dispatchers.IO) {
+            githubReleaseVersions(clientProvider, json, releasesApi) { "cleanroom-$it-installer.jar" }
         }
 
     /**
@@ -166,6 +173,7 @@ class CleanroomResolver(
 
     companion object {
         const val CLEANROOM_RELEASES = "https://github.com/CleanroomMC/Cleanroom/releases/download"
+        const val CLEANROOM_RELEASES_API = "https://api.github.com/repos/CleanroomMC/Cleanroom/releases?per_page=50"
         /** The one Minecraft version Cleanroom builds on. */
         const val CLEANROOM_MINECRAFT = "1.12.2"
         /** Required Java major, from upstream docs (not declared in any artifact). */

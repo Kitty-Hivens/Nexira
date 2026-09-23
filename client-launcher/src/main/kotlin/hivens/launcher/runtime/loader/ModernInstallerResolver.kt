@@ -75,8 +75,13 @@ class ModernInstallerResolver(
      * its promotions, NeoForge its version index.
      */
     private val latestVersion: suspend (mcVersion: String) -> String,
+    /** The versions published for a Minecraft version, newest first. */
+    private val versionList: suspend (mcVersion: String) -> List<LoaderVersionOption> = { emptyList() },
     private val installerUrl: (mcVersion: String, loaderVersion: String) -> String,
 ) : LoaderResolver {
+
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> =
+        withContext(Dispatchers.IO) { versionList(mcVersion) }
 
     private val log = LoggerFactory.getLogger(ModernInstallerResolver::class.java)
 
@@ -410,11 +415,20 @@ class ModernInstallerResolver(
                 pickNeoForge(index, line)
                     ?: throw IOException("no NeoForge version for Minecraft $mc (prefix ${line.prefix})")
             },
-        ) { mc, version ->
-            val line = neoforgeLine(mc)
-            val coordinate = neoforgeCoordinate(line, version)
-            "$NEOFORGE_MAVEN/net/neoforged/${line.artifact}/$coordinate/${line.artifact}-$coordinate-installer.jar"
-        }
+            installerUrl = { mc, version ->
+                val line = neoforgeLine(mc)
+                val coordinate = neoforgeCoordinate(line, version)
+                "$NEOFORGE_MAVEN/net/neoforged/${line.artifact}/$coordinate/${line.artifact}-$coordinate-installer.jar"
+            },
+            versionList = { mc ->
+                val line = neoforgeLine(mc)
+                json.parseToJsonElement(fetchText(clientProvider, "$NEOFORGE_META_VERSIONS/${line.artifact}"))
+                    .jsonObject["versions"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+                    .filter { it.startsWith(line.prefix) && '+' !in it }
+                    .reversed()
+                    .map { LoaderVersionOption(it, stable = '-' !in it.removePrefix(line.prefix)) }
+            },
+        )
 
         /** Modern Forge: `<mc>-<build>` slug, same shape as the legacy maven. */
         fun forge(
@@ -429,11 +443,12 @@ class ModernInstallerResolver(
                 pickForgePromotion(json, fetchText(clientProvider, FORGE_PROMOTIONS), mc)
                     ?: throw IOException("no Forge promotion for Minecraft $mc")
             },
-        ) { mc, version ->
-            // Typed in full (`1.20.1-47.2.0`) the Minecraft part used to be added twice.
-            val build = forgeBuild(mc, version)
-            "$FORGE_MAVEN/net/minecraftforge/forge/$mc-$build/forge-$mc-$build-installer.jar"
-        }
+            installerUrl = { mc, version ->
+                // Typed in full (`1.20.1-47.2.0`) the Minecraft part used to be added twice.
+                val build = forgeBuild(mc, version)
+                "$FORGE_MAVEN/net/minecraftforge/forge/$mc-$build/forge-$mc-$build-installer.jar"
+            },
+        )
     }
 }
 
@@ -453,6 +468,10 @@ class ForgeResolver(
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         if (isLaunchwrapperEra(mcVersion)) legacy.resolve(mcVersion, loaderVersion)
         else modern.resolve(mcVersion, loaderVersion)
+
+    /** One listing for both eras, which the Forge maven serves alike. */
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> =
+        legacy.availableVersions(mcVersion)
 
     companion object {
         /** Forge that launches through launchwrapper -- Minecraft 1.12.2 and earlier. */

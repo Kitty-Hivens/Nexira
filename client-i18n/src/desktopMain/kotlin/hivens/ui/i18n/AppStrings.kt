@@ -739,6 +739,10 @@ interface AppStrings {
     val createPackLoaderVersionLatest: String
     /** Placeholder of the loader version field for a loader that has no latest to offer. */
     val createPackLoaderVersionRequired: String
+    /** Beside a loader version the loader itself recommends. */
+    val createPackLoaderRecommended: String
+    /** Beside a loader version that is a beta or an alpha. */
+    val createPackLoaderPreRelease: String
     val createPackConfirm: String
     val createPackCancel: String
     val createPackShowSnapshots: String

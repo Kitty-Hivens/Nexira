@@ -193,7 +193,24 @@ interface LoaderResolver {
     val loaderId: String
 
     suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile
+
+    /**
+     * The versions this loader publishes for [mcVersion], newest first, for a
+     * person to pick from. Empty when the loader has no listing to offer.
+     */
+    suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> = emptyList()
 }
+
+/**
+ * One loader version on offer. [recommended] is the loader's own pick where it
+ * makes one (Forge's promotions); [stable] is false for a beta or an alpha, so a
+ * picker can say so rather than leave it to the version string.
+ */
+data class LoaderVersionOption(
+    val version: String,
+    val stable: Boolean = true,
+    val recommended: Boolean = false,
+)
 
 /**
  * Looks up the [LoaderResolver] for a manifest's loader name. `vanilla`,

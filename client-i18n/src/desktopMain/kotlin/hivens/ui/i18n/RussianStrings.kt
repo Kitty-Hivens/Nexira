@@ -650,6 +650,8 @@ object RussianStrings : AppStrings {
     override val createPackLoaderVersion = "Версия загрузчика"
     override val createPackLoaderVersionLatest = "Пусто: последняя"
     override val createPackLoaderVersionRequired = "Для этого загрузчика обязательна"
+    override val createPackLoaderRecommended = "рекомендуемая"
+    override val createPackLoaderPreRelease = "предварительная"
     override val createPackConfirm       = "Создать"
     override val createPackCancel        = "Отмена"
     override val createPackShowSnapshots = "Показать снапшоты"

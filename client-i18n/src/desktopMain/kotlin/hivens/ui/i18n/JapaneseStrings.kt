@@ -663,6 +663,8 @@ object JapaneseStrings : AppStrings {
     override val createPackLoaderVersion = "ローダーのバージョン"
     override val createPackLoaderVersionLatest = "空欄で最新版"
     override val createPackLoaderVersionRequired = "このローダーでは必須です"
+    override val createPackLoaderRecommended = "推奨"
+    override val createPackLoaderPreRelease = "プレリリース"
     override val createPackConfirm = "作成"
     override val createPackCancel = "キャンセル"
     override val createPackShowSnapshots = "スナップショットを表示"

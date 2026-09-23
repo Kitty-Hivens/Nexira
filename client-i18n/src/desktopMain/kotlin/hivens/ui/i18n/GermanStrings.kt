@@ -650,6 +650,8 @@ object GermanStrings : AppStrings {
     override val createPackLoaderVersion = "Loader-Version"
     override val createPackLoaderVersionLatest = "Leer für die neueste"
     override val createPackLoaderVersionRequired = "Für diesen Loader erforderlich"
+    override val createPackLoaderRecommended = "empfohlen"
+    override val createPackLoaderPreRelease = "Vorabversion"
     override val createPackConfirm       = "Erstellen"
     override val createPackCancel        = "Abbrechen"
     override val createPackShowSnapshots = "Snapshots anzeigen"

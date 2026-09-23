@@ -15,6 +15,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
@@ -151,6 +154,22 @@ class ForgeLegacyResolver(
             requested, mcVersion, latest,
         )
         return latest
+    }
+
+    /**
+     * Every Forge build for [mcVersion], newest first, the promoted ones marked.
+     *
+     * Served from here for both eras: the maven metadata lists modern builds too,
+     * and the promotions name the recommended and latest for each Minecraft version.
+     */
+    override suspend fun availableVersions(mcVersion: String): List<LoaderVersionOption> = withContext(Dispatchers.IO) {
+        val promos = runCatching {
+            json.parseToJsonElement(fetchText(ModernInstallerResolver.FORGE_PROMOTIONS)).jsonObject["promos"]?.jsonObject
+        }.getOrNull()
+        val recommended = promos?.get("$mcVersion-recommended")?.jsonPrimitive?.contentOrNull
+        forgeBuildsFor(mcVersion)
+            .sortedWith { a, b -> compareForgeBuilds(b, a) }
+            .map { LoaderVersionOption(it, recommended = it == recommended) }
     }
 
     private suspend fun forgeBuildsFor(mcVersion: String): List<String> {

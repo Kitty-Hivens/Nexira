@@ -651,6 +651,8 @@ object EnglishStrings : AppStrings {
     override val createPackLoaderVersion = "Loader version"
     override val createPackLoaderVersionLatest = "Empty for the latest"
     override val createPackLoaderVersionRequired = "Required for this loader"
+    override val createPackLoaderRecommended = "recommended"
+    override val createPackLoaderPreRelease = "pre-release"
     override val createPackConfirm       = "Create"
     override val createPackCancel        = "Cancel"
     override val createPackShowSnapshots = "Show snapshots"
