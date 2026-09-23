@@ -22,6 +22,8 @@ Jede Fortschrittsanzeige reagiert auf einen Druck und folgt einem Ziehen, wo imm
 
 Und eine lange Liste von Kleinigkeiten. Ein Klick auf eine Anzeige trifft jedes Mal statt etwa in der Hälfte der Fälle. Das Ziehen um die Schallplatte folgt weiter der Hand, statt stehen zu bleiben, sobald sie über den Rand gerät. Ein Titelwechsel lässt die Suchleiste nicht mehr mit der Länge des vorherigen Titels rechnen, sodass ein Klick auf die Mitte eines kurzen Stücks nicht mehr an dessen Ende springt. Uhr und Balken stimmen überein. Ein Titel ohne Tags behält einen Namen und benennt sich beim Laden nicht mehr um. Der Wiedergabeknopf auf der Cover-Karte ist im dunklen Erscheinungsbild lesbar. Ein leerer Player öffnet eine Datei überall, wo Sie ihn anklicken, auch bei Breiten, in denen sein Cover-Quadrat nicht gezeichnet wird.
 
+Ein Paket, das an keinen Server gebunden ist, startet jetzt immer offline. Bisher konnte es die Sitzung des Kontos erhalten, mit dem Sie angemeldet waren, und eine Mod in diesem Paket konnte sie an sich nehmen. Die Offline-Anmeldung im Profil funktioniert jetzt und bleibt nach einem Neustart erhalten.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.

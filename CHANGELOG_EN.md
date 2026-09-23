@@ -30,6 +30,8 @@ Every measure answers a press and follows a drag, wherever it appears: a bar, th
 
 And a long list of smaller things. A click on a measure lands every time instead of roughly half the time. Dragging around the disc keeps following your hand instead of stopping when it strays past the edge. Changing tracks no longer leaves the scrubber working from the previous track's length, so a click halfway along a short track stops jumping to the end of it. The clock and the bar agree with each other. A track with no tags keeps one name instead of renaming itself while it loads. The play button on the cover card is legible on the dark theme. An empty player opens a file wherever you click it, including at widths where its artwork square is not drawn.
 
+A pack that is not tied to a server now always starts offline. Before, it could receive the session of the account you were signed in with, and a mod in that pack could take it. Signing in offline from your profile now works and is still there after a restart.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.
