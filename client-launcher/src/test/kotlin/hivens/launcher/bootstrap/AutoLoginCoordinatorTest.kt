@@ -85,6 +85,28 @@ class AutoLoginCoordinatorTest {
         assertIs<Resolution.NoCredentials>(resolve(SettingsData(), saved = null))
     }
 
+    /**
+     * An offline identity is not an account in the store, since it has no secret. So
+     * the chosen name is the only record of it, and without reading it here a player
+     * who signed in offline was signed out by every restart.
+     */
+    @Test
+    fun `a chosen offline name comes back with no saved account and offline mode off`() = runTest {
+        val session = session(resolve(SettingsData(offlinePlayerName = "Steve"), saved = null))
+        assertTrue(session.offline)
+        assertEquals("Steve", session.playerName)
+        assertEquals(OfflineIdentity.dashlessUuidFor("Steve"), session.uuid)
+        assertEquals("", session.accessToken)
+    }
+
+    @Test
+    fun `a saved account still wins over a remembered offline name`() = runTest {
+        coEvery { authService.login("ScUser", "hunter2", any()) } returns scSaved.copy(accessToken = "fresh-token")
+        val session = session(resolve(SettingsData(offlinePlayerName = "Steve"), saved = scSaved))
+        assertEquals("ScUser", session.playerName)
+        assertEquals("fresh-token", session.accessToken)
+    }
+
     @Test
     fun `active Microsoft account silent-refreshes to a fresh token`() = runTest {
         val msa: MsaAuthProvider = mockk()

@@ -20,6 +20,9 @@ import org.slf4j.LoggerFactory
  * - **Offline mode is on.** Synthesize an offline-identity session (vanilla
  *   offline UUID, blank token) from the chosen offline name, else the last
  *   signed-in name; null when neither exists. No network call.
+ * - **No saved account, but an offline name was chosen.** The same offline
+ *   identity. It is never stored as an account, having no secret, so without
+ *   this a player who signed in offline was signed out by every restart.
  * - **Microsoft account active.** The session carries a refresh token (SC
  *   sessions never do). Silent-refresh it for a fresh Minecraft token; on any
  *   failure (or no configured client id) trust the cached token -- the MC
@@ -35,7 +38,7 @@ import org.slf4j.LoggerFactory
  *   [AuthException] with `isSslError`, stop at [Resolution.CertificateUntrusted]
  *   and leave the decision to the user.
  *   On any other failure, return null and let the user re-enter manually.
- * - **No cached password.** Return [Resolution.NoCredentials].
+ * - **No cached password, or nothing saved at all.** Return [Resolution.NoCredentials].
  *
  * Returns a [Resolution]: [Resolution.Success] carries the session;
  * [Resolution.NetworkDown] means nothing reached the server (the caller may
@@ -88,18 +91,13 @@ object AutoLoginCoordinator {
             val name = settings.offlinePlayerName?.takeIf { it.isNotBlank() }
                 ?: saved?.playerName?.takeIf { it.isNotBlank() }
                 ?: return Resolution.NoCredentials
-            return Resolution.Success(
-                SessionData(
-                    status      = AuthStatus.OK,
-                    playerName  = name,
-                    uuid        = OfflineIdentity.dashlessUuidFor(name),
-                    accessToken = "",
-                    offline     = true,
-                ),
-            )
+            return Resolution.Success(offlineSession(name))
         }
 
-        if (saved == null) return Resolution.NoCredentials
+        if (saved == null) {
+            val name = settings.offlinePlayerName?.takeIf { it.isNotBlank() } ?: return Resolution.NoCredentials
+            return Resolution.Success(offlineSession(name))
+        }
 
         // Experimental single-session: trust the saved SmartyCraft token and make no
         // request. The re-login below is destructive on SmartyCraft -- it mints a new
@@ -191,6 +189,14 @@ object AutoLoginCoordinator {
             }
         }
     }
+
+    private fun offlineSession(name: String) = SessionData(
+        status      = AuthStatus.OK,
+        playerName  = name,
+        uuid        = OfflineIdentity.dashlessUuidFor(name),
+        accessToken = "",
+        offline     = true,
+    )
 
     /**
      * Backoff ladder for [Resolution.NetworkDown] retries: quick first

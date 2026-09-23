@@ -1212,9 +1212,19 @@ fun AppRoot(
     // that no longer has one, and nothing surfaces the setting again until two
     // accounts are back, so it would decide the face of a session the user set
     // up long after making it.
+    //
+    // Signing out of an offline identity forgets its name as well. The name is the
+    // only record of that identity, and startup signs it back in from there.
     val doLogout = {
+        val wasOffline = (appState as? AppState.Authenticated)?.session?.offline == true
         credentialsManager.clear()
-        settingsService.saveSettings(settingsService.getSettings().copy(preferredFaceProvider = null))
+        val settings = settingsService.getSettings()
+        settingsService.saveSettings(
+            settings.copy(
+                preferredFaceProvider = null,
+                offlinePlayerName = if (wasOffline) null else settings.offlinePlayerName,
+            ),
+        )
         appState = AppState.Unauthenticated
     }
 

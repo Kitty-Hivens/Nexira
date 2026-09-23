@@ -77,8 +77,14 @@ fun ProfileAccountSectionWidget() {
                 // SmartyCraft uses the username/password form (plus offline); the
                 // Microsoft button is suppressed -- it has its own section.
                 LoginPanel(
-                    onLogin = {
-                        credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
+                    onLogin = { session ->
+                        // An offline identity is never stored as an account, so looking
+                        // the face up again would find nothing and drop the sign-in.
+                        if (session.offline) {
+                            ctx.onLogin(session)
+                        } else {
+                            credentials.faceSession(settingsService)?.let { ctx.onLogin(it) }
+                        }
                         revision.value++
                     },
                     showMicrosoft = false,
