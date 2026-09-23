@@ -55,6 +55,7 @@ fun LaunchLogCollector(
                     LogType.INFO,
                 )
                 is LaunchLogEvent.OfflineSkipAuth -> gameConsole.append(s.stateOfflineSkipAuth, LogType.WARN)
+                is LaunchLogEvent.UnboundOffline -> gameConsole.append(s.stateUnboundOffline, LogType.INFO)
                 is LaunchLogEvent.AuthSucceeded -> gameConsole.append(s.authSuccess(event.uuid), LogType.INFO)
                 is LaunchLogEvent.NoPassword -> gameConsole.append(s.stateNoPassword, LogType.WARN)
                 is LaunchLogEvent.AuthFailed -> gameConsole.append(

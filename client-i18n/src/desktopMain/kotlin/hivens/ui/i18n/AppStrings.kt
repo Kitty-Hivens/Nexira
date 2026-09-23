@@ -265,6 +265,8 @@ interface AppStrings {
 
     // --- Launcher States: Offline ---
     val stateOfflineSkipAuth: String
+    /** A pack that names no server is launched without a session token, whatever account is signed in. */
+    val stateUnboundOffline: String
     val stateOfflineSkipSync: String
     /** Files dropped from mods/ before spawn because the pack does not name them. */
     fun stateForeignContentRemoved(count: Int, names: String): String

@@ -241,6 +241,7 @@ object JapaneseStrings : AppStrings {
 
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth = "オフラインモード — 認証を省略しました"
+    override val stateUnboundOffline = "このパックはサーバーに紐付いていないため、オフラインで起動し、セッショントークンは渡されません"
     override val stateOfflineSkipSync = "オフラインモード — ファイル同期を省略し、ローカルのファイルを使用します"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "パックに含まれないファイルを $count 件削除しました: $names"

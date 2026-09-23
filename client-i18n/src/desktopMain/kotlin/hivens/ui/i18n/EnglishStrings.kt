@@ -230,6 +230,7 @@ object EnglishStrings : AppStrings {
 
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Offline mode — authentication skipped"
+    override val stateUnboundOffline       = "This pack is not bound to a server, so it runs offline and gets no session token"
     override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "Removed $count file(s) the pack does not include: $names"

@@ -487,14 +487,16 @@ class LauncherController(
         // - Unverified instance: no roster means nothing vouched for what is in
         //   mods/, and a token is exactly what an unvouched-for jar would want.
         // - A refresh that did not go through: covered in preparePackAuth.
-        val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
+        // - No server binding: the manifest names no server, so no session was earned
+        //   for one. Covered below, where the token is decided.
+        val authRequirement = PackAuthRouter.requirementFor(manifestSnapshot.authRequirement)
 
         // 2b. Hold the instance to the pack -- but only where a token is at stake.
         // A server-bound pack is the case that matters: we are about to hand the
         // game a session that logs into someone's server, and a jar the pack never
         // named is what that session would be lent to. A pack with no binding has no
-        // server and gets no token, so what its owner puts in mods/ is their game and
-        // none of our business.
+        // server and gets no token of ours, so what its owner puts in mods/ is their
+        // game and none of our business.
         //
         // Held against the roster written to the instance at sync time, so it answers
         // with no network and an offline launch is covered too.
@@ -543,7 +545,16 @@ class LauncherController(
                 emit(LaunchLogEvent.InstanceUnverified)
             }
             session = session.toOffline()
-        } else if (authRequirement != null) {
+        } else if (!serverBound) {
+            // The guards above are armed by the binding, so the token has to follow the
+            // same answer. Handing the session in hand to an unbound launch put a live
+            // SmartyCraft token on the command line of a game whose mods/ nobody had
+            // checked, and that token is not scoped to one server.
+            session = licensedSession() ?: run {
+                emit(LaunchLogEvent.UnboundOffline)
+                currentSession.toOffline()
+            }
+        } else {
             setStage(PrepareStage.AUTH, 0.4f)
             session = preparePackAuth(authRequirement, currentSession, refreshedInstance)
                 ?: return Prepared.Bail
@@ -567,11 +578,10 @@ class LauncherController(
             spawn = { onLog ->
                 launcherService.launchPackClient(
                     sessionData          = session,
-                    // Carry the EFFECTIVE requirement (manifest value or the
-                    // router's origin-derived one) so the service's SC-binding step
-                    // sees it; the raw snapshot's authRequirement is null for packs
-                    // whose mirror manifest has no auth block yet (e.g. Industrial).
-                    manifest             = manifestSnapshot.copy(authRequirement = authRequirement),
+                    // The manifest's own declaration, the same one serverBound reads,
+                    // so the service's SC binding and the guards below cannot answer
+                    // the binding question two ways.
+                    manifest             = manifestSnapshot,
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
                     javaPathOverride     = javaOverride,
@@ -583,7 +593,7 @@ class LauncherController(
                     // resolved it to Microsoft -- the launch would hand a
                     // Microsoft token to the SC host. Same test the service uses
                     // for its SC binding, so the two cannot disagree.
-                    redirectAuthHost     = authRequirement?.scServerId != null,
+                    redirectAuthHost     = manifestSnapshot.authRequirement?.scServerId != null,
                     // Same partition the roster sweep uses, and for the same
                     // reason: a bound launch is handed a token, so the loader
                     // hooks it inherits are a way to run code beside it. Taken
@@ -791,13 +801,26 @@ class LauncherController(
     }
 
     /**
-     * Pack-side pre-spawn auth, dispatched by the pack's [PackAuthRequirement].
-     * A requirement is enforced only for a provider the [authProviderRegistry] can
-     * satisfy: SC-bound requirements ([PackAuthRequirement.SmartyCraft], and the SC
-     * half of [PackAuthRequirement.Both]) re-auth via [prepareScAuth] when SC is
-     * registered; [PackAuthRequirement.Microsoft] -- and any SC requirement whose
-     * provider is somehow absent -- is advisory, so the pack launches with the
-     * current session. A newly registered provider activates its gate on its own.
+     * The signed-in Microsoft session, when the provider is registered and has one.
+     *
+     * The only token an unbound launch may carry: it is the player's own licence,
+     * valid wherever they take it, rather than a session minted for somebody's
+     * server. Null means the launch goes offline.
+     */
+    private fun licensedSession(): SessionData? {
+        if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) return null
+        return credentialsManager.accountFor(PackAuthRequirement.Microsoft.PROVIDER_KEY)
+    }
+
+    /**
+     * Pack-side pre-spawn auth for a server-bound pack, dispatched by its
+     * [PackAuthRequirement]. A requirement is enforced only for a provider the
+     * [authProviderRegistry] can satisfy: SC-bound requirements
+     * ([PackAuthRequirement.SmartyCraft], and the SC half of
+     * [PackAuthRequirement.Both]) re-auth via [prepareScAuth] when SC is registered.
+     * A declared [PackAuthRequirement.Microsoft] whose provider is not registered is
+     * advisory: the pack launches, offline, since nothing here holds a session that
+     * was earned for it. A newly registered provider activates its gate on its own.
      */
     private suspend fun preparePackAuth(
         requirement: PackAuthRequirement,
@@ -812,7 +835,7 @@ class LauncherController(
                 if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
             PackAuthRequirement.Microsoft ->
                 if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) {
-                    currentSession // no Microsoft provider configured -> advisory (Phase A behavior)
+                    currentSession.toOffline()
                 } else {
                     credentialsManager.accountFor(PackAuthRequirement.Microsoft.PROVIDER_KEY)
                         ?: run {

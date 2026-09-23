@@ -36,6 +36,13 @@ sealed class LaunchLogEvent {
 
     data object OfflineSkipAuth : LaunchLogEvent()
 
+    /**
+     * The pack names no server, so the launch goes ahead without a session token.
+     * Distinct from [OfflineSkipAuth]: the user did not switch offline mode on, and
+     * a player signed in to an account is owed the reason the game shows offline.
+     */
+    data object UnboundOffline : LaunchLogEvent()
+
     data class AuthSucceeded(val uuid: String) : LaunchLogEvent()
 
     /** Cached credentials missing or blank; auth attempted with offline fallback. */

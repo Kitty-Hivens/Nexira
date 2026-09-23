@@ -177,6 +177,7 @@ private fun renderEvent(event: LaunchLogEvent): String = when (event) {
     is LaunchLogEvent.TargetServer -> "-> ${event.name}" + if (event.offline) " (offline)" else ""
     is LaunchLogEvent.SessionStarted -> "session: ${event.targetLabel ?: event.targetId ?: "?"}"
     LaunchLogEvent.OfflineSkipAuth -> "(offline: skipping auth)"
+    LaunchLogEvent.UnboundOffline -> "(no server binding: launching offline, no session token)"
     is LaunchLogEvent.AuthSucceeded -> "auth ok (${event.uuid})"
     LaunchLogEvent.NoPassword -> "(no cached password; offline fallback)"
     // The cause decides what a stale session means here too: launching on it is

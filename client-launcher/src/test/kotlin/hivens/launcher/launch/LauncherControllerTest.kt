@@ -129,9 +129,12 @@ class LauncherControllerTest {
         runCatching { sandbox.deleteRecursively() }
     }
 
-    private fun newController(scope: TestScope) = LauncherController(
+    private fun newController(
+        scope: TestScope,
+        registry: AuthProviderRegistry = AuthProviderRegistry(listOf(authService)),
+    ) = LauncherController(
         authService          = authService,
-        authProviderRegistry = AuthProviderRegistry(listOf(authService)),
+        authProviderRegistry = registry,
         credentialsManager   = credentialsManager,
         settingsService    = settingsService,
         launcherService    = launcherService,
@@ -712,78 +715,53 @@ class LauncherControllerTest {
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
 
+    /**
+     * An SC-origin record used to derive a binding from its pack id. That binding
+     * reached the auth step and the redirect, while every guard a bound launch runs
+     * under read the manifest and stayed off: a live session for an unchecked game.
+     */
     @Test
-    fun `smartycraft-origin pack derives its SC requirement from the pack id`() = runTest {
-        every { settingsService.getSettings() } returns SettingsData()
-
-        // No authRequirement on the manifest; an SC-origin pack derives the
-        // binding from its packRef id (the mirror name table is gone -- mirror
-        // packs declare the binding in the manifest auth block instead).
-        // Same no-password setup, so the precondition surfaces.
-        val instance = scBoundPackInstance(
-            packId          = "Industrial",
-            displayName     = "Industrial",
-            authRequirement = null,
-            origin          = PackOrigin.Smartycraft,
-        )
-        val controller = newController(this)
-        controller.launchPackInstance(
-            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
-            packInstance   = instance,
-        )
-        advanceUntilIdle()
-
-        val state = controller.state.value
-        assertIs<LaunchState.Error>(state)
-        assertEquals(
-            LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY),
-            state.reason,
-            "an id-derived requirement must drive the same precondition surface as an explicit one",
-        )
-    }
-
-    @Test
-    fun `derived SC requirement is forwarded to launchPackClient, not dropped`() = runTest {
-        // Guards the snapshot-forwarding bug: when the requirement is DERIVED by
-        // the router (manifest authRequirement = null, SC origin), the service
-        // must still receive it, or the SC-binding step (authlib swap) never runs.
+    fun `an smartycraft-origin record with no auth block launches unbound and offline`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
         credentialsManager.save(
             SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
         )
-        coEvery { authService.login("tester", "pw", "Industrial") } returns
-            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
 
         val handle = mockk<LaunchHandle>()
         coEvery { handle.awaitExit() } returns 0
+        val sessionPassed = slot<SessionData>()
         val manifestPassed = slot<hivens.core.data.CachedManifestSnapshot>()
+        val redirect = slot<Boolean>()
+        val bound = slot<Boolean>()
         coEvery {
             launcherService.launchPackClient(
-                sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
+                sessionData = capture(sessionPassed), manifest = capture(manifestPassed), runtime = any(),
                 clientRootPath = any(), javaPathOverride = any(),
-                adaptiveEnabled = any(), redirectAuthHost = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+                adaptiveEnabled = any(), redirectAuthHost = capture(redirect), boundLaunch = capture(bound),
+                seal = any(), displayName = any(), onLog = any(),
             )
         } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
-        val instance = scBoundPackInstance(
-            packId          = "Industrial",
-            displayName     = "Industrial",
-            authRequirement = null,
-            origin          = PackOrigin.Smartycraft,
-        )
         val controller = newController(this)
         controller.launchPackInstance(
-            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
-            packInstance   = instance,
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+            packInstance   = scBoundPackInstance(
+                packId          = "Industrial",
+                displayName     = "Industrial",
+                authRequirement = null,
+                origin          = PackOrigin.Smartycraft,
+            ),
         )
         advanceUntilIdle()
 
-        assertEquals(
-            PackAuthRequirement.SmartyCraft("Industrial"), manifestPassed.captured.authRequirement,
-            "the effective (derived) requirement must reach the service so SC-binding runs",
-        )
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+        assertNull(manifestPassed.captured.authRequirement, "no binding reaches the service")
+        assertEquals(false, redirect.captured, "and nothing is redirected to the SC host")
+        assertEquals(false, bound.captured)
+        assertEquals("", sessionPassed.captured.accessToken, "so the game gets no token")
+        assertEquals(true, sessionPassed.captured.offline)
     }
 
     @Test
@@ -892,18 +870,94 @@ class LauncherControllerTest {
     }
 
     @Test
-    fun `a pack with no server binding is neither swept nor stripped of a token`() = runTest {
+    fun `a pack with no server binding is not swept, and gets no token`() = runTest {
         // The strictness exists because a bound pack is handed a session that logs
-        // into someone's server. A pack with no binding gets no token and has no
-        // server, so what its owner keeps in mods/ is their own game.
+        // into someone's server. A pack with no binding has no server, so what its
+        // owner keeps in mods/ is their own game. For the same reason it is not
+        // handed the session in hand, which would let that game use it.
         coEvery { packSyncService.enforceRoster(any(), any()) } returns RosterVerdict(verified = false)
+        val events = mutableListOf<LaunchLogEvent>()
 
-        capturePackSession(
-            SessionData(playerName = "tester", uuid = "u", accessToken = "live"),
+        val session = capturePackSession(
+            SessionData(playerName = "tester", uuid = "online-uuid", accessToken = "live-sc-token"),
             packInstance = scBoundPackInstance(authRequirement = null),
+            events = events,
         )
 
         coVerify(exactly = 0) { packSyncService.enforceRoster(any(), any()) }
+        assertEquals("", session?.accessToken, "the SmartyCraft token in hand must not reach an unbound game")
+        assertEquals(true, session?.offline)
+        assertTrue(events.any { it is LaunchLogEvent.UnboundOffline }, "and the console says why, got $events")
+    }
+
+    /** The one token an unbound launch may carry is the player's own licence. */
+    @Test
+    fun `an unbound pack carries the Microsoft session when that provider is signed in`() = runTest {
+        val msa = mockk<AuthProvider>()
+        every { msa.id } returns PackAuthRequirement.Microsoft.PROVIDER_KEY
+        credentialsManager.saveAccount(
+            SessionData(playerName = "licensed", uuid = "ms-u", accessToken = "ms-token", refreshToken = "r"),
+            PackAuthRequirement.Microsoft.PROVIDER_KEY,
+        )
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk17/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this, AuthProviderRegistry(listOf(authService, msa)))
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "live-sc-token"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        advanceUntilIdle()
+
+        assertEquals("ms-token", captured.captured.accessToken)
+        assertEquals("licensed", captured.captured.playerName)
+    }
+
+    /**
+     * Signed in to Microsoft or not, an unbound pack launches. The derived Microsoft
+     * requirement used to fail such a launch with MissingAuthProvider once the
+     * provider was registered, for a pack that had never asked for an account.
+     */
+    @Test
+    fun `an unbound pack is not refused when Microsoft is registered with no account`() = runTest {
+        val msa = mockk<AuthProvider>()
+        every { msa.id } returns PackAuthRequirement.Microsoft.PROVIDER_KEY
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk17/bin/java")
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        val captured = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = capture(captured), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
+            )
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this, AuthProviderRegistry(listOf(authService, msa)))
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "live-sc-token"),
+            packInstance   = scBoundPackInstance(authRequirement = null),
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value, "the launch goes ahead")
+        assertEquals("", captured.captured.accessToken, "offline, since there is no licence to carry")
     }
 
     @Test
@@ -1165,7 +1219,7 @@ class LauncherControllerTest {
     fun `Microsoft-routed pack launches without firing the auth gate`() = runTest {
         // A Modrinth-origin pack with no explicit requirement routes to Microsoft,
         // which has no registered provider this phase -- so the gate is advisory:
-        // the pack launches with the current session and authService is never hit.
+        // the pack launches offline and authService is never hit.
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk17/bin/java")
 

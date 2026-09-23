@@ -229,6 +229,7 @@ object GermanStrings : AppStrings {
 
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Offlinemodus — Authentifizierung übersprungen"
+    override val stateUnboundOffline       = "Dieses Paket ist an keinen Server gebunden, läuft daher offline und erhält kein Sitzungstoken"
     override val stateOfflineSkipSync      = "Offlinemodus — Dateisynchronisierung übersprungen, lokale Dateien werden verwendet"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "$count Datei(en) entfernt, die nicht zum Paket gehoeren: $names"

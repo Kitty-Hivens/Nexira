@@ -229,6 +229,7 @@ object RussianStrings : AppStrings {
 
     // --- Launcher States: Offline ---
     override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
+    override val stateUnboundOffline       = "Сборка не привязана к серверу, поэтому запускается офлайн и не получает токен сессии"
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
     override fun stateForeignContentRemoved(count: Int, names: String) =
         "Удалено файлов, которых нет в сборке: $count ($names)"
