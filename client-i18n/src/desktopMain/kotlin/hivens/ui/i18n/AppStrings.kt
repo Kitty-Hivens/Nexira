@@ -735,6 +735,10 @@ interface AppStrings {
     val createPackMc: String
     val createPackLoader: String
     val createPackLoaderVersion: String
+    /** Placeholder of the loader version field for a loader that resolves its own latest. */
+    val createPackLoaderVersionLatest: String
+    /** Placeholder of the loader version field for a loader that has no latest to offer. */
+    val createPackLoaderVersionRequired: String
     val createPackConfirm: String
     val createPackCancel: String
     val createPackShowSnapshots: String

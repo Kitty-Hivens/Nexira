@@ -137,9 +137,19 @@ class RuntimeProvisioner(
         if (loaderRegistry.resolverFor(loaderName) == null && !LoaderRegistry.isVanilla(loaderName)) {
             throw IOException("The loader '${loaderName!!.trim()}' is not one this launcher can install")
         }
-        val vanilla = ensureVanilla(mcVersion, progress)
+        // The two answers that can refuse a pack come before the download that takes
+        // minutes: whether Mojang knows this Minecraft version, and whether the loader
+        // has a build for it. Asked after, Fabric on 1.12.2 or a version typo failed
+        // only once the whole vanilla runtime was on disk.
+        loadOrFetchVersion(mcVersion)
         val resolver = loaderRegistry.resolverFor(loaderName)
-            ?: return@withContext ResolvedRuntime(
+        val profile = resolver?.let {
+            log.info("resolving loader overlay: {} {}", it.loaderId, loaderVersion)
+            it.resolve(mcVersion, loaderVersion)
+        }
+        val vanilla = ensureVanilla(mcVersion, progress)
+        if (profile == null) {
+            return@withContext ResolvedRuntime(
                 libraries = vanilla.libraries,
                 clientJar = vanilla.clientJar,
                 mainClass = VANILLA_MAIN_CLASS,
@@ -147,9 +157,8 @@ class RuntimeProvisioner(
                 natives = vanilla.natives.map { it.path },
                 javaMajor = vanilla.javaMajor,
             )
+        }
 
-        log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
-        val profile = resolver.resolve(mcVersion, loaderVersion)
         val overlay = profile.libraries.map { ResolvedLibrary(it.coord, provision(it)) }
         // Host natives the loader adds on top of vanilla's -- a LWJGL swap
         // (Cleanroom / lwjgl3ify) contributes its own LWJGL3 .so/.dll here. The

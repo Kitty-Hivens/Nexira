@@ -68,6 +68,8 @@ class Lwjgl3ifyResolver(
         withContext(Dispatchers.IO) {
             // No index to ask for the latest, as with Cleanroom.
             if (loaderVersion.isBlank()) throw IOException("lwjgl3ify needs a version to install, and none was given")
+            // As with Cleanroom: one Minecraft version, and nothing else to layer onto.
+            if (mcVersion != LWJGL3IFY_MINECRAFT) throw IOException("lwjgl3ify runs on Minecraft $LWJGL3IFY_MINECRAFT, not $mcVersion")
             val kept = cache.fileFor(loaderId, loaderVersion, "version.json")
             val parsed = cache.readText(kept)
                 ?.let { runCatching { json.decodeFromString(LoaderVersionJson.serializer(), it) }.getOrNull() }
@@ -160,7 +162,9 @@ class Lwjgl3ifyResolver(
             "org.apache.commons:commons-compress",
             "org.apache.commons:commons-lang3",
         )
-        /** Target Java major; the profile declares none, upstream targets 17-21. */
+        /** The one Minecraft version lwjgl3ify builds on. */
+        const val LWJGL3IFY_MINECRAFT = "1.7.10"
+        /** Target Java major. The profile declares none, and upstream targets 17 to 21. */
         const val LWJGL3IFY_JAVA_MAJOR = 21
     }
 }

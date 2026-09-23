@@ -476,6 +476,52 @@ class RuntimeProvisionerTest {
         assertTrue(requested.isEmpty(), "nothing is fetched for a pack that cannot run: $requested")
     }
 
+    /** Fabric on 1.12.2, or a version typo, used to fail only once the whole vanilla runtime was on disk. */
+    @Test
+    fun `a loader that cannot serve the version fails before the vanilla download`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"${sha1(indexJson)}","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "libraries": []
+            }
+        """.trimIndent()
+        val requested = mutableListOf<String>()
+        val engine = MockEngine { req ->
+            requested += req.url.toString()
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond("""{"versions":[{"id":"1.12.2","url":"$VERSION_URL"}]}""", HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val refusing = object : LoaderResolver {
+            override val loaderId = "fabric"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
+                throw IOException("fabric has no loader versions for Minecraft $mcVersion")
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            transfers = testTransferEngine(HttpClientProvider { HttpClient(engine) }),
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(refusing)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        runCatching { p.ensureRuntime(mcVersion = "1.12.2", loaderName = "fabric", loaderVersion = "") }
+            .onSuccess { error("the loader refused, so the runtime must not be provisioned") }
+
+        assertTrue(CLIENT_URL !in requested && INDEX_URL !in requested, "nothing past the version json was fetched: $requested")
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://test.invalid/manifest.json"
         const val VERSION_URL = "https://test.invalid/1.12.2.json"

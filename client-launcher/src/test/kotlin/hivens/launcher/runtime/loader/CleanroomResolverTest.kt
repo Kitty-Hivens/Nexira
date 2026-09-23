@@ -137,4 +137,14 @@ class CleanroomResolverTest {
         assertTrue(msg.contains("9.9.9-alpha"), "names the version: $msg")
         assertTrue(msg.contains("version.json"), "names what is missing: $msg")
     }
+
+    /** Layered onto another Minecraft version it assembled a classpath that could only crash. */
+    @Test
+    fun `Cleanroom refuses any Minecraft but 1_12_2, and a blank version, before fetching anything`() = runTest {
+        val wrongMc = runCatching { resolver.resolve("1.20.1", "0.3.0") }.exceptionOrNull()
+        val blank = runCatching { resolver.resolve("1.12.2", "") }.exceptionOrNull()
+
+        assertTrue(wrongMc?.message.orEmpty().contains("1.12.2"), "got $wrongMc")
+        assertTrue(blank?.message.orEmpty().contains("version"), "got $blank")
+    }
 }

@@ -67,6 +67,9 @@ class CleanroomResolver(
             // blank version has nothing to resolve to. It used to reach the URL as an
             // empty segment and come back as a bare 404.
             if (loaderVersion.isBlank()) throw IOException("Cleanroom needs a version to install, and none was given")
+            // It modernises one Minecraft version and nothing else, and layered onto
+            // another it assembled a classpath that could only crash.
+            if (mcVersion != CLEANROOM_MINECRAFT) throw IOException("Cleanroom runs on Minecraft $CLEANROOM_MINECRAFT, not $mcVersion")
             val kept = cache.fileFor(loaderId, loaderVersion, "installer.jar")
             kept?.takeIf { Files.isRegularFile(it) }?.let { cached ->
                 runCatching { profileFrom(cached, loaderVersion) }
@@ -163,6 +166,8 @@ class CleanroomResolver(
 
     companion object {
         const val CLEANROOM_RELEASES = "https://github.com/CleanroomMC/Cleanroom/releases/download"
+        /** The one Minecraft version Cleanroom builds on. */
+        const val CLEANROOM_MINECRAFT = "1.12.2"
         /** Required Java major, from upstream docs (not declared in any artifact). */
         const val CLEANROOM_JAVA_MAJOR = 25
     }
