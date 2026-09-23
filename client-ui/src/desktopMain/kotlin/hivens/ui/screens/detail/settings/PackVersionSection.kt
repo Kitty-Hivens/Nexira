@@ -61,7 +61,7 @@ import org.koin.compose.koinInject
 internal fun PackVersionSection(
     pack: PackInstance,
     operation: PackOperation?,
-    save: (PackInstance) -> Unit,
+    save: (PackEdit) -> Unit,
     onOpenVersions: () -> Unit = {},
     onNotice: (String?) -> Unit = {},
 ) {
@@ -185,7 +185,7 @@ internal fun PackVersionSection(
             pack.followLatest,
             description = s.packVersionFollowLatestDesc,
             icon = NxIcon.Sync,
-        ) { enabled -> save(pack.copy(followLatest = enabled)) }
+        ) { enabled -> save { it.copy(followLatest = enabled) } }
         // Up-to-date is a quiet one-liner inside the section, not a banner block.
         if (check == UpdateCheck.UpToDate) {
             Text(s.packVersionUpToDate, style = MaterialTheme.typography.bodySmall, color = colors.success)

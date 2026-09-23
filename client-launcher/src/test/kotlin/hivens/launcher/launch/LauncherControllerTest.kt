@@ -114,6 +114,12 @@ class LauncherControllerTest {
             Vault.open(VaultConfig(namespace = "nexira-launcher-test", preferredTiers = listOf(VaultTier.Memory))),
         ) { mockk(relaxed = true) }
         packRepository     = mockk(relaxed = true)
+        // The interface's own read-then-write, so a test that stubs get and captures
+        // put sees an update the way the production default performs it.
+        coEvery { packRepository.update(any(), any()) } coAnswers {
+            val transform = secondArg<(PackInstance) -> PackInstance>()
+            packRepository.get(firstArg())?.let { current -> transform(current).also { packRepository.put(it) } }
+        }
         smrtPackClient     = mockk(relaxed = true)
 
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/usr/bin/java")

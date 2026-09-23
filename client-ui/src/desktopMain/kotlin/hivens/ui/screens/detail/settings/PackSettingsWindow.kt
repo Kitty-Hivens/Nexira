@@ -77,8 +77,19 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
 
+/**
+ * A change to a pack's settings, as a function of the record rather than a copy of
+ * it: applied to whatever the record holds when it is written, so the fields it
+ * does not touch are never carried back from an older read.
+ */
+internal typealias PackEdit = (PackInstance) -> PackInstance
+
 /** An edit on screen that the registry has not carried back yet. */
-private class Edit(val instance: PackInstance, val persist: Boolean)
+private class Edit(val change: PackEdit, val persist: Boolean) {
+    /** This edit followed by [next]: a second change made before the first is written builds on it. */
+    fun then(next: PackEdit, persistNext: Boolean) =
+        Edit({ next(change(it)) }, persist || persistNext)
+}
 
 /**
  * How long an edit waits before it is written: long enough that typing is one
@@ -104,11 +115,13 @@ private const val EDIT_SETTLE_MS = 250L
  * and picks the narration back up, where window-local state would have shown an
  * idle footer and offered to start a second one.
  *
- * A pack instance is the unit of edit: each control is a `copy` handed to [save],
- * which persists it, and the rewritten record arrives back through [pack] because
- * the screen that hosts this window follows the registry. There is no separate
- * form-state blob, and the write lives here rather than in each section -- one
- * write per edit, from the record as this window is showing it.
+ * Each control hands [save] a [PackEdit] naming the fields it changes, and the
+ * rewritten record arrives back through [pack] because the screen that hosts this
+ * window follows the registry. There is no separate form-state blob, and the write
+ * lives here rather than in each section: one write per settled edit, applied
+ * through [IPackRepository.update] to the record as it is at that moment. Writing
+ * the copy this window was showing put back whatever had changed underneath it
+ * during the edit: playtime recorded at exit, a build an update had committed.
  */
 @Composable
 fun PackSettingsWindow(
@@ -137,7 +150,7 @@ fun PackSettingsWindow(
     // is false for an edit something else writes (optional content goes through the
     // launcher), where the wait is for that write rather than for one made here.
     var edit by remember(pack.id) { mutableStateOf<Edit?>(null) }
-    val shown = edit?.instance ?: pack
+    val shown = edit?.change?.invoke(pack) ?: pack
     LaunchedEffect(edit) {
         val current = edit ?: return@LaunchedEffect
         // Settle first: a text field commits per keystroke, and one durable write
@@ -146,25 +159,26 @@ fun PackSettingsWindow(
         // A newer edit cancels this effect, so only what the typing settles on is
         // written, and only ever one write at a time.
         delay(EDIT_SETTLE_MS)
-        if (current.persist) repo.put(current.instance)
+        if (current.persist) repo.update(pack.id, current.change)
         if (edit === current) edit = null
     }
     // Closing the window is not what discards an edit it has not written yet, and
     // the composition scope above dies with it.
     val unwritten = rememberUpdatedState(edit)
     DisposableEffect(pack.id) {
+        val id = pack.id
         onDispose {
             unwritten.value?.takeIf { it.persist }?.let { pendingEdit ->
-                appScope.launch { repo.put(pendingEdit.instance) }
+                appScope.launch { repo.update(id, pendingEdit.change) }
             }
         }
     }
 
     /** Show an edit and persist it. */
-    val save: (PackInstance) -> Unit = { updated -> edit = Edit(updated, persist = true) }
+    val save: (PackEdit) -> Unit = { change -> edit = edit?.then(change, persistNext = true) ?: Edit(change, persist = true) }
 
     /** Show an edit that something else persists -- optional content goes through the launcher. */
-    val adopt: (PackInstance) -> Unit = { updated -> edit = Edit(updated, persist = false) }
+    val adopt: (PackEdit) -> Unit = { change -> edit = edit?.then(change, persistNext = false) ?: Edit(change, persist = false) }
 
     val isMirror = pack.packRef.origin == PackOrigin.Mirror
     // Whether anything can offer this instance other builds, asked of the updater

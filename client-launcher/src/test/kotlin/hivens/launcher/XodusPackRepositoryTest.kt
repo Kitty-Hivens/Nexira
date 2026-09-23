@@ -3,7 +3,11 @@ package hivens.launcher
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -138,5 +142,39 @@ class XodusPackRepositoryTest {
         r.put(instance("b"))
         assertNull(r.get("b"))
         assertEquals(listOf("a"), r.list().map { it.id })
+    }
+
+    @Test
+    fun `an update lands on the record as it is, not as the caller last read it`() = runTest {
+        val r = repo(tempData())
+        r.put(instance("a"))
+        val staleRead = r.get("a")!!
+        // Another writer records playtime after the settings window read the record.
+        r.put(staleRead.copy(playtimeSeconds = 600))
+
+        r.update("a") { it.copy(notes = "edited") }
+
+        val stored = r.get("a")!!
+        assertEquals("edited", stored.notes)
+        assertEquals(600, stored.playtimeSeconds, "the edit carried back the playtime of an older read")
+    }
+
+    @Test
+    fun `concurrent updates each see the one before`() = runTest {
+        val r = repo(tempData())
+        r.put(instance("a"))
+
+        withContext(Dispatchers.Default) {
+            (1..64).map { async { r.update("a") { it.copy(playtimeSeconds = it.playtimeSeconds + 1) } } }.awaitAll()
+        }
+
+        assertEquals(64, r.get("a")!!.playtimeSeconds)
+    }
+
+    @Test
+    fun `an update of an instance that is not installed writes nothing`() = runTest {
+        val r = repo(tempData())
+        assertNull(r.update("ghost") { it.copy(notes = "x") })
+        assertTrue(r.list().isEmpty())
     }
 }

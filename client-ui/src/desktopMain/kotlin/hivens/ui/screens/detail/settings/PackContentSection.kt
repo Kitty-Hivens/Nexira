@@ -33,7 +33,7 @@ import org.koin.compose.koinInject
  * a plain empty/unavailable state.
  */
 @Composable
-internal fun PackContentSection(pack: PackInstance, adopt: (PackInstance) -> Unit) {
+internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
     val mirrorClient: IMirrorPackClient = koinInject()
@@ -90,7 +90,7 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackInstance) -> Uni
                     // Shown at once and composed onto by the next flip: the write
                     // is the launcher's and lands behind it, and a pair of flips
                     // made inside that window must not both start from the record.
-                    adopt(pack.copy(optionalContent = toggles))
+                    adopt { it.copy(optionalContent = toggles) }
                     controller.setOptionalModsAsync(pack, m, toggles)
                 }
             }

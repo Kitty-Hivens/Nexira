@@ -55,7 +55,7 @@ import java.nio.file.Path
 internal fun PackRuntimeSection(
     pack: PackInstance,
     instanceDir: Path,
-    save: (PackInstance) -> Unit,
+    save: (PackEdit) -> Unit,
 ) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
@@ -65,7 +65,9 @@ internal fun PackRuntimeSection(
     val scope = rememberCoroutineScope()
     val runtime = pack.runtime
 
-    fun commit(rt: InstanceRuntime) = save(pack.copy(runtime = rt))
+    // One knob, not the runtime as this frame shows it: the write lands on the
+    // record as it is by then.
+    fun commit(change: (InstanceRuntime) -> InstanceRuntime) = save { it.copy(runtime = change(it.runtime)) }
 
     // Auto-heap resolution mirrors the old settings tab: the adaptive profile when
     // enabled and present, else the physical-memory heuristic.
@@ -87,8 +89,8 @@ internal fun PackRuntimeSection(
             // Nothing pinned: offer what the next launch would use anyway, so
             // leaving Auto starts from the real number rather than a constant.
             currentMb = runtime.memoryMb.takeIf { it > 0 } ?: resolvedAutoMb,
-            onAutoSelected = { commit(runtime.copy(fixedMemory = false)) },
-            onValueChanged = { commit(runtime.copy(memoryMb = it, fixedMemory = true)) },
+            onAutoSelected = { commit { rt -> rt.copy(fixedMemory = false) } },
+            onValueChanged = { commit { rt -> rt.copy(memoryMb = it, fixedMemory = true) } },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -99,7 +101,7 @@ internal fun PackRuntimeSection(
             Text(s.packSettingsJava, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             NxField(
                 value = runtime.javaPath ?: "",
-                onValueChange = { commit(runtime.copy(javaPath = it.ifBlank { null })) },
+                onValueChange = { commit { rt -> rt.copy(javaPath = it.ifBlank { null }) } },
                 placeholder = s.packSettingsJavaPathPlaceholder,
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
@@ -117,7 +119,7 @@ internal fun PackRuntimeSection(
                 if (!runtime.javaPath.isNullOrBlank()) {
                     NxButton(
                         s.packSettingsJavaReset,
-                        onClick = { commit(runtime.copy(javaPath = null)) },
+                        onClick = { commit { rt -> rt.copy(javaPath = null) } },
                         style = NxButtonStyle.Tertiary,
                         compact = true,
                     )
@@ -144,7 +146,7 @@ internal fun PackRuntimeSection(
             runtime.windowSizeOverride,
             description = s.packSettingsWindowOverrideDesc,
             icon = NxIcon.OpenInFull,
-        ) { commit(runtime.copy(windowSizeOverride = it)) }
+        ) { commit { rt -> rt.copy(windowSizeOverride = it) } }
 
         if (runtime.windowSizeOverride) {
             Row(
@@ -157,7 +159,7 @@ internal fun PackRuntimeSection(
                         value = widthText,
                         onValueChange = { raw ->
                             widthText = raw.filter { it.isDigit() }.take(5)
-                            widthText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit(runtime.copy(windowWidth = it)) }
+                            widthText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit { rt -> rt.copy(windowWidth = it) } }
                         },
                         placeholder = s.packSettingsWidth,
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -169,7 +171,7 @@ internal fun PackRuntimeSection(
                         value = heightText,
                         onValueChange = { raw ->
                             heightText = raw.filter { it.isDigit() }.take(5)
-                            heightText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit(runtime.copy(windowHeight = it)) }
+                            heightText.toIntOrNull()?.takeIf { it in 1..10000 }?.let { commit { rt -> rt.copy(windowHeight = it) } }
                         },
                         placeholder = s.packSettingsHeight,
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -179,7 +181,7 @@ internal fun PackRuntimeSection(
         }
 
         NxToggle(s.packSettingsFullscreen, runtime.fullScreen, icon = NxIcon.Tv) {
-            commit(runtime.copy(fullScreen = it))
+            commit { rt -> rt.copy(fullScreen = it) }
         }
     }
 
@@ -196,7 +198,7 @@ internal fun PackRuntimeSection(
             javaMajor = requiredJavaMajor(pack, javaManager),
             onDismiss = { showJvmBuilder = false },
             onApply = { newArgs ->
-                commit(runtime.copy(jvmArgs = newArgs.ifBlank { null }))
+                commit { rt -> rt.copy(jvmArgs = newArgs.ifBlank { null }) }
                 showJvmBuilder = false
             },
         )

@@ -81,16 +81,30 @@ class XodusPackRepository(
 
     override suspend fun put(instance: PackInstance) {
         PackIdentity.require(instance)
+        mutex.withLock { store(instance) }
+    }
+
+    override suspend fun update(id: String, transform: (PackInstance) -> PackInstance): PackInstance? =
         mutex.withLock {
-            val previous = state.value
-            state.update { current ->
-                if (current.any { it.id == instance.id }) current.map { if (it.id == instance.id) instance else it }
-                else current + instance
-            }
-            // Keep memory and disk in lockstep: if the durable write fails, revert the
-            // in-memory state so the UI never claims an install the DB never got.
-            if (!withContext(Dispatchers.IO) { writeInstance(instance) }) state.value = previous
+            val current = state.value.firstOrNull { it.id == id } ?: return@withLock null
+            val next = transform(current)
+            require(next.id == id) { "update of $id returned ${next.id}" }
+            PackIdentity.require(next)
+            next.takeIf { store(it) }
         }
+
+    /** Under [mutex]. @return false when the durable write failed and memory was reverted. */
+    private suspend fun store(instance: PackInstance): Boolean {
+        val previous = state.value
+        state.update { current ->
+            if (current.any { it.id == instance.id }) current.map { if (it.id == instance.id) instance else it }
+            else current + instance
+        }
+        // Keep memory and disk in lockstep: if the durable write fails, revert the
+        // in-memory state so the UI never claims an install the DB never got.
+        val written = withContext(Dispatchers.IO) { writeInstance(instance) }
+        if (!written) state.value = previous
+        return written
     }
 
     override suspend fun delete(id: String) {

@@ -22,7 +22,7 @@ import hivens.ui.theme.NxTheme
  * straight onto the instance -- the repository replaces by id.
  */
 @Composable
-internal fun PackGeneralSection(pack: PackInstance, save: (PackInstance) -> Unit) {
+internal fun PackGeneralSection(pack: PackInstance, save: (PackEdit) -> Unit) {
     val s = LocalStrings.current
     val colors = NxTheme.colors
 
@@ -31,7 +31,7 @@ internal fun PackGeneralSection(pack: PackInstance, save: (PackInstance) -> Unit
             Text(s.packSettingsName, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             NxField(
                 value = pack.displayName,
-                onValueChange = { if (it != pack.displayName) save(pack.copy(displayName = it)) },
+                onValueChange = { if (it != pack.displayName) save { p -> p.copy(displayName = it) } },
                 placeholder = s.packSettingsNamePlaceholder,
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             )
@@ -40,7 +40,7 @@ internal fun PackGeneralSection(pack: PackInstance, save: (PackInstance) -> Unit
             Text(s.packSettingsNotes, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
             NxField(
                 value = pack.notes,
-                onValueChange = { if (it != pack.notes) save(pack.copy(notes = it)) },
+                onValueChange = { if (it != pack.notes) save { p -> p.copy(notes = it) } },
                 placeholder = s.packSettingsNotesPlaceholder,
                 singleLine = false,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(top = 6.dp),

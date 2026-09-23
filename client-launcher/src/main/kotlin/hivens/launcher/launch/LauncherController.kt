@@ -87,15 +87,14 @@ class LauncherController(
         manifest: SmrtPackManifest,
         toggles: List<ContentToggle>,
     ): PackInstance {
-        // Re-read, then change the one field this owns. The record the caller holds
-        // was captured when the tab rendered, and an apply committing in between
-        // moves the pinned version, the installed manifest and the cached one. Writing
-        // the captured copy back whole restores all three to the build the update had
-        // just left, so a checkbox would silently undo an update. The two other
-        // writers in this file already re-read for the same reason.
-        val current = packRepository.get(instance.id) ?: instance
-        val updated = current.copy(optionalContent = toggles)
-        packRepository.put(updated)
+        // The one field this owns, set on the record as it stands. The record the
+        // caller holds was captured when the tab rendered, and an apply committing in
+        // between moves the pinned version, the installed manifest and the cached one.
+        // Writing the captured copy back whole restores all three to the build the
+        // update had just left, so a checkbox would silently undo an update. The other
+        // writers in this file do the same for the same reason.
+        val updated = packRepository.update(instance.id) { it.copy(optionalContent = toggles) }
+            ?: instance.copy(optionalContent = toggles)
         val clientDir = dataDirectory.resolve("instances").resolve(updated.instanceDirName)
         val deferred = withContext(Dispatchers.IO) {
             InstanceMutationLock.withLock(clientDir) {
@@ -529,7 +528,7 @@ class LauncherController(
      * and already on disk after install:
      * - Resolves the [CachedManifestSnapshot]; when [PackInstance.cachedManifest]
      *   is null (instance predates the field) a one-time mirror fetch fills it
-     *   and writes it back via [IPackRepository.put].
+     *   and writes it back via [IPackRepository.update].
      * - Refreshes the SC session right before spawn for SC-bound packs so a cold
      *   mod-load (server-side SC tokens age out in ~minutes) does not invalidate
      *   the join. Packs that declare no requirement pass through untouched.
@@ -722,14 +721,12 @@ class LauncherController(
                 )
             },
             onSpawned = { handle ->
-                // Re-read, then change the one field this owns. The record in hand was
-                // captured before the click, and preparing a launch takes long enough
-                // (a sign-in, a catch-up repair) for an update or a settings edit to
-                // commit meanwhile. Writing the captured copy back whole put all of
-                // that back to how it was. Skipped when the instance is gone.
-                packRepository.get(refreshedInstance.id)?.let { current ->
-                    packRepository.put(current.copy(lastPlayedEpochOrZero = Instant.now().epochSecond))
-                }
+                // The one field this owns, set on the record as it stands. The record in
+                // hand was captured before the click, and preparing a launch takes long
+                // enough (a sign-in, a catch-up repair) for an update or a settings edit
+                // to commit meanwhile. Writing the captured copy back whole put all of
+                // that back to how it was. Nothing is written when the instance is gone.
+                packRepository.update(refreshedInstance.id) { it.copy(lastPlayedEpochOrZero = Instant.now().epochSecond) }
                 // Armed for exactly the launches the seal covers. A launch that got
                 // no token has nothing to lend to a jar that arrives late, and its
                 // owner's `mods/` is their own business.
@@ -740,13 +737,11 @@ class LauncherController(
                 }
             },
             onExit = { secs ->
-                // Re-read the persisted instance (onSpawned wrote lastPlayed; the
-                // user may have edited it mid-session) and add the session onto
-                // THAT, so neither write clobbers the other. Skip when it's gone --
-                // never resurrect an instance deleted while it ran.
-                packRepository.get(refreshedInstance.id)?.let { current ->
-                    packRepository.put(current.copy(playtimeSeconds = current.playtimeSeconds + secs))
-                }
+                // Added onto the record as it stands (onSpawned wrote lastPlayed, the
+                // user may have edited it mid-session), so neither write clobbers the
+                // other. Nothing is written when it is gone: an instance deleted while
+                // it ran is not resurrected.
+                packRepository.update(refreshedInstance.id) { it.copy(playtimeSeconds = it.playtimeSeconds + secs) }
             },
         )
     }
@@ -901,7 +896,7 @@ class LauncherController(
         // Onto the record as it stands, for the same reason onSpawned re-reads: the
         // fetch is a network round trip, and the copy in hand may be older than it.
         runCatching {
-            packRepository.get(instance.id)?.let { current -> packRepository.put(current.copy(cachedManifest = snapshot)) }
+            packRepository.update(instance.id) { it.copy(cachedManifest = snapshot) }
         }.onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
         return snapshot to refreshed
     }
