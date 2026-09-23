@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,13 +22,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.core.launch.LaunchControlMode
-import hivens.launcher.launch.LauncherController
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.notifications.IndicationCenter
-import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.home.new.rememberQuickLaunchTarget
@@ -39,7 +32,6 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 
 @Serializable
 data class LaunchButtonProps(
@@ -56,22 +48,14 @@ data class LaunchButtonProps(
 fun LaunchButtonWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<LaunchButtonProps>()
     val s = LocalStrings.current
-    val quickLaunch = rememberQuickLaunchTarget() ?: return
+    val quickLaunch = rememberQuickLaunchTarget(p.label.ifBlank { s.launchTileReady }) ?: return
     val target = quickLaunch.target
-    val indications: IndicationCenter = koinInject()
-    val controller: LauncherController = koinInject()
-    val indication by indications.launchIndication(target.id).collectAsState()
-    val mode = indication.controlMode()
+    val control = quickLaunch.control
 
-    // A running game is something this tile can act on, so it stays lit and
-    // stops it. Before this it read canLaunch alone and simply went grey for as
-    // long as the game was up -- the one state where the big obvious control on
-    // the home screen had something useful to offer.
-    val ready = when (mode) {
-        LaunchControlMode.Stop -> true
-        LaunchControlMode.Wait -> false
-        LaunchControlMode.Play -> quickLaunch.canLaunch
-    }
+    // Lit whenever the tile has something to do: play, stop the running game, or
+    // take a signed-out player to sign in. It used to go grey for every reason at
+    // once and say "can't play yet", which answered none of them.
+    val ready = control.enabled && !control.busy
 
     val gradient = Brush.linearGradient(
         colors = listOf(
@@ -89,14 +73,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                 NxTheme.colors.surfaceVariant,
                 NxTheme.colors.surfaceVariant,
             )))
-            .clickable(
-                enabled = ready,
-                onClick = if (mode == LaunchControlMode.Stop) {
-                    { controller.abort() }
-                } else {
-                    quickLaunch.launch
-                },
-            )
+            .clickable(enabled = ready, onClick = control.onClick)
             .padding(horizontal = 20.dp, vertical = 18.dp),
     ) {
         Row(
@@ -110,7 +87,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                     .background(Color.White.copy(alpha = if (ready) 0.18f else 0.06f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Symbol(icon = if (mode == LaunchControlMode.Stop) NxIcon.Stop else quickLaunch.icon,
+                Symbol(icon = control.icon,
                     contentDescription = null,
                     tint               = if (ready) Color.White else NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(28.dp),
@@ -119,14 +96,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    // The tile picks its own words -- the mode says what the
-                    // control does, not what it is called.
-                    text       = when {
-                        mode == LaunchControlMode.Stop -> s.packPlayExit
-                        mode == LaunchControlMode.Wait -> s.packPlayWait
-                        ready -> quickLaunch.buttonLabel ?: p.label.ifBlank { s.launchTileReady }
-                        else  -> s.launchTileBlocked
-                    },
+                    text       = control.label,
                     style      = MaterialTheme.typography.titleLarge,
                     color      = if (ready) Color.White else NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.SemiBold,

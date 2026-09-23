@@ -1147,7 +1147,6 @@ object JapaneseStrings : AppStrings {
     override val homeQuickButton = "プレイ"
     override fun homeHeroPlaytime(hours: Long) = "プレイ時間 $hours 時間"
     override val launchTileReady = "起動"
-    override val launchTileBlocked = "まだプレイできません"
 
     // --- Library widgets ---
     override val libraryEmptyTitle = "いまは空です"

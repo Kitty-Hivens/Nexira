@@ -1142,7 +1142,6 @@ object GermanStrings : AppStrings {
     override val homeQuickButton    = "Spielen"
     override fun homeHeroPlaytime(hours: Long) = "$hours Std. gespielt"
     override val launchTileReady    = "Starten"
-    override val launchTileBlocked  = "Noch nicht spielbar"
 
     // --- Library widgets ---
     override val libraryEmptyTitle     = "Noch leer"

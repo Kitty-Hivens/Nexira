@@ -1341,7 +1341,6 @@ interface AppStrings {
     val homeQuickButton: String
     fun homeHeroPlaytime(hours: Long): String
     val launchTileReady: String
-    val launchTileBlocked: String
 
     // --- Library widgets ---
     val libraryEmptyTitle: String

@@ -1155,7 +1155,6 @@ object RussianStrings : AppStrings {
     override val homeQuickButton    = "Играть"
     override fun homeHeroPlaytime(hours: Long) = "В игре $hours ч"
     override val launchTileReady    = "Запустить"
-    override val launchTileBlocked  = "Играть нельзя"
 
     // --- Library widgets ---
     override val libraryEmptyTitle     = "Пока пусто"

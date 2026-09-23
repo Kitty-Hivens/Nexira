@@ -53,20 +53,16 @@ import hivens.core.update.PackUpdateStatusHub
 import hivens.core.update.UpdateDirection
 import hivens.ui.AppState
 import hivens.ui.components.FullscreenVideo
+import hivens.ui.components.LaunchControl
 import hivens.ui.components.VideoMedia
 import hivens.ui.components.isVideoUrl
+import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.core.launch.LaunchControlMode
-import hivens.core.launch.LaunchState
-import hivens.launcher.launch.LauncherController
-import hivens.ui.notifications.IndicationCenter
-import hivens.ui.notifications.IndicationCenter.Companion.controlMode
-import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -103,8 +99,6 @@ import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -134,8 +128,6 @@ fun PackDetailScreen(
     PuppetClick("packDetail.back") { onBack() }
 
     val state = rememberPackDetailState(instanceId)
-    val controller: LauncherController = koinInject()
-    val indications: IndicationCenter = koinInject()
     val updateHub: PackUpdateStatusHub = koinInject()
     val autoUpdateStatuses by updateHub.statuses.collectAsState()
 
@@ -168,38 +160,23 @@ fun PackDetailScreen(
     // inside a tab body is sized and clipped by that body.
     val contentState = rememberContentTabState(pack)
     val authedSession = (appState as? AppState.Authenticated)?.session
-    val launchIndication by indications.launchIndication(pack.id).collectAsState()
-
-    // The launcher runs one game at a time, and this page only knew about its own
-    // pack: with another one up, Play read as available, the controller refused it,
-    // and the click cost the running game its narration for nothing. Same test the
-    // home launch controls use.
-    // Collapsed to the one question this screen asks before collecting it:
-    // Downloading republishes per progress callback, and this page has no reason
-    // to repaint at frame rate while some other pack downloads.
-    val launcherIdle by remember(controller) {
-        controller.state
-            .map { it is LaunchState.Idle || it is LaunchState.Error }
-            .distinctUntilChanged()
-    }.collectAsState(initial = true)
-    val canPlay = authedSession != null && launcherIdle
+    // The same decision the home widgets make: whether this pack can be played, and
+    // when not, why not in words the control can show.
+    val launchControl = rememberLaunchControl(pack, authedSession)
 
     // The hero's play/abort are the only way to drive a pack launch, so the control
     // surface has to reach them -- a scenario that cannot start a launch cannot check
     // what a launch does to the instance.
-    PuppetClick("packDetail.play", enabled = canPlay) {
-        authedSession?.let { state.play(it) }
+    PuppetClick("packDetail.play", enabled = launchControl.enabled && !launchControl.busy) {
+        launchControl.onClick()
     }
     PuppetClick("packDetail.abort") { state.abortLaunch() }
 
     Column(Modifier.fillMaxSize()) {
         Hero(
             pack           = pack,
-            playEnabled    = canPlay,
-            indication     = launchIndication,
+            launchControl  = launchControl,
             onBack         = onBack,
-            onPlay         = { authedSession?.let { state.play(it) } },
-            onAbort        = { state.abortLaunch() },
             onOpenSettings = { showSettings = true },
             onOpenFolder   = { state.openFolder() },
             // Any source that pins a version has one worth naming; this used to
@@ -447,11 +424,8 @@ private fun LogSessionPicker(
 @Composable
 private fun Hero(
     pack: PackInstance,
-    playEnabled: Boolean,
-    indication: LaunchIndication?,
+    launchControl: LaunchControl,
     onBack: () -> Unit,
-    onPlay: () -> Unit,
-    onAbort: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenFolder: () -> Unit,
     versionLabel: String?,
@@ -552,19 +526,15 @@ private fun Hero(
                     }
                 }
                 // The pill walks the launch: Play -> wait (prepare/sync, inert)
-                // -> Exit (stop the running game) -> Play again. Failed falls
-                // back to Play -- the error toast carries the diagnosis.
-                val mode = indication.controlMode()
+                // -> Exit (stop the running game) -> Play again, and names the
+                // reason when Play is not on offer. Failed falls back to Play --
+                // the error toast carries the diagnosis.
                 PlayButton(
-                    label    = when (mode) {
-                        LaunchControlMode.Stop -> s.packPlayExit
-                        LaunchControlMode.Wait -> s.packPlayWait
-                        LaunchControlMode.Play -> s.packDetailPlay
-                    },
-                    icon     = if (mode == LaunchControlMode.Stop) NxIcon.Stop else NxIcon.PlayArrow,
-                    busy     = mode == LaunchControlMode.Wait,
-                    onClick  = if (mode == LaunchControlMode.Stop) onAbort else onPlay,
-                    enabled  = if (mode == LaunchControlMode.Stop) true else playEnabled,
+                    label    = launchControl.label,
+                    icon     = launchControl.icon,
+                    busy     = launchControl.busy,
+                    onClick  = launchControl.onClick,
+                    enabled  = launchControl.enabled,
                     iconOnly = playIconOnly,
                 )
             }
