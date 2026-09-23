@@ -27,6 +27,7 @@ import hivens.core.update.mergedWith
 import hivens.core.update.reconcileMods
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -34,8 +35,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
-import java.time.Instant
-import java.util.UUID
 
 /**
  * Drives a mirror pack instance from its installed build to another one -- a
@@ -62,6 +61,7 @@ class PackUpdateService(
     private val dataDir: Path,
 ) : PackUpdater {
     private val log = LoggerFactory.getLogger(PackUpdateService::class.java)
+    private val guard = ApplyGuard(snapshotService, journal, repository)
 
     private fun clientDirOf(instance: PackInstance): Path =
         dataDir.resolve("instances").resolve(instance.instanceDirName)
@@ -134,57 +134,24 @@ class PackUpdateService(
                 val plan = computePlan(fresh, target, targetManifest, scanInstanceState(clientDir, paths))
                 val compat = gradeCompat(fresh, target)
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
-                // Snapshot the pack-managed files before ANY change so a failed apply
-                // auto-reverts and a structural / no-baseline update stays recoverable
-                // (hardlinks make it cheap; a label-only no-op skips it).
-                val managed = managedRealPaths(fresh.installedManifest, targetManifest)
-                val snapshot = if (!plan.isEmpty) {
-                    val now = Instant.now().toEpochMilli()
-                    snapshotService.capture(clientDir, fresh, managed, "$now-${UUID.randomUUID().toString().take(8)}", now)
-                } else {
-                    null
-                }
-                // Journal the in-flight apply (snapshot id + managed set) BEFORE the
-                // first file write, so a hard crash between here and the commit is
-                // rolled back on the next start instead of leaving a half-updated pack.
-                if (snapshot != null) {
-                    journal.begin(
-                        PendingApply(
-                            instanceId = fresh.id,
-                            instanceDirName = fresh.instanceDirName,
-                            snapshotId = snapshot.id,
-                            fromVersion = currentVersionOf(fresh),
-                            toVersion = target.packVersion,
-                            managedPaths = managed.toList(),
-                            startedAtEpoch = snapshot.createdAtEpoch,
-                        )
-                    )
-                }
-                try {
+                val commitBuild: suspend () -> Unit = {
                     syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
                     commit(fresh, target, enabledState, pinExplicit = targetVersion != null)
-                    // The instance just moved, so the mirror views that describe
-                    // "where it should be" are a build out of date. Left alone,
-                    // the next check answers from a cache older than this apply
-                    // and reports an update back to the build we came from.
-                    client.invalidatePack(packId)
-                    if (snapshot != null) journal.complete(fresh.instanceDirName)
-                } catch (e: Throwable) {
-                    if (snapshot != null) {
-                        try {
-                            repository.put(snapshotService.restore(clientDir, fresh.instanceDirName, snapshot.id, managed))
-                            snapshotService.delete(fresh.instanceDirName, snapshot.id)
-                        } catch (re: Throwable) {
-                            // Apply failed AND the auto-rollback failed: keep the snapshot
-                            // for a manual restore and surface both errors, don't mask the
-                            // original apply failure with the restore one.
-                            e.addSuppressed(re)
-                        }
-                        journal.complete(fresh.instanceDirName)
-                    }
-                    throw e
                 }
-                if (snapshot != null) snapshotService.prune(fresh.instanceDirName, KEEP_SNAPSHOTS)
+                // A label-only move writes no file, so there is nothing to snapshot
+                // or roll back and it commits bare.
+                if (plan.isEmpty) {
+                    commitBuild()
+                } else {
+                    val managed = managedRealPaths(fresh.installedManifest, targetManifest)
+                    guard.apply(clientDir, fresh, managed, currentVersionOf(fresh), target.packVersion, commitBuild)
+                }
+                // After the commit and outside it: the update is done by here, and a
+                // cache that failed to clear is no reason to undo it. Left alone, the
+                // next check answers from a cache older than this apply and reports
+                // an update back to the build we came from.
+                runCatching { client.invalidatePack(packId) }
+                    .onFailure { if (it is CancellationException) throw it else log.warn("update: could not drop the cached views of {}", packId, it) }
                 log.info(
                     "update: pack={} {} -> {} ({} add, {} update, {} delete, {} conflict, compat={})",
                     packId, currentVersionOf(fresh), target.packVersion,
@@ -401,7 +368,4 @@ class PackUpdateService(
         }
     }
 
-    private companion object {
-        private const val KEEP_SNAPSHOTS = 3
-    }
 }
