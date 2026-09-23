@@ -100,6 +100,7 @@ import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalFamilyOverrides
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalPlacementReflow
 import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotMotionMs
@@ -535,6 +536,10 @@ fun EditorSurfaceHost(
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
             Motion.panelSlide.durationMs
         } else 0,
+        // Reflow is a view-time fit, so it is off while editing: a widget capped to
+        // its slot cannot be resized past it. Preview turns it back on to check the
+        // fit, and it is always on outside the editor.
+        LocalPlacementReflow provides !(state is EditModeState.On && !previewing),
         // Placement slots report their window bounds so palette drops land at the
         // release point (PaletteItem reads slotOrigin to convert the pointer).
         LocalSlotBoundsReporter provides slotBoundsReporter,

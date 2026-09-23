@@ -2,9 +2,11 @@ package hivens.widget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -14,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalPlacementReflow
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDescriptor
@@ -213,6 +216,25 @@ class SlotRendererGeometryTest {
         assertEquals(A, frame.at(SIDE - 5, SIDE - 5), "nothing was left to take hold of")
     }
 
+    @Test
+    fun `a placement widget reflows to fit in view but keeps its claim while editing`() {
+        // A widget claiming far more width than the room its anchor leaves. The slot is
+        // 120 wide inside the 200 scene and the widget sits 40 in, so it has 80 of room.
+        // In view the renderer reflows it to those 80 (drawn edge at 120); while editing
+        // the cap is off, so it keeps its claim and runs to the parent limit (edge at
+        // 160), which is what leaves the resize handle somewhere to grow into.
+        val wide = SlotContent(
+            widgets = listOf(box("a", Placement(anchor = Placement.TOP_START, x = 40f, y = 40f, width = 300f, height = 40f))),
+            flow = null,
+        )
+        val view = render(wide, reflow = true, slotWidth = 120)
+        assertEquals(A, view.at(80, 50), "the widget is drawn")
+        assertEquals(PAGE, view.at(140, 50), "in view it is capped to the slot's room and stops before here")
+
+        val editing = render(wide, reflow = false, slotWidth = 120)
+        assertEquals(A, editing.at(140, 50), "while editing the cap is off, so the widget keeps its width past the slot's room")
+    }
+
     // ── Flow ──────────────────────────────────────────────────────────
 
     @Test
@@ -304,7 +326,7 @@ class SlotRendererGeometryTest {
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun render(content: SlotContent, fixedHeight: Int = 0): Frame {
+    private fun render(content: SlotContent, fixedHeight: Int = 0, reflow: Boolean = true, slotWidth: Int = 0): Frame {
         val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
         val registry = Registry(
             mapOf(
@@ -317,9 +339,11 @@ class SlotRendererGeometryTest {
             CompositionLocalProvider(
                 LocalLayoutGraph provides graph,
                 LocalWidgetRegistry provides registry,
+                LocalPlacementReflow provides reflow,
             ) {
                 Box(Modifier.fillMaxSize().background(PAGE_COLOUR)) {
-                    SlotRenderer(surface, slot, Modifier.fillMaxSize())
+                    val slotMod = if (slotWidth > 0) Modifier.width(slotWidth.dp).fillMaxHeight() else Modifier.fillMaxSize()
+                    SlotRenderer(surface, slot, slotMod)
                 }
             }
         }

@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -399,6 +400,14 @@ private fun PlacementSlot(
     }
 }
 
+// The room a widget has from its anchored edge to the far one, less its outer
+// padding. A start or end anchor pins one edge and leaves the space to the other; a
+// centre anchor grows both ways, so an offset eats twice.
+private fun roomFromAnchor(slot: Float, offset: Float, bias: Float, pad: Float): Float {
+    val room = if (bias == 0.5f) slot - 2f * abs(offset) else slot - offset
+    return (room - pad).coerceAtLeast(0f)
+}
+
 // Positions one child against its anchor. Compose's own alignment does the bias
 // arithmetic, so the offset is only the nudge away from that corner -- and it
 // runs inward from an end anchor, because "16 from the right" is what somebody
@@ -495,9 +504,33 @@ private fun BoxScope.PlacedBox(
     // larger than its cell does overflow it, which the overlap warning says.
     val boundW = sizing.boundWidth(width)
     val boundH = sizing.boundHeight(height)
+    // Off while a placement is being edited, or the cap would fight the resize handle
+    // (see [LocalPlacementReflow]). Authoring is at the natural size; the view reflows.
+    val reflow = LocalPlacementReflow.current
+    // Reflow to fit: cap the claim to the room the slot has left from the widget's
+    // anchor, so a widget too wide for a shrunk slot (the right panel opening) draws
+    // narrower and its content reflows, instead of running under the panel. Measured
+    // from the anchored edge: an end anchor tracks the far edge and rarely overflows,
+    // a start anchor's free side is the one that runs past. A widget parked beyond the
+    // slot (offset past its width) is a stray the grab-margin clamp handles, so it is
+    // left at its own size. Never below the widget's floor: if not even the floor fits
+    // it keeps the floor and the overflow is irreducible. A lattice sizes in whole
+    // cells and keeps its own clamp.
+    val availW = if (reflow && !lattice && slotDp.width > 0f && offX <= slotDp.width) {
+        roomFromAnchor(slotDp.width, clampedX, hBias, placement.padding.start(0f) + placement.padding.end(0f))
+    } else {
+        Float.POSITIVE_INFINITY
+    }
+    val availH = if (reflow && !lattice && slotDp.height > 0f && offY <= slotDp.height) {
+        roomFromAnchor(slotDp.height, clampedY, vBias, placement.padding.top(0f) + placement.padding.bottom(0f))
+    } else {
+        Float.POSITIVE_INFINITY
+    }
+    val fitW = if (boundW > 0f) minOf(boundW, availW).coerceAtLeast(sizing.minWidth.toFloat()) else if (availW.isFinite()) availW else 0f
+    val fitH = if (boundH > 0f) minOf(boundH, availH).coerceAtLeast(sizing.minHeight.toFloat()) else if (availH.isFinite()) availH else 0f
     var sizeMod: Modifier = Modifier
-    if (boundW > 0f) sizeMod = sizeMod.widthIn(max = boundW.dp)
-    if (boundH > 0f) sizeMod = sizeMod.heightIn(max = boundH.dp)
+    if (fitW > 0f) sizeMod = sizeMod.widthIn(max = fitW.dp)
+    if (fitH > 0f) sizeMod = sizeMod.heightIn(max = fitH.dp)
     // Space reserved around the widget, from the placement rather than the plane,
     // so a widget that paints its own plane gets it too. Outside sizeMod and inside
     // onSizeChanged: the plane keeps its claimed size, the padding sits around it,

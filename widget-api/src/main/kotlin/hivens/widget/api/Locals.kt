@@ -209,6 +209,16 @@ data class GridGeometry(val cellDp: Float, val gutterDp: Float, val columns: Int
 val LocalGridGeometry: ProvidableCompositionLocal<GridGeometry?> =
     compositionLocalOf { null }
 
+// Whether a placement slot may reflow a widget to fit: cap its drawn width and
+// height to the room its anchor leaves, so an overflowing widget draws smaller
+// instead of running past the slot edge (and under the panel that shrank it). On
+// for display, OFF while a placement is being edited: a widget capped to the slot
+// cannot be resized past it, because the resize handle hangs off the drawn box and
+// the cap freezes it. The editor turns it off so authoring happens at the natural
+// size, and the reflow is a view-time transform on top.
+val LocalPlacementReflow: ProvidableCompositionLocal<Boolean> =
+    compositionLocalOf { true }
+
 // Editor-only hook: SlotRenderer's placement branch reports its window bounds
 // here so a palette drop can land at the release point (converted to slot-local dp).
 // Default no-op; the editor host provides one that registers into the
