@@ -45,7 +45,9 @@ import java.util.zip.ZipFile
  * instance dir and rejected if it escapes (zip-slip / traversal). Downloaded
  * bytes are verified against the strongest hash the index pins (sha512 over
  * sha1); a file entry with downloads but no usable hash is rejected, so a
- * tampered mirror can't substitute content -- not even by omitting sha1.
+ * tampered mirror can't substitute content -- not even by omitting sha1. The
+ * index itself arrives inside the archive, so a downloaded archive is held to
+ * the digest its source publishes before anything in it is believed.
  */
 class MrpackInstaller(
     private val transfers: TransferEngine,
@@ -397,9 +399,15 @@ class MrpackInstaller(
      * Download a `.mrpack` from [url], install it, then drop the archive. [source]
      * stamps the instance's origin/id/version so the update flow can find newer
      * versions later -- this is the Modrinth catalogue install path.
+     *
+     * [sha1] is required: the index that pins every other file is inside this
+     * archive, so an archive taken on trust would let whoever served it choose
+     * both the files and the hashes they are checked against.
      */
     suspend fun installFromUrl(
         url: String,
+        sha1: String,
+        size: Long = -1L,
         source: MrpackSource,
         iconUrl: String? = null,
         bannerUrl: String? = null,
@@ -410,7 +418,11 @@ class MrpackInstaller(
         // the data dir: a pack archive runs to hundreds of megabytes, and a partial
         // that a relaunch cannot find is a download that starts over.
         val archive = dataDir.resolve(DOWNLOADS_DIR).resolve(sanitize("${source.id}-${source.version ?: "latest"}") + ".mrpack")
-        transfers.fetch(Transfer(url = url, dest = archive, skip = SkipIfPresent.Never))
+        // By digest: a verified archive left by an attempt that failed later is the
+        // right bytes, and anything else at that path is fetched again.
+        transfers.fetch(
+            Transfer(url = url, dest = archive, expect = Digest(DigestAlgorithm.SHA1, sha1), size = size, skip = SkipIfPresent.ByDigest),
+        )
         val instance = install(archive, source, iconUrl, bannerUrl, onReserveDir, progress)
         // Dropped only once the install is through. A failure leaves the archive for
         // the next attempt to continue from instead of pulling it again.

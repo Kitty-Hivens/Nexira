@@ -147,11 +147,13 @@ class ModrinthPackUpdater(
                                     "installed, and version '$installed' is no longer listed to read one from. " +
                                     "Reinstall the pack to update it.",
                             )
-                        scratch.resolve("installed.mrpack").also { client.downloadTo(previous.primaryFile().url, it) }
+                        scratch.resolve("installed.mrpack").also { previous.primaryFile().let { f -> client.downloadTo(f.url, it, f.hashes.sha1) } }
                     } else {
                         null
                     }
-                    client.downloadTo(target.primaryFile().url, archive)
+                    // Held to the published digest: the index inside is what pins
+                    // every other file the update fetches.
+                    target.primaryFile().let { f -> client.downloadTo(f.url, archive, f.hashes.sha1) }
                     // Say what went wrong here rather than let a zero-byte file
                     // reach the zip reader, which reports only "zip file is empty"
                     // and names neither the pack nor where the bytes should have

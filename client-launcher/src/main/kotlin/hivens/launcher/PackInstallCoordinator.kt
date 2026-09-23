@@ -40,8 +40,12 @@ class PackInstallCoordinator(
         PackOrigin.Modrinth -> {
             val url = version.downloadUrl
                 ?: throw IOException("Modrinth version ${version.id} carries no .mrpack download URL")
+            val sha1 = version.downloadSha1
+                ?: throw IOException("Modrinth version ${version.id} publishes no digest for its .mrpack")
             mrpackInstaller.installFromUrl(
                 url = url,
+                sha1 = sha1,
+                size = version.downloadSize,
                 source = MrpackSource(PackOrigin.Modrinth, pack.id, version.versionNumber, buildKey = version.id),
                 iconUrl = pack.iconUrl,
                 bannerUrl = pack.bannerUrl,

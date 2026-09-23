@@ -168,7 +168,7 @@ class ModInstaller(
     private suspend fun fetch(dir: Path, v: ModrinthVersion): Boolean {
         val file = v.files.firstOrNull { it.primary } ?: v.files.firstOrNull() ?: return false
         return try {
-            modrinth.downloadTo(file.url, dir.resolve(file.filename))
+            modrinth.downloadTo(file.url, dir.resolve(file.filename), file.hashes.sha1)
             true
         } catch (e: CancellationException) {
             throw e

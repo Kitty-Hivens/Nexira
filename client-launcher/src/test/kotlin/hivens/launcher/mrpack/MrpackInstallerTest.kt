@@ -481,6 +481,64 @@ class MrpackInstallerTest {
         assertEquals(recordBefore, clientDir.resolve(PackFileRecord.FILE_NAME).readText())
     }
 
+    /** An installer whose engine serves [archive] at [ARCHIVE_URL], beside the vanilla runtime. */
+    private fun urlInstaller(archive: ByteArray, repo: FakeRepository, dataDir: Path): MrpackInstaller {
+        val base = engine()
+        val provider = HttpClientProvider {
+            HttpClient(MockEngine { req ->
+                if (req.url.toString() == ARCHIVE_URL) respond(ByteReadChannel(archive), HttpStatusCode.OK)
+                else base.config.requestHandlers.first()(this, req)
+            })
+        }
+        val provisioner = RuntimeProvisioner(
+            librariesDir = tempDir("libs"), assetsDir = tempDir("assets"), clientProvider = provider,
+            transfers = testTransferEngine(provider), json = json,
+            loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
+            versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+        )
+        return MrpackInstaller(testTransferEngine(provider), json, fakeJava, provisioner, repo, dataDir)
+    }
+
+    /**
+     * The index that pins every file's hash travels inside the archive, so an
+     * archive taken on trust lets whoever served it pick the files and the hashes
+     * they are checked against together.
+     */
+    @Test
+    fun `an archive that does not match its published digest installs nothing`() = runTest {
+        val published = Files.readAllBytes(buildMrpack())
+        val served = Files.readAllBytes(buildVersionedPack(second = true))
+        val repo = FakeRepository()
+        val dataDir = tempDir("data")
+
+        runCatching {
+            urlInstaller(served, repo, dataDir).installFromUrl(
+                url = ARCHIVE_URL,
+                sha1 = sha1(published),
+                source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.0.0"),
+            )
+        }.onSuccess { error("an archive with the wrong bytes must not install") }
+
+        assertTrue(repo.stored.isEmpty(), "nothing registered")
+        assertFalse(Files.exists(dataDir.resolve("instances")), "no instance directory was made")
+    }
+
+    @Test
+    fun `an archive that matches its published digest installs`() = runTest {
+        val bytes = Files.readAllBytes(buildMrpack())
+        val repo = FakeRepository()
+
+        val instance = urlInstaller(bytes, repo, tempDir("data")).installFromUrl(
+            url = ARCHIVE_URL,
+            sha1 = sha1(bytes),
+            size = bytes.size.toLong(),
+            source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.0.0"),
+        )
+
+        assertEquals("Test Pack", instance.displayName)
+        assertTrue(repo.stored.any { it.id == instance.id })
+    }
+
     @Test
     fun `archivePaths names what a version places, and not what it skips`() {
         assertEquals(
@@ -502,5 +560,6 @@ class MrpackInstallerTest {
         const val STABLE_URL = "https://cdn.test/stable.jar"
         const val LIB_V1_URL = "https://cdn.test/lib-1.0.jar"
         const val LIB_V2_URL = "https://cdn.test/lib-2.0.jar"
+        const val ARCHIVE_URL = "https://cdn.test/pack.mrpack"
     }
 }

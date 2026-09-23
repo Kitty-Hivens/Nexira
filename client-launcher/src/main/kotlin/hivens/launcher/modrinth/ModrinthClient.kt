@@ -1,6 +1,8 @@
 package hivens.launcher.modrinth
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
 import hivens.core.net.SkipIfPresent
 import hivens.core.net.Transfer
 import hivens.core.net.TransferEngine
@@ -229,16 +231,24 @@ class ModrinthClient(
         }
 
     /**
-     * Fetch a mod jar to [target]; a file already there is left alone.
+     * Fetch a file to [target]; a file already there is left alone.
      *
-     * Modrinth pins hashes on the version metadata, but the browser hands this
-     * function a bare url, so there is nothing here to verify against -- the
-     * transfer is retried and resumed, and the jar's own structure is what the
-     * content scanner checks afterwards.
+     * Held to [sha1] when the caller has it from the version metadata. The mod
+     * browser hands this a bare url and passes none: the transfer is retried and
+     * resumed, and the jar's own structure is what the content scanner checks
+     * afterwards.
      */
-    suspend fun downloadTo(url: String, target: Path): Unit = withContext(Dispatchers.IO) {
+    suspend fun downloadTo(url: String, target: Path, sha1: String? = null): Unit = withContext(Dispatchers.IO) {
         if (Files.exists(target)) return@withContext
-        transfers.fetch(Transfer(url = url, dest = target, userAgent = USER_AGENT, skip = SkipIfPresent.Presence))
+        transfers.fetch(
+            Transfer(
+                url = url,
+                dest = target,
+                expect = sha1?.let { Digest(DigestAlgorithm.SHA1, it) },
+                userAgent = USER_AGENT,
+                skip = SkipIfPresent.Presence,
+            ),
+        )
     }
 
     private suspend inline fun <reified B, reified T> postJson(url: String, body: B): T {
