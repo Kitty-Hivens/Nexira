@@ -1,13 +1,17 @@
 package hivens.ui.editor
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,11 +25,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -39,11 +45,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxTooltip
+import hivens.ui.nx.NxTooltipBehaviour
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
@@ -229,29 +238,28 @@ internal fun SlotLayoutMenuContent(
     NxMenuItem(s.editorSlotGrid, selected = flow != null && flow.wrap > 0) {
         controller.setFlow(path, FlowSpec.grid(DEFAULT_WRAP)); onClose()
     }
-    // Canvas, and when it is the active mode, its adaptive / exact toggle on the SAME
-    // row rather than a new one below, so the menu keeps its height as the canvas
-    // grows options. Adaptive scales the arrangement to fit a narrow slot; exact holds
-    // the stored coordinates and lets a slot too narrow for them clip.
+    // Canvas, and when it is the active mode, its adaptive / exact toggle on the same
+    // row. Adaptive scales the arrangement to fit a narrow slot; exact holds the
+    // stored coordinates and lets a slot too narrow for them clip.
     if (flow == null) {
+        val isAdaptive = live.adaptive
         Row(
-            modifier          = Modifier.fillMaxWidth().padding(end = 8.dp),
+            modifier          = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.weight(1f)) { NxMenuItem(s.editorSlotCanvas, selected = true) {} }
-            val isAdaptive = live.adaptive
-            NxIconButton(
-                NxIcon.OpenInFull, s.editorSlotAdaptive,
-                onClick  = { controller.setSlotAdaptive(path, true) },
-                tint     = if (isAdaptive) NxTheme.colors.primary else NxTheme.colors.textSecondary,
-                iconSize = 16.dp,
+            Text(
+                text     = s.editorSlotCanvas,
+                style    = MaterialTheme.typography.bodyMedium,
+                color    = NxTheme.colors.primary,
+                modifier = Modifier.weight(1f),
             )
-            NxIconButton(
-                NxIcon.Lock, s.editorSlotExact,
-                onClick  = { controller.setSlotAdaptive(path, false) },
-                tint     = if (!isAdaptive) NxTheme.colors.primary else NxTheme.colors.textSecondary,
-                iconSize = 16.dp,
-            )
+            SlotModeButton(NxIcon.OpenInFull, s.editorSlotAdaptive, active = isAdaptive) {
+                controller.setSlotAdaptive(path, true)
+            }
+            Spacer(Modifier.width(4.dp))
+            SlotModeButton(NxIcon.Lock, s.editorSlotExact, active = !isAdaptive) {
+                controller.setSlotAdaptive(path, false)
+            }
         }
     } else {
         NxMenuItem(s.editorSlotCanvas, selected = false) {
@@ -301,5 +309,43 @@ private fun SlotNumberRow(
             modifier = Modifier.padding(horizontal = 6.dp),
         )
         NxIconButton(NxIcon.ChevronRight, s.editorSlotGridColumnsIncrease, onClick = onIncrease, iconSize = 16.dp)
+    }
+}
+
+/**
+ * A square, softly rounded toggle for the canvas scaling mode, with a tooltip. Not
+ * [NxIconButton]: that one is a disc, and a mode switch reads better as a pair of
+ * tiles, the active one washed in the accent.
+ */
+@Composable
+private fun SlotModeButton(icon: IconKey, label: String, active: Boolean, onClick: () -> Unit) {
+    // A visible tile at rest, not just a glyph: the shape has to read as a square
+    // button whether or not it is the active one, so the pair looks like a toggle.
+    // Same fill-plus-border the anchor grid uses.
+    val shape = RoundedCornerShape(6.dp)
+    NxTooltip(text = label, behaviour = NxTooltipBehaviour.LabelCentred) {
+        Box(
+            modifier = Modifier
+                .clip(shape)
+                .background(
+                    if (active) NxTheme.colors.primary.copy(alpha = 0.22f)
+                    else NxTheme.colors.surfaceVariant.copy(alpha = 0.5f),
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (active) NxTheme.colors.primary else NxTheme.colors.outline.copy(alpha = 0.3f),
+                    shape = shape,
+                )
+                .clickable(onClick = onClick)
+                .padding(6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Symbol(
+                icon,
+                contentDescription = null,
+                tint = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary,
+                size = 16.dp,
+            )
+        }
     }
 }
