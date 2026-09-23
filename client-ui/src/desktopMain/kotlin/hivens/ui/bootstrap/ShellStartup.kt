@@ -33,8 +33,9 @@ data class StartupPolicy(
  *  2. If the tray did not come up, put the window back on screen -- a user who
  *     closed to tray during init would otherwise be left with a running
  *     process and no reachable UI.
- *  3. The background services, each on the app scope so they outlive this
- *     composition but still die with the process.
+ *  3. The background services on the app scope, so they outlive this
+ *     composition but still die with the process. Interrupted-update recovery
+ *     finishes before the auto-update pass starts.
  */
 class ShellStartup(
     private val policy: StartupPolicy,
@@ -57,12 +58,25 @@ class ShellStartup(
         // (a locale switch, a crash reload) but are cancelled on JVM exit,
         // unlike a GlobalScope launch which would leak handles past close.
         //
-        // Runs regardless of the auto-update opt-in: an update a hard crash
-        // interrupted leaves a half-applied instance, and that has to be
-        // repaired before anything else touches it.
-        appScope.launch { recoverInterrupted() }
-
-        if (policy.autoUpdatePacks) appScope.launch { autoUpdatePacks() }
+        // Recovery runs regardless of the auto-update opt-in: an update a hard
+        // crash interrupted leaves a half-applied instance, and that has to be
+        // repaired before anything else touches it. One coroutine, so the pass
+        // waits for it. The mutation lock makes the two exclusive and says
+        // nothing about which goes first.
+        appScope.launch {
+            val recovered = try {
+                recoverInterrupted()
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.error("Interrupted-update recovery failed, so the auto-update pass is skipped this session", e)
+                false
+            }
+            // Not over an instance recovery could not vouch for: an update applied on
+            // top of a half-rolled-back one is a third state nobody can undo.
+            if (recovered && policy.autoUpdatePacks) autoUpdatePacks()
+        }
     }
 
     /**

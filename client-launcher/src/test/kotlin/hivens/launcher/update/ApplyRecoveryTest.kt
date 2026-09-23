@@ -4,7 +4,12 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.core.io.InstanceMutationLock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,6 +124,51 @@ class ApplyRecoveryTest {
             listOf(entry), journal.listPending(),
             "the marker is the only thing that brings the next start back to this instance",
         )
+    }
+
+    /**
+     * Recovery and the auto-update pass meet on one instance lock, and the lock says
+     * nothing about who goes first. When the update got it, it committed and cleared
+     * the marker, and a recovery working from the listing it took before waiting
+     * restored the older snapshot over the build that had just landed.
+     */
+    @Test
+    fun `a marker cleared while recovery waited for the lock is not rolled back`() = runTest {
+        val dataDir = Files.createTempDirectory("rec4")
+        val dir = "industrial"
+        val clientDir = dataDir.resolve("instances").resolve(dir)
+        val modsDir = clientDir.resolve("mods")
+        Files.createDirectories(modsDir)
+        Files.writeString(modsDir.resolve("a.jar"), "old-a")
+
+        val snapshots = PackSnapshotService(dataDir, json)
+        val journal = ApplyJournal(dataDir, json)
+        val managed = setOf("mods/a.jar")
+        val snap = snapshots.capture(clientDir, instance("1", dir), managed, "snap-1", 100L)
+        journal.begin(PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L))
+
+        // Something else holds the instance, and finishes its update while recovery
+        // is queued behind it.
+        val release = CompletableDeferred<Unit>()
+        launch {
+            InstanceMutationLock.withLock(clientDir) {
+                release.await()
+                Files.delete(modsDir.resolve("a.jar"))
+                Files.writeString(modsDir.resolve("a.jar"), "committed-a")
+                journal.complete(dir)
+            }
+        }
+        advanceUntilIdle()
+
+        val recovery = ApplyRecovery(snapshots, FakeRepo(), journal, dataDir, io = StandardTestDispatcher(testScheduler))
+        var recovered: List<String>? = null
+        launch { recovered = recovery.recoverInterrupted() }
+        advanceUntilIdle()
+        release.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(emptyList(), recovered)
+        assertEquals("committed-a", Files.readString(modsDir.resolve("a.jar")), "the update that landed stays")
     }
 
     @Test

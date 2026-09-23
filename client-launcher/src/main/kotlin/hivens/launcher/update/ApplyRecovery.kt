@@ -3,6 +3,7 @@ package hivens.launcher.update
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.io.InstanceMutationLock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -23,15 +24,25 @@ class ApplyRecovery(
     private val repository: IPackRepository,
     private val journal: ApplyJournal,
     private val dataDir: Path,
+    private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val log = LoggerFactory.getLogger(ApplyRecovery::class.java)
 
     /** Roll back every journalled in-flight apply. Returns the recovered instance dir names. */
-    suspend fun recoverInterrupted(): List<String> = withContext(Dispatchers.IO) {
+    suspend fun recoverInterrupted(): List<String> = withContext(io) {
         val recovered = ArrayList<String>()
-        for (entry in journal.listPending()) {
-            val clientDir = dataDir.resolve("instances").resolve(entry.instanceDirName)
+        for (listed in journal.listPending()) {
+            val clientDir = dataDir.resolve("instances").resolve(listed.instanceDirName)
             InstanceMutationLock.withLock(clientDir) {
+                // Read again under the lock. The listing was taken before it, and an
+                // apply that got the lock first may have committed since and cleared
+                // the marker: restoring the listed snapshot then would put an older
+                // build over one that had just landed. A marker that is still there,
+                // whichever apply wrote it, is one that did not finish.
+                val entry = journal.read(listed.instanceDirName) ?: run {
+                    log.info("apply-recovery: {} finished since the listing, nothing to roll back", listed.instanceDirName)
+                    return@withLock
+                }
                 try {
                     val restored = snapshotService.restore(clientDir, entry.instanceDirName, entry.snapshotId, entry.managedPaths.toSet())
                     // Pin: a recovered instance stops following latest so a reproducible

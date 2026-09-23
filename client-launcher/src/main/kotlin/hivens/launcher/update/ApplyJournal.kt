@@ -37,6 +37,13 @@ class ApplyJournal(
             .onFailure { log.warn("apply-journal: failed to clear marker for {}", instanceDirName, it) }
     }
 
+    /** The marker for [instanceDirName] as it stands now, or null when there is none or it cannot be read. */
+    fun read(instanceDirName: String): PendingApply? {
+        val file = fileFor(instanceDirName)
+        if (!Files.isRegularFile(file)) return null
+        return runCatching { json.decodeFromString(PendingApply.serializer(), Files.readString(file)) }.getOrNull()
+    }
+
     /** Every in-flight apply marker still on disk. Unreadable markers are skipped. */
     fun listPending(): List<PendingApply> {
         val d = dir()
