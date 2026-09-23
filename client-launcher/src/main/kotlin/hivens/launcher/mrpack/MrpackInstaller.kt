@@ -17,6 +17,7 @@ import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.update.PackFileEntry
 import hivens.launcher.update.PackFileRecord
+import hivens.launcher.update.withBuildOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -254,9 +255,11 @@ class MrpackInstaller(
                     archiveCrc32 = overrides.mapNotNull { (path, e) -> e.crc?.let { path to it } }.toMap(),
                 ),
             )
-            repository.put(updated)
+            // The build fields onto the record as it is now: the update took minutes,
+            // and what was written meanwhile (playtime at a game's exit) is not ours.
+            val written = repository.update(instance.id) { it.withBuildOf(updated) } ?: updated
             log.info("mrpack update: {} now at {}", instance.instanceDirName, pinned ?: "an unnamed version")
-            updated
+            written
         }
     }
 

@@ -136,7 +136,7 @@ class PackUpdateService(
                 val enabledState = OptionalContentRules.enabledState(target.mods, fresh.optionalContent)
                 val commitBuild: suspend () -> Unit = {
                     syncService.applyUpdate(clientDir, target, plan, enabledState, progress)
-                    commit(fresh, target, enabledState, pinExplicit = targetVersion != null)
+                    commit(fresh, target, pinExplicit = targetVersion != null)
                 }
                 // A label-only move writes no file, so there is nothing to snapshot
                 // or roll back and it commits bare.
@@ -309,14 +309,16 @@ class PackUpdateService(
     private suspend fun commit(
         instance: PackInstance,
         target: SmrtPackManifest,
-        enabledState: Map<String, Boolean>,
         pinExplicit: Boolean,
     ) {
-        repository.put(
-            instance.copy(
-                packRef = instance.packRef.copy(version = target.packVersion),
+        // Onto the record as it is at the commit, not as it was read when the update
+        // began: an update takes minutes, and a game exiting meanwhile records its
+        // playtime, which a whole-record write put back to zero.
+        repository.update(instance.id) { current ->
+            current.copy(
+                packRef = current.packRef.copy(version = target.packVersion),
                 pinnedPackVersion = target.packVersion,
-                followLatest = if (pinExplicit) false else instance.followLatest,
+                followLatest = if (pinExplicit) false else current.followLatest,
                 installedManifest = target.toBaselineManifest(),
                 cachedManifest = CachedManifestSnapshot(
                     minecraftVersion = target.minecraft.version,
@@ -325,9 +327,15 @@ class PackUpdateService(
                     javaMajor = target.java.major,
                     authRequirement = target.auth?.toDomain(),
                 ),
-                optionalContent = OptionalContentRules.togglesFrom(target.mods, enabledState),
+                // The choice as it stands now, carried onto the new build. The files
+                // were placed from the choice read when the apply began, and a switch
+                // made during it is relabelled once the lock is released.
+                optionalContent = OptionalContentRules.togglesFrom(
+                    target.mods,
+                    OptionalContentRules.enabledState(target.mods, current.optionalContent),
+                ),
             )
-        )
+        }
     }
 
     /**
@@ -349,8 +357,8 @@ class PackUpdateService(
 
     /**
      * Roll [instance] back to snapshot [snapshotId]: restore the captured files
-     * and the pre-update instance record under the mutation lock. Returns the
-     * restored instance.
+     * and the pre-update build onto the record under the mutation lock. Returns the
+     * record as written.
      */
     override suspend fun rollback(instance: PackInstance, snapshotId: String): PackInstance {
         val clientDir = clientDirOf(instance)
@@ -361,9 +369,8 @@ class PackUpdateService(
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
                 // A rollback is a deliberate pin: stop following latest so the update we
                 // just undid is not re-applied on the next startup.
-                val pinned = restored.copy(followLatest = false)
-                repository.put(pinned)
-                pinned
+                repository.update(current.id) { it.withBuildOf(restored).copy(followLatest = false) }
+                    ?: current.withBuildOf(restored).copy(followLatest = false)
             }
         }
     }

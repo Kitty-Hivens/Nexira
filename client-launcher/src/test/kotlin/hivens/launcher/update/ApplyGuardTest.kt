@@ -65,6 +65,12 @@ class ApplyGuardTest {
         init {
             Files.createDirectories(mods)
             Files.writeString(mods.resolve("a.jar"), "old-a")
+            repo.map[before.id] = before
+        }
+
+        /** The commit landing, and a game's exit recording playtime in the same stretch. */
+        suspend fun commitAndPlay() {
+            repo.put(repo.get("1")!!.copy(pinnedPackVersion = "2", playtimeSeconds = 600))
         }
 
         /** What an apply does to the files: one replaced through a new inode, one added. */
@@ -97,13 +103,15 @@ class ApplyGuardTest {
         assertFailsWith<IOException> {
             h.run {
                 h.rewriteFiles()
+                h.commitAndPlay()
                 throw IOException("sha1 mismatch")
             }
         }
 
         assertEquals("old-a", Files.readString(h.mods.resolve("a.jar")))
         assertFalse(Files.exists(h.mods.resolve("b.jar")))
-        assertEquals("1", h.repo.get("1")?.pinnedPackVersion, "the pre-update record is put back")
+        assertEquals("1", h.repo.get("1")?.pinnedPackVersion, "the pre-update build is put back")
+        assertEquals(600, h.repo.get("1")?.playtimeSeconds, "and only the build: the playtime recorded meanwhile stays")
         assertTrue(h.journal.listPending().isEmpty())
         assertTrue(h.snapshots.list(DIR).isEmpty(), "a snapshot that was spent on the rollback is gone")
     }
@@ -122,6 +130,7 @@ class ApplyGuardTest {
             outcome = runCatching {
                 h.run {
                     h.rewriteFiles()
+                    h.commitAndPlay()
                     parked.await()
                 }
             }.exceptionOrNull()

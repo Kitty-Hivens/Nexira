@@ -37,7 +37,7 @@ internal class ApplyGuard(
      * back on the next start, and a crash after it finds nothing to undo.
      *
      * On any failure, cancellation included, the snapshot is restored and the
-     * pre-update record put back before the failure goes on. That runs outside the
+     * pre-update build written back onto the record before the failure goes on. That runs outside the
      * caller's cancellation: a restore cut short leaves exactly the half-updated
      * instance it exists to prevent. When the restore itself fails, the marker is
      * kept, so the next start's recovery gets a second attempt, and the snapshot
@@ -79,7 +79,8 @@ internal class ApplyGuard(
 
     private suspend fun rollBack(clientDir: Path, instanceDirName: String, snapshotId: String, managed: Set<String>, cause: Throwable) {
         try {
-            repository.put(snapshots.restore(clientDir, instanceDirName, snapshotId, managed))
+            val before = snapshots.restore(clientDir, instanceDirName, snapshotId, managed)
+            repository.update(before.id) { it.withBuildOf(before) }
             snapshots.delete(instanceDirName, snapshotId)
             journal.complete(instanceDirName)
             log.warn("update: {} did not finish ({}) and was rolled back to the snapshot", instanceDirName, cause.toString())

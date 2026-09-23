@@ -210,9 +210,8 @@ class ModrinthPackUpdater(
                 val restored = snapshotService.restore(clientDir, current.instanceDirName, snapshotId, managed)
                 // A rollback is a deliberate pin: stop following latest, or the
                 // update just undone comes back on the next pass.
-                val pinned = restored.copy(followLatest = false)
-                repository.put(pinned)
-                pinned
+                repository.update(current.id) { it.withBuildOf(restored).copy(followLatest = false) }
+                    ?: current.withBuildOf(restored).copy(followLatest = false)
             }
         }
     }

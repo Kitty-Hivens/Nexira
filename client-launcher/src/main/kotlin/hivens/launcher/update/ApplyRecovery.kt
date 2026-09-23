@@ -58,7 +58,7 @@ class ApplyRecovery(
                 val restored = snapshotService.restore(clientDir, entry.instanceDirName, entry.snapshotId, entry.managedPaths.toSet())
                 // Pin: a recovered instance stops following latest so a reproducible
                 // bad build is not re-applied (and re-crashed) on the next pass.
-                repository.put(restored.copy(followLatest = false))
+                repository.update(restored.id) { it.withBuildOf(restored).copy(followLatest = false) }
                 snapshotService.delete(entry.instanceDirName, entry.snapshotId)
                 log.warn(
                     "apply-recovery: instance {} had an update to {} interrupted; rolled back to {}",

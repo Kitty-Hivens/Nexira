@@ -36,11 +36,11 @@ class ApplyRecoveryTest {
     }
 
     /** A repository whose write is interrupted, as a shutdown mid-rollback interrupts it. */
-    private class CancellingRepo : IPackRepository {
+    private class CancellingRepo(private val held: PackInstance) : IPackRepository {
         private val flow = MutableStateFlow<List<PackInstance>>(emptyList())
         override fun observe(): StateFlow<List<PackInstance>> = flow
-        override suspend fun list(): List<PackInstance> = emptyList()
-        override suspend fun get(id: String): PackInstance? = null
+        override suspend fun list(): List<PackInstance> = listOf(held)
+        override suspend fun get(id: String): PackInstance? = held.takeIf { it.id == id }
         override suspend fun put(instance: PackInstance): Unit = throw CancellationException("shutting down")
         override suspend fun delete(id: String) = Unit
     }
@@ -89,6 +89,9 @@ class ApplyRecoveryTest {
         Files.writeString(modsDir.resolve("a.jar"), "new-a")
         Files.writeString(modsDir.resolve("b.jar"), "new-b")
         journal.begin(PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L))
+        // What the registry says by the time the launcher starts again: the build the
+        // crash interrupted, and a session played after the snapshot was taken.
+        repo.put(preUpdate.copy(pinnedPackVersion = "6", playtimeSeconds = 900, notes = "after"))
 
         val recovered = ApplyRecovery(snapshots, repo, journal, dataDir, InstanceWorkRegistry()).recoverInterrupted()
 
@@ -96,6 +99,9 @@ class ApplyRecoveryTest {
         assertEquals("old-a", Files.readString(modsDir.resolve("a.jar")), "captured file restored to pre-update bytes")
         assertFalse(Files.exists(modsDir.resolve("b.jar")), "apply-added file removed")
         assertEquals(false, repo.get("1")?.followLatest, "recovered instance is pinned")
+        assertEquals("5", repo.get("1")?.pinnedPackVersion, "to the build it had")
+        assertEquals(900, repo.get("1")?.playtimeSeconds, "and nothing else is wound back with it")
+        assertEquals("after", repo.get("1")?.notes)
         assertTrue(journal.listPending().isEmpty(), "marker cleared")
         assertTrue(snapshots.list(dir).isEmpty(), "snapshot consumed")
     }
@@ -117,7 +123,7 @@ class ApplyRecoveryTest {
         val entry = PendingApply("1", dir, snap.id, "5", "6", managed.toList(), 100L)
         journal.begin(entry)
 
-        val recovery = ApplyRecovery(snapshots, CancellingRepo(), journal, dataDir, InstanceWorkRegistry())
+        val recovery = ApplyRecovery(snapshots, CancellingRepo(instance("1", dir)), journal, dataDir, InstanceWorkRegistry())
         val outcome = runCatching { recovery.recoverInterrupted() }
 
         assertTrue(outcome.exceptionOrNull() is CancellationException, "the cancellation must propagate, not be logged as a failure")
