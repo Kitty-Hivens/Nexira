@@ -14,10 +14,21 @@ interface IPackSyncService {
     /**
      * @return the filenames whose flip could not be applied on disk right now (the
      * file is held open by a live process -- on Windows a running game keeps its mod
-     * jars locked). The toggle is still persisted, so the next sync applies it; an
-     * empty list means every flip landed.
+     * jars locked). Each is written down beside the instance and carried out by
+     * [settlePending] at the next launch. An empty list means every flip landed.
      */
     fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String>
+
+    /**
+     * Carries out the renames and removals a mod's two names were left owing
+     * because a process held the file at the time, and answers with the mods
+     * still owed something.
+     *
+     * Run before a launch checks the roster. The game that held the file has
+     * exited by then, and nothing else would ever get to it: a launch runs no sync,
+     * so a switched-off mod whose jar could not be moved went on loading.
+     */
+    suspend fun settlePending(clientDir: Path): List<String> = emptyList()
 
     /**
      * Holds an installed instance to the pack it claims to be: deletes everything

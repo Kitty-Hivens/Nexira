@@ -570,6 +570,17 @@ class LauncherController(
             return Prepared.Bail
         }
 
+        // What an earlier switch or update could not do to a mod's files because the
+        // game had them open. That game has exited, and nothing but a launch comes
+        // round again: left alone, a mod the player switched off went on loading.
+        // Before the roster check, which reads the result.
+        val owed = runCatching { smrtSyncService.settlePending(clientDir) }
+            .onFailure { logger.warn("Pack launch {}: pending content changes not applied", refreshedInstance.displayName, it) }
+            .getOrDefault(emptyList())
+        if (owed.isNotEmpty()) {
+            ActionRing.record("Pack launch ${refreshedInstance.displayName}: ${owed.size} content change(s) still held open (${owed.joinToString()})")
+        }
+
         // 3. Auth requirement: refresh the session right before spawn.
         //
         // Three ways a launch ends up without a token, and they share one rule:

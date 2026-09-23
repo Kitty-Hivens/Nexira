@@ -1148,4 +1148,115 @@ class SmrtSyncServiceTest {
         assertTrue(verdict.verified)
         assertTrue(verdict.blocked.isEmpty())
     }
+
+    // --- what a held file could not do waits for the next launch ---
+
+    /**
+     * Holds `mods/` the way a running game holds its jars on Windows: nothing in it
+     * can be renamed or removed. POSIX only, and not as root, which the mode bits
+     * do not bind.
+     */
+    private inline fun whileModsHeld(dir: Path, block: () -> Unit): Boolean {
+        if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) return false
+        val mods = dir.resolve("mods")
+        val perms = Files.getPosixFilePermissions(mods)
+        Files.setPosixFilePermissions(mods, setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_EXECUTE))
+        try {
+            if (Files.isWritable(mods)) return false
+            block()
+        } finally {
+            Files.setPosixFilePermissions(mods, perms)
+        }
+        return true
+    }
+
+    private val optOnly get() = parsed().mods
+
+    /**
+     * A switch made while the game ran used to be promised for "the next launch's
+     * sync", and a launch runs no sync. The mod went on loading until something
+     * else happened to relabel it.
+     */
+    @Test
+    fun `a switch the game held is carried out at the next launch`() = runTest {
+        val dir = tempDir("pending-move")
+        val service = syncService()
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
+
+        var deferred = emptyList<String>()
+        val held = whileModsHeld(dir) {
+            deferred = service.relabel(dir, optOnly, mapOf("req.jar" to true, "opt.jar" to false))
+        }
+        if (!held) return@runTest
+        assertEquals(listOf("opt.jar"), deferred)
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "still loading while held")
+
+        val owed = service.settlePending(dir)
+
+        assertTrue(owed.isEmpty())
+        assertFalse(Files.exists(dir.resolve("mods/opt.jar")), "the mod the player switched off no longer loads")
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar.disabled")))
+        assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)), "nothing is left owed")
+    }
+
+    @Test
+    fun `a later switch that lands clears what an earlier one left pending`() = runTest {
+        val dir = tempDir("pending-cleared")
+        val service = syncService()
+        service.sync(parsed(), dir, enabledState = mapOf("req.jar" to true, "opt.jar" to true))
+        val held = whileModsHeld(dir) {
+            service.relabel(dir, optOnly, mapOf("req.jar" to true, "opt.jar" to false))
+        }
+        if (!held) return@runTest
+
+        // The player changes their mind once the game is closed.
+        service.relabel(dir, optOnly, mapOf("req.jar" to true, "opt.jar" to true))
+        service.settlePending(dir)
+
+        assertTrue(Files.exists(dir.resolve("mods/opt.jar")), "the older choice must not come back and switch it off")
+        assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)))
+    }
+
+    /**
+     * The update case: the new copy of a switched-off mod arrived under the disabled
+     * name, and the old active jar could not be removed beside it.
+     */
+    @Test
+    fun `an update's leftover is dropped at the next launch while its replacement is there`() = runTest {
+        val dir = tempDir("pending-drop")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.write(mods.resolve("opt.jar"), "OLD".toByteArray())
+        Files.write(mods.resolve("opt.jar.disabled"), optBytes)
+        PendingVariants.update(dir, set = listOf(PendingVariants.Op.Drop("opt.jar")))
+
+        syncService().settlePending(dir)
+
+        assertFalse(Files.exists(mods.resolve("opt.jar")), "the stale active jar is gone")
+        assertContentEquals(optBytes, Files.readAllBytes(mods.resolve("opt.jar.disabled")), "the new copy is untouched")
+    }
+
+    @Test
+    fun `a leftover with no replacement beside it is the only copy and stays`() = runTest {
+        val dir = tempDir("pending-drop-alone")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.write(mods.resolve("opt.jar"), "OLD".toByteArray())
+        PendingVariants.update(dir, set = listOf(PendingVariants.Op.Drop("opt.jar")))
+
+        syncService().settlePending(dir)
+
+        assertTrue(Files.exists(mods.resolve("opt.jar")))
+        assertFalse(Files.exists(dir.resolve(PendingVariants.FILE_NAME)), "and the entry is done with")
+    }
+
+    @Test
+    fun `a pending entry cannot name anything but a mod's own two names`() = runTest {
+        val dir = tempDir("pending-bounds")
+        val mods = Files.createDirectories(dir.resolve("mods"))
+        Files.write(mods.resolve("req.jar"), reqBytes)
+        Files.writeString(dir.resolve(PendingVariants.FILE_NAME), "move\tmods/req.jar\tmods/other.jar\ndrop\tconfig/x.cfg")
+
+        syncService().settlePending(dir)
+
+        assertTrue(Files.exists(mods.resolve("req.jar")), "a move between unrelated names is not honoured")
+    }
 }

@@ -117,7 +117,7 @@ class SmrtSyncService(
             // and the loader, or the server, is what brings it up.
             reportUnfetchable(manifest.packId, sink.unfetchable)
             transfers.fetchAll(sink.transfers) { p -> progress?.invoke(p.filesDone, p.filesTotal, p.current) }
-            reportStuckVariants(manifest.packId, sweepStale(stuck))
+            settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
 
             // Drop manifest-removed mods and any other archive the manifest
             // does not name. Only top-level mods/{expected_filename} entries
@@ -181,7 +181,7 @@ class SmrtSyncService(
             val report = transfers.verifyAndRepair(suspect) { p ->
                 progress?.invoke(p.filesDone, p.filesTotal, p.current)
             }
-            reportStuckVariants(manifest.packId, sweepStale(stuck))
+            settleStuck(clientDir, manifest.packId, stuck, manifest.mods.map { it.filename })
             // A verify is a full comparison against the manifest, so it is exactly the
             // moment the instance can be vouched for -- write the roster here too.
             // Without this, "verify and repair" checked every file and still left the
@@ -284,7 +284,12 @@ class SmrtSyncService(
         current = fetches.size
         // Before the relabel below, which declines while both names exist and would
         // otherwise leave the switched-off mod loading under its active name.
-        reportStuckVariants(manifest.packId, sweepStale(stuck))
+        settleStuck(
+            clientDir,
+            manifest.packId,
+            stuck,
+            (plan.toAdd + plan.toUpdate).filter { it.startsWith(MODS_PREFIX) }.map { it.removePrefix(MODS_PREFIX) },
+        )
 
         for (path in plan.toDelete) {
             current++
@@ -505,30 +510,42 @@ class SmrtSyncService(
     override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>): List<String> {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return emptyList()
-        val failed = mutableListOf<String>()
+        val failed = mutableListOf<PendingVariants.Op>()
+        val settled = mutableListOf<String>()
         for (mod in mods) {
             val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
             val active = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
             val disabled = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
             val from = if (enabled) disabled else active
             val to = if (enabled) active else disabled
-            if (Files.exists(from) && !Files.exists(to)) {
-                runCatching {
+            when {
+                Files.exists(from) && !Files.exists(to) -> runCatching {
                     fileOpRetry("smrt relabel ${mod.filename}") {
                         Files.move(from, to, StandardCopyOption.REPLACE_EXISTING)
                     }
-                }.onFailure {
+                }.onSuccess { settled += mod.filename }.onFailure {
                     // A lock that outlives the retry means a holder we can't evict --
                     // typically the running game's classloader, which on Windows keeps
-                    // the jar open without delete-sharing. The intent is already
-                    // persisted in optionalContent, so the next launch's sync applies
-                    // it; record the file instead of pretending the flip took effect.
-                    failed += mod.filename
-                    log.warn("smrt relabel: {} still held after retries; applies on next launch", mod.filename)
+                    // the jar open without delete-sharing. Nothing else would ever
+                    // retry it: a launch runs no sync. So it is written down for the
+                    // next launch to carry out, once that game has let go.
+                    failed += PendingVariants.Op.Move(from.fileName.toString(), to.fileName.toString())
+                    log.warn("smrt relabel: {} still held after retries; applies at the next launch", mod.filename)
                 }
+                // Already where the choice wants it, so whatever an earlier attempt
+                // left pending about this mod no longer stands.
+                !Files.exists(from) -> settled += mod.filename
+                // Both names present: the pass that fetched the copy owns that case
+                // and has recorded its own leftover.
+                else -> Unit
             }
         }
-        return failed
+        PendingVariants.update(clientDir, set = failed, cleared = settled)
+        return failed.map { it.key }
+    }
+
+    override suspend fun settlePending(clientDir: Path): List<String> = withContext(Dispatchers.IO) {
+        InstanceMutationLock.withLock(clientDir) { PendingVariants.settle(clientDir) }
     }
 
 
@@ -766,6 +783,17 @@ class SmrtSyncService(
     }
 
     /**
+     * [sweepStale], then the pending record brought in line with this pass: what
+     * [placed] names is settled unless its leftover is still here, and a leftover
+     * is written down for the next launch to drop.
+     */
+    private fun settleStuck(clientDir: Path, packId: String, stuck: List<Path>, placed: List<String>) {
+        val left = sweepStale(stuck)
+        PendingVariants.update(clientDir, set = left.map { PendingVariants.Op.Drop(it) }, cleared = placed)
+        reportStuckVariants(packId, left)
+    }
+
+    /**
      * Says when a mod the player switched off is still the one on disk under its
      * loadable name.
      *
@@ -783,7 +811,7 @@ class SmrtSyncService(
             packId, loadable.size, loadable,
         )
         ActionRing.record(
-            "$packId: ${loadable.size} file(s) held open, the content change applies after the game restarts (${loadable.joinToString()})",
+            "$packId: ${loadable.size} file(s) held open, the content change applies at the next launch (${loadable.joinToString()})",
         )
     }
 
@@ -1049,7 +1077,7 @@ class SmrtSyncService(
          * reuses the inode rewrites the snapshot's copy along with the live one, and
          * the rollback then restores the bytes it was supposed to undo.
          */
-        internal val INSTANCE_STATE_FILES = listOf(ROSTER_FILE, SOURCE_MARKER_FILE)
+        internal val INSTANCE_STATE_FILES = listOf(ROSTER_FILE, SOURCE_MARKER_FILE, PendingVariants.FILE_NAME)
 
         /** What a mod is identified by when it sits unpacked in a directory. */
         private val MOD_METADATA = listOf("mcmod.info", "META-INF/mods.toml", "fabric.mod.json")
