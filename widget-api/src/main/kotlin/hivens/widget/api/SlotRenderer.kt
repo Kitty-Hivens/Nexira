@@ -370,19 +370,25 @@ private fun PlacementSlot(
             0f
         }
 
-        // Adaptive free placement scales the whole arrangement down to fit a width
-        // too narrow for the stored coordinates, rather than clipping. Only free
-        // placement (no lattice, which reflows through its cell already), and only
-        // down: past 1 it would blow the arrangement up past what it was drawn for.
-        // The extent is read off the stored positions, so it is known before the
-        // draw and there is no measure-then-scale loop.
-        val adaptive = columns == 0 && content.adaptive
+        // Free placement always scales the whole arrangement down to fit a width too
+        // narrow for the stored coordinates, rather than clipping. A lattice is left
+        // out (it reflows through its cell already), and the scale only ever goes down:
+        // when the content fits, it is 1 and nothing moves, so this is a no-op until a
+        // slot is squeezed (the right panel opening, a narrow window). The extent is
+        // read off the stored positions, so it is known before the draw and there is
+        // no measure-then-scale loop.
+        val adaptive = columns == 0
         val placeScale: Float = if (adaptive && boundedWidth > 0f) {
             val extentW = content.widgets.maxOfOrNull { placedFarRight(it.placement ?: Placement(), boundedWidth) } ?: 0f
             val extentH = content.widgets.maxOfOrNull { placedFarBottom(it.placement ?: Placement(), boundedHeight) } ?: 0f
             val sw = if (extentW > 0f) boundedWidth / extentW else 1f
             val sh = if (extentH > 0f && boundedHeight > 0f) boundedHeight / extentH else 1f
-            minOf(1f, sw, sh)
+            val r = minOf(1f, sw, sh)
+            // A widget stored far out of bounds (a corrupt file, a hand edit) would
+            // otherwise drag the whole arrangement down to nothing to "fit" it. Past
+            // this much shrink it is not content that should fit but a stray the grab
+            // margin already keeps reachable, so scaling gives up and the clamp draws it.
+            if (r < MIN_ADAPTIVE_SCALE) 1f else r
         } else {
             1f
         }
@@ -433,6 +439,12 @@ private fun PlacementSlot(
         }
     }
 }
+
+// The floor below which adaptive scaling gives up. A slot squeezed to a fifth of the
+// content it holds is not a slot that shrank but a widget parked far outside it, and
+// scaling everything to fit that one stray reads as the arrangement vanishing. Below
+// this the grab-margin clamp keeps the stray reachable instead.
+private const val MIN_ADAPTIVE_SCALE = 0.2f
 
 // The far edges of a placed widget in the slot's own coordinates, for the adaptive
 // extent. Read off the stored size (the claim): an intrinsic widget that named no

@@ -1376,8 +1376,6 @@ object EnglishStrings : AppStrings {
     override val editorSlotRow    = "Row"
     override val editorSlotGrid   = "Grid"
     override val editorSlotCanvas = "Canvas"
-    override val editorSlotAdaptive = "Adaptive: scale to fit"
-    override val editorSlotExact = "Exact: keep coordinates"
     override val editorAnchorTitle = "Anchor"
     override val editorAnchorTopStart = "Top left"
     override val editorAnchorTopCenter = "Top"

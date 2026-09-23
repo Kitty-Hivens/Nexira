@@ -1383,8 +1383,6 @@ object JapaneseStrings : AppStrings {
     override val editorSlotRow = "横並び"
     override val editorSlotGrid = "グリッド"
     override val editorSlotCanvas = "キャンバス"
-    override val editorSlotAdaptive = "適応: 幅に合わせて縮小"
-    override val editorSlotExact = "固定: 座標を保持"
     override val editorAnchorTitle = "アンカー"
     override val editorAnchorTopStart = "左上"
     override val editorAnchorTopCenter = "上"

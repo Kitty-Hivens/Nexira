@@ -1463,9 +1463,6 @@ interface AppStrings {
     val editorSlotRow: String
     val editorSlotGrid: String
     val editorSlotCanvas: String
-    /** Canvas scaling toggle: scale the arrangement to fit vs hold exact coordinates. */
-    val editorSlotAdaptive: String
-    val editorSlotExact: String
     val editorAnchorTitle: String
     val editorAnchorTopStart: String
     val editorAnchorTopCenter: String

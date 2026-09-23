@@ -48,14 +48,6 @@ data class SlotContent(
     val widgets: List<WidgetInstance> = emptyList(),
     val flow: FlowSpec? = FlowSpec.Column,
     val grid: Int = 0,
-    /**
-     * Read only in placement mode ([flow] null). False is EXACT: widgets sit at
-     * their stored coordinates and a slot too narrow for them clips. True is
-     * ADAPTIVE: the whole arrangement scales down to fit the available width, so it
-     * never clips, at the cost of the pixel-exact positions. A flow slot fills and
-     * wraps on its own and ignores this.
-     */
-    val adaptive: Boolean = false,
 )
 
 /** Upper bound for [SlotContent.grid] and for [FlowSpec.wrap]; the steppers clamp to it. */
@@ -262,16 +254,6 @@ fun LayoutGraph.setGrid(path: SlotPath, grid: Int): LayoutGraph =
     mutate(path) { content ->
         val coerced = grid.coerceIn(0, GRID_MAX)
         if (content.grid == coerced) content else content.copy(grid = coerced)
-    }
-
-/**
- * Turns a placement slot's adaptive scaling on or off. Meaningful only where the
- * slot is in placement mode; a flow slot carries the flag inertly, the way it
- * carries [grid], so flipping a slot to a flow and back does not lose it.
- */
-fun LayoutGraph.setSlotAdaptive(path: SlotPath, adaptive: Boolean): LayoutGraph =
-    mutate(path) { content ->
-        if (content.adaptive == adaptive) content else content.copy(adaptive = adaptive)
     }
 
 // ── Placement ────────────────────────────────────────────────────────
