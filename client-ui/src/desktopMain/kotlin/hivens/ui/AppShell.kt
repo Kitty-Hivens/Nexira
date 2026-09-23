@@ -1,5 +1,11 @@
 package hivens.ui
 
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
+import hivens.ui.components.QuitWithGameHost
+import hivens.ui.components.QuitGate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
@@ -338,6 +344,18 @@ fun FrameWindowScope.AppShellContent(
 
     val settings = remember { settingsService.getSettings() }
 
+    // Every way out of the launcher goes through here. With a game running it asks
+    // first (see QuitWithGameHost); otherwise it quits as it always has.
+    val quitGate = remember { QuitGate() }
+    val quit: () -> Unit = {
+        val state = controller.state.value
+        if (controller.runningPackInstanceId.value != null || state is LaunchState.GameRunning || state is LaunchState.Stopping) {
+            quitGate.request()
+        } else {
+            exitApp()
+        }
+    }
+
     // The console's own commands, declared in ConsoleCommands. Registered once;
     // the console service is a process singleton. The UI-debug toggle is among
     // them only on a build that has the overlay (F9 stays the primary way in).
@@ -556,7 +574,7 @@ fun FrameWindowScope.AppShellContent(
     LaunchedEffect(launchState, activeSessions) {
         val runningName = activeSessions.values.firstOrNull()?.packDisplayName
         when (launchState) {
-            is LaunchState.GameRunning -> tray.setGameStatus(true, runningName)
+            is LaunchState.GameRunning, is LaunchState.Stopping -> tray.setGameStatus(true, runningName)
             is LaunchState.Error -> {
                 tray.setGameStatus(false)
                 if (!isWindowVisible) {
@@ -813,7 +831,7 @@ fun FrameWindowScope.AppShellContent(
                     // visibility flip is unconditional during chaos so the
                     // dialog isn't hidden behind a minimized window.
                     if (af.isActive()) isWindowVisible = true
-                    af.requestCloseDialog { exitApp() }
+                    af.requestCloseDialog { quit() }
                 }
             }
 
@@ -874,7 +892,7 @@ fun FrameWindowScope.AppShellContent(
                     // meant as "minimize".
                     isWindowVisible = false
                 } else {
-                    exitApp()
+                    quit()
                 }
             }
         }
@@ -1048,7 +1066,7 @@ fun FrameWindowScope.AppShellContent(
                     AppRoot(
                         onWallpaperSeed = { wallpaperSeed = it },
                         onWallpaperLuminance = { wallpaperLuminance = it },
-                        onRealExit   = exitApp,
+                        onRealExit   = quit,
                         onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
                         else null,
                         isDarkTheme          = isDarkTheme,
@@ -1124,6 +1142,29 @@ fun FrameWindowScope.AppShellContent(
                 // What the retired server path left on disk, when the player asks
                 // the reminder to show them.
                 hivens.ui.legacy.RetiredClientsHost()
+                // The question a quit asks when a game is running. Both answers record
+                // the session before the process goes; stopping waits for the game's
+                // own shutdown, bounded so a game that will not go cannot hold the
+                // launcher open.
+                QuitWithGameHost(
+                    gate = quitGate,
+                    packName = activeSessions.values.firstOrNull()?.packDisplayName,
+                    onLeaveRunning = {
+                        applicationScope.launch {
+                            controller.settleSessionForQuit()
+                            SwingUtilities.invokeLater { exitApp() }
+                        }
+                    },
+                    onStopGame = {
+                        applicationScope.launch {
+                            controller.abort()
+                            withTimeoutOrNull(QUIT_STOP_WAIT) {
+                                controller.state.first { it is LaunchState.Idle || it is LaunchState.Error }
+                            }
+                            SwingUtilities.invokeLater { exitApp() }
+                        }
+                    },
+                )
             }
             // Synthetic resize grips -- undecorated drops the native border. Only
             // with custom chrome (else the OS frame resizes); self-gates to
@@ -1446,3 +1487,9 @@ fun AppRoot(
       }
     }
 }
+
+/**
+ * How long quitting waits for a game it was asked to stop. The game gets its own
+ * termination grace and then a forced kill; this only has to outlast both.
+ */
+private val QUIT_STOP_WAIT = 15.seconds
