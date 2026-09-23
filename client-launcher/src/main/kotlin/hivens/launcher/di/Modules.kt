@@ -637,6 +637,7 @@ val mirrorModule = module {
             installer = get(),
             repository = get(),
             snapshotService = get(),
+            journal = get(),
             dataDir = get(),
         )
     }
