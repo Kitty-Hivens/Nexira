@@ -1391,6 +1391,8 @@ object RussianStrings : AppStrings {
     override val editorSlotRow    = "Ряд"
     override val editorSlotGrid   = "Сетка"
     override val editorSlotCanvas = "Холст"
+    override val editorSlotAdaptive = "Адаптивный: масштаб под ширину"
+    override val editorSlotExact = "Точный: держать координаты"
     override val editorAnchorTitle = "Якорь"
     override val editorAnchorTopStart = "Сверху слева"
     override val editorAnchorTopCenter = "Сверху"

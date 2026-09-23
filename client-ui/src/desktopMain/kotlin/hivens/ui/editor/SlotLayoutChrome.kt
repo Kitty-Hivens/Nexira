@@ -229,8 +229,34 @@ internal fun SlotLayoutMenuContent(
     NxMenuItem(s.editorSlotGrid, selected = flow != null && flow.wrap > 0) {
         controller.setFlow(path, FlowSpec.grid(DEFAULT_WRAP)); onClose()
     }
-    NxMenuItem(s.editorSlotCanvas, selected = flow == null) {
-        controller.setFlow(path, null); onClose()
+    // Canvas, and when it is the active mode, its adaptive / exact toggle on the SAME
+    // row rather than a new one below, so the menu keeps its height as the canvas
+    // grows options. Adaptive scales the arrangement to fit a narrow slot; exact holds
+    // the stored coordinates and lets a slot too narrow for them clip.
+    if (flow == null) {
+        Row(
+            modifier          = Modifier.fillMaxWidth().padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) { NxMenuItem(s.editorSlotCanvas, selected = true) {} }
+            val isAdaptive = live.adaptive
+            NxIconButton(
+                NxIcon.OpenInFull, s.editorSlotAdaptive,
+                onClick  = { controller.setSlotAdaptive(path, true) },
+                tint     = if (isAdaptive) NxTheme.colors.primary else NxTheme.colors.textSecondary,
+                iconSize = 16.dp,
+            )
+            NxIconButton(
+                NxIcon.Lock, s.editorSlotExact,
+                onClick  = { controller.setSlotAdaptive(path, false) },
+                tint     = if (!isAdaptive) NxTheme.colors.primary else NxTheme.colors.textSecondary,
+                iconSize = 16.dp,
+            )
+        }
+    } else {
+        NxMenuItem(s.editorSlotCanvas, selected = false) {
+            controller.setFlow(path, null); onClose()
+        }
     }
 
     // The one stepper, pointed at whichever number the current mode has. A flow

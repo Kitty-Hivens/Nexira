@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -367,6 +370,23 @@ private fun PlacementSlot(
             0f
         }
 
+        // Adaptive free placement scales the whole arrangement down to fit a width
+        // too narrow for the stored coordinates, rather than clipping. Only free
+        // placement (no lattice, which reflows through its cell already), and only
+        // down: past 1 it would blow the arrangement up past what it was drawn for.
+        // The extent is read off the stored positions, so it is known before the
+        // draw and there is no measure-then-scale loop.
+        val adaptive = columns == 0 && content.adaptive
+        val placeScale: Float = if (adaptive && boundedWidth > 0f) {
+            val extentW = content.widgets.maxOfOrNull { placedFarRight(it.placement ?: Placement(), boundedWidth) } ?: 0f
+            val extentH = content.widgets.maxOfOrNull { placedFarBottom(it.placement ?: Placement(), boundedHeight) } ?: 0f
+            val sw = if (extentW > 0f) boundedWidth / extentW else 1f
+            val sh = if (extentH > 0f && boundedHeight > 0f) boundedHeight / extentH else 1f
+            minOf(1f, sw, sh)
+        } else {
+            1f
+        }
+
         CompositionLocalProvider(
             LocalPlacementSlotSizeDp provides measuredDp,
             // Published only when there is a cell to convert against. A geometry
@@ -374,25 +394,69 @@ private fun PlacementSlot(
             // answers every pointer delta with "no movement", which is a gesture
             // that is present and does nothing.
             LocalGridGeometry provides if (columns > 0 && cell > 0f) GridGeometry(cell, spacing.value, columns) else null,
+            // The editor's gestures divide the pointer delta by this, or a widget in
+            // a scaled slot outruns the pointer.
+            LocalPlacementScale provides placeScale,
         ) {
-            content.widgets.withIndex()
-                .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
-                .forEach { (index, instance) ->
-                    key(instance.instanceId) {
-                        val p = instance.placement ?: Placement()
-                        val descriptor = registry[instance.kind]
-                        val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
-                        PlacedBox(p, columns, cell, spacing.value, clampSize, sizing) {
-                            if (descriptor == null) {
-                                unknownDecorator(address, index, instance)
-                            } else {
-                                val movable = rememberWidgetMovable(descriptor, instance)
-                                decorator(address, index, descriptor, instance) { movable() }
+            // The scale sits on a full-slot box the widgets align within, off the top
+            // start, so the arrangement shrinks toward the origin rather than the
+            // centre. Not a clip: the content is drawn smaller, and the freed space
+            // at the far edges stays empty.
+            val scaled = if (placeScale != 1f) {
+                Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = placeScale
+                    scaleY = placeScale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
+            } else {
+                Modifier.fillMaxSize()
+            }
+            Box(scaled) {
+                content.widgets.withIndex()
+                    .sortedWith(compareBy({ it.value.placement?.z ?: 0 }, { it.index }))
+                    .forEach { (index, instance) ->
+                        key(instance.instanceId) {
+                            val p = instance.placement ?: Placement()
+                            val descriptor = registry[instance.kind]
+                            val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
+                            PlacedBox(p, columns, cell, spacing.value, clampSize, sizing) {
+                                if (descriptor == null) {
+                                    unknownDecorator(address, index, instance)
+                                } else {
+                                    val movable = rememberWidgetMovable(descriptor, instance)
+                                    decorator(address, index, descriptor, instance) { movable() }
+                                }
                             }
                         }
                     }
-                }
+            }
         }
+    }
+}
+
+// The far edges of a placed widget in the slot's own coordinates, for the adaptive
+// extent. Read off the stored size (the claim): an intrinsic widget that named no
+// size counts only as its offset, which under-counts it, but the widgets a person
+// sizes wide enough to overflow are the ones that carry a size. An end anchor's far
+// edge is an inset from the far side and so never exceeds the slot; a start anchor's
+// is the one that runs past it.
+private fun placedFarRight(p: Placement, slotW: Float): Float {
+    val bias = anchorHorizontalBias(p.anchor)
+    val w = p.width
+    return when {
+        bias < 0.5f -> p.x + w
+        bias > 0.5f -> slotW - p.x
+        else -> (slotW - w) / 2f + p.x + w
+    }
+}
+
+private fun placedFarBottom(p: Placement, slotH: Float): Float {
+    val bias = anchorVerticalBias(p.anchor)
+    val h = p.height
+    return when {
+        bias < 0.5f -> p.y + h
+        bias > 0.5f -> slotH - p.y
+        else -> (slotH - h) / 2f + p.y + h
     }
 }
 

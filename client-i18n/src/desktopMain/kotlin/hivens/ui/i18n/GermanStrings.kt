@@ -1378,6 +1378,8 @@ object GermanStrings : AppStrings {
     override val editorSlotRow    = "Reihe"
     override val editorSlotGrid   = "Raster"
     override val editorSlotCanvas = "Leinwand"
+    override val editorSlotAdaptive = "Adaptiv: auf Breite skalieren"
+    override val editorSlotExact = "Exakt: Koordinaten halten"
     override val editorAnchorTitle = "Anker"
     override val editorAnchorTopStart = "Oben links"
     override val editorAnchorTopCenter = "Oben"

@@ -86,6 +86,7 @@ import hivens.ui.nx.NxMenuItem
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalPlacementSlotSizeDp
+import hivens.widget.api.LocalPlacementScale
 import hivens.widget.api.LocalGridGeometry
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
@@ -162,6 +163,10 @@ fun EditableWidgetChrome(
     // Live canvas slot size for the move-clamp (published by SlotRenderer's
     // Canvas branch; Zero outside a Canvas slot disables clamping).
     val liveSlotSize = rememberUpdatedState(LocalPlacementSlotSizeDp.current)
+    // The scale an adaptive slot draws at. The pointer moves in screen pixels but the
+    // widget lives in unscaled slot coordinates, so every gesture divides its delta by
+    // this or the widget outruns the pointer. 1 (exact slot, flow, lattice) is a no-op.
+    val livePlaceScale = rememberUpdatedState(LocalPlacementScale.current)
     // The slot's lattice geometry, read live so the long-lived gesture sees the
     // latest values. Null in a free placement slot, where the unit is already the
     // dp. latticeDrag is the in-flight visual translation, committed to a cell on
@@ -460,9 +465,13 @@ fun EditableWidgetChrome(
                                     drag(down.id) { change ->
                                         val slot = liveSlotSize.value
                                         val wb = widgetWindowBounds
+                                        // Screen pixels -> unscaled slot pixels: an adaptive
+                                        // slot draws at a scale, so the pointer covers more slot
+                                        // than it does screen.
+                                        val sc = livePlaceScale.value.takeIf { it > 0f } ?: 1f
                                         val (nx, ny) = placementDragOffset(
                                             curX, curY,
-                                            change.positionChange().x * signX, change.positionChange().y * signY,
+                                            change.positionChange().x * signX / sc, change.positionChange().y * signY / sc,
                                             density,
                                             slotWDp   = slot.width,
                                             slotHDp   = slot.height,
@@ -586,8 +595,11 @@ fun EditableWidgetChrome(
                                     var accX = 0f
                                     var accY = 0f
                                     drag(down.id) { change ->
-                                        accX += change.positionChange().x
-                                        accY += change.positionChange().y
+                                        // Screen pixels -> unscaled slot pixels, so a handle drag
+                                        // resizes by what it covers in the slot, not on screen.
+                                        val sc = livePlaceScale.value.takeIf { it > 0f } ?: 1f
+                                        accX += change.positionChange().x / sc
+                                        accY += change.positionChange().y / sc
                                         if (geo != null) {
                                             // One gesture, two units: a lattice slot sizes in
                                             // whole cells, so the same drag quantises instead

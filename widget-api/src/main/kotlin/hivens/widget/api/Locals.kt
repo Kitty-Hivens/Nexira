@@ -167,6 +167,19 @@ val LocalPlacementSlotSizeDp: ProvidableCompositionLocal<Size> =
     compositionLocalOf { Size.Zero }
 
 /**
+ * The scale an adaptive placement slot draws its arrangement at, 1 for an exact
+ * slot or a flow.
+ *
+ * An adaptive slot shrinks its whole content with a graphicsLayer so it fits a
+ * width too narrow for the stored coordinates, rather than clipping. The editor's
+ * drag and resize gestures read this and divide the pointer delta by it, or a
+ * widget in a scaled slot would move faster than the pointer. Dynamic, for the
+ * same reason as [LocalPlacementSlotSizeDp]: it changes as the slot resizes.
+ */
+val LocalPlacementScale: ProvidableCompositionLocal<Float> =
+    compositionLocalOf { 1f }
+
+/**
  * The room this widget was given on purpose, in dp, with zero on an axis nobody
  * named.
  *

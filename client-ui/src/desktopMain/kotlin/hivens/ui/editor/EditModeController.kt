@@ -23,6 +23,7 @@ import hivens.widget.model.reorderInSlot
 import hivens.widget.model.resizeWidgetInGrid
 import hivens.widget.model.setFlow
 import hivens.widget.model.setGrid
+import hivens.widget.model.setSlotAdaptive
 import hivens.widget.model.setWidgetAnchor
 import hivens.widget.model.setWidgetBounds
 import hivens.widget.model.setWidgetOffset
@@ -246,6 +247,12 @@ class EditModeController(
     // null hands that to the children and seeds one onto any that carries none.
     fun setFlow(path: SlotPath, flow: FlowSpec?) {
         scope.launch(writeDispatcher) { edit(key = null) { it.setFlow(path, flow) } }
+    }
+
+    // Placement slot: scale the arrangement to fit (adaptive) or hold it at exact
+    // coordinates. Inert on a flow slot, which fills and wraps on its own.
+    fun setSlotAdaptive(path: SlotPath, adaptive: Boolean) {
+        scope.launch(writeDispatcher) { edit(key = null) { it.setSlotAdaptive(path, adaptive) } }
     }
 
     // Nudges the line length of a wrapped flow. Reads the current value from the
