@@ -1,6 +1,7 @@
 package hivens.launcher.component
 
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -94,6 +95,44 @@ class EnvironmentPreparerTest {
 
         assertTrue(Files.exists(nativesDir / hostNativeName()))
         assertEquals("on-disk", Files.readString(nativesDir / hostNativeName()))
+    }
+
+    /**
+     * Rebuilt for a bound launch, the folder was cleared one level deep and the
+     * flatten then moved a file from a subdirectory over what had been unpacked.
+     */
+    @Test
+    fun `a rebuild leaves nothing from a subdirectory to be flattened over the unpacked natives`() = runBlocking {
+        val jar = nativeJar("lwjgl-natives.jar", "genuine".toByteArray())
+        val nested = (workDir / "bin/natives/deep").also { Files.createDirectories(it) }
+        Files.write(nested / hostNativeName(), "planted".toByteArray())
+
+        svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(jar), rebuild = true)
+
+        assertEquals("genuine", Files.readString(workDir / "bin/natives" / hostNativeName()))
+    }
+
+    /** A partial folder passed the one-lwjgl-file check and the game died on the missing library. */
+    @Test
+    fun `an extraction that died partway is not trusted by the next launch`() = runBlocking {
+        val jar = nativeJar("lwjgl-natives.jar", "genuine".toByteArray())
+        val nativesDir = (workDir / "bin/natives").also { Files.createDirectories(it) }
+        Files.write(nativesDir / hostNativeName(), "partial".toByteArray())
+        Files.writeString(nativesDir / ".nexira-extracting", "")
+
+        svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(jar), rebuild = false)
+
+        assertEquals("genuine", Files.readString(nativesDir / hostNativeName()))
+        assertFalse(Files.exists(nativesDir / ".nexira-extracting"))
+    }
+
+    @Test
+    fun `a native jar that will not unpack stops the launch instead of spawning a game that cannot load`() = runBlocking {
+        val broken = (workDir / "broken.jar").also { Files.write(it, "not a zip".toByteArray()) }
+
+        val failure = runCatching { svc.prepareNativesFromManifest(workDir, "bin/natives", listOf(broken), rebuild = true) }.exceptionOrNull()
+
+        assertTrue(failure is IOException, "got $failure")
     }
 
     // ── isFolderValidForOs: per-platform native-extension presence check ──

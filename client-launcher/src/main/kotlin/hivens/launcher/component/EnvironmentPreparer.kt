@@ -1,11 +1,13 @@
 package hivens.launcher.component
 
+import hivens.core.io.deleteTree
 import hivens.core.platform.OS
 import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -45,7 +47,11 @@ class EnvironmentPreparer {
         // contents are wholly derived from jars already verified on download, so
         // a bound launch re-derives them rather than trusting what it finds.
         val trustFolder = !rebuild || !allPresent(nativeJars)
-        if (trustFolder && isFolderValidForOs(nativesDir, osSuffix)) {
+        // A folder whose last extraction did not finish is not one to trust, however
+        // loadable it looks: the check below finds one lwjgl library and passes, and
+        // the game then dies inside the child JVM on the one that is missing.
+        val interrupted = Files.isRegularFile(nativesDir.resolve(EXTRACTING_MARKER))
+        if (trustFolder && !interrupted && isFolderValidForOs(nativesDir, osSuffix)) {
             if (rebuild) {
                 // Wiping with no complete source to rebuild from would cost the
                 // instance its natives for a reason the user cannot act on.
@@ -55,30 +61,32 @@ class EnvironmentPreparer {
             }
             return@withContext
         }
-        if (Files.exists(nativesDir)) {
-            ClientFileHelper.cleanDirectory(nativesDir, emptySet(), log)
-        }
+        // The whole tree, not its top level. A file left one directory down
+        // survived the clear, and the flatten below then moved it over what had
+        // just been unpacked, into the folder the JVM loads from.
+        deleteTree(nativesDir)
         ClientFileHelper.ensureDirectoryExists(nativesDir)
 
         if (nativeJars.isEmpty()) {
             log.error("No native libraries resolved from the manifest for $osSuffix -- natives directory will be empty")
             return@withContext
         }
+        Files.writeString(nativesDir.resolve(EXTRACTING_MARKER), "")
         for (jar in nativeJars) {
             if (!Files.isRegularFile(jar)) {
-                log.warn("Resolved native jar missing on disk, skipping: $jar")
-                continue
+                throw IOException("A native library the game needs is missing: ${jar.fileName}")
             }
             try {
                 ZipUtils.unzip(jar.toFile(), nativesDir.toFile())
             } catch (e: Exception) {
-                log.error("Failed to unpack native jar $jar", e)
+                throw IOException("Could not unpack the native library ${jar.fileName}", e)
             }
         }
         flattenNatives(nativesDir)
         if (!isFolderValidForOs(nativesDir, osSuffix)) {
-            log.error("CRITICAL: manifest natives incomplete for $osSuffix")
+            throw IOException("The native libraries for $osSuffix are incomplete, so the game could not start")
         }
+        Files.deleteIfExists(nativesDir.resolve(EXTRACTING_MARKER))
     }
 
     /** Every declared native jar is on disk, so a rebuild can complete. */
@@ -145,5 +153,10 @@ class EnvironmentPreparer {
                 }
             }
         } catch (_: Exception) { false }
+    }
+
+    private companion object {
+        /** Present while an extraction is under way, so one that died partway is not trusted next time. */
+        const val EXTRACTING_MARKER = ".nexira-extracting"
     }
 }
