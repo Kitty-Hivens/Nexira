@@ -16,7 +16,7 @@ versionsPlugin    = "0.62.0"
 ksp               = "2.3.12"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.5.2"
+ktor              = "3.6.0"
 # Test-only. Pinned to whatever ktor-client-okhttp resolves, so the
 # certificate helper matches the TLS stack under test.
 okhttp            = "5.5.0"
