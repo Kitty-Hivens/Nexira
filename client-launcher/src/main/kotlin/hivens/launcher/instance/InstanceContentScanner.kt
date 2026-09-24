@@ -136,17 +136,22 @@ class InstanceContentScanner(
 
     private fun scanArchives(dir: Path, kind: ContentKind): List<InstalledContent> {
         if (!dir.isDirectory()) return emptyList()
-        return Files.list(dir).use { stream ->
-            stream
-                .filter { it.isRegularFile() && isArchive(it.name) }
-                .map { runCatching { read(it, kind) }.getOrElse { e ->
+        val files = Files.list(dir).use { stream ->
+            stream.filter { it.isRegularFile() && isArchive(it.name) }.toList()
+        }
+        // An item on disk under both of its names is one item: the loadable one,
+        // which is what the game reads. Listed twice, the two rows carried one
+        // identity, which Compose rejects as a duplicate key and the icon cache
+        // fought over as one slot with two sizes.
+        val loadable = files.mapTo(HashSet()) { it.name }
+        return files
+            .filterNot { it.name.endsWith(DISABLED_SUFFIX) && it.name.removeSuffix(DISABLED_SUFFIX) in loadable }
+            .mapNotNull {
+                runCatching { read(it, kind) }.getOrElse { e ->
                     log.warn("Skipping unreadable content at {}: {}", it, e.message)
                     null
-                } }
-                .filter { it != null }
-                .map { it!! }
-                .toList()
-        }
+                }
+            }
     }
 
     private fun isArchive(name: String): Boolean {

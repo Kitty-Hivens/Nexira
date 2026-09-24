@@ -20,7 +20,15 @@ class InstanceContentManager {
 
     private val log = LoggerFactory.getLogger(InstanceContentManager::class.java)
 
-    /** Flip a content item on/off by adding or removing the `.disabled` suffix. */
+    /**
+     * Flip a content item on/off by adding or removing the `.disabled` suffix.
+     *
+     * With both names on disk, the loadable one is the item: it is what the game
+     * reads and what the scanner shows. An atomic move replaces its target, so
+     * enabling used to put the stale `.disabled` copy over the jar in use. Enabling
+     * now leaves a jar already under the loadable name alone, and disabling moves
+     * that jar over the leftover, which is the one of the two nobody was looking at.
+     */
     suspend fun setEnabled(instanceDir: Path, kind: ContentKind, fileName: String, enabled: Boolean) =
         withContext(Dispatchers.IO) {
             InstanceMutationLock.withLock(instanceDir) {
@@ -30,9 +38,9 @@ class InstanceContentManager {
                 runCatching {
                     fileOpRetry("toggle $fileName") {
                         if (enabled) {
-                            if (Files.exists(off)) Files.move(off, on, StandardCopyOption.ATOMIC_MOVE)
+                            if (Files.exists(off) && !Files.exists(on)) Files.move(off, on, StandardCopyOption.ATOMIC_MOVE)
                         } else {
-                            if (Files.exists(on)) Files.move(on, off, StandardCopyOption.ATOMIC_MOVE)
+                            if (Files.exists(on)) Files.move(on, off, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
                         }
                     }
                 }.onFailure { log.warn("Toggle {} ({}) failed: {}", fileName, enabled, it.message) }
@@ -104,6 +112,11 @@ class InstanceContentManager {
      * Copy [sources] into the instance's [kind] folder, skipping a name that
      * already exists so an accidental re-add never clobbers an installed file.
      * Returns how many landed.
+     *
+     * Staged beside the target and moved into place. Copied straight to the final
+     * name, an interrupted copy published a truncated jar there, the retry then
+     * failed on the file it had just made, and adding the same file again was
+     * skipped as already present: the broken copy stayed for good.
      */
     suspend fun addFiles(instanceDir: Path, kind: ContentKind, sources: List<Path>): Int =
         withContext(Dispatchers.IO) {
@@ -112,11 +125,28 @@ class InstanceContentManager {
                 Files.createDirectories(dir)
                 sources.count { src ->
                     val target = dir.resolve(src.name)
+                    val staged = dir.resolve(".${src.name}$STAGING_SUFFIX")
                     runCatching {
-                        if (Files.exists(target)) false
-                        else { fileOpRetry("add ${src.name}") { Files.copy(src, target) }; true }
-                    }.getOrElse { log.warn("Add {} failed: {}", src, it.message); false }
+                        if (Files.exists(target)) {
+                            false
+                        } else {
+                            fileOpRetry("add ${src.name}") {
+                                Files.copy(src, staged, StandardCopyOption.REPLACE_EXISTING)
+                                Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE)
+                            }
+                            true
+                        }
+                    }.getOrElse {
+                        log.warn("Add {} failed: {}", src, it.message)
+                        runCatching { Files.deleteIfExists(staged) }
+                        false
+                    }
                 }
             }
         }
+
+    private companion object {
+        /** Not an archive name, so neither the scanner nor a loader reads a copy in progress. */
+        const val STAGING_SUFFIX = ".nexira-adding"
+    }
 }
