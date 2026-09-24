@@ -26,6 +26,28 @@ Ein Paket, das an keinen Server gebunden ist, startet jetzt immer offline. Bishe
 
 Die Schaltfläche „Spielen“ sagt jetzt, warum Sie nicht spielen können: Das Paket wird aktualisiert, seine Dateien werden geprüft, ein anderes Spiel läuft oder Sie müssen sich anmelden. Während einer Aktualisierung wird die Schaltfläche selbst zum Fortschrittsbalken. In den Widgets „Pack-Hero-Karte“ und „Schnellstart“ können Sie wählen, wo die Erklärung steht: in der Schaltfläche oder daneben.
 
+Ein Pack von Grund auf zu erstellen ist einfacher. Die Loader-Version wird aus einer Liste dessen gewählt, was dieser Loader für deine Minecraft-Version tatsächlich veröffentlicht, mit markiertem empfohlenem Build und markierten Betas, und ein leeres Feld bedeutet weiterhin die neueste. Cleanroom und lwjgl3ify stehen jetzt ebenfalls in der Loader-Liste. Hat ein Loader nichts für die gewählte Version, oder gibt es die Minecraft-Version nicht, sagt der Launcher das sofort und nicht erst, nachdem das ganze Spiel heruntergeladen ist.
+
+Ein Pack merkt sich jetzt die Loader-Version, mit der es installiert wurde. Vorher wechselte ein Pack ohne sie still zu jedem neuen Loader-Release, konnte Forge beim nächsten Start neu installieren und brauchte zum Starten das Internet. Jetzt startet es nach dem ersten Spielen mit jedem Loader auch offline.
+
+NeoForge lässt sich auf Minecraft 1.20.1 und den neuen 26.x-Versionen installieren, wo es vorher scheiterte.
+
+Ein Pack lässt sich nicht löschen, solange sein Spiel läuft oder es aktualisiert wird, und die Löschen-Schaltfläche sagt warum. Beim Löschen verschwinden auch die Sicherungen für ein Zurücksetzen, die vorher für immer auf der Platte blieben.
+
+Ein in eine lokale Kopie gelöstes Pack gehört jetzt ganz dir: Mods, die du hinzufügst, bleiben, wo sie vorher beim nächsten Start entfernt wurden.
+
+Der Inhalts-Tab zeigt einen Mod nur einmal, auch wenn seine aktive und deaktivierte Kopie beide im Ordner liegen. Das Aktivieren eines Mods holt keine alte Kopie mehr zurück, und eine Datei, deren Kopieren abgebrochen wurde, bleibt nicht halb geschrieben im Mod-Ordner liegen.
+
+Ein Update zurückzusetzen oder die Einstellungen eines Packs zu ändern, während etwas anderes es verändert, setzt Spielzeit, Notizen und andere Einstellungen nicht mehr zurück.
+
+Ein Mod, den du während des Spielens deaktivierst, ist beim nächsten Start deaktiviert, wo er vorher weiter geladen werden konnte.
+
+Wird der Launcher bei laufendem Spiel beendet, fragt er, ob das Spiel weiterlaufen oder beendet werden soll, und zählt die Spielzeit in beiden Fällen.
+
+Ein Spiel aus dem Launcher zu stoppen wartet, bis es wirklich geschlossen ist, bevor „Spielen“ zurückkommt. So lässt sich keine zweite Kopie über eine noch speichernde starten, und die gespielte Zeit wird gezählt.
+
+Ein unterbrochenes Update, ob abgebrochen, durch das Schließen des Launchers oder einen Stromausfall, stellt das Pack genau so wieder her, wie es war, statt es halb aktualisiert zu lassen.
+
 ## [2.4.5] - 2026-09-15
 
 Ein Pack, das zurückgefallen ist, holt sich beim Klick auf Spielen selbst wieder ein. Bisher bemerkte der Launcher, dass die Dateien nicht die des Packs sind, sagte auf dem Bildschirm nichts, hielt die Anmeldung still zurück und startete das Spiel trotzdem, sodass der Server einen ohne jede Erklärung abwies. Hineinzugeraten war leicht: Konnte eine Launcher-Version einige Mods eines Packs nicht installieren und die nächste konnte es, lagen die alten Dateien weiterhin da. Jetzt wird das Fehlende zuerst geladen. Ist der Spiegel nicht erreichbar, läuft der Start genau so ab wie zuvor.
