@@ -34,6 +34,28 @@ A pack that is not tied to a server now always starts offline. Before, it could 
 
 The Play button now says why you cannot play: the pack is updating, its files are being checked, another game is running, or you need to sign in. While an update runs, the button itself becomes the progress bar. In the "Pack hero card" and "Quick launch" widgets you can choose where the explanation goes: inside the button or beside it.
 
+Creating a pack from scratch is easier. The loader version is picked from a list of what that loader actually publishes for your Minecraft version, with the recommended build and the betas marked, and leaving it empty still means the latest. Cleanroom and lwjgl3ify are in the list of loaders now too. A loader that has nothing for the version you chose, or a Minecraft version that does not exist, says so straight away instead of after downloading the whole game.
+
+A pack now remembers the loader version it was installed with. Before, a pack created without one quietly moved to each new loader release, could reinstall Forge at the next Play, and needed the internet to start. Now it starts offline for every loader once it has been played once.
+
+NeoForge installs on Minecraft 1.20.1 and on the new 26.x releases, where it failed before.
+
+You cannot delete a pack while its game is running or while it is being updated. The delete button says why. Deleting a pack also clears the backups kept for rolling it back, which used to stay on disk for good.
+
+Detaching a pack to local makes it fully yours: mods you add to it stay, where before the next Play removed them.
+
+The Content tab shows a mod once even if both its on and off copies are in the folder, turning a mod on no longer brings back an old copy of it, and a file whose copying was interrupted is not left half-written in your mods folder.
+
+Rolling back an update, or editing a pack's settings while something else changes it, no longer undoes your playtime, notes or other settings.
+
+A mod you turn off while the game is running is turned off the next time you play, where before it could keep loading.
+
+Quitting the launcher while a game is running now asks whether to leave the game running or stop it, and your playtime is recorded either way.
+
+Stopping a game from the launcher waits for it to actually close before Play comes back, so you cannot start a second copy on top of one still saving, and the time you played is counted.
+
+An update that is interrupted, whether you cancel it, the launcher closes or the power goes, puts the pack back exactly as it was instead of leaving it half updated.
+
 ## [2.4.5] - 2026-09-15
 
 A pack that has fallen behind catches itself up when you press Play. Until now the launcher noticed that the files were not the pack's, said nothing on screen, quietly withheld your login and let the game start anyway, so the server turned you away with no explanation anywhere. This was easy to walk into: if a version of the launcher could not install some of a pack's mods and the next one could, the old files were still sitting there. Now the missing pieces are fetched first and the launch goes ahead properly. If the mirror cannot be reached, the launch still happens exactly as it did before.
