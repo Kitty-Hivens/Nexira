@@ -14,30 +14,17 @@ import java.nio.file.Path
 
 internal class GameCommandBuilder(
     private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
-    // Injected rather than read at the call site so the decision can be exercised
-    // without a compositor.
-    private val waylandSession: Boolean = OS.isLinux && !System.getenv("WAYLAND_DISPLAY").isNullOrBlank(),
 ) {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
 
 
     /**
-     * FML draws its own window while mods load and hands it over when Minecraft
-     * takes the display. It allows one second for that handoff.
-     *
-     * On Wayland a surface nobody is looking at stops receiving frame callbacks,
-     * so the early window's loop stalls the moment the user switches workspace.
-     * The handoff then misses its second and takes the launch down with it --
-     * "trouble handing off the window, tried for 1 second", then exit 1. Not a
-     * corner case: a large pack loads for a minute, and nobody watches a progress
-     * bar for a minute.
-     *
-     * Skipping the early window removes the handoff rather than racing it: the
-     * game opens its own window when it is ready. What is lost is FML's loading
-     * bar, which the launcher is already showing on its own surface.
+     * The half of [EarlyLoadingScreen] that lives on the command line: Forge 1.13
+     * to 1.19 reads this property. Later loaders ignore it and are switched
+     * through `fml.toml` by the launch path.
      */
-    private fun addEarlyWindowGuard(args: MutableList<String>) {
-        if (waylandSession) args.add("-Dfml.earlyprogresswindow=false")
+    private fun addEarlyWindowGuard(args: MutableList<String>, earlyLoadingScreen: Boolean?) {
+        if (earlyLoadingScreen == false) args.add("-Dfml.earlyprogresswindow=false")
     }
 
     /**
@@ -127,6 +114,9 @@ internal class GameCommandBuilder(
         windowWidth: Int? = null,
         windowHeight: Int? = null,
         fullScreen: Boolean = false,
+        // What EarlyLoadingScreen.enforced answered: false emits the property,
+        // true and null leave the loader's default.
+        earlyLoadingScreen: Boolean? = null,
     ): List<String> {
         val args = ArrayList<String>()
         args.add(javaExec)
@@ -163,7 +153,7 @@ internal class GameCommandBuilder(
         val nativesPath = gameDir.resolve(nativesDirName).toAbsolutePath()
         args.add("-Djava.library.path=$nativesPath")
         args.add("-Dfml.ignoreInvalidMinecraftCertificates=true")
-        addEarlyWindowGuard(args)
+        addEarlyWindowGuard(args, earlyLoadingScreen)
 
         args.addAll(userJvmArgs(jvmArgsOverride, restrictJvmArgs))
         addAttachGuard(args, restrictJvmArgs)

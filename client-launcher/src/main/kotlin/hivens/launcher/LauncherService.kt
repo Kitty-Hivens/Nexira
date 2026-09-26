@@ -14,6 +14,7 @@ import hivens.core.jvm.SystemMemory
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchHandle
 import hivens.core.launch.SpawnResult
+import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
@@ -153,6 +154,21 @@ internal class LauncherService(
         // populated.
         envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives, rebuild = boundLaunch)
 
+        // 4b. FML's loading screen. A config that could not be written leaves the
+        // screen as the pack had it, which is a risk to this launch on Wayland but
+        // no reason to refuse it.
+        val earlyScreen = EarlyLoadingScreen.enforced(runtime.earlyLoadingScreen)
+        if (earlyScreen != null && EarlyLoadingScreen.configurableIn(resolved)) {
+            runCatching { EarlyLoadingScreen.writeConfig(clientRootPath, earlyScreen) }
+                .onSuccess { changed ->
+                    if (changed) onLog("Loader loading screen set to ${if (earlyScreen) "on" else "off"} in config/fml.toml", LauncherLogType.INFO)
+                }
+                .onFailure {
+                    log.warn("Could not set the loader loading screen for {}", displayName, it)
+                    onLog("Could not write config/fml.toml: ${it.message}", LauncherLogType.WARN)
+                }
+        }
+
         // 5. Profile-driven command: main class / classpath / args come from the
         // resolved runtime; assets point at the shared root.
         val command = commandBuilder.buildPackCommand(
@@ -175,6 +191,7 @@ internal class LauncherService(
             windowWidth = runtime.windowWidth.takeIf { runtime.windowSizeOverride },
             windowHeight = runtime.windowHeight.takeIf { runtime.windowSizeOverride },
             fullScreen = runtime.fullScreen,
+            earlyLoadingScreen = earlyScreen,
         )
 
         // Last statement before the process exists: everything is provisioned,

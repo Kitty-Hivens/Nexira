@@ -10,9 +10,7 @@ import kotlin.test.*
 
 class GameCommandBuilderTest {
 
-    // Pinned rather than left to the environment: the default reads WAYLAND_DISPLAY,
-    // which would make every assertion here depend on the session the tests run in.
-    private val builder = GameCommandBuilder(waylandSession = false)
+    private val builder = GameCommandBuilder()
 
     // ─── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -85,32 +83,30 @@ class GameCommandBuilderTest {
     )
 
 
-    /**
-     * The path that actually broke: a pack launch on Hyprland died at the handoff
-     * because the user switched workspace while the pack loaded.
-     */
+    private fun earlyScreenCommand(earlyLoadingScreen: Boolean?) = builder.buildPackCommand(
+        javaExec            = "/usr/bin/java",
+        memoryMB            = 4096,
+        gameDir             = Path.of("/tmp/instances/Industrial"),
+        sharedAssetsDir     = Path.of("/tmp/shared/assets"),
+        sharedLibrariesDir  = Path.of("/tmp/shared/libraries"),
+        nativesDirName      = "bin/natives-1.12.2",
+        versionLabel        = "Forge 1.12.2",
+        javaMajor           = 8,
+        runtime             = forgeRuntime(),
+        session             = session(),
+        jvmArgsOverride     = null,
+        earlyLoadingScreen  = earlyLoadingScreen,
+    )
+
     @Test
-    fun `a pack launch on wayland skips the early window too`() {
-        val cmd = GameCommandBuilder(waylandSession = true).buildPackCommand(
-            javaExec            = "/usr/bin/java",
-            memoryMB            = 4096,
-            gameDir             = Path.of("/tmp/instances/Industrial"),
-            sharedAssetsDir     = Path.of("/tmp/shared/assets"),
-            sharedLibrariesDir  = Path.of("/tmp/shared/libraries"),
-            nativesDirName      = "bin/natives-1.12.2",
-            versionLabel        = "Forge 1.12.2",
-            javaMajor           = 8,
-            runtime             = forgeRuntime(),
-            session             = session(),
-            jvmArgsOverride     = null,
-        )
-        assertTrue(cmd.contains("-Dfml.earlyprogresswindow=false"), "the pack path is the one that broke")
+    fun `a launch with the loading screen off carries the property older Forge reads`() {
+        assertTrue(earlyScreenCommand(false).contains("-Dfml.earlyprogresswindow=false"))
     }
 
     @Test
-    fun `a pack launch elsewhere keeps the early window`() {
-        val cmd = packCommand()
-        assertFalse(cmd.any { it.startsWith("-Dfml.earlyprogresswindow") })
+    fun `a launch that leaves the loading screen alone or wants it adds nothing`() {
+        assertFalse(earlyScreenCommand(null).any { it.startsWith("-Dfml.earlyprogresswindow") })
+        assertFalse(earlyScreenCommand(true).any { it.startsWith("-Dfml.earlyprogresswindow") })
     }
 
     @Test

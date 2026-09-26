@@ -1155,6 +1155,15 @@ interface AppStrings {
     val packSettingsWidth: String
     val packSettingsHeight: String
     val packSettingsFullscreen: String
+    /**
+     * The window Forge and NeoForge open while mods load. The Wayland line
+     * replaces the plain description while the launcher is the one keeping it
+     * off, because an off switch nobody touched needs its reason beside it.
+     */
+    val packSettingsEarlyScreen: String
+    val packSettingsEarlyScreenDesc: String
+    val packSettingsEarlyScreenWayland: String
+    val packSettingsEarlyScreenReset: String
     // Content
     val packSettingsOptional: String
     val packSettingsOptionalNone: String

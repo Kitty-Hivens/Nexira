@@ -28,6 +28,7 @@ import hivens.core.jvm.JvmArgsPresets
 import hivens.core.jvm.JvmConfig
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
+import hivens.launcher.component.EarlyLoadingScreen
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.RamSelector
 import hivens.ui.i18n.LocalStrings
@@ -47,7 +48,8 @@ import java.nio.file.Path
 
 /**
  * Launch preferences: heap (via the shared [RamSelector]), the Java executable
- * override + JVM-args builder, and the optional game-window geometry. Every knob
+ * override + JVM-args builder, the optional game-window geometry, and the
+ * loader's own loading screen where the pack's loader has one. Every knob
  * writes onto [InstanceRuntime]; the launch path already honours javaPath and
  * jvmArgs, and window geometry is now wired behind [InstanceRuntime.windowSizeOverride].
  */
@@ -182,6 +184,33 @@ internal fun PackRuntimeSection(
 
         NxToggle(s.packSettingsFullscreen, runtime.fullScreen, icon = NxIcon.Tv) {
             commit { rt -> rt.copy(fullScreen = it) }
+        }
+
+        val manifest = pack.cachedManifest
+        if (EarlyLoadingScreen.appliesTo(manifest?.loaderName, manifest?.minecraftVersion)) {
+            val choice = runtime.earlyLoadingScreen
+            // Read again whenever the choice changes: a launch in between may have rewritten it.
+            var packValue by remember(instanceDir) { mutableStateOf<Boolean?>(null) }
+            LaunchedEffect(instanceDir, choice) {
+                packValue = withContext(Dispatchers.IO) { runCatching { EarlyLoadingScreen.readConfig(instanceDir) }.getOrNull() }
+            }
+            val launcherDecides = choice == null && EarlyLoadingScreen.waylandSession
+            NxToggle(
+                s.packSettingsEarlyScreen,
+                EarlyLoadingScreen.effective(choice, packValue),
+                description = if (launcherDecides) s.packSettingsEarlyScreenWayland else s.packSettingsEarlyScreenDesc,
+                icon = NxIcon.HourglassEmpty,
+                trailing = if (choice == null) null else {
+                    {
+                        NxButton(
+                            s.packSettingsEarlyScreenReset,
+                            onClick = { commit { rt -> rt.copy(earlyLoadingScreen = null) } },
+                            style = NxButtonStyle.Tertiary,
+                            compact = true,
+                        )
+                    }
+                },
+            ) { commit { rt -> rt.copy(earlyLoadingScreen = it) } }
         }
     }
 
