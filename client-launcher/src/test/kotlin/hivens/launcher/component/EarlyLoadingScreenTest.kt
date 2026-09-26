@@ -69,7 +69,7 @@ class EarlyLoadingScreenTest {
     }
 
     private fun runtimeWith(vararg coords: String) = ResolvedRuntime(
-        libraries = coords.map { ResolvedLibrary(MavenCoord.parse(it), Path.of("/libs/$it.jar")) },
+        libraries = coords.map { ResolvedLibrary(MavenCoord.parse(it), Path.of("/libs/${it.replace(':', '/')}.jar")) },
         clientJar = Path.of("/libs/client.jar"),
         mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher",
         assetIndexId = "17",
