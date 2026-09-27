@@ -12,15 +12,15 @@ import java.nio.file.attribute.PosixFilePermission
 /**
  * Linux (AppImage) update flow.
  *
- * AppImage is a single executable; we back the current one up, move the
- * downloaded version into place, set +x, relaunch, and on rollback restore
- * the backup. Desktop-shortcut paths are rewritten if the AppImage filename
- * changed (because a new version moved from `Nexira-2.3.0-x86_64.AppImage`
- * to `Nexira-2.3.1-x86_64.AppImage`).
+ * AppImage is a single executable, and an update replaces the one the launcher
+ * was started from, under the name it already has. The published file name
+ * decides what is downloaded, never where it goes. Whatever tracks the file by
+ * its path keeps finding it: a menu entry, a store that renamed it on install,
+ * an integrator that moved it into its own folder. A nightly kept beside a
+ * release is never touched by the release's update, nor the other way round.
  *
- * The complexity here vs Windows / macOS comes from rollback: the old
- * AppImage is preserved as `<exe>.backup` until the new one proves it
- * starts; failure restores the backup and re-relaunches it.
+ * The current binary is backed up before the swap, and a new version that fails
+ * to start is rolled back and the old one relaunched.
  *
  * All of that happens in a shutdown hook, so it runs with the window already
  * gone and nothing able to report it -- which is why neither half moves the
@@ -47,21 +47,29 @@ class LinuxUpdateApplicator : IUpdateApplicator {
 
     /** Split out so the decision is testable without an installed launcher. */
     internal fun stagedPathFor(currentExe: Path, fallbackDir: Path, fileName: String): Path {
-        val target = targetFor(currentExe, fileName)
-        val dir = target.parent ?: return fallbackDir.resolve(fileName)
-        return if (Files.isWritable(dir)) stagedFor(target) else fallbackDir.resolve(fileName)
+        val dir = currentExe.parent ?: return fallbackDir.resolve(fileName)
+        return if (Files.isWritable(dir)) stagedFor(currentExe) else fallbackDir.resolve(fileName)
     }
 
     override fun stagedLeftovers(): List<Path> {
-        val dir = runCatching { resolveExecutable().parent }.getOrNull() ?: return emptyList()
-        return leftoversIn(dir)
+        val exe = runCatching { resolveExecutable() }.getOrNull() ?: return emptyList()
+        val dir = exe.parent ?: return emptyList()
+        return leftoversIn(dir, exe.fileName.toString())
     }
 
-    /** Split out so the sweep is testable without an installed launcher. */
-    internal fun leftoversIn(dir: Path): List<Path> = try {
+    /**
+     * Staged downloads in [dir]: the one for the running binary, [exeName], which
+     * may be named anything, and any `*.AppImage.new` an older build staged under
+     * the name of the release it was downloading. Split out so the sweep is
+     * testable without an installed launcher.
+     */
+    internal fun leftoversIn(dir: Path, exeName: String): List<Path> = try {
         Files.list(dir).use { stream ->
-            stream.filter { it.fileName.toString().endsWith("$APPIMAGE_EXT$STAGED_SUFFIX", ignoreCase = true) }
-                .toList()
+            stream.filter {
+                val name = it.fileName.toString()
+                name == "$exeName$STAGED_SUFFIX" ||
+                    name.endsWith("$APPIMAGE_EXT$STAGED_SUFFIX", ignoreCase = true)
+            }.toList()
         }
     } catch (e: Exception) {
         logger.debug("Could not sweep staged updates in {}", dir, e)
@@ -70,54 +78,37 @@ class LinuxUpdateApplicator : IUpdateApplicator {
 
     override fun scheduleUpdate(installerPath: Path) {
         try {
-            val currentExe = resolveExecutable()
-            val targetExe = targetFor(currentExe, assetNameOf(installerPath))
+            val exe = resolveExecutable()
+            val backupPath = Paths.get("$exe.backup")
 
-            val backupPath = Paths.get("$currentExe.backup")
-
-            logger.info("Scheduled Linux update: {} -> {}", currentExe, targetExe)
+            logger.info("Scheduled Linux update of {}", exe)
 
             Runtime.getRuntime().addShutdownHook(Thread {
                 try {
                     logger.info("Applying Linux update...")
 
-                    swapBinary(installerPath, currentExe, targetExe, backupPath)
+                    swapBinary(installerPath, exe, backupPath)
 
-                    if (currentExe != targetExe) {
-                        updateDesktopShortcuts(currentExe, targetExe)
-                    }
-
-                    // Relaunch
                     logger.info("Relaunching updated version...")
-                    val process = ProcessBuilder(targetExe.toString()).start()
+                    val process = ProcessBuilder(exe.toString()).start()
 
                     // Cleanup
                     Thread.sleep(2000)
                     if (process.isAlive) {
                         Files.deleteIfExists(backupPath)
                         Files.deleteIfExists(installerPath)
-                        if (currentExe != targetExe) {
-                            Files.deleteIfExists(currentExe)
-                        }
                         logger.info("Update completed successfully")
                     } else {
                         logger.error("New version failed to start, rolling back...")
-                        if (currentExe != targetExe) {
-                            Files.deleteIfExists(targetExe)
-                            updateDesktopShortcuts(targetExe, currentExe)
-                        }
-                        restoreBackup(backupPath, currentExe)
-                        ProcessBuilder(currentExe.toString()).start()
+                        restoreBackup(backupPath, exe)
+                        ProcessBuilder(exe.toString()).start()
                     }
                 } catch (e: Exception) {
                     logger.error("Update failed, attempting rollback", e)
                     try {
                         if (Files.exists(backupPath)) {
-                            if (currentExe != targetExe) {
-                                updateDesktopShortcuts(targetExe, currentExe)
-                            }
-                            restoreBackup(backupPath, currentExe)
-                            ProcessBuilder(currentExe.toString()).start()
+                            restoreBackup(backupPath, exe)
+                            ProcessBuilder(exe.toString()).start()
                         }
                     } catch (rollbackEx: Exception) {
                         logger.error("Rollback failed!", rollbackEx)
@@ -131,8 +122,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
     }
 
     /**
-     * Puts the downloaded AppImage at [targetExe], keeping [currentExe] runnable
-     * throughout.
+     * Puts the downloaded AppImage at [exe], keeping it runnable throughout.
      *
      * Order matters more than it looks. Moving the live binary to [backupPath]
      * first -- which is what this did -- leaves nothing at the launcher's path
@@ -142,7 +132,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
      * still running to restore it. The rollback below only helps while the
      * process is alive to run it.
      *
-     * So: stage the new image beside the target, back up without moving it, and
+     * So: stage the new image beside the binary, back up without moving it, and
      * swap it in with a single move. Every failure before that move leaves the
      * installed launcher exactly as it was, and the move itself replaces one
      * complete file with another.
@@ -153,30 +143,30 @@ class LinuxUpdateApplicator : IUpdateApplicator {
      * so there is no image to copy, and the backup is a second name for the same
      * bytes rather than a second copy of them.
      */
-    internal fun swapBinary(installerPath: Path, currentExe: Path, targetExe: Path, backupPath: Path) {
-        // Beside the target, so the move below stays on one filesystem and can
+    internal fun swapBinary(installerPath: Path, exe: Path, backupPath: Path) {
+        // Beside the binary, so the move below stays on one filesystem and can
         // be atomic. A leftover from an interrupted attempt is overwritten.
-        val staged = stagedFor(targetExe)
+        val staged = stagedFor(exe)
         if (installerPath != staged) {
             Files.copy(installerPath, staged, StandardCopyOption.REPLACE_EXISTING)
             logger.info("Staged new version at {}", staged)
         }
         setExecutable(staged)
 
-        if (Files.exists(currentExe)) {
-            backUp(currentExe, backupPath)
+        if (Files.exists(exe)) {
+            backUp(exe, backupPath)
             logger.info("Backed up current version")
         }
 
         try {
-            Files.move(staged, targetExe, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            Files.move(staged, exe, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         } catch (_: AtomicMoveNotSupportedException) {
             // Some filesystems refuse the atomic flag. The replacing move is
             // still a single operation as far as this process is concerned.
-            Files.move(staged, targetExe, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(staged, exe, StandardCopyOption.REPLACE_EXISTING)
         }
-        setExecutable(targetExe)
-        logger.info("Installed new version at {}", targetExe)
+        setExecutable(exe)
+        logger.info("Installed new version at {}", exe)
     }
 
     /**
@@ -200,11 +190,11 @@ class LinuxUpdateApplicator : IUpdateApplicator {
     /**
      * Puts the backed-up launcher back at [currentExe].
      *
-     * The two are the same file whenever the update was installed under a new
-     * name: the backup is a link, and the binary it links to was never touched.
-     * A rename between two names of one inode succeeds and does nothing, which
-     * would leave the `.backup` sitting beside the launcher for good -- so drop
-     * the extra name instead, which is the whole of the restore in that case.
+     * The two are still the same file when the swap never happened: the backup
+     * is a link, and the binary it links to was not replaced. A rename between
+     * two names of one inode succeeds and does nothing, which would leave the
+     * `.backup` sitting beside the launcher for good. Dropping the extra name is
+     * the whole of the restore in that case.
      */
     internal fun restoreBackup(backupPath: Path, currentExe: Path) {
         if (Files.exists(currentExe) && Files.isSameFile(backupPath, currentExe)) {
@@ -230,58 +220,8 @@ class LinuxUpdateApplicator : IUpdateApplicator {
         }
     }
 
-    private fun updateDesktopShortcuts(oldExe: Path, newExe: Path) {
-        try {
-            val userHome = System.getProperty("user.home") ?: return
-            val applicationsDir = Paths.get(userHome, ".local", "share", "applications")
-
-            if (!Files.exists(applicationsDir)) return
-
-            Files.list(applicationsDir).use { stream ->
-                stream.forEach { desktopFile ->
-                    if (desktopFile.toString().endsWith(".desktop")) {
-                        try {
-                            val content = Files.readString(desktopFile)
-                            if (content.contains(oldExe.toString())) {
-                                val updatedContent = content.replace(oldExe.toString(), newExe.toString())
-                                Files.writeString(desktopFile, updatedContent)
-                                logger.info("Updated desktop shortcut: {}", desktopFile.fileName)
-                            }
-                        } catch (e: Exception) {
-                            logger.warn("Failed to update desktop file: {}", desktopFile.fileName, e)
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Failed to scan for desktop shortcuts", e)
-        }
-    }
-
-    /**
-     * The asset's own name, with the staging suffix taken back off. The target
-     * is decided by what was published, and a path this class chose for the
-     * download must not change that decision.
-     */
-    internal fun assetNameOf(installerPath: Path): String =
-        installerPath.fileName.toString().removeSuffix(STAGED_SUFFIX)
-
-    /**
-     * Where [assetName] installs to. A published AppImage carries its version in
-     * the file name, so the update generally lands beside the running one under
-     * a new name; anything else replaces the binary in place.
-     */
-    internal fun targetFor(currentExe: Path, assetName: String): Path =
-        if (assetName.contains("Nexira", ignoreCase = true) &&
-            assetName.endsWith(APPIMAGE_EXT, ignoreCase = true)
-        ) {
-            currentExe.resolveSibling(assetName)
-        } else {
-            currentExe
-        }
-
-    private fun stagedFor(targetExe: Path): Path =
-        targetExe.resolveSibling("${targetExe.fileName}$STAGED_SUFFIX")
+    private fun stagedFor(exe: Path): Path =
+        exe.resolveSibling("${exe.fileName}$STAGED_SUFFIX")
 
     private fun resolveExecutable(): Path {
         // When running as AppImage, the runtime automatically sets $APPIMAGE
@@ -303,7 +243,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
 
     private companion object {
         const val APPIMAGE_EXT = ".AppImage"
-        /** Marks a download that is not yet the launcher. Stripped before the target is decided. */
+        /** Marks a download that is not yet the launcher. */
         const val STAGED_SUFFIX = ".new"
     }
 }

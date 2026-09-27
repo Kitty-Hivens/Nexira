@@ -9,6 +9,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -55,6 +56,46 @@ class DesktopIntegrationTest {
         val installed = iconsRoot.resolve("hicolor").resolve("256x256").resolve("apps").resolve("nexira.png")
         assertTrue(Files.isRegularFile(installed), "icon not installed at $installed")
         assertEquals(256 to 256, integration.pngSize(installed))
+    }
+
+    @Test
+    fun `the exec target is read back from the entry this class writes`() {
+        val content = integration.desktopEntryContent("/home/u/My Apps/Nexira-x86_64.AppImage", "nexira")
+        assertEquals("/home/u/My Apps/Nexira-x86_64.AppImage", integration.execTargetOf(content))
+        assertEquals("/opt/nexira", integration.execTargetOf("[Desktop Entry]\nExec=/opt/nexira %U\n"))
+        assertNull(integration.execTargetOf("[Desktop Entry]\nName=Nexira\n"))
+    }
+
+    @Test
+    fun `an entry whose AppImage is gone is dead`() {
+        val entry = tmp.resolve("dev.hivens.nexira.desktop")
+        Files.writeString(entry, integration.desktopEntryContent(tmp.resolve("Nexira-2.4.5-x86_64.AppImage").toString(), "nexira"))
+
+        assertTrue(integration.isDeadEntry(entry, tmp.resolve("Nexira-x86_64.AppImage").toString()))
+    }
+
+    /** A nightly beside a release: whichever the user launched last must not take the menu from the other. */
+    @Test
+    fun `an entry naming another copy that still exists is left alone`() {
+        val release = Files.writeString(tmp.resolve("Nexira-x86_64.AppImage"), "RELEASE")
+        val entry = tmp.resolve("dev.hivens.nexira.desktop")
+        Files.writeString(entry, integration.desktopEntryContent(release.toString(), "nexira"))
+
+        assertFalse(integration.isDeadEntry(entry, tmp.resolve("Nexira-nightly-x86_64.AppImage").toString()))
+    }
+
+    @Test
+    fun `an entry already naming the running AppImage is left alone`() {
+        val running = tmp.resolve("Nexira-x86_64.AppImage").toString()
+        val entry = tmp.resolve("dev.hivens.nexira.desktop")
+        Files.writeString(entry, integration.desktopEntryContent(running, "nexira"))
+
+        assertFalse(integration.isDeadEntry(entry, running))
+    }
+
+    @Test
+    fun `no entry is not a dead entry`() {
+        assertFalse(integration.isDeadEntry(tmp.resolve("dev.hivens.nexira.desktop"), "/anywhere/Nexira-x86_64.AppImage"))
     }
 
     private fun writePng(w: Int, h: Int): Path {

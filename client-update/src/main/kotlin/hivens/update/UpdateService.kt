@@ -429,7 +429,7 @@ class UpdateService(
         // urgency belongs to this update even though its own notes say nothing.
         criticalInRange: Boolean = false,
     ): LauncherUpdate? {
-        val asset = findAssetForCurrentOS(release.assets) ?: run {
+        val asset = findAssetForCurrentOS(release.assets, release.tagName) ?: run {
             logger.warn("No compatible asset for current OS in release {}", release.tagName)
             return null
         }
@@ -526,15 +526,18 @@ class UpdateService(
     }
 
     /**
-     * Selects the correct installer asset for the current OS.
+     * Selects the correct installer asset for the current OS from the release
+     * tagged [tag].
      *
      * Windows: `.exe`  (Inno Setup -- see setup.iss / build_release.yml)
      * macOS:   `-aarch64.dmg` on Apple Silicon, `-x86_64.dmg` on Intel.
      *          Falls back to any `.dmg` for legacy pre-dual-arch
      *          releases that shipped a single ARM64-only DMG.
-     * Linux:   `.AppImage`
+     * Linux:   exactly [linuxAssetName]. A release published before those
+     *          names carried the version in its file name and a single
+     *          AppImage, which is taken when it is the only one there.
      */
-    internal fun findAssetForCurrentOS(assets: List<GitHubAsset>): GitHubAsset? {
+    internal fun findAssetForCurrentOS(assets: List<GitHubAsset>, tag: String): GitHubAsset? {
         return when (OS.platform) {
             // Windows installer is Inno Setup (`.exe`), not MSI -- see
             // `setup.iss` + `build_release.yml`.
@@ -554,9 +557,29 @@ class UpdateService(
                     // arch in degraded cases but better than no update at all.
                     ?: assets.find { it.name.endsWith(".dmg") }
             }
-            Platform.LINUX -> assets.find { it.name.endsWith(".AppImage") }
+            Platform.LINUX -> assets.find { it.name == linuxAssetName(tag, OS.arch) }
+                ?: assets.singleOrNull { it.name.endsWith(".AppImage") }
             Platform.UNKNOWN -> null
         }
+    }
+
+    /**
+     * The AppImage the release tagged [tag] publishes for [arch].
+     *
+     * The name carries the channel and the architecture, never the version. An
+     * update replaces the file the user already has, so a version in its name
+     * would soon describe a build the file no longer holds. Release and beta are
+     * one install at two points of the stability ladder and share a name. A
+     * nightly is kept beside a release, so it has its own. Asked for by exact
+     * name, so a second AppImage in one release (another libc, another
+     * architecture) is never taken by mistake.
+     *
+     * `scripts/build-appimage.sh` names the file the same way.
+     */
+    internal fun linuxAssetName(tag: String, arch: Arch): String {
+        val channel = if (ReleaseChannel.classify(tag.removePrefix("v")) == ReleaseChannel.Nightly) "-nightly" else ""
+        val archToken = if (arch == Arch.ARM64) "aarch64" else "x86_64"
+        return "Nexira$channel-$archToken.AppImage"
     }
 
     /**

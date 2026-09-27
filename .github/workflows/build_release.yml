@@ -506,14 +506,16 @@ jobs:
         run: ./scripts/inject-metainfo-release.sh "$APP_VERSION"
 
       - name: Build AppImage
+        id: appimage
         run: |
           JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
           ./scripts/build-appimage.sh "$APP_VERSION" "$JAR"
 
+      # The name comes from the script, which picks it by channel.
       - uses: actions/upload-artifact@v7
         with:
           name: linux-artifacts
-          path: Nexira-${{ env.APP_VERSION }}-x86_64.AppImage
+          path: ${{ steps.appimage.outputs.path }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # MACOS — DMG (Apple Silicon only in the release pipeline)

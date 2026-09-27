@@ -189,11 +189,22 @@ else
     fail "macOS  → no .dmg found"
 fi
 
-LIN_ASSET=$(echo "$RELEASE_JSON" | jq -r '[.assets[] | select(.name | test("\\.AppImage$"))] | first | .name // "NONE"')
+# UpdateService.linuxAssetName: the channel's name, never the version. A release
+# from before those names is served its single AppImage instead.
+LIN_EXPECTED="Nexira-x86_64.AppImage"
+if [[ "$VER_NUM" == *-* && "${VER_NUM#*-}" == nightly* ]]; then
+    LIN_EXPECTED="Nexira-nightly-x86_64.AppImage"
+fi
+LIN_ASSET=$(echo "$RELEASE_JSON" | jq -r --arg n "$LIN_EXPECTED" '[.assets[] | select(.name == $n)] | first | .name // "NONE"')
 if [[ "$LIN_ASSET" != "NONE" ]]; then
     ok "Linux  → $LIN_ASSET"
 else
-    fail "Linux  → no .AppImage found"
+    LIN_ASSET=$(echo "$RELEASE_JSON" | jq -r '[.assets[] | select(.name | test("\\.AppImage$"))] | if length == 1 then .[0].name else "NONE" end')
+    if [[ "$LIN_ASSET" != "NONE" ]]; then
+        warn "Linux  → $LIN_ASSET (named before the channel names, expected $LIN_EXPECTED)"
+    else
+        fail "Linux  → no $LIN_EXPECTED, and no single .AppImage to fall back on"
+    fi
 fi
 
 echo ""

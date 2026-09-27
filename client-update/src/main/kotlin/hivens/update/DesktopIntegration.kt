@@ -29,9 +29,9 @@ class DesktopIntegration {
             ?: error("Not running as an AppImage (APPIMAGE unset)")
         val home = System.getProperty("user.home") ?: error("user.home is unset")
 
-        val appsDir = Paths.get(home, ".local", "share", "applications")
+        val entry = entryPath(home)
+        val appsDir = entry.parent
         Files.createDirectories(appsDir)
-        val entry = appsDir.resolve("dev.hivens.nexira.desktop")
 
         // `Icon=` must resolve to an image. The AppImage is an ELF binary, so
         // pointing the icon at it leaves DEs that don't read the embedded icon
@@ -51,6 +51,50 @@ class DesktopIntegration {
         logger.info("Installed desktop entry at {}", entry)
         entry
     }.onFailure { logger.warn("Failed to install desktop entry", it) }
+
+    /**
+     * Points the menu entry back at the running AppImage when the file it names
+     * is gone. Returns whether the entry was rewritten.
+     *
+     * The entry names the AppImage by its path, and nothing tells it when the
+     * file goes away: a reinstall under another name, a store or an integrator
+     * moving it into its own folder, a download that replaced the old copy.
+     * Only a dead entry is rewritten. One whose file still exists is left alone,
+     * because that file is a second copy the user keeps on purpose, a nightly
+     * beside a release, and the menu is not this copy's to take. No entry at all
+     * is left alone as well: installing one is the user's call.
+     */
+    fun healEntry(): Result<Boolean> = runCatching {
+        if (!isSupported()) return@runCatching false
+        val appImage = System.getenv("APPIMAGE") ?: return@runCatching false
+        val home = System.getProperty("user.home") ?: return@runCatching false
+        if (!isDeadEntry(entryPath(home), appImage)) return@runCatching false
+        installEntry().getOrThrow()
+        logger.info("Desktop entry pointed at a missing AppImage, now at {}", appImage)
+        true
+    }.onFailure { logger.warn("Failed to heal desktop entry", it) }
+
+    /** Whether [entry] exists and execs a file that is neither [appImage] nor anywhere on disk. */
+    internal fun isDeadEntry(entry: Path, appImage: String): Boolean {
+        if (!Files.isRegularFile(entry)) return false
+        val target = execTargetOf(Files.readString(entry)) ?: return false
+        return target != appImage && !Files.exists(Paths.get(target))
+    }
+
+    /** The program an entry's `Exec=` runs, with the quotes [desktopEntryContent] writes taken off. */
+    internal fun execTargetOf(content: String): String? {
+        val exec = content.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("Exec=") }
+            ?.removePrefix("Exec=")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return if (exec.startsWith('"')) exec.drop(1).substringBefore('"') else exec.substringBefore(' ')
+    }
+
+    private fun entryPath(home: String): Path =
+        Paths.get(home, ".local", "share", "applications", ENTRY_FILE)
 
     /**
      * Copies the AppImage's embedded icon (from the live `$APPDIR` mount) into
@@ -111,6 +155,7 @@ class DesktopIntegration {
     """.trimIndent() + "\n"
 
     private companion object {
+        const val ENTRY_FILE = "dev.hivens.nexira.desktop"
         const val ICON_NAME = "nexira"
         val PNG_SIGNATURE = byteArrayOf(
             0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,

@@ -21,13 +21,15 @@ Download the latest release from [GitHub Releases](https://github.com/Kitty-Hive
 
 ## Linux
 
-1. Download `Nexira-*-x86_64.AppImage`
+1. Download `Nexira-x86_64.AppImage` (a nightly build is `Nexira-nightly-x86_64.AppImage`)
 2. Make it executable and run:
 
 ```bash
-chmod +x Nexira-*.AppImage
-./Nexira-*.AppImage
+chmod +x Nexira-x86_64.AppImage
+./Nexira-x86_64.AppImage
 ```
+
+The launcher updates this file in place, so it keeps its name and location from one version to the next. A nightly kept in the same folder is a separate file and is never overwritten by the release, nor the other way round.
 
 :::tip
 Most desktop environments let you right-click → Properties → Allow executing as program.

@@ -40,11 +40,15 @@ CHANGELOG_DETAILS="$CHANGELOG_NOTES"
 
 # Build the SHA256 checksum table by walking dist/SHA256SUMS.txt.
 CHECKSUMS=""
+APPIMAGE_FILE=""
 while IFS= read -r line; do
   hash=$(echo "$line" | awk '{print $1}')
   file=$(echo "$line" | awk '{print $2}' | sed 's|^\./||')
   [ -z "$file" ] && continue
   CHECKSUMS="${CHECKSUMS}| \`${file}\` | \`${hash}\` |"$'\n'
+  # The AppImage is named by channel rather than version (see build-appimage.sh),
+  # so it is read off the list of what was built instead of being spelled here.
+  case "$file" in *.AppImage) APPIMAGE_FILE="$file" ;; esac
 done < "$CHECKSUMS_FILE"
 
 # Compose the body. Heredoc-style printf so the structure is readable;
@@ -65,7 +69,9 @@ done < "$CHECKSUMS_FILE"
   printf '| Platform | File |\n|---|---|\n'
   printf '| Windows Installer | [`Nexira-%s-Setup.exe`](%s/Nexira-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
   printf '| Windows Portable  | [`Nexira-%s-Windows-Portable.zip`](%s/Nexira-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| Linux AppImage    | [`Nexira-%s-x86_64.AppImage`](%s/Nexira-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  if [ -n "$APPIMAGE_FILE" ]; then
+    printf '| Linux AppImage    | [`%s`](%s/%s) |\n' "$APPIMAGE_FILE" "$REPO_BASE" "$APPIMAGE_FILE"
+  fi
   printf '| macOS Apple Silicon | [`Nexira-%s-aarch64.dmg`](%s/Nexira-%s-aarch64.dmg) |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
 
   printf '<details>\n<summary>SHA256 Checksums</summary>\n\n'

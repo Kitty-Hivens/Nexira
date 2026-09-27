@@ -37,7 +37,7 @@
   |---|---|---|
 | Windows | tier-1 | `Nexira-*-Setup.exe` |
 | Windows (portable) | tier-1 | `Nexira-*-Windows-Portable.zip` |
-| Linux | tier-1 | `Nexira-*-x86_64.AppImage` |
+| Linux | tier-1 | `Nexira-x86_64.AppImage` |
 | macOS Apple Silicon | tier-1 | `Nexira-*-aarch64.dmg` |
 | macOS Intel | community | `Nexira-*-x86_64-community.dmg` |
 

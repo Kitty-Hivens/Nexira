@@ -11,7 +11,11 @@
 #   APPDIR=AppDir         scratch directory for AppImage contents
 #   ARCH=x86_64           appimagetool architecture
 #   OUTPUT=<derived>      final .AppImage path; defaults to
-#                         Nexira-<version>-<arch>.AppImage in CWD
+#                         Nexira-<arch>.AppImage in CWD, or
+#                         Nexira-nightly-<arch>.AppImage for a nightly.
+#                         Also written to $GITHUB_OUTPUT as `path` when
+#                         that is set, so a workflow reads the name
+#                         from here instead of deriving it again.
 #   PACKAGING_PROFILE     override path to the generated packaging
 #                         profile (defaults to the standard
 #                         client-ui/build/generated/packaging/
@@ -37,7 +41,20 @@ APP_VERSION="${1:?usage: $0 <version> <jar-path>}"
 JAR="${2:?usage: $0 <version> <jar-path>}"
 APPDIR="${APPDIR:-AppDir}"
 ARCH="${ARCH:-x86_64}"
-OUTPUT="${OUTPUT:-Nexira-${APP_VERSION}-${ARCH}.AppImage}"
+# The file name carries the channel and the architecture, never the version. An
+# update replaces the file the user already has, so a version in the name would
+# soon describe a build the file no longer holds. Release and beta are one
+# install and share a name. A nightly is kept beside a release, so it has its
+# own. The suffix is read the way ReleaseChannel.classify reads it, and
+# UpdateService.linuxAssetName asks for the same names.
+CHANNEL_PART=""
+VERSION_SUFFIX="${APP_VERSION#*-}"
+if [ "$VERSION_SUFFIX" != "$APP_VERSION" ]; then
+    case "${VERSION_SUFFIX,,}" in
+        nightly*) CHANNEL_PART="-nightly" ;;
+    esac
+fi
+OUTPUT="${OUTPUT:-Nexira${CHANNEL_PART}-${ARCH}.AppImage}"
 
 [ -f "$JAR" ] || { echo "error: jar not found: $JAR" >&2; exit 1; }
 [ -d "$APPDIR" ] && { echo "error: $APPDIR already exists; refusing to overwrite" >&2; exit 1; }
@@ -232,3 +249,6 @@ ARCH="$ARCH" appimagetool \
     "$APPDIR" "$OUTPUT"
 
 echo "AppImage written to $OUTPUT"
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "path=$OUTPUT" >> "$GITHUB_OUTPUT"
+fi
