@@ -198,6 +198,79 @@ class EarlyLoadingScreenTest {
         assertEquals(listOf("earlyWindowControl = false"), Files.readAllLines(shared))
     }
 
+    // ─── set for a launch, put back after it ────────────────────────────────
+
+    /** The pack's file, byte for byte, between sessions: what its hash was taken of. */
+    @Test
+    fun `after the game the pack's file is back exactly as it shipped`() {
+        Files.createDirectories(fmlToml.parent)
+        val shipped = "#Should we control the window.\r\nearlyWindowControl = true\r\nmaxThreads = -1\r\n"
+        Files.writeString(fmlToml, shipped)
+
+        assertTrue(EarlyLoadingScreen.prepare(dir, enabled = false))
+        assertEquals(false, EarlyLoadingScreen.readConfig(dir))
+
+        assertTrue(EarlyLoadingScreen.restore(dir))
+        assertEquals(shipped, Files.readString(fmlToml))
+        assertFalse(EarlyLoadingScreen.restore(dir), "a second restore has nothing to do")
+    }
+
+    @Test
+    fun `a file the pack never shipped is gone again after the game`() {
+        EarlyLoadingScreen.prepare(dir, enabled = false)
+        assertTrue(Files.exists(fmlToml))
+
+        EarlyLoadingScreen.restore(dir)
+        assertFalse(Files.exists(fmlToml))
+    }
+
+    /** Whoever changed it during the session meant to. */
+    @Test
+    fun `a value changed during the session is left as it is`() {
+        Files.createDirectories(fmlToml.parent)
+        Files.write(fmlToml, listOf("earlyWindowControl = true"))
+        EarlyLoadingScreen.prepare(dir, enabled = false)
+        Files.write(fmlToml, listOf("earlyWindowControl = true", "maxThreads = 4"))
+
+        assertFalse(EarlyLoadingScreen.restore(dir))
+        assertEquals(listOf("earlyWindowControl = true", "maxThreads = 4"), Files.readAllLines(fmlToml))
+    }
+
+    /** The launcher closed before the game: the next launch keeps the pack's copy, not its own. */
+    @Test
+    fun `a session that never restored is put back before the next one`() {
+        Files.createDirectories(fmlToml.parent)
+        Files.write(fmlToml, listOf("earlyWindowControl = true"))
+        EarlyLoadingScreen.prepare(dir, enabled = false)
+
+        EarlyLoadingScreen.prepare(dir, enabled = false)
+        EarlyLoadingScreen.restore(dir)
+
+        assertEquals(listOf("earlyWindowControl = true"), Files.readAllLines(fmlToml))
+    }
+
+    @Test
+    fun `restoreAll puts back every instance left changed`() {
+        val a = dir.resolve("a").also { Files.createDirectories(it.resolve("config")) }
+        val b = dir.resolve("b").also { Files.createDirectories(it.resolve("config")) }
+        Files.write(a.resolve("config/fml.toml"), listOf("earlyWindowControl = true"))
+        Files.write(b.resolve("config/fml.toml"), listOf("earlyWindowControl = true"))
+        EarlyLoadingScreen.prepare(a, enabled = false)
+
+        assertEquals(1, EarlyLoadingScreen.restoreAll(dir))
+        assertEquals(true, EarlyLoadingScreen.readConfig(a))
+        assertEquals(true, EarlyLoadingScreen.readConfig(b))
+    }
+
+    @Test
+    fun `nothing to change leaves nothing to restore`() {
+        Files.createDirectories(fmlToml.parent)
+        Files.write(fmlToml, listOf("earlyWindowControl = false"))
+
+        assertFalse(EarlyLoadingScreen.prepare(dir, enabled = false))
+        assertFalse(EarlyLoadingScreen.restore(dir))
+    }
+
     @Test
     fun `turning it back on undoes an earlier off`() {
         EarlyLoadingScreen.writeConfig(dir, enabled = false)

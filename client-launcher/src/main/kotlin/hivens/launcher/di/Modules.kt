@@ -29,6 +29,7 @@ import dev.hivens.libvault.VaultConfig
 import dev.hivens.libvault.VaultTier
 import hivens.auth.LazySecretVault
 import hivens.launcher.*
+import hivens.launcher.component.EarlyLoadingScreen
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
@@ -154,6 +155,7 @@ import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.slf4j.LoggerFactory
@@ -861,6 +863,16 @@ val appModule = module {
     // from the scope's own factory so the factory stays a one-liner and
     // the hook can be tested independently if needed.
     single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
+
+    // Puts back any fml.toml a session left changed because the launcher closed
+    // before its game did. Once per start, off the boot path.
+    single(createdAtStart = true, qualifier = named("earlyScreenRestore")) {
+        val instances = get<Path>().resolve("instances")
+        get<CoroutineScope>().launch {
+            val n = EarlyLoadingScreen.restoreAll(instances)
+            if (n > 0) LoggerFactory.getLogger("EarlyLoadingScreen").info("Put back fml.toml in {} instance(s)", n)
+        }
+    }
 
     // The news archive, read from the site's paginated index rather than from the
     // dashboard payload -- which carries three entries and is why a widget asked

@@ -107,6 +107,86 @@ object EarlyLoadingScreen {
     }
 
     /**
+     * Sets the screen for one launch, keeping what was there so [restore] can put
+     * it back. Returns whether the file changed.
+     *
+     * The file is often the pack's own, and the pack's files are tracked by a
+     * hash of the whole file. One line changed by the launcher reads, to an
+     * update, as a player's edit, so the pack's next version of the file was set
+     * aside as a conflict, and to a repair as damage, restored and rewritten on
+     * every launch. Put back after the game, the file between sessions is the
+     * pack's again, byte for byte.
+     *
+     * Anything left over from a session that ended without its restore is put
+     * back first, so the copy kept now is the pack's and not the launcher's.
+     */
+    internal fun prepare(gameDir: Path, enabled: Boolean): Boolean {
+        restore(gameDir)
+        val file = configFile(gameDir)
+        val existed = Files.exists(file)
+        val original = if (existed) Files.readString(file) else ""
+        val backup = backupFile(gameDir)
+        // Written before the config, so a crash between the two leaves a backup
+        // of a file that was never changed, which restores to itself.
+        AtomicFiles.writeString(backup, "wrote=$enabled\nexisted=$existed\n$BACKUP_SEPARATOR\n$original")
+        val changed = runCatching { writeConfig(gameDir, enabled) }
+            .onFailure { Files.deleteIfExists(backup) }
+            .getOrThrow()
+        if (!changed) Files.deleteIfExists(backup)
+        return changed
+    }
+
+    /**
+     * Puts back what [prepare] replaced. Returns whether anything was put back.
+     *
+     * Only while the value it wrote is still there: a value that changed during
+     * the session was changed by someone on purpose, and that stands. A file that
+     * did not exist before goes again, since whatever is there now was made for
+     * this launch.
+     */
+    fun restore(gameDir: Path): Boolean {
+        val backup = backupFile(gameDir)
+        if (!Files.exists(backup)) return false
+        val text = Files.readString(backup)
+        val head = text.substringBefore("\n$BACKUP_SEPARATOR\n", missingDelimiterValue = "")
+        val original = text.substringAfter("\n$BACKUP_SEPARATOR\n", missingDelimiterValue = "")
+        val fields = head.lines().associate { it.substringBefore('=') to it.substringAfter('=', "") }
+        val wrote = fields["wrote"]?.toBooleanStrictOrNull()
+        val existed = fields["existed"]?.toBooleanStrictOrNull()
+        var restored = false
+        if (wrote != null && existed != null && readConfig(gameDir) == wrote) {
+            val file = configFile(gameDir)
+            if (existed) {
+                val target = if (Files.isSymbolicLink(file)) file.toRealPath() else file
+                AtomicFiles.writeString(target, original)
+            } else {
+                Files.deleteIfExists(file)
+            }
+            restored = true
+        }
+        Files.deleteIfExists(backup)
+        return restored
+    }
+
+    /**
+     * [restore] for every instance under [instancesDir]: what a session left
+     * behind when the launcher closed before the game did, or did not close at
+     * all. A running game has read its config long before, so this is safe with
+     * one still open.
+     */
+    fun restoreAll(instancesDir: Path): Int {
+        if (!Files.isDirectory(instancesDir)) return 0
+        return Files.list(instancesDir).use { dirs ->
+            dirs.filter { Files.isDirectory(it) && Files.exists(backupFile(it)) }.toList()
+        }.count { dir -> runCatching { restore(dir) }.getOrDefault(false) }
+    }
+
+    /** Beside the launcher's other per-instance files, where no pack puts anything. */
+    private fun backupFile(gameDir: Path): Path = gameDir.resolve(".nexira-fml-toml")
+
+    private const val BACKUP_SEPARATOR = "--- original ---"
+
+    /**
      * `earlyWindowControl` as [gameDir]'s `config/fml.toml` has it, or null when
      * the file or the key is missing or the value is not a boolean. FML reads a
      * missing key as true.

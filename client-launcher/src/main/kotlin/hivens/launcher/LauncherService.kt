@@ -154,19 +154,27 @@ internal class LauncherService(
         // populated.
         envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives, rebuild = boundLaunch)
 
-        // 4b. FML's loading screen. A config that could not be written leaves the
-        // screen as the pack had it, which is a risk to this launch on Wayland but
-        // no reason to refuse it.
+        // 4b. FML's loading screen, set for this launch and put back when the game
+        // exits. A config that could not be written leaves the screen as the pack
+        // had it, which is a risk to this launch on Wayland but no reason to
+        // refuse it.
         val earlyScreen = EarlyLoadingScreen.enforced(runtime.earlyLoadingScreen)
+        val restoreScreen = {
+            runCatching { EarlyLoadingScreen.restore(clientRootPath) }
+                .onFailure { log.warn("Could not put config/fml.toml back for {}", displayName, it) }
+            Unit
+        }
         if (earlyScreen != null && EarlyLoadingScreen.configurableIn(resolved)) {
-            runCatching { EarlyLoadingScreen.writeConfig(clientRootPath, earlyScreen) }
+            runCatching { EarlyLoadingScreen.prepare(clientRootPath, earlyScreen) }
                 .onSuccess { changed ->
-                    if (changed) onLog("Loader loading screen set to ${if (earlyScreen) "on" else "off"} in config/fml.toml", LauncherLogType.INFO)
+                    if (changed) onLog("Loader loading screen set to ${if (earlyScreen) "on" else "off"} in config/fml.toml for this launch", LauncherLogType.INFO)
                 }
                 .onFailure {
                     log.warn("Could not set the loader loading screen for {}", displayName, it)
                     onLog("Could not write config/fml.toml: ${it.message}", LauncherLogType.WARN)
                 }
+        } else {
+            restoreScreen()
         }
 
         // 5. Profile-driven command: main class / classpath / args come from the
@@ -197,14 +205,18 @@ internal class LauncherService(
         // Last statement before the process exists: everything is provisioned,
         // the command is built, and nothing else stands between here and the
         // game reading mods/.
-        if (seal != null && !seal()) {
-            log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
-            throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
+        val handle = try {
+            if (seal != null && !seal()) {
+                log.error("Refusing to spawn {}: the instance no longer matches the pack", displayName)
+                throw PackPrepBlocked(LaunchError.ContentChangedDuringLaunch)
+            }
+            ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog), afterExit = restoreScreen)
+        } catch (e: Throwable) {
+            // No game will read the config, so it goes back now.
+            restoreScreen()
+            throw e
         }
-        SpawnResult.Started(
-            ProcessLaunchHandle(spawnProcess(command, clientRootPath, boundLaunch, onLog)),
-            resolvedLoaderVersion = resolved.loaderVersion,
-        )
+        SpawnResult.Started(handle, resolvedLoaderVersion = resolved.loaderVersion)
     } catch (e: PackPrepBlocked) {
         // SC-binding step could not complete; surface the carried reason.
         SpawnResult.Failed(e.error)
@@ -404,11 +416,19 @@ internal class LauncherService(
  * `process.waitFor()` -- cancelling the launch job does not interrupt it, so
  * the orchestrator sends [terminate] first to let the wait return.
  */
-private class ProcessLaunchHandle(private val process: Process) : LaunchHandle {
+private class ProcessLaunchHandle(
+    private val process: Process,
+    /** Runs once the game has exited, for what the launch changed only for its own duration. */
+    private val afterExit: () -> Unit = {},
+) : LaunchHandle {
     // On IO by its own doing rather than by the caller's promise: the wait is
     // unbounded, and a blocking wait that borrows whatever thread it was called on
     // is one refactor away from parking a dispatcher that had other work.
-    override suspend fun awaitExit(): Int = withContext(Dispatchers.IO) { process.waitFor() }
+    override suspend fun awaitExit(): Int = withContext(Dispatchers.IO) {
+        val code = process.waitFor()
+        afterExit()
+        code
+    }
 
     /**
      * SIGTERM, then SIGKILL if the game did not take the hint.
