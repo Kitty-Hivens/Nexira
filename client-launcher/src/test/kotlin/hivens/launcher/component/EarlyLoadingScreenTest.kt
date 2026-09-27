@@ -3,6 +3,8 @@ package hivens.launcher.component
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
+import org.junit.jupiter.api.condition.DisabledOnOs
+import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
@@ -54,12 +56,16 @@ class EarlyLoadingScreenTest {
     // ─── which packs have a screen at all ───────────────────────────────────
 
     @Test
-    fun `neoforge and forge from 1_13 have a screen, legacy forge and other loaders do not`() {
+    fun `neoforge and forge where it has a screen, not legacy forge or other loaders`() {
         assertTrue(EarlyLoadingScreen.appliesTo("neoforge", "1.21.1"))
         assertTrue(EarlyLoadingScreen.appliesTo("NeoForge", "26.1"))
         assertTrue(EarlyLoadingScreen.appliesTo("forge", "1.20.1"))
         assertTrue(EarlyLoadingScreen.appliesTo("forge", "1.13.2"))
+        assertTrue(EarlyLoadingScreen.appliesTo("forge", "1.16.5"))
         assertTrue(EarlyLoadingScreen.appliesTo("forge", "26.1"))
+        // 1.17 to 1.19 drew their progress inside the game window.
+        assertFalse(EarlyLoadingScreen.appliesTo("forge", "1.18.2"))
+        assertFalse(EarlyLoadingScreen.appliesTo("forge", "1.19.4"))
         assertFalse(EarlyLoadingScreen.appliesTo("forge", "1.12.2"))
         assertFalse(EarlyLoadingScreen.appliesTo("forge", "1.7.10"))
         assertFalse(EarlyLoadingScreen.appliesTo("forge", null))
@@ -142,6 +148,54 @@ class EarlyLoadingScreenTest {
             listOf("earlyWindowControl = true", "[dependencyOverrides]", "earlyWindowControl = [\"+x\"]"),
             Files.readAllLines(fmlToml),
         )
+    }
+
+    /** The same key to TOML. Missing it put a second definition above, which the parser refuses. */
+    @Test
+    fun `a quoted key is the key`() {
+        Files.createDirectories(fmlToml.parent)
+        Files.write(fmlToml, listOf("\"earlyWindowControl\" = true", "maxThreads = -1"))
+
+        assertTrue(EarlyLoadingScreen.writeConfig(dir, enabled = false))
+        assertEquals(listOf("\"earlyWindowControl\" = false", "maxThreads = -1"), Files.readAllLines(fmlToml))
+        assertEquals(false, EarlyLoadingScreen.readConfig(dir))
+    }
+
+    /** A pack written on Windows. One changed value must stay one changed value. */
+    @Test
+    fun `line endings, a byte-order mark, indent and a trailing comment all survive`() {
+        Files.createDirectories(fmlToml.parent)
+        Files.writeString(fmlToml, "﻿#Early window\r\n  earlyWindowControl = true # shipped on\r\nmaxThreads = -1\r\n")
+
+        assertTrue(EarlyLoadingScreen.writeConfig(dir, enabled = false))
+        assertEquals(
+            "﻿#Early window\r\n  earlyWindowControl = false # shipped on\r\nmaxThreads = -1\r\n",
+            Files.readString(fmlToml),
+        )
+        assertFalse(EarlyLoadingScreen.writeConfig(dir, enabled = false), "an unchanged value is not a change")
+    }
+
+    @Test
+    fun `a missing key goes after a byte-order mark, not before it`() {
+        Files.createDirectories(fmlToml.parent)
+        Files.writeString(fmlToml, "﻿maxThreads = -1\n")
+
+        EarlyLoadingScreen.writeConfig(dir, enabled = false)
+        assertEquals("﻿earlyWindowControl = false\nmaxThreads = -1\n", Files.readString(fmlToml))
+    }
+
+    /** A config shared between instances through a link stays shared. */
+    @Test
+    @DisabledOnOs(OS.WINDOWS, disabledReason = "creating a symbolic link needs a privilege the runner does not have")
+    fun `a linked config is written through the link`() {
+        val shared = Files.createDirectories(dir.resolve("shared")).resolve("fml.toml")
+        Files.write(shared, listOf("earlyWindowControl = true"))
+        Files.createDirectories(fmlToml.parent)
+        Files.createSymbolicLink(fmlToml, shared)
+
+        EarlyLoadingScreen.writeConfig(dir, enabled = false)
+        assertTrue(Files.isSymbolicLink(fmlToml), "the link was replaced by a file")
+        assertEquals(listOf("earlyWindowControl = false"), Files.readAllLines(shared))
     }
 
     @Test

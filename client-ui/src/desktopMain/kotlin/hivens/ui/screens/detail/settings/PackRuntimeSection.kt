@@ -191,11 +191,16 @@ internal fun PackRuntimeSection(
             val choice = runtime.earlyLoadingScreen
             // Read again whenever the choice changes: a launch in between may have rewritten it.
             var packValue by remember(instanceDir) { mutableStateOf<Boolean?>(null) }
+            var read by remember(instanceDir) { mutableStateOf(false) }
             LaunchedEffect(instanceDir, choice) {
                 packValue = withContext(Dispatchers.IO) { runCatching { EarlyLoadingScreen.readConfig(instanceDir) }.getOrNull() }
+                read = true
             }
             val launcherDecides = choice == null && EarlyLoadingScreen.waylandSession
-            NxToggle(
+            // Where the pack's own file is the answer, nothing is shown until it has
+            // been read: a first frame drawn from the default flipped visibly for a
+            // pack that ships the screen off.
+            if (read || choice != null || launcherDecides) NxToggle(
                 s.packSettingsEarlyScreen,
                 EarlyLoadingScreen.effective(choice, packValue),
                 description = if (launcherDecides) s.packSettingsEarlyScreenWayland else s.packSettingsEarlyScreenDesc,

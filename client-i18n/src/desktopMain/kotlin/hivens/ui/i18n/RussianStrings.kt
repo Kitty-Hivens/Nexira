@@ -1000,7 +1000,7 @@ object RussianStrings : AppStrings {
     override val packSettingsWidth              = "Ширина"
     override val packSettingsHeight             = "Высота"
     override val packSettingsFullscreen         = "Полноэкранный режим"
-    override val packSettingsEarlyScreen        = "Экран загрузки Forge"
+    override val packSettingsEarlyScreen        = "Экран загрузки модов"
     override val packSettingsEarlyScreenDesc    = "Окно с прогрессом загрузки модов, пока игра не открыла своё"
     override val packSettingsEarlyScreenWayland = "Выключен на Wayland: если уйти на другой рабочий стол, пока грузятся моды, запуск сорвётся"
     override val packSettingsEarlyScreenReset   = "Как по умолчанию"

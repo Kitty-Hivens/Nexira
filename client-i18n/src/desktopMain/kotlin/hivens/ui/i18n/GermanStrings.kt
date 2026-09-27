@@ -997,7 +997,7 @@ object GermanStrings : AppStrings {
     override val packSettingsWidth              = "Breite"
     override val packSettingsHeight             = "Höhe"
     override val packSettingsFullscreen         = "Vollbild"
-    override val packSettingsEarlyScreen        = "Forge-Ladebildschirm"
+    override val packSettingsEarlyScreen        = "Mod-Ladebildschirm"
     override val packSettingsEarlyScreenDesc    = "Ein Fenster mit dem Ladebalken der Mods, bis das Spiel sein eigenes öffnet"
     override val packSettingsEarlyScreenWayland = "Unter Wayland aus: wer beim Laden der Mods den Arbeitsbereich wechselt, bringt den Start zum Scheitern"
     override val packSettingsEarlyScreenReset   = "Standard nutzen"

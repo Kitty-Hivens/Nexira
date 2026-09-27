@@ -1005,7 +1005,7 @@ object JapaneseStrings : AppStrings {
     override val packSettingsWidth = "幅"
     override val packSettingsHeight = "高さ"
     override val packSettingsFullscreen = "フルスクリーン"
-    override val packSettingsEarlyScreen = "Forge の読み込み画面"
+    override val packSettingsEarlyScreen = "Mod の読み込み画面"
     override val packSettingsEarlyScreenDesc = "ゲームが自分のウィンドウを開くまで、Mod の読み込み状況を表示するウィンドウ"
     override val packSettingsEarlyScreenWayland = "Wayland ではオフです。Mod の読み込み中にワークスペースを切り替えると起動に失敗します"
     override val packSettingsEarlyScreenReset = "既定に戻す"
