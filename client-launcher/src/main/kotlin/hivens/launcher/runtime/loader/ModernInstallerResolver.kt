@@ -296,10 +296,18 @@ class ModernInstallerResolver(
         }
     }
 
-    /** Ends the installer and anything it started, and waits briefly for it to go. */
+    /**
+     * Ends the installer and anything it started, and waits briefly for it to go.
+     *
+     * The parent goes first. Killing a child first hands the parent the moment
+     * between the two signals to notice and carry on, and whatever it does next
+     * lands in the cache. The children are listed before that, because an orphan
+     * no longer shows up among the parent's descendants.
+     */
     private fun kill(process: Process) {
-        runCatching { process.descendants().forEach { it.destroyForcibly() } }
+        val children = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
         runCatching { process.destroyForcibly() }
+        children.forEach { runCatching { it.destroyForcibly() } }
         runCatching { process.waitFor(5, TimeUnit.SECONDS) }
     }
 
