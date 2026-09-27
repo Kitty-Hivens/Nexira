@@ -263,6 +263,34 @@ class ModernInstallerResolverTest {
         }
     }
 
+    /**
+     * The Forge installer compares the jars it repacks against hashes made with the
+     * reference zlib. On the game's JDK those jars are compressed by the system
+     * zlib, which on Arch and Fedora is zlib-ng, and every install failed there.
+     */
+    @Test
+    fun `the Forge installer runs on Java 8 whatever the game needs`() = runBlocking {
+        val asked = ArrayList<Int>()
+        val java = object : IJavaManager {
+            override suspend fun getJavaPath(version: String): Path = Path.of("/bin/java")
+            override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path {
+                asked.add(javaMajor)
+                throw IOException("stop before running anything")
+            }
+        }
+        val engine = MockEngine { respond(ByteReadChannel("JAR".toByteArray()), HttpStatusCode.OK) }
+        val cache = Files.createTempDirectory("forge-java")
+        try {
+            val provider = HttpClientProvider { HttpClient(engine) }
+            val forge = ModernInstallerResolver.forge(provider, testTransferEngine(provider), Json { ignoreUnknownKeys = true }, java, cache)
+            runCatching { forge.resolve("1.20.1", "47.4.10") }
+            assertEquals(listOf(ModernInstallerResolver.FORGE_INSTALLER_JAVA), asked)
+            assertEquals(8, ModernInstallerResolver.FORGE_INSTALLER_JAVA)
+        } finally {
+            cache.toFile().deleteRecursively()
+        }
+    }
+
     @Test
     fun `ForgeResolver splits launchwrapper era at Minecraft 1_12`() {
         assertTrue(ForgeResolver.isLaunchwrapperEra("1.12.2"))

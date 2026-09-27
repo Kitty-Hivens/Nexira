@@ -62,11 +62,9 @@ class ModernInstallerResolver(
     private val cacheDir: Path,
     override val loaderId: String,
     /**
-     * Java major to run the official installer under. Null means derive from the
-     * MC version via [IJavaManager.detectJavaVersion] -- matches every current
-     * loader (Forge / NeoForge target the MC version's own JDK). Pass the
-     * loader's declared major when a future loader needs a different one
-     * (e.g. Cleanroom -> 25) so the installer JDK matches the GAME's JDK.
+     * Java major to run the official installer under. Null means the MC
+     * version's own, via [IJavaManager.detectJavaVersion], which is what NeoForge
+     * uses. Forge pins 8, for the reason given on [forge].
      */
     private val installerJavaMajor: Int? = null,
     /**
@@ -329,6 +327,9 @@ class ModernInstallerResolver(
 
         private const val INSTALLED_MARKER = ".nexira-installed"
 
+        /** The Java the Forge installer runs on; see [forge] for why it is not the game's. */
+        internal const val FORGE_INSTALLER_JAVA = 8
+
         /** The one Minecraft version NeoForge published under Forge's coordinates. */
         private const val NEOFORGE_FORGE_ERA = "1.20.1"
 
@@ -438,7 +439,19 @@ class ModernInstallerResolver(
             },
         )
 
-        /** Modern Forge: `<mc>-<build>` slug, same shape as the legacy maven. */
+        /**
+         * Modern Forge: `<mc>-<build>` slug, same shape as the legacy maven.
+         *
+         * The installer always runs on Java 8, whatever the game needs. It splits
+         * the vanilla client into a slim and an extra jar, repacks them with
+         * deflate and checks their SHA1 against hashes Forge computed with the
+         * reference zlib. A JDK that compresses through the system library takes
+         * whatever zlib the system has, and where that is zlib-ng, as on Arch and
+         * Fedora, the same classes come out as different bytes and the install
+         * fails with "invalid outputs". The managed Java 8 carries its own zlib,
+         * and the installer and every processor it runs are Java 8 bytecode. The
+         * game itself still launches on the Java its version declares.
+         */
         fun forge(
             clientProvider: HttpClientProvider,
             transfers: TransferEngine,
@@ -447,6 +460,7 @@ class ModernInstallerResolver(
             cacheDir: Path,
         ): ModernInstallerResolver = ModernInstallerResolver(
             clientProvider, transfers, json, javaManager, cacheDir, loaderId = "forge",
+            installerJavaMajor = FORGE_INSTALLER_JAVA,
             latestVersion = { mc ->
                 pickForgePromotion(json, fetchText(clientProvider, FORGE_PROMOTIONS), mc)
                     ?: throw IOException("no Forge promotion for Minecraft $mc")
