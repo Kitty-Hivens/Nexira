@@ -63,6 +63,7 @@ import kotlinx.coroutines.withContext
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.LogRetention
 import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
 import javax.swing.SwingUtilities
@@ -139,6 +140,11 @@ val uiModule = module {
     }
 
     single { GameConsoleService(get()) }
+    // Holds the per-session game output files to an age and a total size. Once per
+    // start, off the boot path; see its KDoc for what it leaves alone.
+    single(createdAtStart = true) {
+        LogRetention(get<PlatformPaths>().logsDir).also { it.start(get()) }
+    }
     // One owner of console.json for the three surfaces that read it: the shell's
     // window, Settings > Console and the pack's Logs tab.
     single { ConsoleSettingsStore(get<Path>(), get(), get()) }
