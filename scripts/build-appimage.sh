@@ -15,7 +15,9 @@
 #                         Nexira-nightly-<arch>.AppImage for a nightly.
 #                         Also written to $GITHUB_OUTPUT as `path` when
 #                         that is set, so a workflow reads the name
-#                         from here instead of deriving it again.
+#                         from here instead of deriving it again. A
+#                         release also gets $OUTPUT.zsync, written there
+#                         as `zsync` (empty for any other build).
 #   PACKAGING_PROFILE     override path to the generated packaging
 #                         profile (defaults to the standard
 #                         client-ui/build/generated/packaging/
@@ -55,6 +57,19 @@ if [ "$VERSION_SUFFIX" != "$APP_VERSION" ]; then
     esac
 fi
 OUTPUT="${OUTPUT:-Nexira${CHANNEL_PART}-${ARCH}.AppImage}"
+
+# Update information for AppImageUpdate and the tools built on it. They decide
+# that an update exists by comparing the file's hash with the .zsync, not by
+# version, and `latest` resolves to /releases/latest. A beta or a nightly
+# carrying it would therefore be "updated" back to the release, so only a
+# release gets it and the other two are updated by the launcher alone.
+# appimagetool writes $OUTPUT.zsync beside the image when it is given.
+UPDATE_ARGS=()
+ZSYNC=""
+if [ "$VERSION_SUFFIX" = "$APP_VERSION" ]; then
+    UPDATE_ARGS=(-u "gh-releases-zsync|Kitty-Hivens|Nexira|latest|$(basename "$OUTPUT").zsync")
+    ZSYNC="$OUTPUT.zsync"
+fi
 
 [ -f "$JAR" ] || { echo "error: jar not found: $JAR" >&2; exit 1; }
 [ -d "$APPDIR" ] && { echo "error: $APPDIR already exists; refusing to overwrite" >&2; exit 1; }
@@ -246,9 +261,15 @@ ARCH="$ARCH" appimagetool \
     --comp zstd \
     --mksquashfs-opt=-Xcompression-level --mksquashfs-opt=22 \
     --mksquashfs-opt=-b --mksquashfs-opt=1M \
+    "${UPDATE_ARGS[@]}" \
     "$APPDIR" "$OUTPUT"
 
 echo "AppImage written to $OUTPUT"
+if [ -n "$ZSYNC" ] && [ ! -f "$ZSYNC" ]; then
+    echo "error: update information was embedded but $ZSYNC was not written" >&2
+    exit 1
+fi
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "path=$OUTPUT" >> "$GITHUB_OUTPUT"
+    echo "zsync=$ZSYNC" >> "$GITHUB_OUTPUT"
 fi

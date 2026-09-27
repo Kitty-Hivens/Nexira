@@ -511,11 +511,14 @@ jobs:
           JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
           ./scripts/build-appimage.sh "$APP_VERSION" "$JAR"
 
-      # The name comes from the script, which picks it by channel.
+      # Both names come from the script, which picks them by channel. zsync is
+      # empty for anything but a release, and an empty line is skipped.
       - uses: actions/upload-artifact@v7
         with:
           name: linux-artifacts
-          path: ${{ steps.appimage.outputs.path }}
+          path: |
+            ${{ steps.appimage.outputs.path }}
+            ${{ steps.appimage.outputs.zsync }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # MACOS — DMG (Apple Silicon only in the release pipeline)
@@ -660,6 +663,7 @@ jobs:
               *Setup.exe)             plat=windows; kind=installer ;;
               *Windows-Portable.zip)  plat=windows; kind=portable  ;;
               *.AppImage)             plat=linux;   kind=appimage  ;;
+              *.AppImage.zsync)       plat=linux;   kind=zsync     ;;
               *aarch64.dmg)           plat=macos;   kind=dmg-arm64 ;;
               *x86_64.dmg)            plat=macos;   kind=dmg-intel ;;
               *.dmg)                  plat=macos;   kind=dmg       ;;

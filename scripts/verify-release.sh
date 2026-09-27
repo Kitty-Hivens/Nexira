@@ -159,6 +159,11 @@ check_asset "aarch64\.dmg$"      "macOS DMG (Apple Silicon)"
 # so it is frequently absent when this runs. Filename ends -x86_64-community.dmg.
 check_asset_optional "x86_64-community\.dmg$" "macOS DMG (Intel, community)"
 check_asset "SHA256SUMS"         "SHA256 checksums file"
+# Only a release embeds update information (see build-appimage.sh), so only a
+# release publishes the .zsync that information points at.
+if [[ "$VER_NUM" != *-* ]]; then
+    check_asset "\.AppImage\.zsync$" "AppImage zsync (update information)"
+fi
 
 echo ""
 
