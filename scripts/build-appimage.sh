@@ -186,6 +186,14 @@ cp "$ROOT/resources/dev.hivens.nexira.metainfo.xml" \
 # goes from 260 MB to 65 MB and RSS from 611 MB to 375 MB, with the glibc trim
 # threshold below carrying about 40 MB of that and time to first frame unchanged.
 #
+# TrimNativeHeapInterval is the JVM's own half of the glibc trim below: every ten
+# seconds it hands memory the JVM has freed back to the system. The threshold
+# alone leaves what a burst allocated through malloc resident until something
+# else happens to trim. Measured on an idle home screen with the environment this
+# AppRun sets, RSS goes from 370 MB to 344 MB with time to first frame unchanged.
+# Heap caps, SerialGC and running without the class-data archive were measured
+# in the same pass and each came out worse or no better.
+#
 # InvokesConcurrent is passed rather than assumed. It defaults to true on the JDK
 # this ships with, but it defaulted to false when the periodic collection was
 # introduced, and the difference is a 2 ms young pause against a full stop the
@@ -245,6 +253,7 @@ exec "\$HERE/usr/bin/java" \\
      -XX:MaxHeapFreeRatio=25 \\
      -XX:G1PeriodicGCInterval=15000 \\
      -XX:+G1PeriodicGCInvokesConcurrent \\
+     -XX:TrimNativeHeapInterval=10000 \\
      -jar "\$HERE/usr/lib/nexira.jar" \\
      "\$@"
 EOF
