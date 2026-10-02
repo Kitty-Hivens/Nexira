@@ -101,6 +101,7 @@ object EnglishStrings : AppStrings {
     override val themePickerPreview         = "Preview"
     override val themePickerSelected        = "Selected"
     override val themePickerDarkOnly        = "Dark only"
+    override val themeFromWallpaper         = "From wallpaper"
     override val themePickerBtnSample       = "Sample Button"
     override val themePickerBtnOutlined     = "Outlined Button"
 

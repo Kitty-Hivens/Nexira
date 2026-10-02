@@ -9,29 +9,39 @@ import com.materialkolor.score.Score
 private const val SEED_SAMPLE_BUDGET = 12_000
 private const val SEED_QUANTIZE_COLORS = 96
 
+/** How many ranked colours a picture hands over: enough for a theme's own colours. */
+private const val RANKED_COLOURS = 5
+
 /**
- * Material-You seed colour (ARGB) from a static wallpaper bitmap: quantize the
- * pixels (Celebi) -> score -> top-ranked colour. Returns null when the bitmap is
- * empty or scoring finds nothing usable (then the theme keeps its fixed palette).
- * Pure -- no Compose state, no IO.
+ * The most characteristic colour (ARGB) of a static bitmap: quantize the pixels
+ * (Celebi), score them, take the top one. Null when the bitmap is empty. Pure: no
+ * Compose state, no IO.
  */
-fun seedFromImage(bitmap: ImageBitmap): Int? {
+fun seedFromImage(bitmap: ImageBitmap): Int? = coloursFromImage(bitmap).firstOrNull()
+
+/** The picture's characteristic colours, best first. Same contract as [seedFromImage]. */
+fun coloursFromImage(bitmap: ImageBitmap): List<Int> {
     val w = bitmap.width
     val h = bitmap.height
-    if (w <= 0 || h <= 0) return null
+    if (w <= 0 || h <= 0) return emptyList()
     val pixels = IntArray(w * h)
     bitmap.readPixels(pixels)
-    return seedFromArgb(pixels, pixels.size)
+    return rankedFromArgb(pixels, pixels.size)
 }
 
 /**
- * Seed colour from a raw RGBA frame (the video wallpaper's decoded buffer): subsample
- * + convert to ARGB inline (no full-frame allocation), then quantize -> score. Same
- * null contract as [seedFromImage].
+ * The most characteristic colour of a raw RGBA frame (the video wallpaper's decoded
+ * buffer). Same null contract as [seedFromImage].
  */
-fun seedFromRgba(rgba: ByteArray, width: Int, height: Int): Int? {
+fun seedFromRgba(rgba: ByteArray, width: Int, height: Int): Int? = coloursFromRgba(rgba, width, height).firstOrNull()
+
+/**
+ * The frame's characteristic colours, best first: subsample and convert to ARGB
+ * inline (no full-frame allocation), then quantize and score.
+ */
+fun coloursFromRgba(rgba: ByteArray, width: Int, height: Int): List<Int> {
     val n = width * height
-    if (n <= 0 || rgba.size < n * 4) return null
+    if (n <= 0 || rgba.size < n * 4) return emptyList()
     val step = maxOf(1, n / SEED_SAMPLE_BUDGET)
     val count = (n + step - 1) / step
     val argb = IntArray(count) { j ->
@@ -42,43 +52,60 @@ fun seedFromRgba(rgba: ByteArray, width: Int, height: Int): Int? {
         val a = rgba[o + 3].toInt() and 0xFF
         (a shl 24) or (r shl 16) or (g shl 8) or b
     }
-    val quantized = QuantizerCelebi.quantize(argb, SEED_QUANTIZE_COLORS)
-    return Score.score(quantized).firstOrNull()
+    return ranked(argb)
 }
 
-private fun seedFromArgb(pixels: IntArray, length: Int): Int? {
-    if (length <= 0) return null
+private fun rankedFromArgb(pixels: IntArray, length: Int): List<Int> {
+    if (length <= 0) return emptyList()
     val step = maxOf(1, length / SEED_SAMPLE_BUDGET)
     val sampled = if (step == 1) pixels else IntArray((length + step - 1) / step) { pixels[it * step] }
-    val quantized = QuantizerCelebi.quantize(sampled, SEED_QUANTIZE_COLORS)
-    return Score.score(quantized).firstOrNull()
+    return ranked(sampled)
 }
 
 /**
- * The wallpaper's palette [seedArgb] (the most VIVID colour) plus its overall
- * [avgLuminance] (0..1 average brightness -- below ~0.5 reads as a dark image). The two
- * are distinct: a dark image with a bright accent has a bright seed but a low average.
+ * Scored colours, best first. A picture with nothing colourful in it still has a
+ * colour: scoring filters out greys, so a grey picture falls back to the colour it is
+ * made of most, rather than to nothing or to a stock blue.
  */
-data class WallpaperTone(val seedArgb: Int?, val avgLuminance: Float?)
+private fun ranked(argb: IntArray): List<Int> {
+    val quantized = QuantizerCelebi.quantize(argb, SEED_QUANTIZE_COLORS)
+    val scored = Score.score(quantized, RANKED_COLOURS, null, true)
+    if (scored.isNotEmpty()) return scored
+    return listOfNotNull(quantized.maxByOrNull { it.value }?.key)
+}
 
 /**
- * Seed + average brightness in ONE [readPixels]. A large wallpaper is tens of MB of
- * pixels; reading it twice (once per value) allocates two full arrays at once and OOMs,
- * so both are derived from a single read.
+ * What a wallpaper tells the launcher: its characteristic [colours], best first, and
+ * its overall [avgLuminance] (0..1 average brightness, below about 0.5 reads as a dark
+ * image). The two are distinct: a dark image with a bright accent has a bright first
+ * colour but a low average.
+ */
+data class WallpaperTone(val colours: List<Int>, val avgLuminance: Float?) {
+    val seedArgb: Int? get() = colours.firstOrNull()
+
+    companion object {
+        val NONE = WallpaperTone(emptyList(), null)
+    }
+}
+
+/**
+ * Colours and average brightness in ONE [readPixels]. A large wallpaper is tens of MB
+ * of pixels, and reading it twice (once per value) allocates two full arrays at once
+ * and OOMs, so both are derived from a single read.
  */
 fun wallpaperToneFromImage(bitmap: ImageBitmap): WallpaperTone {
     val w = bitmap.width
     val h = bitmap.height
-    if (w <= 0 || h <= 0) return WallpaperTone(null, null)
+    if (w <= 0 || h <= 0) return WallpaperTone.NONE
     val pixels = IntArray(w * h)
     bitmap.readPixels(pixels)
-    val seed = seedFromArgb(pixels, pixels.size)
+    val colours = rankedFromArgb(pixels, pixels.size)
     val step = maxOf(1, pixels.size / SEED_SAMPLE_BUDGET)
     var sum = 0.0
     var n = 0
     var i = 0
     while (i < pixels.size) { sum += luminanceOfArgb(pixels[i]); n++; i += step }
-    return WallpaperTone(seed, if (n > 0) (sum / n).toFloat() else null)
+    return WallpaperTone(colours, if (n > 0) (sum / n).toFloat() else null)
 }
 
 /** Rec.709 luma (0..1) of one 0xAARRGGBB colour. */

@@ -119,7 +119,7 @@ private fun ThemeCard(
                 Row {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            text       = theme.name,
+                            text       = theme.label(),
                             style      = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color      = NxInk.main,

@@ -1,11 +1,14 @@
 package hivens.ui.widgets.themepicker
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.Theme
 import hivens.ui.theme.Themes
+import hivens.ui.theme.WALLPAPER_THEME_ID
 
 // Surface-scoped state the theme-picker widgets share. The grid shows every theme
 // and writes `selected` on a click. The preview reads `selected` and draws it.
@@ -30,6 +33,10 @@ val LocalThemePickerContext: ProvidableCompositionLocal<ThemePickerContext> =
     staticCompositionLocalOf {
         error("LocalThemePickerContext not provided -- render inside ThemePickerSurface")
     }
+
+/** What the picker calls [this]: the theme's own name, or this launcher's word for the one made from the wallpaper. */
+@Composable
+internal fun Theme.label(): String = if (id == WALLPAPER_THEME_ID) LocalStrings.current.themeFromWallpaper else name
 
 internal val STUB_THEME_PICKER: ThemePickerContext = ThemePickerContext(
     themes   = emptyList(),

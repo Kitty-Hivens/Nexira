@@ -66,7 +66,7 @@ fun ThemePickerPreviewWidget() {
                     color      = NxColor.lead(text = true),
                     fontWeight = FontWeight.Bold,
                 )
-                NxSection(title = theme.name) {
+                NxSection(title = theme.label()) {
                     NxToggle(
                         label           = s.settingsDarkTheme,
                         description     = s.settingsDarkThemeDesc,
@@ -80,7 +80,7 @@ fun ThemePickerPreviewWidget() {
                     }
                     NxCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(theme.name, color = NxInk.main, fontWeight = FontWeight.Medium)
+                            Text(theme.label(), color = NxInk.main, fontWeight = FontWeight.Medium)
                             Text(s.settingsDarkThemeDesc, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                         }
                     }

@@ -99,6 +99,7 @@ object RussianStrings : AppStrings {
     override val themePickerPreview         = "Предпросмотр"
     override val themePickerSelected        = "Выбрана"
     override val themePickerDarkOnly        = "Только тёмная"
+    override val themeFromWallpaper         = "Из обоев"
     override val themePickerBtnSample       = "Пример кнопки"
     override val themePickerBtnOutlined     = "Кнопка с рамкой"
 

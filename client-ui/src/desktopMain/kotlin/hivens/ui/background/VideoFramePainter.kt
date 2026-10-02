@@ -26,7 +26,7 @@ import hivens.ui.audio.AudioOutput
 import hivens.ui.audio.PlaybackRouter
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.WallpaperSession
-import hivens.ui.theme.seedFromRgba
+import hivens.ui.theme.coloursFromRgba
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -242,7 +242,7 @@ internal fun rememberSkinemaFrame(
     audioVolume: Float,
     link: Boolean,
     onAudioVolume: (Float) -> Unit,
-    onSeed: (Int) -> Unit = {},
+    onColours: (List<Int>) -> Unit = {},
 ): VideoFramePainter? {
     // Skinema disabled by boot recovery -> no animated background (same draw-
     // nothing contract as the decode-failure gate below).
@@ -346,7 +346,7 @@ internal fun rememberSkinemaFrame(
 
     LaunchedEffect(video) {
         var resumed = false
-        var seedSent = false
+        var coloursSent = false
         while (true) {
             withFrameNanos { }
             // Put the picture back where the previous player left it, once there is
@@ -370,8 +370,11 @@ internal fun rememberSkinemaFrame(
                     else
                         Size(slot.height.toFloat(), slot.width.toFloat())
                 }
-                // Seed the Material-You palette from the first decoded frame (once).
-                if (!seedSent) seedFromRgba(slot.rgba, slot.width, slot.height)?.let { seedSent = true; onSeed(it) }
+                // The wallpaper's colours come from the first decoded frame, once.
+                if (!coloursSent) {
+                    coloursFromRgba(slot.rgba, slot.width, slot.height).takeIf { it.isNotEmpty() }
+                        ?.let { coloursSent = true; onColours(it) }
+                }
                 frameStamp++
             }
             // Read from the pump rather than on the way out. The close is

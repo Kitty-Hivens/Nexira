@@ -17,17 +17,26 @@ import java.nio.file.Path
 
 /**
  * The themes a person can choose from and the one they chose: everything that ships,
- * and the ones that are their own.
+ * the one made from their wallpaper, and the ones that are their own.
  *
  * Their own are themes they brought in through a file or that an older build stored
  * in a shape this one has replaced. A selection naming a theme that no longer exists
- * lands on the default rather than on nothing.
+ * lands on the default rather than on nothing, and so does the wallpaper theme while
+ * there is no wallpaper to make it from.
+ *
+ * [wallpaper] is the last wallpaper's colours, best first. Kept with the selection so
+ * a launcher that opens on the wallpaper theme opens in it, rather than in the default
+ * until the picture has decoded.
  */
 data class ThemeLibrary(
     val selected: String = Themes.default.id,
     val own: List<Theme> = emptyList(),
+    val wallpaper: List<Int> = emptyList(),
 ) {
-    val all: List<Theme> get() = Themes.all + own
+    /** The theme made from [wallpaper], null without one. Named in English: a screen shows its own word for it. */
+    val fromWallpaper: Theme? by lazy { themeFromWallpaper(wallpaper, "Wallpaper") }
+
+    val all: List<Theme> get() = Themes.all + listOfNotNull(fromWallpaper) + own
 
     val active: Theme get() = all.firstOrNull { it.id == selected } ?: Themes.default
 }
@@ -147,13 +156,19 @@ class ThemeManager(
 internal data class ThemeFile(
     val selected: String = Themes.default.id,
     val themes: List<ThemeRecord> = emptyList(),
+    val wallpaper: List<String> = emptyList(),
 ) {
-    fun toLibrary(): ThemeLibrary = ThemeLibrary(selected = selected, own = themes.mapNotNull { it.toTheme() })
+    fun toLibrary(): ThemeLibrary = ThemeLibrary(
+        selected = selected,
+        own = themes.mapNotNull { it.toTheme() },
+        wallpaper = wallpaper.mapNotNull { parseHexOrNull(it)?.toArgb() },
+    )
 
     companion object {
         fun of(library: ThemeLibrary) = ThemeFile(
             selected = library.selected,
             themes = library.own.map { ThemeRecord.of(it) },
+            wallpaper = library.wallpaper.map { hex(Color(it)) },
         )
     }
 }

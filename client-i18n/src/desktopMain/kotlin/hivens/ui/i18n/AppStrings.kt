@@ -108,6 +108,7 @@ interface AppStrings {
     val themePickerPreview: String
     val themePickerSelected: String
     val themePickerDarkOnly: String
+    val themeFromWallpaper: String
     val themePickerBtnSample: String
     val themePickerBtnOutlined: String
 

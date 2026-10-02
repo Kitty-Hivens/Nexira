@@ -17,7 +17,8 @@ import kotlin.test.assertTrue
  */
 class ThemeIntentTest {
 
-    private fun schemes(): List<Pair<String, Scheme>> = Themes.all.flatMap { theme ->
+    /** Every theme that ships, and themes made from wallpapers of every kind of colour. */
+    private fun schemes(): List<Pair<String, Scheme>> = (Themes.all + wallpaperThemes()).flatMap { theme ->
         listOfNotNull("${theme.id}/dark" to theme.dark, theme.light?.let { "${theme.id}/light" to it })
     }
 
@@ -138,6 +139,39 @@ class ThemeIntentTest {
         assertEquals(Themes.Matrix.dark, Themes.Matrix.scheme(dark = false))
         assertEquals(Themes.Celestia.light, Themes.Celestia.scheme(dark = false))
     }
+
+    @Test
+    fun `a wallpaper theme draws with the wallpaper's colours in their order`() {
+        val theme = themeFromWallpaper(listOf(0xFFE0457B.toInt(), 0xFF2E86C1.toInt()), "w")!!
+        for (scheme in listOf(theme.dark, theme.light!!)) {
+            val hues = scheme.colors.map { it.hct().hue }
+            assertTrue(hueDistance(hues[0], Color(0xFFE0457B).hct().hue) < 3.0, "the first colour lost its hue")
+            assertTrue(hueDistance(hues[1], Color(0xFF2E86C1).hct().hue) < 3.0, "the second colour lost its hue")
+            // The ladder belongs to the first colour, and stays Celestia's in tone. Read
+            // in the middle, since white at the end of a light ladder has no hue to read.
+            val middle = scheme.steps[2].hct()
+            assertTrue(hueDistance(middle.hue, Color(0xFFE0457B).hct().hue) < 10.0, "the ladder is not in the wallpaper's hue")
+        }
+        val celestia = Themes.Celestia.dark.steps.map { it.lstar() }
+        theme.dark.steps.map { it.lstar() }.zip(celestia).forEach { (a, b) -> assertEquals(b, a, 0.6) }
+    }
+
+    @Test
+    fun `a wallpaper without colour gives a neutral ladder and the default colours`() {
+        val theme = themeFromWallpaper(listOf(0xFF808080.toInt()), "w")!!
+        assertEquals(Themes.Celestia.dark.colors, theme.dark.colors)
+        assertTrue(theme.dark.steps.all { it.red == it.green && it.green == it.blue }, "a grey wallpaper tinted the ladder")
+        assertEquals(null, themeFromWallpaper(emptyList(), "w"))
+    }
+
+    private fun wallpaperThemes(): List<Theme> = listOf(
+        listOf(0xFFE0457B, 0xFF2E86C1, 0xFFF4D03F),
+        listOf(0xFF3B0A0A),
+        listOf(0xFF0B3D2E, 0xFF9ACD32),
+        listOf(0xFFFFF59D),
+        listOf(0xFF7A7A7A),
+        listOf(0xFF1A237E, 0xFF00E5FF, 0xFFFF6D00, 0xFF6A1B9A, 0xFF2E7D32),
+    ).mapIndexedNotNull { i, argb -> themeFromWallpaper(argb.map { it.toInt() }, "wallpaper $i")?.copy(id = "wallpaper-$i") }
 
     private companion object {
         const val TEXT = 4.5

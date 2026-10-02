@@ -111,6 +111,7 @@ object JapaneseStrings : AppStrings {
     override val themePickerPreview = "プレビュー"
     override val themePickerSelected = "選択中"
     override val themePickerDarkOnly = "ダークのみ"
+    override val themeFromWallpaper = "壁紙から"
     override val themePickerBtnSample = "サンプルボタン"
     override val themePickerBtnOutlined = "枠線ボタン"
 

@@ -105,6 +105,26 @@ class ThemeManagerTest {
     }
 
     @Test
+    fun `the wallpaper theme opens from the stored colours, before any picture has decoded`() {
+        val dir = tempDir()
+        var written = ""
+        val colours = listOf(0xFFE0457B.toInt(), 0xFF2E86C1.toInt())
+        ThemeManager(dir) { _, c -> written = c }.save(ThemeLibrary(selected = WALLPAPER_THEME_ID, wallpaper = colours))
+        Files.writeString(dir.resolve("themes.json"), written)
+
+        val back = ThemeManager(dir) { _, _ -> }.load()
+        assertEquals(colours, back.wallpaper)
+        assertEquals(themeFromWallpaper(colours, "Wallpaper"), back.active)
+    }
+
+    @Test
+    fun `the wallpaper theme without a wallpaper lands on the default and is not offered`() {
+        val library = ThemeLibrary(selected = WALLPAPER_THEME_ID)
+        assertEquals(Themes.default, library.active)
+        assertTrue(library.all.none { it.id == WALLPAPER_THEME_ID })
+    }
+
+    @Test
     fun `a file from a newer build is read, and not written back over`() {
         val dir = tempDir()
         Files.writeString(dir.resolve("themes.json"), """{"schema_version":99,"selected":"matrix"}""")

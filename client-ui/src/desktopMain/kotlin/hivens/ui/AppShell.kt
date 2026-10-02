@@ -1056,6 +1056,14 @@ fun FrameWindowScope.AppShellContent(
                 } else {
                     AppRoot(
                         onWallpaperLuminance = { wallpaperLuminance = it },
+                        onWallpaperColours   = { colours ->
+                            // Stored with the selection, so the wallpaper theme opens in
+                            // itself next time. Written only when the picture changed.
+                            if (colours != themeLibrary.wallpaper) {
+                                themeLibrary = themeLibrary.copy(wallpaper = colours)
+                                themeManager.save(themeLibrary)
+                            }
+                        },
                         onRealExit   = quit,
                         onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
                         else null,
@@ -1169,6 +1177,7 @@ fun FrameWindowScope.AppShellContent(
 @Composable
 fun AppRoot(
     onWallpaperLuminance: (Float?) -> Unit,
+    onWallpaperColours: (List<Int>) -> Unit,
     isDarkTheme: Boolean,
     onRealExit: () -> Unit,
     onHideToTray: (() -> Unit)?,
@@ -1369,8 +1378,9 @@ fun AppRoot(
     val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
     // What the wallpaper tells the shell: its overall brightness, for the mode that
-    // follows the wallpaper between dark and light. It does not colour the theme.
-    var tone by remember { mutableStateOf(WallpaperTone(null, null)) }
+    // follows the wallpaper between dark and light, and its colours, which the
+    // wallpaper theme is made of.
+    var tone by remember { mutableStateOf(WallpaperTone.NONE) }
 
     LaunchedEffect(tone.avgLuminance) { onWallpaperLuminance(tone.avgLuminance) }
 
@@ -1401,7 +1411,9 @@ fun AppRoot(
       CustomBackground(
           settings         = backgroundSettings,
           mousePosProvider = { mousePos.value },
-          onTone           = { tone = it },
+          // Colours are passed on as reported and not from the initial state, which
+          // would clear the stored ones on every start before the picture decoded.
+          onTone           = { tone = it; onWallpaperColours(it.colours) },
           // The one setting a player widget can move while the wallpaper is what
           // its transport is pointed at. Through the same state the appearance
           // panel writes, so the two sliders are one value and the debounce below

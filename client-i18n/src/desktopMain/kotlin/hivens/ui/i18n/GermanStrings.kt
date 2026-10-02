@@ -99,6 +99,7 @@ object GermanStrings : AppStrings {
     override val themePickerPreview         = "Vorschau"
     override val themePickerSelected        = "Ausgewählt"
     override val themePickerDarkOnly        = "Nur dunkel"
+    override val themeFromWallpaper         = "Aus dem Hintergrundbild"
     override val themePickerBtnSample       = "Beispiel-Schaltfläche"
     override val themePickerBtnOutlined     = "Umrandete Schaltfläche"
 
