@@ -159,6 +159,12 @@ internal object EditorSurfaces {
             shortName = { it.editorSurfShortOverlay },
         ),
         EditorSurfaceSpec(
+            id        = SurfaceId("appshell.backdrop"),
+            icon      = NxIcon.Wallpaper,
+            name      = { it.editorSurfBackdrop },
+            shortName = { it.editorSurfShortBackdrop },
+        ),
+        EditorSurfaceSpec(
             id          = SurfaceId("appshell.leftrail"),
             icon        = NxIcon.ViewSidebar,
             name        = { it.editorSurfLeftRail },

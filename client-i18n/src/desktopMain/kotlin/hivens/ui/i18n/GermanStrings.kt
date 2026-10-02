@@ -1092,6 +1092,8 @@ object GermanStrings : AppStrings {
     override fun notifInstallCancelled(packName: String) = "Installation von $packName abgebrochen"
     override val editorSurfOverlay                      = "Schwebende Ebene"
     override val editorSurfShortOverlay                 = "Schwebend"
+    override val editorSurfBackdrop                     = "Hintergrundebene"
+    override val editorSurfShortBackdrop                = "Hintergrund"
 
     override val activityPillExpand                     = "Alle zeigen"
     override fun activityPillMore(count: Int)           = "+$count"
@@ -1324,6 +1326,9 @@ object GermanStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "Knopfaufbau",
         "widget.home.new.recent" to "Pack-Kacheln",
         "widget.home.new.whatsnew" to "Neuigkeiten",
+        "widget.decor.particles" to "Partikel",
+        "widget.decor.particles.field" to "Art",
+        "widget.decor.particles.density" to "Dichte",
         "widget.home.new.continue" to "Weiterspielen, groß",
         "widget.home.new.continue.showFacts" to "Fakten",
         "widget.home.new.packlist" to "Modpack-Liste",

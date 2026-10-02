@@ -290,6 +290,9 @@ fun ShellCenterRegion(instance: WidgetInstance) {
         RectangleShape,
         opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
     ) {
+        // Under everything the screen draws: a layer for decor, a field of
+        // particles say, that shows wherever the screen leaves the pane open.
+        SlotRenderer(SurfaceId(BACKDROP_SURFACE), SlotId("layers"), Modifier.matchParentSize())
         LocalShellContext.current.centerBody()
         // Nestle the content's top-start corner into the chrome (Modrinth-style).
         // A chrome-colored wedge, not a clip -- clipping the (transparent over a
@@ -314,6 +317,9 @@ fun ShellCenterRegion(instance: WidgetInstance) {
 
 /** Sub-surface for widgets that float over the content rather than sit in it. */
 private const val OVERLAY_SURFACE = "appshell.overlay"
+
+/** Sub-surface for decor under the content: the pane's backdrop. */
+private const val BACKDROP_SURFACE = "appshell.backdrop"
 
 private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width and is not part of the layout, reopen via Ctrl+N
 private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-collapses the right rail

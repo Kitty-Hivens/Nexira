@@ -2,6 +2,19 @@
   "schema_version": 13,
   "graph": {
     "surfaces": {
+      "appshell.backdrop": {
+        "families": {
+          "general": {
+            "slots": {
+              "layers": {
+                "widgets": [],
+                "flow": { "direction": "vertical", "wrap": 0, "uniform": false },
+                "grid": 0
+              }
+            }
+          }
+        }
+      },
       "appshell.overlay": {
         "families": {
           "general": {

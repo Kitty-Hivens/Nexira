@@ -1090,6 +1090,8 @@ object EnglishStrings : AppStrings {
     override fun notifInstallCancelled(packName: String) = "$packName install cancelled"
     override val editorSurfOverlay                      = "Floating layer"
     override val editorSurfShortOverlay                 = "Floating"
+    override val editorSurfBackdrop                     = "Backdrop layer"
+    override val editorSurfShortBackdrop                = "Backdrop"
 
     override val activityPillExpand                     = "Show all"
     override fun activityPillMore(count: Int)           = "+$count"
@@ -1322,6 +1324,9 @@ object EnglishStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "Button layout",
         "widget.home.new.recent" to "Pack tiles",
         "widget.home.new.whatsnew" to "What's new",
+        "widget.decor.particles" to "Particles",
+        "widget.decor.particles.field" to "Field",
+        "widget.decor.particles.density" to "Density",
         "widget.home.new.continue" to "Continue, set large",
         "widget.home.new.continue.showFacts" to "Facts",
         "widget.home.new.packlist" to "Pack list",

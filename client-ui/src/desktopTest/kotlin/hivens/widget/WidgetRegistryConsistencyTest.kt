@@ -47,6 +47,8 @@ class WidgetRegistryConsistencyTest {
             // the type-led Home: the pack to go back to set large, and the library as a list
             "home.new.continue",
             "home.new.packlist",
+            // decor: a field of particles, for the backdrop under the content pane
+            "decor.particles",
             "library.header",
             "library.body",
             "appshell.rightrail.compactnews",
@@ -261,6 +263,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.hero",
             "home.new.continue",
             "home.new.packlist",
+            "decor.particles",
             // About surface (title overrides)
             "about.logo",
             "about.system.card",

@@ -38,6 +38,7 @@ class DefaultLayoutTest {
                 // Floats over the content column rather than taking space in it;
                 // carries the activity pill.
                 "appshell.overlay",
+                "appshell.backdrop",
                 // kernel-3 originals
                 "home.new", "library",
                 "appshell.leftrail", "appshell.rightrail",
@@ -71,6 +72,7 @@ class DefaultLayoutTest {
                 "surface ${surfaceId.value} declares no general family; SlotRenderer would render nothing",
             )
             layout.slotsOf(FamilyId.GENERAL).forEach { (slotId, content) ->
+                if ("${surfaceId.value}.${slotId.value}" in EMPTY_BY_DESIGN) return@forEach
                 assertTrue(
                     content.widgets.isNotEmpty(),
                     "slot ${surfaceId.value}.${slotId.value} is empty; kernel-3 populates every slot",
@@ -145,5 +147,15 @@ class DefaultLayoutTest {
         }
         assertEquals(listOf("Home", "Library", "Browse", "Profile", "Wardrobe", "Settings", "About"), targets("top"))
         assertEquals(listOf("Console", "Logout"), targets("bottom"))
+    }
+
+    private companion object {
+        /**
+         * Slots the bundle leaves empty on purpose. The backdrop under the content
+         * pane holds decor that draws every frame, so it is the reader's to fill:
+         * shipping a field of particles to everyone would spend their frames on a
+         * choice they did not make. An empty backdrop is the pane as it always was.
+         */
+        val EMPTY_BY_DESIGN = setOf("appshell.backdrop.layers")
     }
 }

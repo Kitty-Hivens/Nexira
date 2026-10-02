@@ -1097,6 +1097,8 @@ object JapaneseStrings : AppStrings {
     override fun notifInstallCancelled(packName: String) = "$packName のインストールを中止しました"
     override val editorSurfOverlay = "浮動レイヤー"
     override val editorSurfShortOverlay = "浮動"
+    override val editorSurfBackdrop = "背面レイヤー"
+    override val editorSurfShortBackdrop = "背面"
 
     override val activityPillExpand = "すべて表示"
     override fun activityPillMore(count: Int) = "+${count}"
@@ -1329,6 +1331,9 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "ボタンの構成",
         "widget.home.new.recent" to "パックのタイル",
         "widget.home.new.whatsnew" to "新着",
+        "widget.decor.particles" to "パーティクル",
+        "widget.decor.particles.field" to "種類",
+        "widget.decor.particles.density" to "密度",
         "widget.home.new.continue" to "続きから (大)",
         "widget.home.new.continue.showFacts" to "情報",
         "widget.home.new.packlist" to "パック一覧",

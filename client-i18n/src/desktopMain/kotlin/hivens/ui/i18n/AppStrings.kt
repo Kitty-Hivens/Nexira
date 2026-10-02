@@ -1282,6 +1282,8 @@ interface AppStrings {
     // Activity pill -- the floating account of what the launcher is doing.
     val editorSurfOverlay: String
     val editorSurfShortOverlay: String
+    val editorSurfBackdrop: String
+    val editorSurfShortBackdrop: String
 
     val activityPillExpand: String
     fun activityPillMore(count: Int): String

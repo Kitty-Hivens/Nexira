@@ -232,7 +232,14 @@ class JsonMigrationsTest {
         // is the test below, which derives what it expects from the old bytes.
         val shipped = DefaultLayout.load()
         val produced = migratedBundle()
-        assertEquals(produced.surfaces.keys, shipped.surfaces.keys, "a surface appeared or vanished")
+        // A surface may not vanish. One may appear, the way widgets do, but only by
+        // name below, so an addition is a decision rather than a drift.
+        assertEquals(emptySet(), produced.surfaces.keys - shipped.surfaces.keys, "a surface vanished")
+        assertEquals(
+            SURFACES_ADDED_SINCE_FIXTURE,
+            (shipped.surfaces.keys - produced.surfaces.keys).map { it.value }.toSet(),
+            "a surface appeared that is not named as added since the fixture",
+        )
         produced.surfaces.forEach { (sid, oldLayout) ->
             val now = shipped.surfaces[sid]!!
             oldLayout.families.forEach { (fid, family) ->
@@ -535,5 +542,13 @@ class JsonMigrationsTest {
         assertEquals(oldHorizontal, newHorizontal, "a row or a grid did not stay horizontal")
         assertEquals(oldPlacement, newPlacement, "a canvas or a lattice changed mode")
         assertEquals(oldWeights, newWeights, "a weight was lost, gained or moved to another widget")
+    }
+
+    private companion object {
+        /** Surfaces the bundle gained after the fixture was captured, each one on purpose. */
+        val SURFACES_ADDED_SINCE_FIXTURE = setOf(
+            // decor under the content pane, empty in the bundle
+            "appshell.backdrop",
+        )
     }
 }

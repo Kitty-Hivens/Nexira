@@ -1105,6 +1105,8 @@ object RussianStrings : AppStrings {
     override fun notifInstallCancelled(packName: String) = "Установка $packName отменена"
     override val editorSurfOverlay                      = "Плавающий слой"
     override val editorSurfShortOverlay                 = "Плавающий"
+    override val editorSurfBackdrop                     = "Слой под содержимым"
+    override val editorSurfShortBackdrop                = "Под содержимым"
 
     override val activityPillExpand                     = "Показать все"
     override fun activityPillMore(count: Int)           = "+$count"
@@ -1337,6 +1339,9 @@ object RussianStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "Вид кнопки",
         "widget.home.new.recent" to "Плитки сборок",
         "widget.home.new.whatsnew" to "Что нового",
+        "widget.decor.particles" to "Частицы",
+        "widget.decor.particles.field" to "Характер",
+        "widget.decor.particles.density" to "Плотность",
         "widget.home.new.continue" to "Продолжить крупно",
         "widget.home.new.continue.showFacts" to "Факты",
         "widget.home.new.packlist" to "Список сборок",
