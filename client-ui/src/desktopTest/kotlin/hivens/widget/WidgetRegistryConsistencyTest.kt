@@ -44,6 +44,9 @@ class WidgetRegistryConsistencyTest {
             "home.new.hero",
             // what moved since you last looked: a launcher build, a pack's waiting build
             "home.new.whatsnew",
+            // the type-led Home: the pack to go back to set large, and the library as a list
+            "home.new.continue",
+            "home.new.packlist",
             "library.header",
             "library.body",
             "appshell.rightrail.compactnews",
@@ -256,6 +259,8 @@ class WidgetRegistryConsistencyTest {
             "home.new.recent",
             "home.new.quicklaunch",
             "home.new.hero",
+            "home.new.continue",
+            "home.new.packlist",
             // About surface (title overrides)
             "about.logo",
             "about.system.card",

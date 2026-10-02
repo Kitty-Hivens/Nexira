@@ -1,5 +1,6 @@
 package hivens.ui.widgets.home.new
 
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,5 +31,29 @@ class RecentTileGridTest {
         assertEquals(12, tileBudget(columns = 6, rows = 2, maxTiles = 0))
         assertEquals(5, tileBudget(columns = 6, rows = 2, maxTiles = 5))
         assertEquals(6, tileBudget(columns = 6, rows = 0, maxTiles = 0))
+    }
+}
+
+/** The pack list on a Home that does not scroll. */
+class PackListFitTest {
+
+    @Test
+    fun `the rows that stand in the height are the rows shown`() {
+        // Six rows of 52 with five rules between them take 317.
+        assertEquals(6, rowsThatFit(317.dp))
+        assertEquals(5, rowsThatFit(316.dp))
+    }
+
+    @Test
+    fun `a sliver still shows one row, and no bound shows them all`() {
+        assertEquals(1, rowsThatFit(10.dp))
+        assertEquals(Int.MAX_VALUE, rowsThatFit(Dp.Infinity))
+    }
+
+    @Test
+    fun `columns leave in the order they are least needed`() {
+        assertEquals(PackListColumns(runsOn = false, played = false), PackListColumns.forWidth(400f))
+        assertEquals(PackListColumns(runsOn = true, played = false), PackListColumns.forWidth(600f))
+        assertEquals(PackListColumns(runsOn = true, played = true), PackListColumns.forWidth(900f))
     }
 }

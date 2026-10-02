@@ -100,6 +100,26 @@ class LayoutSeedingTest {
     }
 
     @Test
+    fun `a successor does not arrive beside what it replaces, but is recorded as offered`() {
+        val successors = mapOf(WidgetKind("bg.loop2") to setOf(WidgetKind("bg.loop")))
+        val bundledNew = graph(
+            widget("bg.enable", "bg-enable-default"),
+            widget("bg.loop2", "bg-loop2-default"),
+            widget("bg.audio", "bg-audio-default"),
+        )
+        // Somebody whose panel still has the old control: it stays, the new one waits.
+        val keeping = graph(widget("bg.enable", "bg-enable-default"), widget("bg.loop", "bg-loop-default"))
+        val kept = LayoutSeeding.seed(keeping, bundledNew, offered = null, supersedes = successors)
+        assertEquals(listOf("bg-audio-default"), kept.added)
+        assertEquals(listOf("bg.enable", "bg.loop", "bg.audio"), kindsIn(kept.graph))
+        assertTrue("bg-loop2-default" in kept.offered, "or it would arrive the day the old one is removed")
+
+        // Somebody who never had the old one gets the new one like any other addition.
+        val fresh = LayoutSeeding.seed(graph(widget("bg.enable", "bg-enable-default")), bundledNew, offered = null, supersedes = successors)
+        assertTrue("bg-loop2-default" in fresh.added)
+    }
+
+    @Test
     fun `a graph already holding everything records the offer and changes nothing`() {
         val out = LayoutSeeding.seed(bundled, bundled, offered = null)
         assertEquals(emptyList(), out.added)

@@ -222,7 +222,12 @@ private val VERSION_CHIP_MAX = 180.dp
  * same thing and leads to the same place.
  */
 @Composable
-internal fun PendingUpdateBadge(packId: String, modifier: Modifier = Modifier) {
+internal fun PendingUpdateBadge(
+    packId: String,
+    modifier: Modifier = Modifier,
+    /** Over a picture by default; a row on a plane passes [NxMetaChipTone.Surface]. */
+    tone: NxMetaChipTone = NxMetaChipTone.OnMedia,
+) {
     val hub: PackUpdateStatusHub = koinInject()
     val nav: NavRequests = koinInject()
     val statuses by hub.statuses.collectAsState()
@@ -231,17 +236,23 @@ internal fun PendingUpdateBadge(packId: String, modifier: Modifier = Modifier) {
         isRollback = pending.direction == UpdateDirection.Older,
         onClick    = { nav.open(Screen.PackVersions(packId)) },
         modifier   = modifier,
+        tone       = tone,
     )
 }
 
 /** Compact pill for a pending build move; the card-corner sibling of [LaunchStatusPill]. */
 @Composable
-private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun UpdateBadgePill(
+    isRollback: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tone: NxMetaChipTone = NxMetaChipTone.OnMedia,
+) {
     val s = LocalStrings.current
     NxMetaChip(
         text     = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
         modifier = modifier,
-        tone     = NxMetaChipTone.OnMedia,
+        tone     = tone,
         dot      = if (isRollback) NxColor.status(Status.Warning) else NxColor.lead(),
         onClick  = onClick,
     )

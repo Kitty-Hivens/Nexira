@@ -1167,6 +1167,9 @@ object RussianStrings : AppStrings {
     override val homeQuickStart     = "Запустить"
     override val homeQuickButton    = "Играть"
     override fun homeHeroPlaytime(hours: Long) = "В игре $hours ч"
+    override fun homeFactHours(hours: Long) = "$hours ч"
+    override val homeFactPlaytime = "в игре"
+    override val homeFactLastSession = "последний запуск"
     override val launchTileReady    = "Запустить"
 
     // --- Library widgets ---
@@ -1334,6 +1337,12 @@ object RussianStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "Вид кнопки",
         "widget.home.new.recent" to "Плитки сборок",
         "widget.home.new.whatsnew" to "Что нового",
+        "widget.home.new.continue" to "Продолжить крупно",
+        "widget.home.new.continue.showFacts" to "Факты",
+        "widget.home.new.packlist" to "Список сборок",
+        "widget.home.new.packlist.title" to "Заголовок",
+        "widget.home.new.packlist.maxRows" to "Строк (0: все)",
+        "widget.home.new.packlist.skipContinued" to "Без продолжаемой сборки",
         "widget.home.new.hero.followWidth" to "Расти вместе с шириной",
         "widget.home.new.recent.rows" to "Ряды",
         "widget.home.new.recent.tileWidth" to "Минимальная ширина плитки",

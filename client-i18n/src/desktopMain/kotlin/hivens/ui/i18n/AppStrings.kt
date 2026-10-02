@@ -1365,6 +1365,9 @@ interface AppStrings {
     val homeQuickStart: String
     val homeQuickButton: String
     fun homeHeroPlaytime(hours: Long): String
+    fun homeFactHours(hours: Long): String
+    val homeFactPlaytime: String
+    val homeFactLastSession: String
     val launchTileReady: String
 
     // --- Library widgets ---

@@ -1154,6 +1154,9 @@ object GermanStrings : AppStrings {
     override val homeQuickStart     = "Starten"
     override val homeQuickButton    = "Spielen"
     override fun homeHeroPlaytime(hours: Long) = "$hours Std. gespielt"
+    override fun homeFactHours(hours: Long) = "$hours Std."
+    override val homeFactPlaytime = "gespielt"
+    override val homeFactLastSession = "zuletzt gespielt"
     override val launchTileReady    = "Starten"
 
     // --- Library widgets ---
@@ -1321,6 +1324,12 @@ object GermanStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "Knopfaufbau",
         "widget.home.new.recent" to "Pack-Kacheln",
         "widget.home.new.whatsnew" to "Neuigkeiten",
+        "widget.home.new.continue" to "Weiterspielen, groß",
+        "widget.home.new.continue.showFacts" to "Fakten",
+        "widget.home.new.packlist" to "Modpack-Liste",
+        "widget.home.new.packlist.title" to "Titel",
+        "widget.home.new.packlist.maxRows" to "Zeilen (0: alle)",
+        "widget.home.new.packlist.skipContinued" to "Weitergespieltes Modpack auslassen",
         "widget.home.new.hero.followWidth" to "Mit der Breite wachsen",
         "widget.home.new.recent.rows" to "Reihen",
         "widget.home.new.recent.tileWidth" to "Minimale Kachelbreite",

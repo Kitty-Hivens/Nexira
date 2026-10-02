@@ -1152,6 +1152,9 @@ object EnglishStrings : AppStrings {
     override val homeQuickStart     = "Launch"
     override val homeQuickButton    = "Play"
     override fun homeHeroPlaytime(hours: Long) = "$hours h played"
+    override fun homeFactHours(hours: Long) = "$hours h"
+    override val homeFactPlaytime = "played"
+    override val homeFactLastSession = "last session"
     override val launchTileReady    = "Launch"
 
     // --- Library widgets ---
@@ -1319,6 +1322,12 @@ object EnglishStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "Button layout",
         "widget.home.new.recent" to "Pack tiles",
         "widget.home.new.whatsnew" to "What's new",
+        "widget.home.new.continue" to "Continue, set large",
+        "widget.home.new.continue.showFacts" to "Facts",
+        "widget.home.new.packlist" to "Pack list",
+        "widget.home.new.packlist.title" to "Title",
+        "widget.home.new.packlist.maxRows" to "Rows (0: all)",
+        "widget.home.new.packlist.skipContinued" to "Leave out the continued pack",
         "widget.home.new.hero.followWidth" to "Grow with width",
         "widget.home.new.recent.rows" to "Rows",
         "widget.home.new.recent.tileWidth" to "Minimum tile width",

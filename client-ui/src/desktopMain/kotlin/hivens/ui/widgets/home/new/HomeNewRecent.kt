@@ -290,7 +290,7 @@ private val LIFT_SHADOW = 14.dp
 private val ROOMY_TILE = 300.dp
 
 @Composable
-private fun EmptyPacksCta(onBrowse: () -> Unit) {
+internal fun EmptyPacksCta(onBrowse: () -> Unit) {
     val s = LocalStrings.current
     Column(
         modifier = Modifier

@@ -1159,6 +1159,9 @@ object JapaneseStrings : AppStrings {
     override val homeQuickStart = "起動"
     override val homeQuickButton = "プレイ"
     override fun homeHeroPlaytime(hours: Long) = "プレイ時間 $hours 時間"
+    override fun homeFactHours(hours: Long) = "$hours 時間"
+    override val homeFactPlaytime = "プレイ時間"
+    override val homeFactLastSession = "前回のプレイ"
     override val launchTileReady = "起動"
 
     // --- Library widgets ---
@@ -1326,6 +1329,12 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.quicklaunch.playLayout" to "ボタンの構成",
         "widget.home.new.recent" to "パックのタイル",
         "widget.home.new.whatsnew" to "新着",
+        "widget.home.new.continue" to "続きから (大)",
+        "widget.home.new.continue.showFacts" to "情報",
+        "widget.home.new.packlist" to "パック一覧",
+        "widget.home.new.packlist.title" to "タイトル",
+        "widget.home.new.packlist.maxRows" to "行数 (0: すべて)",
+        "widget.home.new.packlist.skipContinued" to "続きのパックを除く",
         "widget.home.new.hero.followWidth" to "幅に合わせて伸ばす",
         "widget.home.new.recent.rows" to "行数",
         "widget.home.new.recent.tileWidth" to "タイルの最小幅",

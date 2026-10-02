@@ -5,6 +5,7 @@ import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
 import hivens.widget.model.walkInstances
 
 /**
@@ -64,7 +65,12 @@ object LayoutSeeding {
      * arrives from the merge with the bundle's widgets already in it, so by here
      * every slot named below exists.
      */
-    fun seed(user: LayoutGraph, default: LayoutGraph, offered: Set<String>?): Result {
+    fun seed(
+        user: LayoutGraph,
+        default: LayoutGraph,
+        offered: Set<String>?,
+        supersedes: Map<WidgetKind, Set<WidgetKind>> = SUPERSEDES,
+    ): Result {
         val places = bundledPlaces(default)
         if (places.isEmpty()) return Result(user, offered.orEmpty(), emptyList())
 
@@ -76,6 +82,10 @@ object LayoutSeeding {
         for (place in places) {
             val id = place.widget.instanceId
             if (id in userIds || id in known) continue
+            // A successor arriving beside what it replaces would hand the slot both,
+            // so it counts as offered instead: the arrangement stays as it was, and
+            // the new one is in the palette and in a reset.
+            if (slotHoldsAny(user, place, supersedes[place.widget.kind].orEmpty())) continue
             graph = insert(graph, place) ?: continue
             added += id
         }
@@ -103,6 +113,24 @@ object LayoutSeeding {
                 .map { it.kind }
             if (place.widget.kind in kinds) add(place.widget.instanceId)
         }
+    }
+
+    /**
+     * Bundled widgets that take over from older ones in the same slot. A graph that
+     * still holds the older kind keeps it and is not handed the successor as well.
+     */
+    val SUPERSEDES: Map<WidgetKind, Set<WidgetKind>> = mapOf(
+        WidgetKind("home.new.continue") to setOf(WidgetKind("home.new.hero"), WidgetKind("home.new.quicklaunch")),
+        WidgetKind("home.new.packlist") to setOf(WidgetKind("home.new.recent")),
+    )
+
+    private fun slotHoldsAny(user: LayoutGraph, place: Place, kinds: Set<WidgetKind>): Boolean {
+        if (kinds.isEmpty()) return false
+        return user.surfaces[place.surface]
+            ?.family(place.family)
+            ?.slots?.get(place.slot)
+            ?.widgets.orEmpty()
+            .any { it.kind in kinds }
     }
 
     /** Every bundled widget with the slot and position it holds in the bundle. */

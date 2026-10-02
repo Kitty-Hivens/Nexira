@@ -133,24 +133,10 @@
               "main": {
                 "widgets": [
                   {
-                    "kind": "home.new.welcome",
-                    "instance_id": "home-new-welcome-default",
-                    "props": {
-                      "showSubtitle": false
-                    },
+                    "kind": "home.new.continue",
+                    "instance_id": "home-new-continue-default",
                     "placement": {
                       "padding": { "start": 24.0, "end": 24.0, "top": 20.0 }
-                    }
-                  },
-                  {
-                    "kind": "home.new.spacer",
-                    "instance_id": "home-new-spacer-default"
-                  },
-                  {
-                    "kind": "home.new.hero",
-                    "instance_id": "home-new-hero-default",
-                    "placement": {
-                      "padding": { "start": 24.0, "end": 24.0 }
                     }
                   },
                   {
@@ -161,8 +147,8 @@
                     }
                   },
                   {
-                    "kind": "home.new.recent",
-                    "instance_id": "home-new-recent-default",
+                    "kind": "home.new.packlist",
+                    "instance_id": "home-new-packlist-default",
                     "placement": {
                       "padding": { "start": 24.0, "end": 24.0, "bottom": 20.0 }
                     }
