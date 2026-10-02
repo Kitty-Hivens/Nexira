@@ -154,6 +154,13 @@
                     }
                   },
                   {
+                    "kind": "home.new.whatsnew",
+                    "instance_id": "home-new-whatsnew-default",
+                    "placement": {
+                      "padding": { "start": 24.0, "end": 24.0 }
+                    }
+                  },
+                  {
                     "kind": "home.new.recent",
                     "instance_id": "home-new-recent-default",
                     "placement": {

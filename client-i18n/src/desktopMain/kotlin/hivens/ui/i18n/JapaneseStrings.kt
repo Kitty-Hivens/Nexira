@@ -1147,6 +1147,12 @@ object JapaneseStrings : AppStrings {
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle = "あなたのパック"
     override val homeNoPacksTitle = "パックがまだありません"
+    override val homeWhatsNewTitle = "新着"
+    override fun homeWhatsNewLauncher(app: String, version: String) = "$app $version が公開されました"
+    override val homeWhatsNewLauncherHint = "変更点を見てインストール"
+    override fun homeWhatsNewPackReady(version: String) = "ビルド $version が待機中"
+    override fun homeWhatsNewPackRollback(version: String) = "配信元が $version に戻りました"
+    override fun homeWhatsNewPackUpdated(version: String) = "$version に更新済み"
     override val homeNoPacksBody = "「探す」から何か入れると、ここに並びます。"
     override val browseOpen = "「探す」を開く"
     override val homeQuickContinue = "続ける"
@@ -1319,6 +1325,7 @@ object JapaneseStrings : AppStrings {
         "widget.home.new.quicklaunch.buttonLabel" to "ボタンのラベル",
         "widget.home.new.quicklaunch.playLayout" to "ボタンの構成",
         "widget.home.new.recent" to "パックのタイル",
+        "widget.home.new.whatsnew" to "新着",
         "widget.home.new.hero.followWidth" to "幅に合わせて伸ばす",
         "widget.home.new.recent.rows" to "行数",
         "widget.home.new.recent.tileWidth" to "タイルの最小幅",

@@ -1155,6 +1155,12 @@ object RussianStrings : AppStrings {
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle    = "Твои сборки"
     override val homeNoPacksTitle   = "Сборок пока нет"
+    override val homeWhatsNewTitle = "Что нового"
+    override fun homeWhatsNewLauncher(app: String, version: String) = "Вышел $app $version"
+    override val homeWhatsNewLauncherHint = "Посмотреть, что изменилось, и установить"
+    override fun homeWhatsNewPackReady(version: String) = "Ждёт сборка $version"
+    override fun homeWhatsNewPackRollback(version: String) = "Источник вернулся к $version"
+    override fun homeWhatsNewPackUpdated(version: String) = "Обновлена до $version"
     override val homeNoPacksBody    = "Установи что-нибудь через Browse — твои сборки появятся здесь."
     override val browseOpen         = "Открыть Browse"
     override val homeQuickContinue  = "Продолжить"
@@ -1327,6 +1333,7 @@ object RussianStrings : AppStrings {
         "widget.home.new.quicklaunch.buttonLabel" to "Надпись кнопки",
         "widget.home.new.quicklaunch.playLayout" to "Вид кнопки",
         "widget.home.new.recent" to "Плитки сборок",
+        "widget.home.new.whatsnew" to "Что нового",
         "widget.home.new.hero.followWidth" to "Расти вместе с шириной",
         "widget.home.new.recent.rows" to "Ряды",
         "widget.home.new.recent.tileWidth" to "Минимальная ширина плитки",

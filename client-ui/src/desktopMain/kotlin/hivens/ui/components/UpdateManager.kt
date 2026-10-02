@@ -26,6 +26,7 @@ fun UpdateManager() {
     val updateService = koinInject<UpdateService>()
     val desktopIntegration = koinInject<DesktopIntegration>()
     val center        = koinInject<NotificationCenter>()
+    val updateState   = koinInject<LauncherUpdateState>()
     val s             = LocalStrings.current
 
     var availableUpdate by remember { mutableStateOf<LauncherUpdate?>(null) }
@@ -86,6 +87,18 @@ fun UpdateManager() {
             if (mandatory != null) {
                 availableUpdate = mandatory
                 // Retire any pending non-critical card; the modal supersedes it.
+                center.dismiss(UPDATE_SOURCE_KEY)
+                showDialog = true
+            }
+        }
+    }
+
+    // What the check found, for the screens that mention it beside the card, and
+    // their way back to this dialog.
+    LaunchedEffect(availableUpdate) { updateState.publish(availableUpdate) }
+    LaunchedEffect(updateState) {
+        updateState.detailsRequests.collect {
+            if (availableUpdate != null) {
                 center.dismiss(UPDATE_SOURCE_KEY)
                 showDialog = true
             }

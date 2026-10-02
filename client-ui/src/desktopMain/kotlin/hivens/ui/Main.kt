@@ -25,6 +25,7 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.SkinManager
 import hivens.ui.navigation.NavRequests
+import hivens.ui.components.LauncherUpdateState
 import hivens.core.activity.ActivityRegistry
 import hivens.launcher.PackInstallService
 import hivens.core.update.PackUpdateStatusHub
@@ -485,6 +486,7 @@ val uiModule = module {
     // Navigation requests from outside the composition (notification actions,
     // drivers). AppRoot collects and feeds them into the back stack.
     single { NavRequests() }
+    single { LauncherUpdateState() }
     // Surfaces pack-update outcomes (background auto-updater + manual flows via
     // the status hub) into the notification center. Same lifecycle rationale as
     // InstallDriver.

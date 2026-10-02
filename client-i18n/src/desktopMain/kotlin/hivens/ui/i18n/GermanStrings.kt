@@ -1142,6 +1142,12 @@ object GermanStrings : AppStrings {
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle    = "Deine Modpacks"
     override val homeNoPacksTitle   = "Noch keine Modpacks"
+    override val homeWhatsNewTitle = "Neuigkeiten"
+    override fun homeWhatsNewLauncher(app: String, version: String) = "$app $version ist da"
+    override val homeWhatsNewLauncherHint = "Änderungen ansehen und installieren"
+    override fun homeWhatsNewPackReady(version: String) = "Build $version wartet"
+    override fun homeWhatsNewPackRollback(version: String) = "Die Quelle ist zu $version zurückgekehrt"
+    override fun homeWhatsNewPackUpdated(version: String) = "Auf $version aktualisiert"
     override val homeNoPacksBody    = "Installiere etwas über Browse, dann erscheinen deine Modpacks hier."
     override val browseOpen         = "Browse öffnen"
     override val homeQuickContinue  = "Fortsetzen"
@@ -1314,6 +1320,7 @@ object GermanStrings : AppStrings {
         "widget.home.new.quicklaunch.buttonLabel" to "Knopfbeschriftung",
         "widget.home.new.quicklaunch.playLayout" to "Knopfaufbau",
         "widget.home.new.recent" to "Pack-Kacheln",
+        "widget.home.new.whatsnew" to "Neuigkeiten",
         "widget.home.new.hero.followWidth" to "Mit der Breite wachsen",
         "widget.home.new.recent.rows" to "Reihen",
         "widget.home.new.recent.tileWidth" to "Minimale Kachelbreite",

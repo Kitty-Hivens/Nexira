@@ -1353,6 +1353,12 @@ interface AppStrings {
     // --- Home (new) + launch tiles ---
     val homeRecentTitle: String
     val homeNoPacksTitle: String
+    val homeWhatsNewTitle: String
+    fun homeWhatsNewLauncher(app: String, version: String): String
+    val homeWhatsNewLauncherHint: String
+    fun homeWhatsNewPackReady(version: String): String
+    fun homeWhatsNewPackRollback(version: String): String
+    fun homeWhatsNewPackUpdated(version: String): String
     val homeNoPacksBody: String
     val browseOpen: String
     val homeQuickContinue: String

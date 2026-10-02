@@ -1140,6 +1140,12 @@ object EnglishStrings : AppStrings {
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle    = "Your packs"
     override val homeNoPacksTitle   = "No packs yet"
+    override val homeWhatsNewTitle = "What's new"
+    override fun homeWhatsNewLauncher(app: String, version: String) = "$app $version is out"
+    override val homeWhatsNewLauncherHint = "Read what changed and install"
+    override fun homeWhatsNewPackReady(version: String) = "Build $version is waiting"
+    override fun homeWhatsNewPackRollback(version: String) = "The source went back to $version"
+    override fun homeWhatsNewPackUpdated(version: String) = "Updated to $version"
     override val homeNoPacksBody    = "Install something from Browse and your packs will show up here."
     override val browseOpen         = "Open Browse"
     override val homeQuickContinue  = "Continue"
@@ -1312,6 +1318,7 @@ object EnglishStrings : AppStrings {
         "widget.home.new.quicklaunch.buttonLabel" to "Button label",
         "widget.home.new.quicklaunch.playLayout" to "Button layout",
         "widget.home.new.recent" to "Pack tiles",
+        "widget.home.new.whatsnew" to "What's new",
         "widget.home.new.hero.followWidth" to "Grow with width",
         "widget.home.new.recent.rows" to "Rows",
         "widget.home.new.recent.tileWidth" to "Minimum tile width",
