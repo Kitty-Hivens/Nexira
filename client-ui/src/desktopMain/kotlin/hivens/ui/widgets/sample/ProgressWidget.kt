@@ -49,7 +49,7 @@ data class ProgressProps(
     id = "home.new.progress",
     displayName = "widget.home.new.progress",
     propsClass = ProgressProps::class,
-    surface = """{"fill":"panel","opacity":0.4,"padding":{"top":12.0}}""",
+    surface = """{"fill":"panel","padding":{"top":12.0}}""",
 )
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {

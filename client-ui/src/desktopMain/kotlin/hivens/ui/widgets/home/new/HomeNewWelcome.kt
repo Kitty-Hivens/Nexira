@@ -35,7 +35,7 @@ data class WelcomeProps(
     id = "home.new.welcome",
     displayName = "widget.home.new.welcome",
     propsClass = WelcomeProps::class,
-    surface = """{"fill":"panel","opacity":0.45}""",
+    surface = """{"fill":"panel"}""",
 )
 @Composable
 fun HomeNewWelcome(instance: WidgetInstance) {

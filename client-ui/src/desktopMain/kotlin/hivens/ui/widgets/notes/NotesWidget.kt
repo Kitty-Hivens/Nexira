@@ -59,7 +59,7 @@ data class NotesState(
     maxWidth = 880, maxHeight = 720,
     displayName = "widget.notes.scratch",
     propsClass = NotesProps::class,
-    surface = """{"fill":"panel","opacity":0.55}""",
+    surface = """{"fill":"panel"}""",
 )
 @Composable
 fun NotesWidget(instance: WidgetInstance) {

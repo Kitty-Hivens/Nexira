@@ -31,6 +31,9 @@ import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.screens.library.PackCard
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import androidx.compose.foundation.layout.padding
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -137,24 +140,29 @@ private fun LibraryList(
 private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
     val s = LocalStrings.current
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                text       = title,
-                style      = MaterialTheme.typography.titleLarge,
-                color      = NxInk.main,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text      = body,
-                style     = MaterialTheme.typography.bodyMedium,
-                color     = NxInk.quiet,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.widthIn(max = 360.dp),
-            )
-            NxButton(label = s.browseOpen, onClick = onBrowse)
+        // A panel the size of what it says. The words are the whole screen here, and
+        // on the bare page they lay over whatever the wallpaper had in the middle.
+        NxSurface(SurfaceKind.Panel, shape = MaterialTheme.shapes.large) {
+            Column(
+                modifier            = Modifier.padding(horizontal = 32.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    text       = title,
+                    style      = MaterialTheme.typography.titleLarge,
+                    color      = NxInk.main,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text      = body,
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = NxInk.quiet,
+                    textAlign = TextAlign.Center,
+                    modifier  = Modifier.widthIn(max = 360.dp),
+                )
+                NxButton(label = s.browseOpen, onClick = onBrowse)
+            }
         }
     }
 }

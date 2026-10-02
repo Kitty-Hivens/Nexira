@@ -77,7 +77,7 @@ data class ChecklistState(val items: List<ChecklistItem> = emptyList(), val next
     maxWidth = 960, maxHeight = 880,
     displayName = "widget.checklist",
     propsClass = ChecklistProps::class,
-    surface = """{"fill":"panel","opacity":0.55}""",
+    surface = """{"fill":"panel"}""",
 )
 @Composable
 fun ChecklistWidget(instance: WidgetInstance) {

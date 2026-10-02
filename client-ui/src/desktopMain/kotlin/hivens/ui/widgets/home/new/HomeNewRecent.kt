@@ -64,16 +64,18 @@ data class RecentProps(
 // launches still shows the tiles (sorted by createdAt), so the new
 // home reads as populated rather than blank. Empty repo shows a CTA
 // pointing at Browse.
-// No surface. The tiles are the object here and they carry their own art; a plane
-// behind them fills the slot's whole width while they keep their own, so the row
-// ends up sitting on a bar several times longer than itself. It also declared a top
-// inset the column below already applies, so the two stacked.
+// A panel, declared rather than drawn here, so the editor's surface rows move this
+// one. The row's title and the empty state are text, and text laid straight on the
+// page sits on whatever the wallpaper has there, which no theme can answer for. The
+// panel spans the slot like the welcome and the hero above it, and the tiles keep
+// their own width inside it.
 // The ceiling is load-bearing: this lists lazily, and a lazy list cannot be
 // measured against an unbounded axis.
 @Widget(
     id = "home.new.recent",
     displayName = "widget.home.new.recent",
     propsClass = RecentProps::class,
+    surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 120,
     maxWidth = 1200, maxHeight = 720,
 )
@@ -97,7 +99,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
         ).take(p.maxTiles)
     }
 
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(
             text       = p.title.ifBlank { s.homeRecentTitle },
             style      = MaterialTheme.typography.titleSmall,

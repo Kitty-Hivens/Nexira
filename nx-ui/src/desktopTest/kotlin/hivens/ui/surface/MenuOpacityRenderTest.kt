@@ -34,8 +34,9 @@ import hivens.ui.theme.NxColor
 /**
  * Isolated (no window, no compositor, no GPU) proof of the materials: a popup, which
  * floats over arbitrary content, lets nothing through and is exactly the top step of
- * the ladder. Chrome over a picture is glass, and the picture shows through it. Chrome
- * over the bare page is solid in the step above the page, so it cannot read as page.
+ * the ladder. Chrome named an opacity under one is glass, and the picture shows through
+ * it. Chrome left to itself is solid in the step above the page, over a picture too,
+ * because the navigation it carries has to read whatever the picture is.
  */
 class MenuOpacityRenderTest {
 
@@ -50,7 +51,7 @@ class MenuOpacityRenderTest {
                     Column(Modifier.padding(20.dp)) {
                         // The magenta stands in for a wallpaper here.
                         CompositionLocalProvider(LocalPlane provides Plane(0, NxColor.page, Backdrop.Wallpaper)) {
-                            NxSurface(SurfaceKind.Chrome, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
+                            NxSurface(SurfaceKind.Chrome, opacity = 0.35f, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
                                 Box(Modifier.size(260.dp, 60.dp))
                             }
                         }
@@ -59,8 +60,10 @@ class MenuOpacityRenderTest {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                         Spacer(Modifier.height(20.dp))
-                        NxSurface(SurfaceKind.Chrome, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
-                            Box(Modifier.size(260.dp, 60.dp))
+                        CompositionLocalProvider(LocalPlane provides Plane(0, NxColor.page, Backdrop.Wallpaper)) {
+                            NxSurface(SurfaceKind.Chrome, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
+                                Box(Modifier.size(260.dp, 60.dp))
+                            }
                         }
                     }
                 }
@@ -77,14 +80,14 @@ class MenuOpacityRenderTest {
         // Centres at density 2: the column pads 40px, the surfaces sit near y100, y260 and y420, x300.
         val glass = bmp.getColor(300, 100)
         val popup = bmp.getColor(300, 260)
-        val chromeOnPage = bmp.getColor(300, 420)
+        val chromeLeftAlone = bmp.getColor(300, 420)
         fun rgb(c: Int) = Triple((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF)
         val (gr, gg, gb) = rgb(glass)
         println("MenuOpacityRenderTest: glass=RGB($gr,$gg,$gb)  popup=${"%08X".format(popup)}")
 
         val top = Themes.Celestia.dark.steps.last()
         assertEquals(top.toArgb(), popup, "the popup is not the top step")
-        assertEquals(Themes.Celestia.dark.steps[1].toArgb(), chromeOnPage, "chrome over the page is not the step above it")
+        assertEquals(Themes.Celestia.dark.steps[1].toArgb(), chromeLeftAlone, "chrome left to itself is not solid in the step above the page")
         assertTrue(gb - gg >= 40 && abs(gr - gb) <= 30, "glass hid the ground it should show: ($gr,$gg,$gb)")
     }
 }

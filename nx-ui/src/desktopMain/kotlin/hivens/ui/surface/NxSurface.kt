@@ -58,10 +58,10 @@ internal fun surfaceStep(kind: SurfaceKind, parentStep: Int, topStep: Int): Int 
  * has a reason, which is what a user's own widget plane is.
  *
  * A body is opaque by default and never blurs what it covers, since nothing can see
- * through it. [SurfaceKind.Chrome] frames what it holds in the step above it: glass
- * over a picture, a thin coat of that step with a blur when one is asked for, and a
- * solid body over the bare page, where glass would show nothing and so could not be
- * told from the page at all.
+ * through it. [SurfaceKind.Chrome] frames what it holds in the step above it, solid
+ * by default, over a picture as much as over the page: it carries the navigation and
+ * the title, and text on a thin coat over a picture reads only as well as the picture
+ * lets it. Named an opacity under one, it turns to glass and blurs what is behind it.
  *
  * Content is handed a [Plane] for this surface and the main ink for it, so anything
  * inside reads against the colour it is really on.
@@ -77,7 +77,7 @@ fun NxSurface(
     kind: SurfaceKind,
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.medium,
-    /** Body opacity, 0..1. Null is the kind's own: solid for a body, a thin coat for glass. */
+    /** Body opacity, 0..1. Null is the kind's own: solid. */
     opacity: Float? = null,
     /** How far the surface blurs what is behind it. Null is the kind's own: none for a body. */
     blurDp: Float? = null,
@@ -104,7 +104,7 @@ fun NxSurface(
     // Chrome adds no depth to what it holds, but is drawn in the step above it, which
     // is what keeps a rail and a title bar apart from the page they frame.
     val material = fillColor ?: scheme.step(if (glass) parent.step + 1 else step)
-    val alpha = (opacity ?: kind.defaultOpacity(parent.over)).coerceIn(0f, 1f)
+    val alpha = (opacity ?: kind.defaultOpacity()).coerceIn(0f, 1f)
     val body = material.copy(alpha = material.alpha * alpha)
     // A blur under a body nothing can see through is work thrown away: the filter runs
     // every frame and is then covered completely.
@@ -178,18 +178,15 @@ private val SurfaceKind.defaultShadowDp: Float
 private const val HOVER_ALPHA = 0.06f
 private const val PRESS_ALPHA = 0.12f
 
-/** How much of its own colour glass lays over what is behind it when nothing names a number. */
-private const val GLASS_COAT = 0.35f
-
 /**
- * The opacity a surface of this kind draws at when it names none, over [over]: solid
- * for a body, and for chrome a thin coat over a picture and solid over the bare page.
- * Public because an editor showing a surface's values has to open on this one too: a
- * control that starts at a number the renderer never used is the same defect as a
- * control that moves nothing.
+ * The opacity a surface of this kind draws at when it names none. Solid for every
+ * kind: nx-ui cannot see the picture behind a translucent plane, so it cannot promise
+ * that anything on one reads, and see-through is a choice a person makes in their own
+ * layout. Public because an editor showing a surface's values has to open on this one
+ * too: a control that starts at a number the renderer never used is the same defect as
+ * a control that moves nothing.
  */
-fun SurfaceKind.defaultOpacity(over: Backdrop = Backdrop.Page): Float =
-    if (this == SurfaceKind.Chrome && over == Backdrop.Wallpaper) GLASS_COAT else 1f
+fun SurfaceKind.defaultOpacity(): Float = 1f
 
 /** Card-shaped surface: [SurfaceKind.Card] at the card corner. */
 @Composable

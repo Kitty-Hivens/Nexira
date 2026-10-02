@@ -81,7 +81,7 @@ data class ClockProps(
     maxWidth = 800, maxHeight = 920,
     displayName = "widget.home.new.clock",
     propsClass = ClockProps::class,
-    surface = """{"fill":"panel","opacity":0.65,"padding":{"top":12.0}}""",
+    surface = """{"fill":"panel","padding":{"top":12.0}}""",
 )
 @Composable
 fun ClockWidget(instance: WidgetInstance) {

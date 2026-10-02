@@ -82,8 +82,6 @@ import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.LocalPlane
-import hivens.ui.theme.Backdrop
 import hivens.ui.theme.NxTheme
 import hivens.ui.surface.defaultOpacity
 import hivens.widget.api.LocalLayoutGraph
@@ -119,7 +117,7 @@ data class ShellCenterRegionProps(
  * asking for more blur quietly asked for less fill. Two of the four values the preset
  * carried never reached a pixel at all.
  *
- * -1 means "the kind's own": solid for a panel, a thin coat for chrome.
+ * -1 means "the kind's own", which is solid.
  */
 internal fun Int.regionOpacity(): Float? = takeIf { it >= 0 }?.let { it / 100f }
 
@@ -139,8 +137,8 @@ data class ShellRightRegionProps(
 
 /**
  * Props for the LEFT region (the navigation rail). Like the right panel it renders its
- * own [NxSurface], as chrome: by default a thin coat over a wallpaper, so the picture
- * shows through, and solid over the bare page, so the rail stays apart from it.
+ * own [NxSurface], as chrome: solid in the step above the page by default, glass when
+ * the layout names an opacity under one.
  */
 @Serializable
 data class ShellLeftRegionProps(
@@ -228,9 +226,9 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         // with it. Its contents are no answer either, since the rail's slots fill
         // whatever width they are offered so the items centre in it.
         val railWidth = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else NAV_RAIL_DEFAULT_WIDTH)
-        // The rail is chrome: a coat over a wallpaper, solid over the page. AppSidebar's
+        // The rail is chrome, solid unless the layout says otherwise. AppSidebar's
         // NavigationRail is transparent so this owns the background, and the divider
-        // stays OUTSIDE the surface so the coat covers exactly the rail.
+        // stays OUTSIDE the surface so the body covers exactly the rail.
         NxSurface(
             SurfaceKind.Chrome, railWidth.fillMaxHeight(), RectangleShape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
@@ -269,13 +267,12 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     // colour rather than one of its own: the step above the page, at the opacity the
     // rail actually draws at. It only does its job while it is exactly that colour, so
     // the rail's named opacity is read off the layout rather than assumed.
-    val over = LocalPlane.current?.over ?: Backdrop.Page
     val graph = LocalLayoutGraph.current
     val railOpacity = remember(graph) {
         graph.walkInstances().firstOrNull { it.kind.value == "appshell.region.left" }
             ?.props?.get("opacityPct")?.jsonPrimitive?.intOrNull?.regionOpacity()
     }
-    val chrome = NxTheme.colours.step(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity(over))
+    val chrome = NxTheme.colours.step(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity())
     val cornerDp = 12.dp
     // This rectangle is what the editor's overlays sit over. Reported rather than
     // reconstructed from the rails' props: a rail animates, folds itself away on a

@@ -156,20 +156,31 @@ fun ModDetailScreen(
     }
 
     Column(modifier.fillMaxSize()) {
-        Header(state)
-        // The tabs are page chrome, above the card and outside its scroll. They
-        // used to be the first thing inside it, so opening a long description and
-        // reading two screens down left no way back to Versions without scrolling
-        // to the top first -- and nothing on screen said the tabs still existed.
-        Tabs(
-            active = tab,
-            onSelect = { tab = it },
-            hasGallery = gallery.isNotEmpty(),
-            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
-        )
+        // The header and the tabs sit on a panel of their own, like the body under
+        // them. On the bare page they lay over whatever the wallpaper had there, and
+        // no ink the theme can pick reads on a picture it has never seen.
         NxSurface(
             kind = SurfaceKind.Panel,
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
+        ) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+                Header(state)
+                // The tabs are page chrome, above the body and outside its scroll.
+                // They used to be the first thing inside it, so opening a long
+                // description and reading two screens down left no way back to
+                // Versions without scrolling to the top first, and nothing on
+                // screen said the tabs still existed.
+                Tabs(
+                    active = tab,
+                    onSelect = { tab = it },
+                    hasGallery = gallery.isNotEmpty(),
+                    modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
+                )
+            }
+        }
+        NxSurface(
+            kind = SurfaceKind.Panel,
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
         ) {
             when (tab) {
                 // Only the description scrolls as a page. The versions pane is a
@@ -266,7 +277,7 @@ internal fun Header(state: ModDetailState) {
     val installed = state.installed
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
     Row(
@@ -420,9 +431,8 @@ internal fun Header(state: ModDetailState) {
             }
         }
     }
-    // The rule under the header, which the reference draws and this did not: the
-    // header and the body card were two floating blocks with nothing saying they
-    // belonged to one page.
+    // The rule under the header, which the reference draws: it parts the project
+    // from the tabs that lead into it.
     HorizontalDivider(color = NxInk.line)
     }
 }

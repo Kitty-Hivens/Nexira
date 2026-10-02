@@ -108,7 +108,7 @@ private val PILL_BUTTON_SIZE = 28.dp
     id = "notifications.history",
     displayName = "widget.notifications.history",
     propsClass = NotificationHistoryProps::class,
-    surface = """{"fill":"panel","opacity":0.5,"border":{"widthDp":1.0}}""",
+    surface = """{"fill":"panel","border":{"widthDp":1.0}}""",
     minWidth = 260, minHeight = 160,
     maxWidth = 720, maxHeight = 1200,
 )

@@ -24,6 +24,8 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.ThemeLibrary
 import hivens.widget.api.SlotRenderer
@@ -67,25 +69,29 @@ fun ThemePickerSurface(
 
     CompositionLocalProvider(LocalThemePickerContext provides ctx) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            Row(
-                modifier              = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically,
-            ) {
-                // No back arrow of its own. The window frame already carries one,
-                // enabled by the same history this screen would pop.
-                Text(
-                    text       = s.themePickerTitle,
-                    style      = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                    color      = NxInk.main,
-                )
-                Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
-                    NxButton(
-                        label = s.themePickerApply,
-                        onClick = { onThemeSelected(selected.value.id) },
-                        style = NxButtonStyle.Primary,
+            // On a panel of its own, like the grid and the preview under it: the title
+            // is text, and on the bare page it lay over whatever the wallpaper had there.
+            NxSurface(SurfaceKind.Panel, Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    // No back arrow of its own. The window frame already carries one,
+                    // enabled by the same history this screen would pop.
+                    Text(
+                        text       = s.themePickerTitle,
+                        style      = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color      = NxInk.main,
                     )
+                    Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
+                        NxButton(
+                            label = s.themePickerApply,
+                            onClick = { onThemeSelected(selected.value.id) },
+                            style = NxButtonStyle.Primary,
+                        )
+                    }
                 }
             }
             // Grid is the editable panel. The preview reads the same selection, so

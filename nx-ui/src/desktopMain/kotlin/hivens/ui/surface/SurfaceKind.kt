@@ -14,8 +14,8 @@ enum class SurfaceKind {
 
     /**
      * The persistent frame: the rail, the title bar. Drawn in the step above what it
-     * frames, so it stays apart from the page: a thin coat of that step over a picture,
-     * solid over the bare page. It adds no depth to what it holds.
+     * frames, so it stays apart from the page, and solid unless a layout makes it glass.
+     * It adds no depth to what it holds.
      */
     Chrome,
 
