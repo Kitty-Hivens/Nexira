@@ -36,7 +36,10 @@ import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.screens.library.PendingUpdateBadge
+import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
+import androidx.compose.ui.zIndex
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.widget.api.rememberProps
@@ -104,6 +107,8 @@ fun HomeNewHero(instance: WidgetInstance) {
                     modifier           = Modifier.fillMaxSize(),
                 )
             }
+            // A build waiting for this pack, in the corner the library card carries it in.
+            PendingUpdateBadge(target.id, Modifier.align(Alignment.TopStart).padding(12.dp).zIndex(1f))
             // Bottom-weighted scrim so the caption row reads over any art.
             Box(
                 Modifier.fillMaxSize().background(
@@ -151,6 +156,7 @@ fun HomeNewHero(instance: WidgetInstance) {
                             target.packRef.version?.let { add(it) }
                             val hours = target.playtimeSeconds / 3600
                             if (hours > 0) add(s.homeHeroPlaytime(hours))
+                            if (target.lastPlayedEpochOrZero > 0L) add(lastPlayedLabel(target.lastPlayedEpochOrZero))
                         }
                         if (meta.isNotEmpty()) {
                             Text(

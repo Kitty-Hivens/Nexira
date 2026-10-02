@@ -203,16 +203,7 @@ fun PackCard(
         // corner while a launch is in flight; clicking routes straight to the
         // versions screen through the nav mediator.
         if (indication == null) {
-            val hub: PackUpdateStatusHub = koinInject()
-            val nav: NavRequests = koinInject()
-            val statuses by hub.statuses.collectAsState()
-            (statuses[instance.id] as? PackUpdateStatus.Pending)?.let { pending ->
-                UpdateBadgePill(
-                    isRollback = pending.direction == UpdateDirection.Older,
-                    onClick    = { nav.open(Screen.PackVersions(instance.id)) },
-                    modifier   = Modifier.align(Alignment.TopEnd).padding(10.dp),
-                )
-            }
+            PendingUpdateBadge(instance.id, Modifier.align(Alignment.TopEnd).padding(10.dp))
         }
     }
 }
@@ -224,6 +215,24 @@ fun PackCard(
  * are the two facts a long build name used to push off the card.
  */
 private val VERSION_CHIP_MAX = 180.dp
+
+/**
+ * The pill for a build move waiting on [packId], or nothing when none is. Read from the
+ * status hub and routed to the versions screen, so every card that carries it says the
+ * same thing and leads to the same place.
+ */
+@Composable
+internal fun PendingUpdateBadge(packId: String, modifier: Modifier = Modifier) {
+    val hub: PackUpdateStatusHub = koinInject()
+    val nav: NavRequests = koinInject()
+    val statuses by hub.statuses.collectAsState()
+    val pending = statuses[packId] as? PackUpdateStatus.Pending ?: return
+    UpdateBadgePill(
+        isRollback = pending.direction == UpdateDirection.Older,
+        onClick    = { nav.open(Screen.PackVersions(packId)) },
+        modifier   = modifier,
+    )
+}
 
 /** Compact pill for a pending build move; the card-corner sibling of [LaunchStatusPill]. */
 @Composable
