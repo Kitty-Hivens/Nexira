@@ -25,11 +25,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.runtime.CompositionLocalProvider
+import hivens.ui.theme.LocalPlane
+import hivens.ui.theme.Plane
+import hivens.ui.theme.Backdrop
+import hivens.ui.theme.NxColor
 
 /**
- * Isolated (no window, no compositor, no GPU) proof of the two materials: a popup,
- * which floats over arbitrary content, lets nothing through and is exactly the top
- * step of the ladder. Chrome is glass, and the ground shows through it.
+ * Isolated (no window, no compositor, no GPU) proof of the materials: a popup, which
+ * floats over arbitrary content, lets nothing through and is exactly the top step of
+ * the ladder. Chrome over a picture is glass, and the picture shows through it. Chrome
+ * over the bare page is solid in the step above the page, so it cannot read as page.
  */
 class MenuOpacityRenderTest {
 
@@ -37,16 +43,23 @@ class MenuOpacityRenderTest {
     @Test
     fun `a popup admits no bleed and glass does`() {
         val wPx = 600
-        val hPx = 440
+        val hPx = 600
         val scene = ImageComposeScene(width = wPx, height = hPx, density = Density(2f)) {
             NxTheme(Themes.Celestia, dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFFFF00FF))) { // bright magenta ground
                     Column(Modifier.padding(20.dp)) {
-                        NxSurface(SurfaceKind.Chrome, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
-                            Box(Modifier.size(260.dp, 60.dp))
+                        // The magenta stands in for a wallpaper here.
+                        CompositionLocalProvider(LocalPlane provides Plane(0, NxColor.page, Backdrop.Wallpaper)) {
+                            NxSurface(SurfaceKind.Chrome, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
+                                Box(Modifier.size(260.dp, 60.dp))
+                            }
                         }
                         Spacer(Modifier.height(20.dp))
                         NxSurface(SurfaceKind.Popup, shadowDp = 0f, shape = RoundedCornerShape(12.dp)) {
+                            Box(Modifier.size(260.dp, 60.dp))
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        NxSurface(SurfaceKind.Chrome, blurDp = 0f, shape = RoundedCornerShape(12.dp)) {
                             Box(Modifier.size(260.dp, 60.dp))
                         }
                     }
@@ -61,15 +74,17 @@ class MenuOpacityRenderTest {
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(outDir, "menu-opacity.png").writeBytes(it) }
 
         val bmp = Bitmap.makeFromImage(image)
-        // Centres, density 2: Column pad 40px; first surface ~y100, second ~y260; x~300.
+        // Centres at density 2: the column pads 40px, the surfaces sit near y100, y260 and y420, x300.
         val glass = bmp.getColor(300, 100)
         val popup = bmp.getColor(300, 260)
+        val chromeOnPage = bmp.getColor(300, 420)
         fun rgb(c: Int) = Triple((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF)
         val (gr, gg, gb) = rgb(glass)
         println("MenuOpacityRenderTest: glass=RGB($gr,$gg,$gb)  popup=${"%08X".format(popup)}")
 
         val top = Themes.Celestia.dark.steps.last()
         assertEquals(top.toArgb(), popup, "the popup is not the top step")
+        assertEquals(Themes.Celestia.dark.steps[1].toArgb(), chromeOnPage, "chrome over the page is not the step above it")
         assertTrue(gb - gg >= 40 && abs(gr - gb) <= 30, "glass hid the ground it should show: ($gr,$gg,$gb)")
     }
 }

@@ -12,7 +12,11 @@ enum class SurfaceKind {
     /** The window ground. Step 0. */
     Page,
 
-    /** The persistent frame: the rail, the title bar. Glass over what is behind it, no tint of its own. */
+    /**
+     * The persistent frame: the rail, the title bar. Drawn in the step above what it
+     * frames, so it stays apart from the page: a thin coat of that step over a picture,
+     * solid over the bare page. It adds no depth to what it holds.
+     */
     Chrome,
 
     /** A region holding a group: a settings section, a side panel. One step above its parent. */

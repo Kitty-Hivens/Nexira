@@ -58,8 +58,10 @@ internal fun surfaceStep(kind: SurfaceKind, parentStep: Int, topStep: Int): Int 
  * has a reason, which is what a user's own widget plane is.
  *
  * A body is opaque by default and never blurs what it covers, since nothing can see
- * through it. [SurfaceKind.Chrome] is glass: a thin coat of the colour it lies over,
- * a blur when one is asked for, and no tint of its own.
+ * through it. [SurfaceKind.Chrome] frames what it holds in the step above it: glass
+ * over a picture, a thin coat of that step with a blur when one is asked for, and a
+ * solid body over the bare page, where glass would show nothing and so could not be
+ * told from the page at all.
  *
  * Content is handed a [Plane] for this surface and the main ink for it, so anything
  * inside reads against the colour it is really on.
@@ -99,8 +101,10 @@ fun NxSurface(
     val glass = kind == SurfaceKind.Chrome
     val step = surfaceStep(kind, parent.step, scheme.topStep)
 
-    val material = fillColor ?: scheme.step(step)
-    val alpha = (opacity ?: kind.defaultOpacity()).coerceIn(0f, 1f)
+    // Chrome adds no depth to what it holds, but is drawn in the step above it, which
+    // is what keeps a rail and a title bar apart from the page they frame.
+    val material = fillColor ?: scheme.step(if (glass) parent.step + 1 else step)
+    val alpha = (opacity ?: kind.defaultOpacity(parent.over)).coerceIn(0f, 1f)
     val body = material.copy(alpha = material.alpha * alpha)
     // A blur under a body nothing can see through is work thrown away: the filter runs
     // every frame and is then covered completely.
@@ -178,12 +182,14 @@ private const val PRESS_ALPHA = 0.12f
 private const val GLASS_COAT = 0.35f
 
 /**
- * The opacity a surface of this kind draws at when it names none: solid for a body, a
- * thin coat for glass. Public because an editor showing a surface's values has to open
- * on this one too: a control that starts at a number the renderer never used is the
- * same defect as a control that moves nothing.
+ * The opacity a surface of this kind draws at when it names none, over [over]: solid
+ * for a body, and for chrome a thin coat over a picture and solid over the bare page.
+ * Public because an editor showing a surface's values has to open on this one too: a
+ * control that starts at a number the renderer never used is the same defect as a
+ * control that moves nothing.
  */
-fun SurfaceKind.defaultOpacity(): Float = if (this == SurfaceKind.Chrome) GLASS_COAT else 1f
+fun SurfaceKind.defaultOpacity(over: Backdrop = Backdrop.Page): Float =
+    if (this == SurfaceKind.Chrome && over == Backdrop.Wallpaper) GLASS_COAT else 1f
 
 /** Card-shaped surface: [SurfaceKind.Card] at the card corner. */
 @Composable

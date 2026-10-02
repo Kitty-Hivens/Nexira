@@ -82,17 +82,15 @@ import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.LocalPlane
+import hivens.ui.theme.Backdrop
+import hivens.ui.theme.NxTheme
+import hivens.ui.surface.defaultOpacity
+import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.model.walkInstances
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 
-/**
- * The chrome's opacity when nothing overrides it.
- *
- * The rail, the top bar and the centre's corner wedge all draw at this number, and
- * the wedge only does its job -- carrying the content's corner into the chrome --
- * while it is exactly the colour of the plane it joins. They were three separate
- * literals that happened to agree, which is how they came apart: a plane whose
- * opacity was refused on light left a visible patch at the seam.
- */
-private const val CHROME_OPACITY_PCT = 35
 
 /**
  * Props for the CENTRE region: the page under every screen.
@@ -141,15 +139,15 @@ data class ShellRightRegionProps(
 
 /**
  * Props for the LEFT region (the navigation rail). Like the right panel it renders its
- * own [NxSurface], at [CHROME_OPACITY_PCT] by default -- a see-through chrome that
- * prioritises the wallpaper behind it.
+ * own [NxSurface], as chrome: by default a thin coat over a wallpaper, so the picture
+ * shows through, and solid over the bare page, so the rail stays apart from it.
  */
 @Serializable
 data class ShellLeftRegionProps(
     @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
     @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = false,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
-    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = CHROME_OPACITY_PCT,
+    @PropLabel("widget.appshell.region.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = -1,
     @PropLabel("widget.appshell.region.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
 )
 
@@ -230,7 +228,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         // with it. Its contents are no answer either, since the rail's slots fill
         // whatever width they are offered so the items centre in it.
         val railWidth = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else NAV_RAIL_DEFAULT_WIDTH)
-        // The rail is chrome: glass with a 35% coat by default. AppSidebar's
+        // The rail is chrome: a coat over a wallpaper, solid over the page. AppSidebar's
         // NavigationRail is transparent so this owns the background, and the divider
         // stays OUTSIDE the surface so the coat covers exactly the rail.
         NxSurface(
@@ -267,9 +265,17 @@ val NAV_RAIL_DEFAULT_WIDTH = 65.dp
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellCenterRegionProps>()
-    // The wedge is the chrome reaching around the corner, so it takes the chrome's
-    // colour rather than one of its own -- see [CHROME_OPACITY_PCT].
-    val chrome = NxColor.page.copy(alpha = CHROME_OPACITY_PCT / 100f)
+    // The wedge is the chrome reaching around the corner, so it takes the rail's own
+    // colour rather than one of its own: the step above the page, at the opacity the
+    // rail actually draws at. It only does its job while it is exactly that colour, so
+    // the rail's named opacity is read off the layout rather than assumed.
+    val over = LocalPlane.current?.over ?: Backdrop.Page
+    val graph = LocalLayoutGraph.current
+    val railOpacity = remember(graph) {
+        graph.walkInstances().firstOrNull { it.kind.value == "appshell.region.left" }
+            ?.props?.get("opacityPct")?.jsonPrimitive?.intOrNull?.regionOpacity()
+    }
+    val chrome = NxTheme.colours.step(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity(over))
     val cornerDp = 12.dp
     // This rectangle is what the editor's overlays sit over. Reported rather than
     // reconstructed from the rails' props: a rail animates, folds itself away on a
@@ -501,7 +507,7 @@ data class ShellTopRegionProps(
     @PropLabel("widget.appshell.topbar.heightDp") @PropRange(36.0, 72.0) val heightDp: Int = 44,
     @PropLabel("widget.appshell.topbar.cornerStyle") val cornerStyle: CornerStyle = CornerStyle.Rect,
     @PropLabel("widget.appshell.topbar.groupStyle") val groupStyle: GroupStyle = GroupStyle.LineSeparated,
-    @PropLabel("widget.appshell.topbar.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = CHROME_OPACITY_PCT,
+    @PropLabel("widget.appshell.topbar.opacityPct") @PropRange(-1.0, 100.0) val opacityPct: Int = -1,
     @PropLabel("widget.appshell.topbar.blurDp") @PropRange(0.0, 40.0) val blurDp: Int = 0,
     @PropLabel("widget.appshell.topbar.controls") val controls: WindowControlsMode = WindowControlsMode.Auto,
 )
