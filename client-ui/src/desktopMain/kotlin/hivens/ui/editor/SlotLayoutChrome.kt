@@ -45,14 +45,15 @@ import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.SlotPath
 import hivens.widget.model.traverse
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Tier 2 slot layout chrome. The slot's layout control left the layout flow:
 // instead of an inline chip (which displaced the edited content), a slot is SELECTED
@@ -76,7 +77,7 @@ internal fun slotChromeModifier(
     onContextMenu: (SlotPath, Offset) -> Unit,
     onReportRect: (Rect) -> Unit,
 ): Modifier = Modifier.composed {
-    val accent   = NxTheme.colors.primary
+    val accent   = NxColor.lead()
     val cornerPx = with(LocalDensity.current) { 12.dp.toPx() }
     val strokePx = with(LocalDensity.current) { 2.dp.toPx() }
     var bounds by remember { mutableStateOf(Rect.Zero) }
@@ -180,15 +181,14 @@ internal fun SlotSelectionOverlay(
 private fun SlotSelectionHandle(onClick: () -> Unit) {
     val s = LocalStrings.current
     NxSurface(
-        level = NxSurfaceLevel.Floating,
-        blurDp = 0f,
+        kind = SurfaceKind.Popup,
         shape = MaterialTheme.shapes.small,
     ) {
         Box(
             modifier         = Modifier.size(SLOT_HANDLE_SIZE).clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Symbol(NxIcon.ViewQuilt, contentDescription = s.editorSlotLayoutHandle, tint = NxTheme.colors.primary, size = 16.dp)
+            Symbol(NxIcon.ViewQuilt, contentDescription = s.editorSlotLayoutHandle, tint = NxColor.lead(), size = 16.dp)
         }
     }
 }
@@ -213,7 +213,7 @@ internal fun SlotLayoutMenuContent(
     Text(
         text     = s.editorSlotLayoutMenuTitle,
         style    = MaterialTheme.typography.labelSmall,
-        color    = NxTheme.colors.textSecondary,
+        color    = NxInk.quiet,
         modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 2.dp),
     )
     // Four presets over two parameters. The model has one flow with a direction
@@ -266,14 +266,14 @@ private fun SlotNumberRow(
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodyMedium,
-            color    = NxTheme.colors.textPrimary,
+            color    = NxInk.main,
             modifier = Modifier.weight(1f),
         )
         NxIconButton(NxIcon.ChevronLeft, s.editorSlotGridColumnsDecrease, onClick = onDecrease, iconSize = 16.dp)
         Text(
             text     = "$value",
             style    = MaterialTheme.typography.bodyMedium,
-            color    = NxTheme.colors.textPrimary,
+            color    = NxInk.main,
             modifier = Modifier.padding(horizontal = 6.dp),
         )
         NxIconButton(NxIcon.ChevronRight, s.editorSlotGridColumnsIncrease, onClick = onIncrease, iconSize = 16.dp)

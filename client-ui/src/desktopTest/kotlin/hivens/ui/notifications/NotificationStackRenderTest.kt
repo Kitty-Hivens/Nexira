@@ -61,7 +61,7 @@ class NotificationStackRenderTest {
         push(center, "b", "second")
 
         val scene = ImageComposeScene(width = 900, height = 700, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     NotificationStack(center = center)
                 }
@@ -97,7 +97,7 @@ class NotificationStackRenderTest {
     fun `an empty backlog paints nothing and still composes`() {
         val center = NotificationCenter()
         val scene = ImageComposeScene(width = 900, height = 700, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     NotificationStack(center = center)
                 }

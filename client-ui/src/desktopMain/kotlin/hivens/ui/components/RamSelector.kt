@@ -24,7 +24,8 @@ import androidx.compose.ui.unit.sp
 import hivens.core.jvm.SystemMemory
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * RAM mode selector. Represents a MODE, not just a number:
@@ -69,12 +70,12 @@ fun RamSelector(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(s.serverSettingsRam, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary)
+            Text(s.serverSettingsRam, style = MaterialTheme.typography.bodyMedium, color = NxInk.main)
             Text(
                 formatRam(if (isAuto) resolvedAutoMb else currentMb),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = NxTheme.colors.primary
+                color = NxColor.lead(text = true)
             )
         }
 
@@ -111,7 +112,7 @@ fun RamSelector(
 
         // Custom input -- typing a value also pins the instance.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(s.ramCustomInputLabel, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary, modifier = Modifier.width(100.dp))
+            Text(s.ramCustomInputLabel, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet, modifier = Modifier.width(100.dp))
             OutlinedTextField(
                 value = if (isCustomMode) customInput else "",
                 onValueChange = { input ->
@@ -125,18 +126,18 @@ fun RamSelector(
                 placeholder = {
                     Text(
                         if (isCustomMode) "" else formatRam(if (isAuto) resolvedAutoMb else currentMb),
-                        color = NxTheme.colors.textSecondary.copy(alpha = 0.4f),
+                        color = NxInk.quiet.copy(alpha = 0.4f),
                         fontSize = 13.sp,
                     )
                 },
-                suffix = { Text("MB", color = NxTheme.colors.textSecondary, fontSize = 12.sp) },
+                suffix = { Text("MB", color = NxInk.quiet, fontSize = 12.sp) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = NxTheme.colors.textPrimary, unfocusedTextColor = NxTheme.colors.textPrimary,
-                    cursorColor = NxTheme.colors.primary, focusedBorderColor = NxTheme.colors.primary,
-                    unfocusedBorderColor = NxTheme.colors.textSecondary.copy(alpha = 0.2f),
+                    focusedTextColor = NxInk.main, unfocusedTextColor = NxInk.main,
+                    cursorColor = NxColor.lead(), focusedBorderColor = NxColor.lead(),
+                    unfocusedBorderColor = NxInk.line,
                     focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
                 ),
                 shape = MaterialTheme.shapes.small
@@ -147,7 +148,7 @@ fun RamSelector(
         Text(
             text = s.ramSystemHint(formatRam(systemRamMb), formatRam((systemRamMb * 0.75).toInt())),
             style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textSecondary.copy(alpha = 0.5f)
+            color = NxInk.quiet
         )
     }
 }
@@ -155,12 +156,13 @@ fun RamSelector(
 /** A pill used for both the Auto chip and each preset; [selected] drives the fill/text. */
 @Composable
 private fun RamChip(selected: Boolean, label: String, modifier: Modifier, onClick: () -> Unit) {
+    val lead = NxColor.lead()
     val bg by animateColorAsState(
-        if (selected) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f),
+        if (selected) lead else NxColor.wash(NxInk.quiet, 0.08f),
         Motion.fade.of(),
     )
     val fg by animateColorAsState(
-        if (selected) Color.White else NxTheme.colors.textSecondary,
+        if (selected) NxColor.on(lead) else NxInk.quiet,
         Motion.fade.of(),
     )
     Box(
@@ -168,7 +170,7 @@ private fun RamChip(selected: Boolean, label: String, modifier: Modifier, onClic
             .clip(MaterialTheme.shapes.small)
             .border(
                 1.dp,
-                if (selected) NxTheme.colors.primary.copy(alpha = 0.7f) else NxTheme.colors.outline.copy(alpha = 0.2f),
+                if (selected) lead else NxInk.line,
                 MaterialTheme.shapes.small,
             )
             .background(bg)

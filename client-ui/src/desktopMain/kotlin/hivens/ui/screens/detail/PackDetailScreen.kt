@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -88,10 +87,11 @@ import hivens.ui.screens.library.content.ContentVersionsOverlay
 import hivens.ui.screens.library.content.rememberContentTabState
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
-import hivens.ui.theme.origin
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
@@ -102,6 +102,10 @@ import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
+import hivens.ui.theme.originColor
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
@@ -307,18 +311,16 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
         else                 -> fileEntries?.let { ConsoleSource.FileBacked(it) }  // null while loading
     }
 
-    Surface(
+    NxSurface(
         // Floated card, same treatment as the hero above: full-bleed square
         // edges read as a foreign element next to the rounded cards the rest
         // of the screen is built from. The inset around it belongs to the tab
         // host, which gives every pane the same one.
+        kind     = SurfaceKind.Panel,
         modifier = Modifier.fillMaxSize(),
         shape    = MaterialTheme.shapes.medium,
-        // Glass tint, not solid: a solid fill broke the app's translucent
-        // aesthetic and left a hard seam against the right panel. The
-        // wallpaper stays softly visible while the tint keeps dense
-        // monospace readable.
-        color    = NxTheme.colors.surface.copy(alpha = 0.85f),
+        // Solid, like every body: dense monospace needs a ground it is read
+        // against, which a tint over the wallpaper could never promise.
     ) {
         Column(Modifier.fillMaxSize()) {
             LogSessionPicker(
@@ -327,7 +329,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path) {
                 onSelectGeneral = { selectedFile = null },
                 onSelectFile    = { selectedFile = it },
             )
-            HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.3f))
+            HorizontalDivider(color = NxColor.wash(NxInk.line, 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (source == null) {
                     // A file is selected but still reading -- show the spinner
@@ -381,7 +383,6 @@ private fun LogSessionPicker(
     onSelectFile: (File) -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     var open by remember { mutableStateOf(false) }
 
     val currentLabel = selectedFile?.name ?: s.consoleSessionLive
@@ -396,12 +397,12 @@ private fun LogSessionPicker(
         ) {
             Text(
                 text     = s.consoleSessionPickerLabel(currentLabel),
-                color    = colors.textSecondary,
+                color    = NxInk.quiet,
                 fontSize = 11.sp,
             )
             Symbol(icon = NxIcon.ArrowDropDown,
                 contentDescription = null,
-                tint               = colors.textSecondary,
+                tint               = NxInk.quiet,
                 modifier           = Modifier.size(16.dp),
             )
         }
@@ -438,7 +439,7 @@ private fun Hero(
     val bannerUrl = art.bannerUrl
     val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
     var bannerFullscreen by remember(bannerUrl) { mutableStateOf(false) }
-    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
+    val (hueA, hueB) = decorativePair(pack.id)
     // Floated card treatment: the app's cards round via the cardCorner token,
     // and a full-bleed square banner read as a foreign element next to them.
     Box(
@@ -577,27 +578,30 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
     ) {
         tabs.forEachIndexed { i, (icon, label) ->
             val active = i == selected
-            val tint = if (active) Color.White else NxTheme.colors.textSecondary
-            Row(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.small)
-                    .background(if (active) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f))
-                    .clickable { onSelect(i) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Symbol(icon, contentDescription = null, tint = tint, size = 16.dp)
-                // Steady, not a plain Text: the active tab is bold, bold is wider,
-                // and the strip used to re-lay itself out on every click -- the tab
-                // the user pressed moved, and so did the three beside it.
-                NxSteadyText(
-                    text     = label,
-                    style    = MaterialTheme.typography.labelLarge,
-                    color    = tint,
-                    maxLines = 1,
-                    weight   = if (active) FontWeight.Bold else FontWeight.Normal,
-                )
+            val fill = if (active) NxColor.lead() else NxColor.wash(NxInk.quiet, 0.12f)
+            OnFill(fill) {
+                val tint = if (active) NxColor.on(fill) else NxInk.quiet
+                Row(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .background(fill)
+                        .clickable { onSelect(i) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Symbol(icon, contentDescription = null, tint = tint, size = 16.dp)
+                    // Steady, not a plain Text: the active tab is bold, bold is wider,
+                    // and the strip used to re-lay itself out on every click -- the tab
+                    // the user pressed moved, and so did the three beside it.
+                    NxSteadyText(
+                        text     = label,
+                        style    = MaterialTheme.typography.labelLarge,
+                        color    = tint,
+                        maxLines = 1,
+                        weight   = if (active) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
             }
         }
     }
@@ -612,13 +616,14 @@ private fun SourceChip(origin: PackOrigin) {
         PackOrigin.Local       -> "Local"
         PackOrigin.Unknown     -> "Other"
     }
+    val fill = originColor(origin).copy(alpha = 0.9f)
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(NxTheme.colors.origin(origin).copy(alpha = 0.9f))
+            .background(fill)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
     }
 }
 
@@ -636,14 +641,15 @@ private fun HeroChip(text: String) {
 
 @Composable
 private fun HeroUpdateBadge(text: String, rollback: Boolean, onClick: () -> Unit) {
+    val fill = if (rollback) NxColor.status(Status.Warning) else NxColor.lead()
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(if (rollback) NxTheme.colors.warnAccent else NxTheme.colors.primary)
+            .background(fill)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+        Text(text, style = MaterialTheme.typography.labelSmall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
     }
 }
 
@@ -699,8 +705,8 @@ private fun NotFound(onBack: () -> Unit) {
     val s = LocalStrings.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary)
-            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = NxInk.main)
+            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             NxButton(label = s.packDetailNotFoundBack, onClick = onBack)
         }
     }

@@ -24,7 +24,6 @@ import hivens.core.api.dto.modrinth.ModrinthGameVersion
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
@@ -49,6 +48,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
  * The project-view rail, drawn off-screen from the real fixtures through the real
@@ -140,7 +141,7 @@ class ProjectRailRenderTest {
             // The rail as the shell sits it: 300 wide, its own plane, rounded only
             // on the edge that faces the page.
             NxSurface(
-                level = NxSurfaceLevel.Sunken,
+                kind = SurfaceKind.Field,
                 modifier = Modifier.width(300.dp).fillMaxHeight(),
             ) {
                 Column(
@@ -164,8 +165,8 @@ class ProjectRailRenderTest {
         Files.createDirectories(out.parent)
         val projects = slugs.map(::open)
         val scene = ImageComposeScene(300 * slugs.size + 40 * (slugs.size + 1), 1200, density = Density(1f)) {
-            NxTheme(useDarkTheme = dark) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            NxTheme(dark = dark) {
+                Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(40.dp),

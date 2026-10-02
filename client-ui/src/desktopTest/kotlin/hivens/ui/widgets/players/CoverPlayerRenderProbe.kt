@@ -27,6 +27,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /** Renders the cover player over fixed data so its layout can be looked at. */
 class CoverPlayerRenderProbe {
@@ -61,9 +62,9 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((500 * d).toInt(), (1240 * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.ENGLISH) {
-                NxTheme(useDarkTheme = true) {
+                NxTheme(dark = true) {
                     Box(
-                        Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.TopCenter,
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
@@ -103,9 +104,9 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((460 * d).toInt(), (520 * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.ENGLISH) {
-                NxTheme(useDarkTheme = true) {
+                NxTheme(dark = true) {
                     Box(
-                        Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.s16)) {
@@ -153,9 +154,9 @@ class CoverPlayerRenderProbe {
             val d = 2f
             val scene = ImageComposeScene((460 * d).toInt(), (420 * d).toInt(), density = Density(d)) {
                 LocaleProvider(AppLocale.RUSSIAN) {
-                    NxTheme(useDarkTheme = dark) {
+                    NxTheme(dark = dark) {
                         Box(
-                            Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                            Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                             contentAlignment = Alignment.TopStart,
                         ) {
                             Box(Modifier.width(420.dp)) {

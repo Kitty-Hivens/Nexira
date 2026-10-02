@@ -82,7 +82,7 @@ enum class PlayLayout { Plate, Caption }
 
 /**
  * The launch call-to-action on the pack-detail hero and the home launch widgets. A
- * low plate in static monochrome ink, deliberately NOT the palette accent: a hero
+ * low plate in static monochrome ink, deliberately NOT the theme's lead colour: a hero
  * ground is arbitrary art behind a dark scrim, and a stable ink reads on all of it
  * where an accent fill fought both the art and the neighbouring chips. Over media the
  * ink follows the theme (`#121318` in a dark one, white in a light one), as it always

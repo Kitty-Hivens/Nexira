@@ -34,7 +34,7 @@ class ChannelColorTest {
         val pack = LinkedHashMap<VersionChannel, Color>()
         val app = LinkedHashMap<ReleaseChannel, Color>()
         val scene = ImageComposeScene(width = 8, height = 8, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 VersionChannel.entries.forEach { pack[it] = channelColor(it) }
                 ReleaseChannel.entries.forEach { app[it] = channelColor(it) }
             }

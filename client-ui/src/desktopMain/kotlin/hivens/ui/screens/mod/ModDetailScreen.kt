@@ -45,7 +45,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -77,8 +76,7 @@ import hivens.ui.components.ImageGallery
 import hivens.ui.components.modrinthGalleryMedia
 import hivens.ui.render.MarkdownHtml
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.decorativeColor
 import hivens.ui.theme.familyForText
 import hivens.widget.api.LocalSurfaceFamilies
@@ -87,6 +85,9 @@ import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
 import java.awt.datatransfer.StringSelection
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * The project page: a header, the tabs, and the body.
@@ -167,7 +168,7 @@ fun ModDetailScreen(
             modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
         )
         NxSurface(
-            level = NxSurfaceLevel.Raised,
+            kind = SurfaceKind.Panel,
             modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
         ) {
             when (tab) {
@@ -215,7 +216,7 @@ internal fun Body(state: ModDetailState, onRetry: () -> Unit) {
     when {
         state.loading -> Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
-                color = NxTheme.colors.primary.copy(alpha = 0.6f),
+                color = NxColor.wash(NxColor.lead(), 0.6f),
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(26.dp),
             )
@@ -249,7 +250,7 @@ internal fun Body(state: ModDetailState, onRetry: () -> Unit) {
 private fun Unknown(text: String) = Text(
     text,
     style = MaterialTheme.typography.bodySmall,
-    color = NxTheme.colors.textSecondary,
+    color = NxInk.quiet,
 )
 
 // ClipEntry is still experimental; the console's copy actions carry the same
@@ -283,7 +284,7 @@ internal fun Header(state: ModDetailState) {
             Text(
                 state.title,
                 style = MaterialTheme.typography.headlineSmall,
-                color = NxTheme.colors.textPrimary,
+                color = NxInk.main,
                 // Semibold and tight, the way the reference sets it. Bold at this
                 // size reads as a banner rather than as a name.
                 fontWeight = FontWeight.SemiBold,
@@ -296,7 +297,7 @@ internal fun Header(state: ModDetailState) {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                     // The tagline is set to a reading measure rather than to the
                     // column: run across a wide window it becomes one long line
                     // nobody tracks back from.
@@ -387,7 +388,7 @@ internal fun Header(state: ModDetailState) {
                 Text(
                     s.modPageInstalledVersion(it),
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             // Why nothing happened, under the button that was pressed, naming the
@@ -404,7 +405,7 @@ internal fun Header(state: ModDetailState) {
                 Text(
                     if (target.isBlank()) s.modPageNoBuildAny else s.modPageNoBuildFor(target),
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.warnAccent,
+                    color = NxColor.status(Status.Warning, text = true),
                 )
             }
             // Said under the button, where the click was. A mod that landed without
@@ -414,7 +415,7 @@ internal fun Header(state: ModDetailState) {
                 Text(
                     s.modPageInstallMissing(state.installMissing.size),
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.warnAccent,
+                    color = NxColor.status(Status.Warning, text = true),
                 )
             }
         }
@@ -422,7 +423,7 @@ internal fun Header(state: ModDetailState) {
     // The rule under the header, which the reference draws and this did not: the
     // header and the body card were two floating blocks with nothing saying they
     // belonged to one page.
-    HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+    HorizontalDivider(color = NxInk.line)
     }
 }
 
@@ -480,14 +481,15 @@ private fun ProjectIcon(url: String?, title: String) {
             modifier = Modifier.size(ICON_SIZE).clip(shape),
         )
     } else {
+        val tile = decorativeColor(title)
         Box(
-            Modifier.size(ICON_SIZE).clip(shape).background(NxTheme.colors.decorativeColor(title)),
+            Modifier.size(ICON_SIZE).clip(shape).background(tile),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 title.firstOrNull()?.uppercase() ?: "?",
                 style = MaterialTheme.typography.headlineMedium,
-                color = Color.White,
+                color = NxColor.on(tile),
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -497,9 +499,9 @@ private fun ProjectIcon(url: String?, title: String) {
 @Composable
 private fun Stat(icon: IconKey, value: String, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Symbol(icon, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 15.dp)
-        Text(value, style = MaterialTheme.typography.labelLarge, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+        Symbol(icon, contentDescription = null, tint = NxInk.quiet, size = 15.dp)
+        Text(value, style = MaterialTheme.typography.labelLarge, color = NxInk.main, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
     }
 }
 
@@ -561,7 +563,7 @@ internal fun Tabs(
                     text = label,
                     weight = if (id == active) FontWeight.Bold else FontWeight.Normal,
                     style = MaterialTheme.typography.titleSmall,
-                    color = if (id == active) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary,
+                    color = if (id == active) NxInk.main else NxInk.quiet,
                     // No indication. A tab already says where you are with its weight
                     // and its rule, and a hover plate behind the word is a second
                     // answer to a question the row has already answered.
@@ -589,7 +591,7 @@ internal fun Tabs(
                 Box(
                     Modifier.offset(x = travel.value)
                         .size(width = MARK_WIDTH, height = MARK_HEIGHT)
-                        .background(NxTheme.colors.primary),
+                        .background(NxColor.lead()),
                 )
             }
         }

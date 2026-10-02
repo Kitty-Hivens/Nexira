@@ -20,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import hivens.ui.settle
+import hivens.ui.theme.NxColor
 
 /**
  * The leftover-clients surface, drawn so it can be looked at.
@@ -48,7 +49,7 @@ class RetiredClientsRenderProbe {
     @Composable
     private fun Sheet(rows: List<RetiredRow>, finished: Boolean, reclaimed: Long, ready: Boolean = true) {
         Box(
-            Modifier.fillMaxSize().background(NxTheme.colors.background).padding(24.dp),
+            Modifier.fillMaxSize().background(NxColor.page).padding(24.dp),
             contentAlignment = Alignment.TopCenter,
         ) {
             RetiredClientsBody(
@@ -68,7 +69,7 @@ class RetiredClientsRenderProbe {
         val out = Path.of("build/render", "retired-$name.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = dark) {
+            NxTheme(dark = dark) {
                 LocaleProvider(AppLocale.RUSSIAN) { content() }
             }
         }

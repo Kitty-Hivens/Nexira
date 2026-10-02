@@ -31,12 +31,12 @@ import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class VideoPlayerProps(
@@ -110,11 +110,11 @@ private fun PlayPoster(onClick: () -> Unit) {
 @Composable
 private fun EmptyState(hint: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = NxTheme.colors.textSecondary.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
+        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = NxInk.quiet.copy(alpha = 0.6f), modifier = Modifier.size(32.dp))
         Text(
             text     = hint,
             style    = MaterialTheme.typography.bodySmall,
-            color    = NxTheme.colors.textSecondary,
+            color    = NxInk.quiet,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
     }

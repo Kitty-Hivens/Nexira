@@ -44,11 +44,14 @@ import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.surface.NxCard
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * The surface for what the retired server path left on disk.
@@ -114,7 +117,7 @@ internal fun RetiredClientsBody(
     onClose: () -> Unit,
     onApply: () -> Unit,
 ) {
-    NxCard(modifier = Modifier.widthIn(min = 560.dp, max = 860.dp), level = NxSurfaceLevel.Raised) {
+    NxSurface(kind = SurfaceKind.Dialog, modifier = Modifier.widthIn(min = 560.dp, max = 860.dp)) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             when {
                 loading -> Loading()
@@ -128,18 +131,18 @@ internal fun RetiredClientsBody(
 @Composable
 private fun Loading() {
     Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp)
+        CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp)
     }
 }
 
 @Composable
 private fun Done(rows: List<RetiredRow>, reclaimedBytes: Long, onClose: () -> Unit) {
     val s = LocalStrings.current
-    Text(s.retiredTitle, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary)
+    Text(s.retiredTitle, style = MaterialTheme.typography.titleLarge, color = NxInk.main)
     Text(
         text = if (reclaimedBytes > 0) s.retiredDone(byteSizeLabel(reclaimedBytes)) else s.retiredDoneNothing,
         style = MaterialTheme.typography.bodyMedium,
-        color = NxTheme.colors.textSecondary,
+        color = NxInk.quiet,
     )
     Column(
         modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
@@ -160,24 +163,24 @@ private fun OutcomeLine(row: RetiredRow) {
         // A kept source is a success with a condition attached, and green says
         // there is nothing left to read. The reader has to go and look at that one.
         is RetiredOutcome.Adopted -> if (outcome.sourceKept) {
-            s.retiredAdoptedSourceKept to NxTheme.colors.warnAccent
+            s.retiredAdoptedSourceKept to NxColor.status(Status.Warning, text = true)
         } else {
-            s.retiredAdopted to NxTheme.colors.success
+            s.retiredAdopted to NxColor.status(Status.Success, text = true)
         }
-        RetiredOutcome.Deleted -> s.retiredDeleted to NxTheme.colors.textSecondary
-        RetiredOutcome.PartlyDeleted -> s.retiredPartlyDeleted to NxTheme.colors.warnAccent
+        RetiredOutcome.Deleted -> s.retiredDeleted to NxInk.quiet
+        RetiredOutcome.PartlyDeleted -> s.retiredPartlyDeleted to NxColor.status(Status.Warning, text = true)
         is RetiredOutcome.Failed ->
-            (if (outcome.reason == "remove") s.retiredRemoveFailed else s.retiredFailed) to NxTheme.colors.error
+            (if (outcome.reason == "remove") s.retiredRemoveFailed else s.retiredFailed) to NxColor.status(Status.Error, text = true)
         // Left alone, which is an outcome and not an instruction -- naming the
         // button they did not press would read as one.
-        null -> "\u2014" to NxTheme.colors.textSecondary.copy(alpha = 0.6f)
+        null -> "\u2014" to NxInk.quiet.copy(alpha = 0.6f)
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = row.client.name,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = NxTheme.colors.textPrimary,
+            color = NxInk.main,
             modifier = Modifier.width(150.dp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -197,12 +200,12 @@ private fun Chooser(
     val s = LocalStrings.current
     val totalBytes = rows.sumOf { it.client.sizeBytes }
     val anyChosen = rows.any { it.choice != RetiredChoice.Keep }
-    Text(s.retiredTitle, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary)
-    Text(s.retiredIntro, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+    Text(s.retiredTitle, style = MaterialTheme.typography.titleLarge, color = NxInk.main)
+    Text(s.retiredIntro, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
     Text(
         text = s.retiredFound(rows.size, byteSizeLabel(totalBytes)),
         style = MaterialTheme.typography.labelLarge,
-        color = NxTheme.colors.primary,
+        color = NxColor.lead(text = true),
     )
 
     // The list carries its own bar. Without one the surface cut a row in half at
@@ -231,8 +234,8 @@ private fun Chooser(
     // people learn to look past.
     if (rows.any { it.choice == RetiredChoice.Delete }) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Symbol(NxIcon.Warning, contentDescription = null, tint = NxTheme.colors.warnAccent, size = 16.dp)
-            Text(s.retiredWarning, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.warnAccent)
+            Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
+            Text(s.retiredWarning, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Warning, text = true))
         }
     }
 
@@ -243,11 +246,11 @@ private fun Chooser(
     val blocking = rows.filter { it.choice == RetiredChoice.Adopt && !it.adoptable }
     if (blocking.isNotEmpty()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Symbol(NxIcon.Warning, contentDescription = null, tint = NxTheme.colors.warnAccent, size = 16.dp)
+            Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
             Text(
                 text = s.retiredBlockedBy(blocking.joinToString(", ") { it.client.name }),
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.warnAccent,
+                color = NxColor.status(Status.Warning, text = true),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -261,11 +264,11 @@ private fun Chooser(
     ) {
         if (running) {
             CircularProgressIndicator(
-                color = NxTheme.colors.primary,
+                color = NxColor.lead(),
                 strokeWidth = 2.dp,
                 modifier = Modifier.width(16.dp).height(16.dp),
             )
-            Text(s.retiredBusy, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+            Text(s.retiredBusy, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             Spacer(Modifier.width(8.dp))
         }
         NxButton(label = s.retiredClose, onClick = onClose, style = NxButtonStyle.Tertiary, enabled = !running)
@@ -285,15 +288,14 @@ private fun Chooser(
 @Composable
 private fun ClientRow(row: RetiredRow, running: Boolean) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
-    NxCard(modifier = Modifier.fillMaxWidth(), level = NxSurfaceLevel.Base) {
+    NxCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = row.client.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
+                    color = NxInk.main,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(min = 110.dp),
@@ -304,7 +306,7 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
                 Text(
                     text = factsOf(row, s),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (row.adoptable) colors.textSecondary else colors.warnAccent,
+                    color = if (row.adoptable) NxInk.quiet else NxColor.status(Status.Warning, text = true),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -354,7 +356,7 @@ private fun ClientRow(row: RetiredRow, running: Boolean) {
                     Text(
                         text = if (row.adoptable) s.retiredDetected else s.retiredNeedsVersion,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (row.adoptable) colors.textSecondary else colors.warnAccent,
+                        color = if (row.adoptable) NxInk.quiet else NxColor.status(Status.Warning, text = true),
                         modifier = Modifier.weight(1f),
                     )
                 }

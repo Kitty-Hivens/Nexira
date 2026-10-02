@@ -28,9 +28,13 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.SessionRegistry.ActiveSession
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import java.time.Duration
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 @Composable
 fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) { // TODO: Function "ActiveSessionsSection" is never used
@@ -42,7 +46,7 @@ fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) { // TODO: F
         Text(
             text       = s.sessionsActiveTitle,
             style      = MaterialTheme.typography.labelSmall,
-            color      = NxTheme.colors.textSecondary,
+            color      = NxInk.quiet,
             fontWeight = FontWeight.Medium,
         )
         active.values.forEach { session ->
@@ -55,45 +59,47 @@ fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) { // TODO: F
 fun SessionChip(session: ActiveSession) {
     val uptime by session.uptime.collectAsState()
     val s = LocalStrings.current
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surface)
-            .clickable { session.showConsole() }
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+    NxSurface(
+        kind     = SurfaceKind.Card,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { session.showConsole() }
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(NxTheme.colors.success)
+                    .background(NxColor.status(Status.Success))
             )
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text       = session.packDisplayName,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
                     text  = formatUptime(uptime),
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             IconButton(onClick = session.showConsole) {
                 Symbol(icon = NxIcon.MenuOpen,
                     contentDescription = s.notifActionShowConsole,
-                    tint              = NxTheme.colors.textSecondary,
+                    tint              = NxInk.quiet,
                 )
             }
             IconButton(onClick = session.abort) {
                 Symbol(icon = NxIcon.Stop,
                     contentDescription = s.notifActionStop,
-                    tint              = NxTheme.colors.error,
+                    tint              = NxColor.status(Status.Error),
                 )
             }
         }

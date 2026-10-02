@@ -16,6 +16,7 @@ import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
 
 /**
  * Off-screen render of the screenshot grid. The images themselves never load --
@@ -64,8 +65,8 @@ class ImageGalleryRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, 700, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(pad.dp)) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page).padding(pad.dp)) {
                     ImageGallery(media = items)
                 }
             }

@@ -181,7 +181,7 @@ class UnboundedSlotTest {
         return runCatching {
             scene.setContent {
                 LocaleProvider(AppLocale.ENGLISH) {
-                    NxTheme(useDarkTheme = true) {
+                    NxTheme(dark = true) {
                         CompositionLocalProvider(
                             LocalLayoutGraph provides graph,
                             LocalWidgetRegistry provides GeneratedWidgetRegistry,

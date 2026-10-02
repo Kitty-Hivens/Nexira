@@ -57,14 +57,15 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.screens.settings.settingsRowBackground
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSwitch
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.editor.rememberDockOffset
-import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
 
 // Right-edge settings panel for a whole SURFACE (region), distinct from the
 // per-widget WidgetPropPanel. Opened from the editor pill's settings affordance
@@ -94,12 +95,10 @@ fun SurfacePropertiesPanel(
         // widget palette, so the panel can be pulled off the right edge.
         val offset = rememberDockOffset()
         NxSurface(
-            level    = NxSurfaceLevel.Floating,
+            // A popup: solid and above everything, so a settings panel stays
+            // readable and does not composite with the layers it floats over.
+            kind     = SurfaceKind.Popup,
             shape    = MaterialTheme.shapes.large,
-            // Solid, no glass: a settings panel must stay readable and not composite
-            // with the layers it floats over.
-            opacity  = 1f,
-            blurDp   = 0f,
             shadowDp = PANEL_SHADOW_DP,
             modifier = Modifier
                 .graphicsLayer { translationX = offset.value.x; translationY = offset.value.y }
@@ -136,21 +135,21 @@ fun SurfacePropertiesPanel(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Symbol(icon = NxIcon.ViewSidebar,
                         contentDescription = null,
-                        tint               = NxTheme.colors.primary,
+                        tint               = NxColor.lead(),
                         modifier           = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = title,
                         style      = MaterialTheme.typography.titleSmall,
-                        color      = NxTheme.colors.textPrimary,
+                        color      = NxInk.main,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Symbol(icon = NxIcon.Close,
                         contentDescription = s.editorClose,
-                        tint               = NxTheme.colors.textSecondary,
+                        tint               = NxInk.quiet,
                         modifier           = Modifier.size(16.dp),
                     )
                 }
@@ -184,20 +183,20 @@ private fun NavSelectionControl(
 ) {
     val s = LocalStrings.current
 
+    // A group of choices set into the panel, so a field: one step back from it.
+    NxSurface(SurfaceKind.Field, Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(settingsRowBackground())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column {
-            Text(s.navSelectionTitle, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(s.navSelectionTitle, color = NxInk.main, fontWeight = FontWeight.Bold)
             Text(
                 s.navSelectionSub,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
 
@@ -207,28 +206,27 @@ private fun NavSelectionControl(
         ) {
             NavSelectionStyle.entries.forEach { variant ->
                 val selected = customization.navSelectionStyle == variant
+                val fill = if (selected) NxColor.wash(NxColor.lead(), 0.18f) else NxColor.wash(NxInk.quiet, 0.08f)
                 Box(
                     modifier = Modifier
                         .clip(MaterialTheme.shapes.small)
-                        .background(
-                            if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
-                            else NxTheme.colors.surface.copy(alpha = 0.4f),
-                        )
+                        .background(fill)
                         .border(
                             width = 1.dp,
-                            color = if (selected) NxTheme.colors.primary
-                            else NxTheme.colors.outline.copy(alpha = 0.25f),
+                            color = if (selected) NxColor.lead() else NxInk.line,
                             shape = MaterialTheme.shapes.small,
                         )
                         .clickable { onChange(customization.withNavSelectionStyle(variant)) }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    Text(
-                        text       = navSelectionStyleLabel(variant, s),
-                        style      = MaterialTheme.typography.bodySmall,
-                        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    )
+                    OnFill(fill) {
+                        Text(
+                            text       = navSelectionStyleLabel(variant, s),
+                            style      = MaterialTheme.typography.bodySmall,
+                            color      = if (selected) NxColor.lead(text = true) else NxInk.quiet,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    }
                 }
                 PuppetClick("settings.navSelection.${variant.name}") {
                     onChange(customization.withNavSelectionStyle(variant))
@@ -261,7 +259,7 @@ private fun NavSelectionControl(
             Text(
                 text  = s.navSelectionAccent,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
             Row(
                 modifier              = Modifier.fillMaxWidth(),
@@ -289,6 +287,7 @@ private fun NavSelectionControl(
                 }
             }
         }
+    }
     }
 }
 

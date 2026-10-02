@@ -41,7 +41,6 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.library.rememberPackArt
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.widget.api.rememberProps
@@ -51,6 +50,8 @@ import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 @Serializable
 data class RecentProps(
@@ -100,7 +101,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
         Text(
             text       = p.title.ifBlank { s.homeRecentTitle },
             style      = MaterialTheme.typography.titleSmall,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
             modifier   = Modifier.padding(bottom = 8.dp),
         )
@@ -124,7 +125,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
 // glyph tile had -- the row gets art, not more space.
 @Composable
 private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
-    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
+    val (hueA, hueB) = decorativePair(pack.id)
     val art = rememberPackArt(pack)
     Box(
         modifier = Modifier
@@ -185,20 +186,20 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
         Text(
             text       = s.homeNoPacksTitle,
             style      = MaterialTheme.typography.titleSmall,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text  = s.homeNoPacksBody,
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
         Spacer(Modifier.height(2.dp))
         OutlinedButton(
             onClick = onBrowse,
             shape   = MaterialTheme.shapes.small,
             colors  = ButtonDefaults.outlinedButtonColors(
-                contentColor = NxTheme.colors.primary,
+                contentColor = NxColor.lead(),
             ),
         ) {
             Symbol(NxIcon.Search, contentDescription = null, modifier = Modifier.size(16.dp))

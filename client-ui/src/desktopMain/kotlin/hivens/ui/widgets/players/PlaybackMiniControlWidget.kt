@@ -53,12 +53,14 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * The transport as one strip, for a surface that wants the controls without the
@@ -128,7 +130,7 @@ internal fun PlaybackMiniControl(
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
 
-    NxSurface(NxSurfaceLevel.Floating, modifier.fillMaxWidth()) {
+    NxSurface(SurfaceKind.Card, modifier.fillMaxWidth()) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // One threshold per element, none of them consulting another, which is
             // the rule the cards pay for. Widest first: the volume track, then the
@@ -147,7 +149,7 @@ internal fun PlaybackMiniControl(
                     Symbol(
                         icon               = NxIcon.MusicNote,
                         contentDescription = null,
-                        tint               = NxTheme.colors.primary,
+                        tint               = NxColor.lead(),
                         modifier           = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(10.dp))
@@ -157,7 +159,7 @@ internal fun PlaybackMiniControl(
                     Text(
                         text       = name,
                         style      = MaterialTheme.typography.bodyMedium,
-                        color      = NxTheme.colors.textPrimary,
+                        color      = NxInk.main,
                         fontWeight = FontWeight.Medium,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
@@ -212,7 +214,7 @@ internal fun PlaybackMiniControl(
                     // read as one control. That distinction was the whole reason
                     // this line used to be the library's progress drawing, and it
                     // survives the drawing being replaced by something seekable.
-                    accent         = NxTheme.colors.progressAccent,
+                    accent         = NxColor.status(Status.Info),
                 )
             }
         }
@@ -226,8 +228,9 @@ private fun TransportButton(
     onClick: () -> Unit,
     description: String,
 ) {
-    val bg = if (enabled) NxTheme.colors.primary else NxTheme.colors.surfaceVariant.copy(alpha = 0.4f)
-    val tint = if (enabled) NxTheme.colors.onPrimary else NxTheme.colors.textSecondary.copy(alpha = 0.4f)
+    val lead = NxColor.lead()
+    val bg = if (enabled) lead else NxColor.wash(NxInk.quiet, 0.12f)
+    val tint = if (enabled) NxColor.on(lead) else NxInk.off
     Box(
         modifier = Modifier
             .size(30.dp)
@@ -263,7 +266,7 @@ private fun MiniGlyph(icon: IconKey, name: String, enabled: Boolean, onClick: ()
         Symbol(
             icon               = icon,
             contentDescription = name,
-            tint               = NxTheme.colors.textPrimary.copy(alpha = if (enabled) 0.7f else 0.3f),
+            tint               = if (enabled) NxInk.quiet else NxInk.off,
             fill               = 1f,
             weight             = 500,
             modifier           = Modifier.size(16.dp),
@@ -329,14 +332,14 @@ private fun MiniVolumeBar(
                 .fillMaxWidth()
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(NxTheme.colors.outline.copy(alpha = 0.20f)),
+                .background(NxColor.wash(NxInk.quiet, 0.25f)),
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(value)
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(NxTheme.colors.primary),
+                .background(NxColor.lead()),
         )
         if (widthPx > 0 && thumbAlpha > 0.01f) {
             val thumbHalfPx = with(LocalDensity.current) { 8.dp.toPx() / 2f }
@@ -347,7 +350,7 @@ private fun MiniVolumeBar(
                     .size(8.dp)
                     .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
-                    .background(NxTheme.colors.primary),
+                    .background(NxColor.lead()),
             )
         }
     }

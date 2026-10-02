@@ -66,11 +66,11 @@ import hivens.core.api.dto.modrinth.ModrinthGalleryImage
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxInk
 
 /**
  * One gallery item: a still [Image] or a [Video]. The strip shows the light
@@ -264,10 +264,8 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
     // shape, so a rounded cell lit up as a square with its corners filled in.
     val interaction = remember { MutableInteractionSource() }
     NxSurface(
-        level    = NxSurfaceLevel.Raised,
+        kind     = SurfaceKind.Card,
         shape    = shape,
-        // No blur behind a cell that is about to be covered by a photograph.
-        blurDp   = 0f,
         interactionSource = interaction,
         modifier = modifier
             .fillMaxHeight()
@@ -313,7 +311,7 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
                         Text(
                             it,
                             style      = MaterialTheme.typography.titleSmall,
-                            color      = NxTheme.colors.textPrimary,
+                            color      = NxInk.main,
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
@@ -323,7 +321,7 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
                         Text(
                             it,
                             style    = MaterialTheme.typography.bodySmall,
-                            color    = NxTheme.colors.textSecondary,
+                            color    = NxInk.quiet,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )

@@ -50,8 +50,11 @@ import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.LocalPlane
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.seedFromImage
 import hivens.ui.widgets.services.MusicPlayerService
@@ -64,6 +67,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxColor
 
 /**
  * The cover rules the card, but never carries the text.
@@ -158,7 +162,6 @@ internal fun SeededPlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val loaded = state !is PlaybackState.Idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
@@ -166,7 +169,7 @@ internal fun SeededPlayerCard(
     val fill = rememberSeededFill(track?.artwork, tint)
 
     NxSurface(
-        level     = NxSurfaceLevel.Floating,
+        kind      = SurfaceKind.Card,
         modifier  = modifier.fillMaxWidth(),
         shape     = MaterialTheme.shapes.medium,
         fillColor = fill,
@@ -205,7 +208,7 @@ internal fun SeededPlayerCard(
                         Text(
                             text       = title,
                             style      = MaterialTheme.typography.titleMedium,
-                            color      = palette.textPrimary,
+                            color      = NxInk.main,
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
@@ -217,7 +220,7 @@ internal fun SeededPlayerCard(
                         Text(
                             text       = artist,
                             style      = MaterialTheme.typography.bodySmall,
-                            color      = palette.textSecondary,
+                            color      = NxInk.quiet,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
                             fontFamily = familyForText(artist),
@@ -226,7 +229,7 @@ internal fun SeededPlayerCard(
                             Text(
                                 text       = name,
                                 style      = MaterialTheme.typography.labelSmall,
-                                color      = palette.textSecondary.copy(alpha = 0.7f),
+                                color      = NxInk.quiet,
                                 maxLines   = 1,
                                 overflow   = TextOverflow.Ellipsis,
                                 fontFamily = familyForText(name),
@@ -235,18 +238,18 @@ internal fun SeededPlayerCard(
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (skips) {
-                                Glyph(NxIcon.SkipPrevious, s.audioSkipPrevious, 18.dp, palette.textSecondary, loaded, onSkipPrev)
+                                Glyph(NxIcon.SkipPrevious, s.audioSkipPrevious, 18.dp, NxInk.quiet, loaded, onSkipPrev)
                             }
                             Glyph(
                                 icon    = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                                 name    = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
                                 size    = 22.dp,
-                                tint    = palette.textPrimary,
+                                tint    = NxInk.main,
                                 enabled = loaded,
                                 onClick = onPlayPause,
                             )
                             if (skips) {
-                                Glyph(NxIcon.SkipNext, s.audioSkipNext, 18.dp, palette.textSecondary, loaded, onSkipNext)
+                                Glyph(NxIcon.SkipNext, s.audioSkipNext, 18.dp, NxInk.quiet, loaded, onSkipNext)
                             }
                             Spacer(Modifier.width(10.dp))
                             // At rest this is the concept's 3dp bar and nothing else.
@@ -310,7 +313,7 @@ internal fun SeededPlayerCard(
                                 Text(
                                     text  = repeatAnswer(repeat, s),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = palette.textPrimary,
+                                    color = NxInk.main,
                                 )
                             }
                         }
@@ -330,44 +333,49 @@ internal fun SeededPlayerCard(
  * composable it is a dropped frame on every track change, which is precisely the
  * moment the widget is being looked at.
  *
- * Null artwork keeps the plain tonal body, so the card is the library's surface
- * until there is a record to take after.
+ * Null artwork returns null, which leaves the card's own body to the library, so the
+ * card is the library's surface until there is a record to take after.
  */
 @Composable
-private fun rememberSeededFill(artwork: ImageBitmap?, tint: Float): Color {
-    val base = NxTheme.colors.surfaceContainer
+private fun rememberSeededFill(artwork: ImageBitmap?, tint: Float): Color? {
+    // The step a card takes over its holder, so the borrowed colour is mixed into the
+    // body the card would have had rather than into the plane under it.
+    val base = NxTheme.colours.step((LocalPlane.current?.step ?: 0) + 1)
     val seed by produceState<Int?>(initialValue = null, artwork) {
         value = artwork?.let { withContext(Dispatchers.Default) { seedFromImage(it) } }
     }
-    return seed?.let { lerp(base, Color(it), tint.coerceIn(0f, 1f)) } ?: base
+    return seed?.let { lerp(base, Color(it), tint.coerceIn(0f, 1f)) }
 }
 
 /** The picture, and a way in when there is none: the square is the biggest target on the card. */
 @Composable
 private fun CoverSquare(artwork: ImageBitmap?, onPick: () -> Unit, side: Dp = 88.dp) {
     val s = LocalStrings.current
-    Box(
-        modifier = Modifier
-            .size(side)
-            .clip(MaterialTheme.shapes.small)
-            .background(NxTheme.colors.primary.copy(alpha = 0.18f))
-            .clickable(onClick = onPick),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (artwork != null) {
-            Image(
-                bitmap             = artwork,
-                contentDescription = null,
-                contentScale       = ContentScale.Crop,
-                modifier           = Modifier.fillMaxSize(),
-            )
-        } else {
-            Symbol(
-                icon               = NxIcon.MusicNote,
-                contentDescription = s.audioPickTrack,
-                tint               = NxTheme.colors.primary,
-                modifier           = Modifier.size(side * 0.34f),
-            )
+    val well = NxColor.wash(NxColor.lead(), 0.18f)
+    OnFill(well) {
+        Box(
+            modifier = Modifier
+                .size(side)
+                .clip(MaterialTheme.shapes.small)
+                .background(well)
+                .clickable(onClick = onPick),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (artwork != null) {
+                Image(
+                    bitmap             = artwork,
+                    contentDescription = null,
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier.fillMaxSize(),
+                )
+            } else {
+                Symbol(
+                    icon               = NxIcon.MusicNote,
+                    contentDescription = s.audioPickTrack,
+                    tint               = NxColor.lead(),
+                    modifier           = Modifier.size(side * 0.34f),
+                )
+            }
         }
     }
 }

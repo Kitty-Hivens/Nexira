@@ -1,7 +1,8 @@
 package hivens.ui.components
 
 import androidx.compose.runtime.Composable
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Confirm gate for an irreversible action: [ConfirmDialog] with the error colour
@@ -22,6 +23,6 @@ fun DestructiveConfirmDialog(
         confirmLabel = confirmLabel,
         onConfirm    = onConfirm,
         onDismiss    = onDismiss,
-        confirmColor = NxTheme.colors.error,
+        confirmColor = NxColor.status(Status.Error),
     )
 }

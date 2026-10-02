@@ -21,8 +21,8 @@ import hivens.ui.chrome.rememberCrumbLabel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
+import hivens.ui.theme.NxInk
 
 /**
  * Clickable breadcrumb of the current location (Modrinth-style). Back button +
@@ -60,7 +60,7 @@ fun TopBarBreadcrumbWidget() {
                 Symbol(
                     icon = NxIcon.ChevronRight,
                     contentDescription = null,
-                    tint = NxTheme.colors.textSecondary,
+                    tint = NxInk.quiet,
                     size = 16.dp,
                 )
             }
@@ -89,7 +89,7 @@ private fun NavArrow(
             icon = NxIcon.ArrowBack,
             contentDescription = contentDescription,
             modifier = if (mirrored) Modifier.graphicsLayer { scaleX = -1f } else Modifier,
-            tint = NxTheme.colors.textSecondary.copy(alpha = if (enabled) 1f else 0.3f),
+            tint = NxInk.quiet.copy(alpha = if (enabled) 1f else 0.3f),
             size = 18.dp,
         )
     }
@@ -100,7 +100,7 @@ private fun CrumbSegment(label: String, isLast: Boolean, onClick: () -> Unit, mo
     Text(
         text = label,
         style = MaterialTheme.typography.labelLarge,
-        color = if (isLast) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary,
+        color = if (isLast) NxInk.main else NxInk.quiet,
         fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Normal,
         maxLines = 1,
         // Said with an ellipsis rather than cut. maxLines alone leaves the default

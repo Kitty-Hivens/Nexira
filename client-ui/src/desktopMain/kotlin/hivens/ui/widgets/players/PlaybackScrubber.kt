@@ -32,7 +32,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * The seek control the new players share.
@@ -71,7 +72,7 @@ internal fun PlaybackScrubber(
     enabled: Boolean,
     onSeekFraction: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    accent: Color = NxTheme.colors.primary,
+    accent: Color = NxColor.lead(),
 ) {
     val seek by rememberUpdatedState(onSeekFraction)
     val interaction = remember { MutableInteractionSource() }
@@ -130,7 +131,7 @@ internal fun PlaybackScrubber(
                 .fillMaxWidth()
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(NxTheme.colors.textSecondary.copy(alpha = 0.22f)),
+                .background(NxInk.quiet.copy(alpha = 0.22f)),
         )
         Box(
             Modifier
@@ -139,7 +140,7 @@ internal fun PlaybackScrubber(
                 .clip(RoundedCornerShape(50))
                 .background(
                     if (enabled) accent
-                    else NxTheme.colors.textSecondary.copy(alpha = 0.35f),
+                    else NxInk.quiet.copy(alpha = 0.35f),
                 ),
         )
         // Drawn in the on-accent colour, not the accent: a dot of the fill's own
@@ -153,7 +154,7 @@ internal fun PlaybackScrubber(
                     .offset { IntOffset((shown * widthPx - halfPx).toInt(), 0) }
                     .size(handleSize)
                     .clip(CircleShape)
-                    .background(NxTheme.colors.onPrimary),
+                    .background(NxColor.on(NxColor.lead())),
             )
         }
     }

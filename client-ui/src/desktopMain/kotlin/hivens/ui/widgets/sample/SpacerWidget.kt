@@ -12,13 +12,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class SpacerProps(
@@ -37,7 +37,7 @@ fun SpacerWidget(instance: WidgetInstance) {
         Spacer(Modifier.fillMaxWidth().height(h))
         return
     }
-    val lineColor = NxTheme.colors.outline.copy(alpha = 0.35f)
+    val lineColor = NxInk.line.copy(alpha = 0.35f)
     Canvas(
         modifier = Modifier
             .fillMaxWidth()

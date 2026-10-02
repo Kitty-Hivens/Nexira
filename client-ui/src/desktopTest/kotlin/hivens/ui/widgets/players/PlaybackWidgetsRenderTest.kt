@@ -27,6 +27,8 @@ import java.nio.file.Path
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * What the two playback surfaces actually look like, off-screen, across both
@@ -66,13 +68,13 @@ class PlaybackWidgetsRenderTest {
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(useDarkTheme = dark) {
+            NxTheme(dark = dark) {
                 CompositionLocalProvider(
                     LocalStrings provides EnglishStrings,
                 ) {
-                    progressAccent = NxTheme.colors.progressAccent
+                    progressAccent = NxColor.status(Status.Info)
                     Column(
-                        modifier            = Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp),
+                        modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { content() }
                 }

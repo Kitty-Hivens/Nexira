@@ -77,15 +77,25 @@ class SurfaceSpecTest {
     }
 
     @Test
-    fun `a rung is recognised by name, in any case`() {
-        assertEquals(FillSource.Rung("raised"), parseFill("raised"))
-        assertEquals(FillSource.Rung("floating"), parseFill("Floating"))
-        assertEquals(FillSource.Rung("sunken"), parseFill("  SUNKEN "))
+    fun `a surface word is recognised by name, in any case`() {
+        assertEquals(FillSource.Named("card"), parseFill("card"))
+        assertEquals(FillSource.Named("popup"), parseFill("Popup"))
+        assertEquals(FillSource.Named("field"), parseFill("  FIELD "))
     }
 
     @Test
-    fun `every declared rung parses`() {
-        for (rung in SURFACE_RUNGS) assertEquals(FillSource.Rung(rung), parseFill(rung))
+    fun `every declared word parses`() {
+        for (word in SURFACE_WORDS) assertEquals(FillSource.Named(word), parseFill(word))
+    }
+
+    @Test
+    fun `a file written with the old rungs reads as the word that plays their part`() {
+        // The layout is wiped once and never again, so an old name is translated
+        // rather than refused.
+        assertEquals(FillSource.Named("field"), parseFill("sunken"))
+        assertEquals(FillSource.Named("panel"), parseFill("base"))
+        assertEquals(FillSource.Named("card"), parseFill("Raised"))
+        assertEquals(FillSource.Named("popup"), parseFill("floating"))
     }
 
     @Test

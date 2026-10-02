@@ -29,7 +29,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +46,8 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
@@ -148,7 +149,6 @@ internal fun GroundPlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -164,7 +164,7 @@ internal fun GroundPlayerCard(
             // the only affordance this shape has, so it has to be the one.
             .openWhenEmpty(idle, s.audioPickTrack, onPick),
     ) {
-        Ground(track?.artwork, palette.surfaceContainer, palette.primary, palette.tertiary)
+        Ground(track?.artwork)
         // Three stops, and only the middle one is on the knob.
         //
         // The ends carry the text and the wave, so their cover is not a matter of
@@ -250,7 +250,7 @@ internal fun GroundPlayerCard(
                 WaveformStrip(
                     waveform       = waveform,
                     fraction       = progressFraction(state),
-                    played         = palette.primary,
+                    played         = NxColor.lead(),
                     // White rather than the tonal secondary: the ink under this
                     // strip is a photograph, and a palette grey disappears into it
                     // on half the covers there are.
@@ -312,7 +312,7 @@ internal fun GroundPlayerCard(
                             Text(
                                 text  = repeatAnswer(repeat, s),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = palette.textPrimary,
+                                color = NxInk.main,
                             )
                         }
                     }
@@ -331,7 +331,7 @@ internal fun GroundPlayerCard(
  * the cover meets the corner.
  */
 @Composable
-private fun Ground(artwork: ImageBitmap?, base: Color, primary: Color, tertiary: Color) {
+private fun Ground(artwork: ImageBitmap?) {
     if (artwork != null) {
         Image(
             bitmap             = artwork,
@@ -340,10 +340,12 @@ private fun Ground(artwork: ImageBitmap?, base: Color, primary: Color, tertiary:
             modifier           = Modifier.fillMaxSize().blur(GROUND_BLUR, BlurredEdgeTreatment.Unbounded),
         )
     } else {
+        val colors = NxTheme.colours.scheme.colors
+        val third = colors.getOrElse(2) { colors.getOrElse(1) { colors.first() } }
         Box(
             Modifier.fillMaxSize().background(
                 Brush.linearGradient(
-                    listOf(lerp(base, primary, 0.30f), lerp(base, tertiary, 0.16f)),
+                    listOf(NxColor.wash(NxColor.lead(), 0.30f), NxColor.wash(third, 0.16f)),
                 ),
             ),
         )

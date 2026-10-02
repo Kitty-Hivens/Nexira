@@ -39,10 +39,11 @@ import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 private const val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 
@@ -125,7 +126,7 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
             text = session.playerName,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = NxTheme.colors.textPrimary,
+            color = NxInk.main,
         )
         UuidCard(session.uuid)
         // The live skin + cape manager (Mojang-sourced, not the SmartyCraft skin
@@ -148,23 +149,23 @@ private fun UuidCard(uuid: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.background.copy(alpha = 0.4f))
+            .background(NxColor.page.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
-            Text("UUID", style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+            Text("UUID", style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
             Spacer(Modifier.height(2.dp))
             Text(
                 text = dashedUuid(uuid),
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = LocalMonoFamily.current,
-                color = NxTheme.colors.textPrimary,
+                color = NxInk.main,
             )
         }
         IconButton(onClick = { SystemActions.copyToClipboard(uuid) }) {
-            Symbol(NxIcon.ContentCopy, "UUID", tint = NxTheme.colors.textSecondary)
+            Symbol(NxIcon.ContentCopy, "UUID", tint = NxInk.quiet)
         }
         PuppetClick("account.microsoft.copyUuid") { SystemActions.copyToClipboard(uuid) }
     }

@@ -19,12 +19,12 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class QuickLaunchProps(
@@ -40,7 +40,7 @@ data class QuickLaunchProps(
     id = "home.new.quicklaunch",
     displayName = "widget.home.new.quicklaunch",
     propsClass = QuickLaunchProps::class,
-    surface = """{"fill":"base","opacity":0.45,"padding":{"top":12.0}}""",
+    surface = """{"fill":"panel","opacity":0.45,"padding":{"top":12.0}}""",
 )
 @Composable
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
@@ -60,7 +60,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         Text(
             text       = label,
             style      = MaterialTheme.typography.labelLarge,
-            color      = NxTheme.colors.textSecondary,
+            color      = NxInk.quiet,
             fontWeight = FontWeight.Medium,
         )
         Row(
@@ -72,13 +72,13 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 Text(
                     text       = target.displayName,
                     style      = MaterialTheme.typography.titleMedium,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text  = target.packRef.id,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             Spacer(Modifier.width(12.dp))

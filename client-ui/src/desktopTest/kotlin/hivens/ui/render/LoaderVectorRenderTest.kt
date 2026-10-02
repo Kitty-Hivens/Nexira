@@ -37,6 +37,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * The loader glyph as a PATH against the loader glyph as a PICTURE.
@@ -153,7 +155,7 @@ class LoaderVectorRenderTest {
     private fun Caption(text: String) = Text(
         text  = text,
         style = MaterialTheme.typography.labelSmall,
-        color = NxTheme.colors.textSecondary,
+        color = NxInk.quiet,
     )
 
     private val sizes = listOf(16.dp, 24.dp, 48.dp, 96.dp)
@@ -165,8 +167,8 @@ class LoaderVectorRenderTest {
         val ink = Color(0xFFE8E8EC)
         val accent = Color(0xFFB794F6)
         val scene = ImageComposeScene(1160, 860, density = Density(2f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Caption("вектор: fabric и neoforge на 16 / 24 / 48 / 96 dp")
                         Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.Bottom) {

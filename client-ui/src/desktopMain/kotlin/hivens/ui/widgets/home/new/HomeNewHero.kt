@@ -36,7 +36,6 @@ import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.widget.api.rememberProps
@@ -73,7 +72,7 @@ fun HomeNewHero(instance: WidgetInstance) {
     val s = LocalStrings.current
     val quickLaunch = rememberQuickLaunchTarget(s.homeQuickButton) ?: return
     val target = quickLaunch.target
-    val (hueA, hueB) = NxTheme.colors.decorativePair(target.id)
+    val (hueA, hueB) = decorativePair(target.id)
     val art = rememberPackArt(target)
 
     val eyebrow = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart

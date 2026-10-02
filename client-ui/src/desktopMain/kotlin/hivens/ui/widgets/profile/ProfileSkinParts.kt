@@ -35,7 +35,6 @@ import hivens.ui.skin3d.SkinFraming
 import hivens.ui.skin3d.SkinView3D
 import hivens.ui.skin3d.SkinViewState
 import hivens.ui.skin3d.rememberSkinViewState
-import hivens.ui.theme.NxTheme
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -46,6 +45,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 // Shared skin pieces for the profile surface: the live 3D view ([SkinHero]),
 // the upload/refresh logic ([rememberSkinUploader]) and its block + status
@@ -101,12 +103,12 @@ fun SkinHero(
             )
         } else if (!resolved) {
             CircularProgressIndicator(
-                color = NxTheme.colors.primary,
+                color = NxColor.lead(),
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(28.dp),
             )
         } else {
-            Symbol(NxIcon.Person, null, tint = NxTheme.colors.textSecondary, size = 48.dp)
+            Symbol(NxIcon.Person, null, tint = NxInk.quiet, size = 48.dp)
         }
     }
 }
@@ -174,7 +176,7 @@ fun SkinControls(session: SessionData, onSkinChanged: () -> Unit, modifier: Modi
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = uploader.pick) { Text(s.profileUploadSkin) }
             IconButton(onClick = uploader.refresh) {
-                Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxTheme.colors.textSecondary)
+                Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxInk.quiet)
             }
         }
     }
@@ -184,8 +186,8 @@ fun SkinControls(session: SessionData, onSkinChanged: () -> Unit, modifier: Modi
 fun SkinUploadStatusLine(status: UploadStatus) {
     val s = LocalStrings.current
     when (status) {
-        is UploadStatus.Error -> StatusLine(status.message, NxTheme.colors.error)
-        UploadStatus.Loading  -> StatusLine(s.profileUploadSkinLoading, NxTheme.colors.textSecondary)
+        is UploadStatus.Error -> StatusLine(status.message, NxColor.status(Status.Error))
+        UploadStatus.Loading  -> StatusLine(s.profileUploadSkinLoading, NxInk.quiet)
         // Success is silent on purpose -- the changed skin is the feedback.
         is UploadStatus.Success, UploadStatus.None -> Unit
     }

@@ -14,8 +14,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.nx.NxSwitch
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Developer-only debug panel for testing April Fools behavior.
@@ -89,8 +91,8 @@ fun AprilFoolsDebugPanel() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .border(1.dp, NxTheme.colors.error.copy(alpha = 0.4f), MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.error.copy(alpha = 0.06f))
+            .border(1.dp, NxColor.status(Status.Error).copy(alpha = 0.4f), MaterialTheme.shapes.medium)
+            .background(NxColor.status(Status.Error).copy(alpha = 0.06f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -100,18 +102,18 @@ fun AprilFoolsDebugPanel() {
             Text(
                 text       = "🐣 April Fools Debug",
                 fontWeight = FontWeight.Bold,
-                color      = NxTheme.colors.error,
+                color      = NxColor.status(Status.Error),
                 fontSize   = 13.sp,
             )
             Spacer(Modifier.weight(1f))
             Text(
                 text  = "DEV ONLY (etc. clown)",
                 style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.error.copy(alpha = 0.5f),
+                color = NxColor.status(Status.Error).copy(alpha = 0.5f),
             )
         }
 
-        HorizontalDivider(color = NxTheme.colors.error.copy(alpha = 0.2f))
+        HorizontalDivider(color = NxColor.status(Status.Error).copy(alpha = 0.2f))
 
         // ── Force active toggle ───────────────────────────────────────────────
         Row(
@@ -122,7 +124,7 @@ fun AprilFoolsDebugPanel() {
             Text(
                 text  = "Force active (override date)",
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textPrimary,
+                color = NxInk.main,
             )
             NxSwitch(
                 checked         = isForced,
@@ -139,7 +141,7 @@ fun AprilFoolsDebugPanel() {
                         ChaosState.globalTiltDeg = 0f
                     }
                 },
-                accent = NxTheme.colors.error,
+                accent = NxColor.status(Status.Error),
             )
         }
 
@@ -152,13 +154,13 @@ fun AprilFoolsDebugPanel() {
                 Text(
                     text  = "Intensity",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isForced) NxTheme.colors.textPrimary
-                    else NxTheme.colors.textSecondary,
+                    color = if (isForced) NxInk.main
+                    else NxInk.quiet,
                 )
                 Text(
                     text       = "%.0f%% (day ~${(intensity * 13f + 1f).toInt()})".format(intensity * 100),
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = NxTheme.colors.error,
+                    color      = NxColor.status(Status.Error),
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -168,8 +170,8 @@ fun AprilFoolsDebugPanel() {
                 onValueChange = { AprilFools.debugIntensity = it },
                 enabled       = isForced,
                 colors        = SliderDefaults.colors(
-                    thumbColor       = NxTheme.colors.error,
-                    activeTrackColor = NxTheme.colors.error,
+                    thumbColor       = NxColor.status(Status.Error),
+                    activeTrackColor = NxColor.status(Status.Error),
                 ),
             )
 
@@ -196,13 +198,13 @@ fun AprilFoolsDebugPanel() {
             }
         }
 
-        HorizontalDivider(color = NxTheme.colors.error.copy(alpha = 0.15f))
+        HorizontalDivider(color = NxColor.status(Status.Error).copy(alpha = 0.15f))
 
         // ── Event triggers ────────────────────────────────────────────────────
         Text(
             text  = "Trigger event now",
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -226,7 +228,7 @@ fun AprilFoolsDebugPanel() {
         Text(
             text  = "Registered: ${ChaosState.buttons.size} | Active: ${ChaosState.activeCount()}",
             style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
+            color = NxInk.quiet.copy(alpha = 0.5f),
         )
 
         // ── Reset ─────────────────────────────────────────────────────────────
@@ -245,7 +247,7 @@ fun AprilFoolsDebugPanel() {
             },
             modifier = Modifier.fillMaxWidth(),
             colors   = ButtonDefaults.outlinedButtonColors(
-                contentColor = NxTheme.colors.error,
+                contentColor = NxColor.status(Status.Error),
             ),
             shape    = MaterialTheme.shapes.small,
         ) {

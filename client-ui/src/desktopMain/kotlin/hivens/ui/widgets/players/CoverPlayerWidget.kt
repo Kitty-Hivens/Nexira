@@ -48,8 +48,7 @@ import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -58,6 +57,9 @@ import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
 
 /**
  * The cover-led player: the album art carries the card, the words sit beside it,
@@ -145,7 +147,7 @@ internal fun CoverPlayerCard(
     val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
 
-    NxSurface(NxSurfaceLevel.Floating, modifier.fillMaxWidth()) {
+    NxSurface(SurfaceKind.Card, modifier.fillMaxWidth()) {
       // The card is measured before it is composed, because a widget's width is
       // not the designer's choice: a free-canvas placement goes down to 48dp and
       // a cube-grid cell is the slot less its gutters over the column count. A
@@ -192,7 +194,7 @@ internal fun CoverPlayerCard(
                     Text(
                         text       = title,
                         style      = MaterialTheme.typography.titleMedium,
-                        color      = NxTheme.colors.textPrimary,
+                        color      = NxInk.main,
                         fontWeight = FontWeight.SemiBold,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
@@ -204,7 +206,7 @@ internal fun CoverPlayerCard(
                     Text(
                         text       = artist,
                         style      = MaterialTheme.typography.bodyMedium,
-                        color      = NxTheme.colors.textSecondary,
+                        color      = NxInk.quiet,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
                         fontFamily = familyForText(artist),
@@ -214,7 +216,7 @@ internal fun CoverPlayerCard(
                         Text(
                             text       = album,
                             style      = MaterialTheme.typography.bodySmall,
-                            color      = NxTheme.colors.textSecondary.copy(alpha = 0.8f),
+                            color      = NxInk.quiet,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
                             fontFamily = familyForText(album),
@@ -327,7 +329,7 @@ internal fun CoverPlayerCard(
                             Text(
                                 text  = repeatAnswer(repeat, s),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = NxTheme.colors.textPrimary,
+                                color = NxInk.main,
                             )
                         }
                     }
@@ -349,7 +351,7 @@ private fun Timecode(text: String) {
     Text(
         text     = text,
         style    = MaterialTheme.typography.labelSmall,
-        color    = NxTheme.colors.textSecondary,
+        color    = NxInk.quiet,
         maxLines = 1,
         softWrap = false,
     )
@@ -362,33 +364,36 @@ private fun Timecode(text: String) {
 @Composable
 private fun CoverArt(track: TrackInfo?, onPick: () -> Unit, side: Dp) {
     val s = LocalStrings.current
-    Box(
-        modifier = Modifier
-            // A fixed square, not a proportional one: fillMaxHeight plus
-            // aspectRatio in a Row whose height nothing pins takes every pixel
-            // it can and turns the whole card into a square, which is how the
-            // first render of this came out.
-            .size(side)
-            .clip(RoundedCornerShape(12.dp))
-            .background(NxTheme.colors.primary.copy(alpha = 0.16f))
-            .clickable(onClick = onPick),
-        contentAlignment = Alignment.Center,
-    ) {
-        val artwork = track?.artwork
-        if (artwork != null) {
-            Image(
-                bitmap             = artwork,
-                contentDescription = null,
-                contentScale       = ContentScale.Crop,
-                modifier           = Modifier.fillMaxSize(),
-            )
-        } else {
-            Symbol(
-                icon               = NxIcon.MusicNote,
-                contentDescription = s.audioPickTrack,
-                tint               = NxTheme.colors.primary,
-                modifier           = Modifier.size(side * 0.33f),
-            )
+    val well = NxColor.wash(NxColor.lead(), 0.16f)
+    OnFill(well) {
+        Box(
+            modifier = Modifier
+                // A fixed square, not a proportional one: fillMaxHeight plus
+                // aspectRatio in a Row whose height nothing pins takes every pixel
+                // it can and turns the whole card into a square, which is how the
+                // first render of this came out.
+                .size(side)
+                .clip(RoundedCornerShape(12.dp))
+                .background(well)
+                .clickable(onClick = onPick),
+            contentAlignment = Alignment.Center,
+        ) {
+            val artwork = track?.artwork
+            if (artwork != null) {
+                Image(
+                    bitmap             = artwork,
+                    contentDescription = null,
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier.fillMaxSize(),
+                )
+            } else {
+                Symbol(
+                    icon               = NxIcon.MusicNote,
+                    contentDescription = s.audioPickTrack,
+                    tint               = NxColor.lead(),
+                    modifier           = Modifier.size(side * 0.33f),
+                )
+            }
         }
     }
 }
@@ -422,30 +427,29 @@ private fun SkipKey(icon: IconKey, name: String, enabled: Boolean, onClick: () -
 @Composable
 private fun TransportKey(playing: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
-    Box(
-        modifier = Modifier
-            .size(38.dp)
-            .clip(CircleShape)
-            .background(
-                if (enabled) NxTheme.colors.primary
-                else NxTheme.colors.surfaceVariant.copy(alpha = 0.4f),
+    val lead = NxColor.lead()
+    val fill = if (enabled) lead else NxColor.wash(NxInk.quiet, 0.12f)
+    OnFill(fill) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(fill)
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Symbol(
+                icon               = if (playing) NxIcon.Pause else NxIcon.PlayArrow,
+                contentDescription = if (playing) s.audioPause else s.audioPlay,
+                // The scheme's own answer for what reads on the lead colour, not white.
+                // The dark theme's lead is a light purple, and white on it measures
+                // 2.65 to 1, under even the large-graphic floor. A dark lead still
+                // gets a light ink from the same request.
+                tint               = if (enabled) NxColor.on(lead) else NxInk.off,
+                fill               = 1f,
+                weight             = 500,
+                modifier           = Modifier.size(20.dp),
             )
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Symbol(
-            icon               = if (playing) NxIcon.Pause else NxIcon.PlayArrow,
-            contentDescription = if (playing) s.audioPause else s.audioPlay,
-            // The palette's own answer for what reads on the accent, not white.
-            // The dark theme's primary is a light purple and its onPrimary is
-            // BLACK: white on it measures 2.65 to 1, under even the large-graphic
-            // floor, where the token gives 7.93. The light theme's onPrimary is
-            // white anyway, so this changes nothing there and fixes the other.
-            tint               = if (enabled) NxTheme.colors.onPrimary
-                                 else NxTheme.colors.textSecondary.copy(alpha = 0.4f),
-            fill               = 1f,
-            weight             = 500,
-            modifier           = Modifier.size(20.dp),
-        )
+        }
     }
 }

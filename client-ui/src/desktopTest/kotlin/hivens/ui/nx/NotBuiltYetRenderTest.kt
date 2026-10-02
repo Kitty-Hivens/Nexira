@@ -16,13 +16,14 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.RussianStrings
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
  * The unbuilt-feature placeholder beside the error it must not be mistaken for.
@@ -38,13 +39,13 @@ class NotBuiltYetRenderTest {
         val out = Path.of("build/render", "not-built-yet.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(760, 620, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 CompositionLocalProvider(LocalStrings provides RussianStrings) {
                     val s = LocalStrings.current
-                    Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp)) {
+                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             NxSurface(
-                                level = NxSurfaceLevel.Raised,
+                                kind = SurfaceKind.Card,
                                 modifier = Modifier.fillMaxWidth().height(260.dp),
                             ) {
                                 NxNotBuiltYet(
@@ -55,7 +56,7 @@ class NotBuiltYetRenderTest {
                                 )
                             }
                             NxSurface(
-                                level = NxSurfaceLevel.Raised,
+                                kind = SurfaceKind.Card,
                                 modifier = Modifier.fillMaxWidth().height(260.dp),
                             ) {
                                 RetryStateBlock(

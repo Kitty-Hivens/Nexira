@@ -12,12 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class LibraryHeaderProps(
@@ -38,14 +38,14 @@ fun LibraryHeader(instance: WidgetInstance) {
         Text(
             text       = p.title.ifBlank { s.libraryHeaderTitle },
             style      = MaterialTheme.typography.headlineSmall,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text  = p.subtitle.ifBlank { s.libraryHeaderSubtitle },
             style = MaterialTheme.typography.bodyMedium,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
     }
 }

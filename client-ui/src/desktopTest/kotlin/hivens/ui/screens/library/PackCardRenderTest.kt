@@ -46,6 +46,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import hivens.ui.settle
+import hivens.ui.theme.NxColor
 
 /**
  * Every card that stacks metadata chips over cover art, in one sheet.
@@ -152,8 +153,8 @@ class PackCardRenderTest {
         val d = 2f
         val scene = ImageComposeScene((520 * d).toInt(), (480 * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.RUSSIAN) {
-                NxTheme(useDarkTheme = dark) {
-                    Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp)) {
+                NxTheme(dark = dark) {
+                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                         Column(
                             modifier = Modifier.width(488.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),

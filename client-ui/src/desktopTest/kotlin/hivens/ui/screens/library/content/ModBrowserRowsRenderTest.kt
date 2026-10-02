@@ -20,6 +20,8 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * A search result in each of the four states it can be found in.
@@ -38,7 +40,7 @@ class ModBrowserRowsRenderTest {
     @Test
     fun `a result row in each of its four states`() {
         render(1800, 700, "mod-browser-rows.png", Density(2f)) {
-            Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            Box(Modifier.fillMaxSize().background(NxColor.page)) {
                 Column(
                     modifier            = Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -70,7 +72,7 @@ class ModBrowserRowsRenderTest {
         Text(
             text     = text,
             style    = MaterialTheme.typography.labelSmall,
-            color    = NxTheme.colors.textSecondary,
+            color    = NxInk.quiet,
             modifier = Modifier.padding(bottom = 4.dp),
         )
     }
@@ -85,7 +87,7 @@ class ModBrowserRowsRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = density) {
-            NxTheme(useDarkTheme = true) { content() }
+            NxTheme(dark = true) { content() }
         }
         val png = try {
             var frameNanos = 0L

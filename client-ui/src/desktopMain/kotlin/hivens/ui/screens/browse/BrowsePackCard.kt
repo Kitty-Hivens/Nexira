@@ -39,7 +39,6 @@ import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.theme.Dimens
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 
 /**
@@ -62,7 +61,7 @@ fun BrowsePackCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
+    val (hueA, hueB) = decorativePair(pack.id)
     Box(
         modifier = modifier
             .fillMaxWidth()

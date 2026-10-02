@@ -29,6 +29,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
 
 /**
  * One build's page, from the fixtures the project page's sheet already uses.
@@ -129,9 +130,9 @@ class ModVersionPageRenderTest {
         val out = Path.of("build/render", "modversion-build.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1160, 900, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 CompositionLocalProvider(LocalStrings provides RussianStrings) {
-                    Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(14.dp)) {
+                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                         ModVersionBody(
                             project = project(),
                             build = build(),

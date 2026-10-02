@@ -41,9 +41,11 @@ import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -146,14 +148,13 @@ internal fun WavePlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
 
     NxSurface(
-        level    = NxSurfaceLevel.Floating,
+        kind     = SurfaceKind.Card,
         modifier = modifier.fillMaxWidth(),
         shape    = MaterialTheme.shapes.medium,
     ) {
@@ -179,20 +180,23 @@ internal fun WavePlayerCard(
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val disc = NxColor.wash(NxColor.lead(), 0.3f)
                     Box(
-                        Modifier.size(46.dp).clip(CircleShape).background(palette.primaryContainer),
+                        Modifier.size(46.dp).clip(CircleShape).background(disc),
                         contentAlignment = Alignment.Center,
                     ) {
-                        NxIconButton(
-                            icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
-                            contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
-                            onClick            = onPlayPause,
-                            tint               = palette.onPrimaryContainer,
-                            enabled            = loaded,
-                            iconSize           = 22.dp,
-                            fill               = 1f,
-                            weight             = 500,
-                        )
+                        OnFill(disc) {
+                            NxIconButton(
+                                icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
+                                contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
+                                onClick            = onPlayPause,
+                                tint               = NxInk.main,
+                                enabled            = loaded,
+                                iconSize           = 22.dp,
+                                fill               = 1f,
+                                weight             = 500,
+                            )
+                        }
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
@@ -200,7 +204,7 @@ internal fun WavePlayerCard(
                         Text(
                             text       = name,
                             style      = MaterialTheme.typography.bodyLarge,
-                            color      = palette.textPrimary,
+                            color      = NxInk.main,
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
@@ -212,8 +216,8 @@ internal fun WavePlayerCard(
                         WaveformStrip(
                             waveform       = waveform,
                             fraction       = progressFraction(state),
-                            played         = palette.primary,
-                            remaining      = palette.textSecondary.copy(alpha = 0.28f),
+                            played         = NxColor.lead(),
+                            remaining      = NxColor.wash(NxInk.quiet, 0.28f),
                             onSeekFraction = if (loaded && duration > 0L) {
                                 { onSeek((it * duration).toLong()) }
                             } else {
@@ -228,7 +232,7 @@ internal fun WavePlayerCard(
                                     Text(
                                         text       = elapsedLabel(state).ifEmpty { EMPTY_CLOCK },
                                         style      = MaterialTheme.typography.labelSmall,
-                                        color      = palette.textSecondary,
+                                        color      = NxInk.quiet,
                                         fontFamily = LocalMonoFamily.current,
                                         maxLines   = 1,
                                         softWrap   = false,
@@ -240,7 +244,7 @@ internal fun WavePlayerCard(
                                         icon               = NxIcon.SkipPrevious,
                                         contentDescription = s.audioSkipPrevious,
                                         onClick            = onSkipPrev,
-                                        tint               = palette.textPrimary.copy(alpha = 0.7f),
+                                        tint               = NxColor.wash(NxInk.main, 0.7f),
                                         enabled            = loaded,
                                         iconSize           = 16.dp,
                                         fill               = 1f,
@@ -250,7 +254,7 @@ internal fun WavePlayerCard(
                                         icon               = NxIcon.SkipNext,
                                         contentDescription = s.audioSkipNext,
                                         onClick            = onSkipNext,
-                                        tint               = palette.textPrimary.copy(alpha = 0.7f),
+                                        tint               = NxColor.wash(NxInk.main, 0.7f),
                                         enabled            = loaded,
                                         iconSize           = 16.dp,
                                         fill               = 1f,
@@ -262,7 +266,7 @@ internal fun WavePlayerCard(
                                     Text(
                                         text       = totalLabel(state).ifEmpty { EMPTY_CLOCK },
                                         style      = MaterialTheme.typography.labelSmall,
-                                        color      = palette.textSecondary,
+                                        color      = NxInk.quiet,
                                         fontFamily = LocalMonoFamily.current,
                                         maxLines   = 1,
                                         softWrap   = false,
@@ -320,7 +324,7 @@ internal fun WavePlayerCard(
                                 Text(
                                     text  = repeatAnswer(repeat, s),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = palette.textPrimary,
+                                    color = NxInk.main,
                                 )
                             }
                         }

@@ -88,8 +88,8 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.bevelHairline
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.CancellationToken
@@ -101,6 +101,8 @@ import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import java.awt.Desktop
 import java.net.URI
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * In-launcher HTML renderer -- the velocipede before the standalone lib extraction
@@ -206,7 +208,7 @@ fun MarkdownHtml(
 fun HtmlBody(
     html: String,
     modifier: Modifier = Modifier,
-    baseColor: Color = NxTheme.colors.textPrimary,
+    baseColor: Color = NxInk.main,
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
     val parsed by produceState<Pair<String, Element>?>(null, html) {
@@ -216,7 +218,7 @@ fun HtmlBody(
     val ctx = InlineCtx(
         linkColor = linkColor(baseColor),
         baseColor = baseColor,
-        codeBg = NxTheme.colors.surface,
+        codeBg = NxColor.wash(NxInk.quiet, CODE_WASH),
     )
     Column(modifier, verticalArrangement = Arrangement.spacedBy(BLOCK_GAP)) {
         blocks(body, ctx, onLink)
@@ -248,6 +250,9 @@ private fun linkColor(onBase: Color): Color =
 
 private val LINK_ON_DARK = Color(0xFF63A9FF)
 private val LINK_ON_LIGHT = Color(0xFF1A62CC)
+
+/** How far inline code is tinted toward the quiet ink, so it stands apart on whatever plane holds the text. */
+private const val CODE_WASH = 0.12f
 
 /** A highlighter's yellow, thin enough that text in either theme stays readable over it. */
 private val MARK_BG = Color(0x66FFD54F)
@@ -423,7 +428,7 @@ private fun ColumnScope.block(
                 // section from the paragraph above it once a description runs long
                 // enough to have sections at all.
                 if (ruled) HorizontalDivider(
-                    color = NxTheme.colors.outline.copy(alpha = 0.35f),
+                    color = NxInk.line,
                     modifier = Modifier.padding(top = 5.dp),
                 )
             }
@@ -470,7 +475,7 @@ private fun ColumnScope.block(
         // characters of markdown -- took over a minute to lay out one line, on the
         // thread that draws. Drawing it behind the content costs one rectangle.
         "blockquote" -> {
-            val bar = NxTheme.colors.primary.copy(alpha = 0.55f)
+            val bar = NxColor.wash(NxColor.lead(), 0.55f)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -482,21 +487,20 @@ private fun ColumnScope.block(
         // Scrolls sideways rather than wrapping. Wrapped code is code with its
         // structure taken out, and a line long enough to wrap is usually the one
         // being copied.
-        "pre" -> Box(
-            Modifier.fillMaxWidth()
-                .clip(MaterialTheme.shapes.small)
-                .background(NxTheme.colors.surface)
-                .border(1.dp, bevelHairline(NxTheme.colors.surface), MaterialTheme.shapes.small)
-                .horizontalScroll(rememberScrollState())
-                .padding(12.dp),
-        ) {
-            Text(
-                el.wholeText().trimEnd(),
-                style = TextStyle(color = ctx.baseColor, fontFamily = FontFamily.Monospace),
-            )
+        "pre" -> NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
+            Box(
+                Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(12.dp),
+            ) {
+                Text(
+                    el.wholeText().trimEnd(),
+                    style = TextStyle(color = ctx.baseColor, fontFamily = FontFamily.Monospace),
+                )
+            }
         }
         "hr" -> HorizontalDivider(
-            color = NxTheme.colors.outline.copy(alpha = 0.4f),
+            color = NxInk.line,
             modifier = Modifier.padding(vertical = 6.dp),
         )
         "img" -> ImageBlock(el)
@@ -550,32 +554,35 @@ private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, de
     // declared once, on the header or the first row, and every row below is meant
     // to line up under it.
     val columns = remember(el) { tableColumns(cellsByRow) }
-    val shape = MaterialTheme.shapes.small
-    val body = NxTheme.colors.surface
-    val line = bevelHairline(body, 0.14f)
-    val banded = bevelHairline(body, 0.05f)
-    val headerBg = bevelHairline(body, 0.10f)
-    Column(
-        Modifier.fillMaxWidth()
-            .clip(shape)
-            .background(body)
-            .border(1.dp, line, shape),
-    ) {
-        rows.forEachIndexed { rowIdx, tr ->
-            val cells = cellsByRow[rowIdx]
-            val slots = remember(tr) { rowSlots(cells, columns) }
-            val header = cells.any { it.tagName().equals("th", true) }
-            TableRow(
-                slots = slots,
-                line = line,
-                modifier = Modifier.background(if (header) headerBg else if (rowIdx % 2 == 0) body else banded),
-            ) {
-                cells.forEach { cell -> TableCell(cell, header, ctx, onLink, depth) }
+    NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
+        val line = NxInk.line
+        val banded = NxColor.wash(NxInk.main, BANDED_ROW_WASH)
+        val headerBg = NxColor.wash(NxInk.main, HEADER_ROW_WASH)
+        Column(Modifier.fillMaxWidth()) {
+            rows.forEachIndexed { rowIdx, tr ->
+                val cells = cellsByRow[rowIdx]
+                val slots = remember(tr) { rowSlots(cells, columns) }
+                val header = cells.any { it.tagName().equals("th", true) }
+                TableRow(
+                    slots = slots,
+                    line = line,
+                    modifier = when {
+                        header -> Modifier.background(headerBg)
+                        rowIdx % 2 == 0 -> Modifier
+                        else -> Modifier.background(banded)
+                    },
+                ) {
+                    cells.forEach { cell -> TableCell(cell, header, ctx, onLink, depth) }
+                }
+                if (rowIdx < rows.size - 1) HorizontalDivider(color = line)
             }
-            if (rowIdx < rows.size - 1) HorizontalDivider(color = line)
         }
     }
 }
+
+/** How far a banded row and a header row are tinted toward the main ink. */
+private const val BANDED_ROW_WASH = 0.05f
+private const val HEADER_ROW_WASH = 0.10f
 
 /** The nearest table above [el], so a nested table's rows are not taken for the outer one's. */
 private fun owningTable(el: Element): Element? {
@@ -830,14 +837,14 @@ private fun DetailsBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, 
     }
     var open by remember(el) { mutableStateOf(el.hasAttr("open")) }
     val shape = MaterialTheme.shapes.small
-    val line = bevelHairline(NxTheme.colors.surface, 0.14f)
+    val line = NxInk.line
     Column(
         Modifier.fillMaxWidth().clip(shape).border(1.dp, line, shape),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(bevelHairline(NxTheme.colors.surface, 0.10f))
+                .background(NxColor.wash(NxInk.main, HEADER_ROW_WASH))
                 .clickable { open = !open }
                 .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -899,7 +906,7 @@ private fun SizedImage(
     // third party, and an image source is a fetch the page performs on its own.
     // A `file:` source would make remote text drive a local read.
     if (!isFetchableUrl(url) || failed) {
-        if (!alt.isNullOrBlank()) Text(alt, style = TextStyle(color = NxTheme.colors.textSecondary), modifier = modifier)
+        if (!alt.isNullOrBlank()) Text(alt, style = TextStyle(color = NxInk.quiet), modifier = modifier)
         return
     }
     // The picture's own proportions, once it has arrived. A width the column sets
@@ -1138,7 +1145,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
         val ring by animateColorAsState(
-            targetValue = if (hovered && href != null) NxTheme.colors.primary else Color.Transparent,
+            targetValue = if (hovered && href != null) NxColor.lead() else Color.Transparent,
             animationSpec = Motion.tap.of(),
             label = "figure-hover",
         )

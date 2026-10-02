@@ -107,7 +107,7 @@ import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.nexiraCjkFamily
-import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.ThemeLibrary
 import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
@@ -161,6 +161,7 @@ import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxColor
 
 // 2-column Library + sidebar starts collapsing visibly below this width;
 // 600dp of height keeps PackDetail hero + sidebar both reachable. Held
@@ -418,13 +419,6 @@ fun FrameWindowScope.AppShellContent(
     }
 
     var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
-    // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
-    // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
-    // the palette from it. Default-on; the seed is null until a bitmap is decoded.
-    // Switching seeding off is how a theme preset is seen in its own colours, so the
-    // flag is state here rather than a read of the startup snapshot.
-    var paletteFromWallpaper by remember { mutableStateOf(settings.paletteFromWallpaper) }
-    var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
     // Which source drives dark/light: the manual toggle, the OS scheme, or the
     // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
     // persist it), so everything downstream keeps reading one boolean.
@@ -739,8 +733,8 @@ fun FrameWindowScope.AppShellContent(
         val packAutoUpdateService: PackAutoUpdateService = koinInject()
         val applyRecovery: ApplyRecovery = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory, AtomicFiles::writeString) }
-        var customTheme   by remember {
-            val loaded = themeManager.loadTheme()
+        var themeLibrary  by remember {
+            val loaded = themeManager.load()
             // The manager decides read-only on its own, in a module that cannot see
             // the notice registry, so the fact is carried across here. This runs
             // during composition and the notice above is a LaunchedEffect, which
@@ -749,8 +743,8 @@ fun FrameWindowScope.AppShellContent(
             mutableStateOf(loaded)
         }
 
-        // Customization extension: persisted overrides for accent, density,
-        // whether surfaces blur, and the nav rail's selection. Provided via
+        // Customization extension: persisted choices for whether surfaces blur
+        // and how the nav rail draws its selection. Provided via
         // [LocalCustomization] so NxTheme and the surfaces can read them
         // without prop-drilling.
         // coerceInputValues is the half that was missing, and it is the half that
@@ -870,8 +864,8 @@ fun FrameWindowScope.AppShellContent(
         }
 
         // Console window moved inside the CompositionLocalProvider /
-        // NxTheme block below so it inherits the active theme +
-        // customization (accent override, role overrides). The window
+        // NxTheme block below so it inherits the active theme and the
+        // customization. The window
         // itself is a separate OS surface, but Compose Desktop propagates
         // CompositionLocals down through the Window composable.
 
@@ -1023,28 +1017,25 @@ fun FrameWindowScope.AppShellContent(
             ) {
 
             // Console runs as its own OS window but is composed from here so
-            // it inherits LocalCustomization + LocalNxColors via the
-            // Compose composition tree. The internal NxTheme wrap is
-            // what actually projects the palette into the window's surface;
-            // this site only ensures the composition locals are in scope.
+            // it inherits LocalCustomization via the composition tree. Its own
+            // NxTheme wrap is what projects the theme into the window's surface.
+            // This site only ensures the composition locals are in scope.
             if (gameConsole.shouldShowConsole) {
                 // Console preferences are the store's; the window collects them
                 // itself so a slider drag does not recompose the shell.
                 ConsoleWindow(
                     isDarkTheme    = isDarkTheme,
                     onClose        = { gameConsole.hide() },
-                    customTheme    = customTheme,
+                    theme          = themeLibrary.active,
                 )
             }
 
             Box(Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
             NxTheme(
-                useDarkTheme = isDarkTheme,
-                customTheme  = customTheme,
-                paletteSeed  = wallpaperSeed,
-                paletteFromWallpaper = paletteFromWallpaper,
-                uiFamily     = uiFamily,
+                theme    = themeLibrary.active,
+                dark     = isDarkTheme,
+                uiFamily = uiFamily,
             ) {
                 ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
@@ -1064,7 +1055,6 @@ fun FrameWindowScope.AppShellContent(
                     )
                 } else {
                     AppRoot(
-                        onWallpaperSeed = { wallpaperSeed = it },
                         onWallpaperLuminance = { wallpaperLuminance = it },
                         onRealExit   = quit,
                         onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
@@ -1093,17 +1083,10 @@ fun FrameWindowScope.AppShellContent(
                             ))
                         },
                         systemThemeAvailable = systemThemeAvailable,
-                        paletteFromWallpaper = paletteFromWallpaper,
-                        onPaletteFromWallpaperChanged = { seeded ->
-                            paletteFromWallpaper = seeded
-                            settingsService.saveSettings(
-                                settingsService.getSettings().copy(paletteFromWallpaper = seeded),
-                            )
-                        },
-                        customTheme          = customTheme,
-                        onCustomThemeChanged = { newTheme ->
-                            customTheme = newTheme
-                            themeManager.saveTheme(newTheme)
+                        themeLibrary         = themeLibrary,
+                        onThemeSelected      = { id ->
+                            themeLibrary = themeLibrary.copy(selected = id)
+                            themeManager.save(themeLibrary)
                         },
                         currentLocale   = currentLocale,
                         onLocaleChanged = { newLocale ->
@@ -1122,18 +1105,16 @@ fun FrameWindowScope.AppShellContent(
                 } // end ThemeRevealHost
             }
             // Dev UI-debug overlay: top of the shell Box z-order (above AppRoot and
-            // NotificationStack), its own NxTheme wrap so the accent tracks the style.
+            // NotificationStack), its own NxTheme wrap so it draws in the active theme.
             // Inert unless a non-release build has the master toggle on.
             NxTheme(
-                useDarkTheme = isDarkTheme,
-                customTheme  = customTheme,
-                paletteSeed  = wallpaperSeed,
-                paletteFromWallpaper = paletteFromWallpaper,
-                uiFamily     = uiFamily,
+                theme    = themeLibrary.active,
+                dark     = isDarkTheme,
+                uiFamily = uiFamily,
             ) {
                 DebugOverlay(debugOverlay)
                 // Inside the theme on purpose: the prompts are Dialogs with their own
-                // composition, and one raised from outside finds no NxColors and takes
+                // composition, and one raised from outside finds no theme and takes
                 // the shell down.
                 hivens.ui.components.TwoFactorPromptHost()
                 // Whatever read the host -- the news, a login -- parks its refused
@@ -1187,7 +1168,6 @@ fun FrameWindowScope.AppShellContent(
 
 @Composable
 fun AppRoot(
-    onWallpaperSeed: (Int?) -> Unit,
     onWallpaperLuminance: (Float?) -> Unit,
     isDarkTheme: Boolean,
     onRealExit: () -> Unit,
@@ -1196,10 +1176,8 @@ fun AppRoot(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
-    paletteFromWallpaper: Boolean,
-    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
-    customTheme: CustomTheme,
-    onCustomThemeChanged: (CustomTheme) -> Unit,
+    themeLibrary: ThemeLibrary,
+    onThemeSelected: (String) -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
     customization: CustomizationSettings,
@@ -1390,12 +1368,10 @@ fun AppRoot(
     val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
     val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
-    // What the wallpaper tells the palette: its seed colour and its overall
-    // brightness. Nothing else about the image leaves CustomBackground now that a
-    // frosted surface blurs the canvas beneath it instead of reproducing the image.
+    // What the wallpaper tells the shell: its overall brightness, for the mode that
+    // follows the wallpaper between dark and light. It does not colour the theme.
     var tone by remember { mutableStateOf(WallpaperTone(null, null)) }
 
-    LaunchedEffect(tone.seedArgb) { onWallpaperSeed(tone.seedArgb) }
     LaunchedEffect(tone.avgLuminance) { onWallpaperLuminance(tone.avgLuminance) }
 
     Box(
@@ -1405,7 +1381,7 @@ fun AppRoot(
             // first video frame arrives) CustomBackground paints nothing, and without
             // this the bare window default -- a flat grey -- shows through. The theme
             // surface is covered edge-to-edge once the image is ready.
-            .background(NxTheme.colors.background)
+            .background(NxColor.page)
             .onSizeChanged { windowSize = it }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -1458,10 +1434,8 @@ fun AppRoot(
               themeMode = themeMode,
               onThemeModeChanged = onThemeModeChanged,
               systemThemeAvailable = systemThemeAvailable,
-              paletteFromWallpaper = paletteFromWallpaper,
-              onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
-              customTheme = customTheme,
-              onCustomThemeChanged = onCustomThemeChanged,
+              themeLibrary = themeLibrary,
+              onThemeSelected = onThemeSelected,
               currentLocale = currentLocale,
               onLocaleChanged = onLocaleChanged,
               backgroundSettings = backgroundSettings,

@@ -20,8 +20,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.LocalPlane
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.decorativeColor
+import hivens.ui.theme.NxInk
 
 /**
  * One face of a subject stack, and the tile standing for the ones that did not
@@ -43,12 +47,12 @@ import hivens.ui.theme.decorativeColor
  */
 @Composable
 internal fun StackFace(key: String, title: String, icon: Any?, onClick: (() -> Unit)? = null) {
-    val tint = NxTheme.colors.decorativeColor(key)
+    val tint = decorativeColor(key)
     val initials = title.take(2).uppercase()
     val shape = RoundedCornerShape(faceCorner())
     // The ring takes the body colour, so overlapping faces stay separate objects
     // rather than merging into a single blob.
-    val ring = NxTheme.colors.surfaceContainerHigh
+    val ring = bodyColour()
     SubcomposeAsyncImage(
         model = icon,
         contentDescription = null,
@@ -63,7 +67,7 @@ internal fun StackFace(key: String, title: String, icon: Any?, onClick: (() -> U
             Box(Modifier.fillMaxSize().background(tint), contentAlignment = Alignment.Center) {
                 Text(
                     initials,
-                    color = Color.White,
+                    color = NxColor.on(tint),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                 )
@@ -76,22 +80,26 @@ internal fun StackFace(key: String, title: String, icon: Any?, onClick: (() -> U
 @Composable
 internal fun StackOverflow(count: Int) {
     val shape = RoundedCornerShape(faceCorner())
-    Box(
-        Modifier
-            .size(FACE_SIZE)
-            .clip(shape)
-            .background(NxTheme.colors.surfaceContainer)
-            .border(1.5.dp, NxTheme.colors.surfaceContainerHigh, shape),
-        contentAlignment = Alignment.Center,
+    NxSurface(
+        kind          = SurfaceKind.Card,
+        modifier      = Modifier.size(FACE_SIZE),
+        shape         = shape,
+        borderWidthDp = 1.5f,
+        borderColor   = bodyColour(),
     ) {
         Text(
             LocalStrings.current.activityPillMore(count),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
+            modifier = Modifier.align(Alignment.Center),
         )
     }
 }
+
+/** The colour of the plane the stack is drawn on. */
+@Composable
+private fun bodyColour(): Color = LocalPlane.current?.color ?: NxColor.page
 
 /** Capped so a face never rounds into a disc, and still squares under a square form. */
 @Composable

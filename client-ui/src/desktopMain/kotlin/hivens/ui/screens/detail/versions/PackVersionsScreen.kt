@@ -97,8 +97,9 @@ import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
 import hivens.ui.utils.shortNameList
@@ -107,6 +108,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.time.Instant
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /** Which base the changelog diff compares the selected build against. */
 private enum class DiffBase { Previous, Installed }
@@ -237,11 +240,10 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
     val installedBuild = builds?.let { installedBuildOf(it, pack) }
 
     NxSurface(
-        level    = NxSurfaceLevel.Raised,
+        kind     = SurfaceKind.Panel,
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
-            .clip(MaterialTheme.shapes.medium),
+            .padding(16.dp),
     ) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Row(Modifier.weight(1f)) {
@@ -291,7 +293,7 @@ fun PackVersionsScreen(instanceId: String, onBack: () -> Unit) {
                             )
                         }
                     } else if (builds != null && builds!!.isEmpty() && !loadFailed) {
-                        Text(s.packVersionsLoadError, color = NxTheme.colors.textSecondary)
+                        Text(s.packVersionsLoadError, color = NxInk.quiet)
                     }
                 }
             }
@@ -358,7 +360,7 @@ private fun BuildListPane(
             }
         }
         builds == null -> Box(modifier, contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+            CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
         }
         else -> {
             val runs = remember(builds) { groupRebuildRuns(builds) }
@@ -440,68 +442,70 @@ private fun BuildRow(
     onClick: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val shape = MaterialTheme.shapes.medium
     val interaction = remember { MutableInteractionSource() }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(if (isSelected) colors.primary.copy(alpha = 0.14f) else Color.Transparent)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Measured bold, drawn at its current weight. Selecting a build bolded
-            // its number, and a heavier face is wider, so the channel chip and the
-            // tags beside it jumped right on every click down the list.
-            NxSteadyText(
-                text     = build.versionNumber,
-                style    = MaterialTheme.typography.bodyMedium,
-                // Left edge, not centre: this is a column of build numbers, and a
-                // centred label inside a bold-wide box indents every unselected row.
-                align    = Alignment.CenterStart,
-                weight   = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color    = colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            ChannelChip(build.channel)
-            if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
-            else if (isLatest) NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                // Counts are omitted rather than zeroed when the source does not
-                // publish them: a pack that says "0 mods" reads as broken, and
-                // Modrinth cannot answer without handing over the whole archive.
-                // What the build runs on, where the source says so. It is the one
-                // fact that decides whether a switch strands a world, and it lands
-                // in the gap left by a source that publishes no file counts, so
-                // those rows stop reading as though something were missing.
-                text  = listOfNotNull(
-                    formatBuildTimestamp(build.datePublished),
-                    build.modsCount?.let { mods -> build.assetsCount?.let { assets -> s.packVersionsCounts(mods, assets) } },
-                    listOfNotNull(build.minecraftVersion, build.loaderName)
-                        .takeIf { it.isNotEmpty() }
-                        ?.joinToString(" "),
-                ).joinToString("   "),
-                style = MaterialTheme.typography.labelSmall,
-                color = colors.textSecondary,
-            )
-        }
-        if (rebuildTail > 0) {
-            Text(
-                text     = s.packVersionsRebuilds(rebuildTail),
-                style    = MaterialTheme.typography.labelSmall,
-                color    = if (tailShown) colors.primary else colors.textSecondary,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable(onClick = onToggleRun)
-                    .padding(vertical = 2.dp, horizontal = 2.dp),
-            )
+    val fill = if (isSelected) NxColor.wash(NxColor.lead(), 0.14f) else Color.Transparent
+    OnFill(fill) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(fill)
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Measured bold, drawn at its current weight. Selecting a build bolded
+                // its number, and a heavier face is wider, so the channel chip and the
+                // tags beside it jumped right on every click down the list.
+                NxSteadyText(
+                    text     = build.versionNumber,
+                    style    = MaterialTheme.typography.bodyMedium,
+                    // Left edge, not centre: this is a column of build numbers, and a
+                    // centred label inside a bold-wide box indents every unselected row.
+                    align    = Alignment.CenterStart,
+                    weight   = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color    = NxInk.main,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                ChannelChip(build.channel)
+                if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
+                else if (isLatest) NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    // Counts are omitted rather than zeroed when the source does not
+                    // publish them: a pack that says "0 mods" reads as broken, and
+                    // Modrinth cannot answer without handing over the whole archive.
+                    // What the build runs on, where the source says so. It is the one
+                    // fact that decides whether a switch strands a world, and it lands
+                    // in the gap left by a source that publishes no file counts, so
+                    // those rows stop reading as though something were missing.
+                    text  = listOfNotNull(
+                        formatBuildTimestamp(build.datePublished),
+                        build.modsCount?.let { mods -> build.assetsCount?.let { assets -> s.packVersionsCounts(mods, assets) } },
+                        listOfNotNull(build.minecraftVersion, build.loaderName)
+                            .takeIf { it.isNotEmpty() }
+                            ?.joinToString(" "),
+                    ).joinToString("   "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxInk.quiet,
+                )
+            }
+            if (rebuildTail > 0) {
+                Text(
+                    text     = s.packVersionsRebuilds(rebuildTail),
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = if (tailShown) NxColor.lead(text = true) else NxInk.quiet,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(onClick = onToggleRun)
+                        .padding(vertical = 2.dp, horizontal = 2.dp),
+                )
+            }
         }
     }
 }
@@ -523,7 +527,6 @@ private fun BuildDetailPane(
     onSwitch: (UpdateCheck.Available) -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val isInstalled = build.key == installedKey
 
     // Compat preview for a would-be switch; refreshed when the selection or the
@@ -546,7 +549,7 @@ private fun BuildDetailPane(
                 text       = build.versionNumber,
                 style      = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color      = colors.textPrimary,
+                color      = NxInk.main,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
                 modifier   = Modifier.weight(1f, fill = false),
@@ -555,7 +558,7 @@ private fun BuildDetailPane(
             if (isInstalled) NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
         }
         formatBuildTimestamp(build.datePublished)?.let {
-            Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
+            Text(it, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
         }
 
         // The curator's "why" next to the structural diff's "what".
@@ -568,7 +571,7 @@ private fun BuildDetailPane(
         when {
             isInstalled -> Unit
             preview == null -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CircularProgressIndicator(color = colors.primary.copy(alpha = 0.5f), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.5f), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
             }
             preview is UpdateCheck.Available -> {
                 val p = preview as UpdateCheck.Available
@@ -602,7 +605,7 @@ private fun BuildDetailPane(
         if (describesContents) {
             DiffSection(pack, builds, build, installedKey, installedVersion, mirror, icons)
         } else {
-            Text(s.packVersionsNoDiffSource, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            Text(s.packVersionsNoDiffSource, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         }
     }
 }
@@ -618,7 +621,6 @@ private fun DiffSection(
     icons: ModIconResolver,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     var base by remember(build.key) { mutableStateOf(DiffBase.Previous) }
 
     // Previous distinct-content build: skip same-fingerprint rebuild siblings so
@@ -648,11 +650,11 @@ private fun DiffSection(
 
     when {
         base == DiffBase.Previous && previous == null ->
-            Text(s.packVersionsFirstBuild, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            Text(s.packVersionsFirstBuild, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         baseVersion == null ->
-            Text(s.packVersionsFirstBuild, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            Text(s.packVersionsFirstBuild, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         baseVersion == build.versionNumber ->
-            Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         else -> {
             val diff by produceState<Result<Pair<PackVersionDiff, SmrtBuildDiff?>>?>(null, build.versionNumber, baseVersion) {
                 value = null
@@ -672,7 +674,7 @@ private fun DiffSection(
                 }
             }
             when (val result = diff) {
-                null -> CircularProgressIndicator(color = colors.primary.copy(alpha = 0.5f), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                null -> CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.5f), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                 else -> result.fold(
                     onSuccess = { (computed, enriched) -> DiffBody(computed, enriched, icons) },
                     onFailure = {
@@ -687,11 +689,10 @@ private fun DiffSection(
 @Composable
 private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: ModIconResolver) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val labels = remember(enriched) { DiffLabels.from(enriched) }
 
     if (diff.identicalContent && diff.minecraft == null && diff.loader == null && diff.java == null) {
-        Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+        Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         return
     }
 
@@ -703,13 +704,13 @@ private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: Mod
     if (packChanges.isNotEmpty()) {
         NxSection(s.packVersionsSectionPack) {
             packChanges.forEach { line ->
-                Text(line, style = MaterialTheme.typography.bodySmall, color = colors.textPrimary)
+                Text(line, style = MaterialTheme.typography.bodySmall, color = NxInk.main)
             }
         }
     }
 
     if (diff.identicalContent) {
-        Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+        Text(s.packVersionsIdentical, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         return
     }
 
@@ -735,14 +736,13 @@ private fun DiffBody(diff: PackVersionDiff, enriched: SmrtBuildDiff?, icons: Mod
 @Composable
 private fun DiffGroup(entries: List<DiffEntry<SmrtModEntry>>, labels: DiffLabels, icons: ModIconResolver) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val added = entries.filter { it.kind == DiffKind.Added }
     val updated = entries.filter { it.kind == DiffKind.Updated }
     val removed = entries.filter { it.kind == DiffKind.Removed }
 
     @Composable
     fun header(text: String) =
-        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = colors.textSecondary)
+        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = NxInk.quiet)
 
     if (added.isNotEmpty()) {
         header(s.packVersionsAdded(added.size))
@@ -827,11 +827,12 @@ private fun ModDiffIcon(entry: SmrtModEntry, icons: ModIconResolver) {
     if (current != null) {
         AsyncImage(model = current, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
     } else {
-        Box(box.background(NxTheme.colors.decorativeColor(entry.filename)), contentAlignment = Alignment.Center) {
+        val plate = decorativeColor(entry.filename)
+        Box(box.background(plate), contentAlignment = Alignment.Center) {
             Text(
                 text       = (entry.display?.name ?: entry.filename).firstOrNull()?.uppercase() ?: "?",
                 style      = MaterialTheme.typography.labelSmall,
-                color      = Color.White,
+                color      = NxColor.on(plate),
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -862,7 +863,7 @@ private fun SnapshotsSection(
                 )
             }
         }
-        Text(s.packVersionSnapshotsHint, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+        Text(s.packVersionSnapshotsHint, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
     }
 }
 
@@ -878,7 +879,6 @@ private fun SnapshotsSection(
 @Composable
 private fun StatusRow(operation: PackOperation?) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     Box(Modifier.fillMaxWidth().height(34.dp).padding(top = 8.dp), contentAlignment = Alignment.CenterStart) {
         when (val phase = operation?.phase) {
             null -> Unit
@@ -887,23 +887,23 @@ private fun StatusRow(operation: PackOperation?) {
                     LinearProgressIndicator(
                         progress = { phase.current.toFloat() / phase.total },
                         modifier = Modifier.width(160.dp),
-                        color    = colors.primary,
+                        color    = NxColor.lead(),
                     )
                     Text(
                         text  = s.packVersionsApplying(phase.current, phase.total, phase.path),
                         style = MaterialTheme.typography.labelSmall,
-                        color = colors.textSecondary,
+                        color = NxInk.quiet,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 } else {
-                    LinearProgressIndicator(modifier = Modifier.width(160.dp), color = colors.primary)
+                    LinearProgressIndicator(modifier = Modifier.width(160.dp), color = NxColor.lead())
                 }
             }
             is PackOperationPhase.Updated -> Text(
                 text  = s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.success,
+                color = NxColor.status(Status.Success, text = true),
             )
             // Green is for a repair that resolved everything it looked at. One that
             // could not is reported as such here too, or the same run reads as a
@@ -920,14 +920,14 @@ private fun StatusRow(operation: PackOperation?) {
                     )
                 },
                 style    = MaterialTheme.typography.labelSmall,
-                color    = if (phase.failed.isEmpty()) colors.success else colors.warnAccent,
+                color    = if (phase.failed.isEmpty()) NxColor.status(Status.Success, text = true) else NxColor.status(Status.Warning, text = true),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             is PackOperationPhase.Failed -> Text(
                 text     = s.packVersionsFailed(phase.message),
                 style    = MaterialTheme.typography.labelSmall,
-                color    = colors.error,
+                color    = NxColor.status(Status.Error, text = true),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

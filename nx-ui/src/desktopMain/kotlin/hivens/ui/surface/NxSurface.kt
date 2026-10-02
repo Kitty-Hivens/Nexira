@@ -100,7 +100,7 @@ fun NxSurface(
     val step = surfaceStep(kind, parent.step, scheme.topStep)
 
     val material = fillColor ?: scheme.step(step)
-    val alpha = (opacity ?: if (glass) GLASS_COAT else 1f).coerceIn(0f, 1f)
+    val alpha = (opacity ?: kind.defaultOpacity()).coerceIn(0f, 1f)
     val body = material.copy(alpha = material.alpha * alpha)
     // A blur under a body nothing can see through is work thrown away: the filter runs
     // every frame and is then covered completely.
@@ -176,6 +176,14 @@ private const val PRESS_ALPHA = 0.12f
 
 /** How much of its own colour glass lays over what is behind it when nothing names a number. */
 private const val GLASS_COAT = 0.35f
+
+/**
+ * The opacity a surface of this kind draws at when it names none: solid for a body, a
+ * thin coat for glass. Public because an editor showing a surface's values has to open
+ * on this one too: a control that starts at a number the renderer never used is the
+ * same defect as a control that moves nothing.
+ */
+fun SurfaceKind.defaultOpacity(): Float = if (this == SurfaceKind.Chrome) GLASS_COAT else 1f
 
 /** Card-shaped surface: [SurfaceKind.Card] at the card corner. */
 @Composable

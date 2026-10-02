@@ -31,6 +31,7 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * The two news channels side by side, because the difference between them is
@@ -66,9 +67,9 @@ class NewsChannelRenderTest {
         val d = 2f
         val scene = ImageComposeScene((320 * d).toInt(), (300 * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.RUSSIAN) {
-                NxTheme(useDarkTheme = dark) {
+                NxTheme(dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s8),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s8),
                         contentAlignment = Alignment.TopStart,
                     ) {
                         Box(Modifier.width(300.dp)) { body() }

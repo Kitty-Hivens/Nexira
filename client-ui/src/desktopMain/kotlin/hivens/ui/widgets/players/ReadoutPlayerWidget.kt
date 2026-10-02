@@ -39,9 +39,9 @@ import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -135,14 +135,13 @@ internal fun ReadoutPlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
     var menuOpen by remember { mutableStateOf(false) }
 
     NxSurface(
-        level    = NxSurfaceLevel.Floating,
+        kind     = SurfaceKind.Card,
         modifier = modifier.fillMaxWidth(),
         shape    = MaterialTheme.shapes.medium,
     ) {
@@ -172,7 +171,7 @@ internal fun ReadoutPlayerCard(
                     Text(
                         text       = name,
                         style      = MaterialTheme.typography.bodyMedium,
-                        color      = palette.textSecondary,
+                        color      = NxInk.quiet,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
                         fontFamily = familyForText(name),
@@ -184,7 +183,7 @@ internal fun ReadoutPlayerCard(
                         Text(
                             text       = elapsedLabel(state).ifEmpty { EMPTY_CLOCK },
                             style      = MaterialTheme.typography.headlineMedium,
-                            color      = palette.textPrimary,
+                            color      = NxInk.main,
                             fontWeight = FontWeight.Medium,
                             fontFamily = LocalMonoFamily.current,
                             maxLines   = 1,
@@ -195,7 +194,7 @@ internal fun ReadoutPlayerCard(
                             Text(
                                 text       = "/ ${totalLabel(state).ifEmpty { EMPTY_CLOCK }}",
                                 style      = MaterialTheme.typography.bodyMedium,
-                                color      = palette.textSecondary,
+                                color      = NxInk.quiet,
                                 fontFamily = LocalMonoFamily.current,
                                 maxLines   = 1,
                                 softWrap   = false,
@@ -209,7 +208,7 @@ internal fun ReadoutPlayerCard(
                                 icon               = NxIcon.SkipPrevious,
                                 contentDescription = s.audioSkipPrevious,
                                 onClick            = onSkipPrev,
-                                tint               = palette.textPrimary.copy(alpha = 0.7f),
+                                tint               = NxInk.quiet,
                                 enabled            = loaded,
                                 iconSize           = 18.dp,
                                 fill               = 1f,
@@ -220,7 +219,7 @@ internal fun ReadoutPlayerCard(
                             icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                             contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
                             onClick            = onPlayPause,
-                            tint               = palette.textPrimary,
+                            tint               = NxInk.main,
                             enabled            = loaded,
                             iconSize           = 22.dp,
                             fill               = 1f,
@@ -231,7 +230,7 @@ internal fun ReadoutPlayerCard(
                                 icon               = NxIcon.SkipNext,
                                 contentDescription = s.audioSkipNext,
                                 onClick            = onSkipNext,
-                                tint               = palette.textPrimary.copy(alpha = 0.7f),
+                                tint               = NxInk.quiet,
                                 enabled            = loaded,
                                 iconSize           = 18.dp,
                                 fill               = 1f,
@@ -299,7 +298,7 @@ internal fun ReadoutPlayerCard(
                                 Text(
                                     text  = repeatAnswer(repeat, s),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = palette.textPrimary,
+                                    color = NxInk.main,
                                 )
                             }
                         }

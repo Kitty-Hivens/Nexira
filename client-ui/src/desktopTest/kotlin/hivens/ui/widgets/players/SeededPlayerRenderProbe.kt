@@ -25,6 +25,7 @@ import java.io.File
 import java.nio.file.Paths
 import kotlin.test.Test
 import hivens.ui.settle
+import hivens.ui.theme.NxColor
 
 /**
  * Concept F on screen, which is the only way to see whether it IS concept F.
@@ -57,9 +58,9 @@ class SeededPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.ENGLISH) {
-                NxTheme(useDarkTheme = dark) {
+                NxTheme(dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.TopCenter,
                     ) { body() }
                 }

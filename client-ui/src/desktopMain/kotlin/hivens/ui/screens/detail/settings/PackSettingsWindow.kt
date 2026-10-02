@@ -67,8 +67,9 @@ import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.shortNameList
 import kotlinx.coroutines.CoroutineScope
@@ -76,6 +77,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * A change to a pack's settings, as a function of the record rather than a copy of
@@ -218,7 +221,7 @@ fun PackSettingsWindow(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
+            .background(NxColor.page.copy(alpha = 0.55f))
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { ev ->
@@ -232,15 +235,10 @@ fun PackSettingsWindow(
         contentAlignment = Alignment.Center,
     ) {
         NxSurface(
-            level = NxSurfaceLevel.Raised,
-            // No blur and a solid body -- 1 rather than the 0.92 dark bleed-through
-            // -- so the scrim never reads through the window.
-            blurDp = 0f,
-            opacity = 1f,
+            kind = SurfaceKind.Dialog,
             modifier = Modifier
                 .fillMaxWidth(0.88f)
                 .fillMaxHeight(0.90f)
-                .clip(MaterialTheme.shapes.medium)
                 .clickable(card, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
@@ -255,23 +253,23 @@ fun PackSettingsWindow(
                         categories.forEach { category ->
                             val isSelected = category == selected
                             PuppetClick("packSettings.category.${category.name}") { selected = category }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(MaterialTheme.shapes.medium)
-                                    .background(
-                                        if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
-                                        else Color.Transparent,
+                            val rowFill = if (isSelected) NxColor.wash(NxColor.lead(), 0.18f) else Color.Transparent
+                            OnFill(rowFill) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .background(rowFill)
+                                        .clickable { selected = category }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    NxNavRowContent(
+                                        icon = category.icon,
+                                        label = category.label(s),
+                                        isSelected = isSelected,
                                     )
-                                    .clickable { selected = category }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                NxNavRowContent(
-                                    icon = category.icon,
-                                    label = category.label(s),
-                                    isSelected = isSelected,
-                                )
+                                }
                             }
                         }
                     }
@@ -313,7 +311,6 @@ fun PackSettingsWindow(
 @Composable
 private fun WindowHeader(pack: PackInstance, isMirror: Boolean, onDismiss: () -> Unit) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val mirror: IMirrorPackClient = koinInject()
     val installed = pack.pinnedPackVersion ?: pack.packRef.version
 
@@ -336,14 +333,14 @@ private fun WindowHeader(pack: PackInstance, isMirror: Boolean, onDismiss: () ->
                 pack.displayName,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = colors.textPrimary,
+                color = NxInk.main,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 s.packSettingsTitle,
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
         if (isMirror && installed != null) {
@@ -367,7 +364,7 @@ private fun HeaderAvatar(pack: PackInstance) {
         .take(2)
         .joinToString("") { it.first().uppercaseChar().toString() }
         .ifEmpty { "?" }
-    val fallbackTint = NxTheme.colors.decorativeColor(pack.id)
+    val fallbackTint = decorativeColor(pack.id)
     val box = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
     SubcomposeAsyncImage(
         model              = pack.iconUrl,
@@ -390,7 +387,6 @@ private fun HeaderAvatar(pack: PackInstance) {
 @Composable
 private fun FooterStatus(operation: PackOperation?, notice: String?) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     Box(
         modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 18.dp, vertical = 6.dp),
         contentAlignment = Alignment.CenterStart,
@@ -402,7 +398,7 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                     LinearProgressIndicator(
                         progress = { phase.current.toFloat() / phase.total },
                         modifier = Modifier.width(140.dp),
-                        color    = colors.primary,
+                        color    = NxColor.lead(),
                     )
                     Text(
                         text     = when (operation.kind) {
@@ -410,18 +406,18 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                             PackOperationKind.Repair -> s.packSettingsRepairProgress(phase.current, phase.total, phase.path)
                         },
                         style    = MaterialTheme.typography.labelSmall,
-                        color    = colors.textSecondary,
+                        color    = NxInk.quiet,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 } else {
-                    LinearProgressIndicator(modifier = Modifier.width(140.dp), color = colors.primary)
+                    LinearProgressIndicator(modifier = Modifier.width(140.dp), color = NxColor.lead())
                 }
             }
             phase is PackOperationPhase.Updated -> Text(
                 text  = s.packVersionsApplied(phase.version),
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.success,
+                color = NxColor.status(Status.Success, text = true),
             )
             // A repair that left something unresolved is not a success line. The
             // instance is short of a file the pack names either way, and saying so
@@ -435,14 +431,14 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                     shortNameList(phase.failed),
                 ),
                 style    = MaterialTheme.typography.labelSmall,
-                color    = colors.warnAccent,
+                color    = NxColor.status(Status.Warning, text = true),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             phase is PackOperationPhase.Repaired -> Text(
                 text  = s.packSettingsRepairDone(phase.checked, phase.repaired),
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.success,
+                color = NxColor.status(Status.Success, text = true),
             )
             phase is PackOperationPhase.Failed -> FooterError(s.packVersionsFailed(phase.message))
             notice != null -> FooterError(notice)
@@ -455,7 +451,7 @@ private fun FooterError(text: String) {
     Text(
         text     = text,
         style    = MaterialTheme.typography.labelSmall,
-        color    = NxTheme.colors.error,
+        color    = NxColor.status(Status.Error, text = true),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )

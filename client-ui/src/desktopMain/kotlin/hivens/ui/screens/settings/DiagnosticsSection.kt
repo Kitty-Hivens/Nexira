@@ -30,7 +30,6 @@ import hivens.ui.nx.NxSection
 import hivens.ui.icons.NxIcon
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Path
@@ -41,6 +40,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Beacon diagnostic surface + About link.
@@ -217,14 +219,14 @@ internal fun DiagnosticsSection(
             Text(
                 text     = s.settingsDiagnosticBundleHint,
                 style    = MaterialTheme.typography.bodySmall,
-                color    = NxTheme.colors.textSecondary,
+                color    = NxInk.quiet,
                 modifier = Modifier.padding(start = 8.dp),
             )
             bundleError?.let { reason ->
                 Text(
                     text     = reason,
                     style    = MaterialTheme.typography.bodySmall,
-                    color    = NxTheme.colors.error,
+                    color    = NxColor.status(Status.Error),
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }

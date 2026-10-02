@@ -12,11 +12,11 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxSlider
 import hivens.ui.nx.NxToggle
-import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import hivens.ui.theme.NxColor
 
 // The wallpaper's own soundtrack, the level it plays at, and whether the player
 // widgets are pointed at it. One widget, because the three share a fate: a level
@@ -51,7 +51,7 @@ fun BgAudioWidget() {
             description     = if (moves == false) s.backgroundAudioStill else s.backgroundAudioDesc,
             icon            = if (settings.audio && available) NxIcon.VolumeUp else NxIcon.VolumeOff,
             enabled         = available,
-            accent          = NxTheme.colors.primary,
+            accent          = NxColor.lead(),
             onCheckedChange = { ctx.update { copy(audio = it, linkToPlayers = linkToPlayers && it) } },
         )
 
@@ -73,7 +73,7 @@ fun BgAudioWidget() {
                 checked         = settings.linkToPlayers,
                 description     = s.backgroundLinkDesc,
                 icon            = NxIcon.MusicNote,
-                accent          = NxTheme.colors.primary,
+                accent          = NxColor.lead(),
                 onCheckedChange = { ctx.update { copy(linkToPlayers = it) } },
             )
         }

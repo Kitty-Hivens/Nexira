@@ -52,13 +52,14 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.Dimens
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import java.time.Duration
 import java.time.Instant
 import kotlin.math.roundToInt
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * One Library row. Same three-layer background as the Browse card: a
@@ -83,7 +84,7 @@ fun PackCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
+    val (hueA, hueB) = decorativePair(instance.id)
     val art = rememberPackArt(instance)
     PuppetClick("library.pack.${instance.id}") { onOpenDetail() }
     val indications: IndicationCenter = koinInject()
@@ -232,7 +233,7 @@ private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: 
         text     = if (isRollback) s.packVersionRollbackBadge else s.packVersionUpdateBadge,
         modifier = modifier,
         tone     = NxMetaChipTone.OnMedia,
-        dot      = if (isRollback) NxTheme.colors.warnAccent else NxTheme.colors.primary,
+        dot      = if (isRollback) NxColor.status(Status.Warning) else NxColor.lead(),
         onClick  = onClick,
     )
 }
@@ -242,12 +243,12 @@ private fun UpdateBadgePill(isRollback: Boolean, onClick: () -> Unit, modifier: 
 private fun LaunchStatusPill(indication: IndicationCenter.LaunchIndication, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
     val (dotColor, label) = when (indication) {
-        IndicationCenter.LaunchIndication.Preparing -> NxTheme.colors.progressAccent to s.launchPreparing
+        IndicationCenter.LaunchIndication.Preparing -> NxColor.status(Status.Info) to s.launchPreparing
         is IndicationCenter.LaunchIndication.Downloading ->
-            NxTheme.colors.progressAccent to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
-        IndicationCenter.LaunchIndication.Running -> NxTheme.colors.success to s.launchRunning
-        IndicationCenter.LaunchIndication.Stopping -> NxTheme.colors.progressAccent to s.launchStopping
-        IndicationCenter.LaunchIndication.Failed  -> NxTheme.colors.error to s.launchFailed
+            NxColor.status(Status.Info) to (indication.progress?.let { "${(it * 100).roundToInt()}%" } ?: s.launchDownloading.removeSuffix(":"))
+        IndicationCenter.LaunchIndication.Running -> NxColor.status(Status.Success) to s.launchRunning
+        IndicationCenter.LaunchIndication.Stopping -> NxColor.status(Status.Info) to s.launchStopping
+        IndicationCenter.LaunchIndication.Failed  -> NxColor.status(Status.Error) to s.launchFailed
     }
     NxMetaChip(text = label, modifier = modifier, tone = NxMetaChipTone.OnMedia, dot = dotColor)
 }

@@ -71,7 +71,7 @@ class PillWidthTest {
         val strings = if (russian) RussianStrings else EnglishStrings
         val ambient = if (russian) probeAmbient else null
         val scene = ImageComposeScene(width = frame, height = 140, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 CompositionLocalProvider(
                     LocalStrings provides strings,
                 ) {

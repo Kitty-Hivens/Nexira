@@ -4,7 +4,6 @@ import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxSwitch
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,7 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,8 +22,12 @@ import hivens.core.jvm.*
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
 
 /**
  * Visual builder for the [hivens.core.data.InstanceProfile.jvmArgs] string.
@@ -71,10 +74,10 @@ fun JvmArgsBuilderDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
+        NxSurface(
+            kind = SurfaceKind.Dialog,
             modifier = Modifier.width(820.dp).heightIn(min = 540.dp, max = 720.dp),
             shape = MaterialTheme.shapes.large,
-            color = NxTheme.colors.surface,
         ) {
             Column(Modifier.fillMaxSize()) {
                 // ── Header ───────────────────────────────────────────
@@ -86,29 +89,29 @@ fun JvmArgsBuilderDialog(
                 ) {
                     Symbol(NxIcon.Tune,
                         null,
-                        tint = NxTheme.colors.primary,
+                        tint = NxColor.lead(),
                         modifier = Modifier.size(28.dp),
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
                             s.jvmTitle,
-                            color = NxTheme.colors.textPrimary,
+                            color = NxInk.main,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
                             s.jvmSubtitle,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Symbol(NxIcon.Close, null, tint = NxTheme.colors.textSecondary)
+                        Symbol(NxIcon.Close, null, tint = NxInk.quiet)
                     }
                 }
 
-                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.15f))
+                HorizontalDivider(color = NxInk.line)
 
                 // ── Preset picker ──────────────────────────────────────
                 PresetPickerRow(
@@ -119,14 +122,14 @@ fun JvmArgsBuilderDialog(
                     },
                 )
 
-                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.15f))
+                HorizontalDivider(color = NxInk.line)
 
                 // ── Tab row ────────────────────────────────────────────
                 PrimaryScrollableTabRow(
                     selectedTabIndex = selectedTabIdx,
                     edgePadding = 16.dp,
-                    containerColor = NxTheme.colors.surface,
-                    contentColor = NxTheme.colors.primary,
+                    containerColor = Color.Transparent,
+                    contentColor = NxColor.lead(text = true),
                 ) {
                     tabs.forEachIndexed { idx, (label, icon) ->
                         Tab(
@@ -134,8 +137,8 @@ fun JvmArgsBuilderDialog(
                             onClick = { selectedTabIdx = idx },
                             text = { Text(label, fontSize = 13.sp) },
                             icon = { Symbol(icon, null, modifier = Modifier.size(18.dp)) },
-                            selectedContentColor = NxTheme.colors.primary,
-                            unselectedContentColor = NxTheme.colors.textSecondary,
+                            selectedContentColor = NxColor.lead(text = true),
+                            unselectedContentColor = NxInk.quiet,
                         )
                     }
                 }
@@ -170,7 +173,7 @@ fun JvmArgsBuilderDialog(
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text(s.jvmCancel, color = NxTheme.colors.textSecondary)
+                        Text(s.jvmCancel, color = NxInk.quiet)
                     }
                     Spacer(Modifier.width(8.dp))
                     NxButton(
@@ -199,7 +202,7 @@ private fun PresetPickerRow(
     ) {
         Text(
             s.jvmPresetsHeader,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
         )
@@ -212,8 +215,8 @@ private fun PresetPickerRow(
                     onClick = { onSelected(preset) },
                     label = { Text(preset.displayName.substringBefore(" ("), fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = NxTheme.colors.primary.copy(alpha = 0.2f),
-                        selectedLabelColor = NxTheme.colors.primary,
+                        selectedContainerColor = NxColor.wash(NxColor.lead(), 0.2f),
+                        selectedLabelColor = NxColor.lead(text = true),
                     ),
                 )
             }
@@ -224,7 +227,7 @@ private fun PresetPickerRow(
             Spacer(Modifier.height(8.dp))
             Text(
                 selectedPreset.description,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -264,28 +267,32 @@ private fun GcTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun GcOption(label: String, hint: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick)
-            .background(
-                if (selected) NxTheme.colors.primary.copy(alpha = 0.12f)
-                else NxTheme.colors.background.copy(alpha = 0.4f)
-            )
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    NxSurface(
+        kind = SurfaceKind.Field,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        RadioButton(selected = selected, onClick = onClick,
-            colors = RadioButtonDefaults.colors(
-                selectedColor = NxTheme.colors.primary,
-                unselectedColor = NxTheme.colors.textSecondary,
-            ))
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-            Text(hint, color = NxTheme.colors.textSecondary,
-                style = MaterialTheme.typography.bodySmall)
+        val fill = NxColor.wash(NxColor.lead(), if (selected) 0.12f else 0f)
+        OnFill(fill) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClick)
+                    .background(fill)
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = selected, onClick = onClick,
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = NxColor.lead(),
+                        unselectedColor = NxInk.quiet,
+                    ))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(label, color = NxInk.main, fontWeight = FontWeight.Bold)
+                    Text(hint, color = NxInk.quiet,
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
         }
     }
 }
@@ -301,7 +308,7 @@ private fun GcTuningTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit)
         GcChoice.Shenandoah -> ShenandoahTuningPanel(config.shenandoah) { onChange(config.copy(shenandoah = it)) }
         GcChoice.Parallel, GcChoice.Serial -> Text(
             s.jvmTuningNotApplicable("${config.gc.name}GC"),
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -391,7 +398,7 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
         NxSectionHeader(s.jvmCdsHeader)
         Text(
             s.jvmCdsIntro,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(4.dp))
@@ -500,7 +507,7 @@ private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
         NxSectionHeader(s.jvmJfrHeader)
         Text(
             s.jvmJfrIntro,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(4.dp))
@@ -551,7 +558,7 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
         NxSectionHeader(s.jvmCustomHeader)
         Text(
             s.jvmCustomIntro,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall,
         )
         OutlinedTextField(
@@ -579,32 +586,34 @@ private fun ArgsPreviewBox(config: JvmConfig, javaMajor: Int?) {
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Code, null, tint = NxTheme.colors.primary,
+            Symbol(NxIcon.Code, null, tint = NxColor.lead(),
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(s.jvmPreviewFlagsCount(args.size),
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(4.dp))
-        Box(
-            Modifier
+        NxSurface(
+            kind = SurfaceKind.Field,
+            modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 60.dp, max = 110.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .background(NxTheme.colors.background.copy(alpha = 0.6f))
-                .border(1.dp, NxTheme.colors.textSecondary.copy(alpha = 0.2f),
-                    MaterialTheme.shapes.medium)
-                .verticalScroll(rememberScrollState())
-                .padding(12.dp)
+                .heightIn(min = 60.dp, max = 110.dp),
         ) {
-            Text(
-                args.joinToString(" "),
-                color = NxTheme.colors.textPrimary,
-                fontFamily = LocalMonoFamily.current,
-                fontSize = 11.sp,
-            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp)
+            ) {
+                Text(
+                    args.joinToString(" "),
+                    color = NxInk.main,
+                    fontFamily = LocalMonoFamily.current,
+                    fontSize = 11.sp,
+                )
+            }
         }
     }
 }
@@ -623,18 +632,18 @@ private fun SliderField(
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold,
+            Text(label, color = NxInk.main, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
-            Text(display, color = NxTheme.colors.primary, fontFamily = LocalMonoFamily.current)
+            Text(display, color = NxColor.lead(text = true), fontFamily = LocalMonoFamily.current)
         }
         Slider(
             value = value, onValueChange = onChange, valueRange = valueRange, steps = steps,
             colors = SliderDefaults.colors(
-                thumbColor = NxTheme.colors.primary,
-                activeTrackColor = NxTheme.colors.primary,
+                thumbColor = NxColor.lead(),
+                activeTrackColor = NxColor.lead(),
             ),
         )
-        Text(hint, color = NxTheme.colors.textSecondary,
+        Text(hint, color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -646,8 +655,8 @@ private fun ToggleField(label: String, hint: String, checked: Boolean, onChange:
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-            Text(hint, color = NxTheme.colors.textSecondary,
+            Text(label, color = NxInk.main, fontWeight = FontWeight.Bold)
+            Text(hint, color = NxInk.quiet,
                 style = MaterialTheme.typography.bodySmall)
         }
         NxSwitch(checked = checked, onCheckedChange = onChange)
@@ -664,7 +673,7 @@ private fun IntInput(
 ) {
     var text by remember(value) { mutableStateOf(value?.toString() ?: "") }
     Column {
-        Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(label, color = NxInk.main, fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = text,
             onValueChange = {
@@ -675,7 +684,7 @@ private fun IntInput(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Text(hint, color = NxTheme.colors.textSecondary,
+        Text(hint, color = NxInk.quiet,
             style = MaterialTheme.typography.bodySmall)
     }
 }

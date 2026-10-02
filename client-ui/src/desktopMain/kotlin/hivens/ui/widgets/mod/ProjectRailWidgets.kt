@@ -55,13 +55,15 @@ import hivens.ui.screens.mod.licenseLabel
 import hivens.ui.screens.mod.linkLabel
 import hivens.ui.screens.mod.loaderDot
 import hivens.ui.screens.mod.loaderLabel
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import hivens.ui.utils.humanSize
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberSource
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * The project page's metadata blocks, which live in the right rail rather than in
@@ -96,7 +98,7 @@ private fun unknown() = LocalStrings.current.modRailUnknownValue
     // card's sixteen in it shrank every card by thirty-two, pushed the text flat
     // against the border, and turned the twelve between cards into forty-four. The
     // inside of a block belongs to the block.
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
 )
 @Composable
 fun ProjectCompatibilityWidget(instance: WidgetInstance) {
@@ -132,7 +134,7 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
                         loaderLabel(loader),
                         dot = loaderDot(loader).takeUnless { hasLoaderGlyph(loader) },
                         leading = if (hasLoaderGlyph(loader)) {
-                            { LoaderGlyph(loader, tint = NxTheme.colors.textSecondary, size = 12.dp) }
+                            { LoaderGlyph(loader, tint = NxInk.quiet, size = 12.dp) }
                         } else {
                             null
                         },
@@ -164,7 +166,7 @@ fun ProjectCompatibilityWidget(instance: WidgetInstance) {
                                 Symbol(
                                     environmentIcon(env),
                                     contentDescription = null,
-                                    tint = NxTheme.colors.textSecondary,
+                                    tint = NxInk.quiet,
                                     size = 12.dp,
                                 )
                             },
@@ -205,7 +207,7 @@ private fun environmentIcon(environment: Environment): IconKey = when (environme
     // card's sixteen in it shrank every card by thirty-two, pushed the text flat
     // against the border, and turned the twelve between cards into forty-four. The
     // inside of a block belongs to the block.
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
 )
 @Composable
 fun ProjectTagsWidget(instance: WidgetInstance) {
@@ -238,7 +240,7 @@ fun ProjectTagsWidget(instance: WidgetInstance) {
     // card's sixteen in it shrank every card by thirty-two, pushed the text flat
     // against the border, and turned the twelve between cards into forty-four. The
     // inside of a block belongs to the block.
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
 )
 @Composable
 fun ProjectLinksWidget(instance: WidgetInstance) {
@@ -257,7 +259,7 @@ fun ProjectLinksWidget(instance: WidgetInstance) {
             if (donations in 1 until p.links.size && link.kind == ProjectLinkKind.Donate &&
                 p.links.getOrNull(index - 1)?.kind != ProjectLinkKind.Donate
             ) {
-                HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+                HorizontalDivider(color = NxInk.line.copy(alpha = 0.25f))
             }
             // Underline on hover, no plate behind it. A link is text, and a filled
             // rectangle appearing under a line of text reads as a row in a list
@@ -275,14 +277,14 @@ fun ProjectLinksWidget(instance: WidgetInstance) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                Symbol(linkIcon(link.kind), contentDescription = null, tint = NxTheme.colors.textSecondary, size = 16.dp)
+                Symbol(linkIcon(link.kind), contentDescription = null, tint = NxInk.quiet, size = 16.dp)
                 Text(
                     linkLabel(link, s),
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textPrimary,
+                    color = NxInk.main,
                     textDecoration = if (hovered) TextDecoration.Underline else null,
                 )
-                Symbol(NxIcon.OpenInNew, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 12.dp)
+                Symbol(NxIcon.OpenInNew, contentDescription = null, tint = NxInk.quiet, size = 12.dp)
             }
         }
     }
@@ -318,7 +320,7 @@ private fun linkIcon(kind: ProjectLinkKind): IconKey = when (kind) {
     // card's sixteen in it shrank every card by thirty-two, pushed the text flat
     // against the border, and turned the twelve between cards into forty-four. The
     // inside of a block belongs to the block.
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
 )
 @Composable
 fun ProjectCreatorsWidget(instance: WidgetInstance) {
@@ -343,7 +345,7 @@ fun ProjectCreatorsWidget(instance: WidgetInstance) {
                             Text(
                                 creator.name,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = NxTheme.colors.textPrimary,
+                                color = NxInk.main,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -353,7 +355,7 @@ fun ProjectCreatorsWidget(instance: WidgetInstance) {
                                 Symbol(
                                     NxIcon.Star,
                                     contentDescription = null,
-                                    tint = NxTheme.colors.warnAccent,
+                                    tint = NxColor.status(Status.Warning),
                                     size = 12.dp,
                                 )
                             }
@@ -361,7 +363,7 @@ fun ProjectCreatorsWidget(instance: WidgetInstance) {
                         Text(
                             creator.role,
                             style = MaterialTheme.typography.labelSmall,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                         )
                     }
                 }
@@ -382,7 +384,7 @@ private fun CreatorAvatar(creator: ProjectCreator) {
         )
     } else {
         Box(
-            Modifier.size(28.dp).clip(shape).background(NxTheme.colors.decorativeColor(creator.name)),
+            Modifier.size(28.dp).clip(shape).background(decorativeColor(creator.name)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -409,7 +411,7 @@ private fun CreatorAvatar(creator: ProjectCreator) {
     // card's sixteen in it shrank every card by thirty-two, pushed the text flat
     // against the border, and turned the twelve between cards into forty-four. The
     // inside of a block belongs to the block.
-    surface = """{"fill":"raised","border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
 )
 @Composable
 fun ProjectDetailsWidget(instance: WidgetInstance) {
@@ -428,17 +430,17 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
                 Symbol(
                     disclosureIcon(d.type),
                     contentDescription = null,
-                    tint = if (warning) NxTheme.colors.error else NxTheme.colors.textSecondary,
+                    tint = if (warning) NxColor.status(Status.Error) else NxInk.quiet,
                     size = 16.dp,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
                         headline,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (warning) NxTheme.colors.error else NxTheme.colors.textPrimary,
+                        color = if (warning) NxColor.status(Status.Error) else NxInk.main,
                     )
                     notes.forEach {
-                        Text(it, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+                        Text(it, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                     }
                 }
             }
@@ -475,7 +477,7 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
                 Text(
                     p.dependencies.joinToString(", "),
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
         }
@@ -523,7 +525,7 @@ private fun Section(title: String, content: @Composable ColumnScopeShim.() -> Un
             // a hair of each other: on the sheet the block's name and the name of a
             // group inside it read as the same rank. The reference uses two tones
             // and so does the palette, so use them.
-            color = NxTheme.colors.onSurface,
+            color = NxInk.main,
             fontWeight = FontWeight.SemiBold,
         )
         ColumnScopeShim.content()
@@ -570,7 +572,7 @@ private fun ColumnScopeShim.Label(text: String) = Text(
     text,
     style = MaterialTheme.typography.bodyMedium,
     fontSize = GROUP_LABEL,
-    color = NxTheme.colors.textPrimary,
+    color = NxInk.main,
     fontWeight = FontWeight.Normal,
 )
 
@@ -595,6 +597,6 @@ private fun ColumnScopeShim.Fact(icon: IconKey, text: String) = Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(9.dp),
 ) {
-    Symbol(icon, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 16.dp)
-    Text(text, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary)
+    Symbol(icon, contentDescription = null, tint = NxInk.quiet, size = 16.dp)
+    Text(text, style = MaterialTheme.typography.bodySmall, color = NxInk.main)
 }

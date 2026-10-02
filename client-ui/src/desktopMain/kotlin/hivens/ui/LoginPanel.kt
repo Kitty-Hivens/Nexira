@@ -40,13 +40,15 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.NxTheme
 import hivens.ui.platform.SystemActions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 @Composable
 fun LoginPanel(
@@ -101,13 +103,13 @@ fun LoginPanel(
     var twoFactorUnsupported  by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor        = NxTheme.colors.textPrimary,
-        unfocusedTextColor      = NxTheme.colors.textPrimary,
-        focusedBorderColor      = NxTheme.colors.primary,
-        unfocusedBorderColor    = NxTheme.colors.textSecondary.copy(alpha = 0.22f),
-        focusedLabelColor       = NxTheme.colors.primary,
-        unfocusedLabelColor     = NxTheme.colors.textSecondary,
-        cursorColor             = NxTheme.colors.primary,
+        focusedTextColor        = NxInk.main,
+        unfocusedTextColor      = NxInk.main,
+        focusedBorderColor      = NxColor.lead(),
+        unfocusedBorderColor    = NxInk.quiet.copy(alpha = 0.22f),
+        focusedLabelColor       = NxColor.lead(),
+        unfocusedLabelColor     = NxInk.quiet,
+        cursorColor             = NxColor.lead(),
         focusedContainerColor   = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
@@ -266,7 +268,7 @@ fun LoginPanel(
             text       = s.loginTitle,
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color      = NxTheme.colors.textPrimary
+            color      = NxInk.main
         )
 
         // ── 2FA unsupported banner ────────────────────────────────────────
@@ -281,7 +283,7 @@ fun LoginPanel(
                     modifier = Modifier.align(Alignment.End),
                     shape    = MaterialTheme.shapes.small,
                 ) {
-                    Text(s.auth2faUnsupportedDismiss, color = NxTheme.colors.textSecondary)
+                    Text(s.auth2faUnsupportedDismiss, color = NxInk.quiet)
                 }
             }
         }
@@ -291,11 +293,11 @@ fun LoginPanel(
             Text(
                 text     = errorMessage ?: "",
                 style    = MaterialTheme.typography.bodySmall,
-                color    = NxTheme.colors.error,
+                color    = NxColor.status(Status.Error),
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = NxTheme.colors.error.copy(alpha = 0.08f),
+                        color = NxColor.status(Status.Error).copy(alpha = 0.08f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(8.dp)
@@ -344,14 +346,14 @@ fun LoginPanel(
                 checked         = rememberMe,
                 onCheckedChange = setRememberMe,
                 colors          = CheckboxDefaults.colors(
-                    checkedColor   = NxTheme.colors.primary,
-                    uncheckedColor = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
+                    checkedColor   = NxColor.lead(),
+                    uncheckedColor = NxInk.quiet.copy(alpha = 0.4f)
                 )
             )
             Text(
                 text  = s.loginRemember,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary
+                color = NxInk.quiet
             )
         }
         PuppetToggle("login.rememberMe", rememberMe, onValueChange = setRememberMe)
@@ -364,7 +366,7 @@ fun LoginPanel(
                 modifier  = Modifier.fillMaxWidth().height(42.dp),
                 shape     = MaterialTheme.shapes.small,
                 colors    = ButtonDefaults.buttonColors(
-                    disabledContainerColor = NxTheme.colors.primary.copy(alpha = 0.5f)
+                    disabledContainerColor = NxColor.lead().copy(alpha = 0.5f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {

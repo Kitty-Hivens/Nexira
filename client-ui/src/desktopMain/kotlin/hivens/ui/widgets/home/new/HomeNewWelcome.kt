@@ -13,12 +13,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.AppState
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class WelcomeProps(
@@ -35,7 +35,7 @@ data class WelcomeProps(
     id = "home.new.welcome",
     displayName = "widget.home.new.welcome",
     propsClass = WelcomeProps::class,
-    surface = """{"fill":"base","opacity":0.45}""",
+    surface = """{"fill":"panel","opacity":0.45}""",
 )
 @Composable
 fun HomeNewWelcome(instance: WidgetInstance) {
@@ -58,14 +58,14 @@ fun HomeNewWelcome(instance: WidgetInstance) {
             },
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
         )
         if (p.showSubtitle) {
             Spacer(Modifier.height(4.dp))
             Text(
                 text  = s.homeWelcomeSubtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
     }

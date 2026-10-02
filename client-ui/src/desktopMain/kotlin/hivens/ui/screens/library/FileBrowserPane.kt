@@ -48,7 +48,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxVerticalScrollbar
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
 import java.awt.Desktop
 import java.nio.file.Files
@@ -59,6 +60,10 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 /**
  * Two-pane file browser scoped to a single instance directory. Left
@@ -85,7 +90,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
             Text(
                 text  = s.fileBrowserNoRoot,
                 style = MaterialTheme.typography.bodyMedium,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
         return
@@ -120,12 +125,11 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
         // Left: tree.
         val hover = remember { MutableInteractionSource() }
         val hovered by hover.collectIsHoveredAsState()
-        Box(
+        NxSurface(
+            kind     = SurfaceKind.Panel,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .clip(MaterialTheme.shapes.medium)
-                .background(NxTheme.colors.surface.copy(alpha = 0.55f))
                 .hoverable(hover),
         ) {
             val listState = rememberLazyListState()
@@ -164,25 +168,25 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
         Spacer(Modifier.width(12.dp))
 
         // Right: preview.
-        Box(
+        NxSurface(
+            kind     = SurfaceKind.Panel,
             modifier = Modifier
                 .weight(2f)
-                .fillMaxHeight()
-                .clip(MaterialTheme.shapes.medium)
-                .background(NxTheme.colors.surface.copy(alpha = 0.55f))
-                .padding(16.dp),
+                .fillMaxHeight(),
         ) {
-            val picked = selected
-            if (picked == null) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text  = s.fileBrowserPickAFile,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = NxTheme.colors.textSecondary,
-                    )
+            Box(Modifier.fillMaxSize().padding(16.dp)) {
+                val picked = selected
+                if (picked == null) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text  = s.fileBrowserPickAFile,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = NxInk.quiet,
+                        )
+                    }
+                } else {
+                    FilePreview(file = picked)
                 }
-            } else {
-                FilePreview(file = picked)
             }
         }
     }
@@ -238,7 +242,7 @@ private fun FileTreeRow(
     onToggleExpand: () -> Unit,
     onSelect: () -> Unit,
 ) {
-    val rowBg = if (isSelected) NxTheme.colors.primary.copy(alpha = 0.25f)
+    val rowBg = if (isSelected) NxColor.wash(NxColor.lead(), 0.25f)
                 else Color.Transparent
 
     val s = LocalStrings.current
@@ -256,45 +260,47 @@ private fun FileTreeRow(
             .padding(start = (12 * node.depth).dp, top = 4.dp, bottom = 4.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        when {
-            node.isEmpty -> Spacer(Modifier.size(20.dp))
-            node.isDir -> {
-                Symbol(icon = if (isExpanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
-                    contentDescription = null,
-                    tint               = NxTheme.colors.textSecondary,
-                    modifier           = Modifier.size(16.dp),
+        OnFill(rowBg) {
+            when {
+                node.isEmpty -> Spacer(Modifier.size(20.dp))
+                node.isDir -> {
+                    Symbol(icon = if (isExpanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
+                        contentDescription = null,
+                        tint               = NxInk.quiet,
+                        modifier           = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Symbol(icon = NxIcon.Folder,
+                        contentDescription = null,
+                        tint               = NxColor.lead(),
+                        modifier           = Modifier.size(16.dp),
+                    )
+                }
+                else -> {
+                    Spacer(Modifier.size(20.dp))
+                    Symbol(icon = fileIconFor(node.path),
+                        contentDescription = null,
+                        tint               = NxInk.quiet,
+                        modifier           = Modifier.size(16.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            if (node.isEmpty) {
+                Text(
+                    text       = s.fileBrowserEmptyFolder,
+                    style      = MaterialTheme.typography.bodySmall,
+                    color      = NxInk.quiet,
+                    fontStyle  = FontStyle.Italic,
                 )
-                Spacer(Modifier.width(4.dp))
-                Symbol(icon = NxIcon.Folder,
-                    contentDescription = null,
-                    tint               = NxTheme.colors.primary.copy(alpha = 0.85f),
-                    modifier           = Modifier.size(16.dp),
+            } else {
+                Text(
+                    text       = node.path.name,
+                    style      = MaterialTheme.typography.bodySmall,
+                    color      = NxInk.main,
+                    fontWeight = if (node.isDir) FontWeight.SemiBold else FontWeight.Normal,
                 )
             }
-            else -> {
-                Spacer(Modifier.size(20.dp))
-                Symbol(icon = fileIconFor(node.path),
-                    contentDescription = null,
-                    tint               = NxTheme.colors.textSecondary,
-                    modifier           = Modifier.size(16.dp),
-                )
-            }
-        }
-        Spacer(Modifier.width(8.dp))
-        if (node.isEmpty) {
-            Text(
-                text       = s.fileBrowserEmptyFolder,
-                style      = MaterialTheme.typography.bodySmall,
-                color      = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
-                fontStyle  = FontStyle.Italic,
-            )
-        } else {
-            Text(
-                text       = node.path.name,
-                style      = MaterialTheme.typography.bodySmall,
-                color      = NxTheme.colors.textPrimary,
-                fontWeight = if (node.isDir) FontWeight.SemiBold else FontWeight.Normal,
-            )
         }
     }
 }
@@ -356,7 +362,7 @@ private fun TextPreview(file: Path) {
     if (state == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
-                color       = NxTheme.colors.primary.copy(alpha = 0.6f),
+                color       = NxColor.wash(NxColor.lead(), 0.6f),
                 strokeWidth = 2.dp,
                 modifier    = Modifier.size(24.dp),
             )
@@ -371,7 +377,7 @@ private fun TextPreview(file: Path) {
             Text(
                 text  = s.fileBrowserTextTruncated(TEXT_PREVIEW_MAX_BYTES / 1024),
                 style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.error,
+                color = NxColor.status(Status.Error, text = true),
             )
             Spacer(Modifier.height(6.dp))
         }
@@ -383,7 +389,7 @@ private fun TextPreview(file: Path) {
             Text(
                 text       = state.text,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = NxTheme.colors.textPrimary,
+                color      = NxInk.main,
                 fontFamily = LocalMonoFamily.current,
             )
         }
@@ -412,15 +418,14 @@ private fun BinaryPreview(file: Path) {
     ) {
         PreviewHeader(file = file, sizeLabel = file.fileSizeLabel())
         Spacer(Modifier.height(8.dp))
-        Box(
-            modifier         = Modifier.fillMaxWidth().height(140.dp).clip(MaterialTheme.shapes.medium).background(NxTheme.colors.surface.copy(alpha = 0.35f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text  = s.fileBrowserBinaryHint,
-                style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
-            )
+        NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxWidth().height(140.dp)) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text  = s.fileBrowserBinaryHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxInk.quiet,
+                )
+            }
         }
         NxButton(
             label   = s.fileBrowserOpenExternally,
@@ -433,18 +438,18 @@ private fun BinaryPreview(file: Path) {
 @Composable
 private fun PreviewHeader(file: Path, sizeLabel: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Symbol(fileIconFor(file), contentDescription = null, tint = NxTheme.colors.primary, modifier = Modifier.size(18.dp))
+        Symbol(fileIconFor(file), contentDescription = null, tint = NxColor.lead(), modifier = Modifier.size(18.dp))
         Text(
             text       = file.name,
             style      = MaterialTheme.typography.titleSmall,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text  = sizeLabel,
             style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
     }
 }

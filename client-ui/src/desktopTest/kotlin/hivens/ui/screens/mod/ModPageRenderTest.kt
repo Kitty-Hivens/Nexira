@@ -37,7 +37,6 @@ import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.i18n.RussianStrings
 import hivens.ui.components.modrinthGalleryMedia
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.WidgetSurface
@@ -63,6 +62,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
  * The whole screen: the shell's left rail, the page, and the project-view right
@@ -212,10 +213,10 @@ class ModPageRenderTest {
             LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, content -> WidgetSurface(spec, content) },
         ) {
-            Row(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            Row(Modifier.fillMaxSize().background(NxColor.page)) {
                 // Stand-in for appshell.leftrail, here only so the page is measured
                 // against the width it really gets.
-                Box(Modifier.width(56.dp).fillMaxHeight().background(NxTheme.colors.surface.copy(alpha = 0.35f)))
+                Box(Modifier.width(56.dp).fillMaxHeight().background(NxColor.page.copy(alpha = 0.35f)))
 
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     Header(pageState)
@@ -225,7 +226,7 @@ class ModPageRenderTest {
                         modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
                     )
                     NxSurface(
-                        level = NxSurfaceLevel.Raised,
+                        kind = SurfaceKind.Card,
                         modifier = Modifier.weight(1f).fillMaxWidth()
                             .padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
                     ) {
@@ -238,7 +239,7 @@ class ModPageRenderTest {
                 }
 
                 NxSurface(
-                    level = NxSurfaceLevel.Sunken,
+                    kind = SurfaceKind.Field,
                     // Rounded only on the edge that faces the page: the rail sits
                     // flush against the window and a corner there cuts off nothing.
                     shape = RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp),
@@ -262,7 +263,7 @@ class ModPageRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1500, 1000, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) { Screen(slug, local) }
+            NxTheme(dark = true) { Screen(slug, local) }
         }
         val png = try {
             var t = 0L
@@ -328,9 +329,9 @@ class ModPageRenderTest {
         )
 
         val scene = ImageComposeScene(width, 700, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(14.dp)) {
-                    NxSurface(level = NxSurfaceLevel.Raised, modifier = Modifier.fillMaxSize()) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
+                    NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
                         VersionsPane(pageState, onOpenVersion = {}, onReload = {}, modifier = Modifier.fillMaxSize())
                     }
                 }
@@ -362,9 +363,9 @@ class ModPageRenderTest {
         pageState.versions = json.decodeFromString<List<ModrinthVersion>>(resource("iris.versions.json"))
 
         val scene = ImageComposeScene(900, 760, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(14.dp)) {
-                    NxSurface(level = NxSurfaceLevel.Raised, modifier = Modifier.fillMaxSize()) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
+                    NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
                         ChangelogPane(pageState, onReload = {}, modifier = Modifier.fillMaxSize())
                     }
                 }
@@ -396,9 +397,9 @@ class ModPageRenderTest {
         assertTrue(media.isNotEmpty(), "the fixture carries no gallery to draw")
 
         val scene = ImageComposeScene(1000, 760, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(14.dp)) {
-                    NxSurface(level = NxSurfaceLevel.Raised, modifier = Modifier.fillMaxSize()) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
+                    NxSurface(kind = SurfaceKind.Card, modifier = Modifier.fillMaxSize()) {
                         Box(Modifier.fillMaxSize().padding(16.dp)) {
                             ImageGallery(media, Modifier.fillMaxWidth())
                         }

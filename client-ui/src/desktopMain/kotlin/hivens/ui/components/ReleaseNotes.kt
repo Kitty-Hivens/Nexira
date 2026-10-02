@@ -9,7 +9,8 @@ import androidx.compose.ui.text.font.FontWeight
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 
 /**
  * A changelog, rendered at the size of the panel it sits in.
@@ -27,16 +28,16 @@ import hivens.ui.theme.NxTheme
 @Composable
 fun ReleaseNotes(markdown: String, modifier: Modifier = Modifier) {
     val type = MaterialTheme.typography
-    val colors = NxTheme.colors
     val body = type.bodyMedium
+    val codeGround = NxColor.wash(NxInk.quiet, CODE_WASH)
     Markdown(
         content = markdown,
         modifier = modifier,
         colors = markdownColor(
-            text = colors.textPrimary,
-            codeBackground = colors.surface,
-            inlineCodeBackground = colors.surface,
-            dividerColor = colors.outline.copy(alpha = 0.25f),
+            text = NxInk.main,
+            codeBackground = codeGround,
+            inlineCodeBackground = codeGround,
+            dividerColor = NxInk.line,
         ),
         typography = markdownTypography(
             h1 = type.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -51,10 +52,13 @@ fun ReleaseNotes(markdown: String, modifier: Modifier = Modifier) {
             bullet = body,
             list = body,
             table = body,
-            quote = body.copy(fontStyle = FontStyle.Italic, color = colors.textSecondary),
+            quote = body.copy(fontStyle = FontStyle.Italic, color = NxInk.quiet),
             code = type.bodySmall.copy(fontFamily = FontFamily.Monospace),
             inlineCode = body.copy(fontFamily = FontFamily.Monospace),
             alertTitle = body.copy(fontWeight = FontWeight.Bold),
         ),
     )
 }
+
+/** How far a code run is tinted toward the quiet ink, so it stands apart on whatever plane holds the notes. */
+private const val CODE_WASH = 0.12f

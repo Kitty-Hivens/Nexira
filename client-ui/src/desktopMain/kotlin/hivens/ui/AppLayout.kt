@@ -26,8 +26,10 @@ import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.ThemeLibrary
+import hivens.ui.theme.Plane
+import hivens.ui.theme.Backdrop
+import hivens.ui.theme.LocalPlane
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
@@ -46,6 +48,8 @@ import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -69,10 +73,8 @@ fun AppLayout(
     themeMode: ThemeMode = ThemeMode.Manual,
     onThemeModeChanged: (ThemeMode) -> Unit = {},
     systemThemeAvailable: Boolean = false,
-    paletteFromWallpaper: Boolean = true,
-    onPaletteFromWallpaperChanged: (Boolean) -> Unit = {},
-    customTheme: CustomTheme,
-    onCustomThemeChanged: (CustomTheme) -> Unit,
+    themeLibrary: ThemeLibrary,
+    onThemeSelected: (String) -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
@@ -88,10 +90,12 @@ fun AppLayout(
     // exactly until the next appState change discarded it.
     val currentSession = (appState as? AppState.Authenticated)?.session
 
-    // Go transparent only when the wallpaper can actually be drawn -- a deleted
-    // image left the row transparent over a blank white window.
-    val rowBackground = if (backgroundSettings.hasUsableImage()) Color.Transparent
-    else NxTheme.colors.background
+    // Go transparent only when the wallpaper can actually be drawn: a deleted image
+    // left the row transparent over a blank white window. Everything inside is told
+    // which of the two it sits on, so a plane over a picture knows it is over one.
+    val overWallpaper = backgroundSettings.hasUsableImage()
+    val rowBackground = if (overWallpaper) Color.Transparent else NxColor.page
+    val page = Plane(step = 0, color = NxColor.page, over = if (overWallpaper) Backdrop.Wallpaper else Backdrop.Page)
 
     val bypassHost = protocolConfig.sslBypassHost
     val bypassStore: SslBypassStore = koinInject()
@@ -146,9 +150,10 @@ fun AppLayout(
 
                     Screen.ThemePicker ->
                         ThemePickerSurface(
-                            currentTheme    = customTheme,
-                            onThemeSelected = { newTheme ->
-                                onCustomThemeChanged(newTheme)
+                            library         = themeLibrary,
+                            isDarkTheme     = isDarkTheme,
+                            onThemeSelected = { id ->
+                                onThemeSelected(id)
                                 onBack()
                             },
                             onBack          = onBack,
@@ -167,8 +172,7 @@ fun AppLayout(
                             themeMode = themeMode,
                             onThemeModeChanged = onThemeModeChanged,
                             systemThemeAvailable = systemThemeAvailable,
-                            paletteFromWallpaper = paletteFromWallpaper,
-                            onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
+                            activeTheme       = themeLibrary.active,
                             surfaceBlur       = customization.surfaceBlur,
                             onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
@@ -276,6 +280,7 @@ fun AppLayout(
         CompositionLocalProvider(
             LocalShellContext provides shellCtx,
             LocalLinkFollower provides rememberNavigatingLinkFollower(),
+            LocalPlane provides page,
         ) {
             SlotRenderer(
                 surface  = SurfaceId("appshell.root"),
@@ -332,7 +337,7 @@ fun AppSidebar(
             // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
             // background now, so its own opacity and blur drive the matte.
             containerColor = Color.Transparent,
-            contentColor   = NxTheme.colors.textSecondary
+            contentColor   = NxInk.quiet
         ) {
             // Items sit flush (spacing 0) so the rail is one contiguous column
             // of clickable slots with no dead gap between buttons. Each NavSlot

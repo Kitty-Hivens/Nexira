@@ -30,8 +30,6 @@ import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSelect
 import hivens.ui.nx.NxSwitch
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.ui.widgets.customization.panelLabelWidth
@@ -48,6 +46,9 @@ import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 // Renders one editor control for a single prop field, dispatching on the
 // serial kind + @SerialInfo annotations. `current` is the effective
@@ -123,7 +124,7 @@ private fun PanelRow(label: String, control: @Composable () -> Unit) {
 }
 
 /**
- * The panel's text input: the library's sunken plane with a field on it.
+ * The panel's text input: a library field plane with a text field on it.
  *
  * Not [hivens.ui.nx.NxField], for one reason and it is worth writing down. These
  * rows re-seed from the record only while they do NOT have focus, because the
@@ -139,16 +140,15 @@ private fun PanelField(
     onFocus: (Boolean) -> Unit,
 ) {
     NxSurface(
-        level  = NxSurfaceLevel.Sunken,
-        blurDp = 0f,
-        shape  = MaterialTheme.shapes.small,
+        kind  = SurfaceKind.Field,
+        shape = MaterialTheme.shapes.small,
     ) {
         BasicTextField(
             value         = text,
             onValueChange = onValueChange,
             singleLine    = true,
-            textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary),
-            cursorBrush   = SolidColor(NxTheme.colors.primary),
+            textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxInk.main),
+            cursorBrush   = SolidColor(NxColor.lead()),
             modifier      = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.s10, vertical = Spacing.s8)
@@ -309,14 +309,14 @@ internal fun DisclosureRow(label: String, expanded: Boolean, onToggle: () -> Uni
         Symbol(
             icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
             contentDescription = null,
-            tint = NxTheme.colors.textSecondary,
+            tint = NxInk.quiet,
             modifier = Modifier.size(16.dp),
         )
         Spacer(Modifier.width(6.dp))
         Text(
             text  = label,
             style = MaterialTheme.typography.labelMedium,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
     }
 }

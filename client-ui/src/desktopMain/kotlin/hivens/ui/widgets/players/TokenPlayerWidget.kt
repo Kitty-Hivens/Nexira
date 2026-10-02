@@ -54,8 +54,9 @@ import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -176,7 +177,6 @@ internal fun TokenPlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     var menuOpen by remember { mutableStateOf(false) }
@@ -196,7 +196,7 @@ internal fun TokenPlayerCard(
     // screen that put it most of a page away from the thing it names.
     NxTooltip(text = caption, modifier = modifier.playerObject(maxSide)) {
         NxSurface(
-            level    = NxSurfaceLevel.Floating,
+            kind     = SurfaceKind.Card,
             modifier = Modifier.fillMaxWidth().aspectRatio(1f),
             shape    = CircleShape,
         ) {
@@ -214,12 +214,14 @@ internal fun TokenPlayerCard(
                 contentAlignment = Alignment.Center,
             ) {
                 val side = minOf(maxWidth, maxHeight)
+                val ringTrack = NxColor.wash(NxInk.quiet, 0.22f)
+                val ringPlayed = NxColor.lead()
                 Canvas(Modifier.fillMaxSize().padding(RING_PADDING)) {
                     val stroke = RING_STROKE.toPx()
                     val inset = stroke / 2f
                     val arc = Size(size.width - stroke, size.height - stroke)
                     drawArc(
-                        color = palette.textSecondary.copy(alpha = 0.22f),
+                        color = ringTrack,
                         startAngle = -90f, sweepAngle = 360f, useCenter = false,
                         topLeft = Offset(inset, inset), size = arc,
                         style = Stroke(width = stroke, cap = StrokeCap.Round),
@@ -227,7 +229,7 @@ internal fun TokenPlayerCard(
                     val played = progressFraction(state).coerceIn(0f, 1f)
                     if (played > 0f) {
                         drawArc(
-                            color = palette.primary,
+                            color = ringPlayed,
                             startAngle = -90f, sweepAngle = 360f * played, useCenter = false,
                             topLeft = Offset(inset, inset), size = arc,
                             style = Stroke(width = stroke, cap = StrokeCap.Round),
@@ -253,7 +255,7 @@ internal fun TokenPlayerCard(
                         ) { Transport(state, loaded, Color.White, side, s, onPlayPause) }
                     }
                 } else {
-                    Transport(state, loaded, palette.textPrimary, side, s, onPlayPause)
+                    Transport(state, loaded, NxInk.main, side, s, onPlayPause)
                 }
 
                 if (side >= OVERFLOW_FLOOR) {
@@ -328,7 +330,7 @@ internal fun TokenPlayerCard(
                                     Text(
                                         text  = repeatAnswer(repeat, s),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = palette.textPrimary,
+                                        color = NxInk.main,
                                     )
                                 }
                             }

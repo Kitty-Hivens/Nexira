@@ -114,7 +114,7 @@ class PackSettingsWindowRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 // A vivid backdrop so any bleed-through of the overlay surface shows
                 // up as a pink tint -- proves the window is actually opaque.
                 Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {

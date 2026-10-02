@@ -58,7 +58,7 @@ data class TabContainerProps(
     displayName = "widget.container.tabs",
     slots       = ["tab_0", "tab_1", "tab_2"],
     propsClass  = TabContainerProps::class,
-    surface     = """{"fill":"base","opacity":0.0}""",
+    surface     = """{"fill":"panel","opacity":0.0}""",
 )
 @Composable
 fun TabContainerWidget(instance: WidgetInstance) {

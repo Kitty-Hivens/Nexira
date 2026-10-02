@@ -101,6 +101,10 @@ import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 import java.awt.Cursor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 // Wraps a single widget with edit-mode chrome: whole-body drag overlay,
 // remove button (hover-only, hidden when non-removable), configure "tune"
@@ -240,9 +244,9 @@ fun EditableWidgetChrome(
         animationSpec = tween(chromeMotionMs),
         label         = "edit-border-alpha",
     )
-    // Captured here because NxTheme.colors is a @Composable read; the draw lambda
+    // Captured here because NxColor.lead() is a @Composable read. The draw lambda
     // applies the animated alpha (a snapshot read, so it redraws without recomposing).
-    val borderColor = NxTheme.colors.primary
+    val borderColor = NxColor.lead()
     // The corner the resize pivots on, which is the corner the guides hang from.
     val guideAnchor = instance.placement?.anchor ?: Placement.TOP_START
     val hBiasForGuides = anchorHorizontalBias(parseAnchor(guideAnchor))
@@ -252,7 +256,7 @@ fun EditableWidgetChrome(
     // them, so this is the warning and not a refusal: the border turns while the
     // gesture is live, and where it goes is still the person's call.
     val isOverlapped = instance.instanceId in registry.overlapped
-    val overlapColor = NxTheme.colors.error
+    val overlapColor = NxColor.status(Status.Error)
     val overlapAlpha by animateFloatAsState(
         targetValue   = if (isOverlapped) 0.9f else 0f,
         animationSpec = tween(chromeMotionMs),
@@ -547,7 +551,7 @@ fun EditableWidgetChrome(
                     modifier = Modifier.align(edge.alignment()).padding(2.dp),
                 ) {
                     Surface(
-                        color    = NxTheme.colors.primary.copy(alpha = if (edge.isCorner()) 0.85f else 0.6f),
+                        color    = NxColor.lead().copy(alpha = if (edge.isCorner()) 0.85f else 0.6f),
                         shape    = RoundedCornerShape(4.dp),
                         modifier = Modifier
                             .size(edge.handleSize())
@@ -650,7 +654,7 @@ fun EditableWidgetChrome(
                         if (edge.isCorner()) {
                             Symbol(icon = NxIcon.OpenInFull,
                                 contentDescription = null,
-                                tint               = NxTheme.colors.onPrimary,
+                                tint               = NxColor.on(NxColor.lead()),
                                 modifier           = Modifier.size(10.dp).padding(0.dp),
                             )
                         }
@@ -697,26 +701,31 @@ fun EditableWidgetChrome(
     }
 
     if (forceRemoveOpen) {
-        AlertDialog(
-            onDismissRequest = { forceRemoveOpen = false },
-            containerColor   = NxTheme.colors.surface,
-            title            = { Text(s.editorForceRemoveTitle) },
-            text             = {
-                Text(
-                    text = s.editorForceRemoveBody(s.widgetLabel(descriptor.displayName)),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    forceRemoveOpen = false
-                    onRemove()
-                }) { Text(s.editorDelete, color = NxTheme.colors.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }
-            },
-        )
+        val container = NxTheme.colours.step(NxTheme.colours.topStep)
+        OnFill(container) {
+            AlertDialog(
+                onDismissRequest  = { forceRemoveOpen = false },
+                containerColor    = container,
+                titleContentColor = NxInk.main,
+                textContentColor  = NxInk.quiet,
+                title             = { Text(s.editorForceRemoveTitle) },
+                text              = {
+                    Text(
+                        text = s.editorForceRemoveBody(s.widgetLabel(descriptor.displayName)),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        forceRemoveOpen = false
+                        onRemove()
+                    }) { Text(s.editorDelete, color = NxColor.status(Status.Error, text = true)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }
+                },
+            )
+        }
     }
 }
 
@@ -750,7 +759,7 @@ private fun WidgetContextMenuContent(
         Text(
             text     = s.editorAnchorTitle,
             style    = MaterialTheme.typography.labelSmall,
-            color    = NxTheme.colors.textSecondary,
+            color    = NxInk.quiet,
             modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 2.dp),
         )
         AnchorGrid(current) { editController.setWidgetAnchor(path, instanceId, it); onClose() }
@@ -791,13 +800,13 @@ private fun AnchorGrid(current: String, onPick: (String) -> Unit) {
                             .size(26.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(
-                                if (selected) NxTheme.colors.primary.copy(alpha = 0.22f)
-                                else NxTheme.colors.surfaceVariant.copy(alpha = 0.5f),
+                                if (selected) NxColor.wash(NxColor.lead(), 0.22f)
+                                else NxColor.wash(NxInk.quiet, 0.1f),
                             )
                             .border(
                                 width = 1.dp,
-                                color = if (selected) NxTheme.colors.primary
-                                else NxTheme.colors.outline.copy(alpha = 0.3f),
+                                color = if (selected) NxColor.lead()
+                                else NxInk.line,
                                 shape = RoundedCornerShape(6.dp),
                             )
                             .clickable { onPick(anchor) }
@@ -831,7 +840,7 @@ private fun DropIndicator(isRow: Boolean) {
                 .fillMaxHeight()
                 .width(2.dp)
                 .padding(vertical = 4.dp)
-                .background(NxTheme.colors.primary),
+                .background(NxColor.lead()),
         )
     } else {
         Box(
@@ -839,7 +848,7 @@ private fun DropIndicator(isRow: Boolean) {
                 .fillMaxWidth()
                 .height(2.dp)
                 .padding(horizontal = 4.dp)
-                .background(NxTheme.colors.primary),
+                .background(NxColor.lead()),
         )
     }
 }

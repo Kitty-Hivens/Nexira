@@ -29,6 +29,7 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * The Library card's label row, over the banner brightnesses a card actually lands on.
@@ -62,9 +63,9 @@ class MetaChipContrastProbe {
             "night" to Color(0xFF14161C),
         )
         val scene = ImageComposeScene(980, 60 + banners.size * 2 * 96, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 CompositionLocalProvider(LocalStrings provides RussianStrings) {
-                    Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp)) {
+                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             banners.forEach { (name, fill) ->
                                 // 0.45 is the scrim over a real banner, 0.32 the one over

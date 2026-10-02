@@ -92,8 +92,6 @@ interface AppStrings {
     val settingsThemeModeSystem: String
     val settingsThemeModeWallpaper: String
     val settingsThemeModeSystemUnavailable: String
-    val settingsPaletteFromWallpaper: String
-    val settingsPaletteFromWallpaperDesc: String
     val settingsSurfaceBlur: String
     val settingsSurfaceBlurDesc: String
     val settingsCustomChrome: String
@@ -109,13 +107,7 @@ interface AppStrings {
     val themePickerApply: String
     val themePickerPreview: String
     val themePickerSelected: String
-    val themePickerColorPrimary: String
-    val themePickerColorSecondary: String
-    val themePickerColorBackground: String
-    val themePickerColorSurface: String
-    val themePickerColorAccent: String
-    val themePickerColorSuccess: String
-    val themePickerColorError: String
+    val themePickerDarkOnly: String
     val themePickerBtnSample: String
     val themePickerBtnOutlined: String
 
@@ -716,7 +708,6 @@ interface AppStrings {
     val customizationSectionVisual: String
     val customizationSectionColors: String
     val customizationHexInvalid: String
-    val themePickerAccentOverride: String
 
     // --- Browse screen ---
     val browseTitle: String

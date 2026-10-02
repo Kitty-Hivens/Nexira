@@ -65,9 +65,12 @@ import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.ui.utils.humanSize
 import kotlinx.coroutines.launch
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 /**
  * Every build the catalogue has, as a table.
@@ -142,7 +145,7 @@ internal fun VersionsPane(
                 Text(
                     s.modPageVersionsNoEntry,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             return
@@ -164,7 +167,7 @@ internal fun VersionsPane(
             Text(
                 s.contentVersionsUnknown,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
         return
@@ -191,9 +194,9 @@ internal fun VersionsPane(
             totalCount = rows.size,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
         )
-        HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+        HorizontalDivider(color = NxInk.line)
         HeaderRow(columns)
-        HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+        HorizontalDivider(color = NxInk.line)
         if (shown.isEmpty()) {
             // Filtered to nothing, which is not the same as a project with no
             // builds and must not read like one.
@@ -201,7 +204,7 @@ internal fun VersionsPane(
                 Text(
                     s.versionsFilterNoMatch,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             return@Column
@@ -222,7 +225,7 @@ internal fun VersionsPane(
                         onOpen = { onOpenVersion(v) },
                     )
                     if (expanded == v.id) FilesRow(v, s)
-                    HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.12f))
+                    HorizontalDivider(color = NxColor.wash(NxInk.line, 0.5f))
                 }
             }
             NxVerticalScrollbar(
@@ -309,7 +312,7 @@ private fun VersionFilterBar(
         Text(
             s.versionsFilterShown(shownCount, totalCount),
             style = MaterialTheme.typography.labelSmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
         if (!filters.isEmpty) {
             NxButton(
@@ -338,39 +341,39 @@ private fun FilterDropdown(
 ) {
     var open by remember { mutableStateOf(false) }
     val narrowed = summary != null
+    val fill = if (narrowed) NxColor.wash(NxColor.lead(), 0.16f) else NxColor.wash(NxInk.quiet, 0.08f)
     Box {
-        Row(
-            Modifier
-                .clip(MaterialTheme.shapes.large)
-                .background(
-                    if (narrowed) NxTheme.colors.primary.copy(alpha = 0.16f)
-                    else NxTheme.colors.surface.copy(alpha = 0.5f),
+        OnFill(fill) {
+            Row(
+                Modifier
+                    .clip(MaterialTheme.shapes.large)
+                    .background(fill)
+                    .clickable { open = true }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    if (narrowed) "$label: $summary" else label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (narrowed) NxColor.lead(text = true) else NxInk.quiet,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 220.dp),
                 )
-                .clickable { open = true }
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                if (narrowed) "$label: $summary" else label,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (narrowed) NxTheme.colors.primary else NxTheme.colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 220.dp),
-            )
-            // The axis clears itself where it is narrowing, and opens where it is
-            // not, so the same corner never means two things at once.
-            if (narrowed) {
-                Symbol(
-                    NxIcon.Close,
-                    contentDescription = null,
-                    tint = NxTheme.colors.primary,
-                    size = 14.dp,
-                    modifier = Modifier.clickable { onClear() },
-                )
-            } else {
-                Symbol(NxIcon.ExpandMore, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 14.dp)
+                // The axis clears itself where it is narrowing, and opens where it is
+                // not, so the same corner never means two things at once.
+                if (narrowed) {
+                    Symbol(
+                        NxIcon.Close,
+                        contentDescription = null,
+                        tint = NxColor.lead(),
+                        size = 14.dp,
+                        modifier = Modifier.clickable { onClear() },
+                    )
+                } else {
+                    Symbol(NxIcon.ExpandMore, contentDescription = null, tint = NxInk.quiet, size = 14.dp)
+                }
             }
         }
         // Pinned to the LEADING edge. The trigger's label grows when a selection is
@@ -438,7 +441,7 @@ private fun HeaderRow(columns: ScrollState) {
 private fun HeaderCell(label: String, width: Dp) = Text(
     label,
     style = MaterialTheme.typography.labelMedium,
-    color = NxTheme.colors.textSecondary,
+    color = NxInk.quiet,
     maxLines = 1,
     overflow = TextOverflow.Ellipsis,
     modifier = Modifier.width(width),
@@ -493,7 +496,7 @@ private fun VersionTableRow(
             v.versionNumber.ifBlank { v.name },
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = NxTheme.colors.textPrimary,
+            color = NxInk.main,
             textDecoration = if (nameHovered) TextDecoration.Underline else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -528,7 +531,7 @@ private fun VersionTableRow(
                         loaderLabel(loader),
                         tone = if (loader in filters.loaders) NxMetaChipTone.Success else NxMetaChipTone.Surface,
                         leading = if (hasLoaderGlyph(loader)) {
-                            { LoaderGlyph(loader, tint = NxTheme.colors.textSecondary, size = 12.dp) }
+                            { LoaderGlyph(loader, tint = NxInk.quiet, size = 12.dp) }
                         } else {
                             null
                         },
@@ -555,7 +558,7 @@ private fun VersionTableRow(
             Text(
                 relativeAge(v.datePublished, s),
                 style = MaterialTheme.typography.labelMedium,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
                 maxLines = 1,
                 modifier = Modifier.width(DATE_COLUMN),
             )
@@ -567,7 +570,7 @@ private fun VersionTableRow(
             Text(
                 compactCount(v.downloads, s),
                 style = MaterialTheme.typography.labelMedium,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
                 maxLines = 1,
                 modifier = Modifier.width(COUNT_COLUMN),
             )
@@ -594,7 +597,7 @@ private fun VersionTableRow(
                     contentDescription = if (fits) s.modPageInstallShort else s.versionsIncompatibleHint,
                     onClick = { scope.launch { state.installVersion(v) } },
                     enabled = !state.installing,
-                    tint = if (fits) NxTheme.colors.primary else NxTheme.colors.warnAccent,
+                    tint = if (fits) NxColor.lead() else NxColor.status(Status.Warning),
                 )
             }
         }
@@ -660,7 +663,7 @@ private fun FilesRow(v: ModrinthVersion, s: hivens.ui.i18n.AppStrings) {
                         Symbol(
                             NxIcon.Star,
                             contentDescription = null,
-                            tint = NxTheme.colors.warnAccent,
+                            tint = NxColor.status(Status.Warning),
                             size = 12.dp,
                         )
                     }
@@ -710,7 +713,7 @@ private fun <T> OverflowChips(
 
 @Composable
 private fun channelColor(channel: VersionChannel) = when (channel) {
-    VersionChannel.Release -> NxTheme.colors.success
-    VersionChannel.Beta -> NxTheme.colors.warnAccent
-    VersionChannel.Alpha -> NxTheme.colors.error
+    VersionChannel.Release -> NxColor.status(Status.Success)
+    VersionChannel.Beta -> NxColor.status(Status.Warning)
+    VersionChannel.Alpha -> NxColor.status(Status.Error)
 }

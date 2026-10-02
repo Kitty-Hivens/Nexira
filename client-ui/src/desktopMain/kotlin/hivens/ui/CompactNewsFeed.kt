@@ -37,8 +37,9 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.platform.SystemActions
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.shell.NewsImageSource
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
@@ -46,6 +47,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * The news rail, over whichever channel it is handed.
@@ -214,17 +217,17 @@ fun CompactNewsFeed(
                 text       = s.newsTitle,
                 style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold,
-                color      = NxTheme.colors.textSecondary,
+                color      = NxInk.quiet,
                 modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
             )
-            HorizontalDivider(color = NxTheme.colors.outline)
+            HorizontalDivider(color = NxInk.line)
         }
 
         // Filter field -- only once a loaded, non-empty feed gives something to
         // filter; the search narrows by title.
         if (!loading && news.isNotEmpty()) {
             NewsFilterField(query = query, onQueryChange = { query = it })
-            HorizontalDivider(color = NxTheme.colors.outline)
+            HorizontalDivider(color = NxInk.line)
         }
 
         // Weighted so the list owns the remaining height and scrolls within it,
@@ -244,7 +247,7 @@ fun CompactNewsFeed(
                         Text(
                             text  = unavailable ?: s.newsEmpty,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                         )
                         // Explicit retry covers the "network came back but no
                         // setting was touched" path -- the LaunchedEffect above
@@ -265,7 +268,7 @@ fun CompactNewsFeed(
                     Text(
                         text  = s.newsEmpty,
                         style = MaterialTheme.typography.bodySmall,
-                        color = NxTheme.colors.textSecondary,
+                        color = NxInk.quiet,
                     )
                 }
 
@@ -287,7 +290,7 @@ fun CompactNewsFeed(
                                     opensSource = policy.opensSource,
                                 )
                                 HorizontalDivider(
-                                    color    = NxTheme.colors.outline,
+                                    color    = NxInk.line,
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 )
                             }
@@ -335,7 +338,7 @@ private fun FeedTail() {
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(
-            color       = NxTheme.colors.primary.copy(alpha = 0.6f),
+            color       = NxColor.wash(NxColor.lead(), 0.6f),
             strokeWidth = 2.dp,
             modifier    = Modifier.size(16.dp),
         )
@@ -356,50 +359,54 @@ private fun FeedRetry(onRetry: () -> Unit) {
     }
 }
 
-// Compact glass search field. Narrows the feed by title so a long news list
+// Compact search field. Narrows the feed by title so a long news list
 // stays scannable in the rail.
 @Composable
 private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
     val s = LocalStrings.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    NxSurface(
+        kind     = SurfaceKind.Field,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.surfaceContainerHigh)
-            .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        Symbol(icon = NxIcon.Search,
-            contentDescription = null,
-            tint               = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
-            modifier           = Modifier.size(14.dp),
-        )
-        Spacer(Modifier.width(6.dp))
-        Box(Modifier.weight(1f)) {
-            BasicTextField(
-                value         = query,
-                onValueChange = onQueryChange,
-                singleLine    = true,
-                textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary),
-                cursorBrush   = SolidColor(NxTheme.colors.primary),
-                modifier      = Modifier.fillMaxWidth(),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        ) {
+            Symbol(icon = NxIcon.Search,
+                contentDescription = null,
+                tint               = NxColor.wash(NxInk.quiet, 0.7f),
+                modifier           = Modifier.size(14.dp),
             )
-            if (query.isEmpty()) {
-                Text(
-                    text  = s.newsFilterPlaceholder,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
+            Spacer(Modifier.width(6.dp))
+            Box(Modifier.weight(1f)) {
+                BasicTextField(
+                    value         = query,
+                    onValueChange = onQueryChange,
+                    singleLine    = true,
+                    textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxInk.main),
+                    cursorBrush   = SolidColor(NxColor.lead()),
+                    modifier      = Modifier.fillMaxWidth(),
                 )
+                if (query.isEmpty()) {
+                    Text(
+                        text  = s.newsFilterPlaceholder,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxInk.quiet,
+                    )
+                }
             }
-        }
-        if (query.isNotEmpty()) {
-            IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(20.dp)) {
-                Symbol(icon = NxIcon.Close,
-                    contentDescription = s.newsFilterClear,
-                    tint               = NxTheme.colors.textSecondary,
-                    modifier           = Modifier.size(12.dp),
-                )
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(20.dp)) {
+                    Symbol(icon = NxIcon.Close,
+                        contentDescription = s.newsFilterClear,
+                        tint               = NxInk.quiet,
+                        modifier           = Modifier.size(12.dp),
+                    )
+                }
             }
         }
     }
@@ -409,16 +416,13 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
 
 @Composable
 private fun NewsSkeleton() {
-    // Two distinct tonal roles rather than one surface at two alphas: the helper
-    // that resolved a tint returned the same opaque colour for every alpha on a
-    // light palette, so all three stops were identical and the skeleton did not
-    // shimmer at all.
-    val colors = NxTheme.colors
-    val shimmerColors = listOf(
-        colors.surfaceContainer,
-        colors.surfaceContainerHigh,
-        colors.surfaceContainer,
-    )
+    // Two opaque washes of different strength rather than one colour at two
+    // alphas: the helper that resolved a tint returned the same opaque colour for
+    // every alpha on a light palette, so all three stops were identical and the
+    // skeleton did not shimmer at all.
+    val rest = NxColor.wash(NxInk.quiet, 0.08f)
+    val crest = NxColor.wash(NxInk.quiet, 0.16f)
+    val shimmerColors = listOf(rest, crest, rest)
 
     // A still style parks the sweep off-frame rather than restarting it every
     // frame, which is what a collapsed duration would do to an endless loop.
@@ -440,7 +444,7 @@ private fun NewsSkeleton() {
         repeat(4) {
             SkeletonNewsItem(brush)
             HorizontalDivider(
-                color    = NxTheme.colors.outline,
+                color    = NxInk.line,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
@@ -551,7 +555,7 @@ private fun CompactNewsItem(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(NxTheme.colors.surface)
+                    .background(NxColor.wash(NxInk.quiet, 0.10f))
             ) {
                 // The fallback rides on the failure rather than on a subcomposition
                 // per row: a row is cheap and there are hundreds of them. Keyed on the
@@ -581,7 +585,7 @@ private fun CompactNewsItem(
                 text       = item.title,
                 style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
-                color      = NxTheme.colors.textPrimary,
+                color      = NxInk.main,
                 maxLines   = if (plainText) 4 else 2,
                 overflow   = TextOverflow.Ellipsis
             )
@@ -590,7 +594,7 @@ private fun CompactNewsItem(
                 Text(
                     text  = date,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.primary.copy(alpha = 0.7f)
+                    color = NxColor.lead(text = true)
                 )
             }
         }
@@ -600,7 +604,7 @@ private fun CompactNewsItem(
             Text(
                 text  = "›",
                 style = MaterialTheme.typography.bodyMedium,
-                color = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
+                color = NxColor.wash(NxInk.quiet, 0.4f)
             )
         }
     }

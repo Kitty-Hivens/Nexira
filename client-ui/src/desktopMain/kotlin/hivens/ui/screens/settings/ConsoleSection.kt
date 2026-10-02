@@ -37,7 +37,6 @@ import hivens.ui.nx.NxToggle
 import hivens.ui.surface.NxCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.ConsoleSettingsStore
@@ -45,6 +44,9 @@ import hivens.ui.utils.FilterRule
 import hivens.ui.utils.HighlightRule
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Settings > Console. Reads and writes through the shared [ConsoleSettingsStore],
@@ -94,7 +96,7 @@ internal fun ConsoleSection() {
             Text(
                 text  = s.consoleSecApplyNote,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
 
@@ -161,7 +163,7 @@ internal fun ConsoleSection() {
 @Composable
 private fun ConsoleColorRow(label: String, hex: String?, autoLabel: String, onChange: (String?) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(label, color = NxInk.main, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
         NxColorField(
             hex           = hex,
             onValueChange = onChange,
@@ -174,7 +176,7 @@ private fun ConsoleColorRow(label: String, hex: String?, autoLabel: String, onCh
 @Composable
 private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> Unit, onDelete: () -> Unit) {
     val s = LocalStrings.current
-    NxCard(blurDp = 0f) {
+    NxCard {
         Column(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -182,7 +184,7 @@ private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NxSwitch(checked = rule.enabled, onCheckedChange = { onChange(rule.copy(enabled = it)) })
                 NxField(rule.pattern, { onChange(rule.copy(pattern = it)) }, s.consoleSecRulePattern, Modifier.weight(1f))
-                NxIconButton(NxIcon.Delete, null, onDelete, tint = NxTheme.colors.error)
+                NxIconButton(NxIcon.Delete, null, onDelete, tint = NxColor.status(Status.Error))
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 NxChoiceChip(s.consoleSecRegex, rule.regex) { onChange(rule.copy(regex = !rule.regex)) }
@@ -196,7 +198,7 @@ private fun HighlightRuleCard(rule: HighlightRule, onChange: (HighlightRule) -> 
 @Composable
 private fun FilterRuleCard(rule: FilterRule, onChange: (FilterRule) -> Unit, onDelete: () -> Unit) {
     val s = LocalStrings.current
-    NxCard(blurDp = 0f) {
+    NxCard {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment     = Alignment.CenterVertically,
@@ -205,7 +207,7 @@ private fun FilterRuleCard(rule: FilterRule, onChange: (FilterRule) -> Unit, onD
             NxSwitch(checked = rule.enabled, onCheckedChange = { onChange(rule.copy(enabled = it)) })
             NxField(rule.pattern, { onChange(rule.copy(pattern = it)) }, s.consoleSecRulePattern, Modifier.weight(1f))
             NxChoiceChip(s.consoleSecRegex, rule.regex) { onChange(rule.copy(regex = !rule.regex)) }
-            NxIconButton(NxIcon.Delete, null, onDelete, tint = NxTheme.colors.error)
+            NxIconButton(NxIcon.Delete, null, onDelete, tint = NxColor.status(Status.Error))
         }
     }
 }
@@ -215,14 +217,14 @@ private fun EmptyRulesHint(text: String) {
     Text(
         text,
         style    = MaterialTheme.typography.bodySmall,
-        color    = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+        color    = NxInk.quiet,
         modifier = Modifier.padding(vertical = 4.dp),
     )
 }
 
 @Composable
 private fun ArtCard(art: String, onDelete: () -> Unit) {
-    NxCard(blurDp = 0f) {
+    NxCard {
         Row(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment     = Alignment.Top,
@@ -233,13 +235,13 @@ private fun ArtCard(art: String, onDelete: () -> Unit) {
             Text(
                 text     = art,
                 style    = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 11.sp, lineHeight = 12.sp),
-                color    = NxTheme.colors.textSecondary,
+                color    = NxInk.quiet,
                 softWrap = false,
                 maxLines = 10,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).heightIn(max = 140.dp).horizontalScroll(rememberScrollState()),
             )
-            NxIconButton(NxIcon.Delete, null, onDelete, tint = NxTheme.colors.error)
+            NxIconButton(NxIcon.Delete, null, onDelete, tint = NxColor.status(Status.Error))
         }
     }
 }
@@ -252,7 +254,7 @@ private fun ArtAdder(
     addLabel: String,
     placeholder: String,
 ) {
-    NxCard(blurDp = 0f) {
+    NxCard {
         Column(
             Modifier.fillMaxWidth().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -263,7 +265,7 @@ private fun ArtAdder(
                 placeholder   = placeholder,
                 singleLine    = false,
                 modifier      = Modifier.fillMaxWidth().heightIn(min = 72.dp),
-                textStyle     = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 12.sp, color = NxTheme.colors.textPrimary),
+                textStyle     = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 12.sp, color = NxInk.main),
             )
             NxButton(label = addLabel, onClick = onAdd, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
         }

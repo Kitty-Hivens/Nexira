@@ -27,6 +27,7 @@ import java.nio.file.Paths
 import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
 
 /**
  * Concept I on screen.
@@ -70,9 +71,9 @@ class ColumnPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             LocaleProvider(AppLocale.ENGLISH) {
-                NxTheme(useDarkTheme = dark) {
+                NxTheme(dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxTheme.colors.background).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
                         contentAlignment = Alignment.TopStart,
                     ) { body() }
                 }

@@ -47,6 +47,9 @@ import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Every state a launch control can be in, on the ground it is actually drawn over.
@@ -89,7 +92,7 @@ class PlayButtonStatesProbe {
     /** The hero's bottom strip: pixel art under the same 0.4 scrim, control at the end. */
     @Composable
     private fun HeroStrip(seed: String, content: @Composable () -> Unit) {
-        val (a, b) = NxTheme.colors.decorativePair(seed)
+        val (a, b) = decorativePair(seed)
         Box(Modifier.width(STRIP_W.dp).height(STRIP_H.dp).pixelArtBackground(seed, a, b)) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)))
             Box(Modifier.fillMaxSize().padding(horizontal = 24.dp), contentAlignment = Alignment.CenterEnd) { content() }
@@ -103,19 +106,19 @@ class PlayButtonStatesProbe {
     @Composable
     private fun SurfaceStrip(height: Int, content: @Composable () -> Unit) {
         Box(
-            Modifier.width(STRIP_W.dp).height(height.dp).background(NxTheme.colors.surface),
+            Modifier.width(STRIP_W.dp).height(height.dp).background(NxTheme.colours.step(1)),
             contentAlignment = Alignment.CenterEnd,
         ) { Box(Modifier.padding(horizontal = 18.dp)) { content() } }
     }
 
     @Composable
     private fun Sheet(dark: Boolean, onSurface: Boolean = false, stripH: Int = STRIP_H, button: @Composable (Cell, AppStrings) -> Unit) {
-        NxTheme(useDarkTheme = dark) {
-            Box(Modifier.fillMaxSize().background(NxTheme.colors.background).padding(16.dp)) {
+        NxTheme(dark = dark) {
+            Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     cells.forEach { cell ->
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(cell.name, Modifier.width(110.dp), style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
+                            Text(cell.name, Modifier.width(110.dp), style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
                             listOf(RussianStrings, GermanStrings).forEach { strings ->
                                 CompositionLocalProvider(LocalStrings provides strings) {
                                     if (onSurface) SurfaceStrip(stripH) { button(cell, strings) }
@@ -145,18 +148,17 @@ class PlayButtonStatesProbe {
 
     @Composable
     private fun inks(onSurface: Boolean): Inks {
-        val c = NxTheme.colors
-        val dark = c.background.luminance() < 0.5f
+        val dark = NxTheme.isDark
         val plate = if (dark) Color(0xFF121318) else Color.White
         val onPlate = if (dark) Color.White else Color.Black
         return if (onSurface) {
             Inks(
                 plate = if (dark) plate else Color(0xFF121318),
                 onPlate = if (dark) onPlate else Color.White,
-                quiet = c.textSecondary,
-                quietLine = c.textSecondary.copy(alpha = 0.35f),
-                warn = c.warnAccent,
-                caption = c.textSecondary,
+                quiet = NxInk.quiet,
+                quietLine = NxInk.quiet.copy(alpha = 0.35f),
+                warn = NxColor.status(Status.Warning, text = true),
+                caption = NxInk.quiet,
             )
         } else {
             Inks(

@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import hivens.core.data.ReleaseChannel
 import hivens.core.update.VersionChannel
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 // git sits past alpha-yellow on the heat scale, hotter than the plain text dev
 // is drawn in.
@@ -21,11 +23,11 @@ private val NIGHTLY_PURPLE = Color(0xFFB56BFF)
  */
 @Composable
 fun channelColor(channel: ReleaseChannel): Color = when (channel) {
-    ReleaseChannel.Release -> NxTheme.colors.success
-    ReleaseChannel.Beta    -> NxTheme.colors.progressAccent
-    ReleaseChannel.Alpha   -> NxTheme.colors.warnAccent
+    ReleaseChannel.Release -> NxColor.status(Status.Success)
+    ReleaseChannel.Beta    -> NxColor.status(Status.Info)
+    ReleaseChannel.Alpha   -> NxColor.status(Status.Warning)
     ReleaseChannel.Git     -> GIT_ORANGE
-    ReleaseChannel.Dev     -> NxTheme.colors.textPrimary
+    ReleaseChannel.Dev     -> NxInk.main
     ReleaseChannel.Nightly -> NIGHTLY_PURPLE
 }
 

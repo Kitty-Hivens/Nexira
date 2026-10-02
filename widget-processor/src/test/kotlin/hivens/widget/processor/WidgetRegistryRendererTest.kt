@@ -45,12 +45,12 @@ class WidgetRegistryRendererTest {
 
     @Test
     fun `a declared plane is emitted, decoded on first read`() {
-        val src = renderRegistry(listOf(widget("home.card", surfaceJson = """{"fill":"base","opacity":0.45}""")))
+        val src = renderRegistry(listOf(widget("home.card", surfaceJson = """{"fill":"panel","opacity":0.45}""")))
         assertContains(src, "import hivens.widget.model.SurfaceSpec")
         assertContains(src, "override val defaultSurface: SurfaceSpec? by lazy {")
         // Escaped into a Kotlin literal, not pasted raw: an unescaped quote here
         // would not compile, and the failure would be in generated code.
-        assertContains(src, """decodeFromString(SurfaceSpec.serializer(), "{\"fill\":\"base\",\"opacity\":0.45}")""")
+        assertContains(src, """decodeFromString(SurfaceSpec.serializer(), "{\"fill\":\"panel\",\"opacity\":0.45}")""")
     }
 
     @Test

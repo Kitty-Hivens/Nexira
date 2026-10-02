@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.launcher.network.CertificateTrustGate
@@ -24,6 +24,10 @@ import hivens.ui.theme.NxTheme
 import org.koin.compose.koinInject
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 /**
  * Answers a read that was refused by a certificate.
@@ -36,7 +40,7 @@ import java.time.temporal.ChronoUnit
  *
  * MUST be composed inside [hivens.ui.theme.NxTheme]: the prompt is a `Dialog`, which
  * on desktop gets its own composition, and one raised from outside the theme finds no
- * `LocalNxColors` and takes the shell down with it.
+ * `LocalScheme` and takes the shell down with it.
  */
 @Composable
 fun CertificatePromptHost() {
@@ -57,51 +61,62 @@ fun CertificatePromptHost() {
     PuppetClick("certificate.trust.dismiss", enabled = pending != null) { gate.dismiss() }
 
     val request = pending ?: return
+    // Material draws the dialog body, so its words are fitted to that body by hand: the
+    // dialog step of the ladder, which is what a modal is anywhere else in the app.
+    val body = NxTheme.colours.step(NxTheme.colours.topStep)
     AlertDialog(
         onDismissRequest = { gate.dismiss() },
-        title = { Text(s.sslWarningTitle, color = NxTheme.colors.textPrimary, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
+        title = { OnFill(body) { Text(s.sslWarningTitle, color = NxInk.main, fontWeight = FontWeight.Bold) } },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(s.sslWarningBody, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
-                Text(request.host, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textPrimary)
-                Text(s.sslWarningTrustPrompt, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+            OnFill(body) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(s.sslWarningBody, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                    Text(request.host, style = MaterialTheme.typography.labelMedium, color = NxInk.main)
+                    Text(s.sslWarningTrustPrompt, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                }
             }
         },
         confirmButton = {
-            // The three durations read as one row of equal choices, the way they do in
-            // the login form: the risk is the same whichever is picked, only its length
-            // differs.
-            val colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.warnAccent)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = { accept(ChronoUnit.HOURS, 1, "1 hour") },
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.small,
-                    colors = colors,
-                ) { Text(s.sslWarningTrustHour, color = Color.Black) }
-                Button(
-                    onClick = { accept(ChronoUnit.DAYS, 30, "30 days") },
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.small,
-                    colors = colors,
-                ) { Text(s.sslWarningTrust30Days, color = Color.Black) }
-                Button(
-                    onClick = { accept(ChronoUnit.DAYS, ALWAYS_DAYS, "always (100y)") },
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.small,
-                    colors = colors,
-                ) { Text(s.sslWarningTrustAlways, color = Color.Black) }
+            OnFill(body) {
+                // The three durations read as one row of equal choices, the way they do in
+                // the login form: the risk is the same whichever is picked, only its length
+                // differs.
+                val warn = NxColor.status(Status.Warning)
+                val onWarn = NxColor.on(warn)
+                val colors = ButtonDefaults.buttonColors(containerColor = warn, contentColor = onWarn)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = { accept(ChronoUnit.HOURS, 1, "1 hour") },
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.small,
+                        colors = colors,
+                    ) { Text(s.sslWarningTrustHour, color = onWarn) }
+                    Button(
+                        onClick = { accept(ChronoUnit.DAYS, 30, "30 days") },
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.small,
+                        colors = colors,
+                    ) { Text(s.sslWarningTrust30Days, color = onWarn) }
+                    Button(
+                        onClick = { accept(ChronoUnit.DAYS, ALWAYS_DAYS, "always (100y)") },
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.small,
+                        colors = colors,
+                    ) { Text(s.sslWarningTrustAlways, color = onWarn) }
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = { gate.dismiss() }) {
-                Text(s.sslWarningCancel, color = NxTheme.colors.textSecondary)
+            OnFill(body) {
+                TextButton(onClick = { gate.dismiss() }) {
+                    Text(s.sslWarningCancel, color = NxInk.quiet)
+                }
             }
         },
-        containerColor = NxTheme.colors.surface,
+        containerColor = body,
     )
 }
 

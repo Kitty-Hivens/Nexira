@@ -22,7 +22,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.widget.api.rememberProps
@@ -58,13 +59,12 @@ data class NotesState(
     maxWidth = 880, maxHeight = 720,
     displayName = "widget.notes.scratch",
     propsClass = NotesProps::class,
-    surface = """{"fill":"base","opacity":0.55}""",
+    surface = """{"fill":"panel","opacity":0.55}""",
 )
 @Composable
 fun NotesWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<NotesProps>()
     val strings = LocalStrings.current
-    val palette = NxTheme.colors
     var notes by instance.rememberWidgetState { NotesState() }
 
     AdaptiveWidget { scale ->
@@ -77,7 +77,7 @@ fun NotesWidget(instance: WidgetInstance) {
                 Text(
                     text       = p.title.ifBlank { strings.widgetLabel("widget.notes.scratch") },
                     style      = MaterialTheme.typography.labelLarge.scaled(scale),
-                    color      = palette.textSecondary,
+                    color      = NxInk.quiet,
                     fontWeight = FontWeight.Medium,
                     modifier   = Modifier.weight(1f),
                 )
@@ -85,7 +85,7 @@ fun NotesWidget(instance: WidgetInstance) {
                 Text(
                     text  = notes.body.length.toString(),
                     style = MaterialTheme.typography.labelSmall.scaled(scale),
-                    color = palette.textSecondary.copy(alpha = 0.6f),
+                    color = NxInk.quiet,
                 )
             }
 
@@ -94,8 +94,8 @@ fun NotesWidget(instance: WidgetInstance) {
             BasicTextField(
                 value         = notes.body,
                 onValueChange = { notes = notes.copy(body = it) },
-                textStyle     = MaterialTheme.typography.bodyMedium.scaled(scale).copy(color = palette.textPrimary),
-                cursorBrush   = SolidColor(palette.primary),
+                textStyle     = MaterialTheme.typography.bodyMedium.scaled(scale).copy(color = NxInk.main),
+                cursorBrush   = SolidColor(NxColor.lead()),
                 modifier      = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -105,7 +105,7 @@ fun NotesWidget(instance: WidgetInstance) {
                         Text(
                             text  = strings.widgetLabel("widget.notes.scratch.placeholder"),
                             style = MaterialTheme.typography.bodyMedium.scaled(scale),
-                            color = palette.textSecondary.copy(alpha = 0.5f),
+                            color = NxInk.quiet,
                         )
                     }
                     inner()

@@ -4,25 +4,25 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
-import hivens.ui.theme.CustomTheme
-import hivens.ui.theme.ThemePresets
+import hivens.ui.theme.Theme
+import hivens.ui.theme.Themes
 
-// Surface-scoped state + callbacks the theme-picker widgets share.
-// The grid widget reads `themes` to render every preset and writes
-// `selectedTheme.value` on tap; the preview widget reads
-// `selectedTheme.value` to render the preview panel. Applying is not
-// here: the button is surface chrome, not a widget, so it calls the
-// surface's own callback and a copy in the context had no reader.
+// Surface-scoped state the theme-picker widgets share. The grid shows every theme
+// and writes `selected` on a click. The preview reads `selected` and draws it.
+// Applying is not here: the button is surface chrome, not a widget, so it calls the
+// surface's own callback.
 //
-// Stub used by EditorSurfaceHost when a foreign-surface widget gets
-// dropped into theme.picker -- callbacks no-op rather than crash.
-// Plain class, not data class -- holds a MutableState reference and
-// two lambdas, all reference-equality fields. Generated equals /
-// hashCode / toString would be misleading "value semantics" the
-// holder does not actually provide.
+// [isDark] is the mode the launcher is in, so each theme is shown the way it would
+// actually be drawn: a theme with no light scheme stays dark even when the launcher
+// is light, and says so.
+//
+// Stub used by EditorSurfaceHost when a foreign-surface widget gets dropped into
+// theme.picker: no themes, nothing to apply. Plain class, not data class: it holds a
+// MutableState reference and a lambda, and generated value semantics would mislead.
 class ThemePickerContext(
-    val themes: List<CustomTheme>,
-    val selectedTheme: MutableState<CustomTheme>,
+    val themes: List<Theme>,
+    val selected: MutableState<Theme>,
+    val isDark: Boolean,
     val onBack: () -> Unit,
 )
 
@@ -32,7 +32,8 @@ val LocalThemePickerContext: ProvidableCompositionLocal<ThemePickerContext> =
     }
 
 internal val STUB_THEME_PICKER: ThemePickerContext = ThemePickerContext(
-    themes        = emptyList(),
-    selectedTheme = mutableStateOf(ThemePresets.getAll().first()),
-    onBack        = {},
+    themes   = emptyList(),
+    selected = mutableStateOf(Themes.default),
+    isDark   = true,
+    onBack   = {},
 )

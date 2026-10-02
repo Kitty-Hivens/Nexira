@@ -33,8 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,10 +41,10 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.surface.bodyFloor
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.surface.defaultOpacity
+import hivens.ui.widgets.kind
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
@@ -66,6 +64,8 @@ import hivens.widget.model.traverse
 import kotlin.math.roundToInt
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -155,13 +155,10 @@ private fun PropPanelBody(
     }
 
     NxSurface(
-        level    = NxSurfaceLevel.Floating,
+        // A popup: solid and above everything, so a settings panel stays readable
+        // and does not composite with the layers it floats over.
+        kind     = SurfaceKind.Popup,
         shape    = MaterialTheme.shapes.large,
-        // Solid, no glass: a settings panel must stay readable and not composite
-        // with the layers it floats over. Named rather than left to the default,
-        // which thins on dark.
-        opacity  = 1f,
-        blurDp   = 0f,
         shadowDp = PANEL_SHADOW_DP,
         modifier = Modifier
             .width(320.dp)
@@ -179,21 +176,21 @@ private fun PropPanelBody(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon = NxIcon.Tune,
                     contentDescription = null,
-                    tint               = NxTheme.colors.primary,
+                    tint               = NxColor.lead(),
                     modifier           = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text       = s.widgetLabel(descriptor.displayName),
                     style      = MaterialTheme.typography.titleSmall,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                 Symbol(icon = NxIcon.Close,
                     contentDescription = s.editorClose,
-                    tint               = NxTheme.colors.textSecondary,
+                    tint               = NxInk.quiet,
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -257,7 +254,7 @@ private fun PropPanelBody(
             Text(
                 text       = s.editorBackingTitle,
                 style      = MaterialTheme.typography.labelMedium,
-                color      = NxTheme.colors.textSecondary,
+                color      = NxInk.quiet,
                 fontWeight = FontWeight.SemiBold,
             )
             // Seeded through the same resolution the renderer uses, so the sliders
@@ -271,15 +268,15 @@ private fun PropPanelBody(
                 Text(
                     text  = s.editorSurfaceOwn,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                    color = NxInk.quiet.copy(alpha = 0.7f),
                 )
             } else if (resolved == null) {
                 Text(
                     text  = s.editorSurfaceNone,
                     style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+                    color = NxInk.quiet.copy(alpha = 0.7f),
                 )
-                TextButton(onClick = { write(SurfaceSpec(fill = "base", opacity = 0.5f)) }) {
+                TextButton(onClick = { write(SurfaceSpec(fill = "panel", opacity = 0.5f)) }) {
                     Symbol(NxIcon.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(s.editorSurfaceAdd, style = MaterialTheme.typography.labelMedium)
@@ -312,20 +309,8 @@ private fun PropPanelBody(
  */
 internal const val PANEL_SHADOW_DP = 18f
 
-/**
- * Whether the body a spec resolves to is dark, which is what decides the opacity a
- * surface that names none draws at.
- *
- * A rung follows the palette and every rung of one palette sits on the same side of
- * mid grey, so the page's own tone answers for all of them; a literal colour answers
- * for itself.
- */
-@Composable
-private fun surfaceBodyIsDark(spec: SurfaceSpec): Boolean =
-    when (val fill = parseFill(spec.fill)) {
-        is FillSource.Literal -> Color(fill.argb).luminance() < 0.5f
-        else -> NxTheme.colors.surface.luminance() < 0.5f
-    }
+/** The opacity the renderer draws a spec's plane at when the spec names none. */
+private fun defaultOpacityOf(spec: SurfaceSpec): Float = parseFill(spec.fill).kind().defaultOpacity()
 
 /**
  * The seven values a plane has, one row each.
@@ -339,23 +324,23 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     val s = LocalStrings.current
     val corner = 12f
 
-    // One field, a value or a name. Blank follows the theme, a rung name
-    // tracks the palette, a literal does not; a typo falls back to the theme
-    // rather than to black, so a mistake never looks deliberate.
+    // One field, a value or a name. Blank follows the theme, a surface word
+    // follows it relative to what holds the widget, a literal does not. A typo
+    // falls back to the theme rather than to black, so a mistake never looks
+    // deliberate.
     StringRow(s.editorSurfaceFill, surface.fill) { write(surface.copy(fill = it)) }
     Text(
         text  = s.editorSurfaceFillHint,
         style = MaterialTheme.typography.bodySmall,
-        color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+        color = NxInk.quiet.copy(alpha = 0.7f),
     )
     // Both open on what the plane DRAWS at, not on a zero. A value the record
-    // does not name is filled in by the style or by the theme, so a slider
-    // reading its own null reported no blur under a style that blurs at 18dp
-    // and full opacity under a body that draws at 0.92. Moving either one
+    // does not name is filled in by the surface's kind, so a slider reading its
+    // own null would report a number the renderer never used. Moving either one
     // writes it down, which is what makes the number true from then on.
     LabeledSlider(
         label         = s.editorSurfaceOpacity,
-        value         = (surface.opacity ?: bodyFloor(surfaceBodyIsDark(surface))) * 100f,
+        value         = (surface.opacity ?: defaultOpacityOf(surface)) * 100f,
         range         = 0f..100f,
         format        = "%.0f%%",
         keyStep       = 1f,
@@ -408,7 +393,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
           Text(
               text  = s.editorSurfaceShapeKindHint,
               style = MaterialTheme.typography.bodySmall,
-              color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
+              color = NxInk.quiet.copy(alpha = 0.7f),
           )
           LabeledSlider(
               label         = s.editorSurfaceSmoothing,
@@ -511,7 +496,7 @@ private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Uni
     Text(
         text       = s.editorPaddingTitle,
         style      = MaterialTheme.typography.labelMedium,
-        color      = NxTheme.colors.textSecondary,
+        color      = NxInk.quiet,
         fontWeight = FontWeight.SemiBold,
     )
     LabeledSlider(

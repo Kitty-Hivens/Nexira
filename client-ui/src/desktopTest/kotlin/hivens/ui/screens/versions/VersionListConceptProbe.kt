@@ -42,7 +42,6 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.utils.humanSize
 import kotlinx.serialization.SerialName
@@ -53,6 +52,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
  * The version picker as one list instead of two panels.
@@ -171,7 +173,7 @@ class VersionListConceptProbe {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.small)
-                .background(if (selected) NxTheme.colors.primary.copy(alpha = 0.12f) else Color.Transparent)
+                .background(if (selected) NxColor.lead().copy(alpha = 0.12f) else Color.Transparent)
                 .padding(horizontal = 12.dp, vertical = 9.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
@@ -183,7 +185,7 @@ class VersionListConceptProbe {
                 Text(
                     label(v),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NxTheme.colors.textPrimary,
+                    color = NxInk.main,
                     fontWeight = if (installed || selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -212,7 +214,7 @@ class VersionListConceptProbe {
                         listOfNotNull(formatBuildTimestamp(v.datePublished)?.substringBefore(' '), humanSize(size(v), s))
                             .joinToString("  ·  "),
                         style = MaterialTheme.typography.labelSmall,
-                        color = NxTheme.colors.textSecondary,
+                        color = NxInk.quiet,
                         maxLines = 1,
                     )
                 }
@@ -221,7 +223,7 @@ class VersionListConceptProbe {
                 Text(
                     note,
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 17.dp),
@@ -234,7 +236,7 @@ class VersionListConceptProbe {
     private fun Window(selectedIndex: Int, installedIndex: Int) {
         Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)), contentAlignment = Alignment.Center) {
             NxSurface(
-                level = NxSurfaceLevel.Raised,
+                kind = SurfaceKind.Card,
                 // Sized to what it holds. The shipped window takes 88 percent of
                 // the app whatever is in it, which is why eight builds arrive
                 // inside a hall.
@@ -253,8 +255,8 @@ class VersionListConceptProbe {
                             Text("I", style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                         Column(Modifier.weight(1f)) {
-                            Text("Iris Shaders", style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                            Text("${builds("neoforge").size} сборок для 1.21.1", style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+                            Text("Iris Shaders", style = MaterialTheme.typography.titleSmall, color = NxInk.main, fontWeight = FontWeight.Bold)
+                            Text("${builds("neoforge").size} сборок для 1.21.1", style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                         }
                         NxIconButton(icon = NxIcon.Close, contentDescription = "Закрыть", onClick = {})
                     }
@@ -288,7 +290,7 @@ class VersionListConceptProbe {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(900, 760, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) { Window(selected, installed) }
+            NxTheme(dark = true) { Window(selected, installed) }
         }
         val png = try {
             var t = 0L

@@ -65,8 +65,6 @@ import hivens.ui.editor.reportsContentPane
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -81,6 +79,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
  * The chrome's opacity when nothing overrides it.
@@ -120,15 +121,14 @@ data class ShellCenterRegionProps(
  * asking for more blur quietly asked for less fill. Two of the four values the preset
  * carried never reached a pixel at all.
  *
- * -1 means "the theme's own floor", which is what an unnamed opacity has always
- * drawn: 92% on dark, solid on light.
+ * -1 means "the kind's own": solid for a panel, a thin coat for chrome.
  */
 internal fun Int.regionOpacity(): Float? = takeIf { it >= 0 }?.let { it / 100f }
 
 /**
  * Props for the RIGHT region. It draws no divider, so no divider knob exists here --
  * the prop panel shows only what works. Defaults are the panel's shipped look: the
- * theme's own floor, no blur, swipe-to-collapse off.
+ * panel's own solid body, no blur, swipe-to-collapse off.
  */
 @Serializable
 data class ShellRightRegionProps(
@@ -189,7 +189,7 @@ val LocalShellContext = compositionLocalOf<ShellContext> {
 
 @Composable
 private fun RowScope.RegionDivider(show: Boolean) {
-    if (show) VerticalDivider(Modifier.fillMaxHeight(), color = NxTheme.colors.outline)
+    if (show) VerticalDivider(Modifier.fillMaxHeight(), color = NxInk.line)
 }
 
 // Shown for a collapsed LEFT rail while editing: thin but visible, so its edit
@@ -200,8 +200,8 @@ private fun RowScope.RegionDivider(show: Boolean) {
 @Composable
 private fun CollapsedRegionStrip() {
     NxSurface(
-        NxSurfaceLevel.Base, Modifier.width(22.dp).fillMaxHeight(), RectangleShape,
-        borderWidthDp = 0f, opacity = 0.4f,
+        SurfaceKind.Chrome, Modifier.width(22.dp).fillMaxHeight(), RectangleShape,
+        opacity = 0.4f, blurDp = 0f,
     ) {}
 }
 
@@ -230,13 +230,11 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         // with it. Its contents are no answer either, since the rail's slots fill
         // whatever width they are offered so the items centre in it.
         val railWidth = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else NAV_RAIL_DEFAULT_WIDTH)
-        // The rail is an NxSurface at 35% by default. AppSidebar's NavigationRail is
-        // transparent so this owns the background, and the divider stays OUTSIDE the
-        // surface so the tinted area is exactly the rail. Light stops being forced
-        // opaque here: a named opacity is a named opacity on either theme now.
+        // The rail is chrome: glass with a 35% coat by default. AppSidebar's
+        // NavigationRail is transparent so this owns the background, and the divider
+        // stays OUTSIDE the surface so the coat covers exactly the rail.
         NxSurface(
-            NxSurfaceLevel.Base, railWidth.fillMaxHeight(), RectangleShape,
-            borderWidthDp = 0f,
+            SurfaceKind.Chrome, railWidth.fillMaxHeight(), RectangleShape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             AppSidebar(
@@ -271,7 +269,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellCenterRegionProps>()
     // The wedge is the chrome reaching around the corner, so it takes the chrome's
     // colour rather than one of its own -- see [CHROME_OPACITY_PCT].
-    val chrome = NxTheme.colors.surface.copy(alpha = CHROME_OPACITY_PCT / 100f)
+    val chrome = NxColor.page.copy(alpha = CHROME_OPACITY_PCT / 100f)
     val cornerDp = 12.dp
     // This rectangle is what the editor's overlays sit over. Reported rather than
     // reconstructed from the rails' props: a rail animates, folds itself away on a
@@ -284,10 +282,9 @@ fun ShellCenterRegion(instance: WidgetInstance) {
         onDispose { chromeBounds.center = null }
     }
     NxSurface(
-        NxSurfaceLevel.Base,
+        SurfaceKind.Chrome,
         Modifier.fillMaxSize().reportsContentPane(chromeBounds),
         RectangleShape,
-        borderWidthDp = 0f,
         opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
     ) {
         LocalShellContext.current.centerBody()
@@ -359,9 +356,9 @@ private val RAIL_INSET = 4.dp
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRightRegionProps>()
-    // The panel is an NxSurface at Floating depth: a SurfaceContainerHigh body (a step
-    // up the tonal ladder from the page) plus a luminance-derived bevel, so it reads
-    // as a distinct plane over any wallpaper and with none. Its opacity and blur are
+    // The panel is a [SurfaceKind.Panel]: one step above the page plus a
+    // luminance-derived bevel, so it reads as a distinct plane over any wallpaper
+    // and with none. Its opacity and blur are
     // the editable pair.
     val editing = LocalEditMode.current is EditModeState.On
     val path = LocalSlotPath.current
@@ -408,7 +405,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         if (props.collapsed) return
         val sized = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH)
         NxSurface(
-            NxSurfaceLevel.Floating,
+            SurfaceKind.Panel,
             sized.fillMaxHeight().padding(start = RAIL_INSET, top = RAIL_INSET, bottom = RAIL_INSET).clip(panelShape),
             panelShape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
@@ -474,7 +471,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         // as the rail widens.
         if (widthAnim.value > collapsedPx + 1f) {
             NxSurface(
-                NxSurfaceLevel.Floating,
+                SurfaceKind.Panel,
                 Modifier.fillMaxSize().padding(start = RAIL_INSET, top = RAIL_INSET, bottom = RAIL_INSET).clip(panelShape),
                 panelShape,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
@@ -572,8 +569,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
 
     when (props.groupStyle) {
         GroupStyle.LineSeparated -> NxSurface(
-            NxSurfaceLevel.Base, barModifier, shape,
-            borderWidthDp = 0f,
+            SurfaceKind.Chrome, barModifier, shape,
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             Row(
@@ -599,12 +595,11 @@ fun ShellTopRegion(instance: WidgetInstance) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, borderWidthDp = 0f, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
+                NxSurface(SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
             AppGlyph()
             NxSurface(
-                NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
-                borderWidthDp = 0f,
+                SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -613,8 +608,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
             }
             DragLane()
             NxSurface(
-                NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape,
-                borderWidthDp = 0f,
+                SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape,
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -622,7 +616,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
                 }
             }
             if (!HOST_IS_MAC && showControls) {
-                NxSurface(NxSurfaceLevel.Base, Modifier.fillMaxHeight(), shape, borderWidthDp = 0f, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
+                NxSurface(SurfaceKind.Chrome, Modifier.fillMaxHeight(), shape, opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat()) { Caption() }
             }
         }
     }
@@ -637,7 +631,7 @@ private fun AppGlyph() {
         icon = NxIcon.DarkMode,
         contentDescription = null,
         modifier = Modifier.padding(start = 10.dp, end = 6.dp),
-        tint = NxTheme.colors.primary,
+        tint = NxColor.lead(),
         size = 20.dp,
     )
 }
@@ -648,7 +642,7 @@ private fun AppGlyph() {
 private fun BarDivider() {
     VerticalDivider(
         modifier = Modifier.height(18.dp).padding(horizontal = 4.dp),
-        color = NxTheme.colors.outline,
+        color = NxInk.line,
     )
 }
 

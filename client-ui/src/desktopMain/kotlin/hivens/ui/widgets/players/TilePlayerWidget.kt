@@ -35,7 +35,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,7 +52,10 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -176,7 +178,6 @@ internal fun TilePlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -215,7 +216,7 @@ internal fun TilePlayerCard(
         val caption = showCaption && side >= 132.dp
         val transport = side >= 96.dp
 
-        Ground(track?.artwork, palette.surfaceContainer, palette.primary, palette.tertiary)
+        Ground(track?.artwork)
 
         if (reveal > 0f && transport) {
             Box(
@@ -323,13 +324,17 @@ internal fun TilePlayerCard(
                     Modifier.fillMaxWidth().height(3.dp).clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.26f)),
                 )
-                Box(
-                    Modifier
-                        .fillMaxWidth(progressFraction(state).coerceIn(0f, 1f))
-                        .height(3.dp)
-                        .clip(CircleShape)
-                        .background(palette.primary),
-                )
+                // The foot is darkened to near black on every theme, so the played
+                // part is the lead fitted against black rather than against the page.
+                OnFill(Color.Black) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(progressFraction(state).coerceIn(0f, 1f))
+                            .height(3.dp)
+                            .clip(CircleShape)
+                            .background(NxColor.lead()),
+                    )
+                }
             }
         }
 
@@ -381,7 +386,7 @@ internal fun TilePlayerCard(
                         Text(
                             text  = repeatAnswer(repeat, s),
                             style = MaterialTheme.typography.bodySmall,
-                            color = palette.textPrimary,
+                            color = NxInk.main,
                         )
                     }
                 }
@@ -409,7 +414,7 @@ private val SEEK_REACH_MAX = 22.dp
 
 /** The artwork, or a field generated from the palette where there is none. */
 @Composable
-private fun Ground(artwork: ImageBitmap?, base: Color, primary: Color, tertiary: Color) {
+private fun Ground(artwork: ImageBitmap?) {
     if (artwork != null) {
         Image(
             bitmap             = artwork,
@@ -418,10 +423,12 @@ private fun Ground(artwork: ImageBitmap?, base: Color, primary: Color, tertiary:
             modifier           = Modifier.fillMaxSize(),
         )
     } else {
+        val colours = NxTheme.colours
+        val third = colours.distinct(3)[2]
         Box(
             Modifier.fillMaxSize().background(
                 Brush.linearGradient(
-                    listOf(lerp(base, primary, 0.30f), lerp(base, tertiary, 0.16f)),
+                    listOf(NxColor.wash(colours.lead, 0.30f), NxColor.wash(third, 0.16f)),
                 ),
             ),
         )

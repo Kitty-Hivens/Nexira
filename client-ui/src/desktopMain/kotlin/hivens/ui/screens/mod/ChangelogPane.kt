@@ -43,8 +43,10 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.RetryStateBlock
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Every build's notes in one column, newest first.
@@ -107,7 +109,7 @@ internal fun ChangelogPane(
             Text(
                 s.modPageVersionsNoEntry,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
         return
@@ -121,7 +123,7 @@ internal fun ChangelogPane(
             Text(
                 s.versionPickerNoChangelog,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
         return
@@ -178,7 +180,6 @@ internal fun changelogEntries(versions: List<ModrinthVersion>): List<ChangelogEn
 
 @Composable
 private fun ChangelogRow(entry: ChangelogEntry) {
-    val colors = NxTheme.colors
     val v = entry.version
     // Height from the tallest child, so the rule beside the notes can be as tall as
     // they are. Inside a lazy item the row's own max height is infinite, and
@@ -194,7 +195,7 @@ private fun ChangelogRow(entry: ChangelogEntry) {
         Box(
             Modifier.width(3.dp).fillMaxHeight()
                 .clip(RoundedCornerShape(50))
-                .background(channelColor(entry.channel).copy(alpha = if (entry.repeated) 0.3f else 1f)),
+                .background(if (entry.repeated) NxColor.wash(channelColor(entry.channel), 0.3f) else channelColor(entry.channel)),
         )
         Column(
             Modifier.weight(1f).padding(bottom = 18.dp),
@@ -208,7 +209,7 @@ private fun ChangelogRow(entry: ChangelogEntry) {
                     v.name.ifBlank { v.versionNumber },
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,
+                    color = NxInk.main,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -221,7 +222,7 @@ private fun ChangelogRow(entry: ChangelogEntry) {
                     Text(
                         it,
                         style = MaterialTheme.typography.labelMedium,
-                        color = colors.textSecondary,
+                        color = NxInk.quiet,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -238,7 +239,7 @@ private fun ChangelogRow(entry: ChangelogEntry) {
 
 @Composable
 private fun channelColor(channel: VersionChannel) = when (channel) {
-    VersionChannel.Release -> NxTheme.colors.success
-    VersionChannel.Beta -> NxTheme.colors.warnAccent
-    VersionChannel.Alpha -> NxTheme.colors.error
+    VersionChannel.Release -> NxColor.status(Status.Success)
+    VersionChannel.Beta -> NxColor.status(Status.Warning)
+    VersionChannel.Alpha -> NxColor.status(Status.Error)
 }

@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
 
 /**
  * Vertical category nav for the two-column Settings layout. Renders
@@ -53,8 +53,8 @@ internal fun SettingsCategoryNav(
                     .fillMaxWidth()
                     .clip(MaterialTheme.shapes.medium)
                     .background(
-                        if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
-                        else NxTheme.colors.background.copy(alpha = 0.0f),
+                        if (isSelected) NxColor.lead().copy(alpha = 0.18f)
+                        else NxColor.page.copy(alpha = 0.0f),
                     )
                     .clickable { onSelect(category) }
                     .padding(horizontal = 12.dp, vertical = 10.dp),

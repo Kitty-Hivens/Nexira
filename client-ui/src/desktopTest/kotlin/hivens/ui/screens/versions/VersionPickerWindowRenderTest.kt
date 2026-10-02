@@ -76,7 +76,7 @@ class VersionPickerWindowRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
+            NxTheme(dark = true) {
                 Box(Modifier.fillMaxSize().background(Color(0xFFE91E63))) {
                     VersionPickerWindow(
                         title = "Установка сборки",

@@ -22,7 +22,7 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 import org.koin.compose.koinInject
 
 /**
@@ -35,7 +35,6 @@ import org.koin.compose.koinInject
 @Composable
 internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val mirrorClient: IMirrorPackClient = koinInject()
     val controller: LauncherController = koinInject()
     val isMirror = pack.packRef.origin == PackOrigin.Mirror
@@ -72,10 +71,10 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
 
     NxSection(s.packSettingsOptional) {
         when {
-            loading -> Muted(s.packSettingsContentLoading, colors.textSecondary)
-            !isMirror -> Muted(s.packSettingsOptionalNone, colors.textSecondary)
-            manifest == null -> Muted(s.packSettingsContentUnavailable, colors.textSecondary)
-            optional.isEmpty() -> Muted(s.packSettingsOptionalNone, colors.textSecondary)
+            loading -> Muted(s.packSettingsContentLoading)
+            !isMirror -> Muted(s.packSettingsOptionalNone)
+            manifest == null -> Muted(s.packSettingsContentUnavailable)
+            optional.isEmpty() -> Muted(s.packSettingsOptionalNone)
             else -> optional.forEach { mod ->
                 val presence = mod.display?.presenceClass
                 NxToggle(
@@ -99,8 +98,8 @@ internal fun PackContentSection(pack: PackInstance, adopt: (PackEdit) -> Unit) {
 }
 
 @Composable
-private fun Muted(text: String, color: androidx.compose.ui.graphics.Color) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = color)
+private fun Muted(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
 }
 
 /** Side badge for an optional entry; `required` and unknown values render none. */

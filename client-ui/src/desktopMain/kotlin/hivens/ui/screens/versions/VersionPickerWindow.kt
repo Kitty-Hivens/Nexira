@@ -75,8 +75,12 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.LocalPlane
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 import hivens.ui.theme.decorativeColor
 
 /**
@@ -159,7 +163,6 @@ fun VersionPickerWindow(
      */
     loading: Boolean = false,
 ) {
-    val colors = NxTheme.colors
     val busy = busyVersionId != null
     var selected by remember(versions) { mutableStateOf<PickerVersion?>(null) }
 
@@ -172,7 +175,7 @@ fun VersionPickerWindow(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
+            .background(NxColor.page.copy(alpha = 0.55f))
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { ev ->
@@ -186,9 +189,7 @@ fun VersionPickerWindow(
         contentAlignment = Alignment.Center,
     ) {
         NxSurface(
-            level = NxSurfaceLevel.Raised,
-            blurDp = 0f,
-            opacity = 1f,
+            kind = SurfaceKind.Dialog,
             modifier = Modifier
                 // Margin first, then the ceiling, then take what is left. A
                 // fraction cannot express this in either order: `fillMax` fixes
@@ -199,12 +200,11 @@ fun VersionPickerWindow(
                 .heightIn(max = CARD_HEIGHT)
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .clip(MaterialTheme.shapes.medium)
                 .clickable(remember { MutableInteractionSource() }, indication = null, onClick = {}),
         ) {
             Column(Modifier.fillMaxSize()) {
                 Header(title, packName, packIcon, onDismiss)
-                HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
+                HorizontalDivider(color = NxInk.line)
                 VersionBrowser(
                     versions = versions,
                     loading = loading,
@@ -248,7 +248,6 @@ fun VersionBrowser(
     modifier: Modifier = Modifier,
     detailAction: (@Composable (PickerVersion) -> Unit)? = null,
 ) {
-    val colors = NxTheme.colors
     var query by remember { mutableStateOf("") }
     var showIncompatible by remember(versions) { mutableStateOf(false) }
     var selectedId by remember(versions) {
@@ -280,7 +279,7 @@ fun VersionBrowser(
             showIncompatible = showIncompatible,
             onToggleIncompatible = { showIncompatible = !showIncompatible },
         )
-        Box(Modifier.width(1.dp).fillMaxHeight().background(colors.outline.copy(alpha = 0.25f)))
+        Box(Modifier.width(1.dp).fillMaxHeight().background(NxInk.line))
         DetailPane(selected, Modifier.weight(1f).fillMaxHeight(), detailAction)
     }
 }
@@ -306,7 +305,6 @@ private const val SEARCH_THRESHOLD = 8
 @Composable
 private fun Header(title: String, packName: String, icon: Any?, onDismiss: () -> Unit) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -318,14 +316,14 @@ private fun Header(title: String, packName: String, icon: Any?, onDismiss: () ->
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = colors.textPrimary,
+                color = NxInk.main,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = packName,
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.textSecondary,
+                color = NxInk.quiet,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -356,13 +354,11 @@ private fun VersionRail(
     // tone step is the separation here, which is what the ladder is for -- the
     // hairline is the SECOND signal, and a second signal inside a card is noise.
     NxSurface(
-        // Base, not Sunken. The field inside is a Sunken surface, and a Sunken
-        // field on a Sunken rail has no tone step between them at all, so the
-        // field held itself up on its hairline alone and read as a frame laid on
-        // the plane rather than a well cut into it. One rung up gives the card,
-        // the rail and the field three tones in order.
-        level = NxSurfaceLevel.Base,
-        blurDp = 0f,
+        // A panel, so a step past the card, and the field inside it a step back
+        // toward the page from the rail. A field with no tone step between it and
+        // the rail held itself up on its hairline alone and read as a frame laid
+        // on the plane rather than a well cut into it.
+        kind = SurfaceKind.Panel,
         borderWidthDp = 0f,
         shape = RectangleShape,
         modifier = Modifier.width(RAIL_WIDTH).fillMaxHeight(),
@@ -403,6 +399,7 @@ private fun VersionRail(
             // The control floats over a fade rather than taking a row of its own:
             // the list runs under it and keeps the height it had.
             if (hiddenCount > 0) {
+                val plane = LocalPlane.current?.color ?: NxColor.page
                 Box(
                     modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp)
                         .background(
@@ -412,8 +409,8 @@ private fun VersionRail(
                             // had a list row showing through it.
                             Brush.verticalGradient(
                                 0f to Color.Transparent,
-                                0.7f to NxTheme.colors.surface,
-                                1f to NxTheme.colors.surface,
+                                0.7f to plane,
+                                1f to plane,
                             ),
                         ),
                     contentAlignment = Alignment.BottomCenter,
@@ -442,40 +439,43 @@ private fun VersionRail(
 @Composable
 private fun VersionRow(v: PickerVersion, selected: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(ROW_HEIGHT)
-            .clip(MaterialTheme.shapes.medium)
-            .background(if (selected) colors.primary.copy(alpha = 0.16f) else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(channelColor(v.channel)))
-        Text(
-            text = v.label,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (selected || v.installed) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (v.compatible) colors.textPrimary else colors.textSecondary,
-            maxLines = 1,
-            // Middle, not tail: what separates one `SNAPSHOT-0.0.0-...` from the
-            // next is the date at its END, and a tail ellipsis turns the whole
-            // snapshot chain into identical rows.
-            overflow = TextOverflow.MiddleEllipsis,
-            modifier = Modifier.weight(1f),
-        )
-        when {
-            !v.compatible -> Symbol(
-                NxIcon.Warning,
-                contentDescription = s.versionPickerIncompatible,
-                tint = colors.warnAccent,
-                size = 15.dp,
+    // Unselected is the plane itself, a wash of nothing, so the row reads on what it sits on.
+    val fill = NxColor.wash(NxColor.lead(), if (selected) 0.16f else 0f)
+    OnFill(fill) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ROW_HEIGHT)
+                .clip(MaterialTheme.shapes.medium)
+                .background(fill)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(channelColor(v.channel)))
+            Text(
+                text = v.label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (selected || v.installed) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (v.compatible) NxInk.main else NxInk.quiet,
+                maxLines = 1,
+                // Middle, not tail: what separates one `SNAPSHOT-0.0.0-...` from the
+                // next is the date at its END, and a tail ellipsis turns the whole
+                // snapshot chain into identical rows.
+                overflow = TextOverflow.MiddleEllipsis,
+                modifier = Modifier.weight(1f),
             )
-            v.installed -> NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
-            v.latest -> NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
+            when {
+                !v.compatible -> Symbol(
+                    NxIcon.Warning,
+                    contentDescription = s.versionPickerIncompatible,
+                    tint = NxColor.status(Status.Warning),
+                    size = 15.dp,
+                )
+                v.installed -> NxMetaChip(s.packVersionCurrentTag, tone = NxMetaChipTone.Success)
+                v.latest -> NxMetaChip(s.packVersionsLatestTag, tone = NxMetaChipTone.Surface)
+            }
         }
     }
 }
@@ -487,10 +487,9 @@ private fun DetailPane(
     action: (@Composable (PickerVersion) -> Unit)? = null,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     if (v == null) {
         Box(modifier, contentAlignment = Alignment.Center) {
-            Text(s.versionPickerEmpty, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            Text(s.versionPickerEmpty, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         }
         return
     }
@@ -504,7 +503,7 @@ private fun DetailPane(
                     text = v.label,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,
+                    color = NxInk.main,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -513,7 +512,7 @@ private fun DetailPane(
                 // Not dimmed. The date is one of the two facts a reader came for,
                 // and a fact set in the caption colour reads as an aside.
                 formatBuildTimestamp(v.publishedAt)?.let {
-                    Text(it, style = MaterialTheme.typography.labelMedium, color = colors.textPrimary)
+                    Text(it, style = MaterialTheme.typography.labelMedium, color = NxInk.main)
                 }
             }
             // Runtime and size on one line, separated by a dot rather than by a
@@ -523,45 +522,46 @@ private fun DetailPane(
                 Text(
                     facts.joinToString("  ·  "),
                     style = MaterialTheme.typography.labelMedium,
-                    color = colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             if (!v.compatible) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Symbol(NxIcon.Warning, contentDescription = null, tint = colors.warnAccent, size = 16.dp)
+                    Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
                     Text(
                         s.versionPickerIncompatible,
                         style = MaterialTheme.typography.labelMedium,
-                        color = colors.warnAccent,
+                        color = NxColor.status(Status.Warning, text = true),
                     )
                 }
             }
         }
-        HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
+        HorizontalDivider(color = NxInk.line)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val scroll = rememberScrollState()
             val notes = v.changelog?.takeIf { it.isNotBlank() }
             if (notes != null) {
+                val plane = LocalPlane.current?.color ?: NxColor.page
                 Box(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 18.dp, vertical = 14.dp)) {
                     ReleaseNotes(notes, Modifier.fillMaxWidth())
                 }
                 // Text fades out at the bottom edge instead of being cut by it.
                 Box(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(48.dp)
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, colors.surface))),
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, plane))),
                 )
             } else {
                 // Most mirror builds ship no notes, so this is the pane's ordinary
                 // state rather than an exception.
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.versionPickerNoChangelog, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                    Text(s.versionPickerNoChangelog, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
                 }
             }
         }
         // A host with no footer of its own puts its action here, under the notes
         // it belongs to, rather than somewhere the reader has to look away to.
         if (action != null) {
-            HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
+            HorizontalDivider(color = NxInk.line)
             Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) { action(v) }
         }
     }
@@ -578,19 +578,18 @@ private fun Footer(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
-    HorizontalDivider(color = colors.outline.copy(alpha = 0.25f))
+    HorizontalDivider(color = NxInk.line)
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (warning != null) {
-            Symbol(NxIcon.Warning, contentDescription = null, tint = colors.warnAccent, size = 16.dp)
+            Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
             Text(
                 text = warning,
                 style = MaterialTheme.typography.labelSmall,
-                color = colors.textSecondary,
+                color = NxInk.quiet,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -606,7 +605,7 @@ private fun Footer(
             compact = true,
         )
         if (busyThis) {
-            CircularProgressIndicator(color = colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
         }
         // ONE action, and its label states the outcome including direction. The
         // build already on disk is not somewhere to go: the row says "current"
@@ -636,7 +635,7 @@ private fun Footer(
 @Composable
 private fun PackAvatar(icon: Any?, name: String) {
     val box = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
-    val tint = NxTheme.colors.decorativeColor(name)
+    val tint = decorativeColor(name)
     SubcomposeAsyncImage(
         model = icon,
         contentDescription = null,
@@ -648,7 +647,7 @@ private fun PackAvatar(icon: Any?, name: String) {
                 Text(
                     text = name.firstOrNull()?.uppercase() ?: "?",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color.White,
+                    color = NxColor.on(tint),
                     fontWeight = FontWeight.Bold,
                 )
             }

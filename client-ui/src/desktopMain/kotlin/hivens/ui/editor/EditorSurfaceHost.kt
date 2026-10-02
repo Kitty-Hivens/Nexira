@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -95,7 +95,9 @@ import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalFamilyOverrides
@@ -123,6 +125,9 @@ import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 // EditorSurfaceHost is the single coordinator for everything edit-mode
 // related on the active surface. It:
@@ -590,9 +595,9 @@ fun EditorSurfaceHost(
                     } else false
                 },
         ) {
-            // Subtle surface vignette while in edit mode -- a soft inner
-            // primary tint at very low alpha to communicate "this whole
-            // pane is being edited", without obscuring content.
+            // While in edit mode the pane is framed in a thin line of the lead
+            // colour (EditModeVignette below) to communicate "this whole pane is
+            // being edited", without obscuring content.
             content()
 
             entryMenuAt?.let { at ->
@@ -637,11 +642,11 @@ fun EditorSurfaceHost(
                                 TextButton(onClick = {
                                     controller.resetAll()
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorResetAll, color = NxTheme.colors.error) }
+                                }) { Text(s.editorResetAll, color = NxColor.status(Status.Error, text = true)) }
                                 TextButton(onClick = {
                                     controller.resetSurface(surfaceForReset)
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorReset, color = NxTheme.colors.error) }
+                                }) { Text(s.editorReset, color = NxColor.status(Status.Error, text = true)) }
                             }
                         },
                         dismissButton = {
@@ -908,10 +913,9 @@ private fun EditModePill(
             // chips are words rather than icons, so a surface that shows them
             // needs the rest to give up their labels sooner.
             val compact = maxWidth < if (families.size > 1) 1250.dp else 1100.dp
-            Surface(
-                color   = NxTheme.colors.surface.copy(alpha = 0.94f),
-                shape   = RoundedCornerShape(20.dp),
-                shadowElevation = 6.dp,
+            NxSurface(
+                kind  = SurfaceKind.Popup,
+                shape = RoundedCornerShape(20.dp),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -919,13 +923,13 @@ private fun EditModePill(
                 ) {
                     Symbol(icon = NxIcon.Tune,
                         contentDescription = null,
-                        tint               = NxTheme.colors.primary,
+                        tint               = NxColor.lead(),
                         modifier           = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(8.dp))
 
                     // Surface picker chips. One chip per available surface;
-                    // the active surface has a primary tint.
+                    // the active surface has a wash of the lead colour.
                     surfaces.forEach { sid ->
                         SurfaceChip(
                             surface  = sid,
@@ -1068,7 +1072,7 @@ private fun EditModePill(
                         Text(
                             text  = s.editorEscHint,
                             style = MaterialTheme.typography.labelSmall,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                             modifier = Modifier.padding(end = 8.dp),
                         )
                     }
@@ -1096,20 +1100,18 @@ private fun SurfaceChip(
     onClick: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val bg = if (active) NxTheme.colors.primary.copy(alpha = 0.18f)
+    val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f)
              else Color.Transparent
-    val base = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
-    val fg = if (folded) base.copy(alpha = 0.45f) else base
     val name = humanSurfaceShortName(surface, s)
     val label = if (folded) s.editorSurfaceFolded(name) else name
-    Surface(
-        color    = bg,
-        shape    = RoundedCornerShape(12.dp),
-        modifier = Modifier,
-    ) {
+    OnFill(bg) {
+        val base = if (active) NxColor.lead(text = true) else NxInk.quiet
+        val fg = if (folded) NxColor.wash(base, 0.45f) else base
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
+                .clip(CHIP_SHAPE)
+                .background(bg)
                 .clickable { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
@@ -1140,15 +1142,17 @@ private fun SurfaceChip(
 // that would not be a worse label than the word.
 @Composable
 private fun FamilyChip(family: FamilyId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
-    val bg = if (active) NxTheme.colors.primary.copy(alpha = 0.18f) else Color.Transparent
-    val fg = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
-    Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
+    val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f) else Color.Transparent
+    OnFill(bg) {
+        val fg = if (active) NxColor.lead(text = true) else NxInk.quiet
         Text(
             text       = family.value,
             style      = MaterialTheme.typography.labelSmall,
             color      = fg,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
             modifier   = Modifier
+                .clip(CHIP_SHAPE)
+                .background(bg)
                 .clickable { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 6.dp),
         )
@@ -1166,21 +1170,23 @@ private fun ToolChip(
     compact: Boolean = false,
 ) {
     val bg = when {
-        !enabled    -> NxTheme.colors.surfaceVariant.copy(alpha = 0.3f)
-        destructive -> NxTheme.colors.error.copy(alpha = 0.12f)
-        selected    -> NxTheme.colors.primary.copy(alpha = 0.18f)
-        else        -> NxTheme.colors.surfaceVariant.copy(alpha = 0.6f)
+        !enabled    -> NxColor.wash(NxInk.quiet, 0.06f)
+        destructive -> NxColor.wash(NxColor.status(Status.Error), 0.12f)
+        selected    -> NxColor.wash(NxColor.lead(), 0.18f)
+        else        -> NxColor.wash(NxInk.quiet, 0.12f)
     }
-    val fg = when {
-        !enabled    -> NxTheme.colors.textSecondary.copy(alpha = 0.45f)
-        destructive -> NxTheme.colors.error
-        selected    -> NxTheme.colors.primary
-        else        -> NxTheme.colors.textPrimary
-    }
-    Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
+    OnFill(bg) {
+        val fg = when {
+            !enabled    -> NxInk.off
+            destructive -> NxColor.status(Status.Error, text = true)
+            selected    -> NxColor.lead(text = true)
+            else        -> NxInk.main
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
+                .clip(CHIP_SHAPE)
+                .background(bg)
                 .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
@@ -1202,6 +1208,8 @@ private fun ToolChip(
         }
     }
 }
+
+private val CHIP_SHAPE = RoundedCornerShape(12.dp)
 
 private fun surfaceIcon(surface: SurfaceId): IconKey =
     EditorSurfaces.spec(surface)?.icon ?: NxIcon.Home
@@ -1237,7 +1245,7 @@ private fun EditModeVignette(active: Boolean) {
             .alpha(alpha)
             .border(
                 width = 1.5.dp,
-                color = NxTheme.colors.primary.copy(alpha = 0.35f),
+                color = NxColor.wash(NxColor.lead(), 0.35f),
                 shape = RoundedCornerShape(0.dp),
             ),
     )

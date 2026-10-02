@@ -94,10 +94,11 @@ import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxToggle
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxVerticalScrollbar
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativeColor
 import hivens.ui.screens.mod.ModTarget
@@ -113,6 +114,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 /**
  * Library PackDetail Content tab. Reads what is ACTUALLY installed under the
@@ -251,10 +256,10 @@ internal fun ContentTabPane(
         val visible = state.visible
         when {
             state.items == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+                CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
             visible.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
             else -> {
                 val listState = rememberLazyListState()
@@ -535,11 +540,11 @@ private fun UpdateControls(
             verticalAlignment     = Alignment.CenterVertically,
             modifier              = Modifier.padding(horizontal = 6.dp),
         ) {
-            CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+            CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
             Text(
                 text     = s.contentUpdateRunning(active.done, active.total),
                 style    = MaterialTheme.typography.labelLarge,
-                color    = NxTheme.colors.textSecondary,
+                color    = NxInk.quiet,
                 maxLines = 1,
             )
         }
@@ -553,7 +558,7 @@ private fun UpdateControls(
             icon               = NxIcon.Warning,
             contentDescription = s.contentUpdateCheckFailed,
             onClick            = onCheck,
-            tint               = NxTheme.colors.warnAccent,
+            tint               = NxColor.status(Status.Warning),
         )
     }
 }
@@ -591,8 +596,8 @@ private fun ContentFilterButton(
                 icon               = if (open) NxIcon.Close else NxIcon.FilterAlt,
                 contentDescription = s.contentFiltersTitle,
                 onClick            = { open = !open },
-                tint               = if (filters.isEmpty && !open) NxTheme.colors.textSecondary
-                                     else NxTheme.colors.primary,
+                tint               = if (filters.isEmpty && !open) NxInk.quiet
+                                     else NxColor.lead(),
             )
             if (!filters.isEmpty && !open) {
                 Box(
@@ -600,13 +605,13 @@ private fun ContentFilterButton(
                         .padding(top = 2.dp, end = 2.dp)
                         .size(14.dp)
                         .clip(CircleShape)
-                        .background(NxTheme.colors.primary),
+                        .background(NxColor.lead()),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text       = filters.activeCount.toString(),
                         style      = MaterialTheme.typography.labelSmall,
-                        color      = NxTheme.colors.onPrimary,
+                        color      = NxColor.on(NxColor.lead()),
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -620,7 +625,7 @@ private fun ContentFilterButton(
                 Text(
                     text  = s.contentFiltersShown(shownCount, scannedCount),
                     style = MaterialTheme.typography.labelSmall,
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
                 NxButton(
                     label   = s.contentFiltersReset,
@@ -675,23 +680,25 @@ private fun ContentFilterButton(
 
 @Composable
 private fun ContentSearch(query: String, onQuery: (String) -> Unit, placeholder: String) {
-    BasicTextField(
-        value         = query,
-        onValueChange = onQuery,
-        singleLine    = true,
-        textStyle     = MaterialTheme.typography.bodyMedium.copy(color = NxTheme.colors.textPrimary),
-        cursorBrush   = SolidColor(NxTheme.colors.primary),
-        modifier      = Modifier.fillMaxWidth(),
-    ) { inner ->
-        Row(
-            modifier          = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(NxTheme.colors.surface).padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Symbol(NxIcon.Search, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 18.dp)
-            Spacer(Modifier.width(10.dp))
-            Box(Modifier.weight(1f)) {
-                if (query.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
-                inner()
+    NxSurface(SurfaceKind.Field, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        BasicTextField(
+            value         = query,
+            onValueChange = onQuery,
+            singleLine    = true,
+            textStyle     = MaterialTheme.typography.bodyMedium.copy(color = NxInk.main),
+            cursorBrush   = SolidColor(NxColor.lead()),
+            modifier      = Modifier.fillMaxWidth(),
+        ) { inner ->
+            Row(
+                modifier          = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Symbol(NxIcon.Search, contentDescription = null, tint = NxInk.quiet, size = 18.dp)
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
+                    inner()
+                }
             }
         }
     }
@@ -699,26 +706,31 @@ private fun ContentSearch(query: String, onQuery: (String) -> Unit, placeholder:
 
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val fill = if (selected) NxColor.lead() else NxColor.wash(NxInk.quiet, UNSELECTED_CHIP_WASH)
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (selected) NxTheme.colors.primary else NxTheme.colors.surface.copy(alpha = 0.5f))
+            .background(fill)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        // The selected chip is bold and a bold chip is wider, which moved the rest
-        // of the row sideways on every click; the box is measured at the weight the
-        // label can grow to, so only the ink changes.
-        NxSteadyText(
-            text     = label,
-            style    = MaterialTheme.typography.labelLarge,
-            color    = if (selected) Color.White else NxTheme.colors.textSecondary,
-            weight   = if (selected) FontWeight.Bold else FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        OnFill(fill) {
+            // The selected chip is bold and a bold chip is wider, which moved the rest
+            // of the row sideways on every click; the box is measured at the weight the
+            // label can grow to, so only the ink changes.
+            NxSteadyText(
+                text     = label,
+                style    = MaterialTheme.typography.labelLarge,
+                color    = if (selected) NxColor.on(fill) else NxInk.quiet,
+                weight   = if (selected) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
+
+private const val UNSELECTED_CHIP_WASH = 0.10f
 
 /** How much of a row the update chip may take before its label yields. */
 private val UPDATE_CHIP_MAX = 200.dp
@@ -753,100 +765,101 @@ internal fun ContentRow(
     val dim = if (rules.effectiveEnabled) 1f else 0.5f
     var menuAt by remember(content.fileName) { mutableStateOf<Offset?>(null) }
     var rowOrigin by remember(content.fileName) { mutableStateOf(Offset.Zero) }
-    Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .background(
-                if (selected) NxTheme.colors.primary.copy(alpha = 0.14f)
-                else NxTheme.colors.surface.copy(alpha = 0.4f),
-            )
-            .onGloballyPositioned { rowOrigin = it.boundsInWindow().topLeft }
-            .pointerInput(content.fileName) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.type != PointerEventType.Press) continue
-                        if (!event.buttons.isSecondaryPressed) continue
-                        val change = event.changes.first()
-                        menuAt = rowOrigin + change.position
-                        change.consume()
+    NxSurface(SurfaceKind.Card, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
+        val rowFill = if (selected) NxColor.wash(NxColor.lead(), 0.14f) else Color.Transparent
+        OnFill(rowFill) {
+            Row(
+                modifier              = Modifier
+                    .fillMaxWidth()
+                    .background(rowFill)
+                    .onGloballyPositioned { rowOrigin = it.boundsInWindow().topLeft }
+                    .pointerInput(content.fileName) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                if (event.type != PointerEventType.Press) continue
+                                if (!event.buttons.isSecondaryPressed) continue
+                                val change = event.changes.first()
+                                menuAt = rowOrigin + change.position
+                                change.consume()
+                            }
+                        }
+                    }
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // The tick rides the icon rather than taking a column of its own, which
+                // is what keeps every row the same shape whether or not anything is
+                // selected. Messaging apps settled on this for the same reason.
+                Box {
+                    ContentIcon(iconState, content.fileName, content.displayName, dim)
+                    if (selected) {
+                        Box(
+                            Modifier.matchParentSize().clip(MaterialTheme.shapes.small)
+                                .background(NxColor.lead().copy(alpha = 0.72f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Symbol(NxIcon.Check, contentDescription = null, tint = NxColor.on(NxColor.lead()), size = 16.dp)
+                        }
                     }
                 }
-            }
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        // The tick rides the icon rather than taking a column of its own, which
-        // is what keeps every row the same shape whether or not anything is
-        // selected. Messaging apps settled on this for the same reason.
-        Box {
-            ContentIcon(iconState, content.fileName, content.displayName, dim)
-            if (selected) {
-                Box(
-                    Modifier.matchParentSize().clip(MaterialTheme.shapes.small)
-                        .background(NxTheme.colors.primary.copy(alpha = 0.72f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.onPrimary, size = 16.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text       = content.displayName,
+                        fontFamily = familyForText(content.displayName),
+                        style      = MaterialTheme.typography.bodyMedium,
+                        color      = if (rules.effectiveEnabled) NxInk.main else NxInk.quiet,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis,
+                    )
+                    content.version?.let { v ->
+                        Text(v, style = MaterialTheme.typography.labelSmall, color = if (rules.effectiveEnabled) NxInk.quiet else NxInk.off, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                // The chip both reports the newer build and is the way to take it: the
+                // row already says what is installed, so the one thing worth a control
+                // here is the one thing the reader would do about it.
+                if (update != null) {
+                    NxMetaChip(
+                        text    = s.contentUpdateTo(update.versionNumber),
+                        // Capped: the label is a sentence WITH a version number in it, a
+                        // Modrinth build number runs to forty characters, and a plain Row
+                        // measures this before the name column beside it -- so one long
+                        // build number ate the mod's own name off its row.
+                        modifier = Modifier.widthIn(max = UPDATE_CHIP_MAX),
+                        tone    = NxMetaChipTone.Success,
+                        onClick = onUpdate,
+                    )
+                }
+                // Beside the switch rather than buried in the overflow: picking a build
+                // is a thing done TO this row, and the overflow is where actions go to
+                // be found only by someone already looking for them.
+                if (onVersions != null) {
+                    NxIconButton(
+                        // Swap, not a clock: History reads as "put back what was here
+                        // before", and this picks WHICH build to run -- forward, back or
+                        // sideways onto a beta.
+                        icon               = NxIcon.SwapHoriz,
+                        contentDescription = s.contentActionVersions,
+                        onClick            = onVersions,
+                        tint               = NxInk.quiet,
+                    )
+                }
+                if (rules.showToggle) {
+                    NxSwitch(
+                        checked         = rules.effectiveEnabled,
+                        onCheckedChange = onToggle,
+                    )
+                }
+                // One overflow instead of a bare trash can: Details is always available
+                // (local metadata at minimum); Open page and Delete appear only when the
+                // caller passed them (a mod with a known URL / a user-owned row).
+                NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
+                    ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, dismiss)
                 }
             }
-        }
-        Column(Modifier.weight(1f)) {
-            Text(
-                text       = content.displayName,
-                fontFamily = familyForText(content.displayName),
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = NxTheme.colors.textPrimary.copy(alpha = dim),
-                fontWeight = FontWeight.SemiBold,
-                maxLines   = 1,
-                overflow   = TextOverflow.Ellipsis,
-            )
-            content.version?.let { v ->
-                Text(v, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary.copy(alpha = dim), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        // The chip both reports the newer build and is the way to take it: the
-        // row already says what is installed, so the one thing worth a control
-        // here is the one thing the reader would do about it.
-        if (update != null) {
-            NxMetaChip(
-                text    = s.contentUpdateTo(update.versionNumber),
-                // Capped: the label is a sentence WITH a version number in it, a
-                // Modrinth build number runs to forty characters, and a plain Row
-                // measures this before the name column beside it -- so one long
-                // build number ate the mod's own name off its row.
-                modifier = Modifier.widthIn(max = UPDATE_CHIP_MAX),
-                tone    = NxMetaChipTone.Success,
-                onClick = onUpdate,
-            )
-        }
-        // Beside the switch rather than buried in the overflow: picking a build
-        // is a thing done TO this row, and the overflow is where actions go to
-        // be found only by someone already looking for them.
-        if (onVersions != null) {
-            NxIconButton(
-                // Swap, not a clock: History reads as "put back what was here
-                // before", and this picks WHICH build to run -- forward, back or
-                // sideways onto a beta.
-                icon               = NxIcon.SwapHoriz,
-                contentDescription = s.contentActionVersions,
-                onClick            = onVersions,
-                tint               = NxTheme.colors.textSecondary,
-            )
-        }
-        if (rules.showToggle) {
-            NxSwitch(
-                checked         = rules.effectiveEnabled,
-                onCheckedChange = onToggle,
-            )
-        }
-        // One overflow instead of a bare trash can: Details is always available
-        // (local metadata at minimum); Open page and Delete appear only when the
-        // caller passed them (a mod with a known URL / a user-owned row).
-        NxKebabButton(contentDescription = s.packCardMore) { dismiss ->
-            ContentRowMenuItems(content, update, resolveProject, onDetails, onUpdate, onDelete, dismiss)
         }
     }
 
@@ -915,7 +928,7 @@ private fun ContentRowMenuItems(
 private fun ContentIcon(state: ContentIconState?, seed: String, displayName: String, dim: Float) {
     val context = LocalPlatformContext.current
     val box = Modifier.size(30.dp).clip(RoundedCornerShape(7.dp))
-    val plate = NxTheme.colors.decorativeColor(seed).copy(alpha = dim)
+    val plate = decorativeColor(seed).copy(alpha = dim)
 
     /** The tinted square, which is what an icon settles ONTO and never sits on. */
     @Composable
@@ -1008,16 +1021,16 @@ private fun ModBrowser(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onBack).padding(6.dp)) {
-                Symbol(NxIcon.ArrowBack, contentDescription = null, tint = NxTheme.colors.textPrimary, size = 20.dp)
+                Symbol(NxIcon.ArrowBack, contentDescription = null, tint = NxInk.main, size = 20.dp)
             }
-            Text(s.contentFindProjects, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(s.contentFindProjects, style = MaterialTheme.typography.titleMedium, color = NxInk.main, fontWeight = FontWeight.Bold)
         }
         ContentSearch(state.query, { state.query = it }, s.contentSearchPlaceholder)
 
         val r = state.results
         when {
             r == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+                CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
             state.searchFailed -> RetryStateBlock(
                 title      = s.modBrowserErrorTitle,
@@ -1028,7 +1041,7 @@ private fun ModBrowser(
                 titleStyle = MaterialTheme.typography.titleMedium,
             )
             r.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
+                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet)
             }
             else -> {
                 val listState = rememberLazyListState()
@@ -1068,36 +1081,38 @@ internal fun ModResultRow(
 ) {
     val s = LocalStrings.current
     val shape = RoundedCornerShape(7.dp)
-    Row(
-        modifier              = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
-            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
-            .background(NxTheme.colors.surface.copy(alpha = 0.4f)).padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (hit.iconUrl != null) {
-            AsyncImage(model = hit.iconUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(36.dp).clip(shape))
-        } else {
-            Box(Modifier.size(36.dp).clip(shape).background(NxTheme.colors.decorativeColor(hit.title)), contentAlignment = Alignment.Center) {
-                Text(hit.title.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
+    NxSurface(SurfaceKind.Card, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.small) {
+        Row(
+            modifier              = Modifier.fillMaxWidth()
+                .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (hit.iconUrl != null) {
+                AsyncImage(model = hit.iconUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(36.dp).clip(shape))
+            } else {
+                Box(Modifier.size(36.dp).clip(shape).background(decorativeColor(hit.title)), contentAlignment = Alignment.Center) {
+                    Text(hit.title.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
-        }
-        Column(Modifier.weight(1f)) {
-            Text(hit.title, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (hit.description.isNotBlank()) {
-                Text(hit.description, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1f)) {
+                Text(hit.title, style = MaterialTheme.typography.bodyMedium, color = NxInk.main, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (hit.description.isNotBlank()) {
+                    Text(hit.description, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
-        }
-        when {
-            installed -> Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.primary, size = 20.dp)
-            working   -> CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-            // A download that did not land says so and offers the action again.
-            // Silence here reads as success, which is the failure this replaced.
-            failed    -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Symbol(NxIcon.Warning, contentDescription = s.contentInstallFailed, tint = NxTheme.colors.error, size = 18.dp)
-                NxButton(label = s.contentInstallRetry, onClick = onInstall, style = NxButtonStyle.Secondary)
+            when {
+                installed -> Symbol(NxIcon.Check, contentDescription = null, tint = NxColor.lead(), size = 20.dp)
+                working   -> CircularProgressIndicator(color = NxColor.lead(), strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                // A download that did not land says so and offers the action again.
+                // Silence here reads as success, which is the failure this replaced.
+                failed    -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Symbol(NxIcon.Warning, contentDescription = s.contentInstallFailed, tint = NxColor.status(Status.Error), size = 18.dp)
+                    NxButton(label = s.contentInstallRetry, onClick = onInstall, style = NxButtonStyle.Secondary)
+                }
+                else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
             }
-            else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
         }
     }
 }

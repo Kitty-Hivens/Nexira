@@ -35,7 +35,6 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
@@ -45,6 +44,9 @@ import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 // One configurable nav-rail item. `target` selects what the item does --
 // a screen navigation, the console-window toggle, or logout. The whole
@@ -145,7 +147,7 @@ fun NavEntry(instance: WidgetInstance) {
                 phase         = 0.0f,
                 active        = false,
                 chaosEligible = false,
-                iconTint      = NxTheme.colors.error.copy(alpha = 0.75f),
+                iconTint      = NxColor.status(Status.Error).copy(alpha = 0.75f),
                 onClick       = ctx.onLogout,
             )
         }
@@ -211,11 +213,11 @@ private fun NavSlot(
     // Selection accent: the user's nav override, else the theme primary -- so
     // by default it tracks the palette / accent override. Shared by the icon
     // tint and every decoration.
-    val accent = cz.navSelectionAccent?.toWidgetColorOrNull() ?: NxTheme.colors.primary
+    val accent = cz.navSelectionAccent?.toWidgetColorOrNull() ?: NxColor.lead()
     val iconColor = when {
         iconTint != null -> iconTint
         active           -> accent
-        else             -> NxTheme.colors.textSecondary.copy(alpha = if (enabled) 0.70f else 0.20f)
+        else             -> NxInk.quiet.copy(alpha = if (enabled) 0.70f else 0.20f)
     }
     val iconFill = if (outlineSwap && !active && cz.navSelectionOutlineIcons) 0f else 1f
 

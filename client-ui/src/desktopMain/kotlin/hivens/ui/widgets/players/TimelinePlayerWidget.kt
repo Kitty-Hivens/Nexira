@@ -26,7 +26,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,8 +43,9 @@ import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -141,7 +141,6 @@ internal fun TimelinePlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     val duration = durationMsOf(state)
@@ -149,7 +148,7 @@ internal fun TimelinePlayerCard(
     val fraction = progressFraction(state)
 
     NxSurface(
-        level    = NxSurfaceLevel.Floating,
+        kind     = SurfaceKind.Card,
         modifier = modifier.fillMaxWidth(),
         shape    = MaterialTheme.shapes.medium,
     ) {
@@ -167,7 +166,7 @@ internal fun TimelinePlayerCard(
                 Modifier
                     .fillMaxWidth(fraction)
                     .fillMaxHeight()
-                    .background(lerp(palette.surfaceContainer, palette.primary, fill.coerceIn(0f, 1f))),
+                    .background(NxColor.wash(NxColor.lead(), fill.coerceIn(0f, 1f))),
             )
 
             // The gesture layer sits UNDER the row: hit testing runs top down, so
@@ -202,7 +201,7 @@ internal fun TimelinePlayerCard(
                     Text(
                         text       = name,
                         style      = MaterialTheme.typography.bodyLarge,
-                        color      = palette.textPrimary,
+                        color      = NxInk.main,
                         fontWeight = FontWeight.Medium,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
@@ -230,7 +229,7 @@ internal fun TimelinePlayerCard(
                     Text(
                         text       = line,
                         style      = MaterialTheme.typography.bodySmall,
-                        color      = palette.textSecondary,
+                        color      = NxInk.quiet,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
                         fontFamily = familyForText(line),
@@ -242,7 +241,7 @@ internal fun TimelinePlayerCard(
                         icon               = NxIcon.SkipPrevious,
                         contentDescription = s.audioSkipPrevious,
                         onClick            = onSkipPrev,
-                        tint               = palette.textPrimary.copy(alpha = 0.7f),
+                        tint               = NxInk.quiet,
                         enabled            = loaded,
                         iconSize           = 18.dp,
                         fill               = 1f,
@@ -253,7 +252,7 @@ internal fun TimelinePlayerCard(
                     icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                     contentDescription = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
                     onClick            = onPlayPause,
-                    tint               = palette.textPrimary,
+                    tint               = NxInk.main,
                     enabled            = loaded,
                     iconSize           = 22.dp,
                     fill               = 1f,
@@ -264,7 +263,7 @@ internal fun TimelinePlayerCard(
                         icon               = NxIcon.SkipNext,
                         contentDescription = s.audioSkipNext,
                         onClick            = onSkipNext,
-                        tint               = palette.textPrimary.copy(alpha = 0.7f),
+                        tint               = NxInk.quiet,
                         enabled            = loaded,
                         iconSize           = 18.dp,
                         fill               = 1f,
@@ -320,7 +319,7 @@ internal fun TimelinePlayerCard(
                                 Text(
                                     text  = repeatAnswer(repeat, s),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = palette.textPrimary,
+                                    color = NxInk.main,
                                 )
                             }
                         }

@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.PropColor
 import hivens.widget.model.PropLabel
@@ -31,6 +30,8 @@ import kotlinx.serialization.serializer
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
+import hivens.ui.theme.NxColor
+import hivens.ui.surface.SurfaceKind
 
 /**
  * The prop panel's row vocabulary, drawn at the width it actually gets.
@@ -87,8 +88,8 @@ class PropRowsRenderProbe {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun planes(dark: Boolean) {
         val scene = ImageComposeScene(width = 560, height = 320, density = Density(2f)) {
-            NxTheme(useDarkTheme = dark) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            NxTheme(dark = dark) {
+                Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Row(
                         modifier = Modifier.padding(20.dp),
                         horizontalArrangement = Arrangement.spacedBy(20.dp),
@@ -100,12 +101,12 @@ class PropRowsRenderProbe {
                                 .size(110.dp, 120.dp)
                                 .shadow(18.dp, MaterialTheme.shapes.large)
                                 .clip(MaterialTheme.shapes.large)
-                                .background(NxTheme.colors.surface),
+                                .background(NxTheme.colours.step(1)),
                         )
-                        // What they draw now: the floating rung, the same shadow, and
-                        // a hairline lifted off the body.
+                        // What they draw now: a popup, the same shadow, and a hairline
+                        // lifted off the body.
                         NxSurface(
-                            level    = NxSurfaceLevel.Floating,
+                            kind = SurfaceKind.Popup,
                             shape    = MaterialTheme.shapes.large,
                             opacity  = 1f,
                             blurDp   = 0f,
@@ -130,14 +131,14 @@ class PropRowsRenderProbe {
         val values: JsonObject = defaults()
 
         val scene = ImageComposeScene(width = WIDTH, height = HEIGHT, density = Density(DENSITY)) {
-            NxTheme(useDarkTheme = dark) {
+            NxTheme(dark = dark) {
                 // The page behind the panel, so the plane's own edge is visible rather
                 // than being the same colour as everything around it.
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+                Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Column(
                         modifier = Modifier
                             .width(PANEL_DP.dp)
-                            .background(NxTheme.colors.surface)
+                            .background(NxTheme.colours.step(1))
                             .padding(horizontal = GUTTER_DP.dp, vertical = GUTTER_DP.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {

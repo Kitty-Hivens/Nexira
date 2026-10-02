@@ -22,6 +22,7 @@ import java.util.Base64
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
 
 /**
  * The layouts descriptions build out of tables and sized images, drawn off-screen
@@ -64,8 +65,8 @@ class HtmlLayoutRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background).verticalScroll(rememberScrollState())) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page).verticalScroll(rememberScrollState())) {
                     HtmlBody(html, Modifier.fillMaxWidth(), onLink = {})
                 }
             }

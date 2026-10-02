@@ -3,7 +3,6 @@ package hivens.ui.widgets.sample
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,17 +20,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.LocalPlane
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.ui.widgets.toWidgetColorOrNull
@@ -49,6 +50,8 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 @Serializable
 enum class ClockMode { Analog, Digital, Both }
@@ -63,9 +66,9 @@ data class ClockProps(
     @PropLabel("widget.home.new.clock.accent") @PropColor val accent: String = "",
 )
 
-// Analog + digital clock with a once-per-second second hand. Theme-aware: dial
-// reads surface, hands read textPrimary, accent (second hand / hub) reads
-// the accent prop or falls back to primary. Per-second tick recomposes
+// Analog + digital clock with a once-per-second second hand. Theme-aware: the dial
+// is a card on the widget's plane, hands read the main ink, accent (second hand / hub)
+// reads the accent prop or falls back to the theme's lead colour. Per-second tick recomposes
 // only the Canvas + the digital time line; the surrounding card stays
 // still.
 @Widget(
@@ -78,7 +81,7 @@ data class ClockProps(
     maxWidth = 800, maxHeight = 920,
     displayName = "widget.home.new.clock",
     propsClass = ClockProps::class,
-    surface = """{"fill":"base","opacity":0.65,"padding":{"top":12.0}}""",
+    surface = """{"fill":"panel","opacity":0.65,"padding":{"top":12.0}}""",
 )
 @Composable
 fun ClockWidget(instance: WidgetInstance) {
@@ -124,7 +127,7 @@ fun ClockWidget(instance: WidgetInstance) {
                 Text(
                     text       = p.title,
                     style      = MaterialTheme.typography.labelLarge.scaled(scale),
-                    color      = NxTheme.colors.textSecondary,
+                    color      = NxInk.quiet,
                     fontWeight = FontWeight.Medium,
                     modifier   = Modifier.align(Alignment.Start),
                 )
@@ -145,13 +148,13 @@ fun ClockWidget(instance: WidgetInstance) {
                 Text(
                     text       = timeFormatter.format(now),
                     style      = MaterialTheme.typography.titleLarge.scaled(scale),
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontWeight = FontWeight.Light,
                 )
                 Text(
                     text  = dateFormatter.format(now),
                     style = MaterialTheme.typography.bodySmall.scaled(scale),
-                    color = NxTheme.colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
         }
@@ -165,23 +168,32 @@ private fun ClockFace(
     accentOverride: Color?,
     modifier: Modifier = Modifier,
 ) {
-    val dialColor   = NxTheme.colors.surface
-    val rimColor    = NxTheme.colors.outline.copy(alpha = 0.50f)
-    val markerColor = NxTheme.colors.textSecondary.copy(alpha = 0.75f)
-    val hourColor   = NxTheme.colors.textPrimary
-    val minuteColor = NxTheme.colors.textPrimary
-    val secondColor = accentOverride ?: NxTheme.colors.primary
+    // Read before the dial's own plane is entered: the rim fades toward what holds it.
+    val holder = LocalPlane.current?.color ?: NxColor.page
 
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(dialColor, dialColor.copy(alpha = 0.85f)),
-                ),
-            ),
+    NxSurface(
+        kind          = SurfaceKind.Card,
+        modifier      = modifier,
+        shape         = CircleShape,
+        // The rim is drawn on the canvas, so the surface's own hairline would double it.
+        borderWidthDp = 0f,
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        val dialColor   = LocalPlane.current?.color ?: holder
+        val rimColor    = NxColor.wash(NxInk.line, 0.50f)
+        val markerColor = NxColor.wash(NxInk.quiet, 0.75f)
+        val hourColor   = NxInk.main
+        val minuteColor = NxInk.main
+        val secondColor = accentOverride ?: NxColor.lead()
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(dialColor, lerp(dialColor, holder, 0.15f)),
+                    ),
+                ),
+        ) {
             val radius = min(size.width, size.height) / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 

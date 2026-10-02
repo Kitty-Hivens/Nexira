@@ -33,6 +33,8 @@ import java.nio.file.Path
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * Draws the three surfaces the update feature added, so they can be LOOKED at
@@ -186,7 +188,7 @@ class ContentUpdateSurfacesRenderTest {
 
     @Composable
     private fun Sheet(body: @Composable () -> Unit) {
-        Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+        Box(Modifier.fillMaxSize().background(NxColor.page)) {
             Column(
                 modifier            = Modifier.fillMaxWidth().padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -199,7 +201,7 @@ class ContentUpdateSurfacesRenderTest {
         Text(
             text     = text,
             style    = MaterialTheme.typography.labelSmall,
-            color    = NxTheme.colors.textSecondary,
+            color    = NxInk.quiet,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
@@ -249,7 +251,7 @@ class ContentUpdateSurfacesRenderTest {
 
     @Composable
     private fun VersionsWindow() {
-        Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+        Box(Modifier.fillMaxSize().background(NxColor.page)) {
             ModVersionsWindow(
                 content       = content("Iris Shaders", "iris-neoforge-1.8.12.jar", "1.8.12"),
                 versions      = irisVersions,
@@ -279,7 +281,7 @@ class ContentUpdateSurfacesRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = density) {
-            NxTheme(useDarkTheme = true) { content() }
+            NxTheme(dark = true) { content() }
         }
         val png = try {
             var frameNanos = 0L

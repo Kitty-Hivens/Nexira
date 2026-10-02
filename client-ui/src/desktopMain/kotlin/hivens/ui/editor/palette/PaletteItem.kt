@@ -51,7 +51,9 @@ import hivens.ui.editor.windowPointToSlotDp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
@@ -59,6 +61,8 @@ import hivens.widget.model.FlowSpec
 import hivens.widget.model.seedPlacement
 import hivens.widget.model.WidgetSizing
 import hivens.widget.model.traverse
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Palette row. Click + drag from the row drops the widget into the
 // hit-tested slot under the cursor. The ghost is a labeled chip rather
@@ -91,7 +95,7 @@ fun PaletteItem(
     val label = s.widgetLabel(descriptor.displayName)
     val density = LocalDensity.current.density
 
-    val background = if (isHovered) NxTheme.colors.primary.copy(alpha = 0.12f)
+    val background = if (isHovered) NxColor.wash(NxColor.lead(), 0.12f)
                      else Color.Transparent
 
     val preview = rememberWidgetPreview(previews, descriptor.kind)
@@ -167,7 +171,7 @@ fun PaletteItem(
         Text(
             text       = label,
             style      = MaterialTheme.typography.labelMedium,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.Medium,
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
@@ -178,7 +182,7 @@ fun PaletteItem(
             // much of my surface is it about to take.
             text       = descriptor.sizing.footprintLabel() ?: descriptor.kind.value,
             style      = MaterialTheme.typography.labelSmall,
-            color      = NxTheme.colors.textSecondary,
+            color      = NxInk.quiet,
             fontFamily = LocalMonoFamily.current,
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
@@ -201,13 +205,13 @@ private fun WidgetSizing.footprintLabel(): String? =
  */
 @Composable
 private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: WidgetSizing) {
-    Box(
-        modifier = Modifier
+    NxSurface(
+        kind          = SurfaceKind.Card,
+        modifier      = Modifier
             .fillMaxWidth()
-            .aspectRatio(thumbRatio(sizing))
-            .clip(RoundedCornerShape(8.dp))
-            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.45f)),
-        contentAlignment = Alignment.Center,
+            .aspectRatio(thumbRatio(sizing)),
+        shape         = RoundedCornerShape(8.dp),
+        borderWidthDp = 0f,
     ) {
         when (preview) {
             is WidgetPreview.Drawn -> Image(
@@ -219,19 +223,25 @@ private fun WidgetThumbnail(preview: WidgetPreview, label: String, sizing: Widge
                 contentScale       = ContentScale.Fit,
                 modifier           = Modifier.fillMaxSize().padding(4.dp),
             )
-            else -> Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(NxTheme.colors.primary.copy(alpha = 0.20f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text       = label.firstOrNull()?.uppercase() ?: "?",
-                    style      = MaterialTheme.typography.titleMedium,
-                    color      = NxTheme.colors.primary,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            else -> {
+                val tile = NxColor.wash(NxColor.lead(), 0.20f)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(tile),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    OnFill(tile) {
+                        Text(
+                            text       = label.firstOrNull()?.uppercase() ?: "?",
+                            style      = MaterialTheme.typography.titleMedium,
+                            color      = NxColor.lead(text = true),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
             }
         }
     }
@@ -289,8 +299,9 @@ private fun PaletteGhost(displayName: String, sizing: WidgetSizing, preview: Wid
         modifier = Modifier
             .size(w.dp, h.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(NxTheme.colors.primary.copy(alpha = 0.16f))
-            .border(2.dp, NxTheme.colors.primary.copy(alpha = 0.8f), RoundedCornerShape(10.dp)),
+            // Translucent on purpose: the slot the ghost is over has to show through it.
+            .background(NxColor.lead().copy(alpha = 0.16f))
+            .border(2.dp, NxColor.lead().copy(alpha = 0.8f), RoundedCornerShape(10.dp)),
         contentAlignment = Alignment.Center,
     ) {
         // The widget itself where the gallery has it, at the size it will land at,
@@ -312,44 +323,48 @@ private fun PaletteGhost(displayName: String, sizing: WidgetSizing, preview: Wid
 
 @Composable
 private fun PaletteGhostChip(displayName: String) {
+    val fill = NxColor.lead()
+    val ink = NxColor.on(fill)
     Surface(
-        color           = NxTheme.colors.primary,
-        contentColor    = Color.White,
+        color           = fill,
+        contentColor    = ink,
         shape           = RoundedCornerShape(10.dp),
         shadowElevation = 10.dp,
         modifier        = Modifier.shadow(elevation = 12.dp, shape = RoundedCornerShape(10.dp)),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(Color.White.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
+        OnFill(fill) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(NxColor.wash(ink, 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text       = displayName.firstOrNull()?.uppercase() ?: "?",
+                        style      = MaterialTheme.typography.labelLarge,
+                        color      = ink,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
                 Text(
-                    text       = displayName.firstOrNull()?.uppercase() ?: "?",
-                    style      = MaterialTheme.typography.labelLarge,
-                    color      = Color.White,
+                    text       = displayName,
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = ink,
                     fontWeight = FontWeight.SemiBold,
                 )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text  = "→ drop",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxColor.wash(ink, 0.75f),
+                )
             }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text       = displayName,
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = Color.White,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text  = "→ drop",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.75f),
-            )
         }
     }
 }

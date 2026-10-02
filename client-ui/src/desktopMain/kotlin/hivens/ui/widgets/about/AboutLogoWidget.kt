@@ -26,7 +26,6 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -35,6 +34,8 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.painterResource
 import java.text.SimpleDateFormat
 import java.util.Date
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 // Logo + title + version + build-date + description card. The
 // AprilFools wrapper occasionally corrupts these strings -- left
@@ -54,7 +55,7 @@ data class AboutLogoProps(
     id = "about.logo",
     displayName = "widget.about.logo",
     propsClass = AboutLogoProps::class,
-    surface = """{"fill":"raised","opacity":0.92,"border":{"widthDp":1.0}}""",
+    surface = """{"fill":"card","border":{"widthDp":1.0}}""",
 )
 @Composable
 fun AboutLogoWidget(instance: WidgetInstance) {
@@ -77,14 +78,14 @@ fun AboutLogoWidget(instance: WidgetInstance) {
             text       = af.maybeGibberish(p.title.ifBlank { Branding.TITLE }, probability = 0.15f),
             style      = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Black,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
         )
         if (p.showVersion) {
             Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.extraSmall)
-                    .background(NxTheme.colors.primary.copy(alpha = 0.15f))
+                    .background(NxColor.lead().copy(alpha = 0.15f))
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
                 Text(
@@ -94,7 +95,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                         mode        = GibberishMode.FAKE_VER,
                     ),
                     style      = MaterialTheme.typography.labelLarge,
-                    color      = NxTheme.colors.primary,
+                    color      = NxColor.lead(),
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -114,7 +115,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
             Text(
                 text  = af.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
+                color = NxInk.quiet.copy(alpha = 0.6f),
             )
         }
 
@@ -126,7 +127,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                     probability = 0.20f,
                 ),
                 style     = MaterialTheme.typography.bodyMedium,
-                color     = NxTheme.colors.textSecondary,
+                color     = NxInk.quiet,
                 textAlign = TextAlign.Center,
             )
         }

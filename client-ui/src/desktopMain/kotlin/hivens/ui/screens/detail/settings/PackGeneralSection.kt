@@ -14,7 +14,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 
 /**
  * General identity: the editable name and free-text notes, plus read-only
@@ -24,11 +24,10 @@ import hivens.ui.theme.NxTheme
 @Composable
 internal fun PackGeneralSection(pack: PackInstance, save: (PackEdit) -> Unit) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
 
     NxSection(s.packSettingsIdentity) {
         Column(Modifier.fillMaxWidth()) {
-            Text(s.packSettingsName, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            Text(s.packSettingsName, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
             NxField(
                 value = pack.displayName,
                 onValueChange = { if (it != pack.displayName) save { p -> p.copy(displayName = it) } },
@@ -37,7 +36,7 @@ internal fun PackGeneralSection(pack: PackInstance, save: (PackEdit) -> Unit) {
             )
         }
         Column(Modifier.fillMaxWidth()) {
-            Text(s.packSettingsNotes, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            Text(s.packSettingsNotes, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
             NxField(
                 value = pack.notes,
                 onValueChange = { if (it != pack.notes) save { p -> p.copy(notes = it) } },

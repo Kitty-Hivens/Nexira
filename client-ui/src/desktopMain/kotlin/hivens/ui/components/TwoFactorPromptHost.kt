@@ -24,7 +24,7 @@ import org.koin.compose.koinInject
  *
  * MUST be composed inside [hivens.ui.theme.NxTheme]: the prompt is a `Dialog`, which
  * on desktop gets its own composition, and a dialog raised from outside the theme
- * finds no `LocalNxColors` and takes the shell down with it.
+ * finds no `LocalScheme` and takes the shell down with it.
  *
  * The flow is one round trip. The gate hands over the target's server; a login
  * against it provokes the demand and yields the `uid` the code must be signed

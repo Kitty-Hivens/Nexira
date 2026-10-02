@@ -59,13 +59,15 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
 import hivens.ui.nx.RetryStateBlock
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.utils.humanSize
 import hivens.widget.api.LocalSurfaceFamilies
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.nio.file.Path
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * One build of a project, on its own page.
@@ -143,7 +145,7 @@ internal fun ModVersionBody(
 ) {
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
-    NxSurface(level = NxSurfaceLevel.Raised, modifier = modifier) {
+    NxSurface(SurfaceKind.Panel, modifier = modifier) {
         val v = build.version
         when {
             project.failed || build.failed -> RetryStateBlock(
@@ -160,7 +162,7 @@ internal fun ModVersionBody(
                 verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
             ) {
                 BuildHeader(v, project, scope)
-                HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
+                HorizontalDivider(color = NxColor.wash(NxInk.line, 0.25f))
                 Compatibility(v, project)
                 Dependencies(build)
                 Changes(v)
@@ -192,7 +194,7 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: kotl
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                     lineHeight = TITLE_SIZE,
-                    color = NxTheme.colors.textPrimary,
+                    color = NxInk.main,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -211,7 +213,7 @@ private fun BuildHeader(v: ModrinthVersion, project: ModDetailState, scope: kotl
                 }
                 Dot()
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Symbol(NxIcon.Download, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 14.dp)
+                    Symbol(NxIcon.Download, contentDescription = null, tint = NxInk.quiet, size = 14.dp)
                     NxTooltip(text = v.downloads.toString()) { Subtle(compactCount(v.downloads, s)) }
                 }
             }
@@ -253,7 +255,7 @@ private fun Compatibility(v: ModrinthVersion, project: ModDetailState) {
                         tone = NxMetaChipTone.Surface,
                         dot = loaderDot(loader).takeUnless { hasLoaderGlyph(loader) },
                         leading = if (hasLoaderGlyph(loader)) {
-                            { LoaderGlyph(loader, tint = NxTheme.colors.textSecondary, size = 12.dp) }
+                            { LoaderGlyph(loader, tint = NxInk.quiet, size = 12.dp) }
                         } else {
                             null
                         },
@@ -305,7 +307,7 @@ private fun Dependencies(build: ModVersionState) {
                             dep.title.ifBlank { s.modRailUnknownValue },
                             style = MaterialTheme.typography.bodyMedium,
                             fontSize = ROW_TEXT,
-                            color = NxTheme.colors.textPrimary,
+                            color = NxInk.main,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -332,14 +334,14 @@ private fun Dependencies(build: ModVersionState) {
 @Composable
 private fun DependencyMark(dep: VersionDependency, kind: DependencyKind) {
     if (kind == DependencyKind.Incompatible) {
-        Symbol(NxIcon.Warning, contentDescription = null, tint = NxTheme.colors.error, size = 16.dp)
+        Symbol(NxIcon.Warning, contentDescription = null, tint = NxColor.status(Status.Error), size = 16.dp)
         return
     }
     val box = Modifier.size(20.dp).clip(RoundedCornerShape(5.dp))
     if (dep.iconUrl != null) {
         AsyncImage(model = dep.iconUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
     } else {
-        Box(box) { InitialsAvatar(dep.title, NxTheme.colors.decorativeColor(dep.title)) }
+        Box(box) { InitialsAvatar(dep.title, decorativeColor(dep.title)) }
     }
 }
 
@@ -353,7 +355,7 @@ private fun Changes(v: ModrinthVersion) {
                 s.versionPickerNoChangelog,
                 style = MaterialTheme.typography.bodySmall,
                 fontSize = ROW_SUBTLE,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         } else {
             ReleaseNotes(notes, Modifier.fillMaxWidth())
@@ -380,13 +382,13 @@ private fun Files(v: ModrinthVersion) {
                 ) {
                     if (file.primary) {
                         NxTooltip(text = s.modVersionPrimaryFile) {
-                            Symbol(NxIcon.Star, contentDescription = null, tint = NxTheme.colors.warnAccent, size = 16.dp)
+                            Symbol(NxIcon.Star, contentDescription = null, tint = NxColor.status(Status.Warning), size = 16.dp)
                         }
                     } else {
                         Symbol(
                             NxIcon.InsertDriveFile,
                             contentDescription = null,
-                            tint = NxTheme.colors.textSecondary,
+                            tint = NxInk.quiet,
                             size = 16.dp,
                         )
                     }
@@ -394,7 +396,7 @@ private fun Files(v: ModrinthVersion) {
                         file.filename,
                         style = MaterialTheme.typography.bodyMedium,
                         fontSize = ROW_TEXT,
-                        color = NxTheme.colors.textPrimary,
+                        color = NxInk.main,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -432,7 +434,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             title,
             style = MaterialTheme.typography.titleMedium,
             fontSize = BLOCK_TITLE,
-            color = NxTheme.colors.onSurface,
+            color = NxInk.main,
             fontWeight = FontWeight.SemiBold,
         )
         content()
@@ -446,7 +448,7 @@ private fun Group(label: String, content: @Composable () -> Unit) {
             label,
             style = MaterialTheme.typography.bodyMedium,
             fontSize = GROUP_LABEL,
-            color = NxTheme.colors.textPrimary,
+            color = NxInk.main,
             fontWeight = FontWeight.Normal,
         )
         content()
@@ -464,19 +466,19 @@ private fun Subtle(text: String) = Text(
     text,
     style = MaterialTheme.typography.bodySmall,
     fontSize = ROW_SUBTLE,
-    color = NxTheme.colors.textSecondary,
+    color = NxInk.quiet,
     maxLines = 1,
 )
 
 /** The separator between two short facts on one line, as the reference sets it. */
 @Composable
 private fun Dot() = Box(
-    Modifier.size(4.dp).clip(CircleShape).background(NxTheme.colors.outline),
+    Modifier.size(4.dp).clip(CircleShape).background(NxInk.line),
 )
 
 @Composable
 private fun channelColor(channel: VersionChannel) = when (channel) {
-    VersionChannel.Release -> NxTheme.colors.success
-    VersionChannel.Beta -> NxTheme.colors.warnAccent
-    VersionChannel.Alpha -> NxTheme.colors.error
+    VersionChannel.Release -> NxColor.status(Status.Success)
+    VersionChannel.Beta -> NxColor.status(Status.Warning)
+    VersionChannel.Alpha -> NxColor.status(Status.Error)
 }

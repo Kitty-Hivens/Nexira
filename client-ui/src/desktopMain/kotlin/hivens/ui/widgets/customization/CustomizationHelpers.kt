@@ -1,11 +1,10 @@
 package hivens.ui.widgets.customization
 
 import hivens.ui.theme.LocalMonoFamily
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,8 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -33,9 +30,13 @@ import androidx.compose.ui.unit.sp
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSliderTrack
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Spacing
 import hivens.ui.widgets.toWidgetColorOrNull
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * How much of a 320dp panel its labels are allowed to take.
@@ -76,7 +77,7 @@ internal fun LabeledSlider(
             Text(
                 text      = format.format(value * displayMultiplier),
                 style     = MaterialTheme.typography.labelSmall,
-                color     = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
+                color     = NxInk.quiet,
                 textAlign = TextAlign.End,
                 maxLines  = 1,
                 modifier  = Modifier.width(READOUT_WIDTH).padding(start = Spacing.s6),
@@ -109,48 +110,45 @@ internal fun HexField(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(parsed?.takeIf { valid } ?: NxTheme.colors.surface)
-                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(36.dp)
-                .clip(MaterialTheme.shapes.small)
-                .background(NxTheme.colors.surface.copy(alpha = 0.4f))
-                .border(
-                    width = 1.dp,
-                    color = if (valid) NxTheme.colors.outline.copy(alpha = 0.3f) else NxTheme.colors.error,
-                    shape = MaterialTheme.shapes.small,
-                )
-                .padding(horizontal = 10.dp),
-            contentAlignment = Alignment.CenterStart,
+        // The swatch shows the typed colour as data, and an empty well while it does not parse.
+        NxSurface(
+            kind      = SurfaceKind.Field,
+            modifier  = Modifier.size(28.dp),
+            shape     = RoundedCornerShape(6.dp),
+            fillColor = parsed?.takeIf { valid },
+        ) {}
+        NxSurface(
+            kind        = SurfaceKind.Field,
+            modifier    = Modifier.weight(1f).height(36.dp),
+            shape       = MaterialTheme.shapes.small,
+            borderColor = if (valid) null else NxColor.status(Status.Error),
         ) {
-            BasicTextField(
-                value         = text,
-                onValueChange = { t ->
-                    text = t
-                    if (t.isNotBlank()) {
-                        val normalized = t.trim()
-                        if (fits(normalized)) normalized.toWidgetColorOrNull()?.let { onValidHex(normalized) }
-                    }
-                },
-                singleLine    = true,
-                textStyle     = TextStyle(
-                    color      = NxTheme.colors.textPrimary,
-                    fontFamily = LocalMonoFamily.current,
-                    fontSize   = 13.sp,
-                ),
-                cursorBrush   = SolidColor(NxTheme.colors.primary),
-                modifier      = Modifier.fillMaxWidth(),
-            )
+            Box(
+                modifier         = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                BasicTextField(
+                    value         = text,
+                    onValueChange = { t ->
+                        text = t
+                        if (t.isNotBlank()) {
+                            val normalized = t.trim()
+                            if (fits(normalized)) normalized.toWidgetColorOrNull()?.let { onValidHex(normalized) }
+                        }
+                    },
+                    singleLine    = true,
+                    textStyle     = TextStyle(
+                        color      = NxInk.main,
+                        fontFamily = LocalMonoFamily.current,
+                        fontSize   = 13.sp,
+                    ),
+                    cursorBrush   = SolidColor(NxColor.lead()),
+                    modifier      = Modifier.fillMaxWidth(),
+                )
+            }
         }
         if (!valid) {
-            Text(invalidLabel, color = NxTheme.colors.error, style = MaterialTheme.typography.labelSmall)
+            Text(invalidLabel, color = NxColor.status(Status.Error, text = true), style = MaterialTheme.typography.labelSmall)
         }
     }
 }

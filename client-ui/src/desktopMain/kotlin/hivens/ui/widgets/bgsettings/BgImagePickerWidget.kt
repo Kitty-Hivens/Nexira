@@ -25,7 +25,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxIconButton
-import hivens.ui.theme.NxTheme
 import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import hivens.widget.model.Widget
@@ -38,6 +37,9 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.io.File
 import java.nio.file.Path
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 @Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
 @Composable
@@ -115,11 +117,11 @@ fun BgImagePickerWidget() {
                 },
             )
             if (optimizing != null) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = NxTheme.colors.primary)
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = NxColor.lead())
                 NxIconButton(
                     NxIcon.Close, s.backgroundCancelOptimize,
                     onClick = { optimizer.cancel() },
-                    tint    = NxTheme.colors.error,
+                    tint    = NxColor.status(Status.Error),
                 )
             } else if (settings.imagePath != null) {
                 NxIconButton(
@@ -128,7 +130,7 @@ fun BgImagePickerWidget() {
                         ctx.update { copy(imagePath = null, enabled = false) }
                         optimizer.evictUnused(keep = null)
                     },
-                    tint    = NxTheme.colors.error,
+                    tint    = NxColor.status(Status.Error),
                 )
             }
         }
@@ -136,7 +138,7 @@ fun BgImagePickerWidget() {
             Text(
                 text  = settings.imagePath!!.substringAfterLast("/").substringAfterLast("\\"),
                 style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
+                color = NxInk.quiet.copy(alpha = 0.5f),
             )
         }
     }

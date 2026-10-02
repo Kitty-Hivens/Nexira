@@ -22,9 +22,9 @@ import hivens.auth.AuthProviderRegistry
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxNavRowContent
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxColor
 
 // Vertical category nav for the profile surface. Writes
 // `selectedCategory.value` on tap; the surface composable reads it
@@ -70,8 +70,8 @@ fun ProfileNavWidget() {
                     .fillMaxWidth()
                     .clip(MaterialTheme.shapes.medium)
                     .background(
-                        if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
-                        else NxTheme.colors.background.copy(alpha = 0.0f),
+                        if (isSelected) NxColor.lead().copy(alpha = 0.18f)
+                        else NxColor.page.copy(alpha = 0.0f),
                     )
                     .clickable { ctx.selectedCategory.value = category }
                     .padding(horizontal = 12.dp, vertical = 10.dp),

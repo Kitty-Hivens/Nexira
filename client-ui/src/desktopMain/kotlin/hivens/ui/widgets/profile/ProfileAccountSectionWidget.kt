@@ -47,9 +47,11 @@ import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.skin3d.Cycles
 import hivens.ui.skin3d.rememberSkinViewState
-import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 private const val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
@@ -147,7 +149,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
                     )
                 }
                 IconButton(onClick = uploader.refresh) {
-                    Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxTheme.colors.textSecondary)
+                    Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxInk.quiet)
                 }
             }
             SkinUploadStatusLine(uploader.status)
@@ -177,7 +179,7 @@ private fun AccountPanel(session: SessionData) {
                 text = session.playerName,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = NxTheme.colors.textPrimary,
+                color = NxInk.main,
             )
             Spacer(Modifier.width(12.dp))
             StatusPill(online = session.accessToken.length > 10)
@@ -207,7 +209,7 @@ private fun AccountPanel(session: SessionData) {
 @Composable
 private fun StatusPill(online: Boolean) {
     val s = LocalStrings.current
-    val accent = if (online) NxTheme.colors.success else NxTheme.colors.error
+    val accent = if (online) NxColor.status(Status.Success) else NxColor.status(Status.Error)
     Row(
         modifier = Modifier
             .clip(MaterialTheme.shapes.medium)
@@ -231,7 +233,7 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.medium)
-            .background(NxTheme.colors.background.copy(alpha = 0.4f))
+            .background(NxColor.page.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -239,13 +241,13 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Symbol(NxIcon.Star, s.profileBalance, tint = Color(0xFFFFD700), fill = 1f, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
-            Text(s.profileBalance, color = NxTheme.colors.textSecondary)
+            Text(s.profileBalance, color = NxInk.quiet)
         }
         Text(
             text = "$balance ⛃",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = NxTheme.colors.textPrimary,
+            color = NxInk.main,
         )
     }
 }

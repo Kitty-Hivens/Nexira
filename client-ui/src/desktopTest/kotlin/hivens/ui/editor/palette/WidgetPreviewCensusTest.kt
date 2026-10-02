@@ -115,7 +115,7 @@ class WidgetPreviewCensusTest {
         return runCatching {
             scene.setContent {
                 LocaleProvider(AppLocale.ENGLISH) {
-                    NxTheme(useDarkTheme = true) {
+                    NxTheme(dark = true) {
                         Environment {
                             Box(Modifier.size(SIDE.dp)) { descriptor.Render(instance) }
                         }

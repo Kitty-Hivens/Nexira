@@ -15,11 +15,12 @@ import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.surface.NxCard
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
 import org.koin.compose.koinInject
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 
 /**
  * Settings orchestrator: form state, persistence, the "saved" banner,
@@ -69,12 +70,12 @@ fun SettingsScreen(
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-        // The frame is an NxCard: a library-owned tonal body + bevel hairline that
-        // stays a distinct plane under any style and with no wallpaper, instead of
-        // a glass-alpha that collapsed when the coat came off.
-        NxCard(
+        // The frame is a panel: an opaque body and a bevel hairline that stays a
+        // distinct plane with or without a wallpaper, and the sections inside it
+        // step up from it rather than from the page.
+        NxSurface(
+            kind     = SurfaceKind.Panel,
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            level    = NxSurfaceLevel.Raised,
         ) {
             Row(Modifier.fillMaxSize().padding(16.dp)) {
                 SettingsCategoryNav(

@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityPhase
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberSource
@@ -32,6 +31,8 @@ import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 @Serializable
 data class ProgressProps(
@@ -48,7 +49,7 @@ data class ProgressProps(
     id = "home.new.progress",
     displayName = "widget.home.new.progress",
     propsClass = ProgressProps::class,
-    surface = """{"fill":"base","opacity":0.4,"padding":{"top":12.0}}""",
+    surface = """{"fill":"panel","opacity":0.4,"padding":{"top":12.0}}""",
 )
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {
@@ -70,7 +71,7 @@ fun ProgressWidget(instance: WidgetInstance) {
         Text(
             text       = p.title.ifBlank { s.widgetProgressTitle },
             style      = MaterialTheme.typography.labelLarge,
-            color      = NxTheme.colors.textSecondary,
+            color      = NxInk.quiet,
             fontWeight = FontWeight.Medium,
         )
         Spacer(Modifier.height(8.dp))
@@ -100,14 +101,14 @@ private fun InProgressBody(activity: Activity) {
         Text(
             text       = activity.title,
             style      = MaterialTheme.typography.bodyMedium,
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
         )
         if (measured) {
             Text(
                 text  = "${phase.done}/${phase.total}",
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
     }
@@ -116,7 +117,7 @@ private fun InProgressBody(activity: Activity) {
         Text(
             text     = detail,
             style    = MaterialTheme.typography.bodySmall,
-            color    = NxTheme.colors.textSecondary.copy(alpha = 0.75f),
+            color    = NxInk.quiet.copy(alpha = 0.75f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -127,14 +128,14 @@ private fun InProgressBody(activity: Activity) {
         LinearProgressIndicator(
             progress   = { fraction },
             modifier   = barModifier,
-            color      = NxTheme.colors.primary,
-            trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
+            color      = NxColor.lead(),
+            trackColor = NxInk.line.copy(alpha = 0.15f),
         )
     } else {
         LinearProgressIndicator(
             modifier   = barModifier,
-            color      = NxTheme.colors.primary,
-            trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
+            color      = NxColor.lead(),
+            trackColor = NxInk.line.copy(alpha = 0.15f),
         )
     }
 }
@@ -149,7 +150,7 @@ private fun IdleBody(text: String) {
         Text(
             text  = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
     }
 }

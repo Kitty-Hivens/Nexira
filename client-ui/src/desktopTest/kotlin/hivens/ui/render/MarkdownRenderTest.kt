@@ -20,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import hivens.ui.theme.NxColor
 
 /**
  * Off-screen render of a pack description through the whole markdown -> HTML ->
@@ -94,8 +95,8 @@ class MarkdownRenderTest {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1100, 1600, density = Density(1f)) {
-            NxTheme(useDarkTheme = true) {
-                Box(Modifier.fillMaxSize().background(NxTheme.colors.background)) {
+            NxTheme(dark = true) {
+                Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Box(Modifier.verticalScroll(rememberScrollState()).padding(32.dp)) {
                         MarkdownHtml(markdown = body, onLink = {})
                     }

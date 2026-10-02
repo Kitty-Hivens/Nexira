@@ -23,8 +23,9 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SessionData
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
 
 /**
  * The face the shell should wear right now: the user's choice first, licence
@@ -97,7 +98,7 @@ internal fun FacePicker(modifier: Modifier = Modifier) {
         Text(
             text     = s.accountFaceLabel,
             style    = MaterialTheme.typography.labelSmall,
-            color    = NxTheme.colors.textSecondary,
+            color    = NxInk.quiet,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
         options.forEach { (key, label) ->
@@ -112,14 +113,14 @@ private fun FaceOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         text       = label,
         style      = MaterialTheme.typography.bodySmall,
-        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
+        color      = if (selected) NxColor.lead() else NxInk.quiet,
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .background(
-                if (selected) NxTheme.colors.primary.copy(alpha = 0.12f)
-                else NxTheme.colors.background.copy(alpha = 0f),
+                if (selected) NxColor.lead().copy(alpha = 0.12f)
+                else NxColor.page.copy(alpha = 0f),
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),

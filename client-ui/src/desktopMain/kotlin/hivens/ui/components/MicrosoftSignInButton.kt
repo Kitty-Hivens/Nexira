@@ -20,7 +20,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.DeviceCodeAuthProvider
@@ -35,7 +34,6 @@ import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -43,6 +41,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 private val log = LoggerFactory.getLogger("MicrosoftSignInButton")
 
@@ -134,17 +135,17 @@ fun MicrosoftSignInButton(
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
-                    color = NxTheme.colors.primary,
+                    color = NxColor.lead(),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(s.msaWaiting, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+                Text(s.msaWaiting, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             }
             // Errors from the request itself (before any dialog) show here; the
             // dialog owns errors from the poll once it is open.
             deviceCodeError != null && deviceCodePending == null -> Text(
                 text = deviceCodeError ?: "",
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.error,
+                color = NxColor.status(Status.Error),
             )
         }
     }

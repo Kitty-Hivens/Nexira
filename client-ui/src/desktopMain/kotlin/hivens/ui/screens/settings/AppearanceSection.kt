@@ -42,8 +42,10 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.LocalThemeReveal
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.familyForText
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.Status
 
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
@@ -80,7 +82,7 @@ internal fun AppearanceSection(
         NxRow(
             title    = s.settingsLanguage,
             icon     = NxIcon.Language,
-            iconTint = NxTheme.colors.primary,
+            iconTint = NxColor.lead(),
             onClick  = { langExpanded = true },
             trailing = {
                 Box {
@@ -89,11 +91,11 @@ internal fun AppearanceSection(
                         // script the UI face has no glyphs for even while the interface is Latin.
                         Text(
                             currentLocale.displayName,
-                            color = NxTheme.colors.primary,
+                            color = NxColor.lead(),
                             fontWeight = FontWeight.Bold,
                             fontFamily = familyForText(currentLocale.displayName),
                         )
-                        Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary)
+                        Symbol(NxIcon.ArrowDropDown, null, tint = NxColor.lead())
                     }
                     NxContextMenu(
                         expanded         = langExpanded,
@@ -124,9 +126,9 @@ internal fun AppearanceSection(
             title    = s.settingsThemePicker,
             subtitle = s.settingsThemePickerSub,
             icon     = NxIcon.Star,
-            iconTint = NxTheme.colors.primary,
+            iconTint = NxColor.lead(),
             onClick  = onOpenThemePicker,
-            trailing = { Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary) },
+            trailing = { Symbol(NxIcon.ArrowDropDown, null, tint = NxColor.lead()) },
         )
 
         // Custom background shortcut.
@@ -135,9 +137,9 @@ internal fun AppearanceSection(
             title    = s.settingsBackground,
             subtitle = s.settingsBackgroundSub,
             icon     = NxIcon.Wallpaper,
-            iconTint = NxTheme.colors.primary,
+            iconTint = NxColor.lead(),
             onClick  = onOpenBackgroundSettings,
-            trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.primary) },
+            trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxColor.lead()) },
         )
 
         // Dark theme: day/night identity (sun warm, moon cool) + GNOME-style reveal.
@@ -166,7 +168,7 @@ internal fun AppearanceSection(
             Text(
                 text  = s.settingsCustomChromeTiling,
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary,
+                color = NxInk.quiet,
             )
         }
         PuppetToggle("settings.useCustomChrome", form.useCustomChrome, enabled = !IS_TILING_WM) {
@@ -182,7 +184,7 @@ internal fun AppearanceSection(
         }
         PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }
 
-        NxToggle(s.settingsOfflineMode, form.isOfflineMode, description = s.settingsOfflineModeDesc, icon = NxIcon.WifiOff, accent = NxTheme.colors.error) {
+        NxToggle(s.settingsOfflineMode, form.isOfflineMode, description = s.settingsOfflineModeDesc, icon = NxIcon.WifiOff, accent = NxColor.status(Status.Error)) {
             form.isOfflineMode = it; save()
         }
         PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
@@ -197,7 +199,7 @@ private val MoonBlue  = Color(0xFF8AB4F8)
 /**
  * Dark-theme toggle as an in-plane row with a day/night identity: sun (warm) when
  * light, moon (cool) when dark. Icon and switch track take that FIXED colour, not
- * the palette accent. The flip runs through the GNOME-style reveal (a circle growing
+ * the theme's lead colour. The flip runs through the GNOME-style reveal (a circle growing
  * out of the switch) when a host is present; no host (or motion off) is a plain flip.
  */
 @Composable
@@ -225,8 +227,8 @@ internal fun DayNightRow(
             Symbol(if (checked) NxIcon.DarkMode else NxIcon.LightMode, null, tint = tint, size = 22.dp)
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+                Text(title, color = NxInk.main, fontWeight = FontWeight.Medium)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
             }
         }
         Spacer(Modifier.width(12.dp))
@@ -252,8 +254,8 @@ internal fun PickerBlock(
     chips: @Composable FlowRowScope.() -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
-        Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
-        Text(sub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+        Text(title, color = NxInk.main, fontWeight = FontWeight.Medium)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         Spacer(Modifier.height(8.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),

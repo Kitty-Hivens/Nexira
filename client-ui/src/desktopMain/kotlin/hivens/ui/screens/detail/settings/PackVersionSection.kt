@@ -44,7 +44,9 @@ import hivens.ui.nx.NxCalloutTone
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.Status
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -66,7 +68,6 @@ internal fun PackVersionSection(
     onNotice: (String?) -> Unit = {},
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val updater: PackUpdater = koinInject()
     val mirror: IMirrorPackClient = koinInject()
     val hub: PackUpdateStatusHub = koinInject()
@@ -153,13 +154,13 @@ internal fun PackVersionSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(s.packVersionInstalled, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                Text(s.packVersionInstalled, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(current, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
+                    Text(current, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = NxInk.main)
                     installedChannel?.let { ChannelChip(it) }
                 }
                 latestLine?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -188,7 +189,7 @@ internal fun PackVersionSection(
         ) { enabled -> save { it.copy(followLatest = enabled) } }
         // Up-to-date is a quiet one-liner inside the section, not a banner block.
         if (check == UpdateCheck.UpToDate) {
-            Text(s.packVersionUpToDate, style = MaterialTheme.typography.bodySmall, color = colors.success)
+            Text(s.packVersionUpToDate, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Success, text = true))
         }
     }
 
@@ -212,7 +213,7 @@ internal fun PackVersionSection(
                 Text(
                     s.packVersionsPlanCounts(plan.toAdd.size, plan.toUpdate.size, plan.toDelete.size),
                     style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary,
+                    color = NxInk.quiet,
                 )
             }
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

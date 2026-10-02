@@ -49,6 +49,10 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 private val log = LoggerFactory.getLogger("AdvancedSection")
 
@@ -198,11 +202,11 @@ internal fun AdvancedSection(
     // fetched for it. Debounced like the mimic field, and for the same reason --
     // save() is a synchronous file write.
     NxSection(s.settingsSectionNews) {
-        Text(s.settingsAltNewsFeed, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
+        Text(s.settingsAltNewsFeed, color = NxInk.main, fontWeight = FontWeight.Medium)
         Text(
             text  = s.settingsAltNewsFeedDesc,
             style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
+            color = NxInk.quiet,
         )
         NxField(
             value         = form.altNewsFeedUrl,
@@ -221,10 +225,10 @@ internal fun AdvancedSection(
     Spacer(Modifier.height(16.dp))
 
     NxSection(s.settingsSectionDataDir) {
-        Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+        Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         Text(
             text       = paths.dataDir.toAbsolutePath().toString(),
-            color      = NxTheme.colors.textPrimary,
+            color      = NxInk.main,
             fontWeight = FontWeight.SemiBold,
             style      = MaterialTheme.typography.bodyMedium,
         )
@@ -271,42 +275,47 @@ internal fun AdvancedSection(
             },
         )
         if (showError != null) {
-            Text(showError!!, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error)
+            Text(showError!!, style = MaterialTheme.typography.bodySmall, color = NxColor.status(Status.Error))
         }
     }
 
     if (pendingTarget != null) {
         val target = pendingTarget!!
-        AlertDialog(
-            onDismissRequest = { pendingTarget = null },
-            title = { Text(s.settingsDataDirConfirmTitle) },
-            text  = {
-                Text(s.settingsDataDirConfirmBody(
-                    paths.dataDir.toAbsolutePath().toString(),
-                    target.toAbsolutePath().toString(),
-                ))
-            },
-            confirmButton = {
-                NxButton(label = s.settingsDataDirQuitNow, onClick = {
-                    val ok = DataDirMover.schedule(source = paths.dataDir, target = target)
-                    if (ok) {
-                        ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
-                        // Hard exit -- user explicitly clicked "Quit now". The pending move
-                        // applies only after restart, so a clean process termination is right.
-                        exitProcess(0)
-                    } else {
-                        // Schedule refused (target validation raced); let the user re-pick.
-                        pendingTarget = null
+        val container = NxTheme.colours.step(NxTheme.colours.topStep)
+        OnFill(container) {
+            AlertDialog(
+                onDismissRequest = { pendingTarget = null },
+                title = { Text(s.settingsDataDirConfirmTitle) },
+                text  = {
+                    Text(s.settingsDataDirConfirmBody(
+                        paths.dataDir.toAbsolutePath().toString(),
+                        target.toAbsolutePath().toString(),
+                    ))
+                },
+                confirmButton = {
+                    NxButton(label = s.settingsDataDirQuitNow, onClick = {
+                        val ok = DataDirMover.schedule(source = paths.dataDir, target = target)
+                        if (ok) {
+                            ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
+                            // Hard exit -- user explicitly clicked "Quit now". The pending move
+                            // applies only after restart, so a clean process termination is right.
+                            exitProcess(0)
+                        } else {
+                            // Schedule refused (target validation raced); let the user re-pick.
+                            pendingTarget = null
+                        }
+                    })
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
+                        Text(s.sslWarningCancel)
                     }
-                })
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
-                    Text(s.sslWarningCancel)
-                }
-            },
-            containerColor = NxTheme.colors.surface,
-        )
+                },
+                containerColor    = container,
+                titleContentColor = NxInk.main,
+                textContentColor  = NxInk.quiet,
+            )
+        }
     }
 }
 

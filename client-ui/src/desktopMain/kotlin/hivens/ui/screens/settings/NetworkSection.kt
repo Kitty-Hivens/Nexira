@@ -21,10 +21,10 @@ import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSection
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.NxTheme
 import org.koin.compose.koinInject
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import hivens.ui.theme.NxInk
 
 /**
  * Network controls -- the SSL-bypass entries, as a live list with revoke. One
@@ -45,9 +45,9 @@ internal fun NetworkSection() {
         .withZone(java.time.ZoneId.systemDefault())
 
     NxSection(s.settingsSectionNetwork) {
-        Text(s.sslBypassListTitle, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(s.sslBypassListTitle, color = NxInk.main, fontWeight = FontWeight.Bold)
         if (bypasses.isEmpty()) {
-            Text(s.sslBypassNoEntries, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+            Text(s.sslBypassNoEntries, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
         } else {
             bypasses.forEach { entry ->
                 Row(
@@ -56,7 +56,7 @@ internal fun NetworkSection() {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(entry.host, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(entry.host, color = NxInk.main, fontWeight = FontWeight.SemiBold)
                         // Parsing a stored string during composition: a damaged
                         // timestamp threw out of the render pass and took the
                         // settings screen with it, over one unreadable field of
@@ -68,7 +68,7 @@ internal fun NetworkSection() {
                         Text(
                             text  = s.sslBypassExpiresAt(expires),
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxTheme.colors.textSecondary,
+                            color = NxInk.quiet,
                         )
                     }
                     NxButton(

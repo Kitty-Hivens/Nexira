@@ -54,7 +54,9 @@ import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.nx.NxTooltip
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -173,7 +175,6 @@ internal fun RecordPlayerCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val palette = NxTheme.colors
     val idle = state is PlaybackState.Idle
     val loaded = !idle && state !is PlaybackState.Error
     var menuOpen by remember { mutableStateOf(false) }
@@ -216,15 +217,15 @@ internal fun RecordPlayerCard(
                     WaveformRing(
                         waveform = waveform,
                         fraction = progressFraction(state),
-                        played = palette.primary,
-                        remaining = palette.textSecondary.copy(alpha = 0.30f),
+                        played = NxColor.lead(),
+                        remaining = NxColor.wash(NxInk.quiet, 0.30f),
                         // The ring starts where the label ends, with a hair of air
                         // between them so the bars do not appear to grow out of the
                         // artwork itself.
                         innerRadius = innerPx + with(LocalDensity.current) { 3.dp.toPx() },
                         modifier = Modifier.fillMaxSize().padding(RING_INSET),
                     )
-                    Label(track?.artwork, side * LABEL_SHARE, palette.primary)
+                    Label(track?.artwork, side * LABEL_SHARE)
                     Box(
                         Modifier
                             .size(side * BUTTON_SHARE)
@@ -314,7 +315,7 @@ internal fun RecordPlayerCard(
                             Text(
                                 text  = repeatAnswer(repeat, s),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = palette.textPrimary,
+                                color = NxInk.main,
                             )
                         }
                     }
@@ -326,7 +327,7 @@ internal fun RecordPlayerCard(
             Text(
                 text       = name,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = palette.textPrimary,
+                color      = NxInk.main,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
                 textAlign  = TextAlign.Center,
@@ -339,7 +340,7 @@ internal fun RecordPlayerCard(
 
 /** The disc at the middle: the artwork, or a tonal stand-in where there is none. */
 @Composable
-private fun Label(artwork: ImageBitmap?, side: Dp, accent: Color) {
+private fun Label(artwork: ImageBitmap?, side: Dp) {
     if (artwork != null) {
         Image(
             bitmap             = artwork,
@@ -348,11 +349,14 @@ private fun Label(artwork: ImageBitmap?, side: Dp, accent: Color) {
             modifier           = Modifier.size(side).clip(CircleShape),
         )
     } else {
+        val tone = NxColor.wash(NxColor.lead(), 0.18f)
         Box(
-            Modifier.size(side).clip(CircleShape).background(accent.copy(alpha = 0.18f)),
+            Modifier.size(side).clip(CircleShape).background(tone),
             contentAlignment = Alignment.Center,
         ) {
-            Symbol(NxIcon.MusicNote, null, tint = accent, fill = 1f, weight = 500, modifier = Modifier.size(side / 3f))
+            OnFill(tone) {
+                Symbol(NxIcon.MusicNote, null, tint = NxColor.lead(), fill = 1f, weight = 500, modifier = Modifier.size(side / 3f))
+            }
         }
     }
 }

@@ -20,10 +20,11 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.surface.NxSurface
-import hivens.ui.surface.NxSurfaceLevel
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
+import hivens.ui.theme.Theme
+import hivens.ui.surface.SurfaceKind
 
 private const val SURFACE = "bg.settings"
 
@@ -36,14 +37,14 @@ private val THEME_PANEL_WIDTH = 320.dp
  * Appearance studio. AppLayout routes Screen.BackgroundSettings here. Two islands over
  * the live wallpaper: the wallpaper controls (the `controls` slot -- enable + image +
  * scale + position + effects + loop + tint + reset widgets) at the start, and the theme
- * axis ([AppearanceThemeIsland] -- dark/light, UI style, theme picker) at the end.
+ * axis ([AppearanceThemeIsland]: dark/light, its source, the theme picker) at the end.
  *
  * No in-screen title or back button: the top-bar breadcrumb names the screen and drives
  * navigation, as on the other surfaces. There is also no preview -- the app's
  * [hivens.ui.background.CustomBackground] renders behind the whole shell, so the screen
  * stays transparent apart from the islands and the LIVE UI is the preview: editing a
- * wallpaper knob or the theme updates the real background + palette at full size (Monet
- * seeds the scheme from the wallpaper), with no second video pipeline.
+ * wallpaper knob or the theme updates the real background and interface at full size,
+ * with no second video pipeline.
  */
 @Composable
 fun BgSettingsSurface(
@@ -55,8 +56,7 @@ fun BgSettingsSurface(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     systemThemeAvailable: Boolean,
-    paletteFromWallpaper: Boolean,
-    onPaletteFromWallpaperChanged: (Boolean) -> Unit,
+    activeTheme: Theme,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
     onOpenThemePicker: () -> Unit,
@@ -78,7 +78,6 @@ fun BgSettingsSurface(
     PuppetClick("background.clearImage", enabled = settings.value.imagePath != null) {
         update { copy(imagePath = null, enabled = false) }
     }
-    PuppetToggle("background.paletteFromWallpaper", paletteFromWallpaper, onValueChange = onPaletteFromWallpaperChanged)
     PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
     PuppetClick("background.reset") {
         settings.value = BackgroundSettings()
@@ -87,7 +86,7 @@ fun BgSettingsSurface(
 
     CompositionLocalProvider(LocalBgSettingsContext provides ctx) {
         Row(Modifier.fillMaxSize().padding(16.dp)) {
-            NxSurface(NxSurfaceLevel.Floating, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
+            NxSurface(SurfaceKind.Panel, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
                 SlotRenderer(
                     SurfaceId(SURFACE),
                     SlotId("controls"),
@@ -107,8 +106,7 @@ fun BgSettingsSurface(
                 themeMode            = themeMode,
                 onThemeModeChanged   = onThemeModeChanged,
                 systemThemeAvailable = systemThemeAvailable,
-                paletteFromWallpaper = paletteFromWallpaper,
-                onPaletteFromWallpaperChanged = onPaletteFromWallpaperChanged,
+                activeTheme          = activeTheme,
                 surfaceBlur          = surfaceBlur,
                 onSurfaceBlurChanged = onSurfaceBlurChanged,
                 onOpenThemePicker    = onOpenThemePicker,

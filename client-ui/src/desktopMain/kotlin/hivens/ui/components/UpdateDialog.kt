@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IUpdateApplicator
@@ -24,7 +23,8 @@ import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.NxTheme
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import java.nio.file.Paths
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
@@ -35,6 +35,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 
 /**
  * How long the window is given to leave the screen before the process does.
@@ -169,11 +173,10 @@ fun UpdateDialog(
     BasicAlertDialog(
         onDismissRequest = { if (!isBlocking) onDismiss() }
     ) {
-        Surface(
+        NxSurface(
+            kind      = SurfaceKind.Dialog,
             modifier  = Modifier.width(700.dp).wrapContentHeight(),
             shape     = MaterialTheme.shapes.large,
-            color     = NxTheme.colors.surface,
-            tonalElevation = 8.dp
         ) {
             Column(Modifier.padding(24.dp)) {
 
@@ -184,7 +187,7 @@ fun UpdateDialog(
                 ) {
                     Symbol(icon = if (isBlocking) NxIcon.Warning else NxIcon.CloudDownload,
                         contentDescription = null,
-                        tint               = if (isBlocking) NxTheme.colors.error else NxTheme.colors.primary,
+                        tint               = if (isBlocking) NxColor.status(Status.Error) else NxColor.lead(),
                         modifier           = Modifier.size(32.dp)
                     )
                     Spacer(Modifier.width(12.dp))
@@ -196,13 +199,13 @@ fun UpdateDialog(
                                 else               -> s.updateTitle
                             },
                             style      = MaterialTheme.typography.titleLarge,
-                            color      = if (isBlocking) NxTheme.colors.error else NxTheme.colors.textPrimary,
+                            color      = if (isBlocking) NxColor.status(Status.Error, text = true) else NxInk.main,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text  = update.version,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NxTheme.colors.textSecondary
+                            color = NxInk.quiet
                         )
                     }
                 }
@@ -210,31 +213,34 @@ fun UpdateDialog(
                 // ── Critical / Mandatory banner ──────────────────────────────
                 if (isBlocking) {
                     Spacer(Modifier.height(16.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(NxTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
-                            .padding(12.dp)
-                    ) {
-                        val bannerText = when {
-                            update.isMandatory -> {
-                                val reason = update.mandatoryReason
-                                if (!reason.isNullOrBlank()) s.updateMandatoryBannerWithReason(reason)
-                                else s.updateMandatoryBanner
+                    val bannerFill = NxColor.wash(NxColor.status(Status.Error), 0.1f)
+                    OnFill(bannerFill) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(bannerFill, MaterialTheme.shapes.medium)
+                                .padding(12.dp)
+                        ) {
+                            val bannerText = when {
+                                update.isMandatory -> {
+                                    val reason = update.mandatoryReason
+                                    if (!reason.isNullOrBlank()) s.updateMandatoryBannerWithReason(reason)
+                                    else s.updateMandatoryBanner
+                                }
+                                else -> s.updateCriticalBanner
                             }
-                            else -> s.updateCriticalBanner
+                            Text(
+                                bannerText,
+                                style      = MaterialTheme.typography.bodyMedium,
+                                color      = NxColor.status(Status.Error, text = true),
+                                fontWeight = FontWeight.Medium
+                            )
                         }
-                        Text(
-                            bannerText,
-                            style      = MaterialTheme.typography.bodyMedium,
-                            color      = NxTheme.colors.error,
-                            fontWeight = FontWeight.Medium
-                        )
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.2f))
+                HorizontalDivider(color = NxInk.line)
                 Spacer(Modifier.height(16.dp))
 
                 // ── Player notes, or the engineering log behind them ──────────
@@ -252,7 +258,7 @@ fun UpdateDialog(
                 Text(
                     if (hasHighlights) s.updateHighlights else s.updateChangelog,
                     style      = MaterialTheme.typography.titleSmall,
-                    color      = NxTheme.colors.textPrimary,
+                    color      = NxInk.main,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(8.dp))
@@ -261,16 +267,15 @@ fun UpdateDialog(
                 // commit-flavored text. Cap height in both cases -- the dialog is
                 // 700dp wide and would dominate the screen otherwise.
                 val bodyMaxHeight = if (hasHighlights) 200.dp else 350.dp
-                Box(
+                NxSurface(
+                    kind     = SurfaceKind.Field,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = bodyMaxHeight)
-                        .background(NxTheme.colors.background.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
-                        .padding(12.dp)
+                        .heightIn(max = bodyMaxHeight),
                 ) {
                     ReleaseNotes(
                         markdown = bodyContent,
-                        modifier = Modifier.verticalScroll(rememberScrollState())
+                        modifier = Modifier.padding(12.dp).verticalScroll(rememberScrollState())
                     )
                 }
 
@@ -289,20 +294,23 @@ fun UpdateDialog(
 
                 // ── Error ─────────────────────────────────────────────────────
                 errorMessage?.let { error ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(NxTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Text(
-                                s.updateErrorTitle,
-                                style      = MaterialTheme.typography.titleSmall,
-                                color      = NxTheme.colors.error,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(error, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.error)
+                    val errorFill = NxColor.wash(NxColor.status(Status.Error), 0.1f)
+                    OnFill(errorFill) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(errorFill, MaterialTheme.shapes.medium)
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    s.updateErrorTitle,
+                                    style      = MaterialTheme.typography.titleSmall,
+                                    color      = NxColor.status(Status.Error, text = true),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(error, style = MaterialTheme.typography.bodyMedium, color = NxColor.status(Status.Error, text = true))
+                            }
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -320,11 +328,11 @@ fun UpdateDialog(
                         TextButton(onClick = { SystemActions.openUrl(update.releasePageUrl) }) {
                             Symbol(icon = NxIcon.OpenInNew,
                                 contentDescription = null,
-                                tint               = NxTheme.colors.textSecondary,
+                                tint               = NxInk.quiet,
                                 modifier           = Modifier.size(16.dp)
                             )
                             Spacer(Modifier.width(6.dp))
-                            Text(s.updateViewOnGitHub, color = NxTheme.colors.textSecondary)
+                            Text(s.updateViewOnGitHub, color = NxInk.quiet)
                         }
                     }
 
@@ -332,7 +340,7 @@ fun UpdateDialog(
 
                     if (!isBlocking && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = onDismiss) {
-                            Text(s.updateLater, color = NxTheme.colors.textSecondary)
+                            Text(s.updateLater, color = NxInk.quiet)
                         }
                         Spacer(Modifier.width(8.dp))
                     }
@@ -343,68 +351,68 @@ fun UpdateDialog(
                     // user yanking themselves out of an installation in progress.
                     if (update.isMandatory && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = { exitProcess(0) }) {
-                            Text(s.updateExit, color = NxTheme.colors.textSecondary)
+                            Text(s.updateExit, color = NxInk.quiet)
                         }
                         Spacer(Modifier.width(8.dp))
                     }
 
                     when (downloadState) {
                         is DownloadState.Idle -> {
+                            val fill = if (isBlocking) NxColor.status(Status.Error) else NxColor.lead()
                             Button(
                                 onClick = { launchDownload() },
                                 modifier = Modifier.focusRequester(primaryFocus),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isBlocking) NxTheme.colors.error else NxTheme.colors.primary
-                                ),
+                                colors = ButtonDefaults.buttonColors(containerColor = fill),
                                 shape  = MaterialTheme.shapes.small
                             ) {
                                 Text(
                                     if (isBlocking) s.updateDownloadNow else s.updateDownload,
-                                    color      = Color.White,
+                                    color      = NxColor.on(fill),
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
                         is DownloadState.Downloading -> {
+                            val fill = NxColor.wash(NxColor.lead(), 0.5f)
                             Button(
                                 onClick  = {},
                                 enabled  = false,
-                                colors   = ButtonDefaults.buttonColors(
-                                    disabledContainerColor = NxTheme.colors.primary.copy(alpha = 0.5f)
-                                ),
+                                colors   = ButtonDefaults.buttonColors(disabledContainerColor = fill),
                                 shape = MaterialTheme.shapes.small
                             ) {
                                 CircularProgressIndicator(
                                     modifier    = Modifier.size(16.dp),
-                                    color       = Color.White,
+                                    color       = NxColor.on(fill),
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text(s.updateDownloading, color = Color.White)
+                                Text(s.updateDownloading, color = NxColor.on(fill))
                             }
                         }
 
                         is DownloadState.Ready -> {
                             val path = (downloadState as DownloadState.Ready).installerPath
+                            val fill = NxColor.status(Status.Success)
                             Button(
                                 onClick = { installUpdate(path) },
                                 modifier = Modifier.focusRequester(primaryFocus),
-                                colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.success),
+                                colors = ButtonDefaults.buttonColors(containerColor = fill),
                                 shape  = MaterialTheme.shapes.small
                             ) {
-                                Text(s.updateInstall, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(s.updateInstall, color = NxColor.on(fill), fontWeight = FontWeight.Bold)
                             }
                         }
 
                         is DownloadState.Failed -> {
+                            val fill = NxColor.lead()
                             Button(
                                 onClick = { errorMessage = null; downloadState = DownloadState.Idle },
                                 modifier = Modifier.focusRequester(primaryFocus),
-                                colors  = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
+                                colors  = ButtonDefaults.buttonColors(containerColor = fill),
                                 shape   = MaterialTheme.shapes.small
                             ) {
-                                Text(s.updateRetry, color = Color.White)
+                                Text(s.updateRetry, color = NxColor.on(fill))
                             }
                         }
                     }
@@ -429,14 +437,14 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
                 text  = if (state.total > 0) "%.1f / %.1f MB".format(dlMB, totalMB)
                 else "%.1f MB".format(dlMB),
                 style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.textSecondary
+                color = NxInk.quiet
             )
 
             if (state.speed > 0) {
                 Text(
                     "%.2f MB/s".format(speedMB),
                     style      = MaterialTheme.typography.bodySmall,
-                    color      = NxTheme.colors.primary,
+                    color      = NxColor.lead(text = true),
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -451,8 +459,8 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
         LinearProgressIndicator(
             progress        = { progress },
             modifier        = Modifier.fillMaxWidth().height(8.dp),
-            color           = NxTheme.colors.primary,
-            trackColor      = NxTheme.colors.surface,
+            color           = NxColor.lead(),
+            trackColor      = NxColor.wash(NxInk.quiet, 0.25f),
             gapSize         = 0.dp,
             drawStopIndicator = {}
         )
@@ -462,7 +470,7 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
             Text(
                 "${(progress * 100).roundToInt()}%",
                 style    = MaterialTheme.typography.bodySmall,
-                color    = NxTheme.colors.textSecondary,
+                color    = NxInk.quiet,
                 modifier = Modifier.align(Alignment.End)
             )
         }

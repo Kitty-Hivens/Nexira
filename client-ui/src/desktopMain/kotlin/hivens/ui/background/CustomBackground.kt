@@ -47,6 +47,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import hivens.ui.theme.NxColor
 
 private val log = LoggerFactory.getLogger("CustomBackground")
 
@@ -80,6 +81,10 @@ fun CustomBackground(
         return
     }
     val file = File(settings.imagePath!!)
+    // The darkening is the theme's page colour, not black: it is the one place the
+    // theme reaches a page that has a picture on it, and black left every theme
+    // looking the same over the same wallpaper.
+    val page = NxColor.page
 
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedParallaxImage(
@@ -90,9 +95,9 @@ fun CustomBackground(
             onAudioVolume    = onAudioVolume,
         )
 
-        // Darkening overlay
+        // Darkening overlay, in the page colour.
         if (settings.darkenAmount > 0f) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = settings.darkenAmount)))
+            Box(Modifier.fillMaxSize().background(page.copy(alpha = settings.darkenAmount)))
         }
 
         // Color tint overlay
@@ -118,7 +123,7 @@ fun CustomBackground(
                             brush = Brush.radialGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    Color.Black.copy(alpha = settings.vignetteIntensity * 0.6f)
+                                    page.copy(alpha = settings.vignetteIntensity * 0.6f)
                                 ),
                                 center = Offset(centerX, centerY),
                                 radius = radius

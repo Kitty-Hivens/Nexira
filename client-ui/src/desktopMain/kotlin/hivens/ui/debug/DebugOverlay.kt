@@ -43,12 +43,12 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import hivens.config.Branding
 import hivens.ui.diag.RenderBackend
-import hivens.ui.theme.NxTheme
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.theme.NxColor
 
 // Fixed HUD palette: a debug overlay reads over any wallpaper/theme, so it is a
 // deliberate dark chip with light text rather than themed surfaces. The panel
-// accent still follows NxTheme.colors.primary so it matches the active style.
+// accent still follows NxColor.lead() so it matches the active style.
 private val PANEL_BG = Color(0xF116171B)
 private val PANEL_FG = Color(0xFFE6E6EA)
 private val PANEL_DIM = Color(0xFF9A9AA4)
@@ -154,7 +154,7 @@ private fun DebugControlPanel(state: DebugOverlayState, modifier: Modifier = Mod
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Text("UI DEBUG", color = NxTheme.colors.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("UI DEBUG", color = NxColor.lead(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Text(Branding.VERSION, color = PANEL_DIM, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.height(6.dp))
         FacetRow("Slot bounds", state.slotBounds) { state.slotBounds = it }
@@ -179,7 +179,7 @@ private fun FacetRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
     ) {
         Text(
             text = if (on) "[x]" else "[ ]",
-            color = if (on) NxTheme.colors.primary else PANEL_DIM,
+            color = if (on) NxColor.lead() else PANEL_DIM,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
         )

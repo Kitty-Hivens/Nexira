@@ -31,7 +31,6 @@ import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.screens.library.PackCard
-import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -41,6 +40,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+import hivens.ui.theme.NxInk
 
 @Serializable
 data class LibraryBodyProps(
@@ -144,13 +144,13 @@ private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
             Text(
                 text       = title,
                 style      = MaterialTheme.typography.titleLarge,
-                color      = NxTheme.colors.textPrimary,
+                color      = NxInk.main,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text      = body,
                 style     = MaterialTheme.typography.bodyMedium,
-                color     = NxTheme.colors.textSecondary,
+                color     = NxInk.quiet,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 360.dp),
             )

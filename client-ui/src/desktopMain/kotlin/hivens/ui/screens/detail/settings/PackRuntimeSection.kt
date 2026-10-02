@@ -39,7 +39,7 @@ import hivens.ui.nx.NxField
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxInk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,7 +60,6 @@ internal fun PackRuntimeSection(
     save: (PackEdit) -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = NxTheme.colors
     val profilerStore: ProfilerProfileStore = koinInject()
     val settingsService: ISettingsService = koinInject()
     val javaManager: IJavaManager = koinInject()
@@ -100,7 +99,7 @@ internal fun PackRuntimeSection(
     NxSection(s.packSettingsEnvironment) {
         val major = requiredJavaMajor(pack, javaManager)
         Column(Modifier.fillMaxWidth()) {
-            Text(s.packSettingsJava, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+            Text(s.packSettingsJava, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
             NxField(
                 value = runtime.javaPath ?: "",
                 onValueChange = { commit { rt -> rt.copy(javaPath = it.ifBlank { null }) } },
@@ -115,7 +114,7 @@ internal fun PackRuntimeSection(
                     if (runtime.javaPath.isNullOrBlank()) major?.let { s.packSettingsJavaManaged(it) } ?: s.packSettingsJavaCustom
                     else s.packSettingsJavaCustom,
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary,
+                    color = NxInk.quiet,
                     modifier = Modifier.weight(1f),
                 )
                 if (!runtime.javaPath.isNullOrBlank()) {
@@ -156,7 +155,7 @@ internal fun PackRuntimeSection(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(s.packSettingsWidth, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    Text(s.packSettingsWidth, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                     NxField(
                         value = widthText,
                         onValueChange = { raw ->
@@ -168,7 +167,7 @@ internal fun PackRuntimeSection(
                     )
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(s.packSettingsHeight, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    Text(s.packSettingsHeight, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
                     NxField(
                         value = heightText,
                         onValueChange = { raw ->
