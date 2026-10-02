@@ -31,6 +31,8 @@ import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetZ
 import hivens.widget.model.traverse
 import hivens.widget.model.updateWidgetSurface
+import hivens.widget.model.updateWidgetMotion
+import hivens.widget.model.WidgetMotion
 import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -233,6 +235,13 @@ class EditModeController(
     fun updateSurface(path: SlotPath, instanceId: String, surface: SurfaceSpec?) {
         scope.launch(writeDispatcher) {
             edit(key = "surface:$instanceId") { it.updateWidgetSurface(path, instanceId, surface) }
+        }
+    }
+
+    // The instance's own arrival. One that says nothing normalizes to null.
+    fun updateMotion(path: SlotPath, instanceId: String, motion: WidgetMotion?) {
+        scope.launch(writeDispatcher) {
+            edit(key = "motion:$instanceId") { it.updateWidgetMotion(path, instanceId, motion) }
         }
     }
 

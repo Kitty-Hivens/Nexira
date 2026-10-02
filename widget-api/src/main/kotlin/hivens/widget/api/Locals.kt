@@ -7,6 +7,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import hivens.widget.model.Entrance
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
@@ -69,6 +70,26 @@ typealias WidgetSurfaceRenderer = @Composable (surface: SurfaceSpec, content: @C
 
 val LocalWidgetSurfaceRenderer: ProvidableCompositionLocal<WidgetSurfaceRenderer> =
     staticCompositionLocalOf { { _, content -> content() } }
+
+/**
+ * Plays a widget's arrival. [order] is its place in its slot and [delayMs] its own
+ * pinned delay, null for the slot's stagger.
+ *
+ * The kernel knows which character a widget asked for and where it stands, and
+ * nothing about time: durations and curves are the interface's motion scale,
+ * which this module cannot see. So the default plays nothing, and :client-ui
+ * provides the one that moves. Called inside the widget's movable content, so
+ * toggling the editor, which relocates that content, does not play it again.
+ */
+typealias WidgetEntrance = @Composable (
+    entrance: Entrance,
+    order: Int,
+    delayMs: Int?,
+    content: @Composable () -> Unit,
+) -> Unit
+
+val LocalWidgetEntrance: ProvidableCompositionLocal<WidgetEntrance> =
+    staticCompositionLocalOf { { _, _, _, content -> content() } }
 
 // Rendered by SlotRenderer when a slot has no widgets. Default = nothing
 // (production behavior: empty slot stays invisible). The editor swaps

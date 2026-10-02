@@ -30,6 +30,10 @@ data class WidgetInstance(
     // editor's "Surface" section sets it on ANY widget, propless included.
     // Rendered in production via LocalWidgetSurfaceRenderer.
     val surface: SurfaceSpec? = null,
+    // How this instance arrives when its surface opens, over its widget's
+    // declaration. Null says nothing, which is every instance until somebody
+    // changes it in the editor.
+    val motion: WidgetMotion? = null,
 )
 
 /**
@@ -208,6 +212,17 @@ fun LayoutGraph.updateWidgetSurface(
 ): LayoutGraph {
     val normalized = surface?.takeUnless { it == SurfaceSpec() }
     return updateInstance(path, instanceId) { it.copy(surface = normalized) }
+}
+
+// Sets (or clears, with null) the instance's own arrival. One that says nothing
+// normalizes to null, so the field stays absent where the declaration is enough.
+fun LayoutGraph.updateWidgetMotion(
+    path: SlotPath,
+    instanceId: String,
+    motion: WidgetMotion?,
+): LayoutGraph {
+    val normalized = motion?.takeUnless { it.isEmpty }
+    return updateInstance(path, instanceId) { it.copy(motion = normalized) }
 }
 
 // Every per-instance transform is the same three steps: find the instance in the

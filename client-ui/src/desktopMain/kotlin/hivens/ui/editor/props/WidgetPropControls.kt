@@ -119,7 +119,7 @@ internal fun PropFieldRow(
  * first place.
  */
 @Composable
-private fun PanelRow(label: String, control: @Composable () -> Unit) {
+internal fun PanelRow(label: String, control: @Composable () -> Unit) {
     NxRow(title = label, compact = true, labelWidth = panelLabelWidth, trailing = control)
 }
 

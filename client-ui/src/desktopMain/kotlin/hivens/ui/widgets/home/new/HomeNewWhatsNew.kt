@@ -40,6 +40,7 @@ import org.koin.compose.koinInject
 // Its panel is declared, so the editor's surface rows move it like the others.
 @Widget(
     id = "home.new.whatsnew",
+    enter = "rise",
     displayName = "widget.home.new.whatsnew",
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 60,

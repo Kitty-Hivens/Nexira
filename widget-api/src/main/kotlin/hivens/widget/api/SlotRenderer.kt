@@ -221,7 +221,7 @@ private fun FlowWidgets(
             if (descriptor == null) {
                 unknownDecorator(address, index, instance)
             } else {
-                val movable = rememberWidgetMovable(descriptor, instance)
+                val movable = rememberWidgetMovable(descriptor, instance, index)
                 // Outer spacing around the widget, from its placement so a flow
                 // widget reserves room the same way a placed one does.
                 val pad = Modifier.padding((instance.placement?.padding ?: SurfaceInsets()).asPadding())
@@ -267,7 +267,7 @@ private fun WrappedLine(
                 if (descriptor == null) {
                     unknownDecorator(address, index, instance)
                 } else {
-                    val movable = rememberWidgetMovable(descriptor, instance)
+                    val movable = rememberWidgetMovable(descriptor, instance, index)
                     val pad = Modifier.padding((instance.placement?.padding ?: SurfaceInsets()).asPadding())
                     Box(pad) { decorator(address, index, descriptor, instance) { movable() } }
                 }
@@ -389,7 +389,7 @@ private fun PlacementSlot(
                                 if (descriptor == null) {
                                     unknownDecorator(address, index, instance)
                                 } else {
-                                    val movable = rememberWidgetMovable(descriptor, instance)
+                                    val movable = rememberWidgetMovable(descriptor, instance, index)
                                     decorator(address, index, descriptor, instance) { movable() }
                                 }
                             }
@@ -595,10 +595,11 @@ private fun Modifier.animatedReflow(motionMs: Int): Modifier =
 // does not force the movable to be recreated. Call inside a key(instanceId) so the
 // movable is per-instance: stable across reorder, cleaned up when the instance leaves.
 @Composable
-private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: WidgetInstance): @Composable () -> Unit {
+private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: WidgetInstance, order: Int): @Composable () -> Unit {
     val descriptorState = rememberUpdatedState(descriptor)
     val instanceState = rememberUpdatedState(instance)
-    return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
+    val orderState = rememberUpdatedState(order)
+    return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value, orderState.value) } }
 }
 
 // Renders a widget, wrapped in the plane it resolves to. The wrap is inside the
@@ -608,8 +609,12 @@ private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: Widget
 // Which plane it draws is [resolveSurface]'s answer, so the renderer and the
 // editor's panel read the same one.
 @Composable
-private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
+private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance, order: Int) {
     val surface = descriptor.resolveSurface(instance)
+    // The arrival wraps the plane too, so a widget and the panel under it come up
+    // as one thing. Inside the movable content, so it plays once per mount and not
+    // again when the editor relocates the widget.
+    val entrance = LocalWidgetEntrance.current
     // Published around the body so a widget can read its own declaration without
     // being handed its descriptor. AdaptiveWidget takes its reference size from
     // here, which is what keeps the number the annotation carries and the number
@@ -627,7 +632,9 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance)
         // undeclared widget sees changes: most of the registry declares nothing
         // and none of it should start measuring differently for this.
         val ceiling = descriptor.sizing.unboundedAxisCeiling()
-        if (ceiling == null) body() else Box(ceiling) { body() }
+        entrance(descriptor.resolveEntrance(instance), order, instance.motion?.delayMs) {
+            if (ceiling == null) body() else Box(ceiling) { body() }
+        }
     }
 }
 

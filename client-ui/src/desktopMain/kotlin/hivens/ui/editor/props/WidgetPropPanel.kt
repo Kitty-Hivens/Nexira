@@ -49,6 +49,13 @@ import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.resolveSurface
+import hivens.widget.api.resolveEntrance
+import hivens.widget.model.Entrance
+import hivens.widget.model.WidgetMotion
+import hivens.ui.i18n.AppStrings
+import hivens.ui.nx.NxSelect
+import hivens.ui.widgets.MAX_DELAY_MS
+import hivens.ui.widgets.autoEntranceDelayMs
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.FillSource
@@ -248,6 +255,18 @@ private fun PropPanelBody(
             )
             Spacer(Modifier.size(8.dp))
 
+            // How it arrives, on every widget: the character it declares or one of
+            // its own, and the delay its place in the slot gives it or one pinned.
+            val order = LocalLayoutGraph.current.traverse(path)?.widgets
+                ?.indexOfFirst { it.instanceId == instanceId }?.coerceAtLeast(0) ?: 0
+            MotionSection(
+                entrance = descriptor.resolveEntrance(instance),
+                delayMs  = instance.motion?.delayMs ?: autoEntranceDelayMs(order),
+                motion   = instance.motion ?: WidgetMotion(),
+                write    = { controller.updateMotion(path, instanceId, it) },
+            )
+            Spacer(Modifier.size(8.dp))
+
             // The widget's own surface, as the seven values it is. Available on
             // every widget, propless included. Each row writes one field and leaves
             // the rest alone, so nothing here can move something the eye is not on.
@@ -290,6 +309,7 @@ private fun PropPanelBody(
             onClick  = {
                 if (sd != null) controller.updateProps(path, instanceId, JsonObject(emptyMap()))
                 controller.updateSurface(path, instanceId, null)
+                controller.updateMotion(path, instanceId, null)
             },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
@@ -479,6 +499,49 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
           )
       }
     }
+}
+
+/**
+ * How the widget arrives when its surface opens.
+ *
+ * The character is chosen from the closed set by name, never as a duration, so
+ * every choice here is one the motion scale already draws well. The delay opens on
+ * what the widget waits now, its place in the slot unless it pins one, and moving
+ * it pins that number.
+ */
+@Composable
+private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion, write: (WidgetMotion) -> Unit) {
+    val s = LocalStrings.current
+    Text(
+        text       = s.editorMotionTitle,
+        style      = MaterialTheme.typography.labelMedium,
+        color      = NxInk.quiet,
+        fontWeight = FontWeight.SemiBold,
+    )
+    PanelRow(s.editorMotionEnter) {
+        NxSelect(
+            options  = Entrance.entries,
+            selected = entrance,
+            onSelect = { write(motion.copy(enter = it.id)) },
+            label    = { it.label(s) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    LabeledSlider(
+        label         = s.editorMotionDelay,
+        value         = delayMs.toFloat(),
+        range         = 0f..MAX_DELAY_MS.toFloat(),
+        format        = "%.0f",
+        keyStep       = 10f,
+        onValueChange = { write(motion.copy(delayMs = it.roundToInt())) },
+    )
+}
+
+private fun Entrance.label(s: AppStrings): String = when (this) {
+    Entrance.None -> s.entranceNone
+    Entrance.Fade -> s.entranceFade
+    Entrance.Rise -> s.entranceRise
+    Entrance.Settle -> s.entranceSettle
 }
 
 /**

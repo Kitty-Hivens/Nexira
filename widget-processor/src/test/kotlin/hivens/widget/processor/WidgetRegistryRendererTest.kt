@@ -341,3 +341,40 @@ class WidgetRegistryRendererTest {
         assertNull(WidgetValidator.sizingFault(SizingArgs(prefWidth = 400, prefHeight = 300)))
     }
 }
+
+/** A declared arrival reaches the descriptor, and a mistyped one never builds. */
+class WidgetEntranceDeclarationTest {
+
+    private fun widget(id: String, enter: String?) = WidgetModel(
+        id = id,
+        displayName = "Display",
+        removable = true,
+        drawsOwnSurface = false,
+        slots = emptyList(),
+        propsClassFqn = null,
+        functionFqn = "hivens.ui.widgets.Sample",
+        enter = enter,
+    )
+
+    @Test
+    fun `a declared arrival is emitted as the constant it names`() {
+        val src = renderRegistry(listOf(widget("home.card", enter = "Rise")))
+        assertContains(src, "import hivens.widget.model.Entrance")
+        assertContains(src, "override val defaultEntrance: Entrance? = Entrance.Rise")
+    }
+
+    @Test
+    fun `a widget that declares none emits neither the import nor the field`() {
+        val src = renderRegistry(listOf(widget("home.card", enter = null)))
+        assertFalse("Entrance" in src, src)
+    }
+
+    @Test
+    fun `an unknown character is a build error that lists the known ones`() {
+        assertNull(WidgetValidator.entranceFault(""))
+        assertNull(WidgetValidator.entranceFault("settle"))
+        val fault = assertNotNull(WidgetValidator.entranceFault("spiral"))
+        assertContains(fault, "spiral")
+        assertContains(fault, "none, fade, rise, settle")
+    }
+}

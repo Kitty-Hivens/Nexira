@@ -50,6 +50,7 @@ class WidgetRegistryProcessor(
                     injects = extracted.injects,
                     surfaceJson = extracted.surfaceJson,
                     sizing = extracted.sizing,
+                    enter = extracted.enter,
                 ),
                 containingFile = symbol.containingFile,
                 symbol = symbol,

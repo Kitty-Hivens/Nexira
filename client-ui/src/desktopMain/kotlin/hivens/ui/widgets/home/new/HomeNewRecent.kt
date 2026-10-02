@@ -100,6 +100,7 @@ data class RecentProps(
 // page sits on whatever the wallpaper has there, which no theme can answer for.
 @Widget(
     id = "home.new.recent",
+    enter = "rise",
     displayName = "widget.home.new.recent",
     propsClass = RecentProps::class,
     surface = """{"fill":"panel"}""",

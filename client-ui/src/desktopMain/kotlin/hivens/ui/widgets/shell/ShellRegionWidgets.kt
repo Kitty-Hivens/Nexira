@@ -205,7 +205,7 @@ private fun CollapsedRegionStrip() {
  * Left region: the navigation rail plus the divider that separates it from the
  * center. removable=false -- losing the rail would navigation-lock the launcher.
  */
-@Widget(id = "appshell.region.left", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellLeftRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.left", enter = "none", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellLeftRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellLeftRegionProps>()
@@ -259,7 +259,7 @@ val NAV_RAIL_DEFAULT_WIDTH = 65.dp
  * flexes between the two rails. removable=false and never collapsible -- without
  * it there is no content area.
  */
-@Widget(id = "appshell.region.center", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellCenterRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.center", enter = "none", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellCenterRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellCenterRegionProps>()
@@ -355,7 +355,7 @@ private val RAIL_INSET = 4.dp
  * went to zero and the sentence outlived it. Edit mode keeps the static
  * prop-driven behaviour.
  */
-@Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.right", enter = "none", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRightRegionProps>()
@@ -519,7 +519,7 @@ private const val TOPBAR_SURFACE = "appshell.topbar"
  * [WindowControlsMode] (hidden by default on tiling WMs). removable=false --
  * losing the bar would strand window controls on a floating DE.
  */
-@Widget(id = "appshell.region.top", displayName = "widget.appshell.region.top", removable = false, propsClass = ShellTopRegionProps::class, drawsOwnSurface = true)
+@Widget(id = "appshell.region.top", enter = "none", displayName = "widget.appshell.region.top", removable = false, propsClass = ShellTopRegionProps::class, drawsOwnSurface = true)
 @Composable
 fun ShellTopRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellTopRegionProps>()
@@ -656,7 +656,7 @@ private fun BarDivider() {
  * (the arrangement comes from that slot, mirroring the appshell.leftrail nesting).
  * removable=false -- it carries the entire app body.
  */
-@Widget(id = "appshell.region.body", displayName = "widget.appshell.region.body", removable = false)
+@Widget(id = "appshell.region.body", enter = "none", displayName = "widget.appshell.region.body", removable = false)
 @Composable
 fun ShellBodyRegion() {
     SlotRenderer(SurfaceId("appshell.body"), SlotId("content"), Modifier.fillMaxSize())

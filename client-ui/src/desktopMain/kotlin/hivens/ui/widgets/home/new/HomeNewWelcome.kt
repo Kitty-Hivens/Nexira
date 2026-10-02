@@ -33,6 +33,7 @@ data class WelcomeProps(
 // banner does not flicker between greetings during login.
 @Widget(
     id = "home.new.welcome",
+    enter = "rise",
     displayName = "widget.home.new.welcome",
     propsClass = WelcomeProps::class,
     surface = """{"fill":"panel"}""",

@@ -81,6 +81,7 @@ data class PackListProps(
 // played, then what it runs on. The name and the hours stay.
 @Widget(
     id = "home.new.packlist",
+    enter = "rise",
     displayName = "widget.home.new.packlist",
     propsClass = PackListProps::class,
     surface = """{"fill":"panel"}""",

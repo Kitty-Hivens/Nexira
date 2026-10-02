@@ -63,6 +63,7 @@ data class ContinueProps(
 // Empty library elides the widget: the pack list owns the call to action then.
 @Widget(
     id = "home.new.continue",
+    enter = "rise",
     displayName = "widget.home.new.continue",
     propsClass = ContinueProps::class,
     surface = """{"fill":"panel"}""",

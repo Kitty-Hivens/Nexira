@@ -1524,6 +1524,13 @@ interface AppStrings {
     val editorBackingTitle: String
     /** Header for the per-widget outer spacing section, above the backing one. */
     val editorPaddingTitle: String
+    val editorMotionTitle: String
+    val editorMotionEnter: String
+    val editorMotionDelay: String
+    val entranceNone: String
+    val entranceFade: String
+    val entranceRise: String
+    val entranceSettle: String
     val editorSurfaceNone: String
     val editorSurfaceOwn: String
     val editorSurfaceAdd: String

@@ -84,4 +84,11 @@ annotation class Widget(
     val prefHeight: Int = 0,
     val maxWidth: Int = 0,
     val maxHeight: Int = 0,
+    // How the widget arrives when its surface opens, as an [Entrance] id: "none",
+    // "fade", "rise" or "settle". Blank (the default) is [Entrance.DEFAULT]. A name
+    // rather than a duration, because the timing belongs to the motion scale and a
+    // widget only says what kind of arrival it makes. The processor rejects an id
+    // it does not know, so a typo is a build error rather than a widget that
+    // quietly fades.
+    val enter: String = "",
 )

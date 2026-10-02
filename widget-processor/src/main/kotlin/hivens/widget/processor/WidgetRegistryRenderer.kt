@@ -51,6 +51,8 @@ internal data class WidgetModel(
     val surfaceJson: String? = null,
     /** What the widget needs, wants and can use, per axis. Zeroes mean undeclared. */
     val sizing: SizingArgs = SizingArgs(),
+    /** The declared arrival as an Entrance constant name, or null for the default. */
+    val enter: String? = null,
 )
 
 /**
@@ -114,6 +116,7 @@ internal fun renderRegistry(
     val hasSurface = widgets.any { it.surfaceJson != null }
     val hasSizing = widgets.any { it.sizing.declared }
     if (hasSizing) appendLine("import hivens.widget.model.WidgetSizing")
+    if (widgets.any { it.enter != null }) appendLine("import hivens.widget.model.Entrance")
     if (hasSurface) appendLine("import hivens.widget.model.SurfaceSpec")
     if (hasProps || hasSurface) appendLine("import kotlinx.serialization.json.Json")
     if (hasProps) {
@@ -147,6 +150,9 @@ internal fun renderRegistry(
         // written out ninety times.
         if (entry.sizing.declared) {
             appendLine("            override val sizing: WidgetSizing = ${entry.sizing.toLiteral()}")
+        }
+        if (entry.enter != null) {
+            appendLine("            override val defaultEntrance: Entrance? = Entrance.${entry.enter}")
         }
         if (entry.provides.isNotEmpty()) {
             appendLine("            override val provides: Set<String> = ${entry.provides.toStringSetLiteral()}")

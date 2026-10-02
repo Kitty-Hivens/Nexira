@@ -5,6 +5,7 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
+import hivens.widget.model.Entrance
 
 // Shared rule-set for what a @Widget composable must look like. The KSP
 // processor validates Kotlin sources at compile time; Phase E's plugin
@@ -50,6 +51,8 @@ internal object WidgetValidator {
         val surfaceJson: String?,
         /** What the widget needs, wants and can use, already checked to be in order. */
         val sizing: SizingArgs,
+        /** The declared arrival as an [hivens.widget.model.Entrance] constant name, or null for none. */
+        val enter: String? = null,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -220,6 +223,12 @@ internal object WidgetValidator {
             return null
         }
 
+        val rawEnter = (args["enter"] as? String).orEmpty()
+        entranceFault(rawEnter)?.let {
+            env.logger.error("@Widget '$id' $it", symbol)
+            return null
+        }
+
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
         // way. Carrying them through is what lets the mismatch be seen.
@@ -235,7 +244,21 @@ internal object WidgetValidator {
             injects = symbol.serviceContracts(INJECT_SERVICE_FQN, "services"),
             surfaceJson = surface,
             sizing = sizing,
+            enter = Entrance.parse(rawEnter)?.name,
         )
+    }
+
+    /**
+     * What is wrong with a declared arrival, or null when nothing is. Blank is
+     * fine and means the default. Anything else has to name a character the
+     * renderer knows, because an unknown one would otherwise fall back in silence
+     * and read as a widget that ignores what it was told.
+     */
+    internal fun entranceFault(raw: String): String? {
+        if (raw.isBlank()) return null
+        if (Entrance.parse(raw) != null) return null
+        val known = Entrance.entries.joinToString { it.id }
+        return "declares enter '$raw', which is not one of: $known"
     }
 
     private fun Map<String?, Any?>.int(name: String): Int = (this[name] as? Int) ?: 0

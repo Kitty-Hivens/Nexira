@@ -38,6 +38,7 @@ data class QuickLaunchProps(
 // in that state and two empty cards would be noisy.
 @Widget(
     id = "home.new.quicklaunch",
+    enter = "rise",
     displayName = "widget.home.new.quicklaunch",
     propsClass = QuickLaunchProps::class,
     surface = """{"fill":"panel","padding":{"top":12.0}}""",

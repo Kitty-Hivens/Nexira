@@ -70,6 +70,7 @@ data class HeroProps(
 // 170dp, and the mark and the name grow with it. The height prop is then the floor.
 @Widget(
     id = "home.new.hero",
+    enter = "rise",
     displayName = "widget.home.new.hero",
     propsClass = HeroProps::class,
     minWidth = 280, minHeight = 140,
